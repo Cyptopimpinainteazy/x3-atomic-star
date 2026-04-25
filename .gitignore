@@ -1,0 +1,21 @@
+# Build artifacts
+target/
+/bin/x3-chain-node-fresh
+*.wasm
+*.o
+*.so
+*.rlib
+
+# Large packs  
+launch-gates/packs/
+launch-gates/repomix/*.md
+
+# Node
+node_modules/
+*.log
+
+# Misc
+.DS_Store
+.env
+.venv
+venv/
