@@ -113,6 +113,7 @@ members = [
         "crates/x3-asset-kernel-types",
         "pallets/x3-asset-registry",
         "pallets/x3-supply-ledger",
+        "crates/x3-packet-schema",
         "pallets/x3-cross-vm-router",
         "pallets/x3-token-factory",
         "tools/launchops",
