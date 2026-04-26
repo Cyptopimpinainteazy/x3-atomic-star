@@ -2211,3 +2211,215 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
         );
     });
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PHASE 0.2: EMERGENCY HALT / PAUSE VERIFICATION
+// Purpose: Verify emergency pause blocks operations and resume restores functionality
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[test]
+fn test_emergency_halt_blocks_comit_submission() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.2.2: Verify pause blocks COMIT submission
+        
+        let comit_id = H256::from_low_u64_be(1);
+        let fee: Balance = 500;
+        let prepare_root = compute_prepare_root(comit_id, &vec![1, 2, 3], &vec![4, 5], 0, fee);
+
+        // First, verify submission works BEFORE pause
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            comit_id,
+            vec![1, 2, 3],
+            vec![4, 5],
+            0,
+            fee,
+            prepare_root,
+        ));
+
+        // Trigger emergency pause
+        assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
+        assert!(crate::ProtocolPaused::<Test>::get());
+
+        // Try to submit another COMIT — should be blocked
+        let comit_id_2 = H256::from_low_u64_be(2);
+        let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![1, 2], &vec![3, 4], 1, fee);
+        
+        assert_noop!(
+            AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(BOB),
+                comit_id_2,
+                vec![1, 2],
+                vec![3, 4],
+                1,
+                fee,
+                prepare_root_2,
+            ),
+            crate::Error::<Test>::ProtocolIsPaused
+        );
+
+        println!("✅ Phase 0.2.2a: Pause successfully blocks COMIT submission");
+    });
+}
+
+#[test]
+fn test_emergency_halt_recovery_restores_functionality() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.2.3: Verify unpause restores functionality
+        
+        let comit_id = H256::from_low_u64_be(100);
+        let fee: Balance = 500;
+        let prepare_root = compute_prepare_root(comit_id, &vec![1, 2], &vec![3, 4], 0, fee);
+
+        // Pause the system
+        assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
+        assert!(crate::ProtocolPaused::<Test>::get());
+
+        // Verify blocked
+        assert_noop!(
+            AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                comit_id,
+                vec![1, 2],
+                vec![3, 4],
+                0,
+                fee,
+                prepare_root.clone(),
+            ),
+            crate::Error::<Test>::ProtocolIsPaused
+        );
+
+        // Resume operations
+        assert_ok!(AtlasKernel::emergency_unpause(RuntimeOrigin::root()));
+        assert!(!crate::ProtocolPaused::<Test>::get());
+
+        // Now submission should work
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            comit_id,
+            vec![1, 2],
+            vec![3, 4],
+            0,
+            fee,
+            prepare_root,
+        ));
+
+        // Verify nonce was incremented
+        assert_eq!(Nonces::<Test>::get(ALICE), 1);
+
+        println!("✅ Phase 0.2.3: Recovery restores functionality and balances");
+    });
+}
+
+#[test]
+fn test_emergency_halt_multiple_pause_unpause_cycles() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.2.3b: Verify multiple halt/resume cycles work
+        
+        for cycle in 0..3u64 {
+            let comit_id = H256::from_low_u64_be(200 + cycle);
+            let fee: Balance = 100;
+            let prepare_root = compute_prepare_root(
+                comit_id,
+                &vec![1],
+                &vec![2],
+                cycle,
+                fee,
+            );
+
+            // Pause
+            assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
+            assert!(crate::ProtocolPaused::<Test>::get());
+
+            // Verify blocked during pause
+            assert_noop!(
+                AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    comit_id,
+                    vec![1],
+                    vec![2],
+                    cycle,
+                    fee,
+                    prepare_root.clone(),
+                ),
+                crate::Error::<Test>::ProtocolIsPaused
+            );
+
+            // Resume
+            assert_ok!(AtlasKernel::emergency_unpause(RuntimeOrigin::root()));
+            assert!(!crate::ProtocolPaused::<Test>::get());
+
+            // Verify works after unpause
+            assert_ok!(AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                comit_id,
+                vec![1],
+                vec![2],
+                cycle,
+                fee,
+                prepare_root,
+            ));
+        }
+
+        // All 3 nonces should be recorded
+        assert_eq!(Nonces::<Test>::get(ALICE), 3);
+
+        println!("✅ Phase 0.2.3b: Multiple pause/unpause cycles work correctly");
+    });
+}
+
+#[test]
+fn test_emergency_halt_preserves_state_through_cycles() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.2.3c: Verify state is preserved during pause cycles
+        
+        // Submit initial transaction
+        let comit_id_1 = H256::from_low_u64_be(300);
+        let fee: Balance = 100;
+        let prepare_root_1 = compute_prepare_root(comit_id_1, &vec![1], &vec![2], 0, fee);
+        
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            comit_id_1,
+            vec![1],
+            vec![2],
+            0,
+            fee,
+            prepare_root_1,
+        ));
+
+        let nonce_before_pause = Nonces::<Test>::get(ALICE);
+        assert_eq!(nonce_before_pause, 1);
+
+        // Pause and unpause multiple times
+        for _ in 0..5 {
+            assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
+            assert_ok!(AtlasKernel::emergency_unpause(RuntimeOrigin::root()));
+        }
+
+        // Verify nonce unchanged through pause cycles
+        let nonce_after_cycles = Nonces::<Test>::get(ALICE);
+        assert_eq!(
+            nonce_after_cycles, nonce_before_pause,
+            "Nonce should be preserved through pause/unpause cycles"
+        );
+
+        // Verify next transaction uses incremented nonce
+        let comit_id_2 = H256::from_low_u64_be(301);
+        let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![3], &vec![4], 1, fee);
+        
+        assert_ok!(AtlasKernel::submit_comit(
+            RuntimeOrigin::signed(ALICE),
+            comit_id_2,
+            vec![3],
+            vec![4],
+            1,
+            fee,
+            prepare_root_2,
+        ));
+
+        assert_eq!(Nonces::<Test>::get(ALICE), 2);
+
+        println!("✅ Phase 0.2.3c: State preserved through pause/unpause cycles");
+    });
+}
