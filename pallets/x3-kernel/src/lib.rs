@@ -44,10 +44,20 @@ pub mod authority;
 /// **H-5 Note**: For production, configure runtime with `FrontierEvmAdapter` and `RbpfSvmAdapter`
 /// instead of mock adapters. Mock adapters are for testing only.
 pub mod adapters;
+
+/// Packet Deserialization & Domain Routing Layer (Phase 1.3)
+/// Converts raw Vec<u8> payloads into typed Packet enums and routes to appropriate executors.
+pub mod packet_adapters;
+
 pub mod wasm_adapters;
 pub use adapters::{
     EvmExecutorAdapter, FailingMockEvmAdapter, FailingMockSvmAdapter, FailingMockX3Adapter,
     MockEvmAdapter, MockSvmAdapter, MockX3Adapter, SvmExecutorAdapter, X3ExecutorAdapter,
+};
+
+pub use packet_adapters::{
+    deserialize_packet, validate_packet, route_packet, get_domain_mask, get_packet_type,
+    DomainRoute, PacketAdapterError, PacketAdapterResult,
 };
 
 // Re-export real adapters for std builds (native runtime)
@@ -3215,3 +3225,6 @@ mod tests;
 
 #[cfg(test)]
 mod chaos_tests;
+
+#[cfg(test)]
+mod packet_integration_tests;

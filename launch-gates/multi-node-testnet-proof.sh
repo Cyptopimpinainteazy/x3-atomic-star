@@ -111,9 +111,7 @@ for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
         --name "validator-$i" \
         --port $((PORT + i)) \
         --rpc-port "$PORT" \
-        --ws-port "$WS_PORT" \
         --rpc-external \
-        --ws-external \
         --bootnodes "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWSJ5YhzNFU2EqCPzpvfWpZGMf6Yjs6XGxHqEXnVjRNLSQ" \
         --log info \
         > "$TEST_DIR/validator-$i.log" 2>&1 &

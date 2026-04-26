@@ -11291,6 +11291,7 @@ dependencies = [
  "sp-std",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
+ "x3-packet-schema",
  "x3-svm-integration",
  "x3-x3-integration",
 ]
@@ -23942,6 +23943,15 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.23",
  "uuid 1.21.0",
+]
+
+[[package]]
+name = "x3-packet-schema"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "parity-scale-codec",
+ "scale-info",
 ]
 
 [[package]]

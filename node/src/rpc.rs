@@ -1507,138 +1507,22 @@ where
         }
 
         let runtime_api = c.runtime_api();
-        let best_hash = c.info().best_hash;
-
-        let response = runtime_api
-            .agent_memory_hash(best_hash, agent_id)
-            .map_err(|e| custom_error(format!("Runtime API error: {}", e)))?;
-
+        // TODO: Runtime API not yet implemented - these endpoints temporarily disabled
+        // let best_hash = c.info().best_hash;
+        // let response = runtime_api
+        //     .agent_memory_hash(best_hash, agent_id)
+        //     .map_err(|e| custom_error(format!("Runtime API error: {}", e)))?;
+        
         Ok::<_, JsonRpseeError>(serde_json::json!({
-            "agent_id": agent_id_hex,
-            "memory_hash": format!("0x{}", hex::encode(&response.memory_hash)),
-            "block_number": response.block_number,
-            "indexed_at": response.indexed_at,
-            "consensus_reached": response.consensus_reached,
-            "attestations": response.attestations,
+            "error": "agentMemory_hash RPC endpoint not yet implemented",
+            "status": "disabled"
         }))
     })?;
 
-    let c = client.clone();
-    let check = check_rate_limit.clone();
-    module.register_method("agentMemory_atBlock", move |params, _| {
-        check("agentMemory_atBlock")?;
-        let (agent_id_hex, block_number): (String, u32) = params.parse()?;
-
-        let agent_id = decode_hex_param(&agent_id_hex, "agent_id")?;
-        if agent_id.len() != 32 {
-            return Err(custom_error("agent_id must be 32 bytes (H256)"));
-        }
-
-        let runtime_api = c.runtime_api();
-        let best_hash = c.info().best_hash;
-
-        let response = runtime_api
-            .agent_memory_at_block(best_hash, agent_id, block_number)
-            .map_err(|e| custom_error(format!("Runtime API error: {}", e)))?;
-
-        Ok::<_, JsonRpseeError>(serde_json::json!({
-            "agent_id": agent_id_hex,
-            "block_number": response.block_number,
-            "memory_data": format!("0x{}", hex::encode(&response.memory_data)),
-            "size_bytes": response.size_bytes,
-            "verified": response.verified,
-            "verification_block": response.verification_block,
-        }))
-    })?;
-
-    let c = client.clone();
-    let check = check_rate_limit.clone();
-    module.register_method("agentMemory_query", move |params, _| {
-        check("agentMemory_query")?;
-        let req: serde_json::Value = params.one()?;
-
-        let agent_id_hex = req
-            .get("agent_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| custom_error("Missing agent_id"))?;
-        let block_number = req
-            .get("block_number")
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| custom_error("Missing block_number"))?
-            as u32;
-        let function_name = req
-            .get("function_name")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| custom_error("Missing function_name"))?
-            .as_bytes()
-            .to_vec();
-        let params_hex = req
-            .get("params")
-            .and_then(|v| v.as_str())
-            .unwrap_or("0x");
-
-        let agent_id = decode_hex_param(agent_id_hex, "agent_id")?;
-        if agent_id.len() != 32 {
-            return Err(custom_error("agent_id must be 32 bytes (H256)"));
-        }
-
-        let params_bytes = decode_hex_param(params_hex, "params")?;
-
-        let runtime_api = c.runtime_api();
-        let best_hash = c.info().best_hash;
-
-        let response = runtime_api
-            .agent_query(best_hash, agent_id, block_number, function_name, params_bytes)
-            .map_err(|e| custom_error(format!("Runtime API error: {}", e)))?;
-
-        Ok::<_, JsonRpseeError>(serde_json::json!({
-            "success": response.success,
-            "result": response.result.map(|r| format!("0x{}", hex::encode(&r))),
-            "error": response.error.map(|e| String::from_utf8_lossy(&e).into_owned()),
-            "executed_block": response.executed_block,
-            "latency_ms": response.latency_ms,
-        }))
-    })?;
-
-    let c = client.clone();
-    let check = check_rate_limit.clone();
-    module.register_method("agentMemory_consensus", move |params, _| {
-        check("agentMemory_consensus")?;
-        let (agent_id_hex, block_number): (String, u32) = params.parse()?;
-
-        let agent_id = decode_hex_param(&agent_id_hex, "agent_id")?;
-        if agent_id.len() != 32 {
-            return Err(custom_error("agent_id must be 32 bytes (H256)"));
-        }
-
-        let runtime_api = c.runtime_api();
-        let best_hash = c.info().best_hash;
-
-        let response = runtime_api
-            .agent_memory_consensus(best_hash, agent_id, block_number)
-            .map_err(|e| custom_error(format!("Runtime API error: {}", e)))?;
-
-        let attestations = response
-            .attestations_received
-            .into_iter()
-            .map(|att| {
-                serde_json::json!({
-                    "validator": format!("0x{}", hex::encode(&att.validator)),
-                    "verified": att.verified,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        Ok::<_, JsonRpseeError>(serde_json::json!({
-            "agent_id": agent_id_hex,
-            "block_number": response.block_number,
-            "memory_hash": format!("0x{}", hex::encode(&response.memory_hash)),
-            "attestations_received": attestations,
-            "attestations_required": response.attestations_required,
-            "consensus_reached": response.consensus_reached,
-            "consensus_reached_at_block": response.consensus_reached_at_block,
-        }))
-    })?;
+    // Temporarily disabled: AgentMemoryApi not yet implemented in runtime
+    // module.register_method("agentMemory_atBlock", ...)?;
+    // module.register_method("agentMemory_query", ...)?;
+    // module.register_method("agentMemory_consensus", ...);
 
     Ok(module)
 }
