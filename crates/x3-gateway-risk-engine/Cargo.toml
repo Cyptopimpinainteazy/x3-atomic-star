@@ -1,0 +1,12 @@
+[package]
+name = "x3-gateway-risk-engine"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Gateway route risk assessment for X3 cross-chain execution."
+
+[lib]
+name = "x3_gateway_risk_engine"
+path = "src/lib.rs"
+
+[dependencies]

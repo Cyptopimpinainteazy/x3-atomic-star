@@ -116,6 +116,8 @@ members = [
         "pallets/x3-cross-vm-router",
         "pallets/x3-token-factory",
         "tools/launchops",
+        # Dispute resolution (Article III: Deterministic Court)
+        "pallets/x3-jury-anchor",
         # Note: crates/dylint-determinism is intentionally NOT listed here.
     # It is a standalone workspace (has its own [workspace] and rust-toolchain.toml)
     # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.

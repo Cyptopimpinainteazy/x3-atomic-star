@@ -1,0 +1,37 @@
+[package]
+name = "pallet-x3-solvency"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain"]
+description = "X3 solvency engine: pre-quote, pre-reservation, pre-submission gates, post-submission tracking, and snapshot registry"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
+scale-info = { version = "2", default-features = false, features = ["derive"] }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+pallet-x3-inventory = { path = "../x3-inventory", default-features = false }
+pallet-x3-reservation = { path = "../x3-reservation", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
+
+[dev-dependencies]
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409" }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "frame-support/std",
+    "frame-system/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "pallet-x3-inventory/std",
+    "pallet-x3-reservation/std",
+    "serde/std",
+]
+runtime-benchmarks = ["frame-support/runtime-benchmarks"]
+try-runtime = ["frame-support/try-runtime"]
