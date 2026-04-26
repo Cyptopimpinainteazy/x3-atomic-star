@@ -134,13 +134,13 @@ else
 fi
 
 if command -v subwasm >/dev/null 2>&1; then
-  run_gate "subwasm-installed" "subwasm --version"
+  run_gate "subwasm-installed" "NO_COLOR=true subwasm --version"
 else
   skip_gate "subwasm-installed" "subwasm not found in PATH. Install before publishing runtime metadata diff proof."
 fi
 
 if command -v zombienet >/dev/null 2>&1; then
-  run_gate "zombienet-installed" "zombienet --version"
+  run_gate "zombienet-installed" "zombienet version"
 else
   skip_gate "zombienet-installed" "zombienet not found in PATH. Install before publishing local validator network proof."
 fi

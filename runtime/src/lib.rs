@@ -62,7 +62,7 @@ use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     traits::{
         AccountIdConversion, AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto,
-        IdentifyAccount, Verify,
+        IdentifyAccount, SaturatedConversion, Verify,
     },
     MultiAddress, MultiSignature, Perbill,
 };
@@ -3306,14 +3306,15 @@ impl_runtime_apis! {
                 };
             }
 
-            let mut id_bytes = [0u8; 32];
-            id_bytes.copy_from_slice(&agent_id);
-            let agent_h256 = sp_core::H256::from(id_bytes);
+            // Convert first 4 bytes of agent_id to u32 (pallet uses u32 for AgentId)
+            let mut id_bytes = [0u8; 4];
+            id_bytes.copy_from_slice(&agent_id[..4]);
+            let agent_id_u32 = u32::from_le_bytes(id_bytes);
 
-            if let Some(memory_hash) = pallet_agent_memory::LatestMemoryHash::<Runtime>::get(agent_h256) {
+            if let Some(memory_hash) = pallet_agent_memory::LatestMemoryHash::<Runtime>::get(agent_id_u32) {
                 let current_block = frame_system::Pallet::<Runtime>::block_number();
                 let consensus_records = pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(
-                    &agent_h256,
+                    agent_id_u32,
                     current_block.saturated_into::<u32>(),
                 );
 
@@ -3355,13 +3356,14 @@ impl_runtime_apis! {
                 };
             }
 
-            let mut id_bytes = [0u8; 32];
-            id_bytes.copy_from_slice(&agent_id);
-            let agent_h256 = sp_core::H256::from(id_bytes);
+            // Convert first 4 bytes of agent_id to u32 (pallet uses u32 for AgentId)
+            let mut id_bytes = [0u8; 4];
+            id_bytes.copy_from_slice(&agent_id[..4]);
+            let agent_id_u32 = u32::from_le_bytes(id_bytes);
 
             let current_block = frame_system::Pallet::<Runtime>::block_number();
             let consensus_records =
-                pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(&agent_h256, block_number);
+                pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(agent_id_u32, block_number);
             let verified = consensus_records.is_some();
 
             pallet_agent_memory::runtime_api::MemorySnapshotResponse {
@@ -3417,12 +3419,13 @@ impl_runtime_apis! {
                 };
             }
 
-            let mut id_bytes = [0u8; 32];
-            id_bytes.copy_from_slice(&agent_id);
-            let agent_h256 = sp_core::H256::from(id_bytes);
+            // Convert first 4 bytes of agent_id to u32 (pallet uses u32 for AgentId)
+            let mut id_bytes = [0u8; 4];
+            id_bytes.copy_from_slice(&agent_id[..4]);
+            let agent_id_u32 = u32::from_le_bytes(id_bytes);
 
             if let Some((memory_hash, attestation_count)) =
-                pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(&agent_h256, block_number)
+                pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(agent_id_u32, block_number)
             {
                 let threshold = <Runtime as pallet_agent_memory::Config>::MemoryConsensusThreshold::get();
                 let required = (threshold as u32 + 50) / 100;
