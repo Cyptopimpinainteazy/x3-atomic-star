@@ -118,6 +118,8 @@ members = [
         "tools/launchops",
         # Dispute resolution (Article III: Deterministic Court)
         "pallets/x3-jury-anchor",
+        # Phase 0: Sprint 0 Infrastructure
+        "crates/x3-readiness-report",
         # Note: crates/dylint-determinism is intentionally NOT listed here.
     # It is a standalone workspace (has its own [workspace] and rust-toolchain.toml)
     # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.
