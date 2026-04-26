@@ -12374,6 +12374,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "proof-forge"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "colored",
+ "hex",
+ "indicatif 0.17.11",
+ "parking_lot 0.12.5",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "proptest"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
