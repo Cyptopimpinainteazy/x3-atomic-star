@@ -638,11 +638,13 @@ impl pallet_offences::Config for Runtime {
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type KeyOwnerProof = sp_session::MembershipProof;
-    // EquivocationReportSystem: Using () as no-op for equivocation reporting
-    // Full slashing system can be implemented in future phases with proper trait bounds
-    type EquivocationReportSystem = ();
-    type WeightInfo = ();
+    type KeyOwnerProof = sp_session::historical::MembershipProof;
+    type EquivocationReportSystem = pallet_grandpa::EquivocationReportSystem<
+        Runtime,
+        pallet_session::historical::Pallet<Runtime>,
+        pallet_offences::Pallet<Runtime>,
+    >;
+    type WeightInfo = pallet_grandpa::weights::SubstrateWeight<Runtime>;
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
 }

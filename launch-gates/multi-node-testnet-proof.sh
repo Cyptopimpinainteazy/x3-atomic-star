@@ -72,10 +72,14 @@ log_pass "Node binary found"
 # Build chain spec with 4 validators
 log_step "Generating multi-validator chain spec..."
 if timeout 30 ./target/release/x3-chain-node build-spec \
-    --chain dev \
-    --raw \
-    > "$TEST_DIR/chain-spec.json" 2>> "$PROOF_LOG"; then
-    log_pass "Chain spec generated"
+    --chain dev 2>> "$PROOF_LOG" | sed -n '/^{/,$p' > "$TEST_DIR/chain-spec.json"; then
+    # Validate the JSON was actually generated
+    if jq empty "$TEST_DIR/chain-spec.json" 2>/dev/null; then
+        log_pass "Chain spec generated and validated"
+    else
+        log_fail "Generated chain spec is not valid JSON"
+        exit 1
+    fi
 else
     log_fail "Could not generate chain spec"
     exit 1
@@ -111,7 +115,7 @@ for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
         --name "validator-$i" \
         --port $((PORT + i)) \
         --rpc-port "$PORT" \
-        --rpc-external \
+        --unsafe-rpc-external \
         --bootnodes "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWSJ5YhzNFU2EqCPzpvfWpZGMf6Yjs6XGxHqEXnVjRNLSQ" \
         --log info \
         > "$TEST_DIR/validator-$i.log" 2>&1 &
