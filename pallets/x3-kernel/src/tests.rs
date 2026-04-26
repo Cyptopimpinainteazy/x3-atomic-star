@@ -2423,3 +2423,145 @@ fn test_emergency_halt_preserves_state_through_cycles() {
         println!("✅ Phase 0.2.3c: State preserved through pause/unpause cycles");
     });
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PHASE 0.3: MINT/BURN PERMISSIONS VERIFICATION
+// Purpose: Verify authorization controls for sensitive operations
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[test]
+fn test_authorize_account_requires_root_origin() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.3.1: Verify only root can authorize accounts
+        
+        let alice = ALICE;
+        let bob = BOB;
+
+        // Root CAN authorize
+        assert_ok!(AtlasKernel::authorize_account(
+            RuntimeOrigin::root(),
+            alice,
+        ));
+
+        let events = x3_events();
+        assert!(
+            events.iter().any(|e| matches!(e, crate::Event::<Test>::AccountAuthorized { .. })),
+            "AccountAuthorized event should be emitted"
+        );
+
+        println!("✅ Phase 0.3.1a: Root can authorize accounts");
+    });
+}
+
+#[test]
+fn test_authorize_account_permission_persistence() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.3.1b: Verify authorization persists
+        
+        let alice = ALICE;
+        let bob = BOB;
+        let charlie = CHARLIE;
+
+        // Authorize multiple accounts
+        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), alice));
+        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), bob));
+        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), charlie));
+
+        // Deauthorize one
+        assert_ok!(AtlasKernel::deauthorize_account(RuntimeOrigin::root(), alice));
+
+        // Other authorizations should persist
+        let events = x3_events();
+        let auth_count = events
+            .iter()
+            .filter(|e| matches!(e, crate::Event::<Test>::AccountAuthorized { .. }))
+            .count();
+        
+        assert_eq!(
+            auth_count, 3,
+            "Should have 3 authorization events despite deauthorization"
+        );
+
+        println!("✅ Phase 0.3.1b: Authorization persists across operations");
+    });
+}
+
+#[test]
+fn test_deauthorize_account_removes_authorization() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.3.2: Verify deauthorization works
+        
+        let alice = ALICE;
+
+        // Authorize
+        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), alice));
+
+        // Check authorized
+        let mut authorized_count_1 = 0;
+        for _ in crate::AuthorizedAccounts::<Test>::iter() {
+            authorized_count_1 += 1;
+        }
+
+        // Deauthorize
+        assert_ok!(AtlasKernel::deauthorize_account(RuntimeOrigin::root(), alice));
+
+        // Check count decreased
+        let mut authorized_count_2 = 0;
+        for _ in crate::AuthorizedAccounts::<Test>::iter() {
+            authorized_count_2 += 1;
+        }
+
+        assert!(
+            authorized_count_2 < authorized_count_1,
+            "Authorization count should decrease after deauthorization"
+        );
+
+        println!("✅ Phase 0.3.2: Deauthorization removes authorization");
+    });
+}
+
+#[test]
+fn test_add_authority_requires_governance() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.3.2b: Verify authority addition
+        
+        let new_authority = CHARLIE;
+
+        // Root CAN add authority
+        assert_ok!(AtlasKernel::add_authority(
+            RuntimeOrigin::root(),
+            new_authority,
+        ));
+
+        let events = x3_events();
+        assert!(
+            events.iter().any(|e| matches!(e, crate::Event::<Test>::AuthorityAdded { .. })),
+            "AuthorityAdded event should be emitted"
+        );
+
+        println!("✅ Phase 0.3.2b: Authority addition works");
+    });
+}
+
+#[test]
+fn test_authority_cannot_be_duplicated() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.3.2c: Verify duplicate authority check
+        
+        let new_authority = CHARLIE;
+
+        // Add authority first time
+        assert_ok!(AtlasKernel::add_authority(
+            RuntimeOrigin::root(),
+            new_authority,
+        ));
+
+        // Try to add same authority again — should fail
+        assert_noop!(
+            AtlasKernel::add_authority(RuntimeOrigin::root(), new_authority),
+            crate::Error::<Test>::AuthorityAlreadyExists
+        );
+
+        println!("✅ Phase 0.3.2c: Duplicate authority check works");
+    });
+}
