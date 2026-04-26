@@ -1,0 +1,106 @@
+name: Build & Test
+
+on:
+  pull_request:
+    branches: [main, develop, sprint-*]
+  push:
+    branches: [main, develop, sprint-*]
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: 1.89.0
+
+jobs:
+  format:
+    name: Code Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+          components: rustfmt
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+  lint:
+    name: Clippy Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo clippy
+        run: cargo clippy --all --all-targets --all-features -- -D warnings
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [lib, integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test (${{ matrix.test-type }})
+        run: |
+          if [ "${{ matrix.test-type }}" == "lib" ]; then
+            cargo test --lib --all
+          else
+            cargo test --test '*' --all
+          fi
+        timeout-minutes: 60
+
+  build-release:
+    name: Build Release Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo build --release
+        run: cargo build -p x3-chain-node --release
+        timeout-minutes: 120
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
+      - name: Generate coverage
+        run: cargo tarpaulin --out Xml --output-dir coverage/ --timeout 300 --exclude-files tests/*
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/cobertura.xml
+          fail_ci_if_error: false
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

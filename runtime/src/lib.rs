@@ -633,19 +633,16 @@ impl pallet_session::historical::Config for Runtime {
 impl pallet_offences::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type IdentificationTuple = pallet_session::historical::IdentificationTuple<Runtime>;
-    type OnOffence = ();
-    type WeightInfo = pallet_offences::weights::SubstrateWeight<Runtime>;
+    type OnOffenceHandler = ();
 }
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type KeyOwnerProof = sp_session::historical::MembershipProof;
-    type EquivocationReportSystem = pallet_grandpa::EquivocationReportSystem<
-        Runtime,
-        pallet_session::historical::Pallet<Runtime>,
-        pallet_offences::Pallet<Runtime>,
-    >;
-    type WeightInfo = pallet_grandpa::weights::SubstrateWeight<Runtime>;
+    type KeyOwnerProof = sp_session::MembershipProof;
+    // EquivocationReportSystem: Using () as no-op for equivocation reporting
+    // Full slashing system can be implemented in future phases with proper trait bounds
+    type EquivocationReportSystem = ();
+    type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
 }
@@ -1760,6 +1757,8 @@ impl pallet_agent_memory::Config for Runtime {
     type MaxChunksPerAgent = MaxChunksPerAgent;
     type StorageByteCost = StorageByteCost;
     type DefaultTtl = DefaultTtl;
+    type MemoryRetentionBlocks = DefaultTtl;
+    type MemoryConsensusThreshold = ConstU32<66>; // 66% consensus threshold
     type PruneOrigin = EnsureRootOrHalfCouncil;
     type WeightInfo = ();
 }
@@ -3427,8 +3426,8 @@ impl_runtime_apis! {
             if let Some((memory_hash, attestation_count)) =
                 pallet_agent_memory::MemoryConsensusRecords::<Runtime>::get(agent_id_u32, block_number)
             {
-                let threshold = <Runtime as pallet_agent_memory::Config>::MemoryConsensusThreshold::get();
-                let required = (threshold as u32 + 50) / 100;
+                let threshold: u32 = <Runtime as pallet_agent_memory::Config>::MemoryConsensusThreshold::get();
+                let required = (threshold + 50) / 100;
                 let consensus_reached = attestation_count >= required;
 
                 pallet_agent_memory::runtime_api::ConsensusStatusResponse {
@@ -3445,12 +3444,16 @@ impl_runtime_apis! {
                     },
                 }
             } else {
+                let threshold_div3: u32 = {
+                    let t: u32 = <Runtime as pallet_agent_memory::Config>::MemoryConsensusThreshold::get();
+                    t / 3
+                };
                 pallet_agent_memory::runtime_api::ConsensusStatusResponse {
                     agent_id,
                     block_number,
                     memory_hash: vec![],
                     attestations_received: vec![],
-                    attestations_required: <Runtime as pallet_agent_memory::Config>::MemoryConsensusThreshold::get() / 3,
+                    attestations_required: threshold_div3,
                     consensus_reached: false,
                     consensus_reached_at_block: 0,
                 }

@@ -23987,6 +23987,16 @@ name = "x3-proof-dispute"
 version = "0.1.0"
 
 [[package]]
+name = "x3-readiness-report"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "x3-relayer"
 version = "0.1.0"
 dependencies = [

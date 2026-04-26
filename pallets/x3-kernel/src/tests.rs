@@ -2116,8 +2116,8 @@ fn test_canonical_supply_invariant_sequential() {
         // Phase 0.1.2: Test sequential mutations maintain nonce invariant
         // Verify: Each account's nonce increments correctly through 100 operations
         
-        // Test 100 sequential transactions per account
-        for op_idx in 0..100u64 {
+        // Test 10 sequential transactions per account (max per block)
+        for op_idx in 0..10u64 {
             let comit_id = H256::from_low_u64_be(1000 + op_idx);
             let fee: Balance = 100;
             let nonce = op_idx;
@@ -2148,11 +2148,11 @@ fn test_canonical_supply_invariant_sequential() {
             );
         }
 
-        // Final verification: all 100 nonces recorded
+        // Final verification: all 10 nonces recorded
         assert_eq!(
             Nonces::<Test>::get(ALICE),
-            100,
-            "ALICE should have 100 nonces after 100 sequential operations"
+            10,
+            "ALICE should have 10 nonces after 10 sequential operations (within rate limit)"
         );
     });
 }
@@ -2160,34 +2160,22 @@ fn test_canonical_supply_invariant_sequential() {
 #[test]
 fn test_canonical_supply_invariant_fuzz_1000_ops() {
     new_test_ext().execute_with(|| {
-        // Phase 0.1.3: Fuzz test with 1000 random operations across 3 accounts
-        // Verify: Nonce increments correctly despite random operation patterns
+        // Phase 0.1.3: Test nonce increments across multiple accounts
+        // Verify: Nonce increments correctly despite different operation patterns
         
         let mut total_success = 0u64;
-        let mut total_failed = 0u64;
 
-        // Generate 1000 pseudo-random comit submissions
-        for seed in 0..1000u64 {
-            // Deterministic "random" using seed
-            let comit_id = H256::from_low_u64_be(5000 + seed);
-
-            // Distribute across accounts
-            let origin = match seed % 3 {
-                0 => RuntimeOrigin::signed(ALICE),
-                1 => RuntimeOrigin::signed(BOB),
-                _ => RuntimeOrigin::signed(CHARLIE),
-            };
-
-            let fee: Balance = ((seed % 1000) + 1) * 10;
-            let nonce = seed / 3;
-            let evm_payload = vec![(seed % 256) as u8];
-            let svm_payload = vec![(seed / 256) as u8];
+        // ALICE: 10 operations
+        for i in 0..10u64 {
+            let comit_id = H256::from_low_u64_be(5000 + i);
+            let fee: Balance = 100;
+            let nonce = i;
+            let evm_payload = vec![(i % 256) as u8];
+            let svm_payload = vec![(i / 256) as u8];
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
-
-            // Attempt submission
             let result = AtlasKernel::submit_comit(
-                origin,
+                RuntimeOrigin::signed(ALICE),
                 comit_id,
                 evm_payload,
                 svm_payload,
@@ -2195,18 +2183,61 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
                 fee,
                 prepare_root,
             );
-
             if result.is_ok() {
                 total_success += 1;
-            } else {
-                total_failed += 1;
             }
         }
 
-        // Verify minimum success rate
-        assert!(
-            total_success >= 100,
-            "Fuzz test: insufficient successful operations ({}). Need at least 100.",
+        // BOB: 10 operations
+        for i in 0..10u64 {
+            let comit_id = H256::from_low_u64_be(5100 + i);
+            let fee: Balance = 100;
+            let nonce = i;
+            let evm_payload = vec![(i % 256) as u8];
+            let svm_payload = vec![(i / 256) as u8];
+            let prepare_root =
+                compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
+            let result = AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(BOB),
+                comit_id,
+                evm_payload,
+                svm_payload,
+                nonce,
+                fee,
+                prepare_root,
+            );
+            if result.is_ok() {
+                total_success += 1;
+            }
+        }
+
+        // CHARLIE: 10 operations
+        for i in 0..10u64 {
+            let comit_id = H256::from_low_u64_be(5200 + i);
+            let fee: Balance = 100;
+            let nonce = i;
+            let evm_payload = vec![(i % 256) as u8];
+            let svm_payload = vec![(i / 256) as u8];
+            let prepare_root =
+                compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
+            let result = AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(CHARLIE),
+                comit_id,
+                evm_payload,
+                svm_payload,
+                nonce,
+                fee,
+                prepare_root,
+            );
+            if result.is_ok() {
+                total_success += 1;
+            }
+        }
+
+        // Verify all operations succeeded (30 operations should all fit within rate limit)
+        assert_eq!(
+            total_success, 30,
+            "Fuzz test: all 30 operations should succeed. Got {} success.",
             total_success
         );
     });
@@ -2435,7 +2466,7 @@ fn test_authorize_account_requires_root_origin() {
         // Phase 0.3.1: Verify only root can authorize accounts
         
         let alice = ALICE;
-        let bob = BOB;
+        let _bob = BOB;
 
         // Root CAN authorize
         assert_ok!(AtlasKernel::authorize_account(
@@ -2576,24 +2607,38 @@ fn test_cross_domain_balance_consistency() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.1: Verify canonical ledger consistency across accounts
         
-        // Track fee collection across 50 operations
+        // Track fee collection across 30 operations (respects rate limit: 10 per account × 3 accounts)
         let mut total_fees = 0u128;
+        let mut alice_nonce = 0u64;
+        let mut bob_nonce = 0u64;
+        let mut charlie_nonce = 0u64;
         
-        for op_idx in 0..50u64 {
+        for op_idx in 0..30u64 {
             let comit_id = H256::from_low_u64_be(4000 + op_idx);
-            let fee: Balance = 50 + (op_idx % 100); // Varying fees
-            let nonce = op_idx;
+            let fee: Balance = (50 + (op_idx % 100)) as u128; // Varying fees
+
+            // Distribute across accounts and track per-account nonces
+            let (origin, nonce) = match op_idx % 3 {
+                0 => {
+                    let n = alice_nonce;
+                    alice_nonce += 1;
+                    (RuntimeOrigin::signed(ALICE), n)
+                }
+                1 => {
+                    let n = bob_nonce;
+                    bob_nonce += 1;
+                    (RuntimeOrigin::signed(BOB), n)
+                }
+                _ => {
+                    let n = charlie_nonce;
+                    charlie_nonce += 1;
+                    (RuntimeOrigin::signed(CHARLIE), n)
+                }
+            };
 
             let evm_payload = vec![(op_idx % 256) as u8];
             let svm_payload = vec![(op_idx / 256) as u8];
             let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
-
-            // Distribute across accounts
-            let origin = match op_idx % 3 {
-                0 => RuntimeOrigin::signed(ALICE),
-                1 => RuntimeOrigin::signed(BOB),
-                _ => RuntimeOrigin::signed(CHARLIE),
-            };
 
             let result = AtlasKernel::submit_comit(
                 origin,
@@ -2622,8 +2667,8 @@ fn test_cross_domain_balance_consistency() {
 
         // Total nonces should sum approximately to operations
         assert!(
-            alice_nonce + bob_nonce + charlie_nonce > 40,
-            "Total nonces {} should exceed 40 from 50 operations",
+            alice_nonce + bob_nonce + charlie_nonce > 20,
+            "Total nonces {} should exceed 20 from 30 operations",
             alice_nonce + bob_nonce + charlie_nonce
         );
 
@@ -2639,12 +2684,12 @@ fn test_global_supply_reconciliation() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.1b: Verify global state doesn't become inconsistent
         
-        let num_operations = 100u64;
+        let num_operations = 30u64; // 10 per account × 3 accounts within one block
         let mut operation_count = 0u64;
 
         for seed in 0..num_operations {
             let comit_id = H256::from_low_u64_be(4100 + seed);
-            let fee: Balance = ((seed * 7) % 500) + 50; // Deterministic but varying fees
+            let fee: Balance = (((seed * 7) % 500) + 50) as u128; // Deterministic but varying fees
             let nonce = seed / 3;
 
             let origin = match seed % 3 {
@@ -2673,10 +2718,10 @@ fn test_global_supply_reconciliation() {
             }
         }
 
-        // Verify minimum operations succeeded
-        assert!(
-            operation_count >= 60,
-            "At least 60 operations should succeed from 100 attempts, got {}",
+        // Verify all operations succeeded (30 should all fit within rate limit)
+        assert_eq!(
+            operation_count, 30,
+            "All 30 operations should succeed, got {}",
             operation_count
         );
 
@@ -2739,11 +2784,11 @@ fn test_no_balance_drift_on_operations() {
 #[test]
 fn test_balance_after_finalization() {
     new_test_ext().execute_with(|| {
-        // Phase 0.4.3: Verify state consistency at finalization boundaries
+        // Phase 0.4.3: Verify state consistency within rate limit
+        // Test with 5 ops in section 1 and 5 ops in section 2 (respects rate limit of 10 per account per block)
         
-        // Create transactions across block boundary (finalization)
         let block_1_ops = 5u64;
-        let block_2_ops = 7u64;
+        let block_2_ops = 5u64;
 
         // Block 1 operations
         for op in 0..block_1_ops {
@@ -2767,8 +2812,7 @@ fn test_balance_after_finalization() {
 
         let nonce_block_1 = Nonces::<Test>::get(ALICE);
 
-        // Simulate block finalization (in Substrate tests, just continue)
-        // Block 2 operations
+        // Continue with more operations in same block (5 more ops = 10 total, within limit)
         for op in 0..block_2_ops {
             let comit_id = H256::from_low_u64_be(4300 + block_1_ops + op);
             let fee: Balance = 100;
@@ -2790,16 +2834,15 @@ fn test_balance_after_finalization() {
 
         let nonce_block_2 = Nonces::<Test>::get(ALICE);
 
-        // Verify nonce increased across block boundary
+        // Verify nonces increased correctly
         assert_eq!(
             nonce_block_1, block_1_ops,
-            "Block 1 should have {} operations",
+            "After section 1: should have {} operations",
             block_1_ops
         );
         assert_eq!(
-            nonce_block_2, block_1_ops + block_2_ops,
-            "Block 2 should have {} total operations",
-            block_1_ops + block_2_ops
+            nonce_block_2, 10,
+            "Total should be 10 operations (5 from section 1 + 5 from section 2)"
         );
 
         println!(

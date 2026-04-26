@@ -35,6 +35,17 @@ Use these labels only when the matching report exists:
 - Do not claim production FRAME weights while launch pallets still rely on manual `Weight::from_parts(...)` placeholders.
 - Do not claim deterministic runtime release proof until srtool output and subwasm metadata diff are published.
 
+## Local Tool Status
+
+Installed and verified locally on 2026-04-26:
+
+- `srtool` via `cargo install --git https://github.com/chevdor/srtool-cli --locked`
+- `subwasm` via `cargo install --git https://github.com/chevdor/subwasm subwasm --locked`
+- `zombienet` via `npm install -g @zombienet/cli`
+- `chopsticks` via `npm install -g @acala-network/chopsticks@1.2.8`
+
+The current proof-pack status is tracked in `SUBSTRATE_PROOF_PACK_LATEST.md`.
+
 ## Recommended Published Page
 
 For a public security page, link:
