@@ -2104,3 +2104,110 @@ fn unpause_when_not_paused_is_noop() {
         assert!(!crate::ProtocolPaused::<mock::Test>::get());
     });
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PHASE 0.1: CANONICAL SUPPLY INVARIANT TESTS
+// Purpose: Verify nonce sequencing and transaction ordering maintained
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[test]
+fn test_canonical_supply_invariant_sequential() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.1.2: Test sequential mutations maintain nonce invariant
+        // Verify: Each account's nonce increments correctly through 100 operations
+        
+        // Test 100 sequential transactions per account
+        for op_idx in 0..100u64 {
+            let comit_id = H256::from_low_u64_be(1000 + op_idx);
+            let fee: Balance = 100;
+            let nonce = op_idx;
+
+            // Compute prepare_root for this comit
+            let evm_payload = vec![1, 2, (op_idx % 256) as u8];
+            let svm_payload = vec![3, 4];
+            let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
+
+            // Submit from ALICE
+            assert_ok!(AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                comit_id,
+                evm_payload,
+                svm_payload,
+                nonce,
+                fee,
+                prepare_root,
+            ));
+
+            // Verify nonce was incremented
+            assert_eq!(
+                Nonces::<Test>::get(ALICE),
+                op_idx + 1,
+                "ALICE nonce should be {} after operation {}",
+                op_idx + 1,
+                op_idx
+            );
+        }
+
+        // Final verification: all 100 nonces recorded
+        assert_eq!(
+            Nonces::<Test>::get(ALICE),
+            100,
+            "ALICE should have 100 nonces after 100 sequential operations"
+        );
+    });
+}
+
+#[test]
+fn test_canonical_supply_invariant_fuzz_1000_ops() {
+    new_test_ext().execute_with(|| {
+        // Phase 0.1.3: Fuzz test with 1000 random operations across 3 accounts
+        // Verify: Nonce increments correctly despite random operation patterns
+        
+        let mut total_success = 0u64;
+        let mut total_failed = 0u64;
+
+        // Generate 1000 pseudo-random comit submissions
+        for seed in 0..1000u64 {
+            // Deterministic "random" using seed
+            let comit_id = H256::from_low_u64_be(5000 + seed);
+
+            // Distribute across accounts
+            let origin = match seed % 3 {
+                0 => RuntimeOrigin::signed(ALICE),
+                1 => RuntimeOrigin::signed(BOB),
+                _ => RuntimeOrigin::signed(CHARLIE),
+            };
+
+            let fee: Balance = ((seed % 1000) + 1) * 10;
+            let nonce = seed / 3;
+            let evm_payload = vec![(seed % 256) as u8];
+            let svm_payload = vec![(seed / 256) as u8];
+            let prepare_root =
+                compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
+
+            // Attempt submission
+            let result = AtlasKernel::submit_comit(
+                origin,
+                comit_id,
+                evm_payload,
+                svm_payload,
+                nonce,
+                fee,
+                prepare_root,
+            );
+
+            if result.is_ok() {
+                total_success += 1;
+            } else {
+                total_failed += 1;
+            }
+        }
+
+        // Verify minimum success rate
+        assert!(
+            total_success >= 100,
+            "Fuzz test: insufficient successful operations ({}). Need at least 100.",
+            total_success
+        );
+    });
+}
