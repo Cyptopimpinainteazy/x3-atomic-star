@@ -1530,16 +1530,20 @@ pub mod pallet {
             receiver: T::AccountId,
             amount: BalanceOf<T>,
         ) -> DispatchResult {
-            let _executor = ensure_signed(origin)?;
+            let executor = ensure_signed(origin)?;
 
             // P1: Load transfer state from storage
             let mut transfer = SettlementTransfers::<T>::get(transfer_id)
                 .ok_or(Error::<T>::UnknownTransfer)?;
 
-            // P2: Verify executor is authorized (check against verifier/executor role)
-            // For now, we verify the executor is recognized; this will be tied to governance
-            // TODO: Add executor authorization check via x3-kernel pallet
-            // ensure!(Self::is_authorized_executor(&executor), Error::<T>::ExecutorNotAuthorized);
+            // P2: Verify executor is authorized via x3-kernel AuthorizedAccounts registry.
+            // AuthorizedAccounts is secure-by-default: an empty registry rejects all callers.
+            // Accounts are added via x3-kernel::authorize_account (governance-gated).
+            #[cfg(not(feature = "dev-bypass"))]
+            ensure!(
+                pallet_x3_kernel::AuthorizedAccounts::<T>::contains_key(&executor),
+                Error::<T>::ExecutorNotAuthorized
+            );
 
             // P3: Verify transfer status is Pending (0)
             ensure!(transfer.status == 0, Error::<T>::TransferNotPending);

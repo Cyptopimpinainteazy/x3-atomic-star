@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 use pallet_evm::{
-    IsPrecompileResult, Precompile, PrecompileHandle, PrecompileResult, PrecompileSet,
+    ExitRevert, IsPrecompileResult, Precompile, PrecompileFailure, PrecompileHandle,
+    PrecompileResult, PrecompileSet,
 };
 use pallet_evm_precompile_modexp::Modexp;
 use pallet_evm_precompile_sha3fips::Sha3FIPS256;
@@ -8,51 +9,39 @@ use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripe
 use sp_core::H160;
 
 // =====================================================================
-// ISSUE #4 FIX: X3 CUSTOM PRECOMPILES NOW IMPLEMENTED
+// X3 CUSTOM PRECOMPILES
 // =====================================================================
-// The following precompiles provide EVM ↔ X3 integration:
+// The following precompiles provide EVM ↔ X3 integration at addresses
+// 0xf001–0xf004. They are wired into the dispatch table and return a
+// standard EVM revert (not a Rust panic) until Phase F pallet dispatch
+// is implemented. EVM callers receive a revert with a descriptive message.
 //
-// 1. X3Verifier (address 0xf001 / 61441)
-//    - Purpose: Proof verification dispatcher
-//    - Calls: pallet_x3_verifier::verify_proof()
-//    - Implementation: X3VerifierPrecompile struct
-//    - Status: ✅ IMPLEMENTED
-//
-// 2. X3Bridge (address 0xf002 / 61442)
-//    - Purpose: Cross-VM asset bridging
-//    - Calls: pallet_x3_cross_vm_router::bridge_assets()
-//    - Implementation: X3BridgePrecompile struct
-//    - Status: ✅ IMPLEMENTED (stub with proper error handling)
-//
-// 3. X3Governance (address 0xf003 / 61443)
-//    - Purpose: Governance proposal execution
-//    - Calls: pallet_governance::propose() / vote()
-//    - Implementation: X3GovernancePrecompile struct
-//    - Status: ✅ IMPLEMENTED (stub with proper error handling)
-//
-// 4. X3AssetRegistry (address 0xf004 / 61444)
-//    - Purpose: Asset metadata queries and registration
-//    - Calls: pallet_x3_asset_registry::register_asset()
-//    - Implementation: X3AssetRegistryPrecompile struct
-//    - Status: ✅ IMPLEMENTED (stub with proper error handling)
+// Phase F wiring plan (per IMPLEMENTATION_PLAN.md):
+//   0xf001 X3Verifier   → pallet_x3_verifier::submit_receipt()
+//   0xf002 X3Bridge     → pallet_x3_cross_vm_router::xvm_transfer()
+//   0xf003 X3Governance → pallet_governance::propose() / vote()
+//   0xf004 X3AssetReg   → pallet_x3_asset_registry::register_asset()
 // =====================================================================
-
-// Placeholder trait for custom X3 precompiles
-// In production, each precompile should implement full EVM bytecode parsing
-trait X3Precompile {
-    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult;
-}
 
 /// X3Verifier precompile — GPU proof verification dispatcher
 /// Address: 0xf001 (61441)
 pub struct X3VerifierPrecompile;
 
-impl X3Precompile for X3VerifierPrecompile {
-    fn execute(_handle: &mut impl PrecompileHandle) -> PrecompileResult {
-        // TODO: Parse EVM calldata for proof hash and metadata
-        // Call pallet_x3_verifier::verify_proof() via runtime dispatch
-        // Return (success: bool, proof_result: [u8; 32])
-        todo!("X3Verifier precompile: implement proof verification dispatcher")
+impl Precompile for X3VerifierPrecompile {
+    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+        // Guard: reject zero-length calldata early.
+        if handle.input().len() < 4 {
+            return Err(PrecompileFailure::Revert {
+                exit_status: ExitRevert::Reverted,
+                output: b"X3Verifier: calldata too short (need 4-byte selector)".to_vec(),
+            });
+        }
+        // Phase F: route by function selector and dispatch to pallet_x3_verifier.
+        // Until then, return a clean revert so EVM contracts can handle the failure.
+        Err(PrecompileFailure::Revert {
+            exit_status: ExitRevert::Reverted,
+            output: b"X3Verifier: pallet dispatch not yet enabled (Phase F)".to_vec(),
+        })
     }
 }
 
@@ -60,12 +49,19 @@ impl X3Precompile for X3VerifierPrecompile {
 /// Address: 0xf002 (61442)
 pub struct X3BridgePrecompile;
 
-impl X3Precompile for X3BridgePrecompile {
-    fn execute(_handle: &mut impl PrecompileHandle) -> PrecompileResult {
-        // TODO: Parse EVM calldata for asset, amount, destination chain
-        // Call pallet_x3_cross_vm_router::bridge_assets() via runtime dispatch
-        // Return (success: bool, bridge_tx_id: u64)
-        todo!("X3Bridge precompile: implement cross-VM asset bridging")
+impl Precompile for X3BridgePrecompile {
+    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+        if handle.input().len() < 4 {
+            return Err(PrecompileFailure::Revert {
+                exit_status: ExitRevert::Reverted,
+                output: b"X3Bridge: calldata too short (need 4-byte selector)".to_vec(),
+            });
+        }
+        // Phase F: dispatch to pallet_x3_cross_vm_router::xvm_transfer().
+        Err(PrecompileFailure::Revert {
+            exit_status: ExitRevert::Reverted,
+            output: b"X3Bridge: pallet dispatch not yet enabled (Phase F)".to_vec(),
+        })
     }
 }
 
@@ -73,12 +69,19 @@ impl X3Precompile for X3BridgePrecompile {
 /// Address: 0xf003 (61443)
 pub struct X3GovernancePrecompile;
 
-impl X3Precompile for X3GovernancePrecompile {
-    fn execute(_handle: &mut impl PrecompileHandle) -> PrecompileResult {
-        // TODO: Parse EVM calldata for proposal, actions, voting threshold
-        // Call pallet_governance::propose() or vote() via runtime dispatch
-        // Return (success: bool, proposal_id: u64)
-        todo!("X3Governance precompile: implement governance proposal execution")
+impl Precompile for X3GovernancePrecompile {
+    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+        if handle.input().len() < 4 {
+            return Err(PrecompileFailure::Revert {
+                exit_status: ExitRevert::Reverted,
+                output: b"X3Governance: calldata too short (need 4-byte selector)".to_vec(),
+            });
+        }
+        // Phase F: dispatch to pallet_governance::propose() / vote().
+        Err(PrecompileFailure::Revert {
+            exit_status: ExitRevert::Reverted,
+            output: b"X3Governance: pallet dispatch not yet enabled (Phase F)".to_vec(),
+        })
     }
 }
 
@@ -86,12 +89,19 @@ impl X3Precompile for X3GovernancePrecompile {
 /// Address: 0xf004 (61444)
 pub struct X3AssetRegistryPrecompile;
 
-impl X3Precompile for X3AssetRegistryPrecompile {
-    fn execute(_handle: &mut impl PrecompileHandle) -> PrecompileResult {
-        // TODO: Parse EVM calldata for asset metadata (name, symbol, decimals)
-        // Call pallet_x3_asset_registry::register_asset() via runtime dispatch
-        // Return (success: bool, asset_id: u32)
-        todo!("X3AssetRegistry precompile: implement asset registry operations")
+impl Precompile for X3AssetRegistryPrecompile {
+    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+        if handle.input().len() < 4 {
+            return Err(PrecompileFailure::Revert {
+                exit_status: ExitRevert::Reverted,
+                output: b"X3AssetRegistry: calldata too short (need 4-byte selector)".to_vec(),
+            });
+        }
+        // Phase F: dispatch to pallet_x3_asset_registry::register_asset().
+        Err(PrecompileFailure::Revert {
+            exit_status: ExitRevert::Reverted,
+            output: b"X3AssetRegistry: pallet dispatch not yet enabled (Phase F)".to_vec(),
+        })
     }
 }
 
@@ -138,52 +148,12 @@ where
             // X3 additional precompiles
             a if a == hash(1024) => Some(Sha3FIPS256::execute(handle)),
             a if a == hash(1025) => Some(ECRecoverPublicKey::execute(handle)),
-            // ISSUE #4 FIX: X3 CUSTOM PRECOMPILES NOW WIRED
-            a if a == hash(61441) => {
-                // x3_verifier precompile (0xf001)
-                // ✅ Implementation: X3VerifierPrecompile::execute(handle)
-                // This calls pallet_x3_verifier::verify_proof()
-                // TODO: Wire to X3VerifierPrecompile::execute(handle)
-                // For now, return error until precompile is fully implemented
-                Some(Err(pallet_evm::PrecompileFailure::Error {
-                    exit_status: pallet_evm::ExitError::Other(
-                        "X3Verifier precompile not yet fully implemented".into(),
-                    ),
-                }))
-            }
-            a if a == hash(61442) => {
-                // x3_bridge precompile (0xf002)
-                // ✅ Implementation: X3BridgePrecompile::execute(handle)
-                // This calls pallet_x3_cross_vm_router::bridge_assets()
-                // TODO: Wire to X3BridgePrecompile::execute(handle)
-                Some(Err(pallet_evm::PrecompileFailure::Error {
-                    exit_status: pallet_evm::ExitError::Other(
-                        "X3Bridge precompile not yet fully implemented".into(),
-                    ),
-                }))
-            }
-            a if a == hash(61443) => {
-                // x3_governance precompile (0xf003)
-                // ✅ Implementation: X3GovernancePrecompile::execute(handle)
-                // This calls pallet_governance::propose() / vote()
-                // TODO: Wire to X3GovernancePrecompile::execute(handle)
-                Some(Err(pallet_evm::PrecompileFailure::Error {
-                    exit_status: pallet_evm::ExitError::Other(
-                        "X3Governance precompile not yet fully implemented".into(),
-                    ),
-                }))
-            }
-            a if a == hash(61444) => {
-                // x3_asset_registry precompile (0xf004)
-                // ✅ Implementation: X3AssetRegistryPrecompile::execute(handle)
-                // This calls pallet_x3_asset_registry::register_asset()
-                // TODO: Wire to X3AssetRegistryPrecompile::execute(handle)
-                Some(Err(pallet_evm::PrecompileFailure::Error {
-                    exit_status: pallet_evm::ExitError::Other(
-                        "X3AssetRegistry precompile not yet fully implemented".into(),
-                    ),
-                }))
-            }
+            // X3 custom precompiles — wired to struct implementations
+            // Each returns PrecompileFailure::Revert until Phase F pallet dispatch lands.
+            a if a == hash(61441) => Some(X3VerifierPrecompile::execute(handle)),
+            a if a == hash(61442) => Some(X3BridgePrecompile::execute(handle)),
+            a if a == hash(61443) => Some(X3GovernancePrecompile::execute(handle)),
+            a if a == hash(61444) => Some(X3AssetRegistryPrecompile::execute(handle)),
             _ => None,
         }
     }

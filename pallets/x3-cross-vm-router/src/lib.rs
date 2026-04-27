@@ -143,6 +143,10 @@ pub mod pallet {
         type Registry: AssetRegistryInspect + RouteInspect;
         /// Supply ledger pallet (transactional writes).
         type Ledger: SupplyLedgerWrite;
+        /// Origin that may register external bridge roots.
+        /// Use `EnsureRoot` for governance-only, or a custom council origin.
+        /// Defaults to `EnsureRoot<AccountId>` in the runtime configuration.
+        type ExternalExecutorOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
@@ -338,12 +342,12 @@ pub mod pallet {
             block_number: u32,
             proof: Vec<u8>,
         ) -> DispatchResult {
-            let _executor = ensure_signed(origin)?;
+            // Only the configured executor origin (default: Root / governance) may
+            // register bridge roots. This prevents arbitrary accounts from injecting
+            // fake cross-chain state. Full RBAC (council multisig etc.) can be wired
+            // by setting ExternalExecutorOrigin in the runtime configuration.
+            T::ExternalExecutorOrigin::ensure_origin(origin)?;
 
-            // P1: Verify executor is authorized (cross-chain executor/verifier role)
-            // TODO: Integrate with x3-kernel pallet for executor authorization
-            // For now, we accept any signed origin; full RBAC in PHASE F
-            
             // P2: Verify chain_id is valid (must be external chain, not X3 internal)
             ensure!(chain_id != 0, Error::<T>::InvalidProof); // 0 is reserved for X3Native
 

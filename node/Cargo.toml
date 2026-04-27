@@ -26,6 +26,9 @@ x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
 x3-rpc = { path = "../crates/x3-rpc" }
 x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
+pallet-x3-settlement-engine = { path = "../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
+pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false, features = ["std"] }
+pallet-agent-memory = { path = "../pallets/agent-memory", default-features = false, features = ["std"] }
 x3-finality-oracle = { path = "../crates/x3-finality-oracle" }
 x3-verification-router = { path = "../crates/x3-verification-router" }
 x3-validator-attestation = { path = "../crates/x3-validator-attestation" }
