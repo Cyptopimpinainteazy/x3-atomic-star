@@ -266,6 +266,20 @@ pub mod pallet {
     pub type GovernanceConfig<T: Config> =
         StorageValue<_, GovernanceParams<BalanceOf<T>, BlockNumberFor<T>>, ValueQuery>;
 
+    /// S1-2 (governance_bypass): Canonical on-chain constitution hash.
+    ///
+    /// When set, proposals carrying `touches_invariants = true` MUST supply a
+    /// `constitution_hash` matching this value, both at submission time AND at
+    /// enactment time. Mismatched hashes are rejected with
+    /// `ConstitutionHashMismatch` so an attacker cannot forge a privileged
+    /// proposal that references an alternate constitution.
+    ///
+    /// Updated only by `RuntimeUpgradeOrigin` (root / governance-bound).
+    #[pallet::storage]
+    #[pallet::getter(fn canonical_constitution_hash)]
+    pub type CanonicalConstitutionHash<T: Config> =
+        StorageValue<_, [u8; 32], OptionQuery>;
+
     // ============================================================================
     // AI Governance Storage
     // ============================================================================
@@ -452,6 +466,8 @@ pub mod pallet {
         AIReviewerRegistered { reviewer: T::AccountId },
         /// AI governance config updated
         AIConfigUpdated,
+        /// S1-2: Canonical constitution hash was rotated by governance.
+        CanonicalConstitutionHashUpdated { hash: [u8; 32] },
     }
 
     // ========================================================================
@@ -626,6 +642,18 @@ pub mod pallet {
             if touches_invariants {
                 let has_proof = proof_commitment.map(|c| c != [0u8; 32]).unwrap_or(false);
                 ensure!(has_proof, Error::<T>::ProofRequiredForInvariantProposal);
+
+                // S1-2 (governance_bypass): if the runtime has registered a
+                // canonical constitution hash, the proposal MUST reference it
+                // exactly. This prevents an attacker from submitting an
+                // invariant-touching proposal under a forged constitution.
+                if let Some(canonical) = CanonicalConstitutionHash::<T>::get() {
+                    let supplied = constitution_hash.unwrap_or([0u8; 32]);
+                    ensure!(
+                        supplied == canonical,
+                        Error::<T>::ConstitutionHashMismatch
+                    );
+                }
             }
 
             let config = GovernanceConfig::<T>::get();
@@ -1324,6 +1352,27 @@ pub mod pallet {
 
             Ok(())
         }
+
+        /// S1-2 (governance_bypass): Set the canonical constitution hash that
+        /// invariant-touching proposals must reference.
+        ///
+        /// Origin: `RuntimeUpgradeOrigin` (root / governance-bound). Setting
+        /// to the zero hash effectively disables the gate (legacy behaviour).
+        #[pallet::call_index(17)]
+        #[pallet::weight(T::WeightInfo::update_config())]
+        pub fn set_canonical_constitution_hash(
+            origin: OriginFor<T>,
+            hash: [u8; 32],
+        ) -> DispatchResult {
+            T::RuntimeUpgradeOrigin::ensure_origin(origin)?;
+            if hash == [0u8; 32] {
+                CanonicalConstitutionHash::<T>::kill();
+            } else {
+                CanonicalConstitutionHash::<T>::put(hash);
+            }
+            Self::deposit_event(Event::CanonicalConstitutionHashUpdated { hash });
+            Ok(())
+        }
     }
 
     // ========================================================================
@@ -1361,6 +1410,26 @@ pub mod pallet {
                             Self::deposit_event(Event::ProposalCancelled { proposal_id });
                             weight = weight.saturating_add(T::DbWeight::get().writes(1));
                             return weight;
+                        }
+
+                        // S1-2 (governance_bypass): re-validate the constitution
+                        // hash at enactment time. The canonical hash may have
+                        // been rotated between submission and enactment, in
+                        // which case the proposal must be rejected — voters
+                        // approved a proposal under a different constitution.
+                        if let Some(canonical) = CanonicalConstitutionHash::<T>::get() {
+                            let supplied = proposal.constitution_hash.unwrap_or([0u8; 32]);
+                            if supplied != canonical {
+                                let _ = T::Currency::slash_reserved(
+                                    &proposal.proposer,
+                                    proposal.deposit,
+                                );
+                                proposal.status = ProposalStatus::Cancelled;
+                                Proposals::<T>::insert(proposal_id, &proposal);
+                                Self::deposit_event(Event::ProposalCancelled { proposal_id });
+                                weight = weight.saturating_add(T::DbWeight::get().writes(1));
+                                return weight;
+                            }
                         }
                     }
 

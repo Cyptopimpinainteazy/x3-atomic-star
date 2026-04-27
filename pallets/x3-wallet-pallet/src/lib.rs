@@ -13,6 +13,7 @@ mod tests;
 pub mod pallet {
     use frame_support::{pallet_prelude::*, storage::bounded_vec::BoundedVec};
     use frame_system::pallet_prelude::*;
+    use frame_system::ensure_root;
     use sp_runtime::traits::Hash;
     use sp_std::vec::Vec;
     use x3_wallet::{
@@ -305,7 +306,13 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Mint tokens (admin only, simplified)
+        /// Mint tokens (root / governance only).
+        ///
+        /// S1-3 fix: previous implementation only required `ensure_signed`
+        /// and used unchecked addition, which allowed any signed account to
+        /// inflate balances arbitrarily and trigger overflows. Mint authority
+        /// is now restricted to the root origin (governance / sudo) and the
+        /// balance update uses `checked_add` to reject overflow.
         #[pallet::call_index(5)]
         #[pallet::weight(5_000)]
         pub fn mint_tokens(
@@ -314,15 +321,20 @@ pub mod pallet {
             to: T::AccountId,
             amount: u128,
         ) -> DispatchResult {
-            let _who = ensure_signed(origin)?;
+            // S1-3: only governance / root may mint.
+            ensure_root(origin)?;
+            ensure!(amount > 0, Error::<T>::InvalidAmount);
 
             let current = TokenBalances::<T>::get((to.clone(), token_id));
-            TokenBalances::<T>::insert((to.clone(), token_id), current + amount);
+            let new_balance = current
+                .checked_add(amount)
+                .ok_or(Error::<T>::InvalidAmount)?;
+            TokenBalances::<T>::insert((to.clone(), token_id), new_balance);
 
             Self::deposit_event(Event::BalanceUpdated {
                 account: to,
                 token_id,
-                amount: current + amount,
+                amount: new_balance,
             });
 
             Ok(())

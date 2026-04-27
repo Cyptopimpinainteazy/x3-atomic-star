@@ -10,7 +10,11 @@
 //! 1. Operators (governance) configure `InvariantBounds` via `set_bounds`.
 //! 2. Every block, `on_finalize` calls `Self::enforce_all()`.
 //! 3. Any violation emits `InvariantViolated` and increments `ViolationCount`.
-//! 4. If `HaltOnViolation` is set, the node will panic (chain halts) — exchange-grade safety.
+//! 4. If `HaltOnViolation` is set, an emergency `ChainHaltRequested` event is
+//!    emitted, the on-chain `Halted` flag is raised, and the violation is
+//!    logged at error level. (Earlier versions called `panic!()` here, which
+//!    bricked the chain in a node restart loop and defeated the safety goal.
+//!    See S0-6 remediation.)
 //!
 //! ## Article IV Alignment
 //!
@@ -70,11 +74,22 @@ pub mod pallet {
     #[pallet::getter(fn violation_count)]
     pub type ViolationCount<T: Config> = StorageValue<_, u64, ValueQuery>;
 
-    /// If true, any invariant violation causes a runtime panic (chain halt).
-    /// Should only be enabled on production chains after initial burn-in.
+    /// If true, any invariant violation raises the on-chain `Halted` flag
+    /// and emits a `ChainHaltRequested` event. (Previous versions panicked
+    /// the node here; see S0-6.) Should only be enabled on production
+    /// chains after initial burn-in.
     #[pallet::storage]
     #[pallet::getter(fn halt_on_violation)]
     pub type HaltOnViolation<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+    /// S0-6: Set to `true` once any invariant has been violated while
+    /// `HaltOnViolation` was active. Cleared only by governance via
+    /// `set_halt_on_violation(false)` plus an explicit `clear_halted` call.
+    /// Other pallets / runtime hooks may inspect this to refuse new state
+    /// transitions during an emergency stop.
+    #[pallet::storage]
+    #[pallet::getter(fn halted)]
+    pub type Halted<T: Config> = StorageValue<_, bool, ValueQuery>;
 
     /// The canonical constitution hash this pallet was configured against.
     /// Governance proposals that don't match this hash are out-of-scope.
@@ -135,6 +150,16 @@ pub mod pallet {
         HaltModeChanged { halt: bool },
         /// Constitution hash registered on-chain.
         ConstitutionHashSet { hash: [u8; 32] },
+        /// S0-6: Chain halt requested due to invariant violation.
+        /// Replaces previous `panic!()` behaviour. Monitoring and governance
+        /// must observe this event and trigger an orderly stop / runtime
+        /// upgrade rather than relying on a node-level crash.
+        ChainHaltRequested {
+            block: BlockNumberFor<T>,
+            invariant: InvariantKind,
+            observed: u128,
+            bound: u128,
+        },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────────
@@ -334,10 +359,27 @@ pub mod pallet {
                         bound: max_supply,
                     });
                     if HaltOnViolation::<T>::get() {
-                        panic!(
-                            "X3 INVARIANT VIOLATION: total issuance {} exceeds max supply {}",
-                            observed, max_supply
+                        // S0-6: Replaced runtime panic with defensive log + halt
+                        // event. Panicking inside `on_finalize` puts the node in
+                        // a restart loop and bricks the chain — the opposite of
+                        // "exchange-grade safety". Operators / governance must
+                        // pick up `ChainHaltRequested` from monitoring and
+                        // perform an orderly stop or runtime upgrade.
+                        Halted::<T>::put(true);
+                        log::error!(
+                            target: "x3-invariants",
+                            "X3 INVARIANT VIOLATION: total issuance {} exceeds max supply {} (block {:?})",
+                            observed, max_supply, block,
                         );
+                        frame_support::defensive!(
+                            "x3-invariants: max supply violated"
+                        );
+                        Self::deposit_event(Event::ChainHaltRequested {
+                            block,
+                            invariant: InvariantKind::MaxSupply,
+                            observed,
+                            bound: max_supply,
+                        });
                     }
                 }
             }
@@ -356,10 +398,22 @@ pub mod pallet {
                         bound: max_agents as u128,
                     });
                     if HaltOnViolation::<T>::get() {
-                        panic!(
-                            "X3 INVARIANT VIOLATION: agent count {} exceeds max {}",
-                            observed, max_agents
+                        // S0-6: see comment on max-supply branch.
+                        Halted::<T>::put(true);
+                        log::error!(
+                            target: "x3-invariants",
+                            "X3 INVARIANT VIOLATION: agent count {} exceeds max {} (block {:?})",
+                            observed, max_agents, block,
                         );
+                        frame_support::defensive!(
+                            "x3-invariants: agent count violated"
+                        );
+                        Self::deposit_event(Event::ChainHaltRequested {
+                            block,
+                            invariant: InvariantKind::MaxAgents,
+                            observed: observed as u128,
+                            bound: max_agents as u128,
+                        });
                     }
                 }
             }
@@ -378,10 +432,22 @@ pub mod pallet {
                         bound: max_depth as u128,
                     });
                     if HaltOnViolation::<T>::get() {
-                        panic!(
-                            "X3 INVARIANT VIOLATION: proposal depth {} exceeds max {}",
-                            observed, max_depth
+                        // S0-6: see comment on max-supply branch.
+                        Halted::<T>::put(true);
+                        log::error!(
+                            target: "x3-invariants",
+                            "X3 INVARIANT VIOLATION: proposal depth {} exceeds max {} (block {:?})",
+                            observed, max_depth, block,
                         );
+                        frame_support::defensive!(
+                            "x3-invariants: proposal depth violated"
+                        );
+                        Self::deposit_event(Event::ChainHaltRequested {
+                            block,
+                            invariant: InvariantKind::MaxProposalDepth,
+                            observed: observed as u128,
+                            bound: max_depth as u128,
+                        });
                     }
                 }
             }

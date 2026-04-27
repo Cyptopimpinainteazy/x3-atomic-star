@@ -614,31 +614,42 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Rollback a mutation
+        /// Rollback a mutation.
+        ///
+        /// S1-1 fix: the previous version used `try_mutate` for the proposal
+        /// record, but `revert_mutation` independently writes to
+        /// `CurrentParams`. If the proposal mutation succeeded but the params
+        /// write failed (or vice versa) the system could be left in a
+        /// half-rolled-back state. The whole rollback is now wrapped in
+        /// `with_storage_layer` so any intermediate failure reverts every
+        /// storage write atomically.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::rollback_mutation())]
         pub fn rollback_mutation(origin: OriginFor<T>, proposal_id: u64) -> DispatchResult {
             T::EmergencyOrigin::ensure_origin(origin)?;
 
-            Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| {
-                let proposal = maybe_proposal
-                    .as_mut()
-                    .ok_or(Error::<T>::ProposalNotFound)?;
-                ensure!(
-                    proposal.status == ProposalStatus::Applied,
-                    Error::<T>::InvalidMutation
-                );
+            // S1-1: atomic rollback — succeed fully or revert all writes.
+            frame_support::storage::with_storage_layer(|| {
+                Proposals::<T>::try_mutate(proposal_id, |maybe_proposal| {
+                    let proposal = maybe_proposal
+                        .as_mut()
+                        .ok_or(Error::<T>::ProposalNotFound)?;
+                    ensure!(
+                        proposal.status == ProposalStatus::Applied,
+                        Error::<T>::InvalidMutation
+                    );
 
-                // Rollback the mutation
-                Self::revert_mutation(&proposal.mutation)?;
-                proposal.status = ProposalStatus::Rolled;
+                    // Rollback the mutation
+                    Self::revert_mutation(&proposal.mutation)?;
+                    proposal.status = ProposalStatus::Rolled;
 
-                Self::deposit_event(Event::MutationRolledBack {
-                    id: proposal_id,
-                    mutation: proposal.mutation.clone(),
-                });
+                    Self::deposit_event(Event::MutationRolledBack {
+                        id: proposal_id,
+                        mutation: proposal.mutation.clone(),
+                    });
 
-                Ok(())
+                    Ok::<(), DispatchError>(())
+                })
             })
         }
     }
@@ -817,11 +828,15 @@ pub mod pallet {
             })
         }
 
-        /// Check if AI evolution is allowed (governance integration)
+        /// Check if AI evolution is allowed.
+        ///
+        /// S1-2 fix: previously this was a hard-coded `true` placeholder,
+        /// which meant the on-chain `EvolutionEnabled` kill-switch and the
+        /// `emergency_stop` extrinsic had no effect on AI-driven evolution
+        /// flows that called this helper. It now actually returns the
+        /// on-chain flag.
         pub fn is_ai_evolution_allowed() -> bool {
-            // Check if governance pallet allows AI evolution
-            // This would integrate with the governance pallet's kill switch
-            true // Placeholder - would check governance pallet
+            Self::evolution_enabled()
         }
 
         /// Get current evolvable parameters (for other pallets)
@@ -849,10 +864,19 @@ pub mod pallet {
             metrics
         }
 
-        /// Check governance approval before applying mutation
-        fn check_governance_approval(_mutation: &MutationType) -> DispatchResult {
-            // In production, this would check with the governance pallet
-            // For now, allow all mutations (would be replaced with governance integration)
+        /// Check governance approval before applying a mutation.
+        ///
+        /// S1-2 fix: previously a no-op `Ok(())` regardless of state, which
+        /// allowed `apply_mutation` to commit runtime parameter changes even
+        /// while the on-chain kill-switch was engaged. We now refuse to apply
+        /// any mutation while evolution is disabled, and we explicitly reject
+        /// out-of-bounds mutations as a defence-in-depth check (the same
+        /// bounds enforced at proposal-time).
+        fn check_governance_approval(mutation: &MutationType) -> DispatchResult {
+            ensure!(Self::evolution_enabled(), Error::<T>::EvolutionDisabled);
+            // Re-validate at apply-time: bounds may have been tightened by
+            // governance after the mutation was originally proposed.
+            Self::validate_mutation(mutation)?;
             Ok(())
         }
     }

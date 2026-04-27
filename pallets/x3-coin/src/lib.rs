@@ -274,6 +274,18 @@ pub mod pallet {
     pub type CrossChainNonce<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
+    /// S1-3 (unauthorized_mint) — Authorized minter / burner / relayer allow-list.
+    ///
+    /// Only accounts present in this map (or root) may invoke `mint`, `burn`,
+    /// `submit_cross_chain_operation`, or `finalize_cross_chain_operation`.
+    /// Membership is governed by the root origin via `add_minter` / `remove_minter`,
+    /// which in production is bound to governance through the runtime's
+    /// `RuntimeUpgradeOrigin` (or equivalent) -> root scheduler path.
+    #[pallet::storage]
+    #[pallet::getter(fn is_minter)]
+    pub type Minters<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
+
     /// Relayer configuration registry
     /// Value tuple: (enabled_chains, min_confirmations, max_gas_price)
     #[pallet::storage]
@@ -376,6 +388,10 @@ pub mod pallet {
         CrossChainOperationFinalized { operation_id: H256, success: bool },
         /// Treasury allocation updated
         TreasuryAllocationUpdated { new_balance: T::Balance },
+        /// S1-3: An account was added to the authorized-minter allow-list.
+        MinterAdded { account: T::AccountId },
+        /// S1-3: An account was removed from the authorized-minter allow-list.
+        MinterRemoved { account: T::AccountId },
     }
 
     #[pallet::error]
@@ -412,11 +428,17 @@ pub mod pallet {
         InvalidTargetAccount,
         /// Supply conservation invariant violated - total supply must equal treasury + bonus + distributed
         SupplyInvariantViolation,
+        /// S1-3: caller is not in the authorized minter allow-list.
+        UnauthorizedMinter,
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Mint X3 tokens from cross-chain operation
+        ///
+        /// S1-3 (unauthorized_mint): caller MUST be in the `Minters` allow-list.
+        /// `ensure_signed` alone is not sufficient — minting is a privileged
+        /// operation that affects total supply.
         #[pallet::call_index(0)]
         #[pallet::weight(<T as Config>::WeightInfo::mint())]
         pub fn mint(
@@ -425,7 +447,8 @@ pub mod pallet {
             amount: T::Balance,
             proof: X3Proof,
         ) -> DispatchResult {
-            ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
+            Self::ensure_minter(&who)?;
 
             // Validate proof
             Self::validate_proof(&proof)?;
@@ -471,6 +494,10 @@ pub mod pallet {
         }
 
         /// Burn X3 tokens for cross-chain operation
+        ///
+        /// S1-3 (unauthorized_mint): symmetric guard — only authorized minters
+        /// may perform cross-chain burns. Prevents an unauthorized actor from
+        /// burning canonical balance to forge an external-chain release.
         #[pallet::call_index(1)]
         #[pallet::weight(<T as Config>::WeightInfo::burn())]
         pub fn burn(
@@ -479,7 +506,8 @@ pub mod pallet {
             amount: T::Balance,
             proof: X3Proof,
         ) -> DispatchResult {
-            ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
+            Self::ensure_minter(&who)?;
 
             // Validate proof
             Self::validate_proof(&proof)?;
@@ -642,13 +670,17 @@ pub mod pallet {
         }
 
         /// Submit cross-chain operation
+        ///
+        /// S1-3 (unauthorized_mint): only authorized minters may submit
+        /// cross-chain mint/burn/transfer operations.
         #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::submit_cross_chain_operation())]
         pub fn submit_cross_chain_operation(
             origin: OriginFor<T>,
             operation: CrossChainOperation,
         ) -> DispatchResult {
-            ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
+            Self::ensure_minter(&who)?;
 
             let operation_id = Self::generate_cross_chain_operation_id(&operation);
 
@@ -697,6 +729,8 @@ pub mod pallet {
         }
 
         /// Finalize cross-chain operation
+        /// S1-3 (unauthorized_mint): finalization triggers the actual mint /
+        /// burn / transfer — this MUST be guarded against arbitrary callers.
         #[pallet::call_index(5)]
         #[pallet::weight(<T as Config>::WeightInfo::finalize_cross_chain_operation())]
         pub fn finalize_cross_chain_operation(
@@ -704,7 +738,8 @@ pub mod pallet {
             operation_id: H256,
             success: bool,
         ) -> DispatchResult {
-            ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
+            Self::ensure_minter(&who)?;
 
             let operation = CrossChainOperations::<T>::get(operation_id)
                 .ok_or(Error::<T>::CrossChainOperationNotFound)?;
@@ -764,9 +799,45 @@ pub mod pallet {
 
             Ok(())
         }
+
+        /// S1-3: Add an account to the authorized-minter allow-list.
+        ///
+        /// Origin: `Root` (governance-bound in production).
+        #[pallet::call_index(20)]
+        #[pallet::weight(<T as Config>::WeightInfo::mint())]
+        pub fn add_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+            Minters::<T>::insert(&who, ());
+            Self::deposit_event(Event::MinterAdded { account: who });
+            Ok(())
+        }
+
+        /// S1-3: Remove an account from the authorized-minter allow-list.
+        ///
+        /// Origin: `Root` (governance-bound in production).
+        #[pallet::call_index(21)]
+        #[pallet::weight(<T as Config>::WeightInfo::mint())]
+        pub fn remove_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+            Minters::<T>::remove(&who);
+            Self::deposit_event(Event::MinterRemoved { account: who });
+            Ok(())
+        }
     }
 
     impl<T: Config> Pallet<T> {
+        /// S1-3 (unauthorized_mint): Reject callers that are not in the
+        /// authorized minter allow-list. Privileged paths (mint, burn,
+        /// cross-chain submit/finalize) MUST call this immediately after
+        /// `ensure_signed`.
+        pub(crate) fn ensure_minter(who: &T::AccountId) -> Result<(), Error<T>> {
+            ensure!(
+                Minters::<T>::contains_key(who),
+                Error::<T>::UnauthorizedMinter
+            );
+            Ok(())
+        }
+
         fn parse_finality_envelope(
             proof_bytes: &[u8],
             expected_chain: u8,

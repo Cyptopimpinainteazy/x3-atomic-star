@@ -1251,35 +1251,43 @@ pub mod pallet {
         }
 
         /// Refund settlement after timeout
+        ///
+        /// S1-1 (failed_rollback) FIX: All refund-side bookkeeping (state
+        /// transitions, escrow releases, bond adjustments, events) is wrapped
+        /// in `with_storage_layer` so that a failure mid-refund leaves the
+        /// intent untouched. There is no partial-refund window in which an
+        /// intent could be observed half-reverted.
         #[pallet::call_index(4)]
         #[pallet::weight(T::SettlementWeightInfo::refund_intent())]
         pub fn refund_settlement(origin: OriginFor<T>, intent_id: H256) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // Verify intent exists
-            let intent =
-                SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
+            frame_support::storage::with_storage_layer(|| {
+                // Verify intent exists
+                let intent = SettlementIntents::<T>::get(intent_id)
+                    .ok_or(Error::<T>::IntentNotFound)?;
 
-            // Verify caller is maker or taker
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+                // Verify caller is maker or taker
+                ensure!(
+                    who == intent.maker || who == intent.taker,
+                    Error::<T>::NotAuthorized
+                );
 
-            let state = IntentStates::<T>::get(intent_id);
-            ensure!(
-                !matches!(state, IntentState::Finalized | IntentState::Refunded),
-                Error::<T>::InvalidIntentState
-            );
+                let state = IntentStates::<T>::get(intent_id);
+                ensure!(
+                    !matches!(state, IntentState::Finalized | IntentState::Refunded),
+                    Error::<T>::InvalidIntentState
+                );
 
-            // Verify timeout HAS expired
-            let now = T::UnixTime::now().as_secs();
-            ensure!(now >= intent.timeout, Error::<T>::TimeoutNotExpired);
+                // Verify timeout HAS expired
+                let now = T::UnixTime::now().as_secs();
+                ensure!(now >= intent.timeout, Error::<T>::TimeoutNotExpired);
 
-            // Process refund
-            Self::process_refund(intent_id, &intent, RefundReason::Timeout)?;
+                // Process refund (atomic — all-or-nothing within the storage layer)
+                Self::process_refund(intent_id, &intent, RefundReason::Timeout)?;
 
-            Ok(())
+                Ok(())
+            })
         }
 
         // ────────────────────────────────────────────────────────────────────
