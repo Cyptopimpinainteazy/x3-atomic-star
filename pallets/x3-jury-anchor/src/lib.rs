@@ -18,7 +18,7 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_timestamp::Config {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        
+
         #[pallet::constant]
         type MaxSessionIdLength: Get<u32>;
     }
@@ -187,6 +187,7 @@ mod tests {
     use frame_support::traits::ConstU32;
     use frame_system as system;
     use sp_core::H256;
+    use sp_runtime::BuildStorage;
 
     type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -209,9 +210,10 @@ mod tests {
         type Hash = H256;
         type Hashing = sp_runtime::traits::BlakeTwo256;
         type AccountId = u64;
-        type Lookup = frame_system::traits::IdentityLookup<Self::AccountId>;
+        type Lookup = sp_runtime::traits::IdentityLookup<Self::AccountId>;
         type Block = Block;
         type RuntimeEvent = RuntimeEvent;
+        type BlockHashCount = frame_support::traits::ConstU64<250>;
         type Version = ();
         type PalletInfo = PalletInfo;
         type AccountData = ();
@@ -236,10 +238,9 @@ mod tests {
     }
 
     fn new_test_ext() -> sp_io::TestExternalities {
-        let mut t = system::GenesisConfig::default()
-            .build_storage::<Test>()
+        let t = frame_system::GenesisConfig::<Test>::default()
+            .build_storage()
             .unwrap();
-        
         t.into()
     }
 
@@ -248,7 +249,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let session_id = b"test-session".to_vec();
             let hash = H256::repeat_byte(1);
-            
+
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
 
             assert_ok!(JuryAnchor::anchor_decision(
@@ -293,7 +294,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let session_id = b"verify-test".to_vec();
             let hash = H256::repeat_byte(2);
-            
+
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
             JuryAnchor::anchor_decision(
                 RuntimeOrigin::signed(1),
@@ -311,7 +312,7 @@ mod tests {
             let session_id = b"verify-test-2".to_vec();
             let hash1 = H256::repeat_byte(3);
             let hash2 = H256::repeat_byte(4);
-            
+
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
             JuryAnchor::anchor_decision(
                 RuntimeOrigin::signed(1),
@@ -328,7 +329,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let session_id = b"duplicate-test".to_vec();
             let hash = H256::repeat_byte(5);
-            
+
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
             JuryAnchor::anchor_decision(
                 RuntimeOrigin::signed(1),

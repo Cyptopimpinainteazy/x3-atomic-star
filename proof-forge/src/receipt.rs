@@ -14,28 +14,28 @@ use crate::proof::ProofResult;
 pub struct Receipt {
     /// Git commit hash at time of proof
     pub repo_commit_hash: String,
-    
+
     /// Command that generated this receipt
     pub command_run: String,
-    
+
     /// SHA256 hash of relevant artifacts
     pub artifact_hash: String,
-    
+
     /// SHA256 hash of policy files
     pub policy_hash: String,
-    
+
     /// Files that were inspected/tested
     pub relevant_files: Vec<PathBuf>,
-    
+
     /// Timestamp of proof execution (ISO 8601)
     pub timestamp: DateTime<Utc>,
-    
+
     /// Proof result
     pub result: ProofResult,
-    
+
     /// Known limitations of this proof
     pub limitations: Vec<String>,
-    
+
     /// Cryptographic binding hash (SHA256 of all fields)
     pub binding_hash: String,
 }
@@ -52,7 +52,7 @@ impl Receipt {
         let artifact_hash = compute_artifact_hash(&relevant_files)?;
         let policy_hash = compute_policy_hash()?;
         let timestamp = Utc::now();
-        
+
         let mut receipt = Receipt {
             repo_commit_hash,
             command_run: command,
@@ -64,44 +64,44 @@ impl Receipt {
             limitations,
             binding_hash: String::new(), // Will be computed next
         };
-        
+
         // Compute binding hash over all fields
         receipt.binding_hash = receipt.compute_binding_hash()?;
-        
+
         Ok(receipt)
     }
-    
+
     /// Compute cryptographic binding hash
     fn compute_binding_hash(&self) -> Result<String> {
         let mut hasher = Sha256::new();
-        
+
         // Hash all fields in deterministic order
         hasher.update(self.repo_commit_hash.as_bytes());
         hasher.update(self.command_run.as_bytes());
         hasher.update(self.artifact_hash.as_bytes());
         hasher.update(self.policy_hash.as_bytes());
-        
+
         // Hash relevant files list
         for file in &self.relevant_files {
             hasher.update(file.to_string_lossy().as_bytes());
         }
-        
+
         // Hash timestamp
         hasher.update(self.timestamp.to_rfc3339().as_bytes());
-        
+
         // Hash result (serialize to JSON for deterministic representation)
         let result_json = serde_json::to_string(&self.result)?;
         hasher.update(result_json.as_bytes());
-        
+
         // Hash limitations
         for limitation in &self.limitations {
             hasher.update(limitation.as_bytes());
         }
-        
+
         let hash = hasher.finalize();
         Ok(hex::encode(hash))
     }
-    
+
     /// Verify receipt integrity by recomputing binding hash
     pub fn verify_integrity(&self) -> Result<bool> {
         let mut temp_receipt = self.clone();
@@ -109,14 +109,14 @@ impl Receipt {
         let recomputed_hash = temp_receipt.compute_binding_hash()?;
         Ok(recomputed_hash == self.binding_hash)
     }
-    
+
     /// Check if receipt is fresh (within 24 hours)
     pub fn is_fresh(&self) -> bool {
         let now = Utc::now();
         let age = now.signed_duration_since(self.timestamp);
         age < Duration::hours(24)
     }
-    
+
     /// Check if receipt is stale (relevant files have changed since timestamp)
     pub fn is_stale(&self) -> Result<bool> {
         // Check if any relevant files have been modified since receipt timestamp
@@ -125,21 +125,21 @@ impl Receipt {
                 // File deleted since receipt - definitely stale
                 return Ok(true);
             }
-            
+
             let metadata = fs::metadata(file)
                 .context(format!("Failed to get metadata for {}", file.display()))?;
-            
+
             let modified = metadata.modified()
                 .context(format!("Failed to get modified time for {}", file.display()))?;
-            
+
             let modified_dt: DateTime<Utc> = modified.into();
-            
+
             if modified_dt > self.timestamp {
                 // File modified after receipt - stale
                 return Ok(true);
             }
         }
-        
+
         // Check if git has changes in relevant files since commit
         let current_commit = get_git_commit_hash()?;
         if current_commit != self.repo_commit_hash {
@@ -149,23 +149,23 @@ impl Receipt {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
-    
+
     /// Save receipt to file
     pub fn save(&self, path: &Path) -> Result<()> {
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
+
         let json = serde_json::to_string_pretty(self)?;
         fs::write(path, json)?;
-        
+
         Ok(())
     }
-    
+
     /// Load receipt from file
     pub fn load(path: &Path) -> Result<Self> {
         let json = fs::read_to_string(path)
@@ -182,22 +182,22 @@ fn get_git_commit_hash() -> Result<String> {
         .args(&["rev-parse", "HEAD"])
         .output()
         .context("Failed to run git rev-parse HEAD")?;
-    
+
     if !output.status.success() {
         anyhow::bail!("git rev-parse failed: {}", String::from_utf8_lossy(&output.stderr));
     }
-    
+
     let hash = String::from_utf8(output.stdout)?
         .trim()
         .to_string();
-    
+
     Ok(hash)
 }
 
 /// Compute SHA256 hash of file contents for relevant files
 fn compute_artifact_hash(files: &[PathBuf]) -> Result<String> {
     let mut hasher = Sha256::new();
-    
+
     for file in files {
         if file.exists() && file.is_file() {
             let contents = fs::read(file)
@@ -205,7 +205,7 @@ fn compute_artifact_hash(files: &[PathBuf]) -> Result<String> {
             hasher.update(&contents);
         }
     }
-    
+
     let hash = hasher.finalize();
     Ok(hex::encode(hash))
 }
@@ -213,13 +213,13 @@ fn compute_artifact_hash(files: &[PathBuf]) -> Result<String> {
 /// Compute SHA256 hash of all policy files
 fn compute_policy_hash() -> Result<String> {
     let mut hasher = Sha256::new();
-    
+
     let policy_files = vec![
         "proof/policies/todo_policy.yml",
         "proof/policies/gap_policy.yml",
         "proof/policies/release_gates.yml",
     ];
-    
+
     for policy_file in policy_files {
         let path = PathBuf::from(policy_file);
         if path.exists() {
@@ -228,7 +228,7 @@ fn compute_policy_hash() -> Result<String> {
             hasher.update(&contents);
         }
     }
-    
+
     let hash = hasher.finalize();
     Ok(hex::encode(hash))
 }
@@ -240,18 +240,18 @@ fn check_git_files_changed(old_commit: &str, files: &[PathBuf]) -> Result<bool> 
             .args(&["diff", "--name-only", old_commit, "HEAD", "--", &file.to_string_lossy()])
             .output()
             .context("Failed to run git diff")?;
-        
+
         if !output.status.success() {
             // Ignore git errors - assume file may have changed
             return Ok(true);
         }
-        
+
         if !output.stdout.is_empty() {
             // File changed
             return Ok(true);
         }
     }
-    
+
     Ok(false)
 }
 
@@ -264,11 +264,11 @@ pub fn generate_claim_receipt(
 ) -> Result<Receipt> {
     let command = format!("x3-proof verify {}", claim_id);
     let receipt = Receipt::new(command, result, relevant_files, limitations)?;
-    
+
     // Save to proof/receipts/claims/{claim_id}.receipt.json
     let receipt_path = PathBuf::from(format!("proof/receipts/claims/{}.receipt.json", claim_id));
     receipt.save(&receipt_path)?;
-    
+
     Ok(receipt)
 }
 
@@ -281,28 +281,28 @@ pub fn load_claim_receipt(claim_id: &str) -> Result<Receipt> {
 /// Check all claim receipts for freshness and integrity
 pub fn check_all_receipts() -> Result<HashMap<String, ReceiptStatus>> {
     let mut statuses = HashMap::new();
-    
+
     let receipts_dir = PathBuf::from("proof/receipts/claims");
     if !receipts_dir.exists() {
         return Ok(statuses);
     }
-    
+
     for entry in fs::read_dir(receipts_dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.extension().map(|e| e == "json").unwrap_or(false) {
             let file_stem = path.file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
-            
+
             // Extract claim_id (remove .receipt suffix)
             let claim_id = if file_stem.ends_with(".receipt") {
                 file_stem.trim_end_matches(".receipt").to_string()
             } else {
                 file_stem.to_string()
             };
-            
+
             match Receipt::load(&path) {
                 Ok(receipt) => {
                     let status = if !receipt.verify_integrity()? {
@@ -314,7 +314,7 @@ pub fn check_all_receipts() -> Result<HashMap<String, ReceiptStatus>> {
                     } else {
                         ReceiptStatus::Fresh
                     };
-                    
+
                     statuses.insert(claim_id, status);
                 }
                 Err(e) => {
@@ -324,7 +324,7 @@ pub fn check_all_receipts() -> Result<HashMap<String, ReceiptStatus>> {
             }
         }
     }
-    
+
     Ok(statuses)
 }
 
@@ -342,7 +342,7 @@ impl ReceiptStatus {
     pub fn is_valid(&self) -> bool {
         matches!(self, ReceiptStatus::Fresh | ReceiptStatus::NotFresh)
     }
-    
+
     pub fn as_str(&self) -> &'static str {
         match self {
             ReceiptStatus::Fresh => "FRESH",
@@ -359,39 +359,44 @@ mod tests {
     use super::*;
     use crate::proof::{ProofLevel, ProofStatus};
     use std::collections::HashMap;
-    
+
     #[test]
     fn test_receipt_integrity() {
         let result = ProofResult {
             claim_id: "test.claim".to_string(),
+            claim: "Test claim statement".to_string(),
             status: ProofStatus::Verified,
-            proof_level: ProofLevel::L3,
-            edge_case_level: "BASIC".to_string(),
-            hack_level: "NONE".to_string(),
+            proof_level: Some(ProofLevel::P3),
+            edge_case_level: None,
+            hack_level: None,
+            operator_level: None,
+            degraded_level: None,
             files_inspected: vec![],
             commands_run: vec![],
-            passed_checks: 10,
-            failed_checks: 0,
+            passed_checks: vec![],
+            failed_checks: vec![],
+            missing_proofs: vec![],
             blockers: vec![],
             score: 0.9,
             evidence: HashMap::new(),
             timestamp: Utc::now(),
+            duration_ms: 0,
         };
-        
+
         let receipt = Receipt::new(
             "x3-proof test".to_string(),
             result,
             vec![PathBuf::from("test.rs")],
             vec!["Test limitation".to_string()],
         ).unwrap();
-        
+
         // Verify integrity
         assert!(receipt.verify_integrity().unwrap());
-        
+
         // Tamper with receipt
         let mut tampered = receipt.clone();
         tampered.result.score = 0.5;
-        
+
         // Integrity should fail
         assert!(!tampered.verify_integrity().unwrap());
     }

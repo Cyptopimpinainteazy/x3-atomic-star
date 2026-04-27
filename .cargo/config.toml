@@ -1,0 +1,5 @@
+# Dev-iteration: skip the nested wasm build so `cargo check/test --no-run`
+# stays fast. The wasm binary is only needed when actually running the node.
+# For a full production build, unset or override: SKIP_WASM_BUILD="" cargo build --release
+[env]
+SKIP_WASM_BUILD = { value = "1", force = false }

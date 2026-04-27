@@ -156,10 +156,10 @@ mod integration_tests {
             };
             let svm_bytes = svm_packet_obj.encode();
 
-            // Create an X3VM AtomicCross packet with serialized bytes
+            // Create an X3VM AtomicCross packet with packet objects (Box-wrapped)
             let packet = Packet::X3Vm(X3VmPacket::AtomicCross {
-                evm: Some(evm_bytes),
-                svm: Some(svm_bytes),
+                evm: Some(Box::new(evm_packet_obj)),
+                svm: Some(Box::new(svm_packet_obj)),
                 atomic: true,
             });
 

@@ -1,4 +1,5 @@
 use parity_scale_codec::{Decode, Encode};
+use scale_info::prelude::{string::String, vec::Vec};
 use scale_info::TypeInfo;
 
 /// SVM account metadata
@@ -117,4 +118,3 @@ mod tests {
         assert_eq!(metadata, decoded);
     }
 }
-

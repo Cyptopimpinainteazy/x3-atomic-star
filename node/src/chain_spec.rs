@@ -10,7 +10,7 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, SessionConfig, SessionKeys, Signature,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature,
     SystemConfig, X3CoinConfig, WASM_BINARY,
 };
 
@@ -521,16 +521,9 @@ fn x3_chain_genesis(
         .map(|(_, grandpa)| (grandpa.clone(), 1))
         .collect();
 
-    // Build session keys: (validator_id, validator_id, SessionKeys { aura })
-    let session_keys: Vec<(AccountId, AccountId, SessionKeys)> = initial_authorities
-        .into_iter()
-        .map(|(aura, _grandpa)| {
-            let mut account_bytes = [0u8; 32];
-            account_bytes.copy_from_slice(&aura.encode()[..32]);
-            let account_id = AccountId::from(account_bytes);
-            let keys = SessionKeys { aura: aura };
-            (account_id.clone(), account_id, keys)
-        })
+    let aura_authorities: Vec<AuraId> = initial_authorities
+        .iter()
+        .map(|(aura, _)| aura.clone())
         .collect();
 
     RuntimeGenesisConfig {
@@ -540,15 +533,12 @@ fn x3_chain_genesis(
         },
         balances: BalancesConfig { balances },
         aura: AuraConfig {
-            // Aura authorities are provided via Session keys below.
-            // Setting them directly here as well causes double initialization at genesis.
-            authorities: Vec::new(),
+            authorities: aura_authorities,
         },
         grandpa: GrandpaConfig {
             authorities: grandpa_authorities,
             _config: Default::default(),
         },
-        session: SessionConfig { keys: session_keys },
         atlas_kernel: AtlasKernelConfig {
             assets: x3_kernel_default_assets(),
         },

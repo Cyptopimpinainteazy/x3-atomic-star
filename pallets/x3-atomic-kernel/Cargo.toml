@@ -25,6 +25,10 @@ log = { version = "0.4", default-features = false }
 [dev-dependencies]
 sp-io   = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+# Testing tools
+proptest = "1.0"
+loom = "0.7"
+
 
 [features]
 default = ["std"]

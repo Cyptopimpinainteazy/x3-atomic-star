@@ -501,6 +501,19 @@ impl pallet_evm::Config for Runtime {
     type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 }
 
+// Helper types for pallet_x3_kernel::Config bridge escrow bindings
+pub struct BridgeEvmEscrowZero;
+impl frame_support::traits::Get<sp_core::H160> for BridgeEvmEscrowZero {
+    fn get() -> sp_core::H160 { sp_core::H160::zero() }
+}
+pub struct BridgeSvmEscrowZero;
+impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowZero {
+    fn get() -> [u8; 32] { [0u8; 32] }
+}
+parameter_types! {
+    pub const MaxReplayPruneItemsPerBlock: u32 = 64u32;
+}
+
 impl pallet_x3_kernel::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
@@ -541,6 +554,9 @@ impl pallet_x3_kernel::Config for Runtime {
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
+    type BridgeEvmEscrow = BridgeEvmEscrowZero;
+    type BridgeSvmEscrow = BridgeSvmEscrowZero;
+    type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
 }
 
 impl pallet_x3_coin::Config for Runtime {
@@ -589,6 +605,7 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type DefaultTradeSvmComputeLimit = DefaultTradeSvmComputeLimit;
     type DefaultTradeX3GasLimit = DefaultTradeX3GasLimit;
     type AmmRegistrarOrigin = EnsureRootOrHalfCouncil;
+    type Settlement = pallet_atomic_trade_engine::NoOpSettlementBridge;
 }
 
 #[cfg(feature = "std")]
@@ -654,6 +671,7 @@ mod native_vm_adapters {
                 let state_changes =
                     collect_evm_balance_changes(source, None, &info.logs, &pre_balances);
                 return Ok(ExecutionReceipt {
+                    version: 1,
                     success,
                     gas_used: info.used_gas.standard.unique_saturated_into(),
                     return_data: info.value.as_bytes().to_vec(),
@@ -667,6 +685,9 @@ mod native_vm_adapters {
                         })
                         .collect(),
                     state_changes,
+                    protocol_version: 1,
+                    migration_history: Vec::new(),
+                    compatibility_flags: 0,
                 });
             }
 
@@ -750,6 +771,7 @@ mod native_vm_adapters {
         let success = matches!(info.exit_reason, ExitReason::Succeed(_));
         let state_changes = collect_evm_balance_changes(source, target, &info.logs, pre_balances);
         ExecutionReceipt {
+            version: 1,
             success,
             gas_used: info.used_gas.standard.unique_saturated_into(),
             return_data: info.value,
@@ -763,6 +785,9 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            protocol_version: 1,
+            migration_history: Vec::new(),
+            compatibility_flags: 0,
         }
     }
 
@@ -842,6 +867,7 @@ mod native_vm_adapters {
             })
             .collect();
         ExecutionReceipt {
+            version: 1,
             success: result.success,
             gas_used: result.compute_units_used,
             return_data: result.output,
@@ -855,6 +881,9 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            protocol_version: 1,
+            migration_history: Vec::new(),
+            compatibility_flags: 0,
         }
     }
 
@@ -1133,6 +1162,8 @@ parameter_types! {
     pub const MaxChunksPerAgent: u32 = 1_000;
     pub const StorageByteCost: Balance = X3 / 1000; // 0.001 X3 per byte
     pub const DefaultTtl: BlockNumber = 365 * 24 * 600; // ~1 year at 6s blocks
+    pub const MemoryRetentionBlocks: BlockNumber = 30 * 24 * 600; // ~30 days
+    pub const MemoryConsensusThreshold: u32 = 3u32;
 }
 
 impl pallet_agent_memory::Config for Runtime {
@@ -1143,6 +1174,8 @@ impl pallet_agent_memory::Config for Runtime {
     type StorageByteCost = StorageByteCost;
     type DefaultTtl = DefaultTtl;
     type PruneOrigin = EnsureRootOrHalfCouncil;
+    type MemoryRetentionBlocks = MemoryRetentionBlocks;
+    type MemoryConsensusThreshold = MemoryConsensusThreshold;
     type WeightInfo = ();
 }
 
@@ -1241,6 +1274,7 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type MinBtcConfirmations = MinBtcConfirmations;
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
+    type CrossChainValidator = pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator;
 }
 
 // ===== Swarm Pallet Configuration =====
@@ -1707,6 +1741,14 @@ impl_runtime_apis! {
                 },
                 Err(_) => Err(b"EVM runner estimate failed".to_vec()),
             }
+        }
+
+        fn validate_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+            // Stateless validation: check payload length without mutating state.
+            if raw_tx.len() < (20 + 20 + 16 + 4) {
+                return Err(b"invalid payload: too short".to_vec());
+            }
+            Ok(vec![])
         }
     }
 
@@ -2204,133 +2246,6 @@ impl_runtime_apis! {
         }
     }
 
-    impl pallet_x3_kernel::runtime_api::AtlasKernelApi<Block, AccountId, Balance, AssetId> for Runtime {
-        fn get_evm_balance(
-            account: Vec<u8>,
-            asset_id: u32,
-        ) -> Option<u128> {
-            use sp_core::H160;
-            use sp_runtime::traits::BlakeTwo256;
-            if account.len() != 20 { return None; }
-            let mut slice = [0u8; 20];
-            slice.copy_from_slice(&account[..20]);
-            let evm_addr = H160::from(slice);
-            let account_id: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256> as pallet_evm::AddressMapping<AccountId>>::into_account_id(evm_addr);
-            Some(pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &asset_id))
-        }
-
-        fn get_evm_code(address: Vec<u8>) -> Vec<u8> {
-            use sp_core::H160;
-            if address.len() != 20 { return Vec::new(); }
-            let mut slice = [0u8; 20];
-            slice.copy_from_slice(&address[..20]);
-            let evm_addr = H160::from(slice);
-            pallet_evm::AccountCodes::<Runtime>::get(evm_addr)
-        }
-
-        fn get_evm_storage(
-            address: Vec<u8>,
-            storage_key: H256,
-        ) -> Option<H256> {
-            use sp_core::H160;
-            if address.len() != 20 { return None; }
-            let mut slice = [0u8; 20];
-            slice.copy_from_slice(&address[..20]);
-            let evm_addr = H160::from(slice);
-            let val = pallet_evm::AccountStorages::<Runtime>::get(evm_addr, storage_key);
-            if val == H256::zero() { None } else { Some(val) }
-        }
-
-        fn get_asset_metadata(asset_id: u32) -> Option<(Vec<u8>, u8)> {
-            pallet_x3_kernel::AssetRegistry::<Runtime>::get(&asset_id)
-                .map(|metadata| (metadata.symbol.into_inner(), metadata.decimals))
-        }
-
-        fn is_authorized(account: Vec<u8>) -> bool {
-            use codec::Decode;
-            if let Ok(account_id) = AccountId::decode(&mut &account[..]) {
-                pallet_x3_kernel::AuthorizedAccounts::<Runtime>::contains_key(&account_id)
-            } else {
-                false
-            }
-        }
-
-        fn get_authorized_accounts() -> Vec<Vec<u8>> {
-            pallet_x3_kernel::AuthorizedAccounts::<Runtime>::iter_keys()
-                .map(|account| account.encode())
-                .collect()
-        }
-
-        fn get_authorities() -> Vec<Vec<u8>> {
-            pallet_x3_kernel::Authorities::<Runtime>::get().into_inner()
-                .into_iter()
-                .map(|account| account.encode())
-                .collect()
-        }
-
-        fn deploy_evm_contract(
-            bytecode: Vec<u8>,
-            salt: Option<Vec<u8>>,
-            init_code_hash: Option<Vec<u8>>,
-        ) -> Result<Vec<u8>, sp_runtime::DispatchError> {
-            use sp_core::{H160, U256};
-            use sp_runtime::traits::BlakeTwo256;
-            use pallet_evm::Runner;
-
-            // Validate bytecode
-            if bytecode.is_empty() {
-                return Err(sp_runtime::DispatchError::Other("Empty bytecode"));
-            }
-
-            // Get system account for deployment
-            let source = H160::zero(); // System caller
-            let value = U256::zero();
-            let gas_limit = 10_000_000u64; // 10M gas limit
-            let evm_config = fp_evm::Config::shanghai();
-
-            // Use EVM runner to deploy contract
-            let create_result = <Runtime as pallet_evm::Config>::Runner::create(
-                source,
-                bytecode,
-                value,
-                gas_limit,
-                Some(U256::from(NATIVE_GAS_PRICE)),
-                None,
-                None,
-                Vec::new(),
-                false, // is_transactional
-                false, // validate
-                None,  // weight_limit
-                None,  // proof_size_base_cost
-                &evm_config,
-            );
-
-            match create_result {
-                Ok(info) => {
-                    use fp_evm::ExitReason;
-                    match info.exit_reason {
-                        ExitReason::Succeed(_) => {
-                            // Contract deployed successfully
-                            // The address is in info.value
-                            Ok(info.value.as_bytes().to_vec())
-                        }
-                        ExitReason::Revert(_) => {
-                            Err(sp_runtime::DispatchError::Other("EVM contract deployment reverted"))
-                        }
-                        ExitReason::Error(e) => {
-                            Err(sp_runtime::DispatchError::Other("EVM contract deployment error"))
-                        }
-                        ExitReason::Fatal(_) => {
-                            Err(sp_runtime::DispatchError::Other("EVM contract deployment fatal error"))
-                        }
-                    }
-                }
-                Err(e) => {
-                    Err(sp_runtime::DispatchError::Other("EVM runner failed"))
-                }
-            }
-        }
-    }
 }
 
 #[cfg(feature = "std")]
@@ -2410,105 +2325,5 @@ mod vm_adapter_tests {
             // In WASM, adapters should be mocks
             // This test ensures no_std compatibility
         }
-    }
-}
-
-// CrossChainStateRootApi runtime API implementation (stub)
-impl pallet_cross_chain_validator::CrossChainStateRootApi<BlockNumber> for Runtime {
-    fn validate_evm_header(
-        block_number: u64,
-        block_hash: H256,
-        state_root: H256,
-    ) -> Option<pallet_cross_chain_validator::EvmHeaderProof> {
-        None
-    }
-
-    fn validate_svm_header(
-        slot: u64,
-        block_hash: H256,
-        state_root: H256,
-    ) -> Option<pallet_cross_chain_validator::SvmHeaderProof> {
-        None
-    }
-
-    fn query_cross_chain_status() -> pallet_cross_chain_validator::CrossChainValidationStatus {
-        pallet_cross_chain_validator::CrossChainValidationStatus {
-            evm_headers_validated: 0,
-            svm_headers_validated: 0,
-            total_validation_failures: 0,
-            last_validation_block: 0,
-        }
-    }
-
-    fn aggregate_cross_chain_proofs(
-        proofs: Vec<pallet_cross_chain_validator::CrossChainProofBatch>,
-    ) -> Option<pallet_cross_chain_validator::CrossChainProofBatch> {
-        None
-    }
-
-    fn query_last_evm_header() -> Option<pallet_cross_chain_validator::EvmHeaderInfo> {
-        None
-    }
-
-    fn query_last_svm_header() -> Option<pallet_cross_chain_validator::SvmHeaderInfo> {
-        None
-    }
-
-    fn verify_evm_merkle_root(block_number: u64, merkle_root: H256) -> bool {
-        false
-    }
-
-    fn verify_svm_validator_set(slot: u64, validator_set_hash: H256) -> bool {
-        false
-    }
-}
-
-// CrossChainStateRootApi runtime API implementation (stub)
-impl pallet_cross_chain_validator::CrossChainStateRootApi<BlockNumber> for Runtime {
-    fn validate_evm_header(
-        block_number: u64,
-        block_hash: H256,
-        state_root: H256,
-    ) -> Option<pallet_cross_chain_validator::EvmHeaderProof> {
-        None
-    }
-
-    fn validate_svm_header(
-        slot: u64,
-        block_hash: H256,
-        state_root: H256,
-    ) -> Option<pallet_cross_chain_validator::SvmHeaderProof> {
-        None
-    }
-
-    fn query_cross_chain_status() -> pallet_cross_chain_validator::CrossChainValidationStatus {
-        pallet_cross_chain_validator::CrossChainValidationStatus {
-            evm_headers_validated: 0,
-            svm_headers_validated: 0,
-            total_validation_failures: 0,
-            last_validation_block: 0,
-        }
-    }
-
-    fn aggregate_cross_chain_proofs(
-        proofs: Vec<pallet_cross_chain_validator::CrossChainProofBatch>,
-    ) -> Option<pallet_cross_chain_validator::CrossChainProofBatch> {
-        None
-    }
-
-    fn query_last_evm_header() -> Option<pallet_cross_chain_validator::EvmHeaderInfo> {
-        None
-    }
-
-    fn query_last_svm_header() -> Option<pallet_cross_chain_validator::SvmHeaderInfo> {
-        None
-    }
-
-    fn verify_evm_merkle_root(block_number: u64, merkle_root: H256) -> bool {
-        false
-    }
-
-    fn verify_svm_validator_set(slot: u64, validator_set_hash: H256) -> bool {
-        false
     }
 }

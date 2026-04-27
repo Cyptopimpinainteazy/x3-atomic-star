@@ -106,6 +106,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
+    type ExternalExecutorOrigin = RootOrAny;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {
@@ -184,7 +185,7 @@ fn bootstrap_x3_asset(supply: u128) -> AssetId {
     }
 
     // Mint canonical supply into the native leg.
-    Ledger::mint_canonical(RuntimeOrigin::root(), asset_id, DomainId::X3Native, supply).unwrap();
+    Ledger::mint_canonical(RuntimeOrigin::root(), asset_id, DomainId::X3Native, supply, 0u64).unwrap();
 
     asset_id
 }

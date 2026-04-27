@@ -109,6 +109,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
+    type ExternalExecutorOrigin = RootOrAny;
 }
 
 impl pallet_x3_token_factory::Config for Test {

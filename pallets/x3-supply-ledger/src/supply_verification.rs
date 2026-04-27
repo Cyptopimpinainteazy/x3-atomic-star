@@ -9,7 +9,7 @@
 // SECURITY DESIGN (S0-1 Remediation):
 //
 // 1. Block-Level Verification:
-//    - Verify supply invariants for ALL assets in `on_finalize` 
+//    - Verify supply invariants for ALL assets in `on_finalize`
 //    - Catch any invariant violations that might slip through transaction checks
 //    - Generate cryptographic proofs of supply correctness
 //
@@ -87,7 +87,7 @@ impl AssetSupplyProof {
         merkle_index: u32,
     ) -> Self {
         let leaf_hash = Self::compute_leaf_hash(asset_id, ledger);
-        
+
         AssetSupplyProof {
             asset_id,
             canonical_supply: ledger.canonical_supply,
@@ -113,7 +113,7 @@ impl AssetSupplyProof {
         data.extend_from_slice(&ledger.svm_supply.to_le_bytes());
         data.extend_from_slice(&ledger.external_locked_supply.to_le_bytes());
         data.extend_from_slice(&ledger.pending_supply.to_le_bytes());
-        
+
         H256::from(blake2_256(&data))
     }
 
@@ -143,7 +143,7 @@ impl AssetSupplyProof {
     /// Verify this proof's merkle branch leads to the claimed root.
     pub fn verify_merkle_branch(&self, expected_root: H256) -> bool {
         let mut hash = self.leaf_hash;
-        
+
         for (i, sibling) in self.merkle_branch.iter().enumerate() {
             let position = (self.merkle_index >> i) & 1;
             hash = if position == 0 {
@@ -154,7 +154,7 @@ impl AssetSupplyProof {
                 Self::hash_pair(*sibling, hash)
             };
         }
-        
+
         hash == expected_root
     }
 
@@ -175,7 +175,7 @@ impl SupplyMerkleTree {
     /// Create a new merkle tree from asset proofs.
     pub fn new(proofs: &mut [AssetSupplyProof]) -> Self {
         let leaves: Vec<H256> = proofs.iter().map(|p| p.leaf_hash).collect();
-        
+
         // Build merkle branches for each leaf
         if !leaves.is_empty() {
             let tree = Self::build_tree(&leaves);
@@ -183,7 +183,7 @@ impl SupplyMerkleTree {
                 proof.merkle_branch = Self::get_branch(&tree, i, leaves.len());
             }
         }
-        
+
         Self { leaves }
     }
 
@@ -192,7 +192,7 @@ impl SupplyMerkleTree {
         if self.leaves.is_empty() {
             return H256::zero();
         }
-        
+
         let tree = Self::build_tree(&self.leaves);
         tree[tree.len() - 1]
     }
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn test_asset_proof_creation() {
         let ledger = create_test_ledger(1000, 400, 300, 300);
-        let proof = AssetSupplyProof::from_ledger([1u8; 32], &ledger, 0);
+        let proof = AssetSupplyProof::from_ledger(H256([1u8; 32]), &ledger, 0);
 
         assert_eq!(proof.canonical_supply, 1000);
         assert_eq!(proof.represented_supply, 1000);
@@ -325,19 +325,19 @@ mod tests {
         let mut ledger = create_test_ledger(1000, 400, 300, 300);
         // Violate invariant: represented > canonical
         ledger.native_supply = 1001;
-        
-        let proof = AssetSupplyProof::from_ledger([1u8; 32], &ledger, 0);
+
+        let proof = AssetSupplyProof::from_ledger(H256([1u8; 32]), &ledger, 0);
         assert!(proof.verify_invariant().is_err());
     }
 
     #[test]
     fn test_merkle_tree_single_leaf() {
         let ledger = create_test_ledger(1000, 1000, 0, 0);
-        let mut proofs = vec![AssetSupplyProof::from_ledger([1u8; 32], &ledger, 0)];
-        
+        let mut proofs = vec![AssetSupplyProof::from_ledger(H256([1u8; 32]), &ledger, 0)];
+
         let tree = SupplyMerkleTree::new(&mut proofs);
         let root = tree.root();
-        
+
         assert_eq!(root, proofs[0].leaf_hash);
         assert!(proofs[0].verify_merkle_branch(root));
     }
@@ -347,16 +347,16 @@ mod tests {
         let ledger1 = create_test_ledger(1000, 1000, 0, 0);
         let ledger2 = create_test_ledger(2000, 1000, 1000, 0);
         let ledger3 = create_test_ledger(3000, 1000, 1000, 1000);
-        
+
         let mut proofs = vec![
-            AssetSupplyProof::from_ledger([1u8; 32], &ledger1, 0),
-            AssetSupplyProof::from_ledger([2u8; 32], &ledger2, 1),
-            AssetSupplyProof::from_ledger([3u8; 32], &ledger3, 2),
+            AssetSupplyProof::from_ledger(H256([1u8; 32]), &ledger1, 0),
+            AssetSupplyProof::from_ledger(H256([2u8; 32]), &ledger2, 1),
+            AssetSupplyProof::from_ledger(H256([3u8; 32]), &ledger3, 2),
         ];
-        
+
         let tree = SupplyMerkleTree::new(&mut proofs);
         let root = tree.root();
-        
+
         // All proofs should verify against the root
         for proof in &proofs {
             assert!(proof.verify_merkle_branch(root));
@@ -366,15 +366,15 @@ mod tests {
     #[test]
     fn test_invalid_merkle_proof_detected() {
         let ledger = create_test_ledger(1000, 1000, 0, 0);
-        let mut proofs = vec![AssetSupplyProof::from_ledger([1u8; 32], &ledger, 0)];
-        
+        let mut proofs = vec![AssetSupplyProof::from_ledger(H256([1u8; 32]), &ledger, 0)];
+
         let tree = SupplyMerkleTree::new(&mut proofs);
         let root = tree.root();
-        
+
         // Tamper with the proof
         proofs[0].canonical_supply = 2000;
-        proofs[0].leaf_hash = AssetSupplyProof::compute_leaf_hash([1u8; 32], &ledger);
-        
+        proofs[0].leaf_hash = AssetSupplyProof::compute_leaf_hash(H256([1u8; 32]), &ledger);
+
         // Should fail verification
         assert!(!proofs[0].verify_merkle_branch(root));
     }
