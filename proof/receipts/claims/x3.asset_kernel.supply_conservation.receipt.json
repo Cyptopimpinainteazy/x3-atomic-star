@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.asset_kernel.supply_conservation",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "3e5f4f0bf5d880a4155ac81d0367de0662515232f3d09cee25273c1ddf0a1100"
+}

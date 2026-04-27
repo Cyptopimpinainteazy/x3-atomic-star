@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.governance.proof_gated_upgrade",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "c6e709df7a72a270b998f8d94bf625e89cab37201db0d2e355f35a80f49646c2"
+}

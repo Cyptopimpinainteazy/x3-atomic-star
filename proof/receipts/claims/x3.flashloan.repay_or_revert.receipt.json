@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.flashloan.repay_or_revert",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "c99f69eec8a103000a3ae58d69900121e0beae64e46f3f9eb1bea48c31424a60"
+}

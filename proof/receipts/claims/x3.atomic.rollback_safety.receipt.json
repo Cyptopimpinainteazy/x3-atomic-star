@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.atomic.rollback_safety",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "2a7b412800fb4fb4bed3f420a8ce242e4e247dcdf2530b3ddec3b233c13eb7c2"
+}

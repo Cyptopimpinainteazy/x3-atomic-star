@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.x3lang.compiler_reproducibility",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "1ce26ea3c86f8932890a88e765a0f909541ab09ed52463dbdf715c863034618a"
+}

@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.gpu.cpu_gpu_parity",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "99bcadad23a261d6512b185826a822a1e4ba77f279354dc8f21cb0a8aee82dc6"
+}

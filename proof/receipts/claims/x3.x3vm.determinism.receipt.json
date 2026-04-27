@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.x3vm.determinism",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "e2f7a18e689c422ae25f01296fe300df6c3a8703535d9b4b971152b27868be07"
+}

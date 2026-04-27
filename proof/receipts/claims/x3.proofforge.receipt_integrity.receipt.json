@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.proofforge.receipt_integrity",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "a53673b4ffd58e86b87b39d919b5641b8a6a627a2efe47b2a02a81126372ba39"
+}

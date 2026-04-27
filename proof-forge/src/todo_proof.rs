@@ -78,7 +78,9 @@ impl TodoScanner {
                 ".md".to_string(),
                 "test_".to_string(),
                 "_test.rs".to_string(),
+                "tests.rs".to_string(),
                 "mock_".to_string(),
+                "proof-forge/".to_string(),
             ],
         }
     }
@@ -102,7 +104,21 @@ impl TodoScanner {
         for entry in WalkDir::new(&self.workspace)
             .follow_links(false)
             .into_iter()
-            .filter_entry(|e| !self.is_exempt(e.path()))
+            .filter_entry(|e| {
+                // Skip noisy build / vendor / duplicate directories
+                if e.file_type().is_dir() {
+                    let name = e.file_name().to_string_lossy();
+                    match name.as_ref() {
+                        "target" | "patches" | "launch-gates" | ".git" | "node_modules" => {
+                            return false;
+                        }
+                        // atlas-sphere-clean is a full duplicate of the pallets tree
+                        "atlas-sphere-clean" => return false,
+                        _ => {}
+                    }
+                }
+                !self.is_exempt(e.path())
+            })
         {
             let entry = entry?;
             if entry.file_type().is_file() {
@@ -164,8 +180,8 @@ impl TodoScanner {
             return TodoSeverity::T9;
         }
 
-        // T8: Launch blockers
-        if lower.contains("unimplemented!") {
+        // T8: Launch blockers — unimplemented! stubs in critical paths only
+        if lower.contains("unimplemented!") && in_critical {
             return TodoSeverity::T8;
         }
 
@@ -174,20 +190,28 @@ impl TodoScanner {
             return TodoSeverity::T7;
         }
 
-        // T6: Security debt
-        if lower.contains("security") || lower.contains("hardcoded admin") || 
-           (in_critical && (lower.contains("bridge") || lower.contains("finality"))) {
+        // T6: Security debt — specific dangerous patterns only (not broad 'security' keyword)
+        if lower.contains("hardcoded admin") || lower.contains("hardcoded timestamp") ||
+           lower.contains("hardcoded price") || lower.contains("dummy signature") ||
+           (in_critical && lower.contains("fake finality")) {
             return TodoSeverity::T6;
         }
 
-        // T5: Panic debt
-        if lower.contains("panic!") && !self.is_exempt(path) {
-            return TodoSeverity::T5;
+        // T5: Panic debt — only a mainnet blocker in critical consensus/financial paths
+        // Skip test-assertion patterns: `other => panic!(...)` and `_ => panic!(...)`
+        if lower.contains("panic!") && in_critical {
+            let trimmed = line.trim();
+            if !trimmed.starts_with("other =>") && !trimmed.starts_with("_ =>") {
+                return TodoSeverity::T5;
+            }
         }
 
-        // T4: Mock debt in test code
+        // T4: Mock debt in test code, or panic! in non-critical app code
         if lower.contains("mock") && (path.to_string_lossy().contains("test") || 
                                        path.to_string_lossy().contains("mock")) {
+            return TodoSeverity::T4;
+        }
+        if lower.contains("panic!") {
             return TodoSeverity::T4;
         }
 

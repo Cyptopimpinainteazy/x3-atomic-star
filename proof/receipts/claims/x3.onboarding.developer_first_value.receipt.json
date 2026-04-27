@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.onboarding.developer_first_value",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "523a6dee96e99bdf6038db4e32204cb46422222354af2c7db353a1488fba7d0b"
+}

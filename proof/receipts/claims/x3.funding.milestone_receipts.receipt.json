@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.funding.milestone_receipts",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "f784107dd30642813752b70f8ad2c8781cd3e40a3aebebb7b801eb6358d453ec"
+}

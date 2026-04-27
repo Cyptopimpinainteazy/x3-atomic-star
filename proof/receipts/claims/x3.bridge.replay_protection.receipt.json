@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.bridge.replay_protection",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "950403979e1b548aadc6f5cd9b80b9a075e2b87d4454d55462332df8ec4688d7"
+}

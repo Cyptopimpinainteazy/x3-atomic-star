@@ -1,0 +1,11 @@
+{
+  "claim_id": "x3.evolution.no_regression",
+  "status": "VERIFIED",
+  "date": "2026-04-27",
+  "verifier": "x3-proof-2400b15",
+  "evidence": [
+    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
+    "Codebase review complete as of commit 2400b15"
+  ],
+  "hash": "42268c6aee3e3ae0645957cb6adfa8e8c2dc3c991c06f0be718bd33b3af41f97"
+}

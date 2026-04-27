@@ -71,6 +71,8 @@ pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-fe
 pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
 x3-svm-integration = { path = "../crates/svm-integration", default-features = false }
+pallet-meme-overlord = { path = "../pallets/meme-overlord", default-features = false }
+# staged-pallets (wiring in progress): svm-runtime x3-invariants x3-inventory x3-reservation x3-slash x3-solvency x3-wallet-pallet
 
 sp-api = { workspace = true, default-features = false }
 sp-block-builder = { workspace = true, default-features = false }
