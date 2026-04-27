@@ -1,17 +1,16 @@
-# � X3 ATOMIC STAR - MAINNET READINESS STATUS
+# 🟡 X3 ATOMIC STAR - MAINNET READINESS STATUS
 
-**CRITICAL UPDATE - April 26, 2026:** ProofForge security audit complete  
-**Status:** 🚨 **❌ NOT READY FOR MAINNET DEPLOYMENT**  
-**Reason:** 9 critical security blockers identified (6 S0 catastrophic + 3 S1 critical)  
-**Decision:** **HALT ALL DEPLOYMENT PLANS IMMEDIATELY**  
-**Mainnet Readiness:** 0% (critical blockers active)  
-**Estimated Timeline:** 12-24 weeks minimum for full remediation
+**LATEST AUDIT - April 27, 2026:** Evidence-based reconciliation sweep — see **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)**  
+**Status:** 🟡 **REMEDIATION 56% COMPLETE — 5 of 9 critical blockers RESOLVED**  
+**Resolved:** S0-1 supply, S0-2 double-mint, S0-3 bridge replay, S0-4 finality (Ed25519, commit `dc9d1bd`), S0-5 atomic rollback  
+**Outstanding:** S0-6 runtime panic + S1-1/2/3 (failed_rollback, governance_bypass, unauthorized_mint)  
+**Mainnet:** Still BLOCKED — must clear S0-6 + 3 S1
 
 ---
 
 ## ⚡ READ THIS FIRST
 
-**IMPORTANT:** This document was previously marked "✅ GO FOR MAINNET" based on Phase 4 audit. That status is **NO LONGER VALID** due to ProofForge security audit findings.
+**IMPORTANT:** Earlier versions of this document oscillated between "✅ GO FOR MAINNET" (Phase 4) and "❌ NOT READY" (initial ProofForge run). The April 27, 2026 audit reconciled both: **5 of the 9 ProofForge blockers are now demonstrably FIXED** (file-system + git evidence). See `STATUS_AUDIT_2026_04_27.md` for the authoritative current state.
 
 ### What Changed
 ProofForge comprehensive security audit (April 26, 2026) discovered **9 critical security gaps** that are not acceptable for mainnet deployment:

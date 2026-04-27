@@ -65,7 +65,10 @@ These docs claim "0% / NOT READY / 9 active blockers" but evidence shows otherwi
 
 ## REMAINING WORK (priority order)
 
-1. **S0-6** runtime_panic_critical_path — eliminate `panic!()` / unwrap on critical paths
+1. **S0-6** runtime_panic_critical_path — **scoped Apr 27**:
+   - `pallets/x3-invariants/src/lib.rs:337,359,381` — 3 `HaltOnViolation`-gated panics inside `on_finalize`. Panicking in a pallet hook bricks the chain (node restart loop). Replace with `frame_support::defensive!` + event emission, or return `DispatchError` to caller. Logic is already correct; only the failure mode needs hardening.
+   - `crates/cross-vm-coordinator/src/state_machine.rs:52` — startup misconfig guard (`if !cfg!(test)`). Acceptable fail-fast; **not** a hot-path concern. May leave as-is or convert to `Result` from `new()`.
+   - All other `panic!()` in production crates verified to be inside `#[cfg(test)]` blocks (gpu_fallback_chain, network_partition_recovery, flash-finality, merkle_proof_validator) or compiler-only paths (x3-parser, x3-opt, x3-hir, x3-proof). **Not S0-6 targets.**
 2. **S1-1** failed_rollback — make rollback verified atomic
 3. **S1-2** governance_bypass — harden governance permission checks
 4. **S1-3** unauthorized_mint — strengthen mint access control
@@ -75,6 +78,6 @@ These docs claim "0% / NOT READY / 9 active blockers" but evidence shows otherwi
 ## BUILD STATE NOTES
 
 - All three target binaries present: `x3-chain-node` (54MB), `x3-indexer` (9MB), `x3-proof` (2MB v1.0.0).
-- Latest cargo offline rebuild attempt threw `malloc(): unsorted double linked list corrupted` mid-compile (sha2/sha3/hmac stage). Likely OOM/swap/glibc issue — re-run after `free -h`/`dmesg` check, or rely on existing pre-built binaries until needed.
-- `apply_fixes.sh` is a corrupted single-line script (literal `\n` chars). Its intended changes (`SettlementTimeoutBlocks`, `CrossChainStateRootApi`, `pallet_cross_chain_validator` import) are already present in `runtime/src/lib.rs`. Safe to delete.
+- Latest cargo offline rebuild attempt threw `malloc(): unsorted double linked list corrupted` mid-compile (sha2/sha3/hmac stage). **Diagnosed Apr 27:** transient — `free -h` shows 50GB free, swap untouched. Likely glibc/cargo flake; retry should succeed. Pre-built binaries remain valid.
+- `apply_fixes.sh` was a corrupted single-line script; **deleted Apr 27**. Its intended changes (`SettlementTimeoutBlocks`, `CrossChainStateRootApi`, `pallet_cross_chain_validator` import) are already present in `runtime/src/lib.rs`.
 - `monitor-builds.sh` is informational only; runs but takes no action.

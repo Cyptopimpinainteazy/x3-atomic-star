@@ -6,10 +6,10 @@
 
 This document previously claimed "GO FOR MAINNET (96% confidence)" based on Phase 4 P0 priority-based audit. That decision is **no longer valid** due to ProofForge comprehensive security audit findings.
 
-**New Decision:** 🚨 **NO-GO FOR MAINNET** (0% readiness, 9 critical S0/S1 blockers active)  
-**Decision Date:** April 26, 2026 (ProofForge Override)  
-**Previous Decision:** April 26, 2026 (Phase 4 - NOW SUPERSEDED)  
-**Risk Level:** CRITICAL (security vulnerabilities active)  
+**New Decision:** � **REMEDIATION IN PROGRESS** (5 of 9 critical S0/S1 blockers resolved, S0-6 + 3 S1 outstanding) — see [STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)  
+**Latest Audit:** April 27, 2026 (Evidence-Based Reconciliation Sweep)  
+**Previous Decision:** April 26, 2026 (Phase 4 - SUPERSEDED) and April 26 ProofForge initial run (also superseded by Apr 27 evidence)  
+**Risk Level:** ELEVATED (S0-6 + S1 blockers remain active; mainnet still BLOCKED)  
 
 ### Why This Changed
 - **Phase 4 Audit System**: P0/P1/P2 priority-based ("what blocks timeline")
