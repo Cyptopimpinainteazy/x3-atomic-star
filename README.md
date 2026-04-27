@@ -1,3 +1,5 @@
+> ⚠️ **STATUS BANNER (April 27, 2026):** This document predates the Apr 27 evidence-based reconciliation. **5 of 9 ProofForge critical blockers are now RESOLVED** (S0-1..5). Outstanding: S0-6 + S1-1/2/3. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for the authoritative current state.
+
 # 🚀 X3_ATOMIC_STAR - Unified Blockchain **TESTNET ONLY** Platform
 
 🚨 **CRITICAL - READ FIRST**: This blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
@@ -419,4 +421,3 @@ curl http://localhost:9933 \
 ---
 
 💡 **Pro Tip:** While waiting for builds, read [TESTNET_DEPLOYMENT_GUIDE.md](TESTNET_DEPLOYMENT_GUIDE.md) to understand what you'll be deploying!
-

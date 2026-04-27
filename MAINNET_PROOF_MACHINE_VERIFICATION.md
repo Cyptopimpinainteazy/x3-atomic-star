@@ -1,3 +1,5 @@
+> ⚠️ **STATUS BANNER (April 27, 2026):** This document predates the Apr 27 evidence-based reconciliation. **5 of 9 ProofForge critical blockers are now RESOLVED** (S0-1..5). Outstanding: S0-6 + S1-1/2/3. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for the authoritative current state.
+
 # ⚠️ X3 ATOMIC STAR - MAINNET VERIFICATION STATUS (SUPERSEDED) ⚠️
 
 ❌ **CRITICAL UPDATE**: Previous "GO FOR MAINNET" verdict has been **SUPERSEDED BY PROOFFORGE SECURITY AUDIT**
@@ -401,4 +403,3 @@ cd /home/lojak/Desktop/X3_ATOMIC_STAR
 ```
 
 **Welcome to proof-based mainnet validation.** 🎉
-

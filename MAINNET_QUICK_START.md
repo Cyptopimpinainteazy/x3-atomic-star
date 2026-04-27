@@ -1,3 +1,5 @@
+> ⚠️ **STATUS BANNER (April 27, 2026):** This document predates the Apr 27 evidence-based reconciliation. **5 of 9 ProofForge critical blockers are now RESOLVED** (S0-1..5). Outstanding: S0-6 + S1-1/2/3. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for the authoritative current state.
+
 # ⚠️ X3 Testnet Proof Machine: Quick Start (NOT MAINNET READY)
 
 🚨 **IMPORTANT**: Despite the filename, this blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
@@ -201,4 +203,3 @@ Beautiful code without tests scores 55%. Period.
 **Start now:** `./launch-gates/build-audit-packs.sh`
 
 **Questions?** See full workflow guide: `MAINNET_PROOF_MACHINE_WORKFLOW.md`
-
