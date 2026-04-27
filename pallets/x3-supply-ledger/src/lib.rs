@@ -445,7 +445,7 @@ pub mod pallet {
             // Validate idempotency using validator
             IdempotencyValidator::validate(
                 &origin_bytes,
-                asset_id,
+                asset_id.as_fixed_bytes(),
                 amount,
                 nonce,
                 current_nonce,
@@ -460,7 +460,7 @@ pub mod pallet {
             let block_number = Self::block_number_to_u32(<frame_system::Pallet<T>>::block_number());
             let token = MintIdempotencyToken::new(
                 &origin_bytes,
-                asset_id,
+                asset_id.as_fixed_bytes(),
                 amount,
                 nonce,
                 block_number,
