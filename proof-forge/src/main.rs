@@ -3,6 +3,9 @@ mod scoring;
 mod registry;
 mod dashboard;
 mod proof;
+mod todo_proof;
+mod gap_proof;
+mod receipt;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -187,8 +190,42 @@ enum Commands {
     /// List all claims and their status
     Claims,
 
-    /// Show help for all proof areas
-    Help,
+    /// Run ALL critical proofs and gates - MUST PASS for mainnet
+    ProveEverything {
+        /// Strict mode (fail on any issue)
+        #[arg(short, long)]
+        strict: bool,
+
+        /// Fail hard on blockers
+        #[arg(long)]
+        fail_hard: bool,
+
+        /// Generate receipts
+        #[arg(long)]
+        receipts: bool,
+    },
+
+    /// Scan for TODO/FIXME/HACK/stub/mock/fake code
+    TodoGate {
+        /// Gate to check (mainnet, testnet)
+        #[arg(value_name = "GATE", default_value = "mainnet")]
+        gate: String,
+
+        /// Fail on blockers
+        #[arg(long)]
+        fail_hard: bool,
+    },
+
+    /// Scan for missing implementations, tests, and wiring
+    GapGate {
+        /// Gate to check (mainnet, testnet)
+        #[arg(value_name = "GATE", default_value = "mainnet")]
+        gate: String,
+
+        /// Fail on blockers
+        #[arg(long)]
+        fail_hard: bool,
+    },
 }
 
 #[tokio::main]
@@ -271,8 +308,16 @@ async fn main() -> Result<()> {
             runners::list_all_claims(&cli.workspace, cli.verbose).await?
         }
 
-        Commands::Help => {
-            print_help();
+        Commands::ProveEverything { strict, fail_hard, receipts } => {
+            prove_everything(&cli.workspace, strict, fail_hard, receipts, cli.verbose).await?
+        }
+
+        Commands::TodoGate { gate, fail_hard } => {
+            run_todo_gate(&cli.workspace, &gate, fail_hard, cli.verbose).await?
+        }
+
+        Commands::GapGate { gate, fail_hard } => {
+            run_gap_gate(&cli.workspace, &gate, fail_hard, cli.verbose).await?
         }
     }
 
@@ -315,4 +360,246 @@ fn print_help() {
     println!("  --fail-hard                         - Fail on any error");
     println!("  --dry-run                           - Show what would execute");
     println!("  -v, --verbose                       - Verbose output");
+}
+
+/// Prove Everything - The Ultimate Gate
+async fn prove_everything(
+    workspace: &PathBuf,
+    strict: bool,
+    fail_hard: bool,
+    receipts: bool,
+    verbose: bool,
+) -> Result<()> {
+    println!("{}", "🔥 PROVE EVERYTHING - Ultimate X3 Proof Gauntlet".bold().red());
+    println!();
+    
+    let mut all_pass = true;
+    let mut failures = Vec::new();
+
+    // 1. TodoGate
+    println!("{}", "▸ Running TodoGate...".cyan());
+    if let Err(e) = run_todo_gate(workspace, "mainnet", true, verbose).await {
+        all_pass = false;
+        failures.push(format!("TodoGate: {}", e));
+    }
+
+    // 2. GapGate
+    println!("{}", "▸ Running GapGate...".cyan());
+    if let Err(e) = run_gap_gate(workspace, "mainnet", true, verbose).await {
+        all_pass = false;
+        failures.push(format!("GapGate: {}", e));
+    }
+
+    // 3. Security Gate
+    println!("{}", "▸ Running SecurityGate...".cyan());
+    if let Err(e) = runners::check_security_gate(workspace, true, verbose).await {
+        all_pass = false;
+        failures.push(format!("SecurityGate: {}", e));
+    }
+
+    // 4. Mainnet Gate
+    println!("{}", "▸ Running MainnetGate...".cyan());
+    if let Err(e) = runners::check_mainnet_readiness(workspace, true, true, verbose).await {
+        all_pass = false;
+        failures.push(format!("MainnetGate: {}", e));
+    }
+
+    // 5. Critical Claims
+    println!("{}", "▸ Verifying Critical Claims...".cyan());
+    let critical_claims = vec![
+        "x3.asset_kernel.supply_conservation",
+        "x3.bridge.replay_protection",
+        "x3.bridge.finality_verification",
+        "x3.atomic.one_terminal_state",
+        "x3.atomic.rollback_safety",
+        "x3.flashloan.repay_or_revert",
+        "x3.x3vm.determinism",
+        "x3.x3lang.compiler_reproducibility",
+        "x3.contracts.evm_svm_parity",
+        "x3.governance.proof_gated_upgrade",
+        "x3.proofforge.receipt_integrity",
+    ];
+
+    for claim in critical_claims {
+        if let Err(e) = runners::verify_claim(workspace, claim, strict, false).await {
+            all_pass = false;
+            failures.push(format!("Claim {}: {}", claim, e));
+        }
+    }
+
+    println!();
+    if all_pass {
+        println!("{}", "✓ PROVE EVERYTHING PASSED - X3 is proof-ready".bold().green());
+        
+        if receipts {
+            println!("Generating master receipt...");
+            runners::generate_receipt(workspace, "mainnet", &vec![], verbose).await?;
+        }
+        
+        Ok(())
+    } else {
+        println!("{}", "✗ PROVE EVERYTHING FAILED".bold().red());
+        println!();
+        println!("{}", "Failures:".bold());
+        for failure in &failures {
+            println!("  - {}", failure.red());
+        }
+        println!();
+        
+        if fail_hard {
+            anyhow::bail!("prove-everything failed with {} blockers", failures.len());
+        }
+        
+        Ok(())
+    }
+}
+
+/// Run TODO/FIXME/HACK scanner
+async fn run_todo_gate(
+    workspace: &PathBuf,
+    gate: &str,
+    fail_hard: bool,
+    verbose: bool,
+) -> Result<()> {
+    use todo_proof::TodoScanner;
+    
+    println!("{}", format!("📋 TODO Gate: {} readiness", gate).bold().yellow());
+    println!();
+
+    let scanner = TodoScanner::new(workspace.clone());
+    let report = scanner.scan(verbose)?;
+
+    println!("Total TODOs found: {}", report.total_todos);
+    println!();
+
+    println!("By severity:");
+    for (severity, count) in &report.by_severity {
+        println!("  {}: {}", severity, count);
+    }
+    println!();
+
+    let mainnet_blockers = report.mainnet_blockers.len();
+    let testnet_blockers = report.testnet_blockers.len();
+
+    println!("Mainnet blockers (T5+): {}", if mainnet_blockers > 0 {
+        mainnet_blockers.to_string().red()
+    } else {
+        mainnet_blockers.to_string().green()
+    });
+
+    println!("Testnet blockers (T6+): {}", if testnet_blockers > 0 {
+        testnet_blockers.to_string().red()
+    } else {
+        testnet_blockers.to_string().green()
+    });
+
+    println!();
+
+    if !report.mainnet_blockers.is_empty() && verbose {
+        println!("{}", "Mainnet Blockers:".bold().red());
+        for item in &report.mainnet_blockers {
+            println!("  {} (line {}) - {:?}", 
+                item.file.display(), 
+                item.line, 
+                item.severity
+            );
+            println!("    {}", item.content);
+        }
+        println!();
+    }
+
+    // Check gate
+    let passes = scanner.check_gates(&report, gate)?;
+    
+    if passes {
+        println!("{}", format!("✓ {} gate PASSED", gate).bold().green());
+        Ok(())
+    } else {
+        println!("{}", format!("✗ {} gate FAILED", gate).bold().red());
+        
+        if fail_hard {
+            anyhow::bail!("{} gate failed: {} blockers found", gate, 
+                if gate == "mainnet" { mainnet_blockers } else { testnet_blockers });
+        }
+        
+        Ok(())
+    }
+}
+
+/// Run Gap scanner
+async fn run_gap_gate(
+    workspace: &PathBuf,
+    gate: &str,
+    fail_hard: bool,
+    verbose: bool,
+) -> Result<()> {
+    use gap_proof::GapScanner;
+    
+    println!("{}", format!("🔍 Gap Gate: {} readiness", gate).bold().yellow());
+    println!();
+
+    let scanner = GapScanner::new(workspace.clone());
+    let report = scanner.scan(verbose)?;
+
+    println!("Total gaps found: {}", report.total_gaps);
+    println!();
+
+    println!("By type:");
+    for (gap_type, count) in &report.by_type {
+        println!("  {}: {}", gap_type, count);
+    }
+    println!();
+
+    let s0_gaps = report.s0_gaps.len();
+    let mainnet_blockers = report.mainnet_blockers.len();
+    let testnet_blockers = report.testnet_blockers.len();
+
+    println!("S0 gaps (critical): {}", if s0_gaps > 0 {
+        s0_gaps.to_string().red()
+    } else {
+        s0_gaps.to_string().green()
+    });
+
+    println!("Mainnet blockers: {}", if mainnet_blockers > 0 {
+        mainnet_blockers.to_string().red()
+    } else {
+        mainnet_blockers.to_string().green()
+    });
+
+    println!("Testnet blockers: {}", if testnet_blockers > 0 {
+        testnet_blockers.to_string().red()
+    } else {
+        testnet_blockers.to_string().green()
+    });
+
+    println!();
+
+    if !report.s0_gaps.is_empty() && verbose {
+        println!("{}", "S0 Gaps (CRITICAL):".bold().red());
+        for item in &report.s0_gaps {
+            println!("  [{}] {}: {}", 
+                item.area,
+                format!("{:?}", item.gap_type).red(),
+                item.description
+            );
+        }
+        println!();
+    }
+
+    // Check gate
+    let passes = scanner.check_gates(&report, gate)?;
+    
+    if passes {
+        println!("{}", format!("✓ {} gate PASSED", gate).bold().green());
+        Ok(())
+    } else {
+        println!("{}", format!("✗ {} gate FAILED", gate).bold().red());
+        
+        if fail_hard {
+            anyhow::bail!("{} gate failed: {} S0 gaps, {} blockers", 
+                gate, s0_gaps, mainnet_blockers);
+        }
+        
+        Ok(())
+    }
 }
