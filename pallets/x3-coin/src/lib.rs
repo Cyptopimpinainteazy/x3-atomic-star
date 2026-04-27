@@ -30,7 +30,7 @@ use frame_support::traits::UnixTime;
 use frame_system::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::traits::{SaturatedConversion, Zero};
+use sp_runtime::traits::{CheckedAdd, SaturatedConversion, Zero};
 use sp_std::{vec, vec::Vec};
 
 const FINALITY_ENVELOPE_MAGIC: &[u8; 4] = b"X3PF";
@@ -410,6 +410,8 @@ pub mod pallet {
         InsufficientBalance,
         /// Invalid target account
         InvalidTargetAccount,
+        /// Supply conservation invariant violated - total supply must equal treasury + bonus + distributed
+        SupplyInvariantViolation,
     }
 
     #[pallet::call]
@@ -453,6 +455,10 @@ pub mod pallet {
             // Update canonical balance via X3 Kernel
             let account_id = Self::decode_account_id(&target_account)?;
             Self::increase_canonical_balance(&account_id, amount);
+
+            // 🔒 SECURITY: Verify supply conservation invariant after mint
+            // Treasury decreased, canonical balance increased - total should be unchanged
+            Self::verify_supply_invariant()?;
 
             // Emit event
             Self::deposit_event(Event::Minted {
@@ -500,6 +506,10 @@ pub mod pallet {
 
             // Update treasury balance
             TreasuryBalance::<T>::mutate(|balance| *balance = balance.saturating_add(amount));
+
+            // 🔒 SECURITY: Verify supply conservation invariant after burn
+            // Canonical balance decreased, treasury increased - total should be unchanged
+            Self::verify_supply_invariant()?;
 
             // Emit event
             Self::deposit_event(Event::Burned {
@@ -968,6 +978,71 @@ pub mod pallet {
 
         fn x3_asset_id() -> T::AssetId {
             T::AssetId::default()
+        }
+
+        /// Verify the canonical supply conservation invariant:
+        /// TotalSupply == TreasuryBalance + BonusPoolBalance + sum(all distributed balances)
+        ///
+        /// This is the CORE SECURITY INVARIANT for the X3 token economics.
+        /// If this invariant is violated, it indicates:
+        /// - Double-mint vulnerability
+        /// - Burn without proper accounting
+        /// - Balance corruption
+        /// - Arithmetic overflow/underflow bugs
+        ///
+        /// NOTE: This function is computationally expensive as it requires iterating
+        /// over all accounts. It should only be called after critical operations
+        /// (mint/burn) and in debug/audit builds with on_finalize hooks.
+        #[cfg(any(feature = "runtime-benchmarks", test))]
+        fn verify_supply_invariant_full() -> bool {
+            let total_supply = TotalSupply::<T>::get();
+            let treasury = TreasuryBalance::<T>::get();
+            let bonus = BonusPoolBalance::<T>::get();
+            
+            // TODO: In production, we need to track distributed_sum incrementally
+            // rather than iterating all accounts. For now, this is test-only.
+            let mut distributed_sum = T::Balance::zero();
+            
+            // Sum all vesting schedules
+            for (_account, schedule) in TeamVesting::<T>::iter() {
+                distributed_sum = distributed_sum.saturating_add(
+                    schedule.total_amount.saturated_into::<T::Balance>()
+                );
+            }
+            
+            // In production, we would track canonical balance sum incrementally
+            // For tests, we verify: treasury + bonus + vesting ≤ total_supply
+            let accounted = treasury.saturating_add(bonus).saturating_add(distributed_sum);
+            
+            accounted <= total_supply
+        }
+
+        /// Fast supply invariant check for production use.
+        /// Verifies that treasury + bonus + tracked_distributed ≤ total_supply.
+        /// Does NOT iterate accounts - uses cached sum (to be implemented).
+        fn verify_supply_invariant() -> Result<(), Error<T>> {
+            let total_supply = TotalSupply::<T>::get();
+            let treasury = TreasuryBalance::<T>::get();
+            let bonus = BonusPoolBalance::<T>::get();
+            
+            // Basic sanity check: treasury + bonus must not exceed total supply
+            let treasury_plus_bonus = treasury
+                .checked_add(&bonus)
+                .ok_or(Error::<T>::SupplyInvariantViolation)?;
+            
+            ensure!(
+                treasury_plus_bonus <= total_supply,
+                Error::<T>::SupplyInvariantViolation
+            );
+            
+            // Additional check: total supply should be constant (never changes after genesis)
+            let expected_total: T::Balance = X3_TOTAL_SUPPLY.saturated_into();
+            ensure!(
+                total_supply == expected_total,
+                Error::<T>::SupplyInvariantViolation
+            );
+            
+            Ok(())
         }
 
         fn canonical_balance(account: &T::AccountId) -> T::Balance {

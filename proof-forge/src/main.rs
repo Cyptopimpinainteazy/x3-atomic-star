@@ -6,6 +6,7 @@ mod proof;
 mod todo_proof;
 mod gap_proof;
 mod receipt;
+mod feature_proof;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -226,6 +227,241 @@ enum Commands {
         #[arg(long)]
         fail_hard: bool,
     },
+
+    /// Feature built proof - verify all features are truly built
+    Features {
+        #[command(subcommand)]
+        command: Option<FeaturesCommand>,
+
+        /// Fail on blockers
+        #[arg(long)]
+        fail_hard: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum FeaturesCommand {
+    /// List all features
+    List,
+
+    /// Scan all features
+    Scan,
+
+    /// Show feature status summary
+    Status,
+
+    /// Show missing features
+    Missing,
+
+    /// Show partial features
+    Partial,
+
+    /// Show unwired features
+    Unwired,
+
+    /// Show untested features
+    Untested,
+
+    /// Show stale features
+    Stale,
+
+    /// Show blocked features
+    Blockers,
+
+    /// Generate full report
+    Report,
+}
+
+// ============================================================================
+// Feature Command Handlers
+// ============================================================================
+
+fn run_features_list(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let matrix = scanner.load_matrix()?;
+    
+    println!("{}", "X3 Feature Registry".bold());
+    println!();
+    
+    for feature in &matrix.features {
+        println!("  {} {}", feature.id, format!("({})", feature.criticality).dimmed());
+        if verbose {
+            println!("    {}", feature.name);
+        }
+    }
+    
+    println!();
+    println!("Total features: {}", matrix.features.len());
+    
+    Ok(())
+}
+
+fn run_features_scan(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(verbose)?;
+    scanner.save_report(&report)?;
+    
+    println!("{}", "Feature scan complete".green());
+    println!("Reports saved to proof/reports/");
+    
+    Ok(())
+}
+
+fn run_features_status(workspace: &PathBuf, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Feature Status Summary".bold());
+    println!();
+    println!("Built:     {}", report.built_count.to_string().green());
+    println!("Partial:   {}", report.partial_count.to_string().yellow());
+    println!("Missing:   {}", report.missing_count.to_string().red());
+    println!("Unwired:   {}", report.unwired_count.to_string().yellow());
+    println!("Untested:  {}", report.untested_count.to_string().yellow());
+    println!("Weak:      {}", report.weak_count.to_string().yellow());
+    println!("Stale:     {}", report.stale_count.to_string().yellow());
+    println!("Blocked:   {}", report.blocked_count.to_string().red());
+    
+    Ok(())
+}
+
+fn run_features_missing(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Missing Features".bold().red());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Missing {
+            println!("  ❌ {}", result.feature_id);
+            if verbose {
+                for missing in &result.code_missing {
+                    println!("      - {}", missing.dimmed());
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_partial(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Partial Features".bold().yellow());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Partial {
+            println!("  🟡 {}", result.feature_id);
+            if verbose {
+                for blocker in &result.blockers {
+                    println!("      - {}", blocker.dimmed());
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_unwired(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Unwired Features".bold().yellow());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Unwired {
+            println!("  🔌 {}", result.feature_id);
+            if verbose {
+                for missing in &result.wiring_missing {
+                    println!("      - {}", missing.dimmed());
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_untested(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Untested Features".bold().yellow());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Untested {
+            println!("  🧪 {}", result.feature_id);
+            if verbose {
+                for missing in &result.tests_missing {
+                    println!("      - {}", missing.dimmed());
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_stale(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Stale Features".bold().yellow());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Stale {
+            println!("  🕐 {}", result.feature_id);
+            if verbose {
+                println!("      Receipt needs regeneration");
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_blockers(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    
+    println!("{}", "Blocked Features".bold().red());
+    println!();
+    
+    for result in &report.results {
+        if result.status == feature_proof::FeatureStatus::Blocked {
+            println!("  🚫 {}", result.feature_id);
+            if verbose {
+                for blocker in &result.blockers {
+                    println!("      - {}", blocker.red());
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn run_features_report(workspace: &PathBuf, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+    let report = scanner.scan(false)?;
+    scanner.save_report(&report)?;
+    
+    println!("{}", "Full Feature Report Generated".bold().green());
+    println!();
+    println!("  - proof/reports/feature_status.json");
+    println!("  - proof/reports/features_report.md");
+    println!();
+    println!("Verdict: {}", report.verdict.bold());
+    
+    Ok(())
 }
 
 #[tokio::main]
@@ -318,6 +554,45 @@ async fn main() -> Result<()> {
 
         Commands::GapGate { gate, fail_hard } => {
             run_gap_gate(&cli.workspace, &gate, fail_hard, cli.verbose).await?
+        }
+
+        Commands::Features { command, fail_hard } => {
+            match command {
+                None => {
+                    // Default: run full feature gate
+                    feature_proof::run_feature_gate(&cli.workspace, fail_hard, cli.verbose)?;
+                }
+                Some(FeaturesCommand::List) => {
+                    run_features_list(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Scan) => {
+                    run_features_scan(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Status) => {
+                    run_features_status(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Missing) => {
+                    run_features_missing(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Partial) => {
+                    run_features_partial(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Unwired) => {
+                    run_features_unwired(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Untested) => {
+                    run_features_untested(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Stale) => {
+                    run_features_stale(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Blockers) => {
+                    run_features_blockers(&cli.workspace, cli.verbose)?;
+                }
+                Some(FeaturesCommand::Report) => {
+                    run_features_report(&cli.workspace, cli.verbose)?;
+                }
+            }
         }
     }
 

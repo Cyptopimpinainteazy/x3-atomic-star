@@ -1,70 +1,168 @@
 #!/bin/bash
-# Phase 5 Complete Execution Launcher
-# Runs all three concurrent Phase 5 tasks: Settlement Testing | Indexer | Monitoring
+# Phase 5 Complete Execution Launcher (ENHANCED)
+# Runs all three concurrent Phase 5 tasks with deployment verification
+# Fixes: Path issues, false positives, validator startup, logging
 
 set -e
 
 WORKSPACE="/home/lojak/Desktop/X3_ATOMIC_STAR"
 LOG_DIR="/tmp/x3-testnet-logs"
-mkdir -p "$LOG_DIR"
+VALIDATORS_DIR="/tmp/x3-validators"
+mkdir -p "$LOG_DIR" "$VALIDATORS_DIR"
+
+# Enhanced logging
+log_info() { echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+log_error() { echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+log_success() { echo "[✅] $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+log_warning() { echo "[⚠️] $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+
+# Process verification function
+verify_process_started() {
+  local pid=$1
+  local name=$2
+  local timeout=${3:-5}
+  local elapsed=0
+  
+  while [ $elapsed -lt $timeout ]; do
+    if kill -0 $pid 2>/dev/null; then
+      log_success "$name process started (PID: $pid)"
+      return 0
+    fi
+    sleep 0.5
+    elapsed=$((elapsed + 1))
+  done
+  
+  log_error "$name process did not start (PID: $pid may have exited)"
+  return 1
+}
+
+# Binary health check
+verify_binary_exists() {
+  local binary=$1
+  local name=$2
+  
+  if [ ! -f "$binary" ]; then
+    log_error "$name binary not found at: $binary"
+    return 1
+  fi
+  
+  if [ ! -x "$binary" ]; then
+    log_error "$name binary not executable: $binary"
+    return 1
+  fi
+  
+  log_success "$name binary verified: $binary"
+  return 0
+}
 
 echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║    PHASE 5 - COMPLETE PARALLEL EXECUTION LAUNCHER             ║"
+echo "║    PHASE 5 - COMPLETE PARALLEL EXECUTION LAUNCHER (ENHANCED)  ║"
 echo "║  🔴 5a: Settlement E2E | 🟡 5b: Indexer | 🟢 5c: Monitoring   ║"
+echo "║  ✨ Features: Process Verification | Error Handling | Logging  ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo
 
 # Kill any existing Phase 5 processes
-echo "🧹 Cleaning up any existing Phase 5 processes..."
+log_info "Cleaning up any existing Phase 5 processes..."
 pkill -f "p4_p5_production_release" 2>/dev/null || true
 pkill -f "x3-indexer" 2>/dev/null || true
+pkill -f "x3-chain-node.*validator" 2>/dev/null || true
 sleep 2
-echo "✅ Cleanup complete"
+log_success "Cleanup complete"
 echo
 
 # ===== PHASE 5a: Settlement Flow E2E Tests =====
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔴 [Phase 5a] Settlement Flow E2E Testing"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Command: python3 p4_p5_production_release.py --validators 3 --testnet-enabled"
-echo "Logging to: $LOG_DIR/settlement-tests.log"
-echo "Starting in 3 seconds..."
+log_info "Command: python3 p4_p5_production_release.py --validators 3 --testnet-enabled"
+log_info "Logging to: $LOG_DIR/settlement-tests.log"
+log_info "Starting in 3 seconds..."
 sleep 3
+
+if [ ! -f "$WORKSPACE/tests_phase4/p4_p5_production_release.py" ]; then
+  log_error "Settlement test script not found at $WORKSPACE/tests_phase4/p4_p5_production_release.py"
+  exit 1
+fi
+
 cd "$WORKSPACE/tests_phase4"
-timeout 900 python3 p4_p5_production_release.py --validators 3 --testnet-enabled \
-  2>&1 | tee "$LOG_DIR/settlement-tests.log" &
+{
+  echo "=== Settlement Tests Started: $(date) ==="
+  echo "Environment: Python $(python3 --version 2>&1)"
+  echo "Working directory: $PWD"
+  timeout 900 python3 -u p4_p5_production_release.py --validators 3 --testnet-enabled 2>&1
+  echo "=== Settlement Tests Exit Code: $? ==="
+} > "$LOG_DIR/settlement-tests.log" 2>&1 &
 SETTLEMENT_PID=$!
-echo "✅ Started (PID: $SETTLEMENT_PID)"
+
+if verify_process_started $SETTLEMENT_PID "Settlement Tests"; then
+  echo "✅ Started (PID: $SETTLEMENT_PID)"
+else
+  log_warning "Settlement test process may not have started properly, but continuing..."
+fi
 echo
 
 # ===== PHASE 5b: Indexer Build & Deployment =====
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🟡 [Phase 5b] X3 Indexer Build & Deployment"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Location: crates/x3-indexer"
-echo "Logging to: $LOG_DIR/indexer.log"
-echo "Target: Release binary for :4000"
-echo "Starting in 10 seconds (after Phase 5a started)..."
+log_info "Location: crates/x3-indexer"
+log_info "Logging to: $LOG_DIR/indexer.log"
+log_info "Target: Release binary for :4000"
+log_info "Starting in 10 seconds (after Phase 5a started)..."
 sleep 10
 
 cd "$WORKSPACE/crates/x3-indexer"
 
 # Build indexer
-echo "🔨 Building X3 Indexer..."
-timeout 600 cargo build --release 2>&1 | tee "$LOG_DIR/indexer-build.log"
-echo "✅ Build complete"
+log_info "Building X3 Indexer..."
+{
+  echo "=== Indexer Build Started: $(date) ==="
+  timeout 600 cargo build --release 2>&1
+  echo "=== Indexer Build Complete: $(date) ==="
+} | tee "$LOG_DIR/indexer-build.log"
 
-# Deploy indexer
+INDEXER_BINARY="$WORKSPACE/target/release/x3-indexer"
+
+if ! verify_binary_exists "$INDEXER_BINARY" "Indexer"; then
+  log_error "Indexer binary build failed or binary not found"
+  exit 1
+fi
+
 echo
-echo "🚀 Deploying X3 Indexer on :4000..."
-timeout 600 ./target/release/x3-indexer \
-  --listen 0.0.0.0:4000 \
-  --rpc-urls http://127.0.0.1:9933 \
-             http://127.0.0.1:9934 \
-             http://127.0.0.1:9935 \
-  2>&1 | tee -a "$LOG_DIR/indexer.log" &
+log_info "Deploying X3 Indexer on :4000..."
+
+# Deploy indexer with proper verification
+{
+  echo "=== Indexer Runtime Started: $(date) ==="
+  echo "Command: $INDEXER_BINARY --listen 0.0.0.0:4000 --rpc-urls http://127.0.0.1:9933 http://127.0.0.1:9934 http://127.0.0.1:9935"
+  echo "Working directory: $PWD"
+  timeout 600 "$INDEXER_BINARY" \
+    --listen 0.0.0.0:4000 \
+    --rpc-urls http://127.0.0.1:9933 \
+               http://127.0.0.1:9934 \
+               http://127.0.0.1:9935 \
+    2>&1
+  echo "=== Indexer Runtime Exit: $(date) ==="
+} >> "$LOG_DIR/indexer.log" 2>&1 &
 INDEXER_PID=$!
-echo "✅ Indexer deployed (PID: $INDEXER_PID)"
+
+if verify_process_started $INDEXER_PID "Indexer"; then
+  log_success "Indexer deployed (PID: $INDEXER_PID)"
+  
+  # Verify indexer is responding
+  sleep 2
+  if curl -s http://127.0.0.1:4000/graphql -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"{ __typename }"}' > /dev/null 2>&1; then
+    log_success "Indexer GraphQL endpoint responding"
+  else
+    log_warning "Indexer GraphQL not yet responsive (may still be starting)"
+  fi
+else
+  log_error "Indexer deployment failed - process did not start"
+  exit 1
+fi
 echo
 
 # ===== PHASE 5c: Live Monitoring =====
@@ -185,18 +283,34 @@ echo
 # Settlement Results
 echo "📋 PHASE 5a - Settlement Flow E2E Testing:"
 if [ -f "$LOG_DIR/settlement-tests.log" ]; then
-  PASSED=$(grep -c "test result: ok" "$LOG_DIR/settlement-tests.log" 2>/dev/null || echo "0")
-  FAILED=$(grep -c "test result: FAILED" "$LOG_DIR/settlement-tests.log" 2>/dev/null || echo "0")
-  TOTAL=$((PASSED + FAILED))
-  echo "   ✅ Passed: $PASSED"
-  echo "   ❌ Failed: $FAILED"
-  echo "   📊 Total: $TOTAL"
-  if [ "$FAILED" -eq 0 ] && [ "$PASSED" -gt 0 ]; then
-    echo "   🎉 STATUS: ✅ ALL TESTS PASSED"
-  elif [ "$FAILED" -gt 0 ]; then
-    echo "   ⚠️  STATUS: ❌ SOME TESTS FAILED"
+  TOTAL_LINES=$(wc -l < "$LOG_DIR/settlement-tests.log" 2>/dev/null || echo "0")
+  
+  if [ "$TOTAL_LINES" -gt 0 ]; then
+    PASSED=$(grep -c "test result: ok" "$LOG_DIR/settlement-tests.log" 2>/dev/null || echo "0")
+    FAILED=$(grep -c "test result: FAILED" "$LOG_DIR/settlement-tests.log" 2>/dev/null || echo "0")
+    TOTAL=$((PASSED + FAILED))
+    
+    # Safe division - avoid division by zero
+    if [ "$TOTAL" -gt 0 ]; then
+      PERCENTAGE=$((PASSED * 100 / TOTAL))
+    else
+      PERCENTAGE=0
+    fi
+    
+    echo "   ✅ Passed: $PASSED"
+    echo "   ❌ Failed: $FAILED"
+    echo "   📊 Total: $TOTAL"
+    
+    if [ "$FAILED" -eq 0 ] && [ "$PASSED" -gt 0 ]; then
+      echo "   🎉 STATUS: ✅ ALL TESTS PASSED"
+    elif [ "$FAILED" -gt 0 ]; then
+      echo "   ⚠️  STATUS: ❌ SOME TESTS FAILED"
+    else
+      echo "   ⏳ STATUS: Tests may not have executed (${TOTAL_LINES} log lines)"
+      tail -10 "$LOG_DIR/settlement-tests.log" | sed 's/^/      /'
+    fi
   else
-    echo "   ⏳ STATUS: Tests may not have executed"
+    echo "   ⏳ STATUS: No settlement test results (log is empty)"
   fi
 else
   echo "   ⚠️  No settlement test results found"
@@ -207,16 +321,31 @@ echo
 echo "🔧 PHASE 5b - X3 Indexer Deployment:"
 if [ -f "$LOG_DIR/indexer-build.log" ] && grep -q "Finished" "$LOG_DIR/indexer-build.log"; then
   echo "   ✅ Build: Successful"
-  BINARY_SIZE=$(du -h "$WORKSPACE/crates/x3-indexer/target/release/x3-indexer" 2>/dev/null | cut -f1)
-  echo "   📦 Binary Size: $BINARY_SIZE"
-  if pgrep -f "x3-indexer" > /dev/null 2>&1; then
-    echo "   🚀 Deployment: Running on :4000"
-  else
-    echo "   ⏳ Deployment: Binary ready, needs manual startup"
+  
+  if [ -f "$WORKSPACE/target/release/x3-indexer" ]; then
+    BINARY_SIZE=$(du -h "$WORKSPACE/target/release/x3-indexer" 2>/dev/null | cut -f1)
+    echo "   📦 Binary Size: $BINARY_SIZE"
   fi
-  echo "   Command: ./crates/x3-indexer/target/release/x3-indexer --listen 0.0.0.0:4000 --rpc-urls http://127.0.0.1:9933"
+  
+  if pgrep -f "x3-indexer" > /dev/null 2>&1; then
+    echo "   🚀 Deployment: ✅ Running on :4000"
+    if curl -s http://127.0.0.1:4000/graphql -X POST \
+      -H "Content-Type: application/json" \
+      -d '{"query":"{ __typename }"}' > /dev/null 2>&1; then
+      echo "      GraphQL: ✅ Responsive"
+    else
+      echo "      GraphQL: ⏳ Pending..."
+    fi
+  else
+    echo "   ⏳ Deployment: Binary ready but process not running"
+    echo "      Start with: $WORKSPACE/target/release/x3-indexer --listen 0.0.0.0:4000 --rpc-urls http://127.0.0.1:9933 http://127.0.0.1:9934 http://127.0.0.1:9935"
+  fi
 else
-  echo "   🔨 Build: In progress or pending"
+  echo "   🔨 Build: Pending or failed"
+  if [ -f "$LOG_DIR/indexer-build.log" ]; then
+    log_error "Last errors from indexer build:"
+    grep -i "error" "$LOG_DIR/indexer-build.log" | head -3 | sed 's/^/      /'
+  fi
 fi
 echo
 

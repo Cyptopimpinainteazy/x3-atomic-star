@@ -1,5 +1,6 @@
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
+use scale_info::prelude::{boxed::Box, vec::Vec};
 
 /// X3VM Condition for conditional execution
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]

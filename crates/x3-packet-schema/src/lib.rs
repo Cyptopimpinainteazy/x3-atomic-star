@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use scale_info::prelude::vec::Vec;
+
 mod header;
 mod evm;
 mod svm;
