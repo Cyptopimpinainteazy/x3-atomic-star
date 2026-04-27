@@ -2,7 +2,7 @@
 
 ## ⚠️ CRITICAL UPDATE - DECISION REVERSED
 
-**Status**: ❌ **SUPERSEDED BY PROOFFORGE SECURITY AUDIT - NOT READY FOR MAINNET**
+**Status**: 🟡 **REMEDIATION 56% COMPLETE — 5 of 9 PROOFFORGE BLOCKERS RESOLVED (see [STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md))**
 
 This document previously claimed "GO FOR MAINNET (96% confidence)" based on Phase 4 P0 priority-based audit. That decision is **no longer valid** due to ProofForge comprehensive security audit findings.
 

@@ -10,7 +10,7 @@
 
 The Phase 4 audit successfully fixed all 5 P0 blockers below (score: 49.25→87.92/100).
 
-**However**, ProofForge v1.0.0 security audit found **9 critical security blockers (6 S0 + 3 S1)** that are NOT P0 blockers.
+**However**, ProofForge v1.0.0 security audit found **9 critical security blockers (6 S0 + 3 S1)** that are NOT P0 blockers. **As of April 27, 2026: 5 of 9 RESOLVED — see [STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md).**
 
 **See**: [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md)
 
@@ -158,7 +158,7 @@ cargo test --lib
 
 ### Current Status (ProofForge v1.0.0)
 
-❌ **NOT READY FOR MAINNET** - 9 Critical Blockers Found
+🟡 **REMEDIATION 56% COMPLETE** — 5 of 9 Critical Blockers RESOLVED (see [STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md))
 
 While P0 blockers above are resolved, ProofForge identified security-severity (S0/S1) blockers that are distinct:
 
