@@ -1,18 +1,36 @@
-# 🚀 X3 Option D: Comprehensive Production Readiness Validation
+# � X3 Option D: Testnet Validation System (NOT Mainnet Ready)
+
+## ⚠️ CRITICAL DISCLAIMER
+
+**Option D performs TESTNET validation, NOT mainnet security verification**
+
+This guide describes Phase 4 test infrastructure that validates basic functionality. However, ProofForge security audit identified **9 critical blockers (6 S0 + 3 S1)** that prevent mainnet deployment:
+
+- atomic_rollback_missing (S0-005)
+- Double mint possible (S0-002)
+- Bridge replay accepted (S0-003)
+- Finality spoof vulnerabilities (S0-004)
+- 5 additional critical issues
+
+**Status**: ✅ Testnet validation complete | 🚨 NOT production-ready
+
+**See**: [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) for details
+
+---
 
 ## Overview
 
-**Option D** is the **full-suite automated validation system** that comprehensively tests all critical X3 blockchain production systems in real-time.
+**Option D** is the **testnet-focused automated validation system** that tests X3 blockchain functionality on isolated testnet.
 
 ### What Option D Does
 
-Option D orchestrates **3 parallel production monitoring systems** that validate:
+Option D orchestrates **3 parallel testnet monitoring systems** that validate:
 
-1. **Settlement Timeout Enforcement** - Verifies 28,800-block deadline mechanism
-2. **GPU Sidecar Health Monitoring** - Tracks 5-block health check intervals and failure thresholds
-3. **Peer Consensus Finalization** - Monitors validator synchronization and block production
+1. **Settlement Timeout Enforcement** - Verifies 28,800-block deadline mechanism (testnet only)
+2. **GPU Sidecar Health Monitoring** - Tracks 5-block health check intervals (testnet only)
+3. **Peer Consensus Finalization** - Monitors validator synchronization on testnet
 
-### Status: Phase 4 ✅ COMPLETE
+### Status: Phase 4 ✅ TESTNET VALIDATION COMPLETE
 
 ```
 ✅ All 68 Phase 4 Tests Passing

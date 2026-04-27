@@ -1,6 +1,12 @@
-# 🚀 TESTNET READINESS: QUICK START GUIDE
+# 🚀 TESTNET READINESS: QUICK START GUIDE (NOT MAINNET READY)
 
-**Status:** 🟢 Ready to Begin  
+� **STATUS UPDATE (April 27, 2026):** Remediation now 56% complete — 5 of 9 ProofForge blockers RESOLVED (S0-1, S0-2, S0-3, S0-4, S0-5). 1 S0 + 3 S1 remain. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for current authoritative status.
+
+🚨 **CRITICAL**: Mainnet still BLOCKED until S0-6 + 3 S1 cleared.
+📖 Original audit context: [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md)  
+⏱️ Estimated 12-24 weeks to mainnet readiness
+
+**Status:** 🟢 Testnet Ready | 🚨 Mainnet NOT READY
 **Phase:** 1 of 4  
 **Duration:** ~10 days  
 

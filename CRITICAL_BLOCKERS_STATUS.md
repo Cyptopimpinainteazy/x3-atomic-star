@@ -1,13 +1,24 @@
-# ✅ ALL 5 CRITICAL P0 BLOCKERS - RESOLVED & VERIFIED
+# ⚠️ UPDATE REQUIRED: P0 BLOCKERS RESOLVED BUT S0/S1 BLOCKERS FOUND
 
-**Status**: ✅ **VERIFICATION COMPLETE** | **Date**: April 26, 2026  
-**Decision**: GO FOR MAINNET (96% confidence)
+**Status**: ⚠️ **HISTORICAL STATUS - SUPERSEDED BY PROOFFORGE** | **Date**: April 26, 2026  
+**Previous Decision**: GO FOR MAINNET (96% confidence) - NOW INVALID
+**Current Decision**: NO-GO FOR MAINNET - 9 Security Blockers Found
 
 ---
 
-## Summary
+## 🚨 CRITICAL UPDATE
 
-All 5 P0 critical blockers from the NO-GO audit decision have been **fully implemented, tested, and verified**. 
+The Phase 4 audit successfully fixed all 5 P0 blockers below (score: 49.25→87.92/100).
+
+**However**, ProofForge v1.0.0 security audit found **9 critical security blockers (6 S0 + 3 S1)** that are NOT P0 blockers.
+
+**See**: [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md)
+
+---
+
+## Historical Summary (P0 System)
+
+All 5 P0 critical blockers from Phase 4 have been **fully implemented, tested, and verified**. 
 
 **Score Impact**: 49.25/100 (NO-GO) → 87.92/100 (✅ GO) = +38.67 pts
 
@@ -139,5 +150,42 @@ cargo test --lib
 
 **Status**: Ready for compilation verification  
 **Risk Level**: Low (conservative fixes following established patterns)  
-**Timeline to GO**: ~1 hour (after compilation + test verification + audit re-run)
+**Timeline to GO (P0 System)**: ~1 hour (after verification)
+
+---
+
+## ProofForge Findings: S0/S1 Security Blockers (NEW)
+
+### Current Status (ProofForge v1.0.0)
+
+❌ **NOT READY FOR MAINNET** - 9 Critical Blockers Found
+
+While P0 blockers above are resolved, ProofForge identified security-severity (S0/S1) blockers that are distinct:
+
+### S0 Blockers (Catastrophic - 6 Total)
+1. **canonical_supply_invariant_missing** - Infinite minting possible
+2. **double_mint_possible** - Unlimited token creation
+3. **bridge_replay_accepted** - Asset draining attacks
+4. **finality_spoof_accepted** - Double-spend exploits
+5. **atomic_rollback_missing** - State corruption
+6. **runtime_panic_critical_path** - Validator crashes
+
+### S1 Blockers (Critical - 3 Total)
+1. **failed_rollback** - Atomic operation failures
+2. **governance_bypass** - Unauthorized upgrades
+3. **unauthorized_mint** - Inflation attacks
+
+### What's the Difference?
+
+- **P0 Blockers (Phase 4)**: Priority-based - "blocks our timeline"
+- **S0/S1 Blockers (ProofForge)**: Security-severity-based - "breaks cryptography"
+
+P0 and S0 use different classification systems. ProofForge's security gates caught gaps Phase 4's priority audit missed.
+
+**See**: [PROOFFORGE_RECONCILIATION.md](PROOFFORGE_RECONCILIATION.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](S0_BLOCKERS_REMEDIATION_PLAN.md)
+
+### Remediation Required
+**Timeline**: 12-24 weeks minimum to fix all S0/S1 blockers and pass ProofForge gates
+
+**Action**: Do NOT deploy until S0/S1 blockers resolved and ProofForge `prove-everything` passes
 

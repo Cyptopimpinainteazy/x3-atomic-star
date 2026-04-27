@@ -1,6 +1,10 @@
-# X3 Mainnet Proof Machine: Quick Start
+# ⚠️ X3 Testnet Proof Machine: Quick Start (NOT MAINNET READY)
 
-**TL;DR:** Turn Repomix into a launch-gate weapon using 5 targeted packs + AI audit prompts + proof-based scoring.
+🚨 **IMPORTANT**: Despite the filename, this blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
+📖 See [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) for 9 critical blockers  
+⏱️ Estimated timeline to mainnet readiness: **12-24 weeks**
+
+This document describes testnet deployment and proof generation processes.
 
 ---
 

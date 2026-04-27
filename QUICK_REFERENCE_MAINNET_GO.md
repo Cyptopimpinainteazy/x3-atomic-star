@@ -1,63 +1,89 @@
-# 🚀 QUICK REFERENCE - GO FOR MAINNET
+# 🟡 QUICK REFERENCE — REMEDIATION IN PROGRESS (5/9 BLOCKERS FIXED)
 
-**Current Status**: ✅ **GO FOR MAINNET**  
-**Confidence**: 96%  
-**Score**: 87.92/100  
-**Date**: April 26, 2026
+> 📢 **April 27, 2026 audit:** This file's "0% confidence / 9 blockers" framing is OUT OF DATE. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for current state. Below preserved as historical context.
 
----
-
-## ⚡ 30-Second Summary
-
-- ✅ All 5 P0 blockers resolved
-- ✅ 80/80 tests passing (100%)
-- ✅ Score improved 49.25 → 87.92 (+38.67 pts)
-- ✅ Byzantine safety enabled
-- ✅ Solvency mathematically proven
-- ✅ Validator readiness confirmed
-
-**Result: MAINNET READY ✅**
+⚠️ **CRITICAL UPDATE**: Previous "GO FOR MAINNET" status is SUPERSEDED by ProofForge security audit findings.  
+**Current Status**: 🚨 **NOT READY FOR MAINNET**  
+**Confidence**: 0% (9 critical security blockers active)  
+**ProofForge Audit Date**: April 26, 2026  
+**Previous Score**: 87.92/100 (Phase 4 - priority-based, pre-ProofForge)
+**Security Readiness**: 0% (S0/S1 severity-based)
 
 ---
 
-## 🎯 READ THIS FIRST
+## 🚨 ProofForge Security Audit Findings
 
-[**STEP_4_FINAL_GO_NO_GO_DECISION.md**](./STEP_4_FINAL_GO_NO_GO_DECISION.md)
-- Executive GO decision with full technical evidence
-- Risk assessment and mitigation
-- Deployment timeline
-- Validator readiness checklist
+### What Phase 4 Verified (Still Valid)
+- ✅ All 5 P0 blockers resolved (priority-based)
+- ✅ Tests improved from 49.25 → 87.92 score
+- ✅ Byzantine safety implementation started
+- ✅ Solvency test framework created
+
+### What ProofForge Discovered (Security-Critical)
+- ❌ **6 S0 Blockers (Catastrophic)** - Can cause infinite minting, asset draining, validator crashes
+- ❌ **3 S1 Blockers (Critical)** - Can cause governance bypass, unauthorized minting
+- ❌ **24 S0 Implementation Gaps** - Critical security features incomplete
+- ❌ **549 Mainnet-Blocking TODOs** - Highest priority items unfixed
+
+**Result: NOT READY FOR MAINNET ❌**  
+**Why**: Phase 4 used P0 priority classification. ProofForge uses S0/S1 security-severity classification (more rigorous for mainnet safety).  
+**What to do**: See [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) - 12-24 weeks to fix all 9 blockers.
 
 ---
 
-## 🔍 VERIFY BLOCKERS
+## 🎯 FOR MAINNET DEPLOYMENT TO PROCEED
+
+All of the following MUST be met (currently NOT met):
+
+### Prerequisites Checklist
+- [ ] All 6 S0 blockers fixed & verified
+- [ ] All 3 S1 blockers fixed & verified
+- [ ] ProofForge SecurityGate: PASS (currently FAIL)
+- [ ] ProofForge MainnetGate: PASS (currently 85/88 tests)
+- [ ] ProofForge GapGate: PASS (currently 116 gaps open)
+- [ ] ProofForge TodoGate: PASS (currently 549+ mainnet-blocking TODOs)
+- [ ] External security audit: COMPLETE (currently pending)
+- [ ] 30+ day stable testnet validation: COMPLETE (currently pending)
+
+### Timeline
+Estimated 12-24 weeks minimum for full remediation with coordinated team effort.
+
+### References
+1. **[⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md)** - Explains why status changed
+2. **[S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md)** - Implementation specs for each blocker
+3. **[PROOFFORGE_RECONCILIATION.md](./PROOFFORGE_RECONCILIATION.md)** - Why Phase 4 and ProofForge differ
+4. **[STEP_4_FINAL_GO_NO_GO_DECISION.md](./STEP_4_FINAL_GO_NO_GO_DECISION.md)** - Historical reference (now NO-GO)
+
+---
+
+## 🔍 VERIFY PROOFFORGE GATES (Current Status: 0/4 PASS)
+
+To check mainnet readiness, verify all 4 ProofForge gates:
 
 ```bash
-# All 5 blockers resolved?
 cd /home/lojak/Desktop/X3_ATOMIC_STAR
 
-# Check blocker 1: Equivocation detection
-grep "pallet-offences\|EquivocationReportSystem" runtime/src/lib.rs | wc -l
-# Should show: 5+ matches ✓
+# Gate 1: SecurityGate - Check for S0/S1 security blockers
+grep -r "S0_\|S1_" S0_BLOCKERS_REMEDIATION_PLAN.md | wc -l
+# Should show: 9 critical blockers identified (currently FAIL)
 
-# Check blocker 2: Multi-node tests
-grep "multi_validator_consensus" tests/multi_node_consensus_test.rs | wc -l
-# Should show: 4+ matches (4 test functions) ✓
+# Gate 2: MainnetGate - Test coverage
+grep "mainnet\|invariant\|fuzz" tests/ -r | wc -l
+# Should show: 88+ tests (currently 85/88 = FAIL)
 
-# Check blocker 3: Sender validation
-grep "UnauthorizedSender" pallets/x3-cross-vm-router/src/lib.rs | wc -l
-# Should show: 2+ matches ✓
+# Gate 3: GapGate - Implementation gaps
+grep -r "TODO_MAINNET\|FIXME_MAINNET" . --include="*.rs" | wc -l
+# Should show: 0 gaps (currently 116 gaps open = FAIL)
 
-# Check blocker 4: Storage pruning
-grep "expires_at\|reaper" pallets/x3-cross-vm-router/src/lib.rs | wc -l
-# Should show: 2+ matches ✓
+# Gate 4: TodoGate - Mainnet-blocking TODOs
+grep -r "TODO\|FIXME" . --include="*.rs" | grep -i "mainnet\|crypto\|consensus" | wc -l
+# Should show: 0 T7-T9 emergency items (currently 549 blocking = FAIL)
 
-# Check blocker 5: Solvency test
-grep "vault_solvency_invariant_holds" pallets/x3-settlement-engine/src/tests.rs
-# Should show: test function ✓
+# Summary: All gates must show PASS before mainnet deployment
+echo "Current status: All 4 gates FAILING - DO NOT DEPLOY"
+```
 
-# Run all tests
-cargo test --lib 2>&1 | tail -5
+**When will mainnet be ready?** When all 9 S0/S1 blockers are fixed and ProofForge gates pass. See [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) for implementation roadmap.
 # Expected: test result: ok. 80 passed; 0 failed
 ```
 

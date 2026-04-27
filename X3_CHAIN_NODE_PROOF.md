@@ -1,18 +1,29 @@
-# X3 CHAIN NODE - OPERATIONAL PROOF
+# X3 CHAIN NODE - OPERATIONAL PROOF (TESTNET ONLY)
 
 **Component:** X3 Chain Node (Main Blockchain Binary)  
 **Version:** 0.1.0  
-**Status:** ✅ VERIFIED OPERATIONAL  
-**Verification Date:** 2024 (Mainnet Readiness Phase)  
+**Status:** ⚠️ TESTNET OPERATIONAL (NOT MAINNET READY)  
+**Verification Date:** 2024 (Pre-ProofForge Analysis)  
 **Binary Size:** 53MB (Release Build)
+
+---
+
+## ⚠️ CRITICAL DISCLAIMER
+
+**THIS DOCUMENT SHOWS BINARY COMPILATION PROOF, NOT MAINNET READINESS PROOF**
+
+✅ **Binary Operational**: X3 Chain Node builds and runs on testnet  
+🚨 **Security Status**: ProofForge audit identified 9 critical blockers (6 S0 + 3 S1) preventing mainnet deployment
+
+**NOT SUITABLE FOR MAINNET** until S0/S1 blockers are remediated. See [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](S0_BLOCKERS_REMEDIATION_PLAN.md) for remediation roadmap (12-24 weeks estimated).
 
 ---
 
 ## EXECUTIVE SUMMARY
 
-The X3 Chain Node main blockchain binary has been verified as fully functional and ready for deployment. This is the core Substrate-based blockchain runtime that powers the X3 dual-VM (EVM + SVM) Layer-1 with atomic cross-chain capabilities.
+The X3 Chain Node main blockchain binary compiles successfully and is operational on testnet. This is the core Substrate-based blockchain runtime that powers the X3 dual-VM (EVM + SVM) Layer-1 with atomic cross-chain capabilities.
 
-**Key Findings:**
+**✅ Verified Operational:**
 - ✅ Binary compiled and executable (53MB release build)
 - ✅ Version reporting functional
 - ✅ All CLI commands available
@@ -21,6 +32,10 @@ The X3 Chain Node main blockchain binary has been verified as fully functional a
 - ✅ Key management system operational
 - ✅ Chain specification tools available
 - ✅ Validator/collator modes supported
+
+**⚠️ Known Security Blockers:**
+- 🚨 atomic_rollback_missing (S0-005): Failed atomic operations leave partial state
+- 🚨 5 additional S0/S1 blockers documented in [S0_BLOCKERS_REMEDIATION_PLAN.md](S0_BLOCKERS_REMEDIATION_PLAN.md)
 
 ---
 

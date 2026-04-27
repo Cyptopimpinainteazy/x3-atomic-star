@@ -316,6 +316,7 @@ pub mod pallet {
 
 #[cfg(test)]
 mod tests {
+    use super::pallet::*;
     use crate::fraud_proofs::{
         freeze::{FreezeReason, FreezeState},
         scheduler_v1::scheduler_commitment_from_bytes,

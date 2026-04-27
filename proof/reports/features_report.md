@@ -10,8 +10,8 @@
 | PARTIAL | 0 |
 | MISSING | 33 |
 | UNWIRED | 17 |
-| UNTESTED | 8 |
-| WEAK | 1 |
+| UNTESTED | 7 |
+| WEAK | 2 |
 | STALE | 0 |
 | BLOCKED | 0 |
 | REVOKED | 0 |

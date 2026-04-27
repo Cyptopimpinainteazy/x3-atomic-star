@@ -5,8 +5,8 @@
   "partial_count": 0,
   "missing_count": 33,
   "unwired_count": 17,
-  "untested_count": 8,
-  "weak_count": 1,
+  "untested_count": 7,
+  "weak_count": 2,
   "stale_count": 0,
   "blocked_count": 0,
   "revoked_count": 0,
@@ -2048,7 +2048,7 @@
     {
       "feature_id": "x3.atomic_execution",
       "name": "Atomic Execution Engine",
-      "status": "UNTESTED",
+      "status": "WEAK",
       "docs_found": 0,
       "docs_missing": [
         "pallets/x3-atomic-kernel/README.md"
@@ -2057,10 +2057,9 @@
       "code_missing": [],
       "wiring_found": 1,
       "wiring_missing": [],
-      "tests_found": 0,
+      "tests_found": 1,
       "tests_missing": [
         "unit: atomic_commit",
-        "unit: atomic_rollback",
         "integration: cross_vm_atomic"
       ],
       "negative_tests_found": 0,
@@ -2072,7 +2071,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
-        "3 tests missing",
+        "2 tests missing",
         "2 negative tests missing",
         "proof receipt missing"
       ],
@@ -2291,7 +2290,7 @@
     "x3.asset_registry: 2 tests missing",
     "x3.asset_registry: proof receipt missing",
     "x3.atomic_execution: 2 negative tests missing",
-    "x3.atomic_execution: 3 tests missing",
+    "x3.atomic_execution: 2 tests missing",
     "x3.atomic_execution: proof receipt missing",
     "x3.balances: 1 code files missing",
     "x3.balances: 2 negative tests missing",

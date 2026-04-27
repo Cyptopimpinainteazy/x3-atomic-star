@@ -1,20 +1,34 @@
-# 🚀 X3_ATOMIC_STAR - Unified Blockchain Testnet Platform
+# 🚀 X3_ATOMIC_STAR - Unified Blockchain **TESTNET ONLY** Platform
 
-**Welcome!** This is the complete, consolidated X3 blockchain codebase ready for testnet deployment.
+🚨 **CRITICAL - READ FIRST**: This blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
+📖 See [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) for details (2 min read)  
+🛠️ See [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) for fix roadmap (12-24 weeks)
+
+**Current Status**: 🚨 NOT READY FOR MAINNET (0% readiness, 9 critical S0/S1 security blockers active)  
+**Previous Status**: ✅ TESTNET READY (87.92/100, Phase 4 audit - priority-based)  
+**Change Date**: April 26, 2026 (ProofForge security-severity audit)  
+**Minimum Timeline to Mainnet**: 12-24 weeks (fix all blockers + external audit + testnet validation)
+
+---
+
+## ✅ TESTNET STATUS: DEPLOYMENT READY
+
+**Welcome!** This is the complete, consolidated X3 blockchain codebase **ready for testnet deployment only**.
 
 ---
 
 ## 🎯 What is This?
 
-**X3_ATOMIC_STAR** is a production-ready Substrate blockchain featuring:
+**X3_ATOMIC_STAR** is a Substrate blockchain featuring:
 
 - **31 Core Pallets** - Settlement, routing, governance, and 28+ more
 - **101 Custom Crates** - Advanced cross-chain features
 - **GPU Acceleration** - Optional 10-100x faster validation
 - **Multi-Chain Support** - EVM, Solana, Native chain integration
 - **Advanced Consensus** - ChronosFlash, Flash-Finality, Quantum-Swarm
-- **Fully Tested** - 65/65 Phase 4 tests passing
-- **Production Ready** - Rust 1.89.0, all dependencies reconciled
+- **Fully Tested** - 65/65 Phase 4 tests passing (but security audit finds gaps)
+- **Testnet Ready** - Rust 1.89.0, all dependencies reconciled
+- **⚠️ NOT MAINNET READY** - 9 critical security blockers must be fixed first
 
 ---
 

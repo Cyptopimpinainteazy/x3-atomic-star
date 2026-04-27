@@ -20,6 +20,7 @@ sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 serde = { workspace = true, optional = true, features = ["derive"] }
+log = { workspace = true, default-features = false }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 

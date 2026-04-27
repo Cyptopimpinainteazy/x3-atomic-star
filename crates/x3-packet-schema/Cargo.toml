@@ -8,6 +8,8 @@ license = "Apache-2.0"
 parity-scale-codec = { workspace = true, features = ["max-encoded-len"] }
 scale-info = { workspace = true }
 frame-support = { workspace = true }
+crc32fast = "1.4"
+sp-core = { workspace = true }
 
 [features]
 default = ["std"]
@@ -15,6 +17,7 @@ std = [
     "parity-scale-codec/std",
     "scale-info/std",
     "frame-support/std",
+    "sp-core/std",
 ]
 
 [dev-dependencies]

@@ -305,6 +305,14 @@ impl EthereumBridge {
             .ok_or("Message not found")?
             .clone();
 
+        // S0-003: Prevent bridge message replay attacks
+        match message.status {
+            MessageStatus::Executed { .. } => {
+                return Err("Bridge message already executed".to_string());
+            }
+            _ => {}
+        }
+
         // Verify signatures threshold met
         if message.signatures.len() < self.signature_threshold as usize {
             return Err("Not enough signatures".to_string());
@@ -710,5 +718,62 @@ mod tests {
 
         let refund = bridge.refund_deposit(&deposit.id, "User cancelled".to_string());
         assert!(refund.is_ok());
+    }
+
+    #[test]
+    fn test_bridge_replay_protection() {
+        // S0-003: Test that bridge messages cannot be replayed
+        let validators: Vec<String> = (0..7).map(|i| format!("0x{:040x}", i)).collect();
+        let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+
+        let usdc = ERC20Token {
+            address: "0xUSDC".to_string(),
+            name: "USDC".to_string(),
+            decimals: 6,
+            total_supply: 1_000_000_000_000u128,
+        };
+
+        bridge.register_token(usdc).ok();
+
+        let deposit = bridge
+            .lock_on_ethereum(
+                "0xAlice".to_string(),
+                "0xUSDC".to_string(),
+                1_000_000u128,
+                17_000_000,
+                "0xtxhash".to_string(),
+            )
+            .unwrap();
+
+        bridge.confirm_deposit(&deposit.id, 17_000_012).ok();
+        let msg = bridge.create_bridge_message(deposit.id).unwrap();
+
+        for i in 0..5 {
+            bridge.sign_message(&msg.id, i as u32, vec![i as u8]).ok();
+        }
+
+        // First execution should succeed
+        let result1 = bridge.execute_mint(&msg.id, "0xAlice_X3".to_string(), 1000);
+        assert!(result1.is_ok(), "First execution should succeed");
+
+        // Check initial balance
+        let balance1 = bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC");
+        assert_eq!(balance1, 1_000_000u128, "Balance should be 1M after first mint");
+
+        // Second execution with same message_id should FAIL (replay protection)
+        let result2 = bridge.execute_mint(&msg.id, "0xAlice_X3".to_string(), 1001);
+        assert!(result2.is_err(), "Second execution should fail");
+        assert_eq!(
+            result2.unwrap_err(),
+            "Bridge message already executed",
+            "Should return replay protection error"
+        );
+
+        // Balance should remain unchanged (no double-mint)
+        let balance2 = bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC");
+        assert_eq!(
+            balance2, 1_000_000u128,
+            "Balance should still be 1M, no double-mint"
+        );
     }
 }

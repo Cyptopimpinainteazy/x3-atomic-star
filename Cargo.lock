@@ -11378,6 +11378,7 @@ version = "0.1.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "log",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -23975,9 +23976,11 @@ dependencies = [
 name = "x3-packet-schema"
 version = "0.1.0"
 dependencies = [
+ "crc32fast",
  "frame-support",
  "parity-scale-codec",
  "scale-info",
+ "sp-core",
 ]
 
 [[package]]

@@ -15,8 +15,8 @@ pub struct SvmAccount {
 /// SVM deployment metadata
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
 pub struct SvmDeployMetadata {
-    pub name: Vec<u8>,
-    pub version: Vec<u8>,
+    pub name: String,
+    pub version: String,
     pub upgrade_authority: Option<[u8; 32]>,
 }
 
@@ -65,8 +65,8 @@ mod tests {
         let packet = SvmPacket::Deploy {
             bytecode: vec![0xBF; 100],
             metadata: SvmDeployMetadata {
-                name: b"test".to_vec(),
-                version: b"1.0".to_vec(),
+                name: "test_program".to_string(),
+                version: "1.0.0".to_string(),
                 upgrade_authority: Some([0xAA; 32]),
             },
         };
@@ -87,4 +87,34 @@ mod tests {
         let decoded: SvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
         assert_eq!(packet, decoded);
     }
+
+    #[test]
+    fn test_svm_account_round_trip() {
+        let account = SvmAccount {
+            pubkey: [0x33; 32],
+            is_writable: true,
+            is_signer: false,
+            is_executable: true,
+            lamports: 1000000,
+            owner: [0x44; 32],
+        };
+
+        let encoded = account.encode();
+        let decoded: SvmAccount = Decode::decode(&mut &encoded[..]).unwrap();
+        assert_eq!(account, decoded);
+    }
+
+    #[test]
+    fn test_svm_deploy_metadata_round_trip() {
+        let metadata = SvmDeployMetadata {
+            name: "my_program".to_string(),
+            version: "2.1.3".to_string(),
+            upgrade_authority: None,
+        };
+
+        let encoded = metadata.encode();
+        let decoded: SvmDeployMetadata = Decode::decode(&mut &encoded[..]).unwrap();
+        assert_eq!(metadata, decoded);
+    }
 }
+

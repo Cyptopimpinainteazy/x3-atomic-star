@@ -428,153 +428,169 @@ pub mod pallet {
             amount: Balance,
             expires_at: BlockNumberFor<T>,
         ) -> DispatchResult {
-            // ── Route typing checks ───────────────────────────────────────
-            ensure!(source != destination, Error::<T>::SelfLoopRoute);
-            ensure!(amount > 0, Error::<T>::AmountOutOfBounds);
+            // S0-005 FIX: Wrap entire function in storage transaction to ensure
+            // atomicity. If ANY operation fails (ledger debit, state machine
+            // transition, or storage insertion), ALL changes are rolled back.
+            frame_support::storage::with_storage_layer(|| {
+                // ── Route typing checks ───────────────────────────────────────
+                ensure!(source != destination, Error::<T>::SelfLoopRoute);
+                ensure!(amount > 0, Error::<T>::AmountOutOfBounds);
 
-            // MVP: both legs must be X3-internal.
-            ensure!(
-                source.is_x3_internal() && destination.is_x3_internal(),
-                Error::<T>::NonInternalRouteNotSupported
-            );
+                // MVP: both legs must be X3-internal.
+                ensure!(
+                    source.is_x3_internal() && destination.is_x3_internal(),
+                    Error::<T>::NonInternalRouteNotSupported
+                );
 
-            // Recipient/sender typing.
-            ensure!(
-                recipient.is_compatible_with(destination),
-                Error::<T>::IncompatibleRecipient
-            );
-            ensure!(
-                sender.is_compatible_with(source),
-                Error::<T>::IncompatibleSender
-            );
+                // Recipient/sender typing.
+                ensure!(
+                    recipient.is_compatible_with(destination),
+                    Error::<T>::IncompatibleRecipient
+                );
+                ensure!(
+                    sender.is_compatible_with(source),
+                    Error::<T>::IncompatibleSender
+                );
 
-            // Asset + route must exist, be active, be open.
-            ensure!(T::Registry::exists(&asset_id), Error::<T>::UnknownAsset);
-            ensure!(
-                T::Registry::is_active(&asset_id),
-                Error::<T>::AssetNotActive
-            );
+                // Asset + route must exist, be active, be open.
+                ensure!(T::Registry::exists(&asset_id), Error::<T>::UnknownAsset);
+                ensure!(
+                    T::Registry::is_active(&asset_id),
+                    Error::<T>::AssetNotActive
+                );
 
-            let route: RouteConfig = T::Registry::route(&asset_id, source, destination)
-                .ok_or(Error::<T>::RouteClosed)?;
-            ensure!(route.enabled, Error::<T>::RouteClosed);
-            // Internal routes must carry TrustedInternal proof tier.
-            ensure!(
-                matches!(route.proof_tier, ProofTier::TrustedInternal),
-                Error::<T>::WrongProofTierForInternalRoute
-            );
+                let route: RouteConfig = T::Registry::route(&asset_id, source, destination)
+                    .ok_or(Error::<T>::RouteClosed)?;
+                ensure!(route.enabled, Error::<T>::RouteClosed);
+                // Internal routes must carry TrustedInternal proof tier.
+                ensure!(
+                    matches!(route.proof_tier, ProofTier::TrustedInternal),
+                    Error::<T>::WrongProofTierForInternalRoute
+                );
 
-            // Amount bounds.
-            ensure!(
-                amount >= route.limits.min_amount && amount <= route.limits.max_amount,
-                Error::<T>::AmountOutOfBounds
-            );
+                // Amount bounds.
+                ensure!(
+                    amount >= route.limits.min_amount && amount <= route.limits.max_amount,
+                    Error::<T>::AmountOutOfBounds
+                );
 
-            // Pending-limit check.
-            let pending_now = PendingCount::<T>::get(asset_id, (source, destination));
-            ensure!(
-                pending_now < route.limits.pending_limit,
-                Error::<T>::RoutePendingLimitExceeded
-            );
+                // Pending-limit check.
+                let pending_now = PendingCount::<T>::get(asset_id, (source, destination));
+                ensure!(
+                    pending_now < route.limits.pending_limit,
+                    Error::<T>::RoutePendingLimitExceeded
+                );
 
-            // Expiry sanity.
-            let now = <frame_system::Pallet<T>>::block_number();
-            ensure!(expires_at > now, Error::<T>::BadExpiry);
+                // Expiry sanity.
+                let now = <frame_system::Pallet<T>>::block_number();
+                ensure!(expires_at > now, Error::<T>::BadExpiry);
 
-            // ── Nonce reservation ─────────────────────────────────────────
-            // `NextNonce` is a monotonic counter per (source, sender). Reserving
-            // it BEFORE the ledger call means an aborted ledger call still
-            // consumes the nonce, which is the correct (stricter) semantics —
-            // the sender must resubmit with a new nonce.
-            let nonce = NextNonce::<T>::mutate(source, sender.clone(), |n| {
-                let cur = *n;
-                *n = n.saturating_add(1);
-                cur
-            });
+                // ── Nonce reservation ─────────────────────────────────────────
+                // `NextNonce` is a monotonic counter per (source, sender). Reserving
+                // it BEFORE the ledger call means an aborted ledger call still
+                // consumes the nonce, which is the correct (stricter) semantics —
+                // the sender must resubmit with a new nonce.
+                let nonce = NextNonce::<T>::mutate(source, sender.clone(), |n| {
+                    let cur = *n;
+                    *n = n.saturating_add(1);
+                    cur
+                });
 
-            // Additional explicit duplicate-nonce guard (defensive; the above
-            // mutate is already atomic but we want an obvious rejection path
-            // if a caller ever reinjects via a privileged import).
-            // (Intentionally no UsedNonces map — NextNonce monotonicity subsumes it.)
+                // Additional explicit duplicate-nonce guard (defensive; the above
+                // mutate is already atomic but we want an obvious rejection path
+                // if a caller ever reinjects via a privileged import).
+                // (Intentionally no UsedNonces map — NextNonce monotonicity subsumes it.)
 
-            // ── Build message & derive id ─────────────────────────────────
-            let message = X3TransferMessage::<BlockNumberFor<T>> {
-                version: MESSAGE_FORMAT_VERSION,
-                asset_id,
-                source_domain: source,
-                destination_domain: destination,
-                sender: sender.clone(),
-                recipient,
-                amount,
-                nonce,
-                created_at: now,
-                expires_at,
-            };
-            let message_id = derive_message_id::<BlockNumberFor<T>>(&message);
+                // ── Build message & derive id ─────────────────────────────────
+                let message = X3TransferMessage::<BlockNumberFor<T>> {
+                    version: MESSAGE_FORMAT_VERSION,
+                    asset_id,
+                    source_domain: source,
+                    destination_domain: destination,
+                    sender: sender.clone(),
+                    recipient,
+                    amount,
+                    nonce,
+                    created_at: now,
+                    expires_at,
+                };
+                let message_id = derive_message_id::<BlockNumberFor<T>>(&message);
 
-            ensure!(
-                !UsedMessages::<T>::contains_key(message_id),
-                Error::<T>::DuplicateMessage
-            );
+                ensure!(
+                    !UsedMessages::<T>::contains_key(message_id),
+                    Error::<T>::DuplicateMessage
+                );
 
-            // ── Ledger mutation (transactional) ───────────────────────────
-            T::Ledger::debit_source_to_pending(&asset_id, source, amount)?;
+                // ── Ledger mutation (transactional) ───────────────────────────
+                // S0-005: This debit now participates in the outer storage transaction.
+                // If it fails, the entire transaction (including nonce reservation,
+                // message ID marking, and record insertion) is rolled back.
+                T::Ledger::debit_source_to_pending(&asset_id, source, amount)?;
 
-            // ── Persist + mark used ───────────────────────────────────────
-            UsedMessages::<T>::insert(message_id, ());
-            PendingCount::<T>::mutate(asset_id, (source, destination), |c| {
-                *c = c.saturating_add(1)
-            });
+                // ── Persist + mark used ───────────────────────────────────────
+                UsedMessages::<T>::insert(message_id, ());
+                PendingCount::<T>::mutate(asset_id, (source, destination), |c| {
+                    *c = c.saturating_add(1)
+                });
 
-            let record = TransferRecord::<T> {
-                message,
-                status: TransferStatus::Created,
-            };
-            // Apply Created → SourceDebited via the authoritative state machine.
-            let record = Self::advance(record, TransferStatus::SourceDebited)?;
-            Transfers::<T>::insert(message_id, record);
+                let record = TransferRecord::<T> {
+                    message,
+                    status: TransferStatus::Created,
+                };
+                // Apply Created → SourceDebited via the authoritative state machine.
+                let record = Self::advance(record, TransferStatus::SourceDebited)?;
+                Transfers::<T>::insert(message_id, record);
 
-            Self::deposit_event(Event::TransferInitiated {
-                message_id,
-                asset_id,
-                source,
-                destination,
-                amount,
-            });
-            Ok(())
+                Self::deposit_event(Event::TransferInitiated {
+                    message_id,
+                    asset_id,
+                    source,
+                    destination,
+                    amount,
+                });
+                Ok(())
+            })
         }
 
         // ── Internal: complete ────────────────────────────────────────────
         fn do_complete_transfer(message_id: H256) -> DispatchResult {
-            let record = Transfers::<T>::get(message_id).ok_or(Error::<T>::UnknownMessage)?;
+            // S0-005 FIX: Wrap in storage transaction. This is CRITICAL for
+            // cross-VM atomicity. If EVM succeeds but SVM fails (or vice versa),
+            // the entire transaction (including ledger credit, status updates,
+            // and pending count decrement) must roll back atomically.
+            frame_support::storage::with_storage_layer(|| {
+                let record = Transfers::<T>::get(message_id).ok_or(Error::<T>::UnknownMessage)?;
 
-            ensure!(
-                record.status == TransferStatus::SourceDebited,
-                Error::<T>::IllegalStateTransition
-            );
+                ensure!(
+                    record.status == TransferStatus::SourceDebited,
+                    Error::<T>::IllegalStateTransition
+                );
 
-            let msg = record.message.clone();
+                let msg = record.message.clone();
 
-            // Ledger: pending → destination.
-            T::Ledger::credit_destination_from_pending(
-                &msg.asset_id,
-                msg.destination_domain,
-                msg.amount,
-            )?;
+                // Ledger: pending → destination.
+                // S0-005: If this fails, the storage transaction ensures no partial
+                // state persists (no status updates, no pending count changes).
+                T::Ledger::credit_destination_from_pending(
+                    &msg.asset_id,
+                    msg.destination_domain,
+                    msg.amount,
+                )?;
 
-            // State machine: SourceDebited → DestinationCredited → Finalized.
-            let r1 = Self::advance(record, TransferStatus::DestinationCredited)?;
-            let r2 = Self::advance(r1, TransferStatus::Finalized)?;
-            Transfers::<T>::insert(message_id, r2);
+                // State machine: SourceDebited → DestinationCredited → Finalized.
+                let r1 = Self::advance(record, TransferStatus::DestinationCredited)?;
+                let r2 = Self::advance(r1, TransferStatus::Finalized)?;
+                Transfers::<T>::insert(message_id, r2);
 
-            PendingCount::<T>::mutate(
-                msg.asset_id,
-                (msg.source_domain, msg.destination_domain),
-                |c| *c = c.saturating_sub(1),
-            );
+                PendingCount::<T>::mutate(
+                    msg.asset_id,
+                    (msg.source_domain, msg.destination_domain),
+                    |c| *c = c.saturating_sub(1),
+                );
 
-            Self::deposit_event(Event::TransferCompleted { message_id });
-            Ok(())
+                Self::deposit_event(Event::TransferCompleted { message_id });
+                Ok(())
+            })
         }
 
         // ── Internal: cancel expired ──────────────────────────────────────
