@@ -22,7 +22,7 @@
     },
     "claim_id": {
       "type": "string",
-      "minLength": 3
+      "pattern": "^x3\\.[A-Za-z0-9_.-]+$"
     },
     "repo_commit_hash": {
       "type": "string",
@@ -30,7 +30,8 @@
     },
     "command_run": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^x3-proof verify .+"
     },
     "artifact_hash": {
       "type": "string",
@@ -69,13 +70,28 @@
       ],
       "properties": {
         "claim_id": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^x3\\.[A-Za-z0-9_.-]+$"
         },
         "claim": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "status": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "verified",
+            "pass",
+            "passed",
+            "partial",
+            "failed",
+            "unverified",
+            "blocked",
+            "proof_complete",
+            "green",
+            "red",
+            "unknown"
+          ]
         },
         "proof_level": {
           "type": ["string", "null"]
