@@ -145,13 +145,15 @@ impl VaultController {
         signer_id: &str,
     ) -> Result<VaultOperationResponse> {
         // Check signer policy
-        let policies = self.signer_policies.read();
-        let policy = policies.get(signer_id).ok_or_else(|| {
-            VaultControllerError::OperationFailed(format!(
-                "Signer {} policy not registered",
-                signer_id
-            ))
-        })?;
+        let policy = {
+            let policies = self.signer_policies.read();
+            policies.get(signer_id).cloned().ok_or_else(|| {
+                VaultControllerError::OperationFailed(format!(
+                    "Signer {} policy not registered",
+                    signer_id
+                ))
+            })?
+        };
 
         // Check signer policy limits
         if amount > policy.max_single_operation {
@@ -168,8 +170,6 @@ impl VaultController {
                 "Signer policy expired".to_string(),
             ));
         }
-
-        drop(policies);
 
         // Create custody command
         let vault_id = vault_type.vault_id(chain_id, asset);
@@ -359,7 +359,7 @@ mod tests {
             max_single_operation: 10_000,
             max_daily_aggregate: 100_000,
             allowed_tiers: vec![AuthorizationTier::Operational],
-            expires_at_ms: Utc::now().timestamp_millis() as u64 + 86400_000,
+            expires_at_ms: Utc::now().timestamp_millis() as u64 + 86_400_000,
         };
 
         controller.register_signer_policy(policy).unwrap();
@@ -383,7 +383,7 @@ mod tests {
             max_single_operation: 10_000,
             max_daily_aggregate: 100_000,
             allowed_tiers: vec![AuthorizationTier::Operational],
-            expires_at_ms: Utc::now().timestamp_millis() as u64 + 86400_000,
+            expires_at_ms: Utc::now().timestamp_millis() as u64 + 86_400_000,
         };
         controller.register_signer_policy(policy).unwrap();
 

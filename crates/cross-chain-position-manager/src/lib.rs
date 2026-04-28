@@ -57,6 +57,12 @@ impl PositionId {
     }
 }
 
+impl Default for PositionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PositionType {
     Token,
@@ -211,21 +217,11 @@ pub struct ChainConfig {
     pub assets: Vec<AssetConfig>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PositionManagerConfig {
     pub tracking_config: PositionTrackerConfig,
     pub risk_config: RiskConfig,
     pub chain_configs: BTreeMap<u64, ChainConfig>,
-}
-
-impl Default for PositionManagerConfig {
-    fn default() -> Self {
-        Self {
-            tracking_config: PositionTrackerConfig::default(),
-            risk_config: RiskConfig::default(),
-            chain_configs: BTreeMap::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

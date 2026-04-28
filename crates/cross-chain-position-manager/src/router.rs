@@ -654,7 +654,7 @@ impl RouteOptimizer {
             .config
             .chain_configs
             .get(&chain_id)
-            .ok_or_else(|| PositionManagerError::ChainNotFound(chain_id))?;
+            .ok_or(PositionManagerError::ChainNotFound(chain_id))?;
 
         Ok(U256::from(150_000)) // Base swap gas
     }
@@ -707,14 +707,17 @@ impl RouteOptimizer {
         self.dex_routers
             .get(&chain_id)
             .and_then(|routers| routers.first())
-            .ok_or_else(|| PositionManagerError::DexRouterNotFound(chain_id))
+            .ok_or(PositionManagerError::DexRouterNotFound(chain_id))
     }
 
     /// Get bridge contract between chains
     fn get_bridge_contract(&self, source_chain: u64, target_chain: u64) -> Result<&BridgeContract> {
         self.bridge_contracts
             .get(&(source_chain, target_chain))
-            .ok_or_else(|| PositionManagerError::BridgeNotFound(source_chain, target_chain))
+            .ok_or(PositionManagerError::BridgeNotFound(
+                source_chain,
+                target_chain,
+            ))
     }
 
     /// Check if bridge exists between chains
@@ -725,10 +728,7 @@ impl RouteOptimizer {
 
     /// Add DEX router
     pub fn add_dex_router(&mut self, chain_id: u64, router: DexRouter) {
-        self.dex_routers
-            .entry(chain_id)
-            .or_insert_with(Vec::new)
-            .push(router);
+        self.dex_routers.entry(chain_id).or_default().push(router);
     }
 
     /// Add bridge contract
