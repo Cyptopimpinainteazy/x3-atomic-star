@@ -1,0 +1,105 @@
+name: Release Candidate Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Candidate tag or commit SHA to rehearse
+        required: true
+        default: main
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rehearse:
+    name: Rehearse Candidate Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref }}
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: target
+          cache-all-crates: true
+
+      - name: Prepare evidence directories
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-evidence/metadata candidate-evidence/gates candidate-evidence/signoff
+
+      - name: Receipt Schema Gate
+        run: |
+          set -euo pipefail
+          chmod +x scripts/proof/*.sh
+          bash scripts/proof/verify-receipts.sh 2>&1 | tee candidate-evidence/gates/receipt-schema.txt
+
+      - name: Claim Registry Status Gate
+        run: |
+          set -euo pipefail
+          bash scripts/proof/check-claim-status.sh 2>&1 | tee candidate-evidence/gates/claim-status.txt
+
+      - name: EVM or SVM Parity Gate
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors 2>&1 | tee candidate-evidence/gates/parity-vectors.txt
+
+      - name: Replay or Failure-Path Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-minimal-stack-replay-failure.sh 2>&1 | tee candidate-evidence/gates/replay-failure.txt
+
+      - name: GPU or CPU Determinism Benchmark Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-gpu-cpu-determinism-benchmark-gate.sh 2>&1 | tee candidate-evidence/gates/gpu-cpu-determinism.txt
+
+      - name: Status-Doc Truth Lint Gate
+        run: |
+          set -euo pipefail
+          chmod +x scripts/proof/lint-status-doc-truth.sh
+          bash scripts/proof/lint-status-doc-truth.sh 2>&1 | tee candidate-evidence/gates/status-doc-truth-lint.txt
+
+      - name: Write metadata
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          NOW_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > candidate-evidence/metadata/run.json <<JSON
+          {
+            "candidate_ref": "${CANDIDATE_REF}",
+            "workflow_run_id": "${RUN_ID}",
+            "workflow_url": "${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}",
+            "commit_sha": "${SHA}",
+            "timestamp_utc": "${NOW_UTC}",
+            "operator": "${ACTOR}"
+          }
+          JSON
+
+      - name: Attach sign-off template
+        run: |
+          set -euo pipefail
+          cp docs/release-notes/CANDIDATE_SIGNOFF_TEMPLATE.md candidate-evidence/signoff/candidate-signoff.md
+
+      - name: Upload rehearsal evidence pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-evidence-pack
+          path: candidate-evidence
+          retention-days: 30
