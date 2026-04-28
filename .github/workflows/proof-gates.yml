@@ -73,6 +73,11 @@ jobs:
           set -euo pipefail
           bash scripts/test-minimal-stack-replay-failure.sh
 
+      - name: GPU or CPU Determinism Benchmark Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-gpu-cpu-determinism-benchmark-gate.sh
+
       - name: Runtime No-Op Wiring Guard
         run: |
           set -euo pipefail
