@@ -2611,13 +2611,13 @@ fn test_authority_cannot_be_duplicated() {
 fn test_cross_domain_balance_consistency() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.1: Verify canonical ledger consistency across accounts
-        
+
         // Track fee collection across 30 operations (respects rate limit: 10 per account × 3 accounts)
         let mut total_fees = 0u128;
         let mut alice_nonce = 0u64;
         let mut bob_nonce = 0u64;
         let mut charlie_nonce = 0u64;
-        
+
         for op_idx in 0..30u64 {
             let comit_id = H256::from_low_u64_be(4000 + op_idx);
             let fee: Balance = (50 + (op_idx % 100)) as u128; // Varying fees
@@ -2784,7 +2784,7 @@ fn test_balance_after_finalization() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.3: Verify state consistency within rate limit
         // Test with 5 ops in section 1 and 5 ops in section 2 (respects rate limit of 10 per account per block)
-        
+
         let block_1_ops = 5u64;
         let block_2_ops = 5u64;
 

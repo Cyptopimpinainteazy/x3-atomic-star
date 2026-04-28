@@ -419,11 +419,7 @@ fn grep_count_non_test(root: &Path, pattern: &str) -> usize {
         .unwrap_or(0)
 }
 
-pub async fn check_security_gate(
-    workspace: &Path,
-    fail_hard: bool,
-    verbose: bool,
-) -> Result<()> {
+pub async fn check_security_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Result<()> {
     println!("{}", "Checking Security Gates (S0/S1)...".bold().cyan());
 
     let pallets = workspace.join("pallets");

@@ -5,11 +5,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "Formal proofs verified".to_string(),

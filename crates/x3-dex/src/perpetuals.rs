@@ -277,7 +277,6 @@ impl PerpetualFuturesEngine {
         let net = long_oi as i64 - short_oi as i64;
         let total = (long_oi + short_oi) as i64;
 
-
         if total != 0 {
             (net * 10_000 / total).min(max_rate).max(-max_rate)
         } else {

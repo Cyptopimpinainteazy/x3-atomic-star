@@ -7,11 +7,7 @@ use std::process::Command;
 use std::time::Instant;
 
 /// Verify asset kernel supply conservation claim
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {

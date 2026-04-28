@@ -10,11 +10,7 @@ use std::time::Instant;
 ///
 /// Checks:
 ///   cpu_gpu_parity — GPU-accelerated execution matches CPU reference results
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {

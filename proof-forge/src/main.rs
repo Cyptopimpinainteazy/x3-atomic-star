@@ -756,12 +756,7 @@ async fn prove_everything(
 }
 
 /// Run TODO/FIXME/HACK scanner
-async fn run_todo_gate(
-    workspace: &Path,
-    gate: &str,
-    fail_hard: bool,
-    verbose: bool,
-) -> Result<()> {
+async fn run_todo_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bool) -> Result<()> {
     use todo_proof::TodoScanner;
 
     println!(
@@ -845,12 +840,7 @@ async fn run_todo_gate(
 }
 
 /// Run Gap scanner
-async fn run_gap_gate(
-    workspace: &Path,
-    gate: &str,
-    fail_hard: bool,
-    verbose: bool,
-) -> Result<()> {
+async fn run_gap_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bool) -> Result<()> {
     use gap_proof::GapScanner;
 
     println!(

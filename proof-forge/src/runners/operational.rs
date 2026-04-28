@@ -10,11 +10,7 @@ use std::time::Instant;
 ///   onboarding.developer_first_value  — dev quickstart path exists and is measurable
 ///   funding.milestone_receipts        — funding asks map to milestones with deliverables
 ///   evolution.no_regression           — S0/S1 claim registry shows no new regressions
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     if claim_id.contains("onboarding") {
         verify_onboarding(workspace, claim_id, verbose).await
     } else if claim_id.contains("funding") {
@@ -27,11 +23,7 @@ pub async fn verify_claim(
     }
 }
 
-async fn verify_onboarding(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+async fn verify_onboarding(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {
@@ -251,11 +243,7 @@ async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Resu
     })
 }
 
-async fn verify_evolution(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+async fn verify_evolution(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {

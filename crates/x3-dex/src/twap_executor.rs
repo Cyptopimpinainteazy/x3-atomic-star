@@ -74,8 +74,7 @@ impl TWAPExecutor {
             return Err("Slice count out of range");
         }
 
-        if !(Self::MIN_TIME_WINDOW..=Self::MAX_TIME_WINDOW).contains(&time_window_blocks)
-        {
+        if !(Self::MIN_TIME_WINDOW..=Self::MAX_TIME_WINDOW).contains(&time_window_blocks) {
             return Err("Time window out of range");
         }
 

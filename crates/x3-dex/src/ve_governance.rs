@@ -91,7 +91,8 @@ impl VeX3GovernanceEngine {
             return Err("Lock amount out of range");
         }
 
-        if !(Self::MIN_LOCK_DURATION_DAYS..=Self::MAX_LOCK_DURATION_DAYS).contains(&lock_duration_days)
+        if !(Self::MIN_LOCK_DURATION_DAYS..=Self::MAX_LOCK_DURATION_DAYS)
+            .contains(&lock_duration_days)
         {
             return Err("Lock duration outside allowed range (1-4 years)");
         }

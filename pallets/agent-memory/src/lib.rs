@@ -926,13 +926,11 @@ pub mod pallet {
 
                 // Clean up old consensus records
                 let mut to_remove = Vec::new();
-                MemoryConsensusRecords::<T>::iter_prefix(agent_id).for_each(
-                    |(block_number, _)| {
-                        if block_number < cutoff_block {
-                            to_remove.push(block_number);
-                        }
-                    },
-                );
+                MemoryConsensusRecords::<T>::iter_prefix(agent_id).for_each(|(block_number, _)| {
+                    if block_number < cutoff_block {
+                        to_remove.push(block_number);
+                    }
+                });
 
                 for block_number in to_remove {
                     MemoryConsensusRecords::<T>::remove(agent_id, block_number);

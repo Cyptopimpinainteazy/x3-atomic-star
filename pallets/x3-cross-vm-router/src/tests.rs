@@ -228,7 +228,7 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) -> H256
     // P0 Optimization (batch nonce): With batch pre-allocation, we need to
     // derive which nonce was actually used. Read the batch allocation that
     // was created/updated by reserve_nonce_from_batch.
-    let nonce = if let Some((batch_start, _batch_size, used_count)) = 
+    let nonce = if let Some((batch_start, _batch_size, used_count)) =
         Router::nonce_batch_allocation(src, sender.clone())
     {
         // The nonce that was just used is at (used_count - 1) within the batch

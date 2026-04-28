@@ -131,7 +131,6 @@ impl RealSlippageCalculator {
             return 0;
         }
 
-
         if execution_price < spot_price {
             // Buying: execution price < spot price (unfavorable for buyer)
             ((spot_price as u128 - execution_price as u128) * 10_000 / spot_price as u128) as u32

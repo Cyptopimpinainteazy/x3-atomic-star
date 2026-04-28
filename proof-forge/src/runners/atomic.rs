@@ -11,11 +11,7 @@ use std::time::Instant;
 /// Checks:
 ///   one_terminal_state  — every atomic bundle ends in commit XOR rollback
 ///   rollback_safety     — failed legs trigger full rollback, no partial commits
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {
