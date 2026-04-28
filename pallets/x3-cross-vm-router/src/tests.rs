@@ -185,7 +185,15 @@ fn bootstrap_x3_asset(supply: u128) -> AssetId {
     }
 
     // Mint canonical supply into the native leg.
-    Ledger::mint_canonical(RuntimeOrigin::root(), asset_id, DomainId::X3Native, supply, 0u64).unwrap();
+    // `mint_canonical` requires a signed origin after governance check.
+    Ledger::mint_canonical(
+        RuntimeOrigin::signed(1),
+        asset_id,
+        DomainId::X3Native,
+        supply,
+        0u64,
+    )
+    .unwrap();
 
     asset_id
 }
@@ -205,9 +213,6 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) -> H256
     let now = System::block_number();
     let expires_at = now + 50;
 
-    // Capture nonce before call.
-    let nonce = Router::next_nonce(src, sender.clone());
-
     Router::xvm_transfer(
         RuntimeOrigin::signed(1),
         asset_id,
@@ -219,6 +224,19 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) -> H256
         expires_at,
     )
     .expect("xvm_transfer");
+
+    // P0 Optimization (batch nonce): With batch pre-allocation, we need to
+    // derive which nonce was actually used. Read the batch allocation that
+    // was created/updated by reserve_nonce_from_batch.
+    let nonce = if let Some((batch_start, _batch_size, used_count)) = 
+        Router::nonce_batch_allocation(src, sender.clone())
+    {
+        // The nonce that was just used is at (used_count - 1) within the batch
+        batch_start.saturating_add((used_count.saturating_sub(1)) as u128)
+    } else {
+        // Fallback (shouldn't happen after successful xvm_transfer)
+        0
+    };
 
     // Rebuild the message exactly as the router did, then rederive id.
     let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
@@ -621,3 +639,204 @@ fn test_external_route_rejected_in_mvp() {
 // - test_expired_transfer_refunds_to_source (expiry handling)
 //
 // Future developers: See PHASE_1_4_REFERENCE_IMPLEMENTATION.md for patterns.
+
+// ─────────────────────────────────────────────────────────────────────────
+// SCOPE FREEZE TESTS — v0.4 internal-only mainnet RC.
+//
+// These tests are the runtime-level proof that the external bridge surface
+// is paused by default and can only be opened by Root. They are launch
+// blockers: if either of these regresses, the pallet is shipping with a
+// hot bridge that has not been audited.
+// ─────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn external_bridges_are_paused_at_genesis() {
+    new_test_ext().execute_with(|| {
+        assert!(
+            !pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get(),
+            "scope freeze: external bridges MUST be off at genesis"
+        );
+    });
+}
+
+#[test]
+fn register_external_root_rejected_when_bridges_disabled() {
+    new_test_ext().execute_with(|| {
+        let res = Router::register_external_root(
+            RuntimeOrigin::root(),
+            1, // chain_id
+            H256::repeat_byte(0xab),
+            42, // block_number (in past)
+            vec![0u8; 32],
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled.into()),
+            "register_external_root must fail when bridges are disabled"
+        );
+    });
+}
+
+#[test]
+fn emergency_pause_bridge_rejected_when_bridges_disabled() {
+    new_test_ext().execute_with(|| {
+        let res =
+            Router::emergency_pause_bridge(RuntimeOrigin::root(), 1, b"audit pending".to_vec());
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled.into()),
+            "emergency_pause_bridge must fail when bridges are disabled"
+        );
+    });
+}
+
+#[test]
+fn only_root_can_toggle_external_bridges() {
+    new_test_ext().execute_with(|| {
+        // Non-root must be rejected.
+        let res = Router::set_external_bridges_enabled(RuntimeOrigin::signed(0xCAFE), true);
+        assert!(res.is_err(), "non-root must not toggle the kill-switch");
+        assert!(
+            !pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get(),
+            "kill-switch must remain off after a failed non-root toggle"
+        );
+
+        // Root may toggle.
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert!(pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+
+        // And toggle back.
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            false
+        ));
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+    });
+}
+
+#[test]
+fn register_external_root_works_only_after_governance_enables() {
+    new_test_ext().execute_with(|| {
+        // First call: blocked.
+        assert!(Router::register_external_root(
+            RuntimeOrigin::root(),
+            1,
+            H256::repeat_byte(0x11),
+            1,
+            vec![1u8; 8],
+        )
+        .is_err());
+
+        // Governance opens the gate.
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
+
+        // Now it should pass the scope-freeze gate (other validation may still
+        // gate it; here block_number=1 == current block so it is in-range).
+        assert_ok!(Router::register_external_root(
+            RuntimeOrigin::root(),
+            1,
+            H256::repeat_byte(0x11),
+            1,
+            vec![1u8; 8],
+        ));
+    });
+}
+
+#[test]
+fn packet_commitment_and_ixl_receipt_are_recorded_on_complete() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        let now = System::block_number();
+        let sender = alice_native();
+        let recipient = alice_evm();
+        let nonce = Router::next_nonce(DomainId::X3Native, sender.clone());
+        let expires_at = now + 50;
+
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            sender.clone(),
+            recipient.clone(),
+            100,
+            expires_at,
+        ));
+
+        let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender,
+            recipient,
+            amount: 100,
+            nonce,
+            created_at: now,
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+
+        assert!(Router::packet_commitments(message_id).is_some());
+
+        assert_ok!(Router::complete_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        assert_eq!(Router::ixl_receipt_entries(message_id), Some(1));
+    });
+}
+
+#[test]
+fn completion_rejected_after_packet_timeout() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        let now = System::block_number();
+        let sender = alice_native();
+        let recipient = alice_evm();
+        let nonce = Router::next_nonce(DomainId::X3Native, sender.clone());
+        let expires_at = now + 1;
+
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            sender.clone(),
+            recipient.clone(),
+            100,
+            expires_at,
+        ));
+
+        let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender,
+            recipient,
+            amount: 100,
+            nonce,
+            created_at: now,
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+
+        // Timeout policy in packet-standard is now_height >= timeout_height.
+        System::set_block_number(expires_at);
+
+        assert_eq!(
+            Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id),
+            Err(pallet_x3_cross_vm_router::Error::<Test>::PacketTimedOut.into())
+        );
+    });
+}
