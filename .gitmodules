@@ -1,0 +1,3 @@
+[submodule "apps/atlas-sphere-clean"]
+	path = apps/atlas-sphere-clean
+	url = https://github.com/Cyptopimpinainteazy/atlas-sphere.git
