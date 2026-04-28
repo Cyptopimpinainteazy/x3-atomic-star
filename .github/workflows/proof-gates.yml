@@ -68,6 +68,11 @@ jobs:
           set -euo pipefail
           cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors
 
+      - name: Minimal Stack Replay and Failure Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-minimal-stack-replay-failure.sh
+
       - name: Runtime No-Op Wiring Guard
         run: |
           set -euo pipefail
