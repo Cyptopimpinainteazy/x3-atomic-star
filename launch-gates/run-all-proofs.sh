@@ -26,6 +26,9 @@ EVIDENCE_DIR="${REPO_ROOT}/launch-gates/evidence"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 STRICT_TARGET_DIR="${REPO_ROOT}/target_strict"
 STRICT_TOOLCHAIN="${STRICT_TOOLCHAIN:-1.90.0}"
+# Keep Proof 2 aligned with the strict toolchain by default while still
+# allowing overrides for local diagnosis.
+STRICT_TEST_TOOLCHAIN="${STRICT_TEST_TOOLCHAIN:-${STRICT_TOOLCHAIN}}"
 
 # Allow `STRICT=0` to keep the legacy advisory mode locally; CI must run with
 # the default STRICT=1 so non-blocking failures cannot mask real regressions.
@@ -89,11 +92,11 @@ echo "════════════════════════�
 
 run_proof "proof-01-check-workspace" \
   "Cargo check (full workspace)" \
-  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check --workspace --all-targets"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-1073741824} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check --workspace --all-targets"
 
 run_proof "proof-01-check-runtime" \
   "Cargo check (runtime only)" \
-  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check -p x3-chain-runtime"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-1073741824} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check -p x3-chain-runtime"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PROOF 2: Runtime Tests
@@ -105,11 +108,11 @@ echo "════════════════════════�
 
 run_proof "proof-02-test-workspace" \
   "Cargo test (full workspace)" \
-  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test --workspace --lib --exclude x3-chain-runtime"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TEST_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-1073741824} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test --workspace --lib --exclude x3-chain-runtime"
 
 run_proof "proof-02-test-runtime" \
   "Runtime tests" \
-  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test -p x3-chain-runtime --lib"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TEST_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-1073741824} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test -p x3-chain-runtime --lib"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PROOF 3: Bridge & Atomic Tests
