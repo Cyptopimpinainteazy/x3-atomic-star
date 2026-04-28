@@ -13,7 +13,11 @@ fn expected_attack_tests() -> Vec<&'static str> {
     ]
 }
 
-async fn run_dex_attack_suite(claim_id: String, claim: String, workspace: &Path) -> Result<ProofResult> {
+async fn run_dex_attack_suite(
+    claim_id: String,
+    claim: String,
+    workspace: &Path,
+) -> Result<ProofResult> {
     let started = Instant::now();
     let expected = expected_attack_tests();
     let (passed_tests, failed_tests) =
@@ -30,10 +34,7 @@ async fn run_dex_attack_suite(claim_id: String, claim: String, workspace: &Path)
         } else if found_fail {
             failed_checks.push(format!("{} failed", t));
         } else {
-            failed_checks.push(format!(
-                "{} missing/ignored (MEV mitigation gap)",
-                t
-            ));
+            failed_checks.push(format!("{} missing/ignored (MEV mitigation gap)", t));
         }
     }
 
@@ -59,8 +60,14 @@ async fn run_dex_attack_suite(claim_id: String, claim: String, workspace: &Path)
     };
 
     let mut evidence = HashMap::new();
-    evidence.insert("expected_attack_tests".to_string(), total_expected.to_string());
-    evidence.insert("passed_attack_tests".to_string(), passed_expected.to_string());
+    evidence.insert(
+        "expected_attack_tests".to_string(),
+        total_expected.to_string(),
+    );
+    evidence.insert(
+        "passed_attack_tests".to_string(),
+        passed_expected.to_string(),
+    );
     evidence.insert(
         "failed_attack_tests".to_string(),
         failed_checks.len().to_string(),
@@ -72,7 +79,11 @@ async fn run_dex_attack_suite(claim_id: String, claim: String, workspace: &Path)
         status,
         proof_level: Some(ProofLevel::P6),
         edge_case_level: Some(EdgeCaseLevel::E7),
-        hack_level: Some(if blocked { HackLevel::H0 } else { HackLevel::H8 }),
+        hack_level: Some(if blocked {
+            HackLevel::H0
+        } else {
+            HackLevel::H8
+        }),
         operator_level: Some(OperatorLevel::I6),
         degraded_level: Some(DegradedLevel::D5),
         files_inspected: vec![

@@ -107,10 +107,10 @@ impl SmtSolver {
     /// Check if two expressions are equivalent under constraints
     pub fn are_equivalent(&self, expr1: &SymbolicValue, expr2: &SymbolicValue) -> bool {
         // Simplified: structural equality + commutativity/associativity
-        self.structural_equiv(expr1, expr2)
+        Self::structural_equiv(expr1, expr2)
     }
 
-    fn structural_equiv(&self, e1: &SymbolicValue, e2: &SymbolicValue) -> bool {
+    fn structural_equiv(e1: &SymbolicValue, e2: &SymbolicValue) -> bool {
         match (e1, e2) {
             (SymbolicValue::Const(a), SymbolicValue::Const(b)) => a == b,
             (SymbolicValue::Var(a), SymbolicValue::Var(b)) => a == b,
@@ -129,9 +129,11 @@ impl SmtSolver {
                 op1 == op2
                     && (
                         // Standard order
-                        (self.structural_equiv(l1, l2) && self.structural_equiv(r1, r2))
+                        (Self::structural_equiv(l1, l2) && Self::structural_equiv(r1, r2))
                         // Commutative (if op supports it)
-                        || (is_commutative(op1) && self.structural_equiv(l1, r2) && self.structural_equiv(r1, l2))
+                        || (is_commutative(op1)
+                            && Self::structural_equiv(l1, r2)
+                            && Self::structural_equiv(r1, l2))
                     )
             }
             _ => false,
@@ -223,7 +225,7 @@ impl Superoptimizer {
         let mut instrs = Vec::new();
         let mut reg_counter = 0u32;
 
-        self.synthesize_recursive(value, &mut instrs, &mut reg_counter);
+        Self::synthesize_recursive(value, &mut instrs, &mut reg_counter);
 
         let mut seq = InstructionSequence::new(instrs);
         seq.cost = self.estimate_cost(&seq);
@@ -231,7 +233,6 @@ impl Superoptimizer {
     }
 
     fn synthesize_recursive(
-        &self,
         value: &SymbolicValue,
         instrs: &mut Vec<String>,
         reg_counter: &mut u32,
@@ -251,8 +252,8 @@ impl Superoptimizer {
                 reg
             }
             SymbolicValue::BinOp { op, left, right } => {
-                let left_reg = self.synthesize_recursive(left, instrs, reg_counter);
-                let right_reg = self.synthesize_recursive(right, instrs, reg_counter);
+                let left_reg = Self::synthesize_recursive(left, instrs, reg_counter);
+                let right_reg = Self::synthesize_recursive(right, instrs, reg_counter);
                 let result_reg = *reg_counter;
                 *reg_counter += 1;
 

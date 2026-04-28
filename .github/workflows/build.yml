@@ -96,7 +96,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v2
       - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.35.4 --locked --force
       - name: Generate coverage
         run: cargo tarpaulin --out Xml --output-dir coverage/ --timeout 300 --exclude-files tests/*
       - name: Upload coverage to Codecov
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check-action@v1
+      - uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
