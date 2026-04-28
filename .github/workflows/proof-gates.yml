@@ -63,6 +63,11 @@ jobs:
         run: |
           bash scripts/proof/check-claim-status.sh
 
+      - name: EVM or SVM Parity Gate
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors
+
       - name: Runtime No-Op Wiring Guard
         run: |
           set -euo pipefail
