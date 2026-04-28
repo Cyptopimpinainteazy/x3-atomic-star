@@ -1407,7 +1407,7 @@ features:
     criticality: catastrophic
     owner_area: flashloan
     docs: [pallets/x3-flashloan/README.md]
-    code: [pallets/x3-flashloan/src/lib.rs]
+    code: [crates/x3-flashloan/src/lib.rs]
     wiring: ["flashloan pallet in runtime"]
     tests:
       unit: [flashloan_borrow_repay]
@@ -1422,7 +1422,7 @@ features:
     criticality: critical
     owner_area: dex
     docs: [pallets/x3-dex/README.md]
-    code: [pallets/x3-dex/src/lib.rs]
+    code: [crates/x3-dex/src/lib.rs]
     wiring: ["DEX pallet in runtime"]
     tests:
       unit: [pool_creation, swap]
@@ -1467,7 +1467,7 @@ features:
     criticality: high
     owner_area: frontend
     docs: [dashboard/README.md]
-    code: [dashboard/src/]
+    code: [apps/inferstructor-dashboard/src/]
     wiring: ["dashboard accessible"]
     tests:
       unit: [component_tests]
