@@ -19479,7 +19479,6 @@ dependencies = [
 [[package]]
 name = "sp-state-machine"
 version = "0.28.0"
-source = "git+https://github.com/paritytech/substrate?rev=948fbd2#948fbd2fd1233dc26dbb9f9bbc1d2cca2c03945d"
 dependencies = [
  "hash-db 0.16.0",
  "log",
@@ -19494,7 +19493,7 @@ dependencies = [
  "sp-trie 22.0.0",
  "thiserror 1.0.69",
  "tracing",
- "trie-db 0.27.1",
+ "trie-db",
 ]
 
 [[package]]
@@ -19516,7 +19515,7 @@ dependencies = [
  "sp-trie 29.0.0",
  "thiserror 1.0.69",
  "tracing",
- "trie-db 0.28.0",
+ "trie-db",
 ]
 
 [[package]]
@@ -19639,7 +19638,6 @@ dependencies = [
 [[package]]
 name = "sp-trie"
 version = "22.0.0"
-source = "git+https://github.com/paritytech/substrate?rev=948fbd2#948fbd2fd1233dc26dbb9f9bbc1d2cca2c03945d"
 dependencies = [
  "ahash 0.8.12",
  "hash-db 0.16.0",
@@ -19655,7 +19653,7 @@ dependencies = [
  "sp-std 8.0.0",
  "thiserror 1.0.69",
  "tracing",
- "trie-db 0.27.1",
+ "trie-db",
  "trie-root",
 ]
 
@@ -19680,7 +19678,7 @@ dependencies = [
  "sp-std 14.0.0",
  "thiserror 1.0.69",
  "tracing",
- "trie-db 0.28.0",
+ "trie-db",
  "trie-root",
 ]
 
@@ -21708,19 +21706,6 @@ checksum = "e747b1f9b7b931ed39a548c1fae149101497de3c1fc8d9e18c62c1a66c683d3d"
 dependencies = [
  "cc",
  "regex",
-]
-
-[[package]]
-name = "trie-db"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "767abe6ffed88a1889671a102c2861ae742726f52e0a5a425b92c9fbfa7e9c85"
-dependencies = [
- "hash-db 0.16.0",
- "hashbrown 0.13.2",
- "log",
- "rustc-hex",
- "smallvec",
 ]
 
 [[package]]

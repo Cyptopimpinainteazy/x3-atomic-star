@@ -60,6 +60,7 @@ pub struct ArbBotEventSystem;
 
 impl ArbBotEventSystem {
     /// Detect arbitrage opportunity between two pools
+    #[allow(clippy::too_many_arguments)]
     pub fn detect_opportunity(
         pool_a_id: [u8; 32],
         pool_b_id: [u8; 32],
@@ -488,7 +489,7 @@ mod tests {
             last_execution: 2000,
         };
 
-        let (execs, profit, avg, wr) = ArbBotEventSystem::get_performance_summary(&perf);
+        let (execs, profit, _avg, wr) = ArbBotEventSystem::get_performance_summary(&perf);
         assert_eq!(execs, 100);
         assert_eq!(profit, 5000000);
         assert_eq!(wr, 7500);

@@ -2,7 +2,7 @@ use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
@@ -12,7 +12,7 @@ use std::time::Instant;
 ///   one_terminal_state  — every atomic bundle ends in commit XOR rollback
 ///   rollback_safety     — failed legs trigger full rollback, no partial commits
 pub async fn verify_claim(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {

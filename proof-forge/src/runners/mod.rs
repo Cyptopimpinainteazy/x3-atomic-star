@@ -4,7 +4,7 @@ use anyhow::Result;
 use chrono::Utc;
 use colored::*;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub mod asset_kernel;
 pub mod atomic;
@@ -31,7 +31,7 @@ pub mod x3language;
 pub mod x3vm;
 
 pub async fn verify_claim(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     strict: bool,
     verbose: bool,
@@ -263,7 +263,7 @@ fn verify_proofforge_claim(claim_id: &str) -> Result<ProofResult> {
 }
 
 pub async fn prove_area(
-    workspace: &PathBuf,
+    workspace: &Path,
     area: &str,
     strict: bool,
     dry_run: bool,
@@ -302,7 +302,7 @@ pub async fn prove_area(
 }
 
 pub async fn prove_all(
-    workspace: &PathBuf,
+    workspace: &Path,
     strict: bool,
     dry_run: bool,
     parallel: bool,
@@ -381,7 +381,7 @@ pub async fn prove_all(
 }
 
 /// Grep `root` directory recursively for `pattern`, returning true if found.
-fn grep_rs(root: &PathBuf, pattern: &str) -> bool {
+fn grep_rs(root: &Path, pattern: &str) -> bool {
     use std::process::Command as StdCommand;
     let out = StdCommand::new("grep")
         .args([
@@ -395,7 +395,7 @@ fn grep_rs(root: &PathBuf, pattern: &str) -> bool {
 }
 
 /// Grep a specific file for a pattern.
-fn grep_file(file: &PathBuf, pattern: &str) -> bool {
+fn grep_file(file: &Path, pattern: &str) -> bool {
     use std::process::Command as StdCommand;
     let out = StdCommand::new("grep")
         .args(["-q", pattern, file.to_str().unwrap_or("")])
@@ -404,7 +404,7 @@ fn grep_file(file: &PathBuf, pattern: &str) -> bool {
 }
 
 /// Count lines matching pattern in directory (excluding tests).
-fn grep_count_non_test(root: &PathBuf, pattern: &str) -> usize {
+fn grep_count_non_test(root: &Path, pattern: &str) -> usize {
     use std::process::Command as StdCommand;
     // grep in non-test files: exclude #[cfg(test)] blocks heuristically via -l then inspect
     let out = StdCommand::new("bash")
@@ -420,7 +420,7 @@ fn grep_count_non_test(root: &PathBuf, pattern: &str) -> usize {
 }
 
 pub async fn check_security_gate(
-    workspace: &PathBuf,
+    workspace: &Path,
     fail_hard: bool,
     verbose: bool,
 ) -> Result<()> {
@@ -561,7 +561,7 @@ pub async fn check_security_gate(
 }
 
 pub async fn test_hack_resistance(
-    workspace: &PathBuf,
+    workspace: &Path,
     area: Option<String>,
     strict: bool,
     verbose: bool,
@@ -590,7 +590,7 @@ pub async fn test_hack_resistance(
 }
 
 pub async fn test_edge_cases(
-    workspace: &PathBuf,
+    workspace: &Path,
     area: Option<String>,
     strict: bool,
     verbose: bool,
@@ -619,7 +619,7 @@ pub async fn test_edge_cases(
 }
 
 pub async fn test_limp_mode(
-    workspace: &PathBuf,
+    workspace: &Path,
     area: Option<String>,
     strict: bool,
     verbose: bool,
@@ -649,7 +649,7 @@ pub async fn test_limp_mode(
 }
 
 pub async fn test_idiot_proof(
-    workspace: &PathBuf,
+    workspace: &Path,
     command: &str,
     dry_run: bool,
     verbose: bool,
@@ -677,7 +677,7 @@ pub async fn test_idiot_proof(
 }
 
 pub async fn check_formal_proofs(
-    workspace: &PathBuf,
+    workspace: &Path,
     area: Option<String>,
     verbose: bool,
 ) -> Result<()> {
@@ -707,7 +707,7 @@ pub async fn check_formal_proofs(
 }
 
 pub async fn generate_receipt(
-    workspace: &PathBuf,
+    workspace: &Path,
     receipt_type: &str,
     areas: &[String],
     verbose: bool,
@@ -743,7 +743,7 @@ pub async fn generate_receipt(
 }
 
 pub async fn check_mainnet_readiness(
-    workspace: &PathBuf,
+    workspace: &Path,
     fail_hard: bool,
     strict: bool,
     verbose: bool,
@@ -771,7 +771,7 @@ pub async fn check_mainnet_readiness(
 }
 
 pub async fn check_testnet_readiness(
-    workspace: &PathBuf,
+    workspace: &Path,
     fail_hard: bool,
     verbose: bool,
 ) -> Result<()> {
@@ -793,7 +793,7 @@ pub async fn check_testnet_readiness(
 }
 
 pub async fn scan_claims(
-    workspace: &PathBuf,
+    workspace: &Path,
     file: Option<PathBuf>,
     fail_on_unproven: bool,
     verbose: bool,
@@ -826,7 +826,7 @@ pub async fn scan_claims(
 }
 
 pub async fn check_ai_patch(
-    workspace: &PathBuf,
+    workspace: &Path,
     diff: Option<String>,
     fail_hard: bool,
     verbose: bool,
@@ -848,7 +848,7 @@ pub async fn check_ai_patch(
     Ok(())
 }
 
-pub async fn explain_blockers(workspace: &PathBuf, area: &str, verbose: bool) -> Result<()> {
+pub async fn explain_blockers(workspace: &Path, area: &str, verbose: bool) -> Result<()> {
     println!(
         "{}",
         format!("Explaining blockers for: {}", area).bold().cyan()
@@ -869,7 +869,7 @@ pub async fn explain_blockers(workspace: &PathBuf, area: &str, verbose: bool) ->
     Ok(())
 }
 
-pub async fn list_all_claims(workspace: &PathBuf, verbose: bool) -> Result<()> {
+pub async fn list_all_claims(workspace: &Path, verbose: bool) -> Result<()> {
     println!("{}", "All Claims in Registry:".bold().cyan());
 
     println!();

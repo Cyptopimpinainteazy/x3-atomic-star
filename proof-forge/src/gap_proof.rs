@@ -420,7 +420,7 @@ impl GapScanner {
     }
 
     fn is_critical_module(&self, module: &str) -> bool {
-        let critical = vec![
+        let critical = [
             "kernel",
             "bridge",
             "atomic",

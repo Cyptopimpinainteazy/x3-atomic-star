@@ -2,7 +2,7 @@ use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 /// Verify operational / evidence-based claims:
@@ -11,7 +11,7 @@ use std::time::Instant;
 ///   funding.milestone_receipts        — funding asks map to milestones with deliverables
 ///   evolution.no_regression           — S0/S1 claim registry shows no new regressions
 pub async fn verify_claim(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {
@@ -28,7 +28,7 @@ pub async fn verify_claim(
 }
 
 async fn verify_onboarding(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {
@@ -140,7 +140,7 @@ async fn verify_onboarding(
     })
 }
 
-async fn verify_funding(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     if verbose {
@@ -252,7 +252,7 @@ async fn verify_funding(workspace: &PathBuf, claim_id: &str, verbose: bool) -> R
 }
 
 async fn verify_evolution(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {

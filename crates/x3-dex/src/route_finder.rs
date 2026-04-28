@@ -33,6 +33,12 @@ pub struct RouteFinder {
     pub graph: HashMap<String, Vec<String>>, // token → connected pools
 }
 
+impl Default for RouteFinder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RouteFinder {
     pub fn new() -> Self {
         Self {
@@ -50,12 +56,12 @@ impl RouteFinder {
         // Add to graph
         self.graph
             .entry(pool.token_a.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pool.pool_id.clone());
 
         self.graph
             .entry(pool.token_b.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pool.pool_id.clone());
 
         self.pools.insert(pool.pool_id.clone(), pool);
@@ -178,7 +184,7 @@ impl RouteFinder {
         let mut amount = amount_in;
         let mut current_token = token_in.to_string();
         let mut tokens = vec![token_in.to_string()];
-        let mut total_fees = 0u64;
+        let mut _total_fees = 0u64;
 
         for pool_id in pool_path {
             let pool = self.pools.get(pool_id).ok_or("Pool not found")?;
@@ -195,10 +201,10 @@ impl RouteFinder {
             // Apply fee
             let fee_amount = (amount as u64 * pool.fee_bps as u64) / 10_000;
             amount = amount.saturating_sub(fee_amount as u128);
-            total_fees += fee_amount;
+            _total_fees += fee_amount;
 
             // Constant product formula
-            let numerator = (amount as u128).wrapping_mul(reserve_out);
+            let numerator = amount.wrapping_mul(reserve_out);
             let denominator = reserve_in.saturating_add(amount);
 
             if denominator == 0 {
@@ -344,7 +350,7 @@ mod tests {
 
         let path = router.find_best_path("USDC", "X3", 1_000_000_000_000u128, 5);
         assert!(path.is_ok());
-        assert!(path.unwrap().hops.len() >= 1);
+        assert!(!path.unwrap().hops.is_empty());
     }
 
     #[test]

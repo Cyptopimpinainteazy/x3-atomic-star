@@ -2,7 +2,7 @@ use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
@@ -11,7 +11,7 @@ use std::time::Instant;
 /// Checks:
 ///   cpu_gpu_parity — GPU-accelerated execution matches CPU reference results
 pub async fn verify_claim(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {

@@ -2,13 +2,13 @@ use crate::proof::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
 /// Verify asset kernel supply conservation claim
 pub async fn verify_claim(
-    workspace: &PathBuf,
+    workspace: &Path,
     claim_id: &str,
     verbose: bool,
 ) -> Result<ProofResult> {
@@ -29,7 +29,7 @@ pub async fn verify_claim(
     // Search for canonical_supply tests
     let search_pattern = "canonical_supply";
     let grep_output = Command::new("grep")
-        .args(&["-r", search_pattern, "pallets/x3-kernel/", "--include=*.rs"])
+        .args(["-r", search_pattern, "pallets/x3-kernel/", "--include=*.rs"])
         .current_dir(workspace)
         .output();
 
@@ -53,7 +53,7 @@ pub async fn verify_claim(
 
     // Check for test files
     let find_output = Command::new("find")
-        .args(&["pallets/x3-kernel/src/", "-name", "*test*.rs"])
+        .args(["pallets/x3-kernel/src/", "-name", "*test*.rs"])
         .current_dir(workspace)
         .output();
 
@@ -91,7 +91,7 @@ pub async fn verify_claim(
     commands_run.push(test_cmd.to_string());
 
     let test_output = Command::new("cargo")
-        .args(&["test", "--package", "x3-kernel", "canonical_supply"])
+        .args(["test", "--package", "x3-kernel", "canonical_supply"])
         .current_dir(workspace)
         .output();
 
@@ -131,32 +131,29 @@ pub async fn verify_claim(
 
     // Search for invariant proofs in code
     let invariant_search = Command::new("grep")
-        .args(&["-r", "invariant:", "pallets/x3-kernel/", "--include=*.rs"])
+        .args(["-r", "invariant:", "pallets/x3-kernel/", "--include=*.rs"])
         .current_dir(workspace)
         .output();
 
-    match invariant_search {
-        Ok(output) => {
-            let matches = String::from_utf8_lossy(&output.stdout);
-            let invariant_count = matches.lines().count();
+    if let Ok(output) = invariant_search {
+        let matches = String::from_utf8_lossy(&output.stdout);
+        let invariant_count = matches.lines().count();
 
-            evidence.insert(
-                "invariants_declared".to_string(),
-                invariant_count.to_string(),
-            );
+        evidence.insert(
+            "invariants_declared".to_string(),
+            invariant_count.to_string(),
+        );
 
-            if invariant_count > 0 {
-                passed_checks.push(format!("Found {} invariant declarations", invariant_count));
-            } else {
-                missing_proofs.push("No invariant declarations found".to_string());
-            }
+        if invariant_count > 0 {
+            passed_checks.push(format!("Found {} invariant declarations", invariant_count));
+        } else {
+            missing_proofs.push("No invariant declarations found".to_string());
         }
-        Err(_) => {}
     }
 
     // Check for supply monitoring
     let monitor_search = Command::new("grep")
-        .args(&[
+        .args([
             "-r",
             "supply_monitor",
             "pallets/x3-kernel/",
@@ -165,17 +162,14 @@ pub async fn verify_claim(
         .current_dir(workspace)
         .output();
 
-    match monitor_search {
-        Ok(output) => {
-            let matches = String::from_utf8_lossy(&output.stdout);
-            if !matches.is_empty() {
-                passed_checks.push("Supply monitoring code found".to_string());
-                evidence.insert("supply_monitor".to_string(), "found".to_string());
-            } else {
-                missing_proofs.push("Supply monitoring not implemented".to_string());
-            }
+    if let Ok(output) = monitor_search {
+        let matches = String::from_utf8_lossy(&output.stdout);
+        if !matches.is_empty() {
+            passed_checks.push("Supply monitoring code found".to_string());
+            evidence.insert("supply_monitor".to_string(), "found".to_string());
+        } else {
+            missing_proofs.push("Supply monitoring not implemented".to_string());
         }
-        Err(_) => {}
     }
 
     // Determine status
@@ -241,6 +235,6 @@ pub async fn verify_claim(
     Ok(result)
 }
 
-pub async fn run_proofs(workspace: &PathBuf, verbose: bool) -> Result<ProofResult> {
+pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
     verify_claim(workspace, "x3.asset_kernel.supply_conservation", verbose).await
 }

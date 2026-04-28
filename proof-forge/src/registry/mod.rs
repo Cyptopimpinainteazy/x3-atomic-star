@@ -76,7 +76,7 @@ impl Registry {
                     }
                 })
             })
-            .filter_map(|x| x)
+            .flatten()
             .collect()
     }
 

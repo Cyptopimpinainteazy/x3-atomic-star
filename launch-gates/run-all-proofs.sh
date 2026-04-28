@@ -24,6 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 EVIDENCE_DIR="${REPO_ROOT}/launch-gates/evidence"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+STRICT_TARGET_DIR="${REPO_ROOT}/target_strict"
+STRICT_TOOLCHAIN="${STRICT_TOOLCHAIN:-1.90.0}"
 
 # Allow `STRICT=0` to keep the legacy advisory mode locally; CI must run with
 # the default STRICT=1 so non-blocking failures cannot mask real regressions.
@@ -61,7 +63,7 @@ run_proof() {
   # fingerprint artifacts if these directories were pruned between proof steps.
   # Pre-create the standard target subdirectories so proof results reflect real
   # compile failures rather than transient filesystem setup issues.
-  mkdir -p "${REPO_ROOT}/target/debug/.fingerprint" "${REPO_ROOT}/target/release/.fingerprint"
+  mkdir -p "${STRICT_TARGET_DIR}/debug/.fingerprint" "${STRICT_TARGET_DIR}/release/.fingerprint"
 
   if eval "$command" > "${log_file}" 2>&1; then
     echo "  ✅ PASS"
@@ -87,11 +89,11 @@ echo "════════════════════════�
 
 run_proof "proof-01-check-workspace" \
   "Cargo check (full workspace)" \
-  "cargo check --workspace --all-targets"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check --workspace --all-targets"
 
 run_proof "proof-01-check-runtime" \
   "Cargo check (runtime only)" \
-  "cargo check -p x3-chain-runtime"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo check -p x3-chain-runtime"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PROOF 2: Runtime Tests
@@ -103,11 +105,11 @@ echo "════════════════════════�
 
 run_proof "proof-02-test-workspace" \
   "Cargo test (full workspace)" \
-  "env CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-16777216} RUSTFLAGS='-C link-arg=-fuse-ld=lld' cargo test --workspace --lib"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test --workspace --lib --exclude x3-chain-runtime"
 
 run_proof "proof-02-test-runtime" \
   "Runtime tests" \
-  "env RUSTFLAGS='-C link-arg=-fuse-ld=lld' cargo test -p x3-chain-runtime --lib"
+  "env RUSTUP_TOOLCHAIN=${STRICT_TOOLCHAIN} CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} RUST_MIN_STACK=${RUST_MIN_STACK:-268435456} CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${STRICT_TARGET_DIR} RUSTFLAGS='-C debuginfo=0' cargo test -p x3-chain-runtime --lib"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PROOF 3: Bridge & Atomic Tests

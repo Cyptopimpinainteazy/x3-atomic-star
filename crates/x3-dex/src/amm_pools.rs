@@ -1,8 +1,6 @@
 /// AMM Liquidity Pools — ConstantProduct (Uniswap V2-style) pool implementation with LP token management.
 /// Enables AMM-based trading across X3, supports multi-pool routing, and governs LP rewards.
 use parity_scale_codec::{Decode, Encode};
-use sp_runtime::FixedU128;
-use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
 pub struct LiquidityPool {
@@ -106,12 +104,6 @@ impl AMMPool {
             // First liquidity: use geometric mean of deposits
             Self::sqrt(amount_a.saturating_mul(amount_b))
         } else {
-            let fee_tier = if pool.fee_basis_points <= 100 {
-                0.001
-            } else {
-                0.005
-            };
-
             // LP tokens = min(amount_a * total_supply / reserve_a, amount_b * total_supply / reserve_b)
             let lp_from_a =
                 (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
@@ -232,7 +224,7 @@ impl AMMPool {
             return 0;
         }
         let mut x = n;
-        let mut y = (x + 1) / 2;
+        let mut y = x.div_ceil(2);
         while y < x {
             x = y;
             y = (x + n / x) / 2;
@@ -245,13 +237,13 @@ impl AMMPool {
         let mut hash = 0u64;
         hash = hash
             .wrapping_mul(31)
-            .wrapping_add((token_a.chain_id as u64));
+            .wrapping_add(token_a.chain_id as u64);
         hash = hash
             .wrapping_mul(31)
             .wrapping_add((token_a.asset_id >> 64) as u64);
         hash = hash
             .wrapping_mul(31)
-            .wrapping_add((token_b.chain_id as u64));
+            .wrapping_add(token_b.chain_id as u64);
         hash = hash
             .wrapping_mul(31)
             .wrapping_add((token_b.asset_id >> 64) as u64);

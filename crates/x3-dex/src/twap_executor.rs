@@ -74,7 +74,7 @@ impl TWAPExecutor {
             return Err("Slice count out of range");
         }
 
-        if time_window_blocks < Self::MIN_TIME_WINDOW || time_window_blocks > Self::MAX_TIME_WINDOW
+        if !(Self::MIN_TIME_WINDOW..=Self::MAX_TIME_WINDOW).contains(&time_window_blocks)
         {
             return Err("Time window out of range");
         }
@@ -222,11 +222,7 @@ impl TWAPExecutor {
             0
         };
 
-        let price_improvement = if avg_price < market_price_at_creation {
-            (avg_price as i64) - (market_price_at_creation as i64)
-        } else {
-            (avg_price as i64) - (market_price_at_creation as i64)
-        };
+        let price_improvement = (avg_price as i64) - (market_price_at_creation as i64);
 
         let execution_time = if executions.len() > 1 {
             executions.last().unwrap().executed_block - executions.first().unwrap().executed_block
@@ -262,13 +258,13 @@ impl TWAPExecutor {
         base_price: u64,
         total_volume: u64,
         slice_count: u32,
-        liquidity_depth: u64,
+        _liquidity_depth: u64,
     ) -> Result<Vec<u64>, &'static str> {
         if slice_count == 0 {
             return Err("Slice count must be > 0");
         }
 
-        let slice_volume = total_volume / (slice_count as u64);
+        let _slice_volume = total_volume / (slice_count as u64);
         let mut prices = Vec::new();
 
         for i in 0..slice_count {
@@ -289,11 +285,7 @@ impl TWAPExecutor {
         initial_price: u64,
         max_slippage_bps: u64,
     ) -> bool {
-        let price_diff = if current_price > initial_price {
-            current_price - initial_price
-        } else {
-            initial_price - current_price
-        };
+        let price_diff = current_price.abs_diff(initial_price);
 
         let slippage = (price_diff * 10_000) / initial_price;
         slippage > max_slippage_bps
@@ -307,8 +299,8 @@ impl TWAPExecutor {
     /// Derive deterministic order ID
     fn derive_order_id(
         user: [u8; 32],
-        token_in: u128,
-        token_out: u128,
+        _token_in: u128,
+        _token_out: u128,
         slices: u32,
         nonce: u64,
     ) -> [u8; 32] {

@@ -13,7 +13,7 @@ mod todo_proof;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "x3-proof")]
@@ -278,8 +278,8 @@ enum FeaturesCommand {
 // Feature Command Handlers
 // ============================================================================
 
-fn run_features_list(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_list(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let matrix = scanner.load_matrix()?;
 
     println!("{}", "X3 Feature Registry".bold());
@@ -302,8 +302,8 @@ fn run_features_list(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_scan(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_scan(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(verbose)?;
     scanner.save_report(&report)?;
 
@@ -313,8 +313,8 @@ fn run_features_scan(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_status(workspace: &PathBuf, _verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_status(workspace: &Path, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Feature Status Summary".bold());
@@ -331,8 +331,8 @@ fn run_features_status(workspace: &PathBuf, _verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_missing(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_missing(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Missing Features".bold().red());
@@ -352,8 +352,8 @@ fn run_features_missing(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_partial(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_partial(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Partial Features".bold().yellow());
@@ -373,8 +373,8 @@ fn run_features_partial(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_unwired(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_unwired(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Unwired Features".bold().yellow());
@@ -394,8 +394,8 @@ fn run_features_unwired(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_untested(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_untested(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Untested Features".bold().yellow());
@@ -415,8 +415,8 @@ fn run_features_untested(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_stale(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_stale(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Stale Features".bold().yellow());
@@ -434,8 +434,8 @@ fn run_features_stale(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_blockers(workspace: &PathBuf, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_blockers(workspace: &Path, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
 
     println!("{}", "Blocked Features".bold().red());
@@ -455,8 +455,8 @@ fn run_features_blockers(workspace: &PathBuf, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_features_report(workspace: &PathBuf, _verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
+fn run_features_report(workspace: &Path, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(false)?;
     scanner.save_report(&report)?;
 
@@ -655,7 +655,7 @@ fn print_help() {
 
 /// Prove Everything - The Ultimate Gate
 async fn prove_everything(
-    workspace: &PathBuf,
+    workspace: &Path,
     strict: bool,
     fail_hard: bool,
     receipts: bool,
@@ -734,7 +734,7 @@ async fn prove_everything(
 
         if receipts {
             println!("Generating master receipt...");
-            runners::generate_receipt(workspace, "mainnet", &vec![], verbose).await?;
+            runners::generate_receipt(workspace, "mainnet", &[], verbose).await?;
         }
 
         Ok(())
@@ -757,7 +757,7 @@ async fn prove_everything(
 
 /// Run TODO/FIXME/HACK scanner
 async fn run_todo_gate(
-    workspace: &PathBuf,
+    workspace: &Path,
     gate: &str,
     fail_hard: bool,
     verbose: bool,
@@ -770,7 +770,7 @@ async fn run_todo_gate(
     );
     println!();
 
-    let scanner = TodoScanner::new(workspace.clone());
+    let scanner = TodoScanner::new(workspace.to_path_buf());
     let report = scanner.scan(verbose)?;
 
     println!("Total TODOs found: {}", report.total_todos);
@@ -846,7 +846,7 @@ async fn run_todo_gate(
 
 /// Run Gap scanner
 async fn run_gap_gate(
-    workspace: &PathBuf,
+    workspace: &Path,
     gate: &str,
     fail_hard: bool,
     verbose: bool,
@@ -859,7 +859,7 @@ async fn run_gap_gate(
     );
     println!();
 
-    let scanner = GapScanner::new(workspace.clone());
+    let scanner = GapScanner::new(workspace.to_path_buf());
     let report = scanner.scan(verbose)?;
 
     println!("Total gaps found: {}", report.total_gaps);

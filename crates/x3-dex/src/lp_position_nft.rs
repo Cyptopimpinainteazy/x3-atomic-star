@@ -72,14 +72,13 @@ pub struct NFTRoyalty {
 pub struct LPPositionNFTEngine;
 
 impl LPPositionNFTEngine {
-    const NFT_MINTING_FEE_BPS: u32 = 50; // 0.5% fee to mint
     const MIN_LIQUIDITY_FOR_NFT: u64 = 1_000; // Minimum liquidity to mint NFT
-    const DEFAULT_ROYALTY_BPS: u32 = 500; // 5% default creator royalty
     const MAX_ROYALTY_BPS: u32 = 2_000; // 20% max royalty
     const MIN_LTV_RATIO: u32 = 2_500; // 25% minimum loan-to-value
     const MAX_LTV_RATIO: u32 = 7_500; // 75% maximum loan-to-value
 
     /// Mint LP position as NFT
+    #[allow(clippy::too_many_arguments)]
     pub fn mint_lp_position_nft(
         position_id: [u8; 32],
         owner: [u8; 32],
@@ -244,7 +243,7 @@ impl LPPositionNFTEngine {
             return Err("Cannot collateralize inactive NFT");
         }
 
-        if ltv_ratio < Self::MIN_LTV_RATIO || ltv_ratio > Self::MAX_LTV_RATIO {
+        if !(Self::MIN_LTV_RATIO..=Self::MAX_LTV_RATIO).contains(&ltv_ratio) {
             return Err("LTV ratio out of bounds");
         }
 
@@ -484,7 +483,7 @@ mod tests {
 
         let mut listing = LPPositionNFTEngine::list_nft(&nft, 75_000, 200).unwrap();
 
-        let (transfer, seller_proceeds, royalty) = LPPositionNFTEngine::buy_nft(
+        let (_transfer, _seller_proceeds, royalty) = LPPositionNFTEngine::buy_nft(
             &mut nft,
             &mut listing,
             [4; 32],

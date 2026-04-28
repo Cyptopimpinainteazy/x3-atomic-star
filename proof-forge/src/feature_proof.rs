@@ -158,6 +158,20 @@ pub struct FeatureScanner {
     workspace: PathBuf,
 }
 
+struct FeatureStatusInputs {
+    code_found: usize,
+    code_missing: usize,
+    wiring_found: usize,
+    wiring_missing: usize,
+    tests_found: usize,
+    tests_missing: usize,
+    negative_tests_found: usize,
+    negative_tests_missing: usize,
+    receipt_exists: bool,
+    receipt_fresh: bool,
+    critical_todos: usize,
+}
+
 impl FeatureScanner {
     pub fn new(workspace: PathBuf) -> Self {
         Self { workspace }
@@ -381,19 +395,19 @@ impl FeatureScanner {
         }
 
         // Determine status
-        let status = self.determine_status(
+        let status = self.determine_status(FeatureStatusInputs {
             code_found,
-            code_missing.len(),
+            code_missing: code_missing.len(),
             wiring_found,
-            wiring_missing.len(),
+            wiring_missing: wiring_missing.len(),
             tests_found,
-            tests_missing.len(),
+            tests_missing: tests_missing.len(),
             negative_tests_found,
-            negative_tests_missing.len(),
+            negative_tests_missing: negative_tests_missing.len(),
             receipt_exists,
             receipt_fresh,
             critical_todos,
-        );
+        });
 
         Ok(FeatureProofResult {
             feature_id: feature.id.clone(),
@@ -447,58 +461,48 @@ impl FeatureScanner {
     }
 
     /// Determine feature status based on checks
-    fn determine_status(
-        &self,
-        code_found: usize,
-        code_missing: usize,
-        wiring_found: usize,
-        wiring_missing: usize,
-        tests_found: usize,
-        tests_missing: usize,
-        negative_tests_found: usize,
-        negative_tests_missing: usize,
-        receipt_exists: bool,
-        receipt_fresh: bool,
-        critical_todos: usize,
-    ) -> FeatureStatus {
+    fn determine_status(&self, inputs: FeatureStatusInputs) -> FeatureStatus {
         // BLOCKED: critical TODOs or major issues
-        if critical_todos > 0 {
+        if inputs.critical_todos > 0 {
             return FeatureStatus::Blocked;
         }
 
         // MISSING: no code found
-        if code_found == 0 {
+        if inputs.code_found == 0 {
             return FeatureStatus::Missing;
         }
 
         // UNWIRED: code exists but wiring missing
-        if code_found > 0 && wiring_found == 0 {
+        if inputs.code_found > 0 && inputs.wiring_found == 0 {
             return FeatureStatus::Unwired;
         }
 
         // UNTESTED: code and wiring exist but no tests
-        if code_found > 0 && wiring_found > 0 && tests_found == 0 {
+        if inputs.code_found > 0 && inputs.wiring_found > 0 && inputs.tests_found == 0 {
             return FeatureStatus::Untested;
         }
 
         // WEAK: tests exist but negative tests missing
-        if tests_found > 0 && negative_tests_found == 0 && negative_tests_missing > 0 {
+        if inputs.tests_found > 0
+            && inputs.negative_tests_found == 0
+            && inputs.negative_tests_missing > 0
+        {
             return FeatureStatus::Weak;
         }
 
         // STALE: receipt exists but not fresh
-        if receipt_exists && !receipt_fresh {
+        if inputs.receipt_exists && !inputs.receipt_fresh {
             return FeatureStatus::Stale;
         }
 
         // BUILT: all criteria met
-        if code_missing == 0
-            && wiring_missing == 0
-            && tests_missing == 0
-            && negative_tests_missing == 0
-            && receipt_exists
-            && receipt_fresh
-            && critical_todos == 0
+        if inputs.code_missing == 0
+            && inputs.wiring_missing == 0
+            && inputs.tests_missing == 0
+            && inputs.negative_tests_missing == 0
+            && inputs.receipt_exists
+            && inputs.receipt_fresh
+            && inputs.critical_todos == 0
         {
             return FeatureStatus::Built;
         }
@@ -520,7 +524,7 @@ impl FeatureScanner {
 
         for term in search_terms {
             let output = Command::new("grep")
-                .args(&["-r", term, "runtime/", "--include=*.rs"])
+                .args(["-r", term, "runtime/", "--include=*.rs"])
                 .current_dir(&self.workspace)
                 .output();
 
@@ -543,7 +547,7 @@ impl FeatureScanner {
             }
 
             let output = Command::new("grep")
-                .args(&["-l", test_name, &full_path.to_string_lossy()])
+                .args(["-l", test_name, &full_path.to_string_lossy()])
                 .output();
 
             if let Ok(output) = output {
@@ -555,7 +559,7 @@ impl FeatureScanner {
             // Also check parent directory for test files
             if let Some(parent) = full_path.parent() {
                 let output = Command::new("find")
-                    .args(&[
+                    .args([
                         parent.to_string_lossy().as_ref(),
                         "-name",
                         "*.rs",
@@ -568,7 +572,7 @@ impl FeatureScanner {
                     let test_files = String::from_utf8_lossy(&output.stdout);
                     for test_file in test_files.lines() {
                         let grep_output = Command::new("grep")
-                            .args(&["-l", test_name, test_file])
+                            .args(["-l", test_name, test_file])
                             .output();
 
                         if let Ok(grep_output) = grep_output {
@@ -605,7 +609,7 @@ impl FeatureScanner {
 
             for pattern in &critical_patterns {
                 let output = Command::new("grep")
-                    .args(&["-c", pattern, &full_path.to_string_lossy()])
+                    .args(["-c", pattern, &full_path.to_string_lossy()])
                     .output();
 
                 if let Ok(output) = output {
@@ -641,13 +645,13 @@ impl FeatureScanner {
         md.push_str(&format!("| STALE | {} |\n", report.stale_count));
         md.push_str(&format!("| BLOCKED | {} |\n", report.blocked_count));
         md.push_str(&format!("| REVOKED | {} |\n", report.revoked_count));
-        md.push_str("\n");
+        md.push('\n');
 
         md.push_str("## Top Blockers\n");
         for (i, blocker) in report.top_blockers.iter().enumerate().take(10) {
             md.push_str(&format!("{}. {}\n", i + 1, blocker));
         }
-        md.push_str("\n");
+        md.push('\n');
 
         md.push_str("## Built Features\n");
         md.push_str("| Feature | Status |\n");
@@ -662,7 +666,7 @@ impl FeatureScanner {
                 ));
             }
         }
-        md.push_str("\n");
+        md.push('\n');
 
         md.push_str("## Partial Features\n");
         md.push_str("| Feature | Blockers | Next Command |\n");
@@ -681,7 +685,7 @@ impl FeatureScanner {
                 ));
             }
         }
-        md.push_str("\n");
+        md.push('\n');
 
         md.push_str("## Missing Features\n");
         md.push_str("| Feature | Missing Code |\n");
@@ -692,7 +696,7 @@ impl FeatureScanner {
                 md.push_str(&format!("| {} | {} |\n", result.feature_id, missing));
             }
         }
-        md.push_str("\n");
+        md.push('\n');
 
         Ok(md)
     }

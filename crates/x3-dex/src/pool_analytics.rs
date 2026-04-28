@@ -94,8 +94,6 @@ impl PoolAnalyticsEngine {
     const BLOCKS_PER_DAY: u64 = 28_800; // 3-second blocks
     const BLOCKS_PER_7D: u64 = 201_600;
     const BLOCKS_PER_30D: u64 = 864_000;
-    const SECONDS_PER_YEAR: u64 = 31_536_000;
-    const MIN_TVL_FOR_APY: u64 = 1_000; // Minimum TVL to calculate APY
 
     /// Calculate pool APY from fees
     pub fn calculate_apy(fees_earned: u64, tvl: u64, time_period_blocks: u64) -> u32 {
@@ -104,7 +102,6 @@ impl PoolAnalyticsEngine {
         }
 
         // APY = (fees / TVL) * (365 / period_days) * 10000
-        let blocks_per_year = Self::BLOCKS_PER_DAY * 365;
         let period_days = time_period_blocks / Self::BLOCKS_PER_DAY;
 
         if period_days == 0 {
@@ -141,6 +138,7 @@ impl PoolAnalyticsEngine {
     }
 
     /// Get pool metrics snapshot
+    #[allow(clippy::too_many_arguments)]
     pub fn get_pool_metrics(
         pool_id: [u8; 32],
         tvl: u64,
@@ -174,6 +172,7 @@ impl PoolAnalyticsEngine {
     }
 
     /// Get LP statistics
+    #[allow(clippy::too_many_arguments)]
     pub fn get_lp_stats(
         provider: [u8; 32],
         pool_id: [u8; 32],
@@ -256,6 +255,7 @@ impl PoolAnalyticsEngine {
     }
 
     /// Calculate token metrics
+    #[allow(clippy::too_many_arguments)]
     pub fn calculate_token_metrics(
         token_id: u128,
         name: Vec<u8>,
@@ -267,9 +267,7 @@ impl PoolAnalyticsEngine {
         current_block: u64,
     ) -> TokenMetrics {
         let price_change = if price_24h_ago > 0 {
-            let change_bps =
-                ((price_usd as i64 - price_24h_ago as i64) * 10_000 / price_24h_ago as i64) as i32;
-            change_bps
+            ((price_usd as i64 - price_24h_ago as i64) * 10_000 / price_24h_ago as i64) as i32
         } else {
             0
         };
@@ -314,8 +312,8 @@ impl PoolAnalyticsEngine {
     ) -> u64 {
         // Income = TVL * APY% * LP_share%
         let share_value = (tvl as u128 * share_percentage as u128 / 10_000) as u64;
-        let income = (share_value as u128 * pool_apy as u128 / 10_000) as u64;
-        income
+
+        (share_value as u128 * pool_apy as u128 / 10_000) as u64
     }
 
     /// Calculate concentration of liquidity (Herfindahl index)
@@ -346,8 +344,7 @@ impl PoolAnalyticsEngine {
             -(((volatility_score / 100).min(5_000)) as i32)
         };
 
-        let projected = (current_apy_24h as i32 + adjustment).max(0) as u32;
-        projected
+        (current_apy_24h as i32 + adjustment).max(0) as u32
     }
 
     /// Derive volume bucket ID

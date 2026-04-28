@@ -87,12 +87,11 @@ impl VeX3GovernanceEngine {
         lock_duration_days: u32,
         current_block: u64,
     ) -> Result<VeX3Lock, &'static str> {
-        if amount < Self::MIN_LOCK_AMOUNT || amount > Self::MAX_LOCK_AMOUNT {
+        if !(Self::MIN_LOCK_AMOUNT..=Self::MAX_LOCK_AMOUNT).contains(&amount) {
             return Err("Lock amount out of range");
         }
 
-        if lock_duration_days < Self::MIN_LOCK_DURATION_DAYS
-            || lock_duration_days > Self::MAX_LOCK_DURATION_DAYS
+        if !(Self::MIN_LOCK_DURATION_DAYS..=Self::MAX_LOCK_DURATION_DAYS).contains(&lock_duration_days)
         {
             return Err("Lock duration outside allowed range (1-4 years)");
         }
@@ -292,11 +291,7 @@ impl VeX3GovernanceEngine {
 
     /// Calculate time remaining on lock
     pub fn calculate_time_remaining(lock: &VeX3Lock, current_block: u64) -> u64 {
-        if current_block >= lock.unlock_block {
-            0
-        } else {
-            lock.unlock_block - current_block
-        }
+        lock.unlock_block.saturating_sub(current_block)
     }
 
     /// Calculate time remaining as days
@@ -454,7 +449,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(proposal.title.len() > 0);
+        assert!(!proposal.title.is_empty());
         assert_eq!(proposal.status, 0); // voting
     }
 

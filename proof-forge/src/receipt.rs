@@ -207,7 +207,7 @@ fn canonicalize_json_value(value: Value) -> Value {
 /// Get current git commit hash
 fn get_git_commit_hash() -> Result<String> {
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .context("Failed to run git rev-parse HEAD")?;
 
@@ -266,7 +266,7 @@ fn compute_policy_hash() -> Result<String> {
 fn check_git_files_changed(old_commit: &str, files: &[PathBuf]) -> Result<bool> {
     for file in files {
         let output = Command::new("git")
-            .args(&[
+            .args([
                 "diff",
                 "--name-only",
                 old_commit,
