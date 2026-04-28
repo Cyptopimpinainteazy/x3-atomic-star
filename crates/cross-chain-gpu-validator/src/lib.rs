@@ -42,14 +42,14 @@ use x3_gpu_validator_swarm::SwarmOrchestrator;
 
 /// Wrapper for cross-chain validator lifecycle
 pub struct CrossChainValidator {
-    orchestrator: Arc<RwLock<SwarmOrchestrator>>,
+    _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
     protocol_version: u32,
 }
 
 impl CrossChainValidator {
     pub fn new(orchestrator: Arc<RwLock<SwarmOrchestrator>>, protocol_version: u32) -> Self {
         Self {
-            orchestrator,
+            _orchestrator: orchestrator,
             protocol_version,
         }
     }
@@ -84,8 +84,8 @@ pub enum ValidationError {
 /// Falls back to CPU if GPU unavailable
 pub async fn validate_evm_header(
     block_number: u64,
-    block_hash: [u8; 32],
-    state_root: [u8; 32],
+    _block_hash: [u8; 32],
+    _state_root: [u8; 32],
     _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
 ) -> Result<String, ValidationError> {
     // Stub: Phase 3 will wire actual orchestrator call here
@@ -100,8 +100,8 @@ pub async fn validate_evm_header(
 /// Falls back to CPU if GPU unavailable
 pub async fn validate_svm_header(
     slot: u64,
-    block_hash: [u8; 32],
-    state_root: [u8; 32],
+    _block_hash: [u8; 32],
+    _state_root: [u8; 32],
     _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
 ) -> Result<String, ValidationError> {
     // Stub: Phase 3 will wire actual orchestrator call here

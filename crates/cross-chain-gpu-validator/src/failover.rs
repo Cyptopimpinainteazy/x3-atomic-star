@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_failover_manager_creation() {
-        let manager = FailoverManager::new(32);
+        let _manager = FailoverManager::new(32);
         // Manager created successfully
     }
 
@@ -132,7 +132,7 @@ mod tests {
         let manager = FailoverManager::new(32);
         let inputs = vec![b"test".as_slice()];
 
-        let (hashes, _, used_gpu) = manager.hash_with_failover(&inputs).unwrap();
+        let (hashes, _, _used_gpu) = manager.hash_with_failover(&inputs).unwrap();
         assert_eq!(hashes.len(), 1);
         assert_eq!(hashes[0].len(), 32); // Keccak256 = 32 bytes
     }
