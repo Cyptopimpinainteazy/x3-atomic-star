@@ -46,13 +46,13 @@ prop_compose! {
     ) -> Bundle {
         let n = amounts.len();
         let mut ix = Vec::with_capacity(n * 2);
-        for i in 0..n {
+        for (i, amount) in amounts.iter().copied().enumerate().take(n) {
             ix.push(Instruction::Lock {
                 slot_id: i as u32,
                 kind: AssetKind::X3Native,
                 asset: asset(1),
                 payer: addr(payer_seed.wrapping_add(i as u8)),
-                amount: amounts[i],
+                amount,
             });
             ix.push(Instruction::Settle {
                 slot_id: i as u32,
@@ -106,13 +106,13 @@ proptest! {
         // a partial receipt that mirrors what the interpreter would have
         // produced if it had executed n locks then crashed.
         let mut r = x3_ixl::Receipt::new();
-        for i in 0..n {
+        for (i, amount) in amounts.iter().copied().enumerate().take(n) {
             r.push(ReceiptEntry::Locked {
                 slot_id: i as u32,
                 kind: AssetKind::X3Native,
                 asset: asset(1),
                 payer: addr(payer_seed.wrapping_add(i as u8)),
-                amount: amounts[i],
+                amount,
             });
         }
 
@@ -127,7 +127,7 @@ proptest! {
                     prop_assert_eq!(*receiver, addr(payer_seed.wrapping_add(i as u8)));
                     prop_assert_eq!(*amount, amounts[i]);
                 }
-                _ => prop_assert!(false, "expected CreditReceiver for Lock rollback"),
+                _ => panic!("expected CreditReceiver for Lock rollback"),
             }
         }
     }

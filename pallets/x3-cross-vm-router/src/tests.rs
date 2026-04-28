@@ -8,8 +8,6 @@
 //
 // The **one** test that matters: `test_x3_native_evm_svm_roundtrip_preserves_supply`.
 
-#![cfg(test)]
-
 use crate as pallet_x3_cross_vm_router;
 use frame_support::{
     assert_ok, construct_runtime, derive_impl, parameter_types,

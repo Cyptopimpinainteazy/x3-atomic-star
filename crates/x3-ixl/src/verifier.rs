@@ -12,7 +12,7 @@
 //! 1. **Custody balance conservation** — the sum of `Locked` amounts for
 //!    every slot equals the sum of `Minted + Swapped(in) + Settled + Refunded
 //!    + Burned` amounts for that slot.  No slot may end in credit without a
-//!    corresponding debit.
+//!      corresponding debit.
 //!
 //! 2. **Slot lifecycle monotonicity** — each slot must follow
 //!    `Locked → [Minted|Swapped]* → Settled|Refunded|Burned`.  A slot may not

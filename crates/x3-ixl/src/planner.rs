@@ -161,8 +161,7 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner failed for empty bundle: {:?}", err);
-                return;
+                panic!("planner failed for empty bundle: {:?}", err);
             }
         };
         assert!(plan.is_empty());
@@ -189,8 +188,7 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner rejected valid lock+settle: {:?}", err);
-                return;
+                panic!("planner rejected valid lock+settle: {:?}", err);
             }
         };
         assert_eq!(plan.len(), 2);
@@ -209,8 +207,7 @@ mod tests {
             }],
         }) {
             Ok(_) => {
-                assert!(false, "planner accepted unresolved custody");
-                return;
+                panic!("planner accepted unresolved custody");
             }
             Err(err) => err,
         };
@@ -230,8 +227,7 @@ mod tests {
             }],
         }) {
             Ok(_) => {
-                assert!(false, "planner accepted mint without lock");
-                return;
+                panic!("planner accepted mint without lock");
             }
             Err(err) => err,
         };
@@ -265,8 +261,7 @@ mod tests {
             ],
         }) {
             Ok(_) => {
-                assert!(false, "planner accepted duplicate slot");
-                return;
+                panic!("planner accepted duplicate slot");
             }
             Err(err) => err,
         };
@@ -290,8 +285,7 @@ mod tests {
             instructions: instrs,
         }) {
             Ok(_) => {
-                assert!(false, "planner accepted oversized bundle");
-                return;
+                panic!("planner accepted oversized bundle");
             }
             Err(err) => err,
         };

@@ -333,16 +333,14 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner rejected valid test bundle: {:?}", err);
-                return;
+                panic!("planner rejected valid test bundle: {:?}", err);
             }
         };
         let mut ctx = ExecutionContext::new(&no_swap);
         let receipt = match Interpreter::execute(&plan, &mut ctx) {
             Ok(receipt) => receipt,
             Err((_partial, err)) => {
-                assert!(false, "interpreter failed on lock+settle: {:?}", err);
-                return;
+                panic!("interpreter failed on lock+settle: {:?}", err);
             }
         };
         assert_eq!(ctx.effects.len(), 2);
@@ -366,8 +364,7 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner rejected refund bundle: {:?}", err);
-                return;
+                panic!("planner rejected refund bundle: {:?}", err);
             }
         };
         let mut ctx = ExecutionContext::new(&no_swap);
@@ -421,8 +418,7 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner rejected slippage bundle: {:?}", err);
-                return;
+                panic!("planner rejected slippage bundle: {:?}", err);
             }
         };
         let mut ctx = ExecutionContext::new(&always_one);
@@ -460,8 +456,7 @@ mod tests {
         }) {
             Ok(plan) => plan,
             Err(err) => {
-                assert!(false, "planner rejected abort bundle: {:?}", err);
-                return;
+                panic!("planner rejected abort bundle: {:?}", err);
             }
         };
         let mut ctx = ExecutionContext::new(&no_swap);
