@@ -67,8 +67,14 @@ async fn run_oracle_attack_suite(
     };
 
     let mut evidence = HashMap::new();
-    evidence.insert("expected_attack_tests".to_string(), total_expected.to_string());
-    evidence.insert("passed_attack_tests".to_string(), passed_expected.to_string());
+    evidence.insert(
+        "expected_attack_tests".to_string(),
+        total_expected.to_string(),
+    );
+    evidence.insert(
+        "passed_attack_tests".to_string(),
+        passed_expected.to_string(),
+    );
     evidence.insert(
         "failed_attack_tests".to_string(),
         failed_checks.len().to_string(),
@@ -80,7 +86,11 @@ async fn run_oracle_attack_suite(
         status,
         proof_level: Some(ProofLevel::P5),
         edge_case_level: Some(EdgeCaseLevel::E6),
-        hack_level: Some(if blocked { HackLevel::H0 } else { HackLevel::H8 }),
+        hack_level: Some(if blocked {
+            HackLevel::H0
+        } else {
+            HackLevel::H8
+        }),
         operator_level: Some(OperatorLevel::I5),
         degraded_level: Some(DegradedLevel::D4),
         files_inspected: vec![
