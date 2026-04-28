@@ -22,6 +22,7 @@ mod tests;
 
 pub use pallet::*;
 
+#[allow(clippy::too_many_arguments)]
 #[frame_support::pallet]
 pub mod pallet {
     use super::types::*;
