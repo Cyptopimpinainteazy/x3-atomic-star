@@ -22,6 +22,22 @@ pub mod trade_history;
 pub mod twap_executor;
 pub mod ve_governance;
 
+#[cfg(test)]
+#[path = "tests/attack_sandwich.rs"]
+mod attack_sandwich;
+
+#[cfg(test)]
+#[path = "tests/attack_liquidation_frontrun.rs"]
+mod attack_liquidation_frontrun;
+
+#[cfg(test)]
+#[path = "tests/attack_twap_manipulation.rs"]
+mod attack_twap_manipulation;
+
+#[cfg(test)]
+#[path = "tests/attack_oracle_frontrun.rs"]
+mod attack_oracle_frontrun;
+
 pub use amm_pools::{AMMPool, LPPosition, LiquidityPool, SwapEvent, TokenId};
 pub use arb_bot_events::{
     ArbBotEventSystem, ArbOpportunity, BotPerformance, BotSubscription, ExecutedArb,
