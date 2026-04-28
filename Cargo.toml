@@ -388,10 +388,14 @@ sp-weights = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" 
 frame-support = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
 frame-system = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
 sp-io = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-trie = { path = "patches/sp-trie" }
+sp-state-machine = { path = "patches/sp-state-machine" }
 
 # Patch Substrate git sources for prometheus fix and executor bulk-memory support
 [patch."https://github.com/paritytech/substrate"]
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+sp-trie = { path = "patches/sp-trie" }
+sp-state-machine = { path = "patches/sp-state-machine" }
 sc-executor = { path = "patches/sc-executor" }
 sc-network = { path = "patches/sc-network" }
 sc-network-common = { path = "patches/sc-network/common" }
