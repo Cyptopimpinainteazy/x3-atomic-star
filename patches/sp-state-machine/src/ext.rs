@@ -62,6 +62,7 @@ fn guard() -> () {
 /// Errors that can occur when interacting with the externalities.
 #[cfg(feature = "std")]
 #[derive(Debug, Copy, Clone)]
+#[allow(dead_code)]
 pub enum Error<B, E> {
 	/// Failure to load state data from the backend.
 	#[allow(unused)]

@@ -124,6 +124,7 @@ impl sp_std::fmt::Display for DefaultError {
 	}
 }
 
+#[allow(unused_imports)]
 pub use crate::{
 	backend::{Backend, IterArgs, KeysIter, PairsIter, StorageIterator},
 	error::{Error, ExecutionError},
@@ -140,6 +141,7 @@ pub use crate::{
 
 #[cfg(feature = "std")]
 mod std_reexport {
+	#[allow(unused_imports)]
 	pub use crate::{
 		basic::BasicExternalities,
 		error::{Error, ExecutionError},
