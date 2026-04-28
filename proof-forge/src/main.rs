@@ -79,6 +79,15 @@ enum Commands {
         fail_hard: bool,
     },
 
+    /// Run economic attack gate across flashloan/DEX/oracle/governance vectors
+    EconomicGate {
+        #[arg(short, long)]
+        strict: bool,
+
+        #[arg(long)]
+        fail_hard: bool,
+    },
+
     /// Test hack resistance
     Hack {
         /// Specific area to test
@@ -506,6 +515,10 @@ async fn main() -> Result<()> {
             runners::check_security_gate(&cli.workspace, fail_hard, cli.verbose).await?
         }
 
+        Commands::EconomicGate { strict, fail_hard } => {
+            run_economic_gate(&cli.workspace, strict, fail_hard, cli.verbose).await?
+        }
+
         Commands::Hack { area, strict } => {
             runners::test_hack_resistance(&cli.workspace, area, strict, cli.verbose).await?
         }
@@ -625,6 +638,7 @@ fn print_help() {
     println!();
     println!("{}", "Security & Safety:".bold());
     println!("  x3-proof security-gate              - Check S0/S1 blockers");
+    println!("  x3-proof economic-gate --strict     - Run core economic attack tests");
     println!("  x3-proof hack [AREA]                - Test hack resistance");
     println!("  x3-proof edge-case [AREA]           - Test edge cases");
     println!("  x3-proof limp [AREA]                - Test degraded operation");
@@ -651,6 +665,74 @@ fn print_help() {
     println!("  --fail-hard                         - Fail on any error");
     println!("  --dry-run                           - Show what would execute");
     println!("  -v, --verbose                       - Verbose output");
+}
+
+async fn run_economic_gate(
+    workspace: &Path,
+    strict: bool,
+    fail_hard: bool,
+    _verbose: bool,
+) -> Result<()> {
+    println!(
+        "{}",
+        "🔒 Economic Attack Gate — Running 9 core attack tests"
+            .bold()
+            .cyan()
+    );
+    if strict {
+        println!("Mode: strict");
+    }
+    println!();
+
+    let flash = runners::flashloans::run_proofs(workspace, false).await?;
+    let dex = runners::dex::run_proofs(workspace, false).await?;
+    let oracle = runners::oracle::run_proofs(workspace, false).await?;
+    let governance = runners::governance::run_proofs(workspace, false).await?;
+    let results = vec![flash, dex, oracle, governance];
+
+    println!("{:14} | {:10} | {:8}", "Area", "Status", "Score");
+    println!("{:-<14}-+-{:-<10}-+-{:-<8}", "", "", "");
+
+    let mut blocked_count = 0usize;
+    for result in &results {
+        let area = result
+            .claim_id
+            .split('.')
+            .nth(1)
+            .unwrap_or("unknown")
+            .to_string();
+        let status = match result.status {
+            proof::ProofStatus::Verified => "VERIFIED".green().bold().to_string(),
+            proof::ProofStatus::Partial => "PARTIAL".yellow().bold().to_string(),
+            proof::ProofStatus::Failed => "FAILED".red().bold().to_string(),
+            proof::ProofStatus::Unverified => "UNVERIFIED".bright_yellow().bold().to_string(),
+            proof::ProofStatus::Blocked => "BLOCKED".bright_red().bold().to_string(),
+        };
+        if result.status == proof::ProofStatus::Blocked {
+            blocked_count += 1;
+        }
+        println!("{:14} | {:10} | {:>7.1}%", area, status, result.score * 100.0);
+    }
+
+    println!();
+    if blocked_count == 0 {
+        println!("{}", "✓ ECONOMIC GATE PASSED".bold().green());
+        Ok(())
+    } else {
+        println!(
+            "{}",
+            format!(
+                "✗ ECONOMIC GATE FAILED — {} attack vectors unmitigated",
+                blocked_count
+            )
+            .bold()
+            .red()
+        );
+        if fail_hard {
+            anyhow::bail!("economic-gate failed with {} blocked areas", blocked_count);
+        }
+        Ok(())
+    }
 }
 
 /// Prove Everything - The Ultimate Gate
@@ -693,14 +775,21 @@ async fn prove_everything(
         failures.push(format!("SecurityGate: {}", e));
     }
 
-    // 4. Mainnet Gate
+    // 4. Economic Gate
+    println!("{}", "▸ Running EconomicGate...".cyan());
+    if let Err(e) = run_economic_gate(workspace, true, true, verbose).await {
+        all_pass = false;
+        failures.push(format!("EconomicGate: {}", e));
+    }
+
+    // 5. Mainnet Gate
     println!("{}", "▸ Running MainnetGate...".cyan());
     if let Err(e) = runners::check_mainnet_readiness(workspace, true, true, verbose).await {
         all_pass = false;
         failures.push(format!("MainnetGate: {}", e));
     }
 
-    // 5. Critical Claims
+    // 6. Critical Claims
     println!("{}", "▸ Verifying Critical Claims...".cyan());
     let critical_claims = vec![
         "x3.asset_kernel.supply_conservation",

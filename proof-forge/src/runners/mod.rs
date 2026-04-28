@@ -3,8 +3,10 @@ use crate::receipt;
 use anyhow::Result;
 use chrono::Utc;
 use colored::*;
+use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tokio::process::Command;
 
 pub mod asset_kernel;
 pub mod atomic;
@@ -260,6 +262,59 @@ fn verify_proofforge_claim(claim_id: &str) -> Result<ProofResult> {
         timestamp: Utc::now(),
         duration_ms: 0,
     })
+}
+
+pub(crate) async fn run_cargo_test_and_parse(
+    workspace: &Path,
+    package: &str,
+    filter: &str,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let output = Command::new("cargo")
+        .current_dir(workspace)
+        .arg("test")
+        .arg("-p")
+        .arg(package)
+        .arg(filter)
+        .arg("--")
+        .arg("--nocapture")
+        .output()
+        .await?;
+
+    let mut combined = String::from_utf8_lossy(&output.stdout).to_string();
+    if !output.stderr.is_empty() {
+        if !combined.is_empty() {
+            combined.push('\n');
+        }
+        combined.push_str(&String::from_utf8_lossy(&output.stderr));
+    }
+
+    let mut passed: Vec<String> = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    let test_line = Regex::new(r"^test\s+(.+?)\s+\.\.\.\s+(ok|FAILED)$")?;
+
+    for line in combined.lines() {
+        if let Some(caps) = test_line.captures(line.trim()) {
+            let name = caps
+                .get(1)
+                .map(|m| m.as_str().trim().to_string())
+                .unwrap_or_default();
+            let status = caps.get(2).map(|m| m.as_str()).unwrap_or_default();
+            if status == "ok" {
+                passed.push(name);
+            } else if status == "FAILED" {
+                failed.push(name);
+            }
+        }
+    }
+
+    if !output.status.success() && passed.is_empty() && failed.is_empty() {
+        failed.push(format!(
+            "cargo test process failed for package '{}' with filter '{}'",
+            package, filter
+        ));
+    }
+
+    Ok((passed, failed))
 }
 
 pub async fn prove_area(
