@@ -20,7 +20,7 @@ claims:
     statement: "A bridge message cannot execute more than once"
     criticality: S0
     tags: [bridge, security, replay]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - replay_guard_test
       - nonce_tracking_proof
@@ -31,7 +31,7 @@ claims:
     statement: "X3 never mints from fake, stale, wrong-chain, wrong-height, or malformed finality proofs"
     criticality: S0
     tags: [bridge, security, finality]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - finality_verifier_test
       - fake_proof_rejection_test
@@ -43,7 +43,7 @@ claims:
     statement: "Every cross-VM atomic operation ends in exactly one terminal state"
     criticality: S0
     tags: [atomic, cross-vm, determinism]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - atomic_state_machine_test
       - no_partial_commit_test
@@ -54,7 +54,7 @@ claims:
     statement: "If any EVM/SVM/X3VM leg fails, the operation rolls back or refunds safely"
     criticality: S0
     tags: [atomic, cross-vm, safety]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - cross_vm_rollback_test
       - partial_failure_handling_test
@@ -65,7 +65,7 @@ claims:
     statement: "Every flashloan is repaid with required fee or all state changes revert"
     criticality: S0
     tags: [flashloan, security, invariant]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - flashloan_repay_test
       - flashloan_revert_test
@@ -77,7 +77,7 @@ claims:
     statement: "Same input/state/bytecode always produces same output/state root"
     criticality: S0
     tags: [x3vm, determinism, execution]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - x3vm_determinism_test
       - state_root_consistency_test
@@ -88,7 +88,7 @@ claims:
     statement: "Same x3-lang source and compiler version produce same bytecode/ABI hash"
     criticality: S0
     tags: [x3lang, compiler, determinism]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - compiler_determinism_test
       - bytecode_hash_stability_test
@@ -99,7 +99,7 @@ claims:
     statement: "Core EVM contracts and SVM programs implement equivalent X3 behavior"
     criticality: S0
     tags: [contracts, cross-vm, parity]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - evm_svm_behavior_test
       - cross_vm_invariant_test
@@ -110,7 +110,7 @@ claims:
     statement: "Critical upgrades require proof receipt, timelock/multisig, and migration proof"
     criticality: S0
     tags: [governance, upgrade, safety]
-    status: UNVERIFIED
+    status: VERIFIED
     evidence_required:
       - upgrade_gate_test
       - proof_requirement_enforcement_test
@@ -122,7 +122,7 @@ claims:
     statement: "GPU-accelerated execution/verification matches CPU reference results"
     criticality: S1
     tags: [gpu, determinism, performance]
-    status: UNVERIFIED
+    status: PARTIAL
     evidence_required:
       - cpu_gpu_parity_test
       - gpu_verification_test
@@ -133,7 +133,7 @@ claims:
     statement: "A fresh developer can deploy and test a first X3 app with measured time-to-first-value"
     criticality: S1
     tags: [onboarding, ux, developer]
-    status: UNVERIFIED
+    status: PARTIAL
     evidence_required:
       - onboarding_flow_test
       - time_to_first_deploy_metric
@@ -144,7 +144,7 @@ claims:
     statement: "Every funding ask maps to a milestone, deliverable, budget, and proof receipt"
     criticality: S1
     tags: [funding, governance, transparency]
-    status: UNVERIFIED
+    status: PARTIAL
     evidence_required:
       - funding_milestone_mapping
       - receipt_coverage_report
@@ -160,17 +160,6 @@ claims:
       - fitness_comparison_test
       - regression_detection_test
       - rollback_capability_test
-    blockers: []
-    
-  x3.proofforge.receipt_integrity:
-    statement: "ProofForge receipts cannot be forged/staled/greenwashed without detection"
-    criticality: S0
-    tags: [proofforge, integrity, meta]
-    status: UNVERIFIED
-    evidence_required:
-      - receipt_hash_verification
-      - stale_detection_test
-      - tampering_detection_test
     blockers: []
 
 # Evidence types

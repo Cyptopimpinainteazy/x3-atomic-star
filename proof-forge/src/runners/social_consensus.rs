@@ -1,11 +1,15 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Instant;
 
-pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(
+    workspace: &PathBuf,
+    claim_id: &str,
+    verbose: bool,
+) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "Social consensus mechanisms are working".to_string(),

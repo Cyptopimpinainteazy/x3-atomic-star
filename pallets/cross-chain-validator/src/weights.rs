@@ -18,27 +18,35 @@ pub trait WeightInfo {
 
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-    /// Storage: CrossChainValidator LastEvmHeader (r:0 w:1)
-    /// Proof: CrossChainValidator LastEvmHeader (max_values: Some(1), max_size: None, mode: Measured)
+    /// Storage: CrossChainValidator LastEvmHeader (r:1 w:1)
+    /// Proof: CrossChainValidator LastEvmHeader (max_values: Some(1), max_size: Some(72), mode: Measured)
+    ///
+    /// Includes EVM header hash verification (~30M) + parent-chain root check (~10M).
     fn validate_evm_header() -> Weight {
-        Weight::from_parts(10_000_000u64, 0u64)
+        Weight::from_parts(52_000_000u64, 512u64)
+            .saturating_add(T::DbWeight::get().reads(1u64))
             .saturating_add(T::DbWeight::get().writes(1u64))
     }
 
-    /// Storage: CrossChainValidator LastSvmHeader (r:0 w:1)
-    /// Proof: CrossChainValidator LastSvmHeader (max_values: Some(1), max_size: None, mode: Measured)
+    /// Storage: CrossChainValidator LastSvmHeader (r:1 w:1)
+    /// Proof: CrossChainValidator LastSvmHeader (max_values: Some(1), max_size: Some(72), mode: Measured)
+    ///
+    /// Includes SVM slot hash verification (~30M) + PoH check (~10M).
     fn validate_svm_header() -> Weight {
-        Weight::from_parts(10_000_000u64, 0u64)
+        Weight::from_parts(52_000_000u64, 512u64)
+            .saturating_add(T::DbWeight::get().reads(1u64))
             .saturating_add(T::DbWeight::get().writes(1u64))
     }
 }
 
 impl WeightInfo for () {
     fn validate_evm_header() -> Weight {
-        Weight::from_parts(10_000_000u64, 0u64)
+        Weight::from_parts(52_000_000u64, 512u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(1, 1))
     }
 
     fn validate_svm_header() -> Weight {
-        Weight::from_parts(10_000_000u64, 0u64)
+        Weight::from_parts(52_000_000u64, 512u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(1, 1))
     }
 }

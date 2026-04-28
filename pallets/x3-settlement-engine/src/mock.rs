@@ -124,7 +124,8 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
     type ChallengePeriod = frame_support::traits::ConstU64<10>;
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
-    type CrossChainValidator = pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator; // Phase 4: Use no-op for tests
+    type CrossChainValidator =
+        pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator; // Phase 4: Use no-op for tests
 }
 
 // Test accounts

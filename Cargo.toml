@@ -112,6 +112,7 @@ members = [
         # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
         "crates/x3-asset-kernel-types",
         "pallets/x3-asset-registry",
+        "pallets/x3-account-registry",
         "pallets/x3-supply-ledger",
         "crates/x3-packet-schema",
         "pallets/x3-cross-vm-router",
@@ -121,6 +122,13 @@ members = [
         "pallets/x3-jury-anchor",
         # Phase 0: Sprint 0 Infrastructure
         "crates/x3-readiness-report",
+        # v0.4 internal-mainnet path: packet lifecycle + IXL instruction layer
+        "crates/x3-packet-standard",
+        "crates/x3-ixl",
+        "crates/x3-parallel-executor",
+        "crates/x3-appzone-factory",
+        "crates/x3-liquidity-core",
+        "crates/x3-universal-contracts",
         # ProofForge: Complete proof system for X3 blockchain (v0-v7)
         "proof-forge",
         # Note: crates/dylint-determinism is intentionally NOT listed here.

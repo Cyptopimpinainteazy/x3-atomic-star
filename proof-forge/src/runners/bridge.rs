@@ -1,9 +1,9 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Instant;
 
 pub async fn verify_claim(
     workspace: &PathBuf,
@@ -25,9 +25,7 @@ pub async fn verify_claim(
             "pallets/bridge/src/lib.rs".to_string(),
             "pallets/bridge/src/tests.rs".to_string(),
         ],
-        commands_run: vec![
-            "cargo test -p pallet-bridge".to_string(),
-        ],
+        commands_run: vec!["cargo test -p pallet-bridge".to_string()],
         passed_checks: vec![
             "Replay detection verified".to_string(),
             "Finality verification working".to_string(),

@@ -27,7 +27,7 @@
 //! ```
 
 use crate::gpu_hostcalls::GpuHostcalls;
-use crate::{ExecutionResult, VMConfig, VMError, VMErrorKind, Value, VM};
+use crate::{ExecutionResult, VMError, VMErrorKind, Value, VM};
 
 // Re-export x3-backend types for bytecode helpers (used by tests and callers)
 pub use x3_backend::bc_format_helpers;
@@ -70,6 +70,7 @@ impl Default for BridgeConfig {
     }
 }
 
+#[allow(dead_code)]
 fn bridge_disabled_error(name: &str) -> VMError {
     VMError::without_ip(VMErrorKind::HostcallError(format!(
         "bridge hostcall '{}': no executor configured (call X3VMBridge::with_executors())",

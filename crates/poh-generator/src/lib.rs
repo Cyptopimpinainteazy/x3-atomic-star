@@ -168,7 +168,7 @@ impl PoHState {
 
         // Chain: new_hash = SHA256(prev_hash || tx_mix_root)
         let mut h = Sha256::new();
-        h.update(&self.current_hash);
+        h.update(self.current_hash);
         h.update(tx_mix_root);
         let new_hash: [u8; 32] = h.finalize().into();
 

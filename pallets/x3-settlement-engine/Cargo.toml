@@ -25,6 +25,7 @@ sp-io = { git = "https://github.com/paritytech/substrate", default-features = fa
 sp-api = { git = "https://github.com/paritytech/substrate", default-features = false, rev = "948fbd2" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 ripemd = { version = "0.1", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate", default-features = false, rev = "948fbd2", optional = true }
 
 # Internal dependencies
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
@@ -56,7 +57,10 @@ std = [
 runtime-benchmarks = [
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
+    "frame-benchmarking",
+    "frame-benchmarking/runtime-benchmarks",
 ]
 try-runtime = [
     "frame-support/try-runtime",
 ]
+dev-bypass = []

@@ -1,14 +1,4 @@
-#![allow(
-    dead_code,
-    unused_imports,
-    unused_variables,
-    unused_mut,
-    non_snake_case,
-    unexpected_cfgs,
-    unused_parens,
-    non_camel_case_types,
-    clippy::all
-)]
+#![warn(unused_imports, unused_variables)]
 
 //! X3 DEX Core
 //!

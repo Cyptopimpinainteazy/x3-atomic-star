@@ -1,11 +1,62 @@
 {
-  "claim_id": "x3.asset_kernel.supply_conservation",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.asset_kernel.supply_conservation",
+  "artifact_hash": "df8f13050b29e21fc4483d4e62766c6a9a4ba2319e8db5415d0a76fc575263ee",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "pallets/x3-kernel/src/replay_tests.rs",
+    "pallets/x3-kernel/src/packet_integration_tests.rs",
+    "pallets/x3-kernel/src/tests.rs",
+    "pallets/x3-kernel/src/chaos_tests.rs"
   ],
-  "hash": "3e5f4f0bf5d880a4155ac81d0367de0662515232f3d09cee25273c1ddf0a1100"
+  "timestamp": "2026-04-27T23:19:42.054590163Z",
+  "result": {
+    "claim_id": "x3.asset_kernel.supply_conservation",
+    "claim": "Asset kernel maintains canonical supply invariant across all operations",
+    "status": "failed",
+    "proof_level": "P2",
+    "edge_case_level": "E1",
+    "hack_level": "H0",
+    "operator_level": "I1",
+    "degraded_level": "D1",
+    "files_inspected": [
+      "pallets/x3-kernel/src/replay_tests.rs",
+      "pallets/x3-kernel/src/packet_integration_tests.rs",
+      "pallets/x3-kernel/src/tests.rs",
+      "pallets/x3-kernel/src/chaos_tests.rs"
+    ],
+    "commands_run": [
+      "cargo test --package x3-kernel canonical_supply"
+    ],
+    "passed_checks": [
+      "canonical_supply test found",
+      "Found 4 test files"
+    ],
+    "failed_checks": [
+      "canonical_supply tests FAILED"
+    ],
+    "missing_proofs": [
+      "No invariant declarations found",
+      "Supply monitoring not implemented"
+    ],
+    "blockers": [
+      "canonical_supply tests failing"
+    ],
+    "score": 0.0,
+    "evidence": {
+      "canonical_supply_test": "found",
+      "test_result": "FAILED",
+      "test_files": "4",
+      "invariants_declared": "0",
+      "test_cases_run": "0"
+    },
+    "timestamp": "2026-04-27T23:19:42.047851520Z",
+    "duration_ms": 1600
+  },
+  "limitations": [
+    "No invariant declarations found",
+    "Supply monitoring not implemented",
+    "canonical_supply tests failing"
+  ],
+  "binding_hash": "7d4c8162a4fd48c7a1ab9d43a3ee6da13e5e40d77e0ea5766612d9eed9870348"
 }

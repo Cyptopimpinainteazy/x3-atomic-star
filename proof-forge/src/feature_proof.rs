@@ -6,41 +6,43 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::receipt::Receipt;
+
 /// Feature status classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FeatureStatus {
     /// Fully built: all 10 criteria met
     #[serde(rename = "BUILT")]
     Built,
-    
+
     /// Some parts exist but not all proof exists
     #[serde(rename = "PARTIAL")]
     Partial,
-    
+
     /// Registry says required but no implementation found
     #[serde(rename = "MISSING")]
     Missing,
-    
+
     /// Code exists but runtime/API/UI/deployment does not expose it
     #[serde(rename = "UNWIRED")]
     Unwired,
-    
+
     /// Code exists and wired, but tests are missing
     #[serde(rename = "UNTESTED")]
     Untested,
-    
+
     /// Only happy-path tests exist, negative tests missing
     #[serde(rename = "WEAK")]
     Weak,
-    
+
     /// Receipt exists but touched files changed after receipt
     #[serde(rename = "STALE")]
     Stale,
-    
+
     /// S0/S1 gap or T6+ TODO exists
     #[serde(rename = "BLOCKED")]
     Blocked,
-    
+
     /// Feature was previously built but proof is now stale or failing
     #[serde(rename = "REVOKED")]
     Revoked,
@@ -60,7 +62,7 @@ impl FeatureStatus {
             FeatureStatus::Revoked => "REVOKED",
         }
     }
-    
+
     pub fn emoji(&self) -> &'static str {
         match self {
             FeatureStatus::Built => "✅",
@@ -160,38 +162,38 @@ impl FeatureScanner {
     pub fn new(workspace: PathBuf) -> Self {
         Self { workspace }
     }
-    
+
     /// Load feature matrix from YAML
     pub fn load_matrix(&self) -> Result<FeatureMatrix> {
         let matrix_path = self.workspace.join("proof/features/feature_matrix.yml");
         let yaml_content = fs::read_to_string(&matrix_path)
             .context(format!("Failed to read {}", matrix_path.display()))?;
-        
-        let matrix: FeatureMatrix = serde_yaml::from_str(&yaml_content)
-            .context("Failed to parse feature_matrix.yml")?;
-        
+
+        let matrix: FeatureMatrix =
+            serde_yaml::from_str(&yaml_content).context("Failed to parse feature_matrix.yml")?;
+
         Ok(matrix)
     }
-    
+
     /// Scan all features
     pub fn scan(&self, verbose: bool) -> Result<FeatureReport> {
         let matrix = self.load_matrix()?;
-        
+
         if verbose {
             println!("Scanning {} features...", matrix.features.len());
         }
-        
+
         let mut results = Vec::new();
-        
+
         for feature in &matrix.features {
             if verbose {
                 println!("  → {}", feature.id);
             }
-            
+
             let result = self.scan_feature(feature, verbose)?;
             results.push(result);
         }
-        
+
         // Compute report statistics
         let total_features = results.len();
         let mut built_count = 0;
@@ -203,7 +205,7 @@ impl FeatureScanner {
         let mut stale_count = 0;
         let mut blocked_count = 0;
         let mut revoked_count = 0;
-        
+
         for result in &results {
             match result.status {
                 FeatureStatus::Built => built_count += 1,
@@ -217,7 +219,7 @@ impl FeatureScanner {
                 FeatureStatus::Revoked => revoked_count += 1,
             }
         }
-        
+
         // Collect top blockers
         let mut top_blockers = Vec::new();
         for result in &results {
@@ -229,7 +231,7 @@ impl FeatureScanner {
         }
         top_blockers.sort();
         top_blockers.truncate(50);
-        
+
         // Determine verdict
         let verdict = if blocked_count > 0 || missing_count > 0 {
             "BLOCKED"
@@ -240,7 +242,7 @@ impl FeatureScanner {
         } else {
             "INCOMPLETE"
         };
-        
+
         Ok(FeatureReport {
             verdict: verdict.to_string(),
             total_features,
@@ -257,7 +259,7 @@ impl FeatureScanner {
             top_blockers,
         })
     }
-    
+
     /// Scan a single feature
     fn scan_feature(&self, feature: &Feature, verbose: bool) -> Result<FeatureProofResult> {
         let mut docs_found = 0;
@@ -272,7 +274,7 @@ impl FeatureScanner {
         let mut negative_tests_missing = Vec::new();
         let mut blockers = Vec::new();
         let mut next_commands = Vec::new();
-        
+
         // Check docs
         for doc_path in &feature.docs {
             let full_path = self.workspace.join(doc_path);
@@ -282,7 +284,7 @@ impl FeatureScanner {
                 docs_missing.push(doc_path.clone());
             }
         }
-        
+
         // Check code files
         for code_path in &feature.code {
             let full_path = self.workspace.join(code_path);
@@ -292,7 +294,7 @@ impl FeatureScanner {
                 code_missing.push(code_path.clone());
             }
         }
-        
+
         // Check wiring (search for evidence in codebase)
         for wiring_desc in &feature.wiring {
             let found = self.check_wiring_evidence(wiring_desc, verbose)?;
@@ -302,7 +304,7 @@ impl FeatureScanner {
                 wiring_missing.push(wiring_desc.clone());
             }
         }
-        
+
         // Check unit tests
         for test_name in &feature.tests.unit {
             let found = self.check_test_exists(test_name, &feature.code)?;
@@ -312,7 +314,7 @@ impl FeatureScanner {
                 tests_missing.push(format!("unit: {}", test_name));
             }
         }
-        
+
         // Check integration tests
         for test_name in &feature.tests.integration {
             let found = self.check_test_exists(test_name, &feature.code)?;
@@ -322,7 +324,7 @@ impl FeatureScanner {
                 tests_missing.push(format!("integration: {}", test_name));
             }
         }
-        
+
         // Check negative tests
         for test_name in &feature.tests.negative {
             let found = self.check_test_exists(test_name, &feature.code)?;
@@ -332,20 +334,17 @@ impl FeatureScanner {
                 negative_tests_missing.push(test_name.clone());
             }
         }
-        
+
         // Check receipt
-        let receipt_path = self.workspace.join(format!("proof/receipts/claims/{}.receipt.json", feature.id));
+        let receipt_path = self
+            .workspace
+            .join(format!("proof/receipts/claims/{}.receipt.json", feature.id));
         let receipt_exists = receipt_path.exists();
-        let receipt_fresh = if receipt_exists {
-            // TODO: Check receipt freshness
-            false
-        } else {
-            false
-        };
-        
+        let receipt_fresh = self.receipt_is_fresh_and_valid(&receipt_path, receipt_exists)?;
+
         // Check for critical TODOs in code
         let critical_todos = self.count_critical_todos(&feature.code)?;
-        
+
         // Build blockers list
         if !code_missing.is_empty() {
             blockers.push(format!("{} code files missing", code_missing.len()));
@@ -357,7 +356,10 @@ impl FeatureScanner {
             blockers.push(format!("{} tests missing", tests_missing.len()));
         }
         if !negative_tests_missing.is_empty() {
-            blockers.push(format!("{} negative tests missing", negative_tests_missing.len()));
+            blockers.push(format!(
+                "{} negative tests missing",
+                negative_tests_missing.len()
+            ));
         }
         if !receipt_exists {
             blockers.push("proof receipt missing".to_string());
@@ -367,7 +369,7 @@ impl FeatureScanner {
         if critical_todos > 0 {
             blockers.push(format!("{} critical TODOs found", critical_todos));
         }
-        
+
         // Build next commands
         if !tests_missing.is_empty() {
             for cmd in &feature.proof_commands {
@@ -377,7 +379,7 @@ impl FeatureScanner {
         if !receipt_exists {
             next_commands.push(format!("x3-proof claim prove {}", feature.id));
         }
-        
+
         // Determine status
         let status = self.determine_status(
             code_found,
@@ -392,7 +394,7 @@ impl FeatureScanner {
             receipt_fresh,
             critical_todos,
         );
-        
+
         Ok(FeatureProofResult {
             feature_id: feature.id.clone(),
             name: feature.name.clone(),
@@ -414,7 +416,36 @@ impl FeatureScanner {
             next_commands,
         })
     }
-    
+
+    /// A receipt is fresh only when it loads, passes integrity, is not stale, and is <24h old.
+    fn receipt_is_fresh_and_valid(
+        &self,
+        receipt_path: &Path,
+        receipt_exists: bool,
+    ) -> Result<bool> {
+        if !receipt_exists {
+            return Ok(false);
+        }
+
+        let receipt = match Receipt::load(receipt_path) {
+            Ok(receipt) => receipt,
+            Err(_) => {
+                // Legacy or malformed receipts are treated as not fresh until migrated.
+                return Ok(false);
+            }
+        };
+
+        if !receipt.verify_integrity()? {
+            return Ok(false);
+        }
+
+        if receipt.is_stale()? {
+            return Ok(false);
+        }
+
+        Ok(receipt.is_fresh())
+    }
+
     /// Determine feature status based on checks
     fn determine_status(
         &self,
@@ -434,32 +465,32 @@ impl FeatureScanner {
         if critical_todos > 0 {
             return FeatureStatus::Blocked;
         }
-        
+
         // MISSING: no code found
         if code_found == 0 {
             return FeatureStatus::Missing;
         }
-        
+
         // UNWIRED: code exists but wiring missing
         if code_found > 0 && wiring_found == 0 {
             return FeatureStatus::Unwired;
         }
-        
+
         // UNTESTED: code and wiring exist but no tests
         if code_found > 0 && wiring_found > 0 && tests_found == 0 {
             return FeatureStatus::Untested;
         }
-        
+
         // WEAK: tests exist but negative tests missing
         if tests_found > 0 && negative_tests_found == 0 && negative_tests_missing > 0 {
             return FeatureStatus::Weak;
         }
-        
+
         // STALE: receipt exists but not fresh
         if receipt_exists && !receipt_fresh {
             return FeatureStatus::Stale;
         }
-        
+
         // BUILT: all criteria met
         if code_missing == 0
             && wiring_missing == 0
@@ -471,11 +502,11 @@ impl FeatureScanner {
         {
             return FeatureStatus::Built;
         }
-        
+
         // PARTIAL: some criteria met but not all
         FeatureStatus::Partial
     }
-    
+
     /// Check if wiring evidence exists
     fn check_wiring_evidence(&self, wiring_desc: &str, _verbose: bool) -> Result<bool> {
         // Simple heuristic: search for key phrases in relevant files
@@ -486,23 +517,23 @@ impl FeatureScanner {
         } else {
             vec![wiring_desc]
         };
-        
+
         for term in search_terms {
             let output = Command::new("grep")
                 .args(&["-r", term, "runtime/", "--include=*.rs"])
                 .current_dir(&self.workspace)
                 .output();
-            
+
             if let Ok(output) = output {
                 if !output.stdout.is_empty() {
                     return Ok(true);
                 }
             }
         }
-        
+
         Ok(false)
     }
-    
+
     /// Check if a test exists in code files
     fn check_test_exists(&self, test_name: &str, code_files: &[String]) -> Result<bool> {
         for code_file in code_files {
@@ -510,30 +541,36 @@ impl FeatureScanner {
             if !full_path.exists() {
                 continue;
             }
-            
+
             let output = Command::new("grep")
                 .args(&["-l", test_name, &full_path.to_string_lossy()])
                 .output();
-            
+
             if let Ok(output) = output {
                 if output.status.success() && !output.stdout.is_empty() {
                     return Ok(true);
                 }
             }
-            
+
             // Also check parent directory for test files
             if let Some(parent) = full_path.parent() {
                 let output = Command::new("find")
-                    .args(&[parent.to_string_lossy().as_ref(), "-name", "*.rs", "-type", "f"])
+                    .args(&[
+                        parent.to_string_lossy().as_ref(),
+                        "-name",
+                        "*.rs",
+                        "-type",
+                        "f",
+                    ])
                     .output();
-                
+
                 if let Ok(output) = output {
                     let test_files = String::from_utf8_lossy(&output.stdout);
                     for test_file in test_files.lines() {
                         let grep_output = Command::new("grep")
                             .args(&["-l", test_name, test_file])
                             .output();
-                        
+
                         if let Ok(grep_output) = grep_output {
                             if grep_output.status.success() && !grep_output.stdout.is_empty() {
                                 return Ok(true);
@@ -543,14 +580,14 @@ impl FeatureScanner {
                 }
             }
         }
-        
+
         Ok(false)
     }
-    
+
     /// Count critical TODOs in code files
     fn count_critical_todos(&self, code_files: &[String]) -> Result<usize> {
         let mut count = 0;
-        
+
         let critical_patterns = vec![
             "TODO: CRITICAL",
             "TODO: BLOCKER",
@@ -559,18 +596,18 @@ impl FeatureScanner {
             "unimplemented!()",
             "todo!()",
         ];
-        
+
         for code_file in code_files {
             let full_path = self.workspace.join(code_file);
             if !full_path.exists() {
                 continue;
             }
-            
+
             for pattern in &critical_patterns {
                 let output = Command::new("grep")
                     .args(&["-c", pattern, &full_path.to_string_lossy()])
                     .output();
-                
+
                 if let Ok(output) = output {
                     if output.status.success() {
                         let count_str = String::from_utf8_lossy(&output.stdout);
@@ -581,17 +618,17 @@ impl FeatureScanner {
                 }
             }
         }
-        
+
         Ok(count)
     }
-    
+
     /// Generate markdown report
     pub fn generate_markdown_report(&self, report: &FeatureReport) -> Result<String> {
         let mut md = String::new();
-        
+
         md.push_str("# X3 FeatureBuiltProof Report\n\n");
         md.push_str(&format!("## Verdict\n**{}**\n\n", report.verdict));
-        
+
         md.push_str("## Summary\n");
         md.push_str("| Status | Count |\n");
         md.push_str("|---|---:|\n");
@@ -605,35 +642,47 @@ impl FeatureScanner {
         md.push_str(&format!("| BLOCKED | {} |\n", report.blocked_count));
         md.push_str(&format!("| REVOKED | {} |\n", report.revoked_count));
         md.push_str("\n");
-        
+
         md.push_str("## Top Blockers\n");
         for (i, blocker) in report.top_blockers.iter().enumerate().take(10) {
             md.push_str(&format!("{}. {}\n", i + 1, blocker));
         }
         md.push_str("\n");
-        
+
         md.push_str("## Built Features\n");
         md.push_str("| Feature | Status |\n");
         md.push_str("|---|---|\n");
         for result in &report.results {
             if result.status == FeatureStatus::Built {
-                md.push_str(&format!("| {} | {} {} |\n", result.feature_id, result.status.emoji(), result.status.as_str()));
+                md.push_str(&format!(
+                    "| {} | {} {} |\n",
+                    result.feature_id,
+                    result.status.emoji(),
+                    result.status.as_str()
+                ));
             }
         }
         md.push_str("\n");
-        
+
         md.push_str("## Partial Features\n");
         md.push_str("| Feature | Blockers | Next Command |\n");
         md.push_str("|---|---|---|\n");
         for result in &report.results {
             if result.status == FeatureStatus::Partial {
                 let blockers = result.blockers.join(", ");
-                let next_cmd = result.next_commands.first().map(|s| s.as_str()).unwrap_or("N/A");
-                md.push_str(&format!("| {} | {} | {} |\n", result.feature_id, blockers, next_cmd));
+                let next_cmd = result
+                    .next_commands
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("N/A");
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    result.feature_id, blockers, next_cmd
+                ));
             }
         }
         md.push_str("\n");
-        
+
         md.push_str("## Missing Features\n");
         md.push_str("| Feature | Missing Code |\n");
         md.push_str("|---|---|\n");
@@ -644,22 +693,22 @@ impl FeatureScanner {
             }
         }
         md.push_str("\n");
-        
+
         Ok(md)
     }
-    
+
     /// Save report to files
     pub fn save_report(&self, report: &FeatureReport) -> Result<()> {
         // Save JSON
         let json_path = self.workspace.join("proof/reports/feature_status.json");
         let json = serde_json::to_string_pretty(report)?;
         fs::write(&json_path, json)?;
-        
+
         // Save Markdown
         let md_path = self.workspace.join("proof/reports/features_report.md");
         let md = self.generate_markdown_report(report)?;
         fs::write(&md_path, md)?;
-        
+
         Ok(())
     }
 }
@@ -668,13 +717,13 @@ impl FeatureScanner {
 pub fn run_feature_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Result<()> {
     println!("{}", "🔥 X3 FEATUREBUILTPROOF GATE".bold().red());
     println!();
-    
+
     let scanner = FeatureScanner::new(workspace.to_path_buf());
     let report = scanner.scan(verbose)?;
-    
+
     // Save reports
     scanner.save_report(&report)?;
-    
+
     // Print summary
     println!("{}", format!("Verdict: {}", report.verdict).bold());
     println!();
@@ -688,7 +737,7 @@ pub fn run_feature_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Res
     println!("Blocked:   {}", report.blocked_count.to_string().red());
     println!("Revoked:   {}", report.revoked_count.to_string().red());
     println!();
-    
+
     if !report.top_blockers.is_empty() {
         println!("{}", "Top blockers:".bold());
         for (i, blocker) in report.top_blockers.iter().enumerate().take(5) {
@@ -696,15 +745,19 @@ pub fn run_feature_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Res
         }
         println!();
     }
-    
+
     println!("Reports saved:");
     println!("  - proof/reports/feature_status.json");
     println!("  - proof/reports/features_report.md");
     println!();
-    
+
     if fail_hard && (report.blocked_count > 0 || report.missing_count > 0) {
-        anyhow::bail!("Feature gate FAILED: {} blocked, {} missing", report.blocked_count, report.missing_count);
+        anyhow::bail!(
+            "Feature gate FAILED: {} blocked, {} missing",
+            report.blocked_count,
+            report.missing_count
+        );
     }
-    
+
     Ok(())
 }

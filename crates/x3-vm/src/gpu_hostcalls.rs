@@ -31,7 +31,7 @@
 //! | 0xD4 | gpu_device_count     | ()                          | I64            |
 //! | 0xD5 | gpu_benchmark        | (count: I64, streams: I64)  | Bytes (JSON)   |
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::error::{VMError, VMErrorKind, VMResult};
@@ -79,6 +79,7 @@ struct CudaLib {
 }
 
 /// Loaded SHA-256 library functions
+#[allow(dead_code)]
 struct Sha256Lib {
     batch: Sha256BatchFn,
     poh_chain: Sha256PohChainFn,
@@ -87,6 +88,7 @@ struct Sha256Lib {
 }
 
 /// Loaded Ed25519 library functions
+#[allow(dead_code)]
 struct Ed25519Lib {
     verify_batch: Ed25519VerifyBatchFn,
     verify_multi_gpu: Ed25519VerifyMultiGpuFn,
@@ -94,6 +96,7 @@ struct Ed25519Lib {
 }
 
 /// Loaded stream pipeline library functions
+#[allow(dead_code)]
 struct StreamPipelineLib {
     batch_streamed: Sha256BatchStreamedFn,
     benchmark: PipelineBenchmarkFn,
@@ -109,6 +112,7 @@ struct Keccak256Lib {
 }
 
 /// Loaded secp256k1 library functions
+#[allow(dead_code)]
 struct Secp256k1Lib {
     verify: Secp256k1VerifyFn,
     verify_multi_gpu: Secp256k1VerifyMultiGpuFn,

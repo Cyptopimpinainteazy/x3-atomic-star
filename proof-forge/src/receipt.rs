@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
@@ -90,7 +91,9 @@ impl Receipt {
         hasher.update(self.timestamp.to_rfc3339().as_bytes());
 
         // Hash result (serialize to JSON for deterministic representation)
-        let result_json = serde_json::to_string(&self.result)?;
+        let result_value = serde_json::to_value(&self.result)?;
+        let canonical_result = canonicalize_json_value(result_value);
+        let result_json = serde_json::to_string(&canonical_result)?;
         hasher.update(result_json.as_bytes());
 
         // Hash limitations
@@ -129,8 +132,10 @@ impl Receipt {
             let metadata = fs::metadata(file)
                 .context(format!("Failed to get metadata for {}", file.display()))?;
 
-            let modified = metadata.modified()
-                .context(format!("Failed to get modified time for {}", file.display()))?;
+            let modified = metadata.modified().context(format!(
+                "Failed to get modified time for {}",
+                file.display()
+            ))?;
 
             let modified_dt: DateTime<Utc> = modified.into();
 
@@ -170,9 +175,32 @@ impl Receipt {
     pub fn load(path: &Path) -> Result<Self> {
         let json = fs::read_to_string(path)
             .context(format!("Failed to read receipt from {}", path.display()))?;
-        let receipt: Receipt = serde_json::from_str(&json)
-            .context("Failed to parse receipt JSON")?;
+        let receipt: Receipt =
+            serde_json::from_str(&json).context("Failed to parse receipt JSON")?;
         Ok(receipt)
+    }
+}
+
+fn canonicalize_json_value(value: Value) -> Value {
+    match value {
+        Value::Object(obj) => {
+            let mut keys: Vec<String> = obj.keys().cloned().collect();
+            keys.sort();
+
+            let mut canonical = Map::new();
+            for key in keys {
+                if let Some(v) = obj.get(&key) {
+                    canonical.insert(key, canonicalize_json_value(v.clone()));
+                }
+            }
+
+            Value::Object(canonical)
+        }
+        Value::Array(arr) => {
+            let canonicalized: Vec<Value> = arr.into_iter().map(canonicalize_json_value).collect();
+            Value::Array(canonicalized)
+        }
+        other => other,
     }
 }
 
@@ -184,12 +212,13 @@ fn get_git_commit_hash() -> Result<String> {
         .context("Failed to run git rev-parse HEAD")?;
 
     if !output.status.success() {
-        anyhow::bail!("git rev-parse failed: {}", String::from_utf8_lossy(&output.stderr));
+        anyhow::bail!(
+            "git rev-parse failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
-    let hash = String::from_utf8(output.stdout)?
-        .trim()
-        .to_string();
+    let hash = String::from_utf8(output.stdout)?.trim().to_string();
 
     Ok(hash)
 }
@@ -200,8 +229,8 @@ fn compute_artifact_hash(files: &[PathBuf]) -> Result<String> {
 
     for file in files {
         if file.exists() && file.is_file() {
-            let contents = fs::read(file)
-                .context(format!("Failed to read file {}", file.display()))?;
+            let contents =
+                fs::read(file).context(format!("Failed to read file {}", file.display()))?;
             hasher.update(&contents);
         }
     }
@@ -237,7 +266,14 @@ fn compute_policy_hash() -> Result<String> {
 fn check_git_files_changed(old_commit: &str, files: &[PathBuf]) -> Result<bool> {
     for file in files {
         let output = Command::new("git")
-            .args(&["diff", "--name-only", old_commit, "HEAD", "--", &file.to_string_lossy()])
+            .args(&[
+                "diff",
+                "--name-only",
+                old_commit,
+                "HEAD",
+                "--",
+                &file.to_string_lossy(),
+            ])
             .output()
             .context("Failed to run git diff")?;
 
@@ -292,7 +328,8 @@ pub fn check_all_receipts() -> Result<HashMap<String, ReceiptStatus>> {
         let path = entry.path();
 
         if path.extension().map(|e| e == "json").unwrap_or(false) {
-            let file_stem = path.file_stem()
+            let file_stem = path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
 
@@ -388,7 +425,8 @@ mod tests {
             result,
             vec![PathBuf::from("test.rs")],
             vec!["Test limitation".to_string()],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Verify integrity
         assert!(receipt.verify_integrity().unwrap());
@@ -399,5 +437,51 @@ mod tests {
 
         // Integrity should fail
         assert!(!tampered.verify_integrity().unwrap());
+    }
+
+    #[test]
+    fn test_receipt_integrity_stable_with_evidence_map_order() {
+        let mut evidence = HashMap::new();
+        evidence.insert("zeta".to_string(), "1".to_string());
+        evidence.insert("alpha".to_string(), "2".to_string());
+        evidence.insert("mid".to_string(), "3".to_string());
+
+        let result = ProofResult {
+            claim_id: "test.claim.map".to_string(),
+            claim: "Map determinism claim".to_string(),
+            status: ProofStatus::Verified,
+            proof_level: Some(ProofLevel::P3),
+            edge_case_level: None,
+            hack_level: None,
+            operator_level: None,
+            degraded_level: None,
+            files_inspected: vec![],
+            commands_run: vec![],
+            passed_checks: vec![],
+            failed_checks: vec![],
+            missing_proofs: vec![],
+            blockers: vec![],
+            score: 1.0,
+            evidence,
+            timestamp: Utc::now(),
+            duration_ms: 1,
+        };
+
+        let receipt = Receipt::new(
+            "x3-proof verify test.claim.map".to_string(),
+            result,
+            vec![PathBuf::from("proof/claims/registry.yml")],
+            vec![],
+        )
+        .unwrap();
+
+        // Re-load and verify to ensure map deserialization order does not break binding.
+        let temp_path = PathBuf::from("/tmp/proofforge-map-order-receipt.json");
+        receipt.save(&temp_path).unwrap();
+        let loaded = Receipt::load(&temp_path).unwrap();
+
+        assert!(loaded.verify_integrity().unwrap());
+
+        let _ = std::fs::remove_file(temp_path);
     }
 }

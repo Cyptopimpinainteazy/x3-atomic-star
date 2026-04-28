@@ -69,7 +69,7 @@ impl Default for VMConfig {
 }
 
 /// Runtime value in the VM.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum Value {
     /// 64-bit signed integer.
     I64(i64),
@@ -84,6 +84,7 @@ pub enum Value {
     /// Address/pointer.
     Addr(u64),
     /// Unit (void/null).
+    #[default]
     Unit,
 }
 
@@ -135,11 +136,7 @@ impl Value {
     }
 }
 
-impl Default for Value {
-    fn default() -> Self {
-        Value::Unit
-    }
-}
+
 
 /// Call frame on the call stack.
 #[derive(Clone, Debug)]
@@ -172,6 +169,7 @@ pub struct VM {
     /// Register file.
     regs: Vec<Value>,
     /// Operand stack.
+    #[allow(dead_code)]
     stack: Vec<Value>,
     /// Call stack.
     call_stack: Vec<Frame>,
@@ -207,7 +205,7 @@ impl VM {
                 .const_pool
                 .entries
                 .get(idx)
-                .map(|c| Value::from_const(c))
+                .map(Value::from_const)
                 .unwrap_or(Value::Unit);
             globals.push(val);
         }
@@ -403,7 +401,7 @@ impl VM {
                     // Set return value in caller's r0 (respect caller base)
                     if let Some(v) = value {
                         if let Some(caller) = self.call_stack.last() {
-                            let idx = caller.base + 0;
+                            let idx = caller.base;
                             self.regs[idx] = v;
                         } else {
                             self.regs[0] = v;
@@ -423,7 +421,7 @@ impl VM {
 
     /// Execute a single instruction.
     fn execute_instruction(&mut self, opcode: Opcode, ip: usize) -> VMResult<StepResult> {
-        let code = &self.module.code;
+        let _code = &self.module.code;
 
         match opcode {
             // ================================================================
@@ -998,7 +996,7 @@ impl VM {
                     self.globals = globals_snap;
                 }
                 self.atomic_depth -= 1;
-                return Err(self.error_at(ip, VMErrorKind::AtomicAborted));
+                Err(self.error_at(ip, VMErrorKind::AtomicAborted))
             }
 
             // ================================================================
@@ -1035,7 +1033,7 @@ impl VM {
                 } else {
                     "panic".to_string()
                 };
-                return Err(self.error_at(ip, VMErrorKind::UserPanic(msg)));
+                Err(self.error_at(ip, VMErrorKind::UserPanic(msg)))
             }
 
             // ================================================================

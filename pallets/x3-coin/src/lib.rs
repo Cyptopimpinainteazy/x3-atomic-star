@@ -283,8 +283,7 @@ pub mod pallet {
     /// `RuntimeUpgradeOrigin` (or equivalent) -> root scheduler path.
     #[pallet::storage]
     #[pallet::getter(fn is_minter)]
-    pub type Minters<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
+    pub type Minters<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
 
     /// Relayer configuration registry
     /// Value tuple: (enabled_chains, min_confirmations, max_gas_price)
@@ -314,6 +313,11 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
+            // The configured treasury account is the default privileged bridge
+            // executor for genesis and testnet bring-up, so it must start on
+            // the minter allow-list.
+            Minters::<T>::insert(T::TreasuryAccount::get(), ());
+
             // Set total supply
             let total_supply: T::Balance = X3_TOTAL_SUPPLY.saturated_into();
             TotalSupply::<T>::put(total_supply);
@@ -1069,22 +1073,23 @@ pub mod pallet {
             let total_supply = TotalSupply::<T>::get();
             let treasury = TreasuryBalance::<T>::get();
             let bonus = BonusPoolBalance::<T>::get();
-            
+
             // TODO: In production, we need to track distributed_sum incrementally
             // rather than iterating all accounts. For now, this is test-only.
             let mut distributed_sum = T::Balance::zero();
-            
+
             // Sum all vesting schedules
             for (_account, schedule) in TeamVesting::<T>::iter() {
-                distributed_sum = distributed_sum.saturating_add(
-                    schedule.total_amount.saturated_into::<T::Balance>()
-                );
+                distributed_sum = distributed_sum
+                    .saturating_add(schedule.total_amount.saturated_into::<T::Balance>());
             }
-            
+
             // In production, we would track canonical balance sum incrementally
             // For tests, we verify: treasury + bonus + vesting ≤ total_supply
-            let accounted = treasury.saturating_add(bonus).saturating_add(distributed_sum);
-            
+            let accounted = treasury
+                .saturating_add(bonus)
+                .saturating_add(distributed_sum);
+
             accounted <= total_supply
         }
 
@@ -1095,24 +1100,24 @@ pub mod pallet {
             let total_supply = TotalSupply::<T>::get();
             let treasury = TreasuryBalance::<T>::get();
             let bonus = BonusPoolBalance::<T>::get();
-            
+
             // Basic sanity check: treasury + bonus must not exceed total supply
             let treasury_plus_bonus = treasury
                 .checked_add(&bonus)
                 .ok_or(Error::<T>::SupplyInvariantViolation)?;
-            
+
             ensure!(
                 treasury_plus_bonus <= total_supply,
                 Error::<T>::SupplyInvariantViolation
             );
-            
+
             // Additional check: total supply should be constant (never changes after genesis)
             let expected_total: T::Balance = X3_TOTAL_SUPPLY.saturated_into();
             ensure!(
                 total_supply == expected_total,
                 Error::<T>::SupplyInvariantViolation
             );
-            
+
             Ok(())
         }
 

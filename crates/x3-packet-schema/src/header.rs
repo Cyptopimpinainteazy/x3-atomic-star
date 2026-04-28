@@ -93,9 +93,6 @@ impl PacketHeader {
         if self.version != 1 {
             return Err("Invalid packet version");
         }
-        if self.payload_size > 65535 {
-            return Err("Payload size exceeds kernel limit");
-        }
         if self.domain_mask == 0 {
             return Err("Must target at least one domain");
         }
@@ -112,7 +109,7 @@ impl Default for PacketHeader {
     fn default() -> Self {
         Self {
             version: 1,
-            domain_mask: 0b0111,  // All domains by default
+            domain_mask: 0b0111, // All domains by default
             packet_type: 0,
             reserved: 0,
             payload_size: 0,
@@ -208,7 +205,7 @@ mod tests {
         // Instead test the validation logic by checking that u16::MAX is accepted
         header.payload_size = 65535;
         assert!(header.validate().is_ok());
-        
+
         // To test "exceeds", we'd need a payload_size > 65535 which can't be stored
         // So we test the boundary condition
         header.payload_size = 65000;

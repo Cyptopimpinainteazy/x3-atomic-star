@@ -57,18 +57,25 @@ const GRANDPA: KeyTypeId = KeyTypeId(*b"gran");
 /// Tuned per audit recommendation: 100k ready / 50k future, 256 MiB / 64 MiB.
 /// NOTE: Default sizing (100k ready / 50k future) scales dynamically based on network speed.
 /// See NetworkSpeed enum for speed-specific pool configurations.
+#[allow(dead_code)]
 const TX_POOL_READY_COUNT: usize = 100_000;
+#[allow(dead_code)]
 const TX_POOL_FUTURE_COUNT: usize = 50_000;
+#[allow(dead_code)]
 const TX_POOL_READY_BYTES: usize = 256 * 1024 * 1024; // 256 MiB
+#[allow(dead_code)]
 const TX_POOL_FUTURE_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
+#[allow(dead_code)]
 const TX_POOL_BAN_TIME_SECS: u64 = 60; // 60s ban (vs default 1800s) — faster retry under burst
 
 /// GPU Validator Sidecar health check interval (blocks).
 /// Health check runs every N blocks to detect sidecar crashes.
+#[allow(dead_code)]
 const GPU_SIDECAR_HEALTH_CHECK_INTERVAL: u32 = 5;
 
 /// GPU Validator Sidecar restart threshold (consecutive failures).
 /// If sidecar health check fails N times consecutively, trigger restart.
+#[allow(dead_code)]
 const GPU_SIDECAR_RESTART_THRESHOLD: u32 = 3;
 
 /// Network speed detection for dynamic TX pool sizing.
@@ -183,7 +190,9 @@ impl GpuSidecarHealthMonitor {
                     "🚨 GPU sidecar health check failed {} times. \
                     Triggering restart at block {}. \
                     Last healthy block: {}.",
-                    self.consecutive_failures, current_block, self.last_healthy_block
+                    self.consecutive_failures,
+                    current_block,
+                    self.last_healthy_block
                 );
                 self.is_healthy = false;
             }
@@ -297,11 +306,11 @@ fn tuned_transaction_pool_options(
     options.future.count = options.future.count.max(future_count);
     options.ready.total_bytes = options.ready.total_bytes.max(ready_bytes);
     options.future.total_bytes = options.future.total_bytes.max(future_bytes);
-    
+
     // Ban time: 60s instead of default 1800s — faster retry for legitimate bursts
     const TX_POOL_BAN_TIME_SECS: u64 = 60;
     options.ban_time = Duration::from_secs(TX_POOL_BAN_TIME_SECS);
-    
+
     log::info!(
         "🔗 TX Pool configured for {:?} network: {} ready / {} future, {} MiB / {} MiB",
         network_speed,
@@ -1343,7 +1352,8 @@ pub fn new_full(
                                 );
 
                                 // Exponential backoff: 5s base, max 60s
-                                let backoff_secs = std::cmp::min(5 * 2_u64.pow(restart_count - 1), 60);
+                                let backoff_secs =
+                                    std::cmp::min(5 * 2_u64.pow(restart_count - 1), 60);
                                 tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
 
                                 // Safety: prevent infinite restart loops beyond threshold
@@ -1362,13 +1372,9 @@ pub fn new_full(
                 },
             );
 
-            log::info!(
-                "✅ Sidecar service lifecycle manager spawned; monitoring enabled"
-            );
+            log::info!("✅ Sidecar service lifecycle manager spawned; monitoring enabled");
         } else {
-            log::warn!(
-                "⚠️ Cross-VM Sidecar Service disabled via X3_ENABLE_SIDECAR=false"
-            );
+            log::warn!("⚠️ Cross-VM Sidecar Service disabled via X3_ENABLE_SIDECAR=false");
         }
     }
 
@@ -1423,7 +1429,10 @@ pub fn new_full(
 /// x3_sidecar::start_sidecar(config).await
 /// ```
 async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
-    log::debug!("🔌 Sidecar service '{}': placeholder implementation", service_id);
+    log::debug!(
+        "🔌 Sidecar service '{}': placeholder implementation",
+        service_id
+    );
 
     // TODO: Implement actual sidecar service spawning here
     // The sidecar should:

@@ -72,6 +72,11 @@ pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-featur
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
 x3-svm-integration = { path = "../crates/svm-integration", default-features = false }
 pallet-meme-overlord = { path = "../pallets/meme-overlord", default-features = false }
+# IXL instruction-set and IBC-style packet standard (no_std, safe in WASM).
+x3-ixl = { path = "../crates/x3-ixl", default-features = false }
+x3-packet-standard = { path = "../crates/x3-packet-standard", default-features = false }
+# Post-quantum crypto (std-only; thiserror/anyhow are not no_std — gated via "pq" feature).
+quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 # staged-pallets (wiring in progress): svm-runtime x3-invariants x3-inventory x3-reservation x3-slash x3-solvency x3-wallet-pallet
 
 sp-api = { workspace = true, default-features = false }
@@ -103,6 +108,9 @@ substrate-wasm-builder = { workspace = true }
 [features]
 default = ["std"]
 dev = ["pallet-sudo"]
+# Enable post-quantum crypto primitives on native (non-WASM) builds.
+# quantum-crypto depends on thiserror/anyhow/rand which require std; never enable in WASM.
+pq = ["quantum-crypto"]
 std = [
 	"codec/std",
 	"scale-info/std",
@@ -151,6 +159,8 @@ std = [
 	"pallet-x3-cross-vm-router/std",
 	"pallet-x3-token-factory/std",
 	"x3-svm-integration/std",
+	"x3-ixl/std",
+	"x3-packet-standard/std",
 	"sp-api/std",
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",

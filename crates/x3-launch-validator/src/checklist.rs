@@ -232,6 +232,25 @@ impl LaunchChecklist {
         self.items.iter().filter(|i| i.blocking).any(|i| i.failed())
     }
 
+    /// Returns `true` if any blocking item is not explicitly passed.
+    ///
+    /// This treats `Fail`, `Skipped`, and `None` (not executed) as unmet.
+    pub fn any_blocking_unmet(&self) -> bool {
+        self.items
+            .iter()
+            .filter(|i| i.blocking)
+            .any(|i| !i.passed())
+    }
+
+    /// Count of blocking checks that are not explicitly passed.
+    pub fn blocking_unmet_count(&self) -> usize {
+        self.items
+            .iter()
+            .filter(|i| i.blocking)
+            .filter(|i| !i.passed())
+            .count()
+    }
+
     /// Count of (pass, fail, skip) across all items.
     pub fn summary(&self) -> (usize, usize, usize) {
         let pass = self.items.iter().filter(|i| i.passed()).count();
@@ -271,5 +290,17 @@ mod tests {
             "expected ≥12 blocking checks, got {}",
             blocking_count
         );
+    }
+
+    #[test]
+    fn blocking_unmet_includes_skipped_and_pending() {
+        let mut cl = LaunchChecklist::canonical();
+        // Mark one blocking item pass and leave the rest pending.
+        if let Some(item) = cl.items.iter_mut().find(|i| i.blocking) {
+            item.result = Some(CheckResult::Pass);
+        }
+
+        assert!(cl.any_blocking_unmet());
+        assert!(cl.blocking_unmet_count() > 0);
     }
 }

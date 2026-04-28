@@ -1,11 +1,49 @@
 {
-  "claim_id": "x3.evolution.no_regression",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.evolution.no_regression",
+  "artifact_hash": "c6b3ba8de41c60f8d4505cc8407e79cace31f7690d34ef259658d8c042659761",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "proof/claims/registry.yml",
+    "pallets/evolution-core/src/lib.rs"
   ],
-  "hash": "42268c6aee3e3ae0645957cb6adfa8e8c2dc3c991c06f0be718bd33b3af41f97"
+  "timestamp": "2026-04-27T23:22:08.392491174Z",
+  "result": {
+    "claim_id": "x3.evolution.no_regression",
+    "claim": "New generations must beat prior generations without S0/S1 regressions",
+    "status": "unverified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "proof/claims/registry.yml",
+      "pallets/evolution-core/src/lib.rs"
+    ],
+    "commands_run": [],
+    "passed_checks": [
+      "evolution-core pallet exists"
+    ],
+    "failed_checks": [
+      "1/10 S0 claims are unverified — S0 regressions present"
+    ],
+    "missing_proofs": [
+      "4/4 S1 claims are unverified"
+    ],
+    "blockers": [],
+    "score": 0.5,
+    "evidence": {
+      "s1_total": "4",
+      "s0_total": "10",
+      "s1_verified": "0",
+      "s0_verified": "9"
+    },
+    "timestamp": "2026-04-27T23:22:08.387339745Z",
+    "duration_ms": 0
+  },
+  "limitations": [
+    "4/4 S1 claims are unverified"
+  ],
+  "binding_hash": "46e86d6297935bee0be8ce54aa8025e7ffc718aa99138f90c847d5494d6e0bfb"
 }

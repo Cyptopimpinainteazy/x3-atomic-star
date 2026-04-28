@@ -301,12 +301,12 @@ impl TrendStrategy {
                 }
                 "RSI" => {
                     let rsi = history.rsi(14)?;
-                    if rsi > 70.0 {
-                        bearish_signals += 1;
-                        triggered.push("RSI overbought".to_string());
-                    } else if rsi < 30.0 {
+                    if rsi > 50.0 {
                         bullish_signals += 1;
-                        triggered.push("RSI oversold".to_string());
+                        triggered.push("RSI bullish momentum".to_string());
+                    } else if rsi < 50.0 {
+                        bearish_signals += 1;
+                        triggered.push("RSI bearish momentum".to_string());
                     }
                 }
                 "MACD" => {

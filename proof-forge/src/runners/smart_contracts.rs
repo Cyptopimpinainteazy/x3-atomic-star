@@ -1,11 +1,15 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Instant;
 
-pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(
+    workspace: &PathBuf,
+    claim_id: &str,
+    verbose: bool,
+) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "Smart contracts are safe".to_string(),
@@ -17,7 +21,10 @@ pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) ->
         degraded_level: Some(DegradedLevel::D4),
         files_inspected: vec!["x3-contracts/src/lib.rs".to_string()],
         commands_run: vec!["cargo test -p x3-contracts".to_string()],
-        passed_checks: vec!["Bytecode verified".to_string(), "State transitions safe".to_string()],
+        passed_checks: vec![
+            "Bytecode verified".to_string(),
+            "State transitions safe".to_string(),
+        ],
         failed_checks: vec![],
         missing_proofs: vec![],
         blockers: vec![],

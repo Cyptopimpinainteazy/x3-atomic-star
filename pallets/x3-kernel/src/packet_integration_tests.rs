@@ -6,13 +6,13 @@
 #[cfg(test)]
 mod integration_tests {
     use frame_support::assert_ok;
-    use x3_packet_schema::{
-        Packet, EvmPacket, SvmPacket, X3VmPacket, U256, SvmAccount, SvmDeployMetadata, EvmCall,
-    };
     use parity_scale_codec::Encode;
+    use x3_packet_schema::{
+        EvmCall, EvmPacket, Packet, SvmAccount, SvmDeployMetadata, SvmPacket, X3VmPacket, U256,
+    };
 
     use crate::{
-        mock::{new_test_ext},
+        mock::new_test_ext,
         packet_adapters::{deserialize_packet, route_packet, validate_packet, DomainRoute},
     };
 
@@ -39,7 +39,11 @@ mod integration_tests {
             assert!(deserialized.is_ok(), "Deserialization should succeed");
 
             let deserialized_packet = deserialized.unwrap();
-            assert_eq!(deserialized_packet.domain_mask(), 0b0001, "Should be EVM domain");
+            assert_eq!(
+                deserialized_packet.domain_mask(),
+                0b0001,
+                "Should be EVM domain"
+            );
 
             // Validate packet
             let validation = validate_packet(&deserialized_packet);
@@ -50,9 +54,7 @@ mod integration_tests {
             assert!(route.is_ok(), "Routing should succeed");
             assert_eq!(route.unwrap(), DomainRoute::EvmOnly, "Should route to EVM");
 
-            println!(
-                "✅ Phase 1.3: EVM Call packet deserialized and routed correctly"
-            );
+            println!("✅ Phase 1.3: EVM Call packet deserialized and routed correctly");
         });
     }
 
@@ -80,9 +82,7 @@ mod integration_tests {
             let route = route_packet(&deserialized_packet);
             assert_eq!(route.unwrap(), DomainRoute::EvmOnly, "Should route to EVM");
 
-            println!(
-                "✅ Phase 1.3: EVM Deploy packet deserialized and routed correctly"
-            );
+            println!("✅ Phase 1.3: EVM Deploy packet deserialized and routed correctly");
         });
     }
 
@@ -122,16 +122,18 @@ mod integration_tests {
             assert!(deserialized.is_ok(), "Deserialization should succeed");
 
             let deserialized_packet = deserialized.unwrap();
-            assert_eq!(deserialized_packet.domain_mask(), 0b0010, "Should be SVM domain");
+            assert_eq!(
+                deserialized_packet.domain_mask(),
+                0b0010,
+                "Should be SVM domain"
+            );
 
             // Validate and route
             assert_ok!(validate_packet(&deserialized_packet));
             let route = route_packet(&deserialized_packet);
             assert_eq!(route.unwrap(), DomainRoute::SvmOnly, "Should route to SVM");
 
-            println!(
-                "✅ Phase 1.3: SVM Invoke packet deserialized and routed correctly"
-            );
+            println!("✅ Phase 1.3: SVM Invoke packet deserialized and routed correctly");
         });
     }
 
@@ -169,16 +171,22 @@ mod integration_tests {
             assert!(deserialized.is_ok(), "Deserialization should succeed");
 
             let deserialized_packet = deserialized.unwrap();
-            assert_eq!(deserialized_packet.domain_mask(), 0b0100, "Should be X3VM domain");
+            assert_eq!(
+                deserialized_packet.domain_mask(),
+                0b0100,
+                "Should be X3VM domain"
+            );
 
             // Validate and route
             assert_ok!(validate_packet(&deserialized_packet));
             let route = route_packet(&deserialized_packet);
-            assert_eq!(route.unwrap(), DomainRoute::EvmAndSvm, "Should route to both EVM and SVM");
-
-            println!(
-                "✅ Phase 1.3: X3VM AtomicCross packet deserialized and routed correctly"
+            assert_eq!(
+                route.unwrap(),
+                DomainRoute::EvmAndSvm,
+                "Should route to both EVM and SVM"
             );
+
+            println!("✅ Phase 1.3: X3VM AtomicCross packet deserialized and routed correctly");
         });
     }
 
@@ -190,9 +198,7 @@ mod integration_tests {
             let result = deserialize_packet(&empty_payload);
             assert!(result.is_err(), "Empty payload should fail deserialization");
 
-            println!(
-                "✅ Phase 1.3: Empty payload correctly rejected"
-            );
+            println!("✅ Phase 1.3: Empty payload correctly rejected");
         });
     }
 
@@ -203,11 +209,12 @@ mod integration_tests {
             // Create a payload that exceeds 65535 bytes
             let oversized_payload = vec![0u8; 65536];
             let result = deserialize_packet(&oversized_payload);
-            assert!(result.is_err(), "Oversized payload should fail deserialization");
-
-            println!(
-                "✅ Phase 1.3: Oversized payload correctly rejected"
+            assert!(
+                result.is_err(),
+                "Oversized payload should fail deserialization"
             );
+
+            println!("✅ Phase 1.3: Oversized payload correctly rejected");
         });
     }
 
@@ -218,11 +225,12 @@ mod integration_tests {
             // Create a payload that's just too short (less than minimum packet size)
             let corrupted_payload = vec![0u8; 10]; // Too short to be valid
             let result = deserialize_packet(&corrupted_payload);
-            assert!(result.is_err(), "Corrupted payload should fail deserialization");
-
-            println!(
-                "✅ Phase 1.3: Corrupted payload correctly rejected"
+            assert!(
+                result.is_err(),
+                "Corrupted payload should fail deserialization"
             );
+
+            println!("✅ Phase 1.3: Corrupted payload correctly rejected");
         });
     }
 
@@ -248,11 +256,12 @@ mod integration_tests {
             let bytes2 = deserialized.encode();
 
             // Both serializations should be identical
-            assert_eq!(bytes1, bytes2, "Round-trip serialization should be idempotent");
-
-            println!(
-                "✅ Phase 1.3: Packet round-trip serialization is idempotent"
+            assert_eq!(
+                bytes1, bytes2,
+                "Round-trip serialization should be idempotent"
             );
+
+            println!("✅ Phase 1.3: Packet round-trip serialization is idempotent");
         });
     }
 
@@ -287,9 +296,7 @@ mod integration_tests {
             });
             assert_eq!(x3vm_packet.domain_mask(), 0b0100);
 
-            println!(
-                "✅ Phase 1.3: Domain mask routing is consistent across all packet types"
-            );
+            println!("✅ Phase 1.3: Domain mask routing is consistent across all packet types");
         });
     }
 
@@ -319,7 +326,10 @@ mod integration_tests {
             assert!(payload.len() <= 65535, "Payload should be within limits");
 
             let deserialized = deserialize_packet(&payload);
-            assert!(deserialized.is_ok(), "Large valid payload should deserialize");
+            assert!(
+                deserialized.is_ok(),
+                "Large valid payload should deserialize"
+            );
 
             println!(
                 "✅ Phase 1.3: Large valid payload ({} bytes) deserialized successfully",

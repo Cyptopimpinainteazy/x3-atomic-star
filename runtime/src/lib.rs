@@ -29,6 +29,7 @@ use pallet_atomic_trade_engine;
 use pallet_aura;
 use pallet_balances;
 use pallet_collective;
+use pallet_cross_chain_validator;
 use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
@@ -40,11 +41,15 @@ use pallet_swarm;
 use pallet_timestamp;
 use pallet_transaction_payment::CurrencyAdapter;
 use pallet_treasury;
+use pallet_x3_asset_registry;
+use pallet_x3_cross_vm_router;
 use pallet_x3_kernel;
 use pallet_x3_settlement_engine;
+use pallet_x3_supply_ledger;
+use pallet_x3_token_factory;
 use pallet_x3_verifier;
-use pallet_cross_chain_validator;
 use scale_info::TypeInfo;
+// IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
 use sp_api::impl_runtime_apis;
 use sp_core::{OpaqueMetadata, H256, U256};
 use sp_runtime::{
@@ -263,6 +268,11 @@ construct_runtime!(
         EvolutionCore: pallet_evolution_core,
         X3Verifier: pallet_x3_verifier,
         X3DomainRegistry: pallet_x3_domain_registry,
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3TokenFactory: pallet_x3_token_factory,
+        CrossChainValidator: pallet_cross_chain_validator,
         X3SettlementEngine: pallet_x3_settlement_engine,
         Swarm: pallet_swarm,
         DepinMarketplace: pallet_depin_marketplace,
@@ -296,6 +306,11 @@ construct_runtime!(
         EvolutionCore: pallet_evolution_core,
         X3Verifier: pallet_x3_verifier,
         X3DomainRegistry: pallet_x3_domain_registry,
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3TokenFactory: pallet_x3_token_factory,
+        CrossChainValidator: pallet_cross_chain_validator,
         X3SettlementEngine: pallet_x3_settlement_engine,
         Swarm: pallet_swarm,
         DepinMarketplace: pallet_depin_marketplace,
@@ -504,14 +519,292 @@ impl pallet_evm::Config for Runtime {
 // Helper types for pallet_x3_kernel::Config bridge escrow bindings
 pub struct BridgeEvmEscrowZero;
 impl frame_support::traits::Get<sp_core::H160> for BridgeEvmEscrowZero {
-    fn get() -> sp_core::H160 { sp_core::H160::zero() }
+    fn get() -> sp_core::H160 {
+        sp_core::H160::zero()
+    }
 }
 pub struct BridgeSvmEscrowZero;
 impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowZero {
-    fn get() -> [u8; 32] { [0u8; 32] }
+    fn get() -> [u8; 32] {
+        [0u8; 32]
+    }
 }
 parameter_types! {
     pub const MaxReplayPruneItemsPerBlock: u32 = 64u32;
+}
+
+/// Production cross-chain proof verifier.
+///
+/// Validates `LockProof` and `MerkleReceipt` payloads with structural
+/// sanity checks and enforces a byzantine threshold of validator signatures
+/// from the currently configured X3 kernel authorities.
+pub struct SubstrateProofVerifier;
+
+impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVerifier {
+    fn verify_proof(
+        _origin: &AccountId,
+        _operation: &x3_cross_vm_bridge::CrossVmOperation,
+        proof: &pallet_x3_kernel::CrossChainProof,
+    ) -> Result<(), frame_support::sp_runtime::DispatchError> {
+        use codec::Encode;
+        use pallet_x3_kernel::CrossChainProof;
+
+        fn threshold(authority_count: usize) -> usize {
+            // 2/3 + 1, but always at least 1.
+            let needed = (authority_count.saturating_mul(2) / 3).saturating_add(1);
+            core::cmp::max(1, needed)
+        }
+
+        fn account_to_key_bytes(
+            account: &AccountId,
+        ) -> Result<[u8; 32], frame_support::sp_runtime::DispatchError> {
+            let encoded = account.encode();
+            if encoded.len() != 32 {
+                return Err(frame_support::sp_runtime::DispatchError::Other(
+                    "Authority key must SCALE-encode to 32 bytes",
+                ));
+            }
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&encoded);
+            Ok(out)
+        }
+
+        fn verify_signature_any(pubkey_bytes: [u8; 32], message: &[u8], signature: &[u8]) -> bool {
+            if signature.len() != 64 {
+                return false;
+            }
+
+            // sr25519
+            {
+                let pubkey = sp_core::sr25519::Public::from_raw(pubkey_bytes);
+                let sig = sp_core::sr25519::Signature::from_raw({
+                    let mut buf = [0u8; 64];
+                    buf.copy_from_slice(signature);
+                    buf
+                });
+                if sp_io::crypto::sr25519_verify(&sig, message, &pubkey) {
+                    return true;
+                }
+            }
+
+            // ed25519
+            {
+                let pubkey = sp_core::ed25519::Public::from_raw(pubkey_bytes);
+                let sig = sp_core::ed25519::Signature::from_raw({
+                    let mut buf = [0u8; 64];
+                    buf.copy_from_slice(signature);
+                    buf
+                });
+                sp_io::crypto::ed25519_verify(&sig, message, &pubkey)
+            }
+        }
+
+        fn require_len(
+            actual: usize,
+            expected: usize,
+            label: &'static str,
+        ) -> Result<(), frame_support::sp_runtime::DispatchError> {
+            if actual != expected {
+                return Err(frame_support::sp_runtime::DispatchError::Other(label));
+            }
+            Ok(())
+        }
+
+        let authorities = pallet_x3_kernel::Authorities::<Runtime>::get();
+        let authority_keys: sp_std::collections::btree_set::BTreeSet<[u8; 32]> = authorities
+            .into_iter()
+            .map(|a| account_to_key_bytes(&a))
+            .collect::<Result<_, _>>()?;
+        let needed = threshold(authority_keys.len());
+
+        match proof {
+            CrossChainProof::None => Ok(()),
+            CrossChainProof::LockProof(bytes) => {
+                if bytes.is_empty() {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "LockProof: empty bytes",
+                    ));
+                }
+                // Format:
+                // [0..32)  event_hash
+                // [32]     sig_count (u8)
+                // repeat sig_count times:
+                //   [validator_id:32][signature:64]
+                if bytes.len() < 33 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "LockProof: payload too short (< 33 bytes)",
+                    ));
+                }
+
+                let event_hash = &bytes[0..32];
+                let sig_count = bytes[32] as usize;
+                if sig_count == 0 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "LockProof: signature count must be > 0",
+                    ));
+                }
+
+                let expected_len = 33usize.saturating_add(sig_count.saturating_mul(96));
+                require_len(
+                    bytes.len(),
+                    expected_len,
+                    "LockProof: malformed payload length",
+                )?;
+
+                let mut valid = 0usize;
+                let mut seen: sp_std::collections::btree_set::BTreeSet<[u8; 32]> =
+                    sp_std::collections::btree_set::BTreeSet::new();
+
+                for idx in 0..sig_count {
+                    let offset = 33 + idx * 96;
+                    let mut validator_id = [0u8; 32];
+                    validator_id.copy_from_slice(&bytes[offset..offset + 32]);
+                    let signature = &bytes[offset + 32..offset + 96];
+
+                    if !authority_keys.contains(&validator_id) {
+                        continue;
+                    }
+                    if !seen.insert(validator_id) {
+                        continue;
+                    }
+                    if verify_signature_any(validator_id, event_hash, signature) {
+                        valid = valid.saturating_add(1);
+                    }
+                }
+
+                if valid < needed {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "LockProof: insufficient validator signatures",
+                    ));
+                }
+
+                Ok(())
+            }
+            CrossChainProof::MerkleReceipt(bytes) => {
+                if bytes.is_empty() {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: empty bytes",
+                    ));
+                }
+                // Format:
+                // [0..32)  state_root
+                // [32..40) finalized_block (u64 LE)
+                // [40..48) execution_index (u64 LE)
+                // [48..52) merkle_proof_len (u32 LE)
+                // [..]     merkle_proof_bytes (len)
+                // [..]     sig_count (u8)
+                // repeat sig_count times:
+                //   [validator_id:32][signature:64] over sha2_256(state_root||finalized_block||execution_index||merkle_proof_bytes)
+                if bytes.len() < 53 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: payload too short",
+                    ));
+                }
+
+                let mut state_root = [0u8; 32];
+                state_root.copy_from_slice(&bytes[0..32]);
+                if state_root == [0u8; 32] {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: state_root must be non-zero",
+                    ));
+                }
+
+                let finalized_block =
+                    u64::from_le_bytes(bytes[32..40].try_into().map_err(|_| {
+                        frame_support::sp_runtime::DispatchError::Other(
+                            "MerkleReceipt: invalid finalized_block",
+                        )
+                    })?);
+                if finalized_block == 0 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: finalized_block must be > 0",
+                    ));
+                }
+
+                let execution_index =
+                    u64::from_le_bytes(bytes[40..48].try_into().map_err(|_| {
+                        frame_support::sp_runtime::DispatchError::Other(
+                            "MerkleReceipt: invalid execution_index",
+                        )
+                    })?);
+
+                let merkle_len = u32::from_le_bytes(bytes[48..52].try_into().map_err(|_| {
+                    frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: invalid merkle_proof_len",
+                    )
+                })?) as usize;
+                if merkle_len == 0 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: merkle_proof_bytes must be non-empty",
+                    ));
+                }
+
+                let proof_start = 52usize;
+                let proof_end = proof_start.checked_add(merkle_len).ok_or(
+                    frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: proof length overflow",
+                    ),
+                )?;
+                if bytes.len() < proof_end + 1 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: payload too short for merkle proof",
+                    ));
+                }
+
+                let merkle_proof_bytes = &bytes[proof_start..proof_end];
+                let sig_count = bytes[proof_end] as usize;
+                if sig_count == 0 {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: signature count must be > 0",
+                    ));
+                }
+
+                let expected_len = (proof_end + 1).saturating_add(sig_count.saturating_mul(96));
+                require_len(
+                    bytes.len(),
+                    expected_len,
+                    "MerkleReceipt: malformed payload length",
+                )?;
+
+                let mut msg =
+                    sp_std::vec::Vec::with_capacity(32 + 8 + 8 + merkle_proof_bytes.len());
+                msg.extend_from_slice(&state_root);
+                msg.extend_from_slice(&finalized_block.to_le_bytes());
+                msg.extend_from_slice(&execution_index.to_le_bytes());
+                msg.extend_from_slice(merkle_proof_bytes);
+                let settlement_hash = sp_io::hashing::sha2_256(&msg);
+
+                let mut valid = 0usize;
+                let mut seen: sp_std::collections::btree_set::BTreeSet<[u8; 32]> =
+                    sp_std::collections::btree_set::BTreeSet::new();
+
+                for idx in 0..sig_count {
+                    let offset = (proof_end + 1) + idx * 96;
+                    let mut validator_id = [0u8; 32];
+                    validator_id.copy_from_slice(&bytes[offset..offset + 32]);
+                    let signature = &bytes[offset + 32..offset + 96];
+
+                    if !authority_keys.contains(&validator_id) {
+                        continue;
+                    }
+                    if !seen.insert(validator_id) {
+                        continue;
+                    }
+                    if verify_signature_any(validator_id, &settlement_hash, signature) {
+                        valid = valid.saturating_add(1);
+                    }
+                }
+
+                if valid < needed {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "MerkleReceipt: insufficient validator signatures",
+                    ));
+                }
+
+                Ok(())
+            }
+        }
+    }
 }
 
 impl pallet_x3_kernel::Config for Runtime {
@@ -553,7 +846,7 @@ impl pallet_x3_kernel::Config for Runtime {
     #[cfg(not(feature = "std"))]
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
-    type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
+    type CrossChainProofVerifier = SubstrateProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowZero;
     type BridgeSvmEscrow = BridgeSvmEscrowZero;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
@@ -571,6 +864,51 @@ impl pallet_x3_coin::Config for Runtime {
 }
 
 // ===== AtomicTradeEngine Configuration =====
+
+pub struct RuntimeSettlementBridge;
+
+impl pallet_atomic_trade_engine::SettlementBridge<AccountId> for RuntimeSettlementBridge {
+    fn register_completed_batch(
+        maker: &AccountId,
+        _batch_id: H256,
+        secret_hash: H256,
+        legs: &[(pallet_atomic_trade_engine::VmType, u128)],
+    ) -> Result<H256, frame_support::sp_runtime::DispatchError> {
+        use pallet_atomic_trade_engine::VmType;
+        use pallet_x3_settlement_engine::types::{AssetSpec, ExternalChainId, TokenId};
+
+        let map_leg = |idx: usize| -> AssetSpec {
+            let (vm_type, amount) = legs.get(idx).copied().unwrap_or((VmType::X3, 0));
+            let chain = match vm_type {
+                VmType::Evm => ExternalChainId::Ethereum,
+                VmType::Svm => ExternalChainId::Solana,
+                VmType::X3 | VmType::CrossVm => ExternalChainId::X3Native,
+            };
+            AssetSpec {
+                chain,
+                token: TokenId::Native,
+                amount,
+            }
+        };
+
+        let taker = maker.clone();
+        let next_nonce = pallet_x3_settlement_engine::TotalIntents::<Runtime>::get();
+        let expected_intent_id = pallet_x3_settlement_engine::Pallet::<Runtime>::generate_intent_id(
+            maker, &taker, next_nonce,
+        );
+
+        pallet_x3_settlement_engine::Pallet::<Runtime>::create_intent(
+            frame_system::RawOrigin::Signed(maker.clone()).into(),
+            taker,
+            map_leg(0),
+            map_leg(1),
+            secret_hash,
+            None,
+        )?;
+
+        Ok(expected_intent_id)
+    }
+}
 
 parameter_types! {
     pub const MaxTradeLegs: u32 = 16;
@@ -605,7 +943,7 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type DefaultTradeSvmComputeLimit = DefaultTradeSvmComputeLimit;
     type DefaultTradeX3GasLimit = DefaultTradeX3GasLimit;
     type AmmRegistrarOrigin = EnsureRootOrHalfCouncil;
-    type Settlement = pallet_atomic_trade_engine::NoOpSettlementBridge;
+    type Settlement = RuntimeSettlementBridge;
 }
 
 #[cfg(feature = "std")]
@@ -1233,6 +1571,11 @@ impl pallet_x3_verifier::Config for Runtime {
     type WeightInfo = pallet_x3_verifier::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_cross_chain_validator::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_cross_chain_validator::weights::SubstrateWeight<Runtime>;
+}
+
 // ===== X3 Domain Registry Pallet Configuration =====
 parameter_types! {
     pub const MaxX3DomainLen: u32 = 253;
@@ -1240,6 +1583,37 @@ parameter_types! {
     pub const MaxX3RecordsPerDomain: u32 = 32;
     pub const MaxX3CnameLen: u32 = 253;
     pub const MaxX3TxtLen: u32 = 1024;
+}
+
+parameter_types! {
+    pub const MaxRegistryAssets: u32 = 10_000;
+}
+
+impl pallet_x3_asset_registry::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RegistryOrigin = EnsureRootOrHalfCouncil;
+    type EmergencyPauseOrigin = EnsureRootOrHalfCouncil;
+    type MaxAssets = MaxRegistryAssets;
+}
+
+impl pallet_x3_supply_ledger::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type SupplyGovernance = EnsureRootOrHalfCouncil;
+    type Registry = X3AssetRegistry;
+}
+
+impl pallet_x3_cross_vm_router::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Registry = X3AssetRegistry;
+    type Ledger = X3SupplyLedger;
+    type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
+}
+
+impl pallet_x3_token_factory::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type CreateTokenOrigin = frame_system::EnsureSigned<AccountId>;
+    type Registry = X3AssetRegistry;
+    type Ledger = X3SupplyLedger;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -1263,6 +1637,48 @@ parameter_types! {
     pub const ChallengePeriod: BlockNumber = 600;   // ~1 hour for dispute period
 }
 
+pub struct RuntimeCrossChainValidator;
+
+impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
+    for RuntimeCrossChainValidator
+{
+    fn verify_evm_proof(
+        block_number: u64,
+        block_hash: H256,
+        state_root: H256,
+        merkle_root: H256,
+    ) -> bool {
+        pallet_cross_chain_validator::Pallet::<Runtime>::verify_settlement_evm_header(
+            block_number,
+            block_hash,
+            state_root,
+            merkle_root,
+        )
+    }
+
+    fn verify_svm_proof(
+        slot: u64,
+        block_hash: H256,
+        state_root: H256,
+        validator_set_hash: H256,
+    ) -> bool {
+        pallet_cross_chain_validator::Pallet::<Runtime>::verify_settlement_svm_header(
+            slot,
+            block_hash,
+            state_root,
+            validator_set_hash,
+        )
+    }
+
+    fn get_latest_evm_header_hash() -> Option<H256> {
+        pallet_cross_chain_validator::Pallet::<Runtime>::get_latest_evm_header_hash()
+    }
+
+    fn get_latest_svm_header_hash() -> Option<H256> {
+        pallet_cross_chain_validator::Pallet::<Runtime>::get_latest_svm_header_hash()
+    }
+}
+
 impl pallet_x3_settlement_engine::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type SettlementWeightInfo = pallet_x3_settlement_engine::weights::SubstrateWeight<Runtime>;
@@ -1274,7 +1690,7 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type MinBtcConfirmations = MinBtcConfirmations;
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
-    type CrossChainValidator = pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator;
+    type CrossChainValidator = RuntimeCrossChainValidator;
 }
 
 // ===== Swarm Pallet Configuration =====

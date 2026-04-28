@@ -27,8 +27,8 @@
 //! ```
 
 use frame_support::pallet_prelude::*;
-use x3_packet_schema::{Packet, EvmPacket, SvmPacket, X3VmPacket, U256};
 use parity_scale_codec::Decode;
+use x3_packet_schema::{EvmPacket, Packet, SvmPacket, X3VmPacket};
 
 /// Result type for packet adapter operations
 pub type PacketAdapterResult<T> = Result<T, PacketAdapterError>;
@@ -92,12 +92,18 @@ pub enum DomainRoute {
 impl DomainRoute {
     /// Check if this route includes EVM
     pub fn targets_evm(&self) -> bool {
-        matches!(self, DomainRoute::EvmOnly | DomainRoute::EvmAndSvm | DomainRoute::AllDomains)
+        matches!(
+            self,
+            DomainRoute::EvmOnly | DomainRoute::EvmAndSvm | DomainRoute::AllDomains
+        )
     }
 
     /// Check if this route includes SVM
     pub fn targets_svm(&self) -> bool {
-        matches!(self, DomainRoute::SvmOnly | DomainRoute::EvmAndSvm | DomainRoute::AllDomains)
+        matches!(
+            self,
+            DomainRoute::SvmOnly | DomainRoute::EvmAndSvm | DomainRoute::AllDomains
+        )
     }
 
     /// Check if this route includes X3VM
@@ -160,7 +166,7 @@ pub fn deserialize_packet(payload: &[u8]) -> PacketAdapterResult<Packet> {
 pub fn validate_packet(packet: &Packet) -> PacketAdapterResult<()> {
     // All packets must have a valid domain mask (non-zero)
     let domain_mask = packet.domain_mask();
-    
+
     if domain_mask == 0 {
         return Err(PacketAdapterError::NoDomainTarget);
     }
@@ -208,14 +214,16 @@ pub fn route_packet(packet: &Packet) -> PacketAdapterResult<DomainRoute> {
         Packet::X3Vm(x3vm_packet) => {
             // For X3VM packets, determine route based on packet contents
             match x3vm_packet {
-                X3VmPacket::AtomicCross { evm, svm, atomic: _ } => {
-                    match (evm.is_some(), svm.is_some()) {
-                        (true, true) => Ok(DomainRoute::EvmAndSvm),
-                        (true, false) => Ok(DomainRoute::EvmOnly),
-                        (false, true) => Ok(DomainRoute::SvmOnly),
-                        (false, false) => Err(PacketAdapterError::NoDomainTarget),
-                    }
-                }
+                X3VmPacket::AtomicCross {
+                    evm,
+                    svm,
+                    atomic: _,
+                } => match (evm.is_some(), svm.is_some()) {
+                    (true, true) => Ok(DomainRoute::EvmAndSvm),
+                    (true, false) => Ok(DomainRoute::EvmOnly),
+                    (false, true) => Ok(DomainRoute::SvmOnly),
+                    (false, false) => Err(PacketAdapterError::NoDomainTarget),
+                },
                 X3VmPacket::Conditional { .. } => {
                     // Conditional packets route based on condition evaluation
                     // For now, route to X3VM for specialized handling
@@ -243,33 +251,28 @@ pub fn get_domain_mask(packet: &Packet) -> u8 {
 /// Get packet type identifier for logging/debugging
 pub fn get_packet_type(packet: &Packet) -> &'static str {
     match packet {
-        Packet::Evm(evm_packet) => {
-            match evm_packet {
-                EvmPacket::Call { .. } => "EVM::Call",
-                EvmPacket::Deploy { .. } => "EVM::Deploy",
-                EvmPacket::Batch { .. } => "EVM::Batch",
-            }
-        }
-        Packet::Svm(svm_packet) => {
-            match svm_packet {
-                SvmPacket::Invoke { .. } => "SVM::Invoke",
-                SvmPacket::Deploy { .. } => "SVM::Deploy",
-                SvmPacket::InitializeState { .. } => "SVM::InitializeState",
-            }
-        }
-        Packet::X3Vm(x3vm_packet) => {
-            match x3vm_packet {
-                X3VmPacket::AtomicCross { .. } => "X3VM::AtomicCross",
-                X3VmPacket::Conditional { .. } => "X3VM::Conditional",
-                X3VmPacket::Transfer { .. } => "X3VM::Transfer",
-            }
-        }
+        Packet::Evm(evm_packet) => match evm_packet {
+            EvmPacket::Call { .. } => "EVM::Call",
+            EvmPacket::Deploy { .. } => "EVM::Deploy",
+            EvmPacket::Batch { .. } => "EVM::Batch",
+        },
+        Packet::Svm(svm_packet) => match svm_packet {
+            SvmPacket::Invoke { .. } => "SVM::Invoke",
+            SvmPacket::Deploy { .. } => "SVM::Deploy",
+            SvmPacket::InitializeState { .. } => "SVM::InitializeState",
+        },
+        Packet::X3Vm(x3vm_packet) => match x3vm_packet {
+            X3VmPacket::AtomicCross { .. } => "X3VM::AtomicCross",
+            X3VmPacket::Conditional { .. } => "X3VM::Conditional",
+            X3VmPacket::Transfer { .. } => "X3VM::Transfer",
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_packet_schema::U256;
 
     #[test]
     fn test_deserialize_empty_payload() {

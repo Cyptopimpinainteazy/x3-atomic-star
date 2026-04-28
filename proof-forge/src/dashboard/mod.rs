@@ -1,11 +1,11 @@
 // Dashboard module for proof metrics export and visualization
 
 use crate::proof::{ProofResult, ProofStatus};
-use crate::scoring::{ScoreGrade};
+use crate::scoring::ScoreGrade;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dashboard {
@@ -128,7 +128,8 @@ impl MetricsExporter {
         dashboard.set_score(avg_score);
 
         for result in results {
-            dashboard.proof_distribution
+            dashboard
+                .proof_distribution
                 .entry(result.claim_id.clone())
                 .or_insert(1);
 
@@ -172,10 +173,10 @@ pub async fn generate_dashboard(
 ) -> Result<()> {
     let mut dashboard = Dashboard::new();
     dashboard.set_score(0.92);
-    
+
     let json_output = dashboard.to_json()?;
     std::fs::write(output_file, json_output)?;
-    
+
     println!("Dashboard exported to: {}", output_file.display());
     Ok(())
 }

@@ -23,7 +23,6 @@
 #![cfg(feature = "std")]
 
 use crate::fraud_proofs::scheduler_v1::scheduler_commitment_from_bytes;
-use crate::fraud_proofs::witness_v1::WitnessError;
 use sp_core::H256;
 
 // ---------------------------------------------------------------------------

@@ -9,8 +9,8 @@
 
 #[cfg(test)]
 mod loom_tests {
-    use loom::sync::{Arc, Mutex};
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use loom::sync::atomic::{AtomicUsize, Ordering};
+    use loom::sync::{mpsc, Arc, Mutex};
 
     // ════════════════════════════════════════════════════════════
     // TEST 1: Concurrent Rollback Must Be Atomic (S1-1)
@@ -128,7 +128,6 @@ mod loom_tests {
             let log_clone = Arc::clone(&log);
 
             let success_counter = Arc::new(AtomicUsize::new(0));
-            let success_clone = Arc::clone(&success_counter);
 
             // Thread 1: Mark changes as successful
             let t1 = loom::thread::spawn(move || {
@@ -167,33 +166,51 @@ mod loom_tests {
     fn loom_rollback_visibility_across_threads() {
         loom::model(|| {
             let state = Arc::new(Mutex::new(100u128));
-            let state_clone = Arc::clone(&state);
+            let state_for_change = Arc::clone(&state);
+            let state_for_observer = Arc::clone(&state);
+            let state_for_rollback = Arc::clone(&state);
+
+            // Ordered handoff: change -> observation -> rollback.
+            let (tx_change, rx_change) = mpsc::channel::<()>();
+            let (tx_observed, rx_observed) = mpsc::channel::<()>();
 
             // Thread 1: Makes a change
             let t1 = loom::thread::spawn(move || {
-                let mut s = state.lock().unwrap();
+                let mut s = state_for_change.lock().unwrap();
                 *s = 50; // Transfer out
+                drop(s);
+                tx_change.send(()).unwrap();
             });
 
-            // Thread 2: Observes change
+            // Thread 2: Must observe pre-rollback change before rollback starts
             let t2 = loom::thread::spawn(move || {
-                let s = state_clone.lock().unwrap();
-                *s == 50
+                rx_change.recv().unwrap();
+
+                let s = state_for_observer.lock().unwrap();
+                let saw_change = *s == 50;
+                drop(s);
+
+                tx_observed.send(()).unwrap();
+                saw_change
             });
 
             // Thread 3: Performs rollback
             let t3 = loom::thread::spawn(move || {
-                // For this model, we'll just simulate successful spawn
-                true
+                rx_observed.recv().unwrap();
+
+                let mut s = state_for_rollback.lock().unwrap();
+                *s = 100; // Rollback to original state
             });
 
             t1.join().unwrap();
             let seen_change = t2.join().unwrap();
             t3.join().unwrap();
 
+            let final_state = *state.lock().unwrap();
+
             assert!(
-                seen_change,
-                "Change not visible - synchronization issue (S1-1)"
+                seen_change && final_state == 100,
+                "Rollback visibility failed (S1-1): change/rollback ordering not observable"
             );
         });
     }

@@ -1,11 +1,55 @@
 {
-  "claim_id": "x3.gpu.cpu_gpu_parity",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.gpu.cpu_gpu_parity",
+  "artifact_hash": "bdf513e36f43704b2652cebf70a22c63cd695f7c23ebc267e68a0498320d13df",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "crates/x3-gpu-validator-swarm/src/lib.rs",
+    "crates/x3-gpu-validator-swarm/src/deterministic.rs",
+    "crates/x3-gpu-validator-swarm/src/cpu_validator.rs"
   ],
-  "hash": "99bcadad23a261d6512b185826a822a1e4ba77f279354dc8f21cb0a8aee82dc6"
+  "timestamp": "2026-04-27T23:19:59.686065780Z",
+  "result": {
+    "claim_id": "x3.gpu.cpu_gpu_parity",
+    "claim": "GPU-accelerated execution/verification matches CPU reference results",
+    "status": "partial",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "crates/x3-gpu-validator-swarm/src/lib.rs",
+      "crates/x3-gpu-validator-swarm/src/deterministic.rs",
+      "crates/x3-gpu-validator-swarm/src/cpu_validator.rs"
+    ],
+    "commands_run": [
+      "cargo test -p x3-gpu-validator-swarm -- deterministic --quiet"
+    ],
+    "passed_checks": [
+      "crates/x3-gpu-validator-swarm/src/lib.rs exists",
+      "crates/x3-gpu-validator-swarm/src/deterministic.rs exists",
+      "crates/x3-gpu-validator-swarm/src/cpu_validator.rs exists",
+      "63 CPU/GPU parity references found",
+      "GPU validator tests passed (13 tests)",
+      "CPU fallback path found in deterministic.rs"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [
+      "No test explicitly named 'parity' or 'deterministic' in output; add test_cpu_gpu_parity that asserts CPU and GPU results match"
+    ],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "cpu_fallback": "present",
+      "tests_passed": "13",
+      "parity_references": "63"
+    },
+    "timestamp": "2026-04-27T23:19:59.678297809Z",
+    "duration_ms": 2012
+  },
+  "limitations": [
+    "No test explicitly named 'parity' or 'deterministic' in output; add test_cpu_gpu_parity that asserts CPU and GPU results match"
+  ],
+  "binding_hash": "26c96b7a26ecc5f08608dac9d151998f081af21b9a9cb37e53d022e52075beef"
 }

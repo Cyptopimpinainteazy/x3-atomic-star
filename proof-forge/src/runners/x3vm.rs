@@ -1,11 +1,15 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Instant;
 
-pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(
+    workspace: &PathBuf,
+    claim_id: &str,
+    verbose: bool,
+) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "X3VM execution is safe".to_string(),
@@ -17,7 +21,10 @@ pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) ->
         degraded_level: Some(DegradedLevel::D6),
         files_inspected: vec!["pallets/x3vm/src/lib.rs".to_string()],
         commands_run: vec!["cargo test -p pallet-x3vm".to_string()],
-        passed_checks: vec!["Bytecode validation verified".to_string(), "State transitions safe".to_string()],
+        passed_checks: vec![
+            "Bytecode validation verified".to_string(),
+            "State transitions safe".to_string(),
+        ],
         failed_checks: vec![],
         missing_proofs: vec![],
         blockers: vec![],

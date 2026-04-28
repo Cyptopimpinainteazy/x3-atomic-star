@@ -2115,7 +2115,7 @@ fn test_canonical_supply_invariant_sequential() {
     new_test_ext().execute_with(|| {
         // Phase 0.1.2: Test sequential mutations maintain nonce invariant
         // Verify: Each account's nonce increments correctly through 100 operations
-        
+
         // Test 10 sequential transactions per account (max per block)
         for op_idx in 0..10u64 {
             let comit_id = H256::from_low_u64_be(1000 + op_idx);
@@ -2125,7 +2125,8 @@ fn test_canonical_supply_invariant_sequential() {
             // Compute prepare_root for this comit
             let evm_payload = vec![1, 2, (op_idx % 256) as u8];
             let svm_payload = vec![3, 4];
-            let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
+            let prepare_root =
+                compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
 
             // Submit from ALICE
             assert_ok!(AtlasKernel::submit_comit(
@@ -2162,7 +2163,7 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
     new_test_ext().execute_with(|| {
         // Phase 0.1.3: Test nonce increments across multiple accounts
         // Verify: Nonce increments correctly despite different operation patterns
-        
+
         let mut total_success = 0u64;
 
         // ALICE: 10 operations
@@ -2252,7 +2253,7 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
 fn test_emergency_halt_blocks_comit_submission() {
     new_test_ext().execute_with(|| {
         // Phase 0.2.2: Verify pause blocks COMIT submission
-        
+
         let comit_id = H256::from_low_u64_be(1);
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root(comit_id, &vec![1, 2, 3], &vec![4, 5], 0, fee);
@@ -2275,7 +2276,7 @@ fn test_emergency_halt_blocks_comit_submission() {
         // Try to submit another COMIT — should be blocked
         let comit_id_2 = H256::from_low_u64_be(2);
         let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![1, 2], &vec![3, 4], 1, fee);
-        
+
         assert_noop!(
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(BOB),
@@ -2297,7 +2298,7 @@ fn test_emergency_halt_blocks_comit_submission() {
 fn test_emergency_halt_recovery_restores_functionality() {
     new_test_ext().execute_with(|| {
         // Phase 0.2.3: Verify unpause restores functionality
-        
+
         let comit_id = H256::from_low_u64_be(100);
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root(comit_id, &vec![1, 2], &vec![3, 4], 0, fee);
@@ -2346,17 +2347,11 @@ fn test_emergency_halt_recovery_restores_functionality() {
 fn test_emergency_halt_multiple_pause_unpause_cycles() {
     new_test_ext().execute_with(|| {
         // Phase 0.2.3b: Verify multiple halt/resume cycles work
-        
+
         for cycle in 0..3u64 {
             let comit_id = H256::from_low_u64_be(200 + cycle);
             let fee: Balance = 100;
-            let prepare_root = compute_prepare_root(
-                comit_id,
-                &vec![1],
-                &vec![2],
-                cycle,
-                fee,
-            );
+            let prepare_root = compute_prepare_root(comit_id, &vec![1], &vec![2], cycle, fee);
 
             // Pause
             assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
@@ -2403,12 +2398,12 @@ fn test_emergency_halt_multiple_pause_unpause_cycles() {
 fn test_emergency_halt_preserves_state_through_cycles() {
     new_test_ext().execute_with(|| {
         // Phase 0.2.3c: Verify state is preserved during pause cycles
-        
+
         // Submit initial transaction
         let comit_id_1 = H256::from_low_u64_be(300);
         let fee: Balance = 100;
         let prepare_root_1 = compute_prepare_root(comit_id_1, &vec![1], &vec![2], 0, fee);
-        
+
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id_1,
@@ -2438,7 +2433,7 @@ fn test_emergency_halt_preserves_state_through_cycles() {
         // Verify next transaction uses incremented nonce
         let comit_id_2 = H256::from_low_u64_be(301);
         let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![3], &vec![4], 1, fee);
-        
+
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id_2,
@@ -2464,19 +2459,18 @@ fn test_emergency_halt_preserves_state_through_cycles() {
 fn test_authorize_account_requires_root_origin() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.1: Verify only root can authorize accounts
-        
+
         let alice = ALICE;
         let _bob = BOB;
 
         // Root CAN authorize
-        assert_ok!(AtlasKernel::authorize_account(
-            RuntimeOrigin::root(),
-            alice,
-        ));
+        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), alice,));
 
         let events = x3_events();
         assert!(
-            events.iter().any(|e| matches!(e, crate::Event::<Test>::AccountAuthorized { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, crate::Event::<Test>::AccountAuthorized { .. })),
             "AccountAuthorized event should be emitted"
         );
 
@@ -2488,7 +2482,7 @@ fn test_authorize_account_requires_root_origin() {
 fn test_authorize_account_permission_persistence() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.1b: Verify authorization persists
-        
+
         let alice = ALICE;
         let bob = BOB;
         let charlie = CHARLIE;
@@ -2496,10 +2490,16 @@ fn test_authorize_account_permission_persistence() {
         // Authorize multiple accounts
         assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), alice));
         assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), bob));
-        assert_ok!(AtlasKernel::authorize_account(RuntimeOrigin::root(), charlie));
+        assert_ok!(AtlasKernel::authorize_account(
+            RuntimeOrigin::root(),
+            charlie
+        ));
 
         // Deauthorize one
-        assert_ok!(AtlasKernel::deauthorize_account(RuntimeOrigin::root(), alice));
+        assert_ok!(AtlasKernel::deauthorize_account(
+            RuntimeOrigin::root(),
+            alice
+        ));
 
         // Other authorizations should persist
         let events = x3_events();
@@ -2507,7 +2507,7 @@ fn test_authorize_account_permission_persistence() {
             .iter()
             .filter(|e| matches!(e, crate::Event::<Test>::AccountAuthorized { .. }))
             .count();
-        
+
         assert_eq!(
             auth_count, 3,
             "Should have 3 authorization events despite deauthorization"
@@ -2521,7 +2521,7 @@ fn test_authorize_account_permission_persistence() {
 fn test_deauthorize_account_removes_authorization() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.2: Verify deauthorization works
-        
+
         let alice = ALICE;
 
         // Authorize
@@ -2534,7 +2534,10 @@ fn test_deauthorize_account_removes_authorization() {
         }
 
         // Deauthorize
-        assert_ok!(AtlasKernel::deauthorize_account(RuntimeOrigin::root(), alice));
+        assert_ok!(AtlasKernel::deauthorize_account(
+            RuntimeOrigin::root(),
+            alice
+        ));
 
         // Check count decreased
         let mut authorized_count_2 = 0;
@@ -2555,7 +2558,7 @@ fn test_deauthorize_account_removes_authorization() {
 fn test_add_authority_requires_governance() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.2b: Verify authority addition
-        
+
         let new_authority = CHARLIE;
 
         // Root CAN add authority
@@ -2566,7 +2569,9 @@ fn test_add_authority_requires_governance() {
 
         let events = x3_events();
         assert!(
-            events.iter().any(|e| matches!(e, crate::Event::<Test>::AuthorityAdded { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, crate::Event::<Test>::AuthorityAdded { .. })),
             "AuthorityAdded event should be emitted"
         );
 
@@ -2578,7 +2583,7 @@ fn test_add_authority_requires_governance() {
 fn test_authority_cannot_be_duplicated() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.2c: Verify duplicate authority check
-        
+
         let new_authority = CHARLIE;
 
         // Add authority first time
@@ -2683,7 +2688,7 @@ fn test_cross_domain_balance_consistency() {
 fn test_global_supply_reconciliation() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.1b: Verify global state doesn't become inconsistent
-        
+
         let num_operations = 30u64; // 10 per account × 3 accounts within one block
         let mut operation_count = 0u64;
 
@@ -2736,23 +2741,18 @@ fn test_global_supply_reconciliation() {
 fn test_no_balance_drift_on_operations() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.2: Verify balances don't drift through operation sequences
-        
+
         // Execute operations and verify nonce state doesn't regress
         let nonce_baseline = Nonces::<Test>::get(ALICE);
-        
+
         for cycle in 0..3u64 {
             for op in 0..10u64 {
                 let comit_id = H256::from_low_u64_be(4200 + cycle * 100 + op);
                 let fee: Balance = 100;
                 let nonce = cycle * 10 + op;
 
-                let prepare_root = compute_prepare_root(
-                    comit_id,
-                    &vec![1, (op as u8)],
-                    &vec![2],
-                    nonce,
-                    fee,
-                );
+                let prepare_root =
+                    compute_prepare_root(comit_id, &vec![1, (op as u8)], &vec![2], nonce, fee);
 
                 let _ = AtlasKernel::submit_comit(
                     RuntimeOrigin::signed(ALICE),
@@ -2775,9 +2775,7 @@ fn test_no_balance_drift_on_operations() {
             );
         }
 
-        println!(
-            "✅ Phase 0.4.2: No drift detected — nonce state consistent"
-        );
+        println!("✅ Phase 0.4.2: No drift detected — nonce state consistent");
     });
 }
 
@@ -2856,7 +2854,7 @@ fn test_balance_after_finalization() {
 fn test_emergency_reconciliation() {
     new_test_ext().execute_with(|| {
         // Phase 0.4.4: Verify pause preserves consistency
-        
+
         // Create some state
         let initial_comit = H256::from_low_u64_be(4400);
         let fee: Balance = 100;
@@ -2888,8 +2886,6 @@ fn test_emergency_reconciliation() {
             "Nonce should be preserved through pause cycles"
         );
 
-        println!(
-            "✅ Phase 0.4.4: Emergency reconciliation maintains consistency"
-        );
+        println!("✅ Phase 0.4.4: Emergency reconciliation maintains consistency");
     });
 }

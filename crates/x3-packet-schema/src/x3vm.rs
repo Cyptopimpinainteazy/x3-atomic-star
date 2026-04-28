@@ -1,6 +1,6 @@
 use parity_scale_codec::{Decode, Encode};
-use scale_info::TypeInfo;
 use scale_info::prelude::{boxed::Box, vec::Vec};
+use scale_info::TypeInfo;
 
 use crate::EvmPacket;
 use crate::SvmPacket;

@@ -54,40 +54,42 @@ jobs:
             cargo build -p proof-forge --release
           fi
 
+      - name: Receipt Schema Gate
+        run: |
+          chmod +x scripts/proof/*.sh
+          bash scripts/proof/verify-receipts.sh
+
+      - name: Claim Registry Status Gate
+        run: |
+          bash scripts/proof/check-claim-status.sh
+
+      - name: Runtime No-Op Wiring Guard
+        run: |
+          set -euo pipefail
+          ! rg -n "type CrossChainProofVerifier\\s*=\\s*pallet_x3_kernel::NoopProofVerifier|type Settlement\\s*=\\s*pallet_atomic_trade_engine::NoOpSettlementBridge|type CrossChainValidator\\s*=\\s*pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator" runtime/src/lib.rs
+
       - name: Run Proof Scan
         id: scan
         run: |
-          set +e
-          OUTPUT=$(./target/release/x3-proof scan-claims 2>&1)
-          EXIT_CODE=$?
-          echo "scan_output<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          exit $((EXIT_CODE > 0 ? 1 : 0))
-        continue-on-error: true
+          set -euo pipefail
+          ./target/release/x3-proof scan-claims 2>&1 | tee precommit-scan-results.txt
 
       - name: Check AI Patch Firewall
         id: ai-patch
         run: |
-          set +e
-          OUTPUT=$(./target/release/x3-proof ai-patch-firewall 2>&1)
-          EXIT_CODE=$?
-          echo "ai_patch_output<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          exit 0
-        continue-on-error: true
+          set -euo pipefail
+          ./target/release/x3-proof ai-patch-firewall 2>&1 | tee precommit-ai-firewall-results.txt
 
       - name: Report Pre-Commit Results
         if: always()
         run: |
           echo "### 🔍 Pre-Commit Gate Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Claim Scan Status:** ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          echo "**Claim Scan Step:** ${{ steps.scan.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**AI Patch Firewall:** ✅ Clean" >> $GITHUB_STEP_SUMMARY
+          echo "**AI Patch Firewall Step:** ${{ steps.ai-patch.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All pre-commit checks passed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "Read logs/artifacts for detailed findings." >> $GITHUB_STEP_SUMMARY
 
   # S0 SECURITY GATE: Runs on PR and main branch
   s0-security-gate:
@@ -112,11 +114,11 @@ jobs:
       - name: Run S0 Security Gate
         id: s0-gate
         run: |
+          set -uo pipefail
           ./target/release/x3-proof security-gate -v 2>&1 | tee s0-gate-results.txt
           EXIT_CODE=${PIPESTATUS[0]}
           echo "gate_result=$EXIT_CODE" >> $GITHUB_OUTPUT
           exit $EXIT_CODE
-        continue-on-error: true
 
       - name: Comment S0 Results on PR
         if: github.event_name == 'pull_request'
@@ -161,28 +163,27 @@ jobs:
         run: cargo build -p proof-forge --release 2>&1 | tail -5
 
       - name: Run Extended Security Checks
+        id: s1-checks
         run: |
-          echo "=== S1 Security Gate - Extended Verification ===" 
+          set -euo pipefail
+          echo "=== S1 Security Gate - Extended Verification ==="
           echo ""
           echo "✓ Checking consensus robustness..."
-          ./target/release/x3-proof prove consensus --strict 2>&1 | head -20
+          ./target/release/x3-proof prove consensus --strict 2>&1 | tee s1-consensus-results.txt
           echo ""
           echo "✓ Checking bridge security..."
-          ./target/release/x3-proof prove bridge --strict 2>&1 | head -20
+          ./target/release/x3-proof prove bridge --strict 2>&1 | tee s1-bridge-results.txt
           echo ""
           echo "✓ Checking runtime integrity..."
-          ./target/release/x3-proof prove runtime --strict 2>&1 | head -20
-          echo ""
-          echo "S1 Security Gate: ✅ PASSED"
+          ./target/release/x3-proof prove runtime --strict 2>&1 | tee s1-runtime-results.txt
 
       - name: Report S1 Results
         if: always()
         run: |
           echo "### 🔐 S1 Security Gate Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Consensus Proof:** ✅ Verified P7" >> $GITHUB_STEP_SUMMARY
-          echo "**Bridge Security:** ✅ Verified P7" >> $GITHUB_STEP_SUMMARY
-          echo "**Runtime Integrity:** ✅ Verified P7" >> $GITHUB_STEP_SUMMARY
+          echo "**Extended Checks Step:** ${{ steps.s1-checks.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "See s1 step logs for consensus/bridge/runtime outputs." >> $GITHUB_STEP_SUMMARY
 
   # TESTNET READINESS GATE
   testnet-gate:
@@ -205,14 +206,14 @@ jobs:
       - name: Run Testnet Gate
         id: testnet
         run: |
+          set -euo pipefail
           echo "=== Testnet Readiness Gate ===" 
           ./target/release/x3-proof testnet-gate -v 2>&1 | tee testnet-gate-results.txt
           
-          VERDICT=$(grep -i "VERDICT" testnet-gate-results.txt | head -1)
+          VERDICT=$(grep -i "VERDICT" testnet-gate-results.txt | head -1 || true)
+          SCORE=$(grep -oP 'Score:\\s*\\K[0-9.]+' testnet-gate-results.txt | head -1 || true)
           echo "testnet_verdict=$VERDICT" >> $GITHUB_OUTPUT
-          
-          # Testnet gate should always pass for non-release branches
-          echo "✅ Testnet readiness verified"
+          echo "testnet_score=$SCORE" >> $GITHUB_OUTPUT
 
       - name: Upload Testnet Results
         if: always()
@@ -226,9 +227,9 @@ jobs:
         run: |
           echo "### 🧪 Testnet Readiness Gate" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Verdict:** READY ✅" >> $GITHUB_STEP_SUMMARY
-          echo "**Score:** 0.94 (exceeds 0.85 threshold)" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** Ready for testnet deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**Step Outcome:** ${{ steps.testnet.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Verdict:** ${{ steps.testnet.outputs.testnet_verdict }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Score:** ${{ steps.testnet.outputs.testnet_score }}" >> $GITHUB_STEP_SUMMARY
 
   # MAINNET READINESS GATE: Only on release tags
   mainnet-gate:
@@ -252,12 +253,15 @@ jobs:
       - name: Run Mainnet Gate
         id: mainnet
         run: |
+          set -uo pipefail
           echo "=== Mainnet Readiness Gate ===" 
           ./target/release/x3-proof mainnet-gate --fail-hard 2>&1 | tee mainnet-gate-results.txt
-          EXIT_CODE=$?
+          EXIT_CODE=${PIPESTATUS[0]}
           
-          VERDICT=$(grep -i "VERDICT" mainnet-gate-results.txt | head -1)
+          VERDICT=$(grep -i "VERDICT" mainnet-gate-results.txt | head -1 || true)
+          SCORE=$(grep -oP 'Score:\\s*\\K[0-9.]+' mainnet-gate-results.txt | head -1 || true)
           echo "mainnet_verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "mainnet_score=$SCORE" >> $GITHUB_OUTPUT
           
           if [ $EXIT_CODE -eq 0 ]; then
             echo "✅ Mainnet readiness verified"
@@ -279,9 +283,9 @@ jobs:
         run: |
           echo "### 🚀 Mainnet Readiness Gate" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Step Outcome:** ${{ steps.mainnet.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ steps.mainnet.outputs.mainnet_verdict }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Score:** 0.94 (at 0.95 threshold)" >> $GITHUB_STEP_SUMMARY
-          echo "**Grade:** A-" >> $GITHUB_STEP_SUMMARY
+          echo "**Score:** ${{ steps.mainnet.outputs.mainnet_score }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Create Release Notes
         if: success()
@@ -355,16 +359,9 @@ jobs:
           echo "### 📊 Daily Proof Verification Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Run Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
-          echo "**Overall Score:** ${{ steps.prove-all.outputs.overall_score }} (A- Grade)" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Score:** ${{ steps.prove-all.outputs.overall_score }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ steps.prove-all.outputs.overall_status }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Modules Verified:** 20/20" >> $GITHUB_STEP_SUMMARY
-          echo "**Tests Passed:** 2,700+" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Module Breakdown" >> $GITHUB_STEP_SUMMARY
-          echo "- **Critical Chain:** 5/5 (P7 avg 0.976) ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- **Economic:** 4/4 (P5-P6 avg 0.935) ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- **Advanced:** 5/5 (P5-P7 avg 0.936) ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- **Infrastructure:** 6/6 (P4-P6 avg 0.933) ✅" >> $GITHUB_STEP_SUMMARY
+          echo "See uploaded artifacts for full module/test breakdown." >> $GITHUB_STEP_SUMMARY
 
   # GITHUB PAGES DASHBOARD PUBLICATION
   publish-dashboard:
@@ -418,20 +415,10 @@ jobs:
               header { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #38444d; }
               h1 { font-size: 2em; margin-bottom: 5px; color: #1da1f2; }
               .subtitle { color: #aab8c2; font-size: 0.9em; }
-              .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
-              .metric-card { background: #192734; border: 1px solid #38444d; border-radius: 8px; padding: 20px; }
-              .metric-label { color: #aab8c2; font-size: 0.85em; text-transform: uppercase; margin-bottom: 8px; }
-              .metric-value { font-size: 1.8em; font-weight: bold; color: #1da1f2; }
-              .metric-unit { color: #aab8c2; font-size: 0.9em; margin-left: 5px; }
-              .grade { font-size: 2.5em; color: #17bf63; }
-              .status-good { color: #17bf63; }
-              .status-warning { color: #ffad1f; }
-              .status-critical { color: #e74c3c; }
-              .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin: 30px 0; }
-              .module { background: #192734; border-left: 4px solid #1da1f2; padding: 15px; border-radius: 4px; }
-              .module-name { font-weight: bold; margin-bottom: 8px; }
-              .module-level { display: inline-block; background: #38444d; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-right: 5px; }
-              .module-score { float: right; font-weight: bold; color: #17bf63; }
+              .panel { background: #192734; border: 1px solid #38444d; border-radius: 8px; padding: 20px; margin: 20px 0; }
+              .label { color: #aab8c2; font-size: 0.85em; text-transform: uppercase; margin-bottom: 8px; }
+              .value { font-size: 1.2em; font-weight: 600; color: #1da1f2; }
+              pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #111820; border: 1px solid #38444d; border-radius: 8px; padding: 16px; margin-top: 12px; }
               footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #38444d; color: #657786; font-size: 0.85em; }
             </style>
           </head>
@@ -439,50 +426,17 @@ jobs:
             <div class="container">
               <header>
                 <h1>🔐 X3 ProofForge Dashboard</h1>
-                <p class="subtitle">Real-time proof verification and readiness status</p>
+                <p class="subtitle">Generated from live proof gate outputs</p>
               </header>
 
-              <div class="metrics">
-                <div class="metric-card">
-                  <div class="metric-label">Overall Score</div>
-                  <div class="metric-value">0.94<span class="metric-unit">%</span></div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-label">Grade</div>
-                  <div class="metric-value grade">A-</div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-label">Testnet Ready</div>
-                  <div class="metric-value status-good">✓ READY</div>
-                </div>
-                <div class="metric-card">
-                  <div class="metric-label">Mainnet Ready</div>
-                  <div class="metric-value status-warning">⚠ CANDIDATE</div>
-                </div>
+              <div class="panel">
+                <div class="label">Generated At (UTC)</div>
+                <div class="value" id="generated-at">loading...</div>
               </div>
 
-              <h2 style="margin: 30px 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #38444d;">Module Status (20/20)</h2>
-              
-              <div class="modules">
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Consensus</span><span class="module-score">0.99</span></div>
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Custody</span><span class="module-score">0.99</span></div>
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Asset Kernel</span><span class="module-score">0.98</span></div>
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Bridge</span><span class="module-score">0.97</span></div>
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Governance</span><span class="module-score">0.96</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">Treasury</span><span class="module-score">0.95</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">X3VM</span><span class="module-score">0.95</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">DEX</span><span class="module-score">0.94</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">Flashloans</span><span class="module-score">0.94</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">Incident Response</span><span class="module-score">0.96</span></div>
-                <div class="module"><span class="module-level">P6</span><span class="module-name">Upgrade Safety</span><span class="module-score">0.96</span></div>
-                <div class="module"><span class="module-level">P5</span><span class="module-name">Launchpad</span><span class="module-score">0.93</span></div>
-                <div class="module"><span class="module-level">P5</span><span class="module-name">Oracle</span><span class="module-score">0.92</span></div>
-                <div class="module"><span class="module-level">P5</span><span class="module-name">X3Language</span><span class="module-score">0.93</span></div>
-                <div class="module"><span class="module-level">P5</span><span class="module-name">Smart Contracts</span><span class="module-score">0.92</span></div>
-                <div class="module"><span class="module-level">P7</span><span class="module-name">Formal Proofs</span><span class="module-score">1.00</span></div>
-                <div class="module"><span class="module-level">P4</span><span class="module-name">Social Consensus</span><span class="module-score">0.90</span></div>
-                <div class="module"><span class="module-level">P4</span><span class="module-name">Ecosystem Quality</span><span class="module-score">0.88</span></div>
-                <div class="module"><span class="module-level">P4</span><span class="module-name">Bug Bounty</span><span class="module-score">0.85</span></div>
+              <div class="panel">
+                <div class="label">Raw Dashboard JSON</div>
+                <pre id="payload">loading...</pre>
               </div>
 
               <footer>
@@ -492,6 +446,16 @@ jobs:
             </div>
             <script>
               document.getElementById('timestamp').textContent = new Date().toLocaleString();
+              Promise.all([
+                fetch('./metadata.json').then((r) => r.json()),
+                fetch('./proof-score.json').then((r) => r.json()),
+              ]).then(([meta, score]) => {
+                document.getElementById('generated-at').textContent = meta.generated_at || 'unknown';
+                document.getElementById('payload').textContent = JSON.stringify(score, null, 2);
+              }).catch((err) => {
+                document.getElementById('generated-at').textContent = 'unavailable';
+                document.getElementById('payload').textContent = `Failed to load dashboard JSON: ${err}`;
+              });
             </script>
           </body>
           </html>
@@ -508,19 +472,18 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
           cname: proofforge.x3.dev
-        continue-on-error: true
 
       - name: Create GitHub Pages Index
         run: |
+          SCORE=$(jq -r '.score // .overall_score // "unknown"' dashboard-data/proof-score.json 2>/dev/null || echo "unknown")
+          STATUS=$(jq -r '.status // .overall_status // "unknown"' dashboard-data/proof-score.json 2>/dev/null || echo "unknown")
           echo "## 📊 ProofForge Dashboard Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Dashboard available at: https://proofforge.x3.dev" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Latest Metrics:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Overall Score: 0.94 (A-)" >> $GITHUB_STEP_SUMMARY
-          echo "- Testnet: ✅ READY" >> $GITHUB_STEP_SUMMARY
-          echo "- Mainnet: 🟡 CANDIDATE" >> $GITHUB_STEP_SUMMARY
-          echo "- Modules Verified: 20/20" >> $GITHUB_STEP_SUMMARY
+          echo "- Overall Score: $SCORE" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: $STATUS" >> $GITHUB_STEP_SUMMARY
 
   # FINAL SUMMARY AND NOTIFICATIONS
   workflow-summary:
@@ -536,14 +499,14 @@ jobs:
             echo "## ✅ ProofForge CI/CD Pipeline Complete"
             echo ""
             echo "### Gate Results"
-            echo "- Pre-Commit Gate: ✅ PASSED"
-            echo "- S0 Security Gate: ✅ PASSED"
-            echo "- S1 Security Gate: ✅ PASSED"
-            echo "- Testnet Gate: ✅ READY"
+            echo "- Pre-Commit Gate: ${{ needs.pre-commit-gate.result }}"
+            echo "- S0 Security Gate: ${{ needs.s0-security-gate.result }}"
+            echo "- S1 Security Gate: ${{ needs.s1-security-gate.result }}"
+            echo "- Testnet Gate: ${{ needs.testnet-gate.result }}"
             echo ""
             echo "### Deployment Status"
-            echo "- Ready for testnet deployment"
-            echo "- Mainnet deployment pending release tag"
+            echo "- Testnet gate result above determines readiness."
+            echo "- Mainnet gate executes only on release tags."
             echo ""
             echo "### Next Steps"
             echo "1. Merge this PR to main branch"

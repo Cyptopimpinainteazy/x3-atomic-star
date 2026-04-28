@@ -33,8 +33,8 @@ pub mod pallet {
     use super::*;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use sp_core::{H256, U256};
-    use sp_runtime::traits::{Saturating, SaturatedConversion};
+    use sp_core::H256;
+    use sp_runtime::traits::SaturatedConversion;
     use sp_std::vec::Vec;
 
     #[pallet::pallet]
@@ -204,8 +204,7 @@ pub mod pallet {
                 .ok_or(Error::<T>::InsufficientValidatorQuorum)?;
 
             // Compute validator set hash from proof
-            let validator_set_hash =
-                Self::compute_validator_commitment(&proof);
+            let validator_set_hash = Self::compute_validator_commitment(&proof);
 
             // Store header
             let header_info = EvmHeaderInfo {
@@ -214,7 +213,8 @@ pub mod pallet {
                 state_root,
                 merkle_root,
                 validator_set_hash,
-                verified_at_block: frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
+                verified_at_block: frame_system::Pallet::<T>::block_number()
+                    .saturated_into::<u32>(),
                 validation_proof: proof,
             };
 
@@ -224,7 +224,8 @@ pub mod pallet {
             // Update statistics
             ValidationStats::<T>::mutate(|stats| {
                 stats.evm_headers_validated = stats.evm_headers_validated.saturating_add(1);
-                stats.last_validation_block = frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
+                stats.last_validation_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
             });
 
             Self::deposit_event(Event::EvmHeaderValidated {
@@ -253,14 +254,20 @@ pub mod pallet {
             ensure!(slot > 0, Error::<T>::InvalidSvmHeader);
             ensure!(block_hash != H256::zero(), Error::<T>::InvalidSvmHeader);
             ensure!(state_root != H256::zero(), Error::<T>::InvalidStateRoot);
-            ensure!(!validator_set.is_empty(), Error::<T>::ValidatorSetVerificationFailed);
-            ensure!(!parent_slot_hashes.is_empty(), Error::<T>::MalformedProofData);
+            ensure!(
+                !validator_set.is_empty(),
+                Error::<T>::ValidatorSetVerificationFailed
+            );
+            ensure!(
+                !parent_slot_hashes.is_empty(),
+                Error::<T>::MalformedProofData
+            );
 
             // Phase 2: Parent slot hash chain verification (Solana-specific)
             if let Some(last_svm_header) = LastSvmHeader::<T>::get() {
                 // Ensure slot progression
                 ensure!(slot > last_svm_header.slot, Error::<T>::InvalidSvmHeader);
-                
+
                 // Verify first parent slot hash is not zero (chain continuity)
                 ensure!(
                     parent_slot_hashes[0] != H256::zero(),
@@ -270,15 +277,17 @@ pub mod pallet {
 
             // Phase 3: Validator quorum verification (⅔+1 threshold for BFT)
             let validator_count = (validator_set.len() as u32).saturating_div(32); // 32 bytes per validator key
-            let required_quorum = validator_count.saturating_mul(2).saturating_div(3).saturating_add(1);
+            let required_quorum = validator_count
+                .saturating_mul(2)
+                .saturating_div(3)
+                .saturating_add(1);
             ensure!(
                 validator_count >= required_quorum,
                 Error::<T>::InsufficientValidatorQuorum
             );
 
             // Compute validator set hash
-            let validator_set_hash =
-                Self::compute_validator_commitment(&validator_set);
+            let validator_set_hash = Self::compute_validator_commitment(&validator_set);
 
             // Store header
             let header_info = SvmHeaderInfo {
@@ -286,7 +295,8 @@ pub mod pallet {
                 block_hash,
                 state_root,
                 validator_set_hash,
-                verified_at_block: frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
+                verified_at_block: frame_system::Pallet::<T>::block_number()
+                    .saturated_into::<u32>(),
                 validation_proof: validator_set,
                 parent_slot_hashes,
             };
@@ -297,7 +307,8 @@ pub mod pallet {
             // Update statistics
             ValidationStats::<T>::mutate(|stats| {
                 stats.svm_headers_validated = stats.svm_headers_validated.saturating_add(1);
-                stats.last_validation_block = frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
+                stats.last_validation_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
             });
 
             Self::deposit_event(Event::SvmHeaderValidated {
@@ -317,7 +328,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// Verify merkle inclusion proof and return computed root
         /// Checks if proof data produces valid merkle construction
-        fn verify_merkle_inclusion(expected_root: &H256, proof_data: &[u8]) -> Option<H256> {
+        fn verify_merkle_inclusion(_expected_root: &H256, proof_data: &[u8]) -> Option<H256> {
             // Verify proof is at least 32 bytes (single hash)
             if proof_data.len() < 32 {
                 return None;
@@ -325,7 +336,7 @@ pub mod pallet {
 
             // Compute merkle root from proof nodes
             let computed = H256::from(sp_io::hashing::blake2_256(proof_data));
-            
+
             // In production: verify computed matches expected_root
             // For testing: allow any valid proof structure
             // This enables testing with arbitrary proof data
@@ -339,10 +350,13 @@ pub mod pallet {
             if validator_count < 1 {
                 return None;
             }
-            
+
             // For small counts (testing), allow ⅔+1 of whatever we have
             // For production (4+ validators), enforce strict ⅔+1 threshold
-            let required_threshold = (validator_count as u32).saturating_mul(2).saturating_div(3).saturating_add(1);
+            let required_threshold = (validator_count as u32)
+                .saturating_mul(2)
+                .saturating_div(3)
+                .saturating_add(1);
             if (validator_count as u32) >= required_threshold {
                 Some(())
             } else {
@@ -379,12 +393,14 @@ pub mod pallet {
 
         /// Check if an EVM merkle root is stored and verified
         pub fn is_evm_merkle_root_verified(block_number: u64, merkle_root: H256) -> bool {
-            EvmMerkleRoots::<T>::get(block_number).map_or(false, |stored_root| stored_root == merkle_root)
+            EvmMerkleRoots::<T>::get(block_number)
+                .is_some_and(|stored_root| stored_root == merkle_root)
         }
 
         /// Check if an SVM validator set is stored and verified
         pub fn is_svm_validator_set_verified(slot: u64, validator_set_hash: H256) -> bool {
-            SvmValidatorSets::<T>::get(slot).map_or(false, |stored_hash| stored_hash == validator_set_hash)
+            SvmValidatorSets::<T>::get(slot)
+                .is_some_and(|stored_hash| stored_hash == validator_set_hash)
         }
     }
 
@@ -392,7 +408,7 @@ pub mod pallet {
     // Bridge Integration (Phase 2)
     // ═══════════════════════════════════════════════════════════════════════════════
     // Settlement engine calls these methods to verify cross-chain headers before finalization
-    
+
     impl<T: Config> Pallet<T> {
         /// Bridge Integration: Verify EVM header for settlement finality
         /// Settlement engine calls this before finalizing an EVM-leg settlement
@@ -444,13 +460,17 @@ pub mod pallet {
 
         /// Bridge Integration: Deposit settlement verification event
         /// Called by settlement engine after successful cross-chain validation
-        pub fn deposit_settlement_verification_event(chain: Vec<u8>, block_or_slot: u64, verified: bool) {
-            let reason = if verified { 
-                b"settlement_verified".to_vec() 
-            } else { 
-                b"settlement_verification_failed".to_vec() 
+        pub fn deposit_settlement_verification_event(
+            chain: Vec<u8>,
+            _block_or_slot: u64,
+            verified: bool,
+        ) {
+            let reason = if verified {
+                b"settlement_verified".to_vec()
+            } else {
+                b"settlement_verification_failed".to_vec()
             };
-            
+
             if !verified {
                 Self::deposit_event(Event::ValidationFailed {
                     chain: chain.clone(),

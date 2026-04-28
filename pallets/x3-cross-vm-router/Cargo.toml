@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 [dependencies]
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
-codec = { package = "parity-scale-codec", workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
@@ -23,6 +23,8 @@ sp-api = { workspace = true, default-features = false }
 serde = { workspace = true, optional = true, features = ["derive"] }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
+x3-packet-standard = { path = "../../crates/x3-packet-standard", default-features = false }
+x3-ixl = { path = "../../crates/x3-ixl", default-features = false }
 
 [features]
 default = ["std"]
@@ -39,10 +41,16 @@ std = [
     "serde",
     "serde/std",
     "x3-asset-kernel-types/std",
+    "x3-packet-standard/std",
+    "x3-ixl/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
+]
+runtime-benchmarks = [
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
 ]
 
 [dev-dependencies]

@@ -1,31 +1,34 @@
-use anyhow::{Context, Result};
-use colored::*;
-use std::path::PathBuf;
-use std::collections::HashMap;
-use tokio::process::Command;
 use crate::proof::*;
+use crate::receipt;
+use anyhow::Result;
 use chrono::Utc;
+use colored::*;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub mod asset_kernel;
+pub mod atomic;
 pub mod bridge;
-pub mod consensus;
-pub mod runtime;
-pub mod governance;
-pub mod treasury;
-pub mod dex;
-pub mod launchpad;
-pub mod oracle;
-pub mod x3vm;
-pub mod x3language;
-pub mod flashloans;
-pub mod smart_contracts;
-pub mod formal_proofs;
-pub mod custody;
-pub mod incident_response;
-pub mod social_consensus;
-pub mod ecosystem_quality;
-pub mod upgrade_safety;
 pub mod bug_bounty;
+pub mod consensus;
+pub mod custody;
+pub mod dex;
+pub mod ecosystem_quality;
+pub mod flashloans;
+pub mod formal_proofs;
+pub mod governance;
+pub mod gpu;
+pub mod incident_response;
+pub mod launchpad;
+pub mod operational;
+pub mod oracle;
+pub mod runtime;
+pub mod smart_contracts;
+pub mod social_consensus;
+pub mod treasury;
+pub mod upgrade_safety;
+pub mod x3language;
+pub mod x3vm;
 
 pub async fn verify_claim(
     workspace: &PathBuf,
@@ -33,24 +36,31 @@ pub async fn verify_claim(
     strict: bool,
     verbose: bool,
 ) -> Result<()> {
-    println!(
-        "{}",
-        format!("Verifying claim: {}", claim_id).bold().cyan()
-    );
-    
+    println!("{}", format!("Verifying claim: {}", claim_id).bold().cyan());
+
     // Extract area from claim_id (e.g., x3.bridge.replay_protection -> bridge)
-    let area = claim_id.split('.').nth(1).unwrap_or("unknown");
-    
-    let mut result = match area {
+    let area_raw = claim_id.split('.').nth(1).unwrap_or("unknown");
+    let area = normalize_area(area_raw);
+
+    let result = match area.as_str() {
         "asset-kernel" => asset_kernel::verify_claim(workspace, claim_id, verbose).await?,
+        "atomic" => atomic::verify_claim(workspace, claim_id, verbose).await?,
         "bridge" => bridge::verify_claim(workspace, claim_id, verbose).await?,
         "consensus" => consensus::verify_claim(workspace, claim_id, verbose).await?,
+        "gpu" => gpu::verify_claim(workspace, claim_id, verbose).await?,
         "runtime" => runtime::verify_claim(workspace, claim_id, verbose).await?,
         "governance" => governance::verify_claim(workspace, claim_id, verbose).await?,
         "treasury" => treasury::verify_claim(workspace, claim_id, verbose).await?,
         "dex" => dex::verify_claim(workspace, claim_id, verbose).await?,
         "oracle" => oracle::verify_claim(workspace, claim_id, verbose).await?,
         "x3vm" => x3vm::verify_claim(workspace, claim_id, verbose).await?,
+        "x3language" => x3language::verify_claim(workspace, claim_id, verbose).await?,
+        "flashloans" => flashloans::verify_claim(workspace, claim_id, verbose).await?,
+        "smart-contracts" => smart_contracts::verify_claim(workspace, claim_id, verbose).await?,
+        "onboarding" | "funding" | "evolution" => {
+            operational::verify_claim(workspace, claim_id, verbose).await?
+        }
+        "proofforge" => verify_proofforge_claim(claim_id)?,
         _ => {
             let mut r = ProofResult {
                 claim_id: claim_id.to_string(),
@@ -78,6 +88,25 @@ pub async fn verify_claim(
             r
         }
     };
+
+    // Emit structured claim receipts for every verification run. Failures are
+    // reported but do not crash verification output.
+    let relevant_files: Vec<PathBuf> = result
+        .files_inspected
+        .iter()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect();
+    let mut limitations = result.missing_proofs.clone();
+    limitations.extend(result.blockers.clone());
+    if let Err(e) =
+        receipt::generate_claim_receipt(claim_id, result.clone(), relevant_files, limitations)
+    {
+        eprintln!(
+            "Warning: failed to generate structured receipt for {}: {}",
+            claim_id, e
+        );
+    }
 
     // Print result
     println!();
@@ -116,6 +145,123 @@ pub async fn verify_claim(
     Ok(())
 }
 
+fn normalize_area(area: &str) -> String {
+    match area {
+        "asset_kernel" | "asset-kernel" => "asset-kernel".to_string(),
+        "x3lang" | "x3language" => "x3language".to_string(),
+        "flashloan" | "flashloans" => "flashloans".to_string(),
+        "contracts" | "smart_contracts" | "smart-contracts" => "smart-contracts".to_string(),
+        "gpu" | "gpu_validator" => "gpu".to_string(),
+        "atomic" | "atomic_kernel" => "atomic".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn verify_proofforge_claim(claim_id: &str) -> Result<ProofResult> {
+    let statuses = receipt::check_all_receipts()?;
+    let mut failed_checks = Vec::new();
+    let mut passed_checks = Vec::new();
+
+    let mut invalid_ids: Vec<String> = statuses
+        .iter()
+        .filter(|(_, s)| {
+            matches!(
+                s,
+                receipt::ReceiptStatus::Invalid | receipt::ReceiptStatus::IntegrityFailed
+            )
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
+    invalid_ids.sort();
+
+    let mut stale_ids: Vec<String> = statuses
+        .iter()
+        .filter(|(_, s)| {
+            matches!(
+                s,
+                receipt::ReceiptStatus::Stale | receipt::ReceiptStatus::NotFresh
+            )
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
+    stale_ids.sort();
+
+    let invalid = statuses
+        .iter()
+        .filter(|(_, s)| {
+            matches!(
+                s,
+                receipt::ReceiptStatus::Invalid | receipt::ReceiptStatus::IntegrityFailed
+            )
+        })
+        .count();
+    let stale = statuses
+        .iter()
+        .filter(|(_, s)| {
+            matches!(
+                s,
+                receipt::ReceiptStatus::Stale | receipt::ReceiptStatus::NotFresh
+            )
+        })
+        .count();
+    let fresh = statuses
+        .iter()
+        .filter(|(_, s)| matches!(s, receipt::ReceiptStatus::Fresh))
+        .count();
+
+    if fresh > 0 {
+        passed_checks.push(format!("{} fresh receipts", fresh));
+    }
+    if invalid > 0 {
+        failed_checks.push(format!("{} invalid/integrity-failed receipts", invalid));
+        failed_checks.push(format!("invalid receipts: {}", invalid_ids.join(", ")));
+    }
+    if stale > 0 {
+        failed_checks.push(format!("{} stale/not-fresh receipts", stale));
+        failed_checks.push(format!("stale receipts: {}", stale_ids.join(", ")));
+    }
+
+    let status = if invalid == 0 && stale == 0 && fresh > 0 {
+        ProofStatus::Verified
+    } else if fresh > 0 {
+        ProofStatus::Partial
+    } else {
+        ProofStatus::Failed
+    };
+
+    let score = match status {
+        ProofStatus::Verified => 1.0,
+        ProofStatus::Partial => 0.5,
+        _ => 0.0,
+    };
+
+    let mut evidence = HashMap::new();
+    evidence.insert("fresh_receipts".to_string(), fresh.to_string());
+    evidence.insert("invalid_receipts".to_string(), invalid.to_string());
+    evidence.insert("stale_receipts".to_string(), stale.to_string());
+
+    Ok(ProofResult {
+        claim_id: claim_id.to_string(),
+        claim: "ProofForge receipt integrity and freshness".to_string(),
+        status,
+        proof_level: None,
+        edge_case_level: None,
+        hack_level: None,
+        operator_level: None,
+        degraded_level: None,
+        files_inspected: vec!["proof/receipts/claims".to_string()],
+        commands_run: vec!["x3-proof verify <claim> --strict".to_string()],
+        passed_checks,
+        failed_checks,
+        missing_proofs: vec![],
+        blockers: vec![],
+        score,
+        evidence,
+        timestamp: Utc::now(),
+        duration_ms: 0,
+    })
+}
+
 pub async fn prove_area(
     workspace: &PathBuf,
     area: &str,
@@ -124,12 +270,15 @@ pub async fn prove_area(
     verbose: bool,
 ) -> Result<()> {
     if dry_run {
-        println!("{}", format!("DRY RUN: Would prove area '{}'", area).yellow());
+        println!(
+            "{}",
+            format!("DRY RUN: Would prove area '{}'", area).yellow()
+        );
         return Ok(());
     }
 
     println!("{}", format!("Proving area: {}", area).bold().cyan());
-    
+
     let result = match area {
         "asset-kernel" => asset_kernel::run_proofs(workspace, verbose).await?,
         "bridge" => bridge::run_proofs(workspace, verbose).await?,
@@ -165,7 +314,7 @@ pub async fn prove_all(
     }
 
     println!("{}", "Proving all areas...".bold().cyan());
-    
+
     let areas = vec![
         "asset-kernel",
         "bridge",
@@ -210,9 +359,15 @@ pub async fn prove_all(
     };
 
     println!();
-    println!("{}", "═══════════════════════════════════════════════════".bold());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════".bold()
+    );
     println!("{}", "PROOF SUMMARY".bold().cyan());
-    println!("{}", "═══════════════════════════════════════════════════".bold());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════".bold()
+    );
     println!("Total Areas: {}", results.len());
     println!("Average Score: {:.1}%", avg_score * 100.0);
     println!("Blocked Areas: {}", blocked_count);
@@ -229,7 +384,12 @@ pub async fn prove_all(
 fn grep_rs(root: &PathBuf, pattern: &str) -> bool {
     use std::process::Command as StdCommand;
     let out = StdCommand::new("grep")
-        .args(["-rql", "--include=*.rs", pattern, root.to_str().unwrap_or(".")])
+        .args([
+            "-rql",
+            "--include=*.rs",
+            pattern,
+            root.to_str().unwrap_or("."),
+        ])
         .output();
     matches!(out, Ok(o) if o.status.success())
 }
@@ -276,12 +436,12 @@ pub async fn check_security_gate(
     }
 
     let supply_ledger = pallets.join("x3-supply-ledger/src/lib.rs");
-    let settlement   = pallets.join("x3-settlement-engine/src/lib.rs");
-    let evolution    = pallets.join("evolution-core/src/lib.rs");
-    let governance   = pallets.join("governance/src/lib.rs");
-    let x3_coin      = pallets.join("x3-coin/src/lib.rs");
-    let x3_wallet    = pallets.join("x3-wallet-pallet/src/lib.rs");
-    let invariants   = pallets.join("x3-invariants/src/lib.rs");
+    let settlement = pallets.join("x3-settlement-engine/src/lib.rs");
+    let evolution = pallets.join("evolution-core/src/lib.rs");
+    let governance = pallets.join("governance/src/lib.rs");
+    let x3_coin = pallets.join("x3-coin/src/lib.rs");
+    let x3_wallet = pallets.join("x3-wallet-pallet/src/lib.rs");
+    let invariants = pallets.join("x3-invariants/src/lib.rs");
 
     let s0: Vec<Check> = vec![
         Check {
@@ -321,8 +481,7 @@ pub async fn check_security_gate(
         Check {
             id: "runtime_panic_critical_path",
             // Pass if x3-invariants no longer has bare panic! (only defensive!/log)
-            passed: !grep_file(&invariants, "panic!(")
-                || grep_file(&invariants, "defensive!"),
+            passed: !grep_file(&invariants, "panic!(") || grep_file(&invariants, "defensive!"),
             evidence: "x3-invariants uses defensive! instead of panic!",
         },
     ];
@@ -375,7 +534,10 @@ pub async fn check_security_gate(
     println!();
     let total_failed = s0_failed.len() + s1_failed.len();
     if total_failed == 0 {
-        println!("{}", "Gate Status: ALL SECURITY GATES PASS ✅".bold().green());
+        println!(
+            "{}",
+            "Gate Status: ALL SECURITY GATES PASS ✅".bold().green()
+        );
     } else {
         println!(
             "{}",
@@ -383,8 +545,12 @@ pub async fn check_security_gate(
                 .bold()
                 .red()
         );
-        for id in &s0_failed { println!("  ⛔ S0: {}", id); }
-        for id in &s1_failed { println!("  ⛔ S1: {}", id); }
+        for id in &s0_failed {
+            println!("  ⛔ S0: {}", id);
+        }
+        for id in &s1_failed {
+            println!("  ⛔ S1: {}", id);
+        }
     }
 
     if fail_hard && total_failed > 0 {
@@ -403,9 +569,7 @@ pub async fn test_hack_resistance(
     let target = area.as_deref().unwrap_or("all");
     println!(
         "{}",
-        format!("Testing hack resistance: {}", target)
-            .bold()
-            .cyan()
+        format!("Testing hack resistance: {}", target).bold().cyan()
     );
 
     println!();
@@ -417,7 +581,10 @@ pub async fn test_hack_resistance(
     println!("  {} Double execution", "→".red());
 
     println!();
-    println!("{}", "Status: Tests would run in integration environment".yellow());
+    println!(
+        "{}",
+        "Status: Tests would run in integration environment".yellow()
+    );
 
     Ok(())
 }
@@ -431,9 +598,7 @@ pub async fn test_edge_cases(
     let target = area.as_deref().unwrap_or("all");
     println!(
         "{}",
-        format!("Testing edge cases: {}", target)
-            .bold()
-            .cyan()
+        format!("Testing edge cases: {}", target).bold().cyan()
     );
 
     println!();
@@ -445,7 +610,10 @@ pub async fn test_edge_cases(
     println!("  {} Timeout cases", "→".yellow());
 
     println!();
-    println!("{}", "Status: Fuzzing would run in test environment".yellow());
+    println!(
+        "{}",
+        "Status: Fuzzing would run in test environment".yellow()
+    );
 
     Ok(())
 }
@@ -472,7 +640,10 @@ pub async fn test_limp_mode(
     println!("  {} Partial state corruption", "→".yellow());
 
     println!();
-    println!("{}", "Expected: Safe degradation with recovery paths".green());
+    println!(
+        "{}",
+        "Expected: Safe degradation with recovery paths".green()
+    );
 
     Ok(())
 }
@@ -512,9 +683,12 @@ pub async fn check_formal_proofs(
 ) -> Result<()> {
     println!(
         "{}",
-        format!("Checking formal proofs: {}", area.as_deref().unwrap_or("all"))
-            .bold()
-            .cyan()
+        format!(
+            "Checking formal proofs: {}",
+            area.as_deref().unwrap_or("all")
+        )
+        .bold()
+        .cyan()
     );
 
     println!();
@@ -524,7 +698,10 @@ pub async fn check_formal_proofs(
     println!("  {} Consensus safety", "?".yellow());
 
     println!();
-    println!("{}", "Note: Formal proofs require specialized tools and time".yellow());
+    println!(
+        "{}",
+        "Note: Formal proofs require specialized tools and time".yellow()
+    );
 
     Ok(())
 }
@@ -537,13 +714,15 @@ pub async fn generate_receipt(
 ) -> Result<()> {
     println!(
         "{}",
-        format!("Generating {} receipt", receipt_type)
-            .bold()
-            .cyan()
+        format!("Generating {} receipt", receipt_type).bold().cyan()
     );
 
     let receipt = ProofReceipt {
-        receipt_id: format!("receipt-{}-{}", receipt_type, chrono::Local::now().format("%s")),
+        receipt_id: format!(
+            "receipt-{}-{}",
+            receipt_type,
+            chrono::Local::now().format("%s")
+        ),
         timestamp: Utc::now(),
         receipt_type: receipt_type.to_string(),
         areas: areas.to_vec(),
@@ -669,16 +848,10 @@ pub async fn check_ai_patch(
     Ok(())
 }
 
-pub async fn explain_blockers(
-    workspace: &PathBuf,
-    area: &str,
-    verbose: bool,
-) -> Result<()> {
+pub async fn explain_blockers(workspace: &PathBuf, area: &str, verbose: bool) -> Result<()> {
     println!(
         "{}",
-        format!("Explaining blockers for: {}", area)
-            .bold()
-            .cyan()
+        format!("Explaining blockers for: {}", area).bold().cyan()
     );
 
     println!();
@@ -696,10 +869,7 @@ pub async fn explain_blockers(
     Ok(())
 }
 
-pub async fn list_all_claims(
-    workspace: &PathBuf,
-    verbose: bool,
-) -> Result<()> {
+pub async fn list_all_claims(workspace: &PathBuf, verbose: bool) -> Result<()> {
     println!("{}", "All Claims in Registry:".bold().cyan());
 
     println!();
@@ -720,9 +890,15 @@ pub async fn list_all_claims(
 
 fn print_proof_summary(result: &ProofResult) {
     println!();
-    println!("{}", "═══════════════════════════════════════════════════".bold());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════".bold()
+    );
     println!("{}", "PROOF RESULT".bold().cyan());
-    println!("{}", "═══════════════════════════════════════════════════".bold());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════".bold()
+    );
     println!("{}  {}", "Status:".bold(), format_status(&result.status));
     println!("{}  {:.1}%", "Score:".bold(), result.score * 100.0);
     println!("{}  {} ms", "Duration:".bold(), result.duration_ms);

@@ -52,10 +52,7 @@ impl Registry {
 
     /// Get claims by area
     pub fn claims_by_area(&self, area: &str) -> Vec<&Claim> {
-        self.claims
-            .values()
-            .filter(|c| c.area == area)
-            .collect()
+        self.claims.values().filter(|c| c.area == area).collect()
     }
 
     /// Get unproven claims

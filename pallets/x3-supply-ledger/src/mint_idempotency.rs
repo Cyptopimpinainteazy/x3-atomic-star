@@ -82,12 +82,7 @@ impl MintIdempotencyToken {
     ///
     /// Uses Blake2-256 over concatenated inputs:
     /// hash = Blake2_256(origin || asset_id || amount || nonce)
-    pub fn compute_hash(
-        origin: &[u8],
-        asset_id: &[u8; 32],
-        amount: Balance,
-        nonce: u64,
-    ) -> H256 {
+    pub fn compute_hash(origin: &[u8], asset_id: &[u8; 32], amount: Balance, nonce: u64) -> H256 {
         use sp_io::hashing::blake2_256;
 
         // Concatenate all inputs for hashing
@@ -101,13 +96,7 @@ impl MintIdempotencyToken {
     }
 
     /// Verify this token matches the given parameters.
-    pub fn verify(
-        &self,
-        origin: &[u8],
-        asset_id: &[u8; 32],
-        amount: Balance,
-        nonce: u64,
-    ) -> bool {
+    pub fn verify(&self, origin: &[u8], asset_id: &[u8; 32], amount: Balance, nonce: u64) -> bool {
         // Check nonce matches
         if self.nonce != nonce {
             return false;
@@ -201,15 +190,11 @@ pub enum IdempotencyError {
 impl From<IdempotencyError> for DispatchError {
     fn from(err: IdempotencyError) -> Self {
         match err {
-            IdempotencyError::InvalidNonce { .. } => {
-                DispatchError::Other("Invalid mint nonce")
-            }
+            IdempotencyError::InvalidNonce { .. } => DispatchError::Other("Invalid mint nonce"),
             IdempotencyError::DuplicateMint { .. } => {
                 DispatchError::Other("Duplicate mint detected")
             }
-            IdempotencyError::HashMismatch => {
-                DispatchError::Other("Mint hash verification failed")
-            }
+            IdempotencyError::HashMismatch => DispatchError::Other("Mint hash verification failed"),
         }
     }
 }
@@ -345,10 +330,7 @@ mod tests {
             |_| true, // Already used
         );
 
-        assert_eq!(
-            result,
-            Err(IdempotencyError::DuplicateMint { nonce: 5 })
-        );
+        assert_eq!(result, Err(IdempotencyError::DuplicateMint { nonce: 5 }));
     }
 
     #[test]
@@ -360,9 +342,6 @@ mod tests {
 
     #[test]
     fn test_next_nonce_saturates_at_max() {
-        assert_eq!(
-            IdempotencyValidator::next_nonce(u64::MAX),
-            u64::MAX
-        );
+        assert_eq!(IdempotencyValidator::next_nonce(u64::MAX), u64::MAX);
     }
 }

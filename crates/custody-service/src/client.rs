@@ -30,6 +30,12 @@ pub struct MockCustodyClient {
     audit_entries: parking_lot::RwLock<Vec<AuditLogEntry>>,
 }
 
+    impl Default for MockCustodyClient {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
 impl MockCustodyClient {
     pub fn new() -> Self {
         Self {

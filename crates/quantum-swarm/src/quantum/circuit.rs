@@ -158,11 +158,13 @@ impl Gate {
                     vec![zero, Complex64::from_polar(1.0, theta / 2.0)],
                 ]
             }
+            // Unitary ordering: (00, qubit1_set, qubit2_set, both_set) matching LSB state indexing
+            // where qubit1 is the first argument (e.g. control for CNOT)
             GateType::Cnot => vec![
                 vec![one, zero, zero, zero],
-                vec![zero, one, zero, zero],
                 vec![zero, zero, zero, one],
                 vec![zero, zero, one, zero],
+                vec![zero, one, zero, zero],
             ],
             GateType::Cz => vec![
                 vec![one, zero, zero, zero],
@@ -170,6 +172,28 @@ impl Gate {
                 vec![zero, zero, one, zero],
                 vec![zero, zero, zero, -one],
             ],
+            GateType::Rzz => {
+                let theta = self.parameters.get(0).copied().unwrap_or(0.0);
+                let ep = Complex64::from_polar(1.0, theta / 2.0);
+                let em = Complex64::from_polar(1.0, -theta / 2.0);
+                vec![
+                    vec![em, zero, zero, zero],
+                    vec![zero, ep, zero, zero],
+                    vec![zero, zero, ep, zero],
+                    vec![zero, zero, zero, em],
+                ]
+            }
+            GateType::Rxx => {
+                let theta = self.parameters.get(0).copied().unwrap_or(0.0);
+                let cos = Complex64::new((theta / 2.0).cos(), 0.0);
+                let neg_i_sin = Complex64::new(0.0, -(theta / 2.0).sin());
+                vec![
+                    vec![cos, zero, zero, neg_i_sin],
+                    vec![zero, cos, neg_i_sin, zero],
+                    vec![zero, neg_i_sin, cos, zero],
+                    vec![neg_i_sin, zero, zero, cos],
+                ]
+            }
             _ => vec![vec![one]], // Identity fallback
         }
     }

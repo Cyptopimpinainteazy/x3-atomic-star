@@ -36,7 +36,7 @@ pub mod pallet {
     #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
     pub struct JuryMetadata {
         pub member_count: u32,
-        pub quorum_threshold: u32,  // 0-100, e.g., 66
+        pub quorum_threshold: u32, // 0-100, e.g., 66
         pub result: bool,
         pub session_duration_secs: u32,
     }
@@ -48,12 +48,17 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         Vec<u8>,
-        JuryDecisionRecord<BlockNumberFor<T>, <T as pallet_timestamp::Config>::Moment, <T as frame_system::Config>::AccountId>,
+        JuryDecisionRecord<
+            BlockNumberFor<T>,
+            <T as pallet_timestamp::Config>::Moment,
+            <T as frame_system::Config>::AccountId,
+        >,
     >;
 
     #[pallet::storage]
     #[pallet::getter(fn jury_authority)]
-    pub type JuryAuthority<T: Config> = StorageValue<_, <T as frame_system::Config>::AccountId, OptionQuery>;
+    pub type JuryAuthority<T: Config> =
+        StorageValue<_, <T as frame_system::Config>::AccountId, OptionQuery>;
 
     #[pallet::storage]
     #[pallet::getter(fn decision_count)]
@@ -90,7 +95,7 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::call_index(0)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::DbWeight::get().reads_writes(1, 2))]
         pub fn anchor_decision(
             origin: OriginFor<T>,
             session_id: Vec<u8>,
@@ -143,7 +148,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(1)]
-        #[pallet::weight(5_000)]
+        #[pallet::weight(T::DbWeight::get().writes(1))]
         pub fn set_jury_authority(
             origin: OriginFor<T>,
             new_authority: <T as frame_system::Config>::AccountId,
@@ -151,9 +156,7 @@ pub mod pallet {
             ensure_root(origin)?;
             JuryAuthority::<T>::put(&new_authority);
 
-            Self::deposit_event(Event::AuthorityChanged {
-                new_authority,
-            });
+            Self::deposit_event(Event::AuthorityChanged { new_authority });
 
             Ok(())
         }
@@ -167,10 +170,7 @@ pub mod pallet {
             JuryDecisions::<T>::get(&session_id)
         }
 
-        pub fn verify_decision(
-            session_id: Vec<u8>,
-            expected_hash: H256,
-        ) -> bool {
+        pub fn verify_decision(session_id: Vec<u8>, expected_hash: H256) -> bool {
             if let Some(record) = Self::get_jury_decision(session_id) {
                 record.decision_hash == expected_hash
             } else {
@@ -272,7 +272,8 @@ mod tests {
                 RuntimeOrigin::signed(2),
                 b"test".to_vec(),
                 H256::repeat_byte(1),
-            ).is_err());
+            )
+            .is_err());
         });
     }
 
@@ -285,7 +286,8 @@ mod tests {
                 RuntimeOrigin::signed(1),
                 vec![],
                 H256::repeat_byte(1),
-            ).is_err());
+            )
+            .is_err());
         });
     }
 
@@ -296,11 +298,8 @@ mod tests {
             let hash = H256::repeat_byte(2);
 
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
-            JuryAnchor::anchor_decision(
-                RuntimeOrigin::signed(1),
-                session_id.clone(),
-                hash,
-            ).unwrap();
+            JuryAnchor::anchor_decision(RuntimeOrigin::signed(1), session_id.clone(), hash)
+                .unwrap();
 
             assert!(JuryAnchor::verify_decision(session_id.clone(), hash));
         });
@@ -314,11 +313,8 @@ mod tests {
             let hash2 = H256::repeat_byte(4);
 
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
-            JuryAnchor::anchor_decision(
-                RuntimeOrigin::signed(1),
-                session_id.clone(),
-                hash1,
-            ).unwrap();
+            JuryAnchor::anchor_decision(RuntimeOrigin::signed(1), session_id.clone(), hash1)
+                .unwrap();
 
             assert!(!JuryAnchor::verify_decision(session_id, hash2));
         });
@@ -331,17 +327,12 @@ mod tests {
             let hash = H256::repeat_byte(5);
 
             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
-            JuryAnchor::anchor_decision(
-                RuntimeOrigin::signed(1),
-                session_id.clone(),
-                hash,
-            ).unwrap();
+            JuryAnchor::anchor_decision(RuntimeOrigin::signed(1), session_id.clone(), hash)
+                .unwrap();
 
-            assert!(JuryAnchor::anchor_decision(
-                RuntimeOrigin::signed(1),
-                session_id,
-                hash,
-            ).is_err());
+            assert!(
+                JuryAnchor::anchor_decision(RuntimeOrigin::signed(1), session_id, hash,).is_err()
+            );
         });
     }
 
@@ -377,7 +368,8 @@ mod tests {
                 RuntimeOrigin::signed(1),
                 b"test".to_vec(),
                 H256::repeat_byte(1),
-            ).is_err());
+            )
+            .is_err());
 
             assert_ok!(JuryAnchor::anchor_decision(
                 RuntimeOrigin::signed(2),

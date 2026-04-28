@@ -758,7 +758,10 @@ mod tests {
 
         // Check initial balance
         let balance1 = bridge.get_wrapped_balance("0xAlice_X3", "0xUSDC");
-        assert_eq!(balance1, 1_000_000u128, "Balance should be 1M after first mint");
+        assert_eq!(
+            balance1, 1_000_000u128,
+            "Balance should be 1M after first mint"
+        );
 
         // Second execution with same message_id should FAIL (replay protection)
         let result2 = bridge.execute_mint(&msg.id, "0xAlice_X3".to_string(), 1001);

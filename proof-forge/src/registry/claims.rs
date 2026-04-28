@@ -10,8 +10,7 @@ pub struct ClaimFile {
 }
 
 pub fn parse_claims(content: &str) -> anyhow::Result<ClaimFile> {
-    serde_json::from_str(content)
-        .map_err(|e| anyhow::anyhow!("Failed to parse claims: {}", e))
+    serde_json::from_str(content).map_err(|e| anyhow::anyhow!("Failed to parse claims: {}", e))
 }
 
 pub fn serialize_claims(claims: &[Claim]) -> anyhow::Result<String> {

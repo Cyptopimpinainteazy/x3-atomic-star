@@ -3,389 +3,358 @@
 # X3 MAINNET GO/NO-GO DECISION ENGINE
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# Generates a final mainnet readiness score based on:
-# 1. Proof-based scoring (not vibes)
-# 2. Hard fail gates (P0 blockers stop launch)
-# 3. Evidence matrix (every claim has proof)
-# 4. Category weights (bridge/atomic = 48% of score)
+# Computes mainnet readiness from real ProofForge evidence:
+# - claim statuses in proof/claims/registry.yml
+# - structured claim receipts in proof/receipts/claims/*.json
 #
-# Output: launch-gates/reports/mainnet-go-no-go.md
+# Output: launch-gates/reports/X3-MAINNET-GO-NO-GO-<timestamp>.md
 #
-# Usage: ./mainnet-go-no-go.sh
+# Usage: ./mainnet-go-no-go-template.sh
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-REPO_ROOT="/home/lojak/Desktop/X3_ATOMIC_STAR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPORTS_DIR="${REPO_ROOT}/launch-gates/reports"
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+REGISTRY_FILE="${REPO_ROOT}/proof/claims/registry.yml"
+RECEIPTS_DIR="${REPO_ROOT}/proof/receipts/claims"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+FRESH_HOURS="${FRESH_HOURS:-24}"
 
 mkdir -p "${REPORTS_DIR}"
 cd "${REPO_ROOT}"
 
-echo "═══════════════════════════════════════════════════════════════════════════════"
-echo "X3 MAINNET GO/NO-GO DECISION - $(date)"
-echo "═══════════════════════════════════════════════════════════════════════════════"
-echo ""
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required for go/no-go scoring." >&2
+  exit 2
+fi
 
-# Initialize scoring
+if [[ ! -f "${REGISTRY_FILE}" ]]; then
+  echo "ERROR: missing claims registry: ${REGISTRY_FILE}" >&2
+  exit 2
+fi
+
+if [[ ! -d "${RECEIPTS_DIR}" ]]; then
+  echo "ERROR: missing receipts directory: ${RECEIPTS_DIR}" >&2
+  exit 2
+fi
+
+declare -A CATEGORY_WEIGHT=(
+  ["Runtime / Pallets"]=12
+  ["Consensus & Finality"]=12
+  ["Universal Asset Kernel"]=15
+  ["Atomic Cross-VM Execution"]=18
+  ["Bridge Security"]=15
+  ["DEX / Liquidity"]=8
+  ["Governance / Launch Gates"]=6
+  ["Validator Operations"]=6
+  ["Observability"]=4
+  ["Documentation / Code Drift"]=4
+)
+
+CATEGORY_ORDER=(
+  "Runtime / Pallets"
+  "Consensus & Finality"
+  "Universal Asset Kernel"
+  "Atomic Cross-VM Execution"
+  "Bridge Security"
+  "DEX / Liquidity"
+  "Governance / Launch Gates"
+  "Validator Operations"
+  "Observability"
+  "Documentation / Code Drift"
+)
+
+declare -A CATEGORY_SCORE_SUM
+declare -A CATEGORY_CLAIM_COUNT
+declare -A CATEGORY_AVG
+
+status_to_score() {
+  case "$1" in
+    VERIFIED|verified|pass|passed) echo 100 ;;
+    PARTIAL|partial) echo 60 ;;
+    STALE|stale) echo 30 ;;
+    UNVERIFIED|unverified) echo 20 ;;
+    BLOCKED|blocked|FAILED|failed|REVOKED|revoked) echo 0 ;;
+    *) echo 0 ;;
+  esac
+}
+
+claim_to_category() {
+  local claim="$1"
+  case "${claim}" in
+    x3.asset_kernel.*) echo "Universal Asset Kernel" ;;
+    x3.bridge.*) echo "Bridge Security" ;;
+    x3.atomic.*) echo "Atomic Cross-VM Execution" ;;
+    x3.governance.*) echo "Governance / Launch Gates" ;;
+    x3.gpu.*) echo "Validator Operations" ;;
+    x3.flashloan.*|x3.x3vm.*|x3.x3lang.*|x3.contracts.*) echo "Runtime / Pallets" ;;
+    x3.onboarding.*|x3.funding.*|x3.evolution.*) echo "Documentation / Code Drift" ;;
+    *) echo "Runtime / Pallets" ;;
+  esac
+}
+
+receipt_shape_valid() {
+  local file="$1"
+  jq -e '
+    has("repo_commit_hash") and
+    has("command_run") and
+    has("artifact_hash") and
+    has("policy_hash") and
+    has("relevant_files") and
+    has("timestamp") and
+    has("result") and
+    has("limitations") and
+    has("binding_hash")
+  ' "$file" >/dev/null 2>&1
+}
+
+min_score() {
+  local a="$1"
+  local b="$2"
+  if (( a < b )); then
+    echo "$a"
+  else
+    echo "$b"
+  fi
+}
+
+BLOCKERS_P0=()
+BLOCKERS_P1=()
+BLOCKERS_P2=()
+CLAIM_ROWS=""
+
+TOTAL_CLAIMS=0
+S0_CLAIMS=0
+S0_VERIFIED=0
+RECEIPT_OK=0
+RECEIPT_MISSING=0
+RECEIPT_INVALID=0
+RECEIPT_STALE=0
+
+while IFS='|' read -r claim criticality registry_status; do
+  [[ -z "${claim}" ]] && continue
+
+  TOTAL_CLAIMS=$((TOTAL_CLAIMS + 1))
+  if [[ "${criticality}" == "S0" ]]; then
+    S0_CLAIMS=$((S0_CLAIMS + 1))
+  fi
+
+  category="$(claim_to_category "${claim}")"
+
+  registry_score="$(status_to_score "${registry_status}")"
+  receipt_file="${RECEIPTS_DIR}/${claim}.receipt.json"
+
+  receipt_state="missing"
+  receipt_score=25
+  receipt_status="MISSING"
+  age_hours="n/a"
+
+  if [[ -f "${receipt_file}" ]]; then
+    if receipt_shape_valid "${receipt_file}"; then
+      RECEIPT_OK=$((RECEIPT_OK + 1))
+      raw_receipt_status="$(jq -r '.result.status // .status // "unknown"' "${receipt_file}")"
+      receipt_status="${raw_receipt_status^^}"
+      receipt_score="$(status_to_score "${raw_receipt_status}")"
+      receipt_state="ok"
+
+      receipt_ts="$(jq -r '.timestamp // empty' "${receipt_file}")"
+      if [[ -n "${receipt_ts}" ]]; then
+        now_epoch="$(date +%s)"
+        receipt_epoch="$(date -d "${receipt_ts}" +%s 2>/dev/null || echo "")"
+        if [[ -n "${receipt_epoch}" ]]; then
+          age_hours="$(( (now_epoch - receipt_epoch) / 3600 ))"
+          if (( age_hours > FRESH_HOURS )); then
+            receipt_state="stale"
+            RECEIPT_STALE=$((RECEIPT_STALE + 1))
+            if (( receipt_score > 70 )); then
+              receipt_score=70
+            fi
+            receipt_status="${receipt_status} (STALE)"
+          fi
+        fi
+      fi
+    else
+      RECEIPT_INVALID=$((RECEIPT_INVALID + 1))
+      receipt_state="invalid"
+      receipt_status="INVALID_SHAPE"
+      receipt_score=0
+    fi
+  else
+    RECEIPT_MISSING=$((RECEIPT_MISSING + 1))
+  fi
+
+  effective_score="$(min_score "${registry_score}" "${receipt_score}")"
+  CATEGORY_SCORE_SUM["${category}"]=$(( ${CATEGORY_SCORE_SUM["${category}"]:-0} + effective_score ))
+  CATEGORY_CLAIM_COUNT["${category}"]=$(( ${CATEGORY_CLAIM_COUNT["${category}"]:-0} + 1 ))
+
+  if [[ "${registry_status}" == "VERIFIED" && "${receipt_state}" == "ok" ]]; then
+    if [[ "${criticality}" == "S0" ]]; then
+      S0_VERIFIED=$((S0_VERIFIED + 1))
+    fi
+  fi
+
+  if [[ "${criticality}" == "S0" ]]; then
+    if [[ "${registry_status}" != "VERIFIED" ]]; then
+      BLOCKERS_P0+=("${claim}: S0 status is ${registry_status}")
+    fi
+    if [[ "${receipt_state}" == "missing" || "${receipt_state}" == "invalid" ]]; then
+      BLOCKERS_P0+=("${claim}: S0 receipt ${receipt_state}")
+    fi
+    if [[ "${receipt_state}" == "stale" ]]; then
+      BLOCKERS_P1+=("${claim}: S0 receipt stale (${age_hours}h)")
+    fi
+  else
+    if [[ "${receipt_state}" == "missing" || "${receipt_state}" == "invalid" ]]; then
+      BLOCKERS_P2+=("${claim}: receipt ${receipt_state}")
+    fi
+  fi
+
+  CLAIM_ROWS+="| ${claim} | ${criticality} | ${category} | ${registry_status} | ${receipt_status} | ${effective_score}% |\n"
+done < <(
+  awk '
+    /^claims:/ { in_claims=1; next }
+    in_claims && /^[^[:space:]]/ { in_claims=0 }
+    in_claims && /^  x3\.[A-Za-z0-9_.-]+:/ {
+      claim=$1
+      sub(/:$/, "", claim)
+      criticality=""
+      status=""
+    }
+    in_claims && /^    criticality:/ { criticality=$2 }
+    in_claims && /^    status:/ {
+      status=$2
+      if (claim != "") print claim "|" criticality "|" status
+    }
+  ' "${REGISTRY_FILE}"
+)
+
+for category in "${CATEGORY_ORDER[@]}"; do
+  count="${CATEGORY_CLAIM_COUNT["${category}"]:-0}"
+  if (( count > 0 )); then
+    CATEGORY_AVG["${category}"]=$(( ${CATEGORY_SCORE_SUM["${category}"]} / count ))
+  else
+    CATEGORY_AVG["${category}"]=0
+  fi
+done
+
+weighted_sum=0
+for category in "${CATEGORY_ORDER[@]}"; do
+  avg="${CATEGORY_AVG["${category}"]}"
+  weight="${CATEGORY_WEIGHT["${category}"]}"
+  weighted_sum=$(( weighted_sum + (avg * weight) ))
+done
+OVERALL_SCORE=$(( weighted_sum / 100 ))
+
+P0_COUNT=${#BLOCKERS_P0[@]}
+P1_COUNT=${#BLOCKERS_P1[@]}
+P2_COUNT=${#BLOCKERS_P2[@]}
+
 DECISION="GO"
-OVERALL_SCORE=0
+if (( P0_COUNT > 0 )); then
+  DECISION="NO-GO"
+fi
+if (( OVERALL_SCORE < 90 )); then
+  DECISION="NO-GO"
+fi
+if (( S0_CLAIMS > 0 )) && (( S0_VERIFIED < S0_CLAIMS )); then
+  DECISION="NO-GO"
+fi
 
-# Score tiers (max points per proof level)
-SCORE_CODE_EXISTS=10
-SCORE_WIRED=25
-SCORE_COMPILES=45
-SCORE_UNIT_TESTED=55
-SCORE_INTEGRATION_TESTED=70
-SCORE_FUZZ_TESTED=85
-SCORE_TESTNET_PROVEN=95
-SCORE_AUDITED=100
-
-# Category weights (sum = 100%)
-WEIGHT_RUNTIME=12
-WEIGHT_CONSENSUS=12
-WEIGHT_ASSET_KERNEL=15
-WEIGHT_ATOMIC_CROSS_VM=18
-WEIGHT_BRIDGE=15
-WEIGHT_DEX=8
-WEIGHT_GOVERNANCE=6
-WEIGHT_VALIDATOR_OPS=6
-WEIGHT_OBSERVABILITY=4
-WEIGHT_DOCS=4
-
-# P0 blockers
-P0_BLOCKERS=()
-P1_BLOCKERS=()
-P2_BLOCKERS=()
-
-# Generate report
+COMMIT_HASH="$(git rev-parse HEAD)"
+SHORT_COMMIT="$(git rev-parse --short=16 HEAD)"
 REPORT_FILE="${REPORTS_DIR}/X3-MAINNET-GO-NO-GO-${TIMESTAMP}.md"
 
-cat > "${REPORT_FILE}" << 'EOF'
-# X3 MAINNET GO/NO-GO DECISION REPORT
-
-**Generated:** $(date)
-**Repository:** X3 Atomic Star
-**Commit:** $(git rev-parse HEAD | head -c 16)...
-
----
-
-## EXECUTIVE SUMMARY
-
-This report determines whether X3 is ready for mainnet based on **proof-based scoring**, not vibes.
-
-Every claim requires:
-- **File path** (where is the code)
-- **Test file** (how is it proven)
-- **Command** (how to reproduce)
-- **Result** (pass/fail)
-- **Score cap** (max points based on proof level)
-
-### DECISION GATES
-
-**Hard Fails (Any one blocks launch):**
-- [ ] Any P0 blocker exists → **FAIL**
-- [ ] Runtime compiles with mocks → **FAIL**
-- [ ] Critical pallet not in construct_runtime! → **FAIL**
-- [ ] Bridge has no replay test → **FAIL**
-- [ ] Atomic swap has no rollback test → **FAIL**
-- [ ] Canonical supply not invariant-tested → **FAIL**
-- [ ] No multi-node testnet proof → **FAIL**
-- [ ] No fresh-machine launch proof → **FAIL**
-- [ ] No validator onboarding pack → **FAIL**
-- [ ] Benchmark weights missing → **FAIL**
-
----
-
-## SCORING CATEGORIES
-
-### 1. Runtime / Pallets (12% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| All pallets in construct_runtime! | grep output | ? |
-| Pallet tests passing | cargo test output | ? |
-| No unbounded storage | grep -v bounded | ? |
-| Migrations complete | storage version | ? |
-| **Category Score** | | **?%** |
-
-### 2. Consensus & Finality (12% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Finality oracle wired | grep FinalityOracle | ? |
-| Sub-second finality proven | multi-node testnet | ? |
-| Equivocation slashing | test_equivocation | ? |
-| **Category Score** | | **?%** |
-
-### 3. Universal Asset Kernel (15% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Canonical supply conserved | test_supply_invariant | ? |
-| Mint/burn balanced | test_mint_burn_balance | ? |
-| Bridge accounting correct | test_bridge_accounting | ? |
-| No supply leaks | proptest | ? |
-| **Category Score** | | **?%** |
-
-### 4. Atomic Cross-VM Execution (18% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Lock → Execute → Settle flow | integration test | ? |
-| Partial settlement impossible | test_partial_blocked | ? |
-| Timeout refund works | test_timeout_refund | ? |
-| Replay protection guaranteed | test_replay_rejected | ? |
-| All-or-nothing property | proptest | ? |
-| Rollback on remote failure | integration test | ? |
-| **Category Score** | | **?%** |
-
-### 5. Bridge Security (15% weight) ⭐ CRITICAL
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Replay protection on every msg | test_replay_same_hash | ? |
-| Nonce strictly increasing | proptest_nonce | ? |
-| Finality checked before settle | code review | ? |
-| Timeout always refunds | test_timeout | ? |
-| Multi-sig on critical actions | code review | ? |
-| **Category Score** | | **?%** |
-
-### 6. DEX / Liquidity (8% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Reserve conservation | test_reserve_invariant | ? |
-| Fee structure sustainable | economic analysis | ? |
-| Slippage limits enforced | test_slippage | ? |
-| **Category Score** | | **?%** |
-
-### 7. Governance / Launch Gates (6% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Mainnet config finalized | chain_spec.json | ? |
-| Launch gates enforced | integration test | ? |
-| Sudo policy decided | governance doc | ? |
-| **Category Score** | | **?%** |
-
-### 8. Validator Operations (6% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Fresh-machine validator launch | fresh-machine.sh success | ? |
-| Session keys procedure | validator-onboarding/generate-keys.sh | ? |
-| Bootnodes configured | chain_spec.json | ? |
-| **Category Score** | | **?%** |
-
-### 9. Observability (4% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Critical events emitted | event grep | ? |
-| Metrics exported | prometheus endpoint | ? |
-| Alerts configured | prometheus config | ? |
-| **Category Score** | | **?%** |
-
-### 10. Documentation / Code Drift (4% weight)
-
-| Claim | Proof | Score |
-|-------|-------|-------|
-| Docs match code | git drift scan | ? |
-| No stale TODOs in critical paths | grep result | ? |
-| Chain spec documented | README | ? |
-| **Category Score** | | **?%** |
-
----
-
-## PROOF SCORING RULES
-
-A feature cannot score higher than the strongest proof attached to it:
-
-```
-Code exists only         → max 10%
-Code wired              → max 25%
-Compiles                → max 45%
-Unit tested             → max 55%
-Integration tested      → max 70%
-Fuzz/invariant tested   → max 85%
-Multi-node testnet      → max 95%
-Externally audited      → max 100%
-```
-
-**Example:**
-- Bridge replay protection code exists? → 10%
-- Bridge replay protection integrated? → 25%
-- Bridge replay protection unit tested? → 55%
-- Bridge replay protection integration tested? → 70%
-- Bridge replay protection fuzz tested? → 85%
-- Bridge replay protection testnet proven? → 95%
-- Bridge replay protection external audit? → 100%
-
-The test level determines the cap. Beautiful code without tests scores 55%.
-
----
-
-## BLOCKER ANALYSIS
-
-### P0 Blockers (Launch Stopped)
-
-These must be FIXED before mainnet:
-
-| Blocker | Module | Status | Fix |
-|---------|--------|--------|-----|
-| ? | ? | ❌ | ? |
-
-**Count:** ? P0 blockers
-
-### P1 Blockers (Launch Delayed)
-
-These should be fixed:
-
-| Blocker | Module | Status | Fix |
-|---------|--------|--------|-----|
-| ? | ? | ⚠️ | ? |
-
-**Count:** ? P1 blockers
-
-### P2 Blockers (Low Priority)
-
-These can be deferred:
-
-| Blocker | Module | Status | Fix |
-|---------|--------|--------|-----|
-| ? | ? | 🟡 | ? |
-
-**Count:** ? P2 blockers
-
----
-
-## UNWIRED MODULES
-
-These modules exist but are not reachable:
-
-| Module | Reason | Status |
-|--------|--------|--------|
-| ? | not in construct_runtime! | ❌ |
-
----
-
-## EVIDENCE MATRIX
-
-Every category score requires evidence:
-
-```json
 {
-  "category": "bridge_security",
-  "claimed_score": 85,
-  "evidence": [
-    {
-      "claim": "Replay protection exists",
-      "file": "crates/x3-bridge/src/nonce.rs",
-      "test_file": "crates/x3-bridge/tests/test_replay.rs",
-      "command": "cargo test -p x3-bridge test_replay",
-      "result": "PASS",
-      "proof_level": "integration_tested",
-      "score_cap": 70
-    },
-    {
-      "claim": "Replay protection fuzz tested",
-      "file": "crates/x3-bridge/tests/fuzz/",
-      "test_file": "crates/x3-bridge/fuzz/replay.rs",
-      "command": "cargo +nightly fuzz run replay_fuzz",
-      "result": "PASS",
-      "proof_level": "fuzz_tested",
-      "score_cap": 85
-    }
-  ],
-  "max_score": 85,
-  "actual_score": 70
-}
-```
-
----
-
-## FINAL DECISION
-
-### Overall Mainnet Readiness Score
-
-**Score: ?% / 100%**
-
-**Status: ? (PASS / FAIL)**
-
-**Reason:**
-- If score ≥ 90% AND zero P0 blockers → **GO**
-- If score < 90% OR any P0 blocker → **NO-GO**
-
-### Why We Are (NOT) Ready
-
-**Positive Proof:**
-- [ ] Runtime compiles without mocks
-- [ ] All critical tests passing
-- [ ] Bridge replay protection proven
-- [ ] Atomic all-or-nothing proven
-- [ ] Multi-node testnet operational
-- [ ] Fresh-machine launch reproducible
-- [ ] Validator onboarding complete
-- [ ] Observability ready
-
-**Blockers Preventing Launch:**
-- [ ] ?
-
----
-
-## REQUIRED NEXT STEPS
-
-Before mainnet, fix:
-
-1. **P0 Critical:** ? (must fix)
-2. **P1 Important:** ? (should fix)
-3. **P2 Nice-to-have:** ? (can defer)
-
----
-
-## PROOF HASHES
-
-For traceability, all evidence is hashed:
-
-```
-Repo commit hash:      [HASH]
-Proof pack hash:       [HASH]
-Test output hash:      [HASH]
-Report hash:           [HASH]
-Timestamp:             [ISO-8601]
-```
-
-This report can be cryptographically verified. Download the evidence pack from the commit hash and reproduce these results.
-
----
-
-## SIGN-OFF
-
-- [ ] CTO reviewed and approved
-- [ ] Security reviewed and approved
-- [ ] Infrastructure team reviewed and approved
-- [ ] Validator team reviewed and approved
-
-**Final approval signature:**
-
-Approved by: ___________________
-Date: ___________________
-
----
-
-**This is a proof-based report. No proof = no points. No P0 blockers = no exceptions.**
-
-EOF
+  echo "# X3 MAINNET GO/NO-GO DECISION REPORT"
+  echo
+  echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Repository: ${REPO_ROOT}"
+  echo "Commit: ${SHORT_COMMIT}"
+  echo "Receipt freshness threshold: ${FRESH_HOURS}h"
+  echo
+  echo "## Executive Summary"
+  echo
+  echo "Decision: **${DECISION}**"
+  echo "Overall Score: **${OVERALL_SCORE}%**"
+  echo "S0 Verified: **${S0_VERIFIED}/${S0_CLAIMS}**"
+  echo
+  echo "Gate rules:"
+  echo "- Score must be >= 90%"
+  echo "- Zero P0 blockers"
+  echo "- All S0 claims must be VERIFIED with valid receipts"
+  echo
+  echo "## Evidence Health"
+  echo
+  echo "- Claims in registry: ${TOTAL_CLAIMS}"
+  echo "- Receipts valid shape: ${RECEIPT_OK}"
+  echo "- Receipts missing: ${RECEIPT_MISSING}"
+  echo "- Receipts invalid: ${RECEIPT_INVALID}"
+  echo "- Receipts stale: ${RECEIPT_STALE}"
+  echo
+  echo "## Category Scores"
+  echo
+  echo "| Category | Weight | Claims | Computed Score | Weighted Contribution |"
+  echo "|---|---:|---:|---:|---:|"
+  for category in "${CATEGORY_ORDER[@]}"; do
+    weight="${CATEGORY_WEIGHT["${category}"]}"
+    count="${CATEGORY_CLAIM_COUNT["${category}"]:-0}"
+    avg="${CATEGORY_AVG["${category}"]}"
+    contribution=$(( avg * weight / 100 ))
+    echo "| ${category} | ${weight}% | ${count} | ${avg}% | ${contribution}% |"
+  done
+  echo
+  echo "## Claim-Level Scoring"
+  echo
+  echo "| Claim | Criticality | Category | Registry Status | Receipt Status | Effective Score |"
+  echo "|---|---|---|---|---|---:|"
+  printf '%b' "${CLAIM_ROWS}"
+  echo
+  echo "## Blockers"
+  echo
+  echo "### P0 (Launch Blocking): ${P0_COUNT}"
+  if (( P0_COUNT == 0 )); then
+    echo "- None"
+  else
+    for b in "${BLOCKERS_P0[@]}"; do
+      echo "- ${b}"
+    done
+  fi
+  echo
+  echo "### P1 (Must Resolve Before Public Testnet): ${P1_COUNT}"
+  if (( P1_COUNT == 0 )); then
+    echo "- None"
+  else
+    for b in "${BLOCKERS_P1[@]}"; do
+      echo "- ${b}"
+    done
+  fi
+  echo
+  echo "### P2 (Deferred / Non-Blocking): ${P2_COUNT}"
+  if (( P2_COUNT == 0 )); then
+    echo "- None"
+  else
+    for b in "${BLOCKERS_P2[@]}"; do
+      echo "- ${b}"
+    done
+  fi
+  echo
+  echo "## Traceability"
+  echo
+  echo "- Repo commit hash: ${COMMIT_HASH}"
+  echo "- Registry source: proof/claims/registry.yml"
+  echo "- Receipt source: proof/receipts/claims/*.receipt.json"
+  echo
+  echo "This report is machine-computed from current claim status + receipt integrity/freshness state."
+} > "${REPORT_FILE}"
 
 echo "✅ Report generated: ${REPORT_FILE}"
-echo ""
-echo "Next steps:"
-echo "1. Feed audit packs to AI auditors with prompts from launch-gates/prompts/"
-echo "2. Run: ./run-all-proofs.sh"
-echo "3. Review evidence in: launch-gates/evidence/"
-echo "4. Update score in report"
-echo "5. If score ≥90% AND no P0 blockers → GO"
-echo ""
+echo "Decision: ${DECISION}"
+echo "Overall score: ${OVERALL_SCORE}%"
 
+if [[ "${DECISION}" == "GO" ]]; then
+  exit 0
+fi
+
+exit 1

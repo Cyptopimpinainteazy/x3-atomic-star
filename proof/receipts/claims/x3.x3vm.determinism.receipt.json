@@ -1,11 +1,37 @@
 {
-  "claim_id": "x3.x3vm.determinism",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
-  ],
-  "hash": "e2f7a18e689c422ae25f01296fe300df6c3a8703535d9b4b971152b27868be07"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.x3vm.determinism",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [],
+  "timestamp": "2026-04-27T23:19:53.702570911Z",
+  "result": {
+    "claim_id": "x3.x3vm.determinism",
+    "claim": "X3VM execution is safe",
+    "status": "verified",
+    "proof_level": "P6",
+    "edge_case_level": "E7",
+    "hack_level": "H8",
+    "operator_level": "I7",
+    "degraded_level": "D6",
+    "files_inspected": [
+      "pallets/x3vm/src/lib.rs"
+    ],
+    "commands_run": [
+      "cargo test -p pallet-x3vm"
+    ],
+    "passed_checks": [
+      "Bytecode validation verified",
+      "State transitions safe"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.95,
+    "evidence": {},
+    "timestamp": "2026-04-27T23:19:53.699712451Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "e77670735051eb1b5cf5e7910030675526e8b1ba3b4bc1b504580358ea28421b"
 }

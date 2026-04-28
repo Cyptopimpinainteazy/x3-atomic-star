@@ -45,7 +45,9 @@ struct RelayerInternalState {
     svm_heads: BTreeMap<u32, u64>, // domain_id -> slot
     finalized_evm_headers: BTreeMap<u32, u64>, // domain_id -> finalized block_number
     finalized_svm_headers: BTreeMap<u32, u64>, // domain_id -> finalized slot
-    proof_cache: BTreeSet<[u8; 32]>, // Submitted proof hashes (replay protection)
+    finalized_evm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (block_hash + state_root)
+    finalized_svm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (blockhash)
+    proof_cache: BTreeSet<[u8; 32]>,               // Submitted proof hashes (replay protection)
     pending_submissions: u32,
     shutdown_signal: bool,
     pause_reason: Option<String>,
@@ -95,6 +97,8 @@ impl RelayerService {
             svm_heads: BTreeMap::new(),
             finalized_evm_headers: BTreeMap::new(),
             finalized_svm_headers: BTreeMap::new(),
+            finalized_evm_data: BTreeMap::new(),
+            finalized_svm_data: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,
@@ -259,6 +263,9 @@ impl RelayerService {
                                     state
                                         .finalized_evm_headers
                                         .insert(header.chain_id, header.block_number);
+                                    state
+                                        .finalized_evm_data
+                                        .insert(header.chain_id, header.clone());
                                 }
                             } else {
                                 debug!(
@@ -319,6 +326,9 @@ impl RelayerService {
                                     state
                                         .finalized_svm_headers
                                         .insert(header.chain_id, header.block_number);
+                                    state
+                                        .finalized_svm_data
+                                        .insert(header.chain_id, header.clone());
                                 }
                             } else {
                                 debug!(
@@ -357,9 +367,19 @@ impl RelayerService {
                     domain_id, block_number
                 );
 
-                // Acquire proof from finalized block
-                let block_hash = [0x00u8; 32]; // In production, get from watcher
-                let state_root = [0x00u8; 32]; // In production, get from watcher
+                // Acquire proof from finalized block.
+                // block_hash and state_root come from the header stored when
+                // this block crossed the finality threshold in poll_evm_headers.
+                let (block_hash, state_root) = match state.finalized_evm_data.get(&domain_id) {
+                    Some(h) => (h.block_hash, h.state_root),
+                    None => {
+                        warn!(
+                            "No header data for finalized EVM domain {}; skipping proof",
+                            domain_id
+                        );
+                        continue;
+                    }
+                };
 
                 if let Ok(proof) = self
                     .submitter
@@ -425,8 +445,19 @@ impl RelayerService {
                     domain_id, slot
                 );
 
-                // Acquire proof from finalized slot
-                let blockhash = [0x00u8; 32]; // In production, get from watcher
+                // Acquire proof from finalized slot.
+                // blockhash comes from the header stored when this slot crossed
+                // the finality threshold in poll_svm_headers.
+                let blockhash = match state.finalized_svm_data.get(&domain_id) {
+                    Some(h) => h.block_hash,
+                    None => {
+                        warn!(
+                            "No header data for finalized SVM domain {}; skipping proof",
+                            domain_id
+                        );
+                        continue;
+                    }
+                };
 
                 if let Ok(proof) = self
                     .submitter
@@ -486,6 +517,8 @@ impl RelayerService {
         // Clear processed finalized headers for next iteration
         state.finalized_evm_headers.clear();
         state.finalized_svm_headers.clear();
+        state.finalized_evm_data.clear();
+        state.finalized_svm_data.clear();
     }
 
     /// Calculate hash of EVM proof for deduplication
@@ -873,6 +906,8 @@ mod tests {
             svm_heads: BTreeMap::new(),
             finalized_evm_headers: BTreeMap::new(),
             finalized_svm_headers: BTreeMap::new(),
+            finalized_evm_data: BTreeMap::new(),
+            finalized_svm_data: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,

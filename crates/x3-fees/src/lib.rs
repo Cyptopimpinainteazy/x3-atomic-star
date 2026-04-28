@@ -125,6 +125,12 @@ pub struct SlashingInsuranceFund {
     approved_claims: HashMap<String, u128>,
 }
 
+impl Default for SlashingInsuranceFund {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SlashingInsuranceFund {
     /// Create new insurance fund
     pub fn new() -> Self {

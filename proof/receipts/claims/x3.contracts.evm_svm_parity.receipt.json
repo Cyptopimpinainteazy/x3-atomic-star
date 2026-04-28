@@ -1,11 +1,37 @@
 {
-  "claim_id": "x3.contracts.evm_svm_parity",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
-  ],
-  "hash": "013e125a32284dcfd618b99b853b6c48db823c010a9c1c1396ead8133857a693"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.contracts.evm_svm_parity",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [],
+  "timestamp": "2026-04-27T23:19:55.703330264Z",
+  "result": {
+    "claim_id": "x3.contracts.evm_svm_parity",
+    "claim": "Smart contracts are safe",
+    "status": "verified",
+    "proof_level": "P5",
+    "edge_case_level": "E6",
+    "hack_level": "H7",
+    "operator_level": "I5",
+    "degraded_level": "D4",
+    "files_inspected": [
+      "x3-contracts/src/lib.rs"
+    ],
+    "commands_run": [
+      "cargo test -p x3-contracts"
+    ],
+    "passed_checks": [
+      "Bytecode verified",
+      "State transitions safe"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.92,
+    "evidence": {},
+    "timestamp": "2026-04-27T23:19:55.699153339Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "56996649316d7e8dd015d91b1aa8dda2930b0e1c2c2078959edf0da10a9951e5"
 }

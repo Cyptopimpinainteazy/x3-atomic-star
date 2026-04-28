@@ -56,7 +56,7 @@ pub mod pallet {
         Blake2_128Concat,
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{Saturating, Zero, SaturatedConversion};
+    use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
     use sp_std::prelude::*;
 
     type BalanceOf<T> =
@@ -189,8 +189,7 @@ pub mod pallet {
 
     /// Last block where offchain worker executed (for dedup).
     #[pallet::storage]
-    pub type LastOffchainUpdateBlock<T: Config> =
-        StorageValue<_, BlockNumberFor<T>, ValueQuery>;
+    pub type LastOffchainUpdateBlock<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
 
     // ========================================================================
     // Events
@@ -817,7 +816,7 @@ pub mod pallet {
         pub fn index_memory_worker() {
             // Get current block number
             let current_block = frame_system::Pallet::<T>::block_number();
-            
+
             // Iterate through all agents and index their latest memory
             // (In production, this would filter agents based on MemoryUpdated events)
             EntryCount::<T>::iter().for_each(|(agent_id, _)| {
@@ -825,7 +824,7 @@ pub mod pallet {
                 if let Some(_entry_count) = EntryCount::<T>::get(agent_id).checked_sub(1) {
                     // Compute memory hash from current chunks
                     let memory_hash = Self::compute_agent_memory_hash(agent_id);
-                    
+
                     // Store in offchain storage via offchain_storage module
                     let _snapshot = MemorySnapshot {
                         agent_id: sp_core::H256::from_slice(&[agent_id as u8; 32]),
@@ -853,7 +852,7 @@ pub mod pallet {
         /// Runs periodically to ensure Byzantine quorum consensus.
         pub fn verify_memory_consistency() {
             let current_block = frame_system::Pallet::<T>::block_number();
-            
+
             // Check every 100 blocks (production: configurable)
             if (current_block % 100u32.into()).is_zero() {
                 // Iterate through agents and verify consensus
@@ -861,18 +860,19 @@ pub mod pallet {
                     if let Some(memory_hash) = LatestMemoryHash::<T>::get(agent_id) {
                         // In production, this would query peer validators via RPC
                         // For now, record a local attestation
-                        let attestations = MemoryConsensusRecords::<T>::get(&agent_id, current_block)
-                            .map(|(_, count)| count)
-                            .unwrap_or(0);
+                        let attestations =
+                            MemoryConsensusRecords::<T>::get(agent_id, current_block)
+                                .map(|(_, count)| count)
+                                .unwrap_or(0);
 
                         // Simulate collecting attestations (in real impl, query peers)
                         let threshold = T::MemoryConsensusThreshold::get();
-                        let required_attestations = (threshold as u32 + 50) / 100;
+                        let required_attestations = (threshold + 50) / 100;
 
                         if attestations >= required_attestations {
                             // Consensus reached
                             MemoryConsensusRecords::<T>::insert(
-                                &agent_id,
+                                agent_id,
                                 current_block,
                                 (memory_hash, attestations),
                             );
@@ -907,13 +907,14 @@ pub mod pallet {
             EntryCount::<T>::iter().for_each(|(agent_id, _)| {
                 // Clean up old memory chunks based on TTL
                 let current_chunk_id = CurrentChunk::<T>::get(agent_id);
-                
+
                 for chunk_id in 0..current_chunk_id {
                     if let Some(chunk) = MemoryChunks::<T>::get(agent_id, chunk_id) {
                         // Check if all entries in chunk are expired
-                        let all_expired = chunk.entries.iter().all(|entry| {
-                            entry.ttl.map_or(false, |ttl| ttl < cutoff_block)
-                        });
+                        let all_expired = chunk
+                            .entries
+                            .iter()
+                            .all(|entry| entry.ttl.is_some_and(|ttl| ttl < cutoff_block));
 
                         if all_expired && chunk.finalized {
                             // Safe to delete
@@ -925,7 +926,7 @@ pub mod pallet {
 
                 // Clean up old consensus records
                 let mut to_remove = Vec::new();
-                MemoryConsensusRecords::<T>::iter_prefix(&agent_id).for_each(
+                MemoryConsensusRecords::<T>::iter_prefix(agent_id).for_each(
                     |(block_number, _)| {
                         if block_number < cutoff_block {
                             to_remove.push(block_number);
@@ -934,7 +935,7 @@ pub mod pallet {
                 );
 
                 for block_number in to_remove {
-                    MemoryConsensusRecords::<T>::remove(&agent_id, block_number);
+                    MemoryConsensusRecords::<T>::remove(agent_id, block_number);
                 }
 
                 if blocks_pruned > 0 {
@@ -953,7 +954,7 @@ pub mod pallet {
         /// Compute agent's current memory hash (merkle root of all chunks).
         fn compute_agent_memory_hash(agent_id: AgentId) -> sp_core::H256 {
             use sp_io::hashing::blake2_256;
-            
+
             let mut hasher_data = Vec::new();
             let chunk_count = CurrentChunk::<T>::get(agent_id).saturating_add(1);
 

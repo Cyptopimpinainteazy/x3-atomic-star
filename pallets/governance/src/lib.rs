@@ -277,8 +277,7 @@ pub mod pallet {
     /// Updated only by `RuntimeUpgradeOrigin` (root / governance-bound).
     #[pallet::storage]
     #[pallet::getter(fn canonical_constitution_hash)]
-    pub type CanonicalConstitutionHash<T: Config> =
-        StorageValue<_, [u8; 32], OptionQuery>;
+    pub type CanonicalConstitutionHash<T: Config> = StorageValue<_, [u8; 32], OptionQuery>;
 
     // ============================================================================
     // AI Governance Storage
@@ -649,10 +648,7 @@ pub mod pallet {
                 // invariant-touching proposal under a forged constitution.
                 if let Some(canonical) = CanonicalConstitutionHash::<T>::get() {
                     let supplied = constitution_hash.unwrap_or([0u8; 32]);
-                    ensure!(
-                        supplied == canonical,
-                        Error::<T>::ConstitutionHashMismatch
-                    );
+                    ensure!(supplied == canonical, Error::<T>::ConstitutionHashMismatch);
                 }
             }
 

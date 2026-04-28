@@ -13,6 +13,12 @@ pub struct AuditLog {
     entry_index: RwLock<BTreeMap<String, usize>>,
 }
 
+impl Default for AuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuditLog {
     pub fn new() -> Self {
         Self {
@@ -22,6 +28,7 @@ impl AuditLog {
     }
 
     /// Record operation in audit trail
+    #[allow(clippy::too_many_arguments)]
     pub fn record_operation(
         &self,
         operation_id: String,

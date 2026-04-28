@@ -16,7 +16,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use x3_backend::bc_format::{BytecodeModule, ConstValue, FunctionEntry, MAGIC, VERSION};
+use x3_backend::bc_format::{BytecodeModule, VERSION};
 use x3_backend::opcode::Opcode;
 
 use crate::error::{VerifierError, VerifierErrorKind, VerifierResult};

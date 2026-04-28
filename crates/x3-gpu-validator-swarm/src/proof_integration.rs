@@ -5,8 +5,7 @@
 
 use crate::deterministic::ExecutionResult;
 use crate::error::SwarmResult;
-use crate::gpu_receipt::{Address as GpuAddress, GpuClass, GpuReceipt, ProofType};
-use crate::proof_aggregator::ProofAggregator;
+use crate::gpu_receipt::{GpuClass, GpuReceipt, ProofType};
 use crate::state_merkle_proof::{generate_merkle_proof, StateMerkleProof};
 use crate::unified_proof::{AtomicVmProof, GpuValidatorAttestation, ProofHeader, UnifiedProof};
 use crate::{crypto::HashOutput, deterministic::ExecutionMode};
@@ -19,7 +18,7 @@ pub type Hash = [u8; 32];
 pub fn execution_result_to_receipt(
     result: &ExecutionResult,
     executor_address: [u8; 32],
-    device_index: u32,
+    _device_index: u32,
 ) -> SwarmResult<GpuReceipt> {
     let kernel_hash = compute_kernel_hash(&result.task_id);
     let input_commitment = compute_input_hash(&[]);
