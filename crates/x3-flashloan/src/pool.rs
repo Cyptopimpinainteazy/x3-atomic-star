@@ -72,6 +72,17 @@ impl FlashloanPool {
 
     /// Borrow capital — issues a receipt that must be repaid atomically.
     pub fn borrow(&mut self, request: &BorrowRequest) -> Result<BorrowReceipt, FlashloanError> {
+        if self
+            .outstanding
+            .values()
+            .any(|receipt| receipt.chain == request.chain && receipt.asset == request.asset)
+        {
+            return Err(FlashloanError::ConcurrentBorrowRejected {
+                chain: request.chain,
+                asset: request.asset.clone(),
+            });
+        }
+
         let available = self.available(request.chain, &request.asset);
         if available < request.amount {
             return Err(FlashloanError::InsufficientLiquidity {

@@ -203,6 +203,22 @@ pub mod pallet {
     pub type ProposalVotes<T: Config> =
         StorageMap<_, Blake2_128Concat, u32, ProposalTally<BalanceOf<T>>, ValueQuery>;
 
+    /// Per-proposal voter balance snapshot captured at proposal submission.
+    ///
+    /// This blocks flash-loaned voting power acquired after submission from
+    /// being counted in the active vote window.
+    #[pallet::storage]
+    #[pallet::getter(fn proposal_balance_snapshot)]
+    pub type ProposalBalanceSnapshot<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        Blake2_128Concat,
+        T::AccountId,
+        BalanceOf<T>,
+        OptionQuery,
+    >;
+
     /// Individual votes per account per proposal.
     #[pallet::storage]
     #[pallet::getter(fn voting)]
@@ -685,6 +701,14 @@ pub mod pallet {
 
             Proposals::<T>::insert(proposal_id, proposal);
             ProposalVotes::<T>::insert(proposal_id, ProposalTally::default());
+
+            for (account, _) in frame_system::Account::<T>::iter() {
+                let snap_balance = T::Currency::free_balance(&account);
+                if !snap_balance.is_zero() {
+                    ProposalBalanceSnapshot::<T>::insert(proposal_id, account, snap_balance);
+                }
+            }
+
             ProposalCount::<T>::put(proposal_id.saturating_add(1));
 
             Self::deposit_event(Event::ProposalSubmitted {
@@ -727,9 +751,10 @@ pub mod pallet {
                 Error::<T>::VotingEnded
             );
 
-            // Check balance
-            let free_balance = T::Currency::free_balance(&voter);
-            ensure!(balance <= free_balance, Error::<T>::InsufficientBalance);
+            // Check proposal snapshot balance to block post-submission flash-loaned power.
+            let snapshot_balance = ProposalBalanceSnapshot::<T>::get(proposal_id, &voter)
+                .unwrap_or_else(Zero::zero);
+            ensure!(balance <= snapshot_balance, Error::<T>::InsufficientBalance);
 
             // Calculate voting power with conviction
             let (mul_num, mul_denom) = conviction.multiplier();
@@ -898,6 +923,7 @@ pub mod pallet {
             // Clean up
             Proposals::<T>::remove(proposal_id);
             ProposalVotes::<T>::remove(proposal_id);
+            Self::clear_proposal_snapshot(proposal_id);
 
             Self::deposit_event(Event::ProposalCancelled { proposal_id });
 
@@ -981,6 +1007,7 @@ pub mod pallet {
             }
 
             Proposals::<T>::insert(proposal_id, proposal);
+            Self::clear_proposal_snapshot(proposal_id);
 
             Ok(())
         }
@@ -1376,6 +1403,16 @@ pub mod pallet {
     // ========================================================================
 
     impl<T: Config> Pallet<T> {
+        /// Remove all per-account snapshot balances for a proposal.
+        fn clear_proposal_snapshot(proposal_id: u32) {
+            let keys: Vec<T::AccountId> = ProposalBalanceSnapshot::<T>::iter_prefix(proposal_id)
+                .map(|(account, _)| account)
+                .collect();
+            for account in keys {
+                ProposalBalanceSnapshot::<T>::remove(proposal_id, account);
+            }
+        }
+
         /// Enact an approved proposal.
         fn enact_proposal(proposal_id: u32) -> Weight {
             let mut weight = T::DbWeight::get().reads(1);
