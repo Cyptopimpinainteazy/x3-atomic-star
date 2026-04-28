@@ -133,6 +133,14 @@ enum Commands {
         /// Area to check
         #[arg(value_name = "AREA")]
         area: Option<String>,
+
+        /// Strict mode: fail closed if any formal proof is missing or fails.
+        #[arg(long)]
+        strict: bool,
+
+        /// Emit a human-readable report (used by formal-verification.yml).
+        #[arg(long)]
+        report: bool,
     },
 
     /// Generate proof receipt
@@ -535,9 +543,11 @@ async fn main() -> Result<()> {
             runners::test_idiot_proof(&cli.workspace, &command, dry_run, cli.verbose).await?
         }
 
-        Commands::Formal { area } => {
-            runners::check_formal_proofs(&cli.workspace, area, cli.verbose).await?
-        }
+        Commands::Formal {
+            area,
+            strict,
+            report,
+        } => runners::check_formal_proofs(&cli.workspace, area, strict, report, cli.verbose).await?,
 
         Commands::Receipt {
             receipt_type,
@@ -675,7 +685,7 @@ async fn run_economic_gate(
 ) -> Result<()> {
     println!(
         "{}",
-        "🔒 Economic Attack Gate — Running 9 core attack tests"
+        "🔒 Economic Attack Gate — Running 10 core attack tests"
             .bold()
             .cyan()
     );
@@ -687,8 +697,9 @@ async fn run_economic_gate(
     let flash = runners::flashloans::run_proofs(workspace, false).await?;
     let dex = runners::dex::run_proofs(workspace, false).await?;
     let oracle = runners::oracle::run_proofs(workspace, false).await?;
+    let cross_vm = runners::cross_vm::run_proofs(workspace, false).await?;
     let governance = runners::governance::run_proofs(workspace, false).await?;
-    let results = vec![flash, dex, oracle, governance];
+    let results = vec![flash, dex, oracle, cross_vm, governance];
 
     println!("{:14} | {:10} | {:8}", "Area", "Status", "Score");
     println!("{:-<14}-+-{:-<10}-+-{:-<8}", "", "", "");

@@ -73,10 +73,7 @@ jobs:
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y opam
-          opam init -y --disable-sandboxing
-          eval $(opam env)
-          opam install -y coq
+          sudo apt-get install -y coq
           echo "✅ Coq installed"
 
       - name: Install K Framework
@@ -86,16 +83,12 @@ jobs:
           sudo apt-get install -y git maven
           cd /opt
           sudo rm -rf k
-          if sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git; then
-            cd k
-            if sudo mvn package -DskipTests; then
-              echo "✅ K Framework installed"
-            else
-              echo "⚠️ K Framework build failed; skipping K-dependent tool checks in CI"
-            fi
-          else
-            echo "⚠️ K Framework clone failed; skipping K-dependent tool checks in CI"
-          fi
+          sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git
+          cd k
+          sudo mvn package -DskipTests
+          test -x /opt/k/k-distribution/target/release/k/bin/kprove
+          sudo ln -sf /opt/k/k-distribution/target/release/k/bin/kprove /usr/local/bin/kprove
+          echo "✅ K Framework installed"
 
       - name: Install Dafny (Optional)
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
@@ -109,23 +102,11 @@ jobs:
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
-          java -jar /opt/tla2tools.jar || echo "⚠️ TLA+ verification needed"
-          eval $(opam env) && coqc --version || echo "⚠️ Coq verification needed"
-          if [ -x /opt/k/k-distribution/target/release/k/bin/kompile ]; then
-            /opt/k/k-distribution/target/release/k/bin/kompile --version
-            echo "K_AVAILABLE=true" >> "$GITHUB_ENV"
-          else
-            echo "⚠️ K verification unavailable; skipping K-dependent tool checks"
-            echo "K_AVAILABLE=false" >> "$GITHUB_ENV"
-          fi
-          /opt/dafny/dafny --version || echo "⚠️ Dafny verification needed"
+          java -jar /opt/tla2tools.jar >/dev/null
+          coqc --version
+          kprove --version
+          /opt/dafny/dafny --version
           echo "✅ Tool verification complete"
-
-      - name: Note K Framework Skip
-        if: env.K_AVAILABLE != 'true'
-        run: |
-          echo "⚠️ K Framework toolchain unavailable in CI"
-          echo "ProofForge formal gate will still run, but backend K tool checks are skipped."
 
       - name: Build x3-proof CLI
         run: |

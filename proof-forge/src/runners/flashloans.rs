@@ -25,6 +25,8 @@ async fn run_parity_vector_harness(workspace: &Path) -> std::result::Result<(), 
 
     let output = Command::new("cargo")
         .arg("test")
+        .arg("--target-dir")
+        .arg(workspace.join("target/gates/economic-attack"))
         .arg("--manifest-path")
         .arg(&manifest)
         .arg("--test")

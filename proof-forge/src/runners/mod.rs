@@ -14,6 +14,7 @@ pub mod bridge;
 pub mod bug_bounty;
 pub mod consensus;
 pub mod custody;
+pub mod cross_vm;
 pub mod dex;
 pub mod ecosystem_quality;
 pub mod flashloans;
@@ -58,6 +59,7 @@ pub async fn verify_claim(
         "x3vm" => x3vm::verify_claim(workspace, claim_id, verbose).await?,
         "x3language" => x3language::verify_claim(workspace, claim_id, verbose).await?,
         "flashloans" => flashloans::verify_claim(workspace, claim_id, verbose).await?,
+        "cross-vm" => cross_vm::verify_claim(workspace, claim_id, verbose).await?,
         "smart-contracts" => smart_contracts::verify_claim(workspace, claim_id, verbose).await?,
         "onboarding" | "funding" | "evolution" => {
             operational::verify_claim(workspace, claim_id, verbose).await?
@@ -152,6 +154,7 @@ fn normalize_area(area: &str) -> String {
         "asset_kernel" | "asset-kernel" => "asset-kernel".to_string(),
         "x3lang" | "x3language" => "x3language".to_string(),
         "flashloan" | "flashloans" => "flashloans".to_string(),
+        "cross_vm" | "cross-vm" | "crossvm" => "cross-vm".to_string(),
         "contracts" | "smart_contracts" | "smart-contracts" => "smart-contracts".to_string(),
         "gpu" | "gpu_validator" => "gpu".to_string(),
         "atomic" | "atomic_kernel" => "atomic".to_string(),
@@ -269,9 +272,12 @@ pub(crate) async fn run_cargo_test_and_parse(
     package: &str,
     filter: &str,
 ) -> Result<(Vec<String>, Vec<String>)> {
+    let target_dir = workspace.join("target/gates/economic-attack");
     let output = Command::new("cargo")
         .current_dir(workspace)
         .arg("test")
+        .arg("--target-dir")
+        .arg(target_dir)
         .arg("-p")
         .arg(package)
         .arg(filter)
@@ -582,6 +588,37 @@ pub async fn check_security_gate(workspace: &Path, fail_hard: bool, verbose: boo
         }
     }
 
+    // Formal verification is a launch-critical S0 requirement. We execute the
+    // formal backend runner directly and fail the gate if proofs are blocked.
+    println!();
+    println!("{}", "Formal Verification (S0):".bold().red());
+    match formal_proofs::run_proofs(workspace, verbose).await {
+        Ok(formal) => {
+            let status_label = match formal.status {
+                ProofStatus::Verified => "VERIFIED".green().to_string(),
+                ProofStatus::Partial => "PARTIAL".yellow().to_string(),
+                ProofStatus::Failed => "FAILED".red().to_string(),
+                ProofStatus::Unverified => "UNVERIFIED".yellow().to_string(),
+                ProofStatus::Blocked => "BLOCKED".bright_red().to_string(),
+            };
+            println!("  {} status={} score={:.1}%", "•".cyan(), status_label, formal.score * 100.0);
+
+            if formal.status.is_blocking() || !formal.missing_proofs.is_empty() {
+                s0_failed.push("formal_verification_blocked");
+                for check in formal.failed_checks.iter().take(3) {
+                    println!("    {} {}", "⛔".red(), check);
+                }
+                for miss in formal.missing_proofs.iter().take(3) {
+                    println!("    {} {}", "⚠".yellow(), miss);
+                }
+            }
+        }
+        Err(e) => {
+            s0_failed.push("formal_verification_error");
+            println!("  {} runner error: {}", "⛔".red(), e);
+        }
+    }
+
     println!();
     let total_failed = s0_failed.len() + s1_failed.len();
     if total_failed == 0 {
@@ -730,29 +767,70 @@ pub async fn test_idiot_proof(
 pub async fn check_formal_proofs(
     workspace: &Path,
     area: Option<String>,
+    strict: bool,
+    report: bool,
     verbose: bool,
 ) -> Result<()> {
+    let area_label = area.as_deref().unwrap_or("all");
     println!(
         "{}",
-        format!(
-            "Checking formal proofs: {}",
-            area.as_deref().unwrap_or("all")
-        )
-        .bold()
-        .cyan()
+        format!("Checking formal proofs: {}", area_label).bold().cyan()
     );
+
+    let formal = formal_proofs::run_proofs(workspace, verbose).await?;
 
     println!();
     println!("{}", "Formal Verification Status:".bold().yellow());
-    println!("  {} Asset supply invariant", "?".yellow());
-    println!("  {} Bridge atomicity", "?".yellow());
-    println!("  {} Consensus safety", "?".yellow());
+    println!("  claim_id: {}", formal.claim_id);
+    println!("  status: {}", format_status(&formal.status));
+    println!("  score: {:.1}%", formal.score * 100.0);
 
-    println!();
-    println!(
-        "{}",
-        "Note: Formal proofs require specialized tools and time".yellow()
-    );
+    if !formal.passed_checks.is_empty() {
+        println!();
+        println!("{}", "Passed checks:".bold().green());
+        for check in &formal.passed_checks {
+            println!("  {} {}", "✓".green(), check);
+        }
+    }
+
+    if !formal.failed_checks.is_empty() {
+        println!();
+        println!("{}", "Failed checks:".bold().red());
+        for check in &formal.failed_checks {
+            println!("  {} {}", "✗".red(), check);
+        }
+    }
+
+    if !formal.missing_proofs.is_empty() {
+        println!();
+        println!("{}", "Missing proofs/tooling:".bold().yellow());
+        for miss in &formal.missing_proofs {
+            println!("  {} {}", "⚠".yellow(), miss);
+        }
+    }
+
+    if report {
+        println!();
+        println!("--- formal-verification-report ---");
+        println!("area: {}", area_label);
+        println!("status: {:?}", formal.status);
+        println!("score: {:.4}", formal.score);
+        println!("passed_checks: {}", formal.passed_checks.len());
+        println!("failed_checks: {}", formal.failed_checks.len());
+        println!("missing_proofs: {}", formal.missing_proofs.len());
+        for (k, v) in &formal.evidence {
+            println!("evidence.{}: {}", k, v);
+        }
+        println!("-----------------------------------");
+    }
+
+    if strict && (formal.status.is_blocking() || !formal.missing_proofs.is_empty()) {
+        anyhow::bail!(
+            "formal verification failed in strict mode: {} failed checks, {} missing proofs/tooling",
+            formal.failed_checks.len(),
+            formal.missing_proofs.len()
+        );
+    }
 
     Ok(())
 }
