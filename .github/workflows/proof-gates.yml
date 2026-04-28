@@ -63,6 +63,12 @@ jobs:
         run: |
           bash scripts/proof/check-claim-status.sh
 
+      - name: Status-Doc Truth Lint Gate
+        run: |
+          set -euo pipefail
+          chmod +x scripts/proof/lint-status-doc-truth.sh
+          bash scripts/proof/lint-status-doc-truth.sh
+
       - name: EVM or SVM Parity Gate
         run: |
           set -euo pipefail
