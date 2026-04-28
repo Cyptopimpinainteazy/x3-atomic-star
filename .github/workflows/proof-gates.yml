@@ -136,7 +136,7 @@ jobs:
 
       - name: Upload S0 Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: s0-gate-results
           path: s0-gate-results.txt
@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload Testnet Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: testnet-gate-results
           path: testnet-gate-results.txt
@@ -272,7 +272,7 @@ jobs:
 
       - name: Upload Mainnet Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mainnet-gate-results
           path: mainnet-gate-results.txt
@@ -302,7 +302,7 @@ jobs:
 
       - name: Upload Release Notes
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-notes
           path: RELEASE_NOTES.md
@@ -346,7 +346,7 @@ jobs:
           cp /tmp/dashboard-formatted.json daily-dashboard.json
 
       - name: Upload Daily Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: daily-proof-run-${{ github.run_number }}
           path: |
