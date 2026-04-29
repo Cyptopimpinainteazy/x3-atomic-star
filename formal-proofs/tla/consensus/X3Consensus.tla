@@ -1,5 +1,5 @@
 ---------------------------- MODULE X3Consensus ----------------------------
-EXTENDS Naturals, FiniteSets
+EXTENDS Integers, FiniteSets
 
 CONSTANTS Validators, MaxHeight, Quorum
 
@@ -19,6 +19,7 @@ CastVote(v, h, b) ==
     /\ v \in Validators
     /\ h \in 0..MaxHeight
     /\ b \in 0..MaxHeight
+    /\ \A x \in votes : ~(x.validator = v /\ x.height = h)
     /\ votes' = votes \cup {[validator |-> v, height |-> h, block |-> b]}
     /\ UNCHANGED finalized
 
@@ -30,7 +31,9 @@ Finalize(h, b) ==
     /\ finalized' = [finalized EXCEPT ![h] = b]
     /\ UNCHANGED votes
 
-Next == \E v, h, b : CastVote(v, h, b) \/ Finalize(h, b)
+Next ==
+    (\E v \in Validators, h \in 0..MaxHeight, b \in 0..MaxHeight: CastVote(v, h, b))
+    \/ (\E h \in 0..MaxHeight, b \in 0..MaxHeight: Finalize(h, b))
 
 NoFork ==
     \A h \in 0..MaxHeight:

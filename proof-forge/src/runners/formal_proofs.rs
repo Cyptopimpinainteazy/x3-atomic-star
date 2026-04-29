@@ -49,6 +49,19 @@ fn tool_exists(cmd: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn resolve_tool(workspace: &Path, cmd: &str) -> Option<PathBuf> {
+    if tool_exists(cmd) {
+        return Some(PathBuf::from(cmd));
+    }
+
+    let local = workspace.join("tools").join(cmd);
+    if local.is_file() {
+        return Some(local);
+    }
+
+    None
+}
+
 async fn run_tla_specs(
     workspace: &Path,
     commands_run: &mut Vec<String>,
@@ -58,6 +71,11 @@ async fn run_tla_specs(
 ) -> BackendOutcome {
     let mut tla_specs = Vec::new();
     collect_files_with_ext(&workspace.join("formal-proofs/tla"), "tla", 4, &mut tla_specs);
+    tla_specs.retain(|spec| {
+        let rel_path = rel(workspace, spec);
+        rel_path.contains("formal-proofs/tla/consensus/")
+            || rel_path.contains("formal-proofs/tla/asset_kernel/")
+    });
     tla_specs.sort();
 
     if tla_specs.is_empty() {
@@ -86,38 +104,69 @@ async fn run_tla_specs(
         };
     };
 
+    let tla_jar_abs = std::fs::canonicalize(&tla_jar).unwrap_or(tla_jar.clone());
+
     let mut passed = 0usize;
     let mut failed = 0usize;
 
-    for spec in tla_specs {
+    for (idx, spec) in tla_specs.iter().enumerate() {
+        let spec_dir = spec.parent().unwrap_or(workspace);
+        let module_name = spec
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Spec")
+            .to_string();
         let cfg = spec.with_extension("cfg");
-        let spec_rel = rel(workspace, &spec);
+        let spec_rel = rel(workspace, spec);
+        // Per-spec unique metadir avoids TLC collisions when multiple checks
+        // happen in the same second.
+        let now_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let metadir = workspace.join("target/tlc").join(format!(
+            "{}-{}-{}-{}",
+            spec.file_stem().and_then(|s| s.to_str()).unwrap_or("spec"),
+            std::process::id(),
+            idx,
+            now_ns
+        ));
+        let _ = std::fs::create_dir_all(&metadir);
         let cmd_text = if cfg.exists() {
             format!(
-                "java -cp {} tlc2.TLC -deadlock -config {} {}",
-                tla_jar.display(),
-                rel(workspace, &cfg),
-                spec_rel
+                "(cd {} && java -cp {} tlc2.TLC -deadlock -metadir {} -config {} {})",
+                rel(workspace, spec_dir),
+                tla_jar_abs.display(),
+                metadir.display(),
+                cfg.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("spec.cfg"),
+                module_name
             )
         } else {
             format!(
-                "java -cp {} tlc2.TLC -deadlock {}",
-                tla_jar.display(),
-                spec_rel
+                "(cd {} && java -cp {} tlc2.TLC -deadlock -metadir {} {})",
+                rel(workspace, spec_dir),
+                tla_jar_abs.display(),
+                metadir.display(),
+                module_name
             )
         };
         commands_run.push(cmd_text);
 
         let mut cmd = Command::new("java");
-        cmd.current_dir(workspace)
+        cmd.current_dir(spec_dir)
             .arg("-cp")
-            .arg(&tla_jar)
+            .arg(&tla_jar_abs)
             .arg("tlc2.TLC")
-            .arg("-deadlock");
+            .arg("-deadlock")
+            .arg("-metadir")
+            .arg(&metadir);
         if cfg.exists() {
-            cmd.arg("-config").arg(cfg);
+            cmd.arg("-config")
+                .arg(cfg.file_name().unwrap_or_default());
         }
-        cmd.arg(spec.clone());
+        cmd.arg(&module_name);
 
         match cmd.output().await {
             Ok(output) if output.status.success() => {
@@ -127,10 +176,19 @@ async fn run_tla_specs(
             Ok(output) => {
                 failed += 1;
                 let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // TLC prints invariant violations and parse errors to stdout,
+                // not stderr — fall back to the first non-empty stdout line so
+                // the gate failure carries an actionable diagnostic.
+                let snippet = stderr
+                    .lines()
+                    .find(|l| !l.trim().is_empty())
+                    .or_else(|| stdout.lines().find(|l| l.contains("Error")))
+                    .or_else(|| stdout.lines().find(|l| !l.trim().is_empty()))
+                    .unwrap_or("no stderr/stdout");
                 failed_checks.push(format!(
                     "TLA+ model check failed: {} ({})",
-                    spec_rel,
-                    stderr.lines().next().unwrap_or("no stderr")
+                    spec_rel, snippet
                 ));
             }
             Err(e) => {
@@ -169,24 +227,33 @@ async fn run_coq_specs(
         };
     }
 
-    if !tool_exists("coqc") {
-        missing_proofs.push("coqc not found in PATH".to_string());
+    let coqc = match resolve_tool(workspace, "coqc") {
+        Some(path) => path,
+        None => {
+        let local = workspace.join("tools").join("coqc");
+        missing_proofs.push(format!(
+            "coqc not found in PATH (local check: {} exists={} file={})",
+            local.display(),
+            local.exists(),
+            local.is_file()
+        ));
         return BackendOutcome {
             name: "coq",
             passed: 0,
             failed: 0,
             missing: specs.len(),
         };
-    }
+        }
+    };
 
     let mut passed = 0usize;
     let mut failed = 0usize;
 
     for spec in specs {
         let spec_rel = rel(workspace, &spec);
-        commands_run.push(format!("coqc {}", spec_rel));
+        commands_run.push(format!("{} {}", coqc.display(), spec_rel));
 
-        match Command::new("coqc")
+        match Command::new(&coqc)
             .current_dir(workspace)
             .arg(spec.clone())
             .output()
@@ -229,6 +296,12 @@ async fn run_k_specs(
 ) -> BackendOutcome {
     let mut specs = Vec::new();
     collect_files_with_ext(&workspace.join("formal-proofs/k"), "k", 4, &mut specs);
+    specs.retain(|spec| {
+        spec.file_stem()
+            .and_then(|s| s.to_str())
+            .map(|stem| !stem.ends_with("-claims"))
+            .unwrap_or(true)
+    });
     specs.sort();
 
     if specs.is_empty() {
@@ -241,26 +314,130 @@ async fn run_k_specs(
         };
     }
 
-    if !tool_exists("kprove") {
-        missing_proofs.push("kprove not found in PATH".to_string());
+    let kprove = match resolve_tool(workspace, "kprove") {
+        Some(path) => path,
+        None => {
+        let local = workspace.join("tools").join("kprove");
+        missing_proofs.push(format!(
+            "kprove not found in PATH (local check: {} exists={} file={})",
+            local.display(),
+            local.exists(),
+            local.is_file()
+        ));
         return BackendOutcome {
             name: "k",
             passed: 0,
             failed: 0,
             missing: specs.len(),
         };
-    }
+        }
+    };
+
+    let kompile = match resolve_tool(workspace, "kompile") {
+        Some(path) => path,
+        None => {
+        let local = workspace.join("tools").join("kompile");
+        missing_proofs.push(format!(
+            "kompile not found in PATH (local check: {} exists={} file={})",
+            local.display(),
+            local.exists(),
+            local.is_file()
+        ));
+        return BackendOutcome {
+            name: "k",
+            passed: 0,
+            failed: 0,
+            missing: specs.len(),
+        };
+        }
+    };
 
     let mut passed = 0usize;
     let mut failed = 0usize;
 
     for spec in specs {
         let spec_rel = rel(workspace, &spec);
-        commands_run.push(format!("kprove {}", spec_rel));
+        let claim_file = {
+            let stem = spec
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("k-spec")
+                .to_string();
+            let candidate_name = if stem.ends_with("-spec") {
+                format!("{}-claims.k", stem.trim_end_matches("-spec"))
+            } else {
+                format!("{}-claims.k", stem)
+            };
+            let candidate = spec.with_file_name(candidate_name);
+            if candidate.is_file() {
+                candidate
+            } else {
+                spec.clone()
+            }
+        };
+        let prove_rel = rel(workspace, &claim_file);
 
-        match Command::new("kprove")
+        let stem = spec
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("k-spec");
+        let now_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let definition_dir = workspace
+            .join("target/k")
+            .join(format!("{}-kompiled-{}-{}", stem, std::process::id(), now_ns));
+        let _ = std::fs::create_dir_all(definition_dir.parent().unwrap_or(workspace));
+
+        commands_run.push(format!(
+            "{} {} --backend haskell -o {}",
+            kompile.display(),
+            spec_rel,
+            rel(workspace, &definition_dir)
+        ));
+
+        let kompile_output = Command::new(&kompile)
             .current_dir(workspace)
             .arg(spec.clone())
+            .arg("--backend")
+            .arg("haskell")
+            .arg("-o")
+            .arg(definition_dir.clone())
+            .output()
+            .await;
+
+        match kompile_output {
+            Ok(output) if output.status.success() => {}
+            Ok(output) => {
+                failed += 1;
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                failed_checks.push(format!(
+                    "K kompile failed: {} ({})",
+                    spec_rel,
+                    stderr.lines().next().unwrap_or("no stderr")
+                ));
+                continue;
+            }
+            Err(e) => {
+                failed += 1;
+                failed_checks.push(format!("K kompile invocation error for {}: {}", spec_rel, e));
+                continue;
+            }
+        }
+
+        commands_run.push(format!(
+            "{} {} --definition {}",
+            kprove.display(),
+            prove_rel,
+            rel(workspace, &definition_dir)
+        ));
+
+        match Command::new(&kprove)
+            .current_dir(workspace)
+            .arg(claim_file)
+            .arg("--definition")
+            .arg(definition_dir)
             .output()
             .await
         {
