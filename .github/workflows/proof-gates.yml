@@ -483,21 +483,23 @@ jobs:
           </html>
           EOF
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Prepare Pages Artifact
+      - name: Prepare Pages Content
         run: |
           echo "proofforge.x3.dev" > dashboard-data/CNAME
 
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dashboard-data
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to gh-pages branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd dashboard-data
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: update ProofForge dashboard (${GITHUB_SHA})"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin HEAD:gh-pages
 
       - name: Create GitHub Pages Index
         run: |
