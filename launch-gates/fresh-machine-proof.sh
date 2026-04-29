@@ -19,6 +19,15 @@ PROOF_LOG="${WORKSPACE_ROOT}/launch-gates/evidence/proof-fresh-machine.log"
 TEMP_DIR="/tmp/x3-fresh-machine-$$"
 PASS_COUNT=0
 FAIL_COUNT=0
+NODE_BIN=""
+
+# Limit parallel C++/Rust jobs to avoid g++ ICE under memory pressure
+# (rocksdb-sys spawns its own C++ pool; cap with NUM_JOBS).
+# Override with X3_BUILD_JOBS=N if you have plenty of RAM.
+: "${X3_BUILD_JOBS:=4}"
+export CARGO_BUILD_JOBS="$X3_BUILD_JOBS"
+export NUM_JOBS="$X3_BUILD_JOBS"
+export MAKEFLAGS="-j${X3_BUILD_JOBS}"
 # Source repo URL: prefer X3_REPO_URL, else this repo's origin, else fall back.
 REPO_URL="${X3_REPO_URL:-$(git -C "$WORKSPACE_ROOT" remote get-url origin 2>/dev/null || echo https://github.com/Cyptopimpinainteazy/x3-atomic-star.git)}"
 
@@ -133,7 +142,7 @@ fi
 
 # Step 8: Generate chain spec
 log_step "Step 8: Generating chain spec..."
-if [ -f "$NODE_BIN" ]; then
+if [ -n "${NODE_BIN:-}" ] && [ -f "$NODE_BIN" ]; then
     if timeout 60 "$NODE_BIN" build-spec --chain dev --raw > chain-spec-dev.json 2>> "$PROOF_LOG"; then
         if [ -s chain-spec-dev.json ]; then
             SPEC_SIZE=$(wc -c < chain-spec-dev.json)
@@ -150,7 +159,7 @@ fi
 
 # Step 9: Node startup test (dev mode, 30 seconds)
 log_step "Step 9: Testing node startup (30 second timeout)..."
-if [ -f "$NODE_BIN" ]; then
+if [ -n "${NODE_BIN:-}" ] && [ -f "$NODE_BIN" ]; then
     timeout 30 "$NODE_BIN" \
         --chain dev \
         --tmp \
