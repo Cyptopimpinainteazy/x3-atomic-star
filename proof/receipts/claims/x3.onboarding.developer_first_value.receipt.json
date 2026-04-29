@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "673edac8b1db460b7ed04c9b1530245efe62d91a",
   "command_run": "x3-proof verify x3.onboarding.developer_first_value",
-  "artifact_hash": "7dabcbab31da7625e29134e813256a0251b23837cfed2fee6771bb6d63319d28",
+  "artifact_hash": "9d511a59ead46bc53aadb90f4785a69e94956bd65540ba11092427a93892ca8c",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "MAINNET_QUICK_START.md",
@@ -9,13 +9,14 @@
     "docs/BLOCKCHAIN_STARTUP_GUIDE.md",
     "README.md",
     "Makefile",
-    "Cargo.toml"
+    "Cargo.toml",
+    "proof/onboarding/ttfv_benchmark.json"
   ],
-  "timestamp": "2026-04-27T23:21:23.295329355Z",
+  "timestamp": "2026-04-28T23:08:37.130224482Z",
   "result": {
     "claim_id": "x3.onboarding.developer_first_value",
     "claim": "A fresh developer can deploy and test a first X3 app with measured time-to-first-value",
-    "status": "partial",
+    "status": "verified",
     "proof_level": null,
     "edge_case_level": null,
     "hack_level": null,
@@ -27,29 +28,32 @@
       "docs/BLOCKCHAIN_STARTUP_GUIDE.md",
       "README.md",
       "Makefile",
-      "Cargo.toml"
+      "Cargo.toml",
+      "proof/onboarding/ttfv_benchmark.json"
     ],
     "commands_run": [],
     "passed_checks": [
       "Quickstart guide found: MAINNET_QUICK_START.md",
       "Makefile present (dev entry point)",
-      "Node crate referenced in workspace Cargo.toml"
+      "Node crate referenced in workspace Cargo.toml",
+      "All TTFV benchmark steps succeeded",
+      "TTFV 24.25s ≤ budget 600s",
+      "TTFV benchmark fresh (≤ 30 days, measured 2026-04-28T21:10:08Z)"
     ],
     "failed_checks": [],
-    "missing_proofs": [
-      "No measured time-to-first-value benchmark — add a CI step that times `cargo build` + node startup + first block"
-    ],
+    "missing_proofs": [],
     "blockers": [],
     "score": 1.0,
     "evidence": {
+      "ttfv_total_seconds": "24.252",
       "makefile": "present",
-      "quickstart_doc": "MAINNET_QUICK_START.md"
+      "quickstart_doc": "MAINNET_QUICK_START.md",
+      "ttfv_budget_seconds": "600",
+      "ttfv_measured_at": "2026-04-28T21:10:08Z"
     },
-    "timestamp": "2026-04-27T23:21:23.289419500Z",
+    "timestamp": "2026-04-28T23:08:37.128254653Z",
     "duration_ms": 0
   },
-  "limitations": [
-    "No measured time-to-first-value benchmark — add a CI step that times `cargo build` + node startup + first block"
-  ],
-  "binding_hash": "83cf829ad3e1d5fe0beab9e5301e3993f1862b34a42a8c671b2ca92d203b7d2e"
+  "limitations": [],
+  "binding_hash": "c85ff03543fe3bf455e1c4e2fc810c0dee0d2eb948f39afcb1786edd2db991a0"
 }

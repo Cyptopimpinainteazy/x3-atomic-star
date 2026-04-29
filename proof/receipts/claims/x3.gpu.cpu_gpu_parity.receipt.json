@@ -1,18 +1,20 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "55bbd9db5a3e7dfb5d79d4257a972771d3fc25f7",
   "command_run": "x3-proof verify x3.gpu.cpu_gpu_parity",
-  "artifact_hash": "bdf513e36f43704b2652cebf70a22c63cd695f7c23ebc267e68a0498320d13df",
+  "artifact_hash": "6d45e66489c55d4fe48b1eb8367817e0c5679c8339056fe0ea98b9074ebc092f",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "crates/x3-gpu-validator-swarm/src/lib.rs",
     "crates/x3-gpu-validator-swarm/src/deterministic.rs",
-    "crates/x3-gpu-validator-swarm/src/cpu_validator.rs"
+    "crates/x3-gpu-validator-swarm/src/cpu_validator.rs",
+    "X3-contracts/shared/gpu-parity-core/Cargo.toml",
+    "X3-contracts/shared/test-vectors/gpu_hash_parity.json"
   ],
-  "timestamp": "2026-04-27T23:19:59.686065780Z",
+  "timestamp": "2026-04-28T21:08:02.083372116Z",
   "result": {
     "claim_id": "x3.gpu.cpu_gpu_parity",
     "claim": "GPU-accelerated execution/verification matches CPU reference results",
-    "status": "partial",
+    "status": "verified",
     "proof_level": null,
     "edge_case_level": null,
     "hack_level": null,
@@ -21,10 +23,13 @@
     "files_inspected": [
       "crates/x3-gpu-validator-swarm/src/lib.rs",
       "crates/x3-gpu-validator-swarm/src/deterministic.rs",
-      "crates/x3-gpu-validator-swarm/src/cpu_validator.rs"
+      "crates/x3-gpu-validator-swarm/src/cpu_validator.rs",
+      "X3-contracts/shared/gpu-parity-core/Cargo.toml",
+      "X3-contracts/shared/test-vectors/gpu_hash_parity.json"
     ],
     "commands_run": [
-      "cargo test -p x3-gpu-validator-swarm -- deterministic --quiet"
+      "cargo test -p x3-gpu-validator-swarm -- deterministic --quiet",
+      "cargo test --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml --test parity_vectors"
     ],
     "passed_checks": [
       "crates/x3-gpu-validator-swarm/src/lib.rs exists",
@@ -32,24 +37,22 @@
       "crates/x3-gpu-validator-swarm/src/cpu_validator.rs exists",
       "63 CPU/GPU parity references found",
       "GPU validator tests passed (13 tests)",
-      "CPU fallback path found in deterministic.rs"
+      "CPU fallback path found in deterministic.rs",
+      "X3-contracts gpu-parity-core hash-vector harness PASSED"
     ],
     "failed_checks": [],
-    "missing_proofs": [
-      "No test explicitly named 'parity' or 'deterministic' in output; add test_cpu_gpu_parity that asserts CPU and GPU results match"
-    ],
+    "missing_proofs": [],
     "blockers": [],
     "score": 1.0,
     "evidence": {
       "cpu_fallback": "present",
+      "parity_references": "63",
       "tests_passed": "13",
-      "parity_references": "63"
+      "gpu_parity_vectors": "ok"
     },
-    "timestamp": "2026-04-27T23:19:59.678297809Z",
-    "duration_ms": 2012
+    "timestamp": "2026-04-28T21:08:02.081259249Z",
+    "duration_ms": 2328
   },
-  "limitations": [
-    "No test explicitly named 'parity' or 'deterministic' in output; add test_cpu_gpu_parity that asserts CPU and GPU results match"
-  ],
-  "binding_hash": "26c96b7a26ecc5f08608dac9d151998f081af21b9a9cb37e53d022e52075beef"
+  "limitations": [],
+  "binding_hash": "550aaa51403358e0c2417344b8579a841a43b0c09d3da3421cfac7638a1f199e"
 }

@@ -1,0 +1,38 @@
+{
+  "repo_commit_hash": "32ca76eaeb5fa554e5d952aa1000350aa7dfb49f",
+  "command_run": "x3-proof verify x3.contracts.some_unimplemented",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [],
+  "timestamp": "2026-04-28T20:15:23.933210091Z",
+  "result": {
+    "claim_id": "x3.contracts.some_unimplemented",
+    "claim": "x3.contracts.some_unimplemented (no evidence-driven runner)",
+    "status": "unverified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [],
+    "commands_run": [],
+    "passed_checks": [],
+    "failed_checks": [
+      "x3.contracts.some_unimplemented: no runner implemented; refusing to fabricate Verified"
+    ],
+    "missing_proofs": [
+      "Add a runner for x3.contracts.some_unimplemented that drives executable evidence"
+    ],
+    "blockers": [],
+    "score": 0.0,
+    "evidence": {
+      "reason": "no runner implemented for this claim id yet"
+    },
+    "timestamp": "2026-04-28T20:15:23.931089792Z",
+    "duration_ms": 0
+  },
+  "limitations": [
+    "Add a runner for x3.contracts.some_unimplemented that drives executable evidence"
+  ],
+  "binding_hash": "53c8bc0b708806a172a7cb449d7f2125d8059fb86bcafc0934b68477f07819ff"
+}
