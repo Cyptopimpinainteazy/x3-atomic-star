@@ -225,16 +225,33 @@ impl LimitOrderSettlementBridge {
         execution_amount: u64,
         block: u64,
     ) -> H256 {
-        use sp_io::hashing::blake2_256;
-        
-        let mut data = Vec::with_capacity(32 + 32 + 8 + 8 + 8);
-        data.extend_from_slice(&buy_order_id);
-        data.extend_from_slice(&sell_order_id);
-        data.extend_from_slice(&execution_price.to_le_bytes());
-        data.extend_from_slice(&execution_amount.to_le_bytes());
-        data.extend_from_slice(&block.to_le_bytes());
-        
-        H256::from(blake2_256(&data))
+        // Simple deterministic hash for no_std compatibility
+        // XOR all inputs together for a basic deterministic ID
+        let mut hash = [0u8; 32];
+
+        for (i, &byte) in buy_order_id.iter().enumerate() {
+            hash[i % 32] ^= byte;
+        }
+        for (i, &byte) in sell_order_id.iter().enumerate() {
+            hash[(i + 8) % 32] ^= byte;
+        }
+
+        let price_bytes = execution_price.to_le_bytes();
+        for (i, &byte) in price_bytes.iter().enumerate() {
+            hash[(i + 16) % 32] ^= byte;
+        }
+
+        let amount_bytes = execution_amount.to_le_bytes();
+        for (i, &byte) in amount_bytes.iter().enumerate() {
+            hash[(i + 20) % 32] ^= byte;
+        }
+
+        let block_bytes = block.to_le_bytes();
+        for (i, &byte) in block_bytes.iter().enumerate() {
+            hash[(i + 24) % 32] ^= byte;
+        }
+
+        H256::from(hash)
     }
     
     /// Check if settlement intent can be finalized
