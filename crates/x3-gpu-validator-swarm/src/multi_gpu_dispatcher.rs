@@ -255,7 +255,6 @@ impl MultiGpuDispatcher {
     pub fn health_snapshot(&self) -> String {
         let devices = self.devices.read();
         let stats = self.perf_stats.read();
-        let counters = self.job_counters.read();
 
         let mut lines = vec!["MultiGpuDispatcher Health Snapshot:".to_string()];
         let mut total_throughput = 0.0;

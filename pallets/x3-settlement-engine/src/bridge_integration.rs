@@ -40,7 +40,9 @@ pub trait CrossChainValidatorProvider {
         block_hash: H256,
         state_root: H256,
         merkle_root: H256,
-    ) -> bool where Self: Sized;
+    ) -> bool
+    where
+        Self: Sized;
 
     /// Verify an SVM (Solana) transaction proof against canonical SVM header state
     ///
@@ -61,17 +63,23 @@ pub trait CrossChainValidatorProvider {
         block_hash: H256,
         state_root: H256,
         validator_set_hash: H256,
-    ) -> bool where Self: Sized;
+    ) -> bool
+    where
+        Self: Sized;
 
     /// Get latest verified EVM header hash
     ///
     /// Used for settlement reconciliation and light client updates.
-    fn get_latest_evm_header_hash() -> Option<H256> where Self: Sized;
+    fn get_latest_evm_header_hash() -> Option<H256>
+    where
+        Self: Sized;
 
     /// Get latest verified SVM header hash
     ///
     /// Used for settlement reconciliation and light client updates.
-    fn get_latest_svm_header_hash() -> Option<H256> where Self: Sized;
+    fn get_latest_svm_header_hash() -> Option<H256>
+    where
+        Self: Sized;
 }
 
 /// No-op implementation for testing without cross-chain-validator pallet

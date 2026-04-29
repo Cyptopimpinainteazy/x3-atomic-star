@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn test_u256_from_u64() {
         let val = U256::from(1000);
-        assert_eq!(val.0[31], 232);  // 1000 in last byte of big-endian
+        assert_eq!(val.0[31], 232); // 1000 in last byte of big-endian
     }
 
     #[test]
@@ -102,13 +102,14 @@ mod tests {
     #[test]
     fn test_evm_batch_packet_round_trip() {
         let packet = EvmPacket::Batch {
-            calls: vec![
-                (EvmCall {
+            calls: vec![(
+                EvmCall {
                     contract: [0x11; 20],
                     function_selector: [0x12, 0x34, 0x56, 0x78],
                     args: vec![],
-                }, None),
-            ],
+                },
+                None,
+            )],
             continue_on_revert: true,
         };
 

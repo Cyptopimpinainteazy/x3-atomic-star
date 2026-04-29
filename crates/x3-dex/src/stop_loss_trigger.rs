@@ -74,7 +74,6 @@ pub struct StopLossTakeProfitEngine;
 
 impl StopLossTakeProfitEngine {
     const MIN_TRIGGER_AMOUNT: u64 = 1;
-    const MAX_TRIGGERS_PER_USER: u32 = 100;
     const EXECUTION_FEE_BPS: u64 = 25; // 0.25%
 
     /// Create a stop-loss trigger (sell if price falls below threshold)
@@ -301,6 +300,7 @@ impl StopLossTakeProfitEngine {
     }
 
     /// Create grid trading configuration
+    #[allow(clippy::too_many_arguments)]
     pub fn create_grid_config(
         user: [u8; 32],
         token_in: u128,
@@ -311,7 +311,7 @@ impl StopLossTakeProfitEngine {
         total_amount: u64,
         current_block: u64,
     ) -> Result<GridTradingConfig, &'static str> {
-        if grid_levels < 2 || grid_levels > 100 {
+        if !(2..=100).contains(&grid_levels) {
             return Err("Grid levels must be between 2 and 100");
         }
 
@@ -391,7 +391,7 @@ impl StopLossTakeProfitEngine {
     fn derive_trigger_id(
         user: [u8; 32],
         token_in: u128,
-        token_out: u128,
+        _token_out: u128,
         price: u64,
         nonce: u64,
     ) -> [u8; 32] {

@@ -1,29 +1,32 @@
-> ✅ **STATUS BANNER (April 27, 2026 — FINAL):** All ProofForge gates PASS as of commit `0b7710c`. `prove-everything` = PASSED. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for full history.
+> ⚠️ **STATUS BANNER (April 28, 2026 — CANONICAL):** Mainnet decision is **NO-GO** per machine-computed report **[X3-MAINNET-GO-NO-GO-20260428-185758.md](./launch-gates/reports/X3-MAINNET-GO-NO-GO-20260428-185758.md)** (score 61%, S0 verified 2/10, stale S0 receipts present).
 
 # 🎯 X3_ATOMIC_STAR - MASTER STATUS & DEPLOYMENT DECISION
 
-**Last Updated:** April 27, 2026 — All ProofForge Gates PASS
-**Status:** ✅ **ALL PROOFFORGE GATES PASS — `prove-everything` PASSED**
+**Last Updated:** April 28, 2026
+**Canonical Status:** ❌ **NO-GO FOR MAINNET (see latest machine report)**
+
+## Canonical Source Of Truth
+
+- Mainnet decision report: **[launch-gates/reports/X3-MAINNET-GO-NO-GO-20260428-185758.md](./launch-gates/reports/X3-MAINNET-GO-NO-GO-20260428-185758.md)**
+- Decision: **NO-GO**
+- Overall score: **61%**
+- S0 verified with fresh receipts: **2/10**
+- Blocking condition: **8 S0 receipts are stale (>24h freshness threshold)**
+- Startup-gate repeatability: **in progress** (clean consecutive runs still required)
+
+## Document State
+
+Sections below may contain historical snapshots from prior audit systems and should be treated as archival unless they match the canonical report above.
 
 ---
 
 ## ⚡ 30-SECOND DECISION
 
-✅ **Status:** All ProofForge security gates PASS (commit `0b7710c`)
-✅ **S0-1 supply invariant** — RESOLVED (14 tests)
-✅ **S0-2 double mint** — RESOLVED (pre-existing fix in `pallets/x3-coin`)
-✅ **S0-3 bridge replay** — RESOLVED (`x3-bridge/ethereum_bridge.rs`)
-✅ **S0-4 finality spoof** — RESOLVED (Ed25519 verification, commit dc9d1bd)
-✅ **S0-5 atomic rollback** — RESOLVED (12 tests)
-✅ **S0-6 runtime panics** — SecurityGate PASS
-✅ **S1-1, S1-2, S1-3** — SecurityGate 9/9 PASS
+❌ **Status:** NO-GO (latest canonical report)
+⚠️ **Freshness blocker:** 8 S0 receipts stale (>24h)
+⚠️ **Startup gate blocker:** repeatability evidence not yet complete (consecutive clean runs pending)
 
-✅ **TodoGate:** 0 mainnet blockers PASSED
-✅ **GapGate:** 0 S0 gaps, 0 mainnet blockers PASSED
-✅ **SecurityGate:** 9/9 PASS
-✅ **PROVE EVERYTHING: PASSED**
-
-📞 **Action:** ProofForge gates clear. Proceed with testnet validator onboarding (28 testnet-only items remain non-blocking).
+📞 **Action:** complete startup-gate consecutive passes, refresh stale S0 receipts, then regenerate report.
 
 ---
 

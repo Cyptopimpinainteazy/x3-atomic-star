@@ -7,8 +7,8 @@ use sp_core::H256;
 use sp_std::prelude::*;
 
 /// Offchain storage key prefix for agent memory index
-const MEMORY_INDEX_PREFIX: &[u8] = b"agent_memory:index:";
-const MEMORY_CONSENSUS_PREFIX: &[u8] = b"agent_memory:consensus:";
+const _MEMORY_INDEX_PREFIX: &[u8] = b"agent_memory:index:";
+const _MEMORY_CONSENSUS_PREFIX: &[u8] = b"agent_memory:consensus:";
 
 /// Agent memory snapshot metadata for offchain indexing
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -228,10 +228,7 @@ impl ConsensusStatus {
 
     /// Get count of verified attestations
     pub fn verified_count(&self) -> u32 {
-        self.attestations
-            .iter()
-            .filter(|a| a.verified)
-            .count() as u32
+        self.attestations.iter().filter(|a| a.verified).count() as u32
     }
 }
 

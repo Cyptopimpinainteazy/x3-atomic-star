@@ -1,11 +1,59 @@
 {
-  "claim_id": "x3.asset_kernel.supply_conservation",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "32ca76eaeb5fa554e5d952aa1000350aa7dfb49f",
+  "command_run": "x3-proof verify x3.asset_kernel.supply_conservation",
+  "artifact_hash": "211119aec8a9cb7c99c4a2a3c8b0f8f97ec8a1234f342b1f937d0036d806c443",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "pallets/x3-kernel/src/replay_tests.rs",
+    "pallets/x3-kernel/src/packet_integration_tests.rs",
+    "pallets/x3-kernel/src/tests.rs",
+    "pallets/x3-kernel/src/chaos_tests.rs"
   ],
-  "hash": "3e5f4f0bf5d880a4155ac81d0367de0662515232f3d09cee25273c1ddf0a1100"
+  "timestamp": "2026-04-28T19:43:25.911194587Z",
+  "result": {
+    "claim_id": "x3.asset_kernel.supply_conservation",
+    "claim": "Asset kernel maintains canonical supply invariant across all operations",
+    "status": "verified",
+    "proof_level": "P2",
+    "edge_case_level": "E1",
+    "hack_level": "H0",
+    "operator_level": "I1",
+    "degraded_level": "D1",
+    "files_inspected": [
+      "pallets/x3-kernel/src/replay_tests.rs",
+      "pallets/x3-kernel/src/packet_integration_tests.rs",
+      "pallets/x3-kernel/src/tests.rs",
+      "pallets/x3-kernel/src/chaos_tests.rs"
+    ],
+    "commands_run": [
+      "cargo test --package pallet-x3-kernel canonical_supply"
+    ],
+    "passed_checks": [
+      "canonical_supply test found",
+      "Found 4 test files",
+      "canonical_supply tests PASSED (2 cases, 0 failed)",
+      "Supply monitoring evidence in 9 files"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [
+      "No executable invariant assertions found"
+    ],
+    "blockers": [],
+    "score": 0.85,
+    "evidence": {
+      "test_result": "PASSED",
+      "test_cases_failed": "0",
+      "canonical_supply_test": "found",
+      "test_cases_passed": "2",
+      "invariants_declared": "0",
+      "supply_monitor": "found",
+      "test_files": "4"
+    },
+    "timestamp": "2026-04-28T19:43:25.907964942Z",
+    "duration_ms": 1190
+  },
+  "limitations": [
+    "No executable invariant assertions found"
+  ],
+  "binding_hash": "07f0fe14c20775e3cd8116c41e300a3e799b842953850ce0ce982f2bb97031d0"
 }

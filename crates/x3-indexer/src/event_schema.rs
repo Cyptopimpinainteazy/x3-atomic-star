@@ -121,9 +121,11 @@ impl EventSchemaRegistry {
             output.push_str(&format!("# {}\n", schema.description));
 
             for event in &schema.events {
-                output.push_str(&format!("type {}_{} implements PalletEvent {{\n", 
-                    snake_to_pascal(pallet_name), 
-                    event.name));
+                output.push_str(&format!(
+                    "type {}_{} implements PalletEvent {{\n",
+                    snake_to_pascal(pallet_name),
+                    event.name
+                ));
                 output.push_str("  pallet: String!\n");
                 output.push_str("  event: String!\n");
                 output.push_str("  blockNumber: Int!\n");
@@ -276,140 +278,157 @@ pub fn create_event_schema_registry() -> EventSchemaRegistry {
     });
 
     // ─── X3 Settlement Engine ────────────────────────────────────────────
-    pallets.insert("x3-settlement-engine".to_string(), PalletEventSchema {
-        pallet_name: "x3-settlement-engine".to_string(),
-        description: "Root of trust for atomic settlements across EVM/SVM/BTC/X3VM".to_string(),
-        events: vec![
-            EventDefinition {
-                name: "X3IntentCreated".to_string(),
-                description: "Trade matched, settlement intent created on X3".to_string(),
-                pallet: "x3-settlement-engine".to_string(),
-                fields: vec![
-                    EventField {
-                        name: "intent_id".to_string(),
-                        rust_type: "H256".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Settlement intent identifier".to_string()),
-                    },
-                    EventField {
-                        name: "maker".to_string(),
-                        rust_type: "T::AccountId".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Maker account".to_string()),
-                    },
-                    EventField {
-                        name: "taker".to_string(),
-                        rust_type: "T::AccountId".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Taker account".to_string()),
-                    },
-                ],
-            },
-            EventDefinition {
-                name: "X3AssetsLocked".to_string(),
-                description: "Assets locked in X3 escrow".to_string(),
-                pallet: "x3-settlement-engine".to_string(),
-                fields: vec![
-                    EventField {
-                        name: "intent_id".to_string(),
-                        rust_type: "H256".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Settlement intent identifier".to_string()),
-                    },
-                    EventField {
-                        name: "amount".to_string(),
-                        rust_type: "u128".to_string(),
-                        ts_type: "bigint".to_string(),
-                        graphql_type: "BigInt!".to_string(),
-                        description: Some("Amount locked in escrow".to_string()),
-                    },
-                ],
-            },
-            EventDefinition {
-                name: "X3Finalized".to_string(),
-                description: "Settlement finalized on X3 (all legs complete)".to_string(),
-                pallet: "x3-settlement-engine".to_string(),
-                fields: vec![
-                    EventField {
-                        name: "intent_id".to_string(),
-                        rust_type: "H256".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Settlement intent identifier".to_string()),
-                    },
-                    EventField {
-                        name: "settlement_time_ms".to_string(),
-                        rust_type: "u64".to_string(),
-                        ts_type: "number".to_string(),
-                        graphql_type: "Int!".to_string(),
-                        description: Some("Settlement duration in milliseconds".to_string()),
-                    },
-                ],
-            },
-        ],
-    });
+    pallets.insert(
+        "x3-settlement-engine".to_string(),
+        PalletEventSchema {
+            pallet_name: "x3-settlement-engine".to_string(),
+            description: "Root of trust for atomic settlements across EVM/SVM/BTC/X3VM".to_string(),
+            events: vec![
+                EventDefinition {
+                    name: "X3IntentCreated".to_string(),
+                    description: "Trade matched, settlement intent created on X3".to_string(),
+                    pallet: "x3-settlement-engine".to_string(),
+                    fields: vec![
+                        EventField {
+                            name: "intent_id".to_string(),
+                            rust_type: "H256".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Settlement intent identifier".to_string()),
+                        },
+                        EventField {
+                            name: "maker".to_string(),
+                            rust_type: "T::AccountId".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Maker account".to_string()),
+                        },
+                        EventField {
+                            name: "taker".to_string(),
+                            rust_type: "T::AccountId".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Taker account".to_string()),
+                        },
+                    ],
+                },
+                EventDefinition {
+                    name: "X3AssetsLocked".to_string(),
+                    description: "Assets locked in X3 escrow".to_string(),
+                    pallet: "x3-settlement-engine".to_string(),
+                    fields: vec![
+                        EventField {
+                            name: "intent_id".to_string(),
+                            rust_type: "H256".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Settlement intent identifier".to_string()),
+                        },
+                        EventField {
+                            name: "amount".to_string(),
+                            rust_type: "u128".to_string(),
+                            ts_type: "bigint".to_string(),
+                            graphql_type: "BigInt!".to_string(),
+                            description: Some("Amount locked in escrow".to_string()),
+                        },
+                    ],
+                },
+                EventDefinition {
+                    name: "X3Finalized".to_string(),
+                    description: "Settlement finalized on X3 (all legs complete)".to_string(),
+                    pallet: "x3-settlement-engine".to_string(),
+                    fields: vec![
+                        EventField {
+                            name: "intent_id".to_string(),
+                            rust_type: "H256".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Settlement intent identifier".to_string()),
+                        },
+                        EventField {
+                            name: "settlement_time_ms".to_string(),
+                            rust_type: "u64".to_string(),
+                            ts_type: "number".to_string(),
+                            graphql_type: "Int!".to_string(),
+                            description: Some("Settlement duration in milliseconds".to_string()),
+                        },
+                    ],
+                },
+            ],
+        },
+    );
 
     // ─── X3 Jury Anchor ──────────────────────────────────────────────────
-    pallets.insert("x3-jury-anchor".to_string(), PalletEventSchema {
-        pallet_name: "x3-jury-anchor".to_string(),
-        description: "Jury staking and verdict anchoring for Byzantine-fault-tolerant consensus".to_string(),
-        events: vec![
-            EventDefinition {
-                name: "JurorStaked".to_string(),
-                description: "A new juror staked tokens".to_string(),
-                pallet: "x3-jury-anchor".to_string(),
-                fields: vec![
-                    EventField {
-                        name: "juror".to_string(),
-                        rust_type: "T::AccountId".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Juror account".to_string()),
-                    },
-                    EventField {
-                        name: "amount".to_string(),
-                        rust_type: "BalanceOf<T>".to_string(),
-                        ts_type: "bigint".to_string(),
-                        graphql_type: "BigInt!".to_string(),
-                        description: Some("Amount staked".to_string()),
-                    },
-                ],
-            },
-            EventDefinition {
-                name: "VerdictAnchored".to_string(),
-                description: "A jury verdict was anchored on-chain".to_string(),
-                pallet: "x3-jury-anchor".to_string(),
-                fields: vec![
-                    EventField {
-                        name: "verdict_id".to_string(),
-                        rust_type: "H256".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Verdict identifier".to_string()),
-                    },
-                    EventField {
-                        name: "verdict_hash".to_string(),
-                        rust_type: "H256".to_string(),
-                        ts_type: "string".to_string(),
-                        graphql_type: "String!".to_string(),
-                        description: Some("Cryptographic hash of verdict".to_string()),
-                    },
-                ],
-            },
-        ],
-    });
+    pallets.insert(
+        "x3-jury-anchor".to_string(),
+        PalletEventSchema {
+            pallet_name: "x3-jury-anchor".to_string(),
+            description:
+                "Jury staking and verdict anchoring for Byzantine-fault-tolerant consensus"
+                    .to_string(),
+            events: vec![
+                EventDefinition {
+                    name: "JurorStaked".to_string(),
+                    description: "A new juror staked tokens".to_string(),
+                    pallet: "x3-jury-anchor".to_string(),
+                    fields: vec![
+                        EventField {
+                            name: "juror".to_string(),
+                            rust_type: "T::AccountId".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Juror account".to_string()),
+                        },
+                        EventField {
+                            name: "amount".to_string(),
+                            rust_type: "BalanceOf<T>".to_string(),
+                            ts_type: "bigint".to_string(),
+                            graphql_type: "BigInt!".to_string(),
+                            description: Some("Amount staked".to_string()),
+                        },
+                    ],
+                },
+                EventDefinition {
+                    name: "VerdictAnchored".to_string(),
+                    description: "A jury verdict was anchored on-chain".to_string(),
+                    pallet: "x3-jury-anchor".to_string(),
+                    fields: vec![
+                        EventField {
+                            name: "verdict_id".to_string(),
+                            rust_type: "H256".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Verdict identifier".to_string()),
+                        },
+                        EventField {
+                            name: "verdict_hash".to_string(),
+                            rust_type: "H256".to_string(),
+                            ts_type: "string".to_string(),
+                            graphql_type: "String!".to_string(),
+                            description: Some("Cryptographic hash of verdict".to_string()),
+                        },
+                    ],
+                },
+            ],
+        },
+    );
 
     // ─── Additional Pallets (Abbreviated) ────────────────────────────────
     // Each pallet has similar structure with name, description, and events
 
     let pallet_names = vec![
-        ("x3-cross-vm-router", "Cross-VM execution routing and dispatch"),
-        ("x3-asset-registry", "Asset registration and metadata management"),
-        ("x3-domain-registry", "Domain name registration and resolution"),
+        (
+            "x3-cross-vm-router",
+            "Cross-VM execution routing and dispatch",
+        ),
+        (
+            "x3-asset-registry",
+            "Asset registration and metadata management",
+        ),
+        (
+            "x3-domain-registry",
+            "Domain name registration and resolution",
+        ),
         ("x3-sequencer", "Transaction sequencing and ordering"),
         ("x3-coin", "Native token and coin management"),
         ("x3-inventory", "Item inventory and state tracking"),
@@ -426,8 +445,14 @@ pub fn create_event_schema_registry() -> EventSchemaRegistry {
         ("agent-accounts", "Agent account management and delegation"),
         ("agent-memory", "Agent memory storage and retrieval"),
         ("atomic-trade-engine", "Atomic swap and trade execution"),
-        ("cross-chain-validator", "Cross-chain validation and finality"),
-        ("depin-marketplace", "Decentralized infrastructure marketplace"),
+        (
+            "cross-chain-validator",
+            "Cross-chain validation and finality",
+        ),
+        (
+            "depin-marketplace",
+            "Decentralized infrastructure marketplace",
+        ),
         ("evolution-core", "Evolution and upgrade system"),
         ("fraud-proofs", "Fraud proof generation and verification"),
         ("governance", "On-chain governance and voting"),
@@ -468,63 +493,58 @@ pub fn create_event_schema_registry() -> EventSchemaRegistry {
                     name: "ProposalVoted".to_string(),
                     description: "A vote was cast on a proposal".to_string(),
                     pallet: name.to_string(),
-                    fields: vec![
-                        EventField {
-                            name: "proposal_id".to_string(),
-                            rust_type: "u32".to_string(),
-                            ts_type: "number".to_string(),
-                            graphql_type: "Int!".to_string(),
-                            description: None,
-                        },
-                    ],
+                    fields: vec![EventField {
+                        name: "proposal_id".to_string(),
+                        rust_type: "u32".to_string(),
+                        ts_type: "number".to_string(),
+                        graphql_type: "Int!".to_string(),
+                        description: None,
+                    }],
                 },
             ],
-            "x3-token-factory" => vec![
-                EventDefinition {
-                    name: "TokenCreated".to_string(),
-                    description: "A new custom token was created".to_string(),
-                    pallet: name.to_string(),
-                    fields: vec![
-                        EventField {
-                            name: "token_id".to_string(),
-                            rust_type: "u32".to_string(),
-                            ts_type: "number".to_string(),
-                            graphql_type: "Int!".to_string(),
-                            description: Some("Token identifier".to_string()),
-                        },
-                        EventField {
-                            name: "creator".to_string(),
-                            rust_type: "T::AccountId".to_string(),
-                            ts_type: "string".to_string(),
-                            graphql_type: "String!".to_string(),
-                            description: None,
-                        },
-                    ],
-                },
-            ],
-            _ => vec![
-                EventDefinition {
-                    name: "EventOccurred".to_string(),
-                    description: format!("Generic event from {}", name),
-                    pallet: name.to_string(),
-                    fields: vec![
-                        EventField {
-                            name: "data".to_string(),
-                            rust_type: "Vec<u8>".to_string(),
-                            ts_type: "string".to_string(),
-                            graphql_type: "String!".to_string(),
-                            description: Some("Event data payload".to_string()),
-                        },
-                    ],
-                },
-            ],
+            "x3-token-factory" => vec![EventDefinition {
+                name: "TokenCreated".to_string(),
+                description: "A new custom token was created".to_string(),
+                pallet: name.to_string(),
+                fields: vec![
+                    EventField {
+                        name: "token_id".to_string(),
+                        rust_type: "u32".to_string(),
+                        ts_type: "number".to_string(),
+                        graphql_type: "Int!".to_string(),
+                        description: Some("Token identifier".to_string()),
+                    },
+                    EventField {
+                        name: "creator".to_string(),
+                        rust_type: "T::AccountId".to_string(),
+                        ts_type: "string".to_string(),
+                        graphql_type: "String!".to_string(),
+                        description: None,
+                    },
+                ],
+            }],
+            _ => vec![EventDefinition {
+                name: "EventOccurred".to_string(),
+                description: format!("Generic event from {}", name),
+                pallet: name.to_string(),
+                fields: vec![EventField {
+                    name: "data".to_string(),
+                    rust_type: "Vec<u8>".to_string(),
+                    ts_type: "string".to_string(),
+                    graphql_type: "String!".to_string(),
+                    description: Some("Event data payload".to_string()),
+                }],
+            }],
         };
 
-        pallets.insert(name.to_string(), PalletEventSchema {
-            pallet_name: name.to_string(),
-            description: description.to_string(),
-            events,
-        });
+        pallets.insert(
+            name.to_string(),
+            PalletEventSchema {
+                pallet_name: name.to_string(),
+                description: description.to_string(),
+                events,
+            },
+        );
     }
 
     EventSchemaRegistry {

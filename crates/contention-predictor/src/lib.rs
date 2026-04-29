@@ -337,7 +337,7 @@ impl ContentionPredictor {
             if count > 1 {
                 entry.conflict_count = entry.conflict_count.saturating_add(count - 1);
             }
-            entry.temperature = entry.temperature.saturating_add(1).min(255);
+            entry.temperature = entry.temperature.saturating_add(1);
         }
     }
 

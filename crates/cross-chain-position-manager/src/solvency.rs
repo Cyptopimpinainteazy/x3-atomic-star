@@ -407,6 +407,7 @@ impl SolvencyEngine {
     /// 1. Reservation is still active and not expired.
     /// 2. Quote freshness.
     /// 3. All pre-reservation checks still hold.
+    #[allow(clippy::too_many_arguments)]
     pub fn pre_submission_check(
         &self,
         reservation: &ReservationRecord,

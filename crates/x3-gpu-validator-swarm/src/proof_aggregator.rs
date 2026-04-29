@@ -4,9 +4,9 @@
 //! Tracks which validators have attested to each proof and determines finality.
 
 use crate::error::{SwarmError, SwarmResult};
-use crate::unified_proof::{ProofValidationResult, UnifiedProof};
+use crate::unified_proof::UnifiedProof;
 use std::collections::BTreeMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub type Address = [u8; 32];
 pub type Hash = [u8; 32];

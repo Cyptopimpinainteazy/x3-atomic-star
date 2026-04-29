@@ -275,7 +275,7 @@ impl Verifier {
         &self,
         _term: &MirTerminator,
         _func_name: &str,
-        _errors: &mut Vec<VerificationError>,
+        _errors: &mut [VerificationError],
         _stats: &mut VerificationStats,
     ) {
         // Terminators are generally safe, but could check for:

@@ -17,6 +17,9 @@ pub enum FlashloanError {
     #[error("insufficient repayment: owed {owed}, paid {paid}")]
     InsufficientRepayment { owed: u128, paid: u128 },
 
+    #[error("concurrent borrow rejected on {chain} for {asset}: outstanding flashloan exists")]
+    ConcurrentBorrowRejected { chain: ChainKind, asset: AssetId },
+
     #[error("unknown flashloan: {0}")]
     UnknownFlashloan(FlashloanId),
 

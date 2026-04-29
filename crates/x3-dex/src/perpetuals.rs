@@ -1,7 +1,6 @@
 /// Perpetual Futures Engine — Unlimited-expiry leveraged derivatives with funding rates
 /// Enables up to 10x leverage, funding rate equilibrium, and liquidation mechanics
 use parity_scale_codec::{Decode, Encode};
-use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
 pub struct PerpetualPosition {
@@ -71,10 +70,10 @@ impl PerpetualFuturesEngine {
     const INITIAL_RATIO_BPS: u32 = 500; // 5% initial margin
     const LIQUIDATION_FEE_BPS: u32 = 500; // 5% of position value
     const FUNDING_INTERVAL_BLOCKS: u64 = 28_800; // ~1 hour
-    const MAX_FUNDING_RATE_BPS: i64 = 10_000; // ±100% per interval max
     const PRICE_SCALE: u64 = 1_000_000_000_000;
 
     /// Open a perpetual position (long or short)
+    #[allow(clippy::too_many_arguments)]
     pub fn open_position(
         trader: [u8; 32],
         base_token: u128,
@@ -85,7 +84,7 @@ impl PerpetualFuturesEngine {
         entry_price: u64,
         current_block: u64,
     ) -> Result<PerpetualPosition, &'static str> {
-        if leverage < Self::MIN_LEVERAGE || leverage > Self::MAX_LEVERAGE {
+        if !(Self::MIN_LEVERAGE..=Self::MAX_LEVERAGE).contains(&leverage) {
             return Err("Leverage outside valid range");
         }
 
@@ -162,7 +161,7 @@ impl PerpetualFuturesEngine {
         entry_price: u64,
         size: i64,
         collateral: u64,
-        leverage: u32,
+        _leverage: u32,
     ) -> u64 {
         if size == 0 {
             return 0;
@@ -173,11 +172,11 @@ impl PerpetualFuturesEngine {
 
         if size > 0 {
             // Long liquidation: entry_price - maintenance / size
-            let sub = maintenance / size.abs() as u64;
+            let sub = maintenance / size.unsigned_abs();
             entry_price.saturating_sub(sub)
         } else {
             // Short liquidation: entry_price + maintenance / abs(size)
-            let add = maintenance / size.abs() as u64;
+            let add = maintenance / size.unsigned_abs();
             entry_price.saturating_add(add)
         }
     }
@@ -193,7 +192,7 @@ impl PerpetualFuturesEngine {
             return Err("Position not open");
         }
 
-        let position_value = ((position.size.abs() as u128 * liquidation_price as u128)
+        let position_value = ((position.size.unsigned_abs() as u128 * liquidation_price as u128)
             / Self::PRICE_SCALE as u128) as u64;
 
         let liquidation_fee =
@@ -278,13 +277,11 @@ impl PerpetualFuturesEngine {
         let net = long_oi as i64 - short_oi as i64;
         let total = (long_oi + short_oi) as i64;
 
-        let rate = if total != 0 {
+        if total != 0 {
             (net * 10_000 / total).min(max_rate).max(-max_rate)
         } else {
             0
-        };
-
-        rate
+        }
     }
 
     /// Create funding rate config

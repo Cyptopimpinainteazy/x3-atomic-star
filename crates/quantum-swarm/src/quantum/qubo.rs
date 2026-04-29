@@ -352,12 +352,12 @@ impl QuboSolver {
 
                 // Single sweep: try flipping each spin
                 for i in 0..n {
-                    // Calculate energy change from flipping spin i
-                    let mut delta_e = 2.0 * ising.h[i] * spins[i] as f64;
+                    // ΔE from flipping spin i: -2*h[i]*s[i] - 2*Σ J[i][j]*s[i]*s[j]
+                    let mut delta_e = -2.0 * ising.h[i] * spins[i] as f64;
                     for j in 0..n {
                         if i != j {
                             let jij = if i < j { ising.j[i][j] } else { ising.j[j][i] };
-                            delta_e += 2.0 * jij * spins[i] as f64 * spins[j] as f64;
+                            delta_e -= 2.0 * jij * spins[i] as f64 * spins[j] as f64;
                         }
                     }
 
@@ -419,11 +419,12 @@ impl QuboSolver {
             for (r, replica) in replicas.iter_mut().enumerate() {
                 let temp = temps[r];
                 for i in 0..n {
-                    let mut delta_e = 2.0 * ising.h[i] * replica[i] as f64;
+                    // ΔE from flipping spin i: -2*h[i]*s[i] - 2*Σ J[i][j]*s[i]*s[j]
+                    let mut delta_e = -2.0 * ising.h[i] * replica[i] as f64;
                     for j in 0..n {
                         if i != j {
                             let jij = if i < j { ising.j[i][j] } else { ising.j[j][i] };
-                            delta_e += 2.0 * jij * replica[i] as f64 * replica[j] as f64;
+                            delta_e -= 2.0 * jij * replica[i] as f64 * replica[j] as f64;
                         }
                     }
 

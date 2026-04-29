@@ -63,6 +63,7 @@ pub fn invariant(attr: TokenStream, item: TokenStream) -> TokenStream {
             .map(|m| format!("{}/tests/fixtures/valid_registry.toml", m)),
     ];
 
+    #[allow(clippy::manual_flatten)]
     for reg_path_opt in registry_paths {
         if let Some(reg_path) = reg_path_opt {
             match std::fs::read_to_string(&reg_path) {

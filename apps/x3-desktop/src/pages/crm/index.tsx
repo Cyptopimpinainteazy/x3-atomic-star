@@ -14,9 +14,8 @@ import './crm.css';
 import ValidatorCapacityPanel from './panels/ValidatorCapacityPanel';
 import EnterpriseIntegrationPanel from './panels/EnterpriseIntegrationPanel';
 import CapacityForecastPanel from './panels/CapacityForecastPanel';
-// TODO: Create these panels
-// import RevenueIntelligencePanel from './panels/RevenueIntelligencePanel';
-// import PipelineKanbanPanel from './panels/PipelineKanbanPanel';
+import RevenueIntelligencePanel from './panels/RevenueIntelligencePanel';
+import PipelineKanbanPanel from './panels/PipelineKanbanPanel';
 
 type ViewTab = 'overview' | 'validators' | 'enterprise' | 'forecast' | 'revenue' | 'pipeline';
 
@@ -91,10 +90,10 @@ const X3CRMDashboard: React.FC = () => {
           <CapacityForecastPanel />
         )}
         {activeTab === 'revenue' && (
-          <div className="crm-panel"><h2>💰 Revenue Intelligence Panel</h2><p>Coming soon...</p></div>
+          <RevenueIntelligencePanel />
         )}
         {activeTab === 'pipeline' && (
-          <div className="crm-panel"><h2>🎯 Pipeline Kanban Panel</h2><p>Coming soon...</p></div>
+          <PipelineKanbanPanel />
         )}
       </div>
     </div>

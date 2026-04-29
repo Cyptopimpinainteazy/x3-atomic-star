@@ -1,11 +1,4 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-#![allow(
-    clippy::derivable_impls,
-    clippy::identity_op,
-    clippy::needless_return,
-    clippy::redundant_closure,
-    clippy::single_match
-)]
+#![warn(dead_code, unused_imports, unused_variables)]
 
 //! X3 Virtual Machine
 //!

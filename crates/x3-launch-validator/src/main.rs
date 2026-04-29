@@ -7,6 +7,7 @@
 //!   x3-launch-check --check post-launch
 //!   x3-launch-check --check failure-conditions
 //!   x3-launch-check --json          (emit JSON report to stdout)
+//!   x3-launch-check --allow-incomplete-blocking
 
 use x3_launch_validator::{
     checklist::{CheckPhase, LaunchChecklist},
@@ -17,6 +18,7 @@ use x3_launch_validator::{
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let json_mode = args.iter().any(|a| a == "--json");
+    let allow_incomplete_blocking = args.iter().any(|a| a == "--allow-incomplete-blocking");
     let phase_filter = args
         .windows(2)
         .find(|w| w[0] == "--check")
@@ -31,7 +33,12 @@ fn main() {
         // Output machine-readable JSON
         let json = serde_json::to_string_pretty(&checklist.items).expect("serialization failed");
         println!("{json}");
-        if checklist.any_blocking_failed() {
+
+        // Fail closed by default: any blocking check that is not PASS is launch-blocking.
+        // Use --allow-incomplete-blocking only for local advisory runs.
+        if (!allow_incomplete_blocking && checklist.any_blocking_unmet())
+            || (allow_incomplete_blocking && checklist.any_blocking_failed())
+        {
             std::process::exit(1);
         }
         return;
@@ -64,7 +71,9 @@ fn main() {
 
     ChecklistReporter::print(&checklist);
 
-    if checklist.any_blocking_failed() {
+    if (!allow_incomplete_blocking && checklist.any_blocking_unmet())
+        || (allow_incomplete_blocking && checklist.any_blocking_failed())
+    {
         std::process::exit(1);
     }
 }

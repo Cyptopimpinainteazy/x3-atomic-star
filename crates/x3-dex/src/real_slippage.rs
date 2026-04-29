@@ -65,7 +65,6 @@ pub struct RealSlippageCalculator;
 
 impl RealSlippageCalculator {
     const PRICE_SCALE: u64 = 10_000; // Scale for fixed-point price calculations
-    const DECIMAL_PLACES: u32 = 8; // 8 decimals for token amounts
     const LOW_IMPACT_THRESHOLD: u32 = 25; // < 0.25% = low
     const MEDIUM_IMPACT_THRESHOLD: u32 = 100; // < 1% = medium
     const HIGH_IMPACT_THRESHOLD: u32 = 500; // < 5% = high
@@ -93,7 +92,7 @@ impl RealSlippageCalculator {
             .ok_or("Overflow in output calculation")?;
 
         let denominator = (reserve_in as u128)
-            .saturating_add((input_after_fee as u128))
+            .saturating_add(input_after_fee as u128)
             .checked_mul(1)
             .ok_or("Invalid denominator")?;
 
@@ -132,15 +131,13 @@ impl RealSlippageCalculator {
             return 0;
         }
 
-        let impact = if execution_price < spot_price {
+        if execution_price < spot_price {
             // Buying: execution price < spot price (unfavorable for buyer)
             ((spot_price as u128 - execution_price as u128) * 10_000 / spot_price as u128) as u32
         } else {
             // Selling: execution price > spot price (favorable for seller)
             ((spot_price as u128 - execution_price as u128) * 10_000 / spot_price as u128) as u32
-        };
-
-        impact
+        }
     }
 
     /// Generate slippage quote for a trade
@@ -253,12 +250,11 @@ impl RealSlippageCalculator {
         let mut aggregated: u128 = 10_000; // Start with 100%
 
         for impact in impacts {
-            let impact_multiplier = (10_000_u128 - impact as u128);
+            let impact_multiplier = 10_000_u128 - impact as u128;
             aggregated = (aggregated * impact_multiplier) / 10_000;
         }
 
-        let total_impact = 10_000 - aggregated as u32;
-        total_impact
+        10_000 - aggregated as u32
     }
 
     /// Get suggested minimum output with default 0.5% slippage allowance

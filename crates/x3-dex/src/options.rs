@@ -79,12 +79,8 @@ pub struct VolatilitySurface {
 pub struct OptionsEngine;
 
 impl OptionsEngine {
-    const RISK_FREE_RATE_BPS: u32 = 100; // 1% annual
-    const MIN_STRIKE: u64 = 1;
-    const MAX_STRIKE: u64 = u64::MAX / 2;
     const MIN_EXPIRATION_BLOCKS: u64 = 10; // At least 10 blocks
     const MAX_EXPIRATION_BLOCKS: u64 = 52_560_000; // ~2 years
-    const SCALING_FACTOR: u64 = 1_000_000_000_000; // For fixed-point math
 
     /// Calculate Black-Scholes option price
     /// Simplified implementation without true sqrt (using approximations)
@@ -102,18 +98,10 @@ impl OptionsEngine {
         // Simplified B-S: option_price ≈ intrinsic + time_value
         let intrinsic = if option_type == 0 {
             // Call: max(S - K, 0)
-            if underlying_price > strike_price {
-                underlying_price - strike_price
-            } else {
-                0
-            }
+            underlying_price.saturating_sub(strike_price)
         } else {
             // Put: max(K - S, 0)
-            if strike_price > underlying_price {
-                strike_price - underlying_price
-            } else {
-                0
-            }
+            strike_price.saturating_sub(underlying_price)
         };
 
         // Time value approximation: TV ≈ 0.4 * S * σ * √T
@@ -152,7 +140,7 @@ impl OptionsEngine {
         let gamma = (volatility_bps as u64 / 40).min(200);
         let theta = -((volatility_bps as u64 * underlying_price / 10000) as i64 / 100);
         let vega = volatility_bps as u64 / 2;
-        let rho = time_to_expiry_blocks as u64 / 100;
+        let rho = time_to_expiry_blocks / 100;
 
         Ok(OptionGreeks {
             delta,
@@ -164,6 +152,7 @@ impl OptionsEngine {
     }
 
     /// Quote an option price
+    #[allow(clippy::too_many_arguments)]
     pub fn quote_option(
         underlying: u128,
         quote_token: u128,
@@ -174,8 +163,7 @@ impl OptionsEngine {
         implied_vol: u32,
         current_block: u64,
     ) -> Result<OptionQuote, &'static str> {
-        if expiration_blocks < Self::MIN_EXPIRATION_BLOCKS
-            || expiration_blocks > Self::MAX_EXPIRATION_BLOCKS
+        if !(Self::MIN_EXPIRATION_BLOCKS..=Self::MAX_EXPIRATION_BLOCKS).contains(&expiration_blocks)
         {
             return Err("Expiration outside valid range");
         }
@@ -212,6 +200,7 @@ impl OptionsEngine {
     }
 
     /// Buy an option
+    #[allow(clippy::too_many_arguments)]
     pub fn buy_option(
         holder: [u8; 32],
         underlying: u128,
@@ -360,7 +349,7 @@ impl OptionsEngine {
             id[i + 11] = *byte;
         }
         let strike_bytes = strike.to_le_bytes();
-        for (i, byte) in strike_bytes.iter().take(12).enumerate() {
+        for (i, byte) in strike_bytes.iter().enumerate() {
             id[i + 19] = *byte;
         }
         id[31] = opt_type;

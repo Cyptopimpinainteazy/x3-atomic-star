@@ -63,7 +63,7 @@ pub struct MemoryJsonlResponse {
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryHashResponse {
     /// Latest memory hash (merkle root)
-    pub memory_hash: Vec<u8>,  // H256 as bytes
+    pub memory_hash: Vec<u8>, // H256 as bytes
     /// Block where memory was last updated
     pub block_number: u32,
     /// Block where memory was indexed offchain
@@ -79,7 +79,7 @@ pub struct MemoryHashResponse {
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemorySnapshotResponse {
     /// Agent ID
-    pub agent_id: Vec<u8>,  // H256 as bytes
+    pub agent_id: Vec<u8>, // H256 as bytes
     /// Block number of snapshot
     pub block_number: u32,
     /// Memory data (serialized)
@@ -123,11 +123,11 @@ pub struct AttestationEntry {
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConsensusStatusResponse {
     /// Agent ID
-    pub agent_id: Vec<u8>,  // H256 as bytes
+    pub agent_id: Vec<u8>, // H256 as bytes
     /// Block number of memory snapshot
     pub block_number: u32,
     /// Memory hash being attested
-    pub memory_hash: Vec<u8>,  // H256 as bytes
+    pub memory_hash: Vec<u8>, // H256 as bytes
     /// List of validator attestations received
     pub attestations_received: Vec<AttestationEntry>,
     /// Number of attestations required for consensus
@@ -156,11 +156,10 @@ sp_api::decl_runtime_apis! {
         /// Get entry count for agent.
         fn get_entry_count(agent_id: u32) -> u64;
 
-        /// ════════════════════════════════════════════════════════════════════════════════
-        /// Phase 3: Offchain Memory RPC Methods
-        /// ════════════════════════════════════════════════════════════════════════════════
-
-        /// Get latest memory hash and consensus status for an agent.
+            // ════════════════════════════════════════════════════════════════════════════════
+            // Phase 3: Offchain Memory RPC Methods
+            // ════════════════════════════════════════════════════════════════════════════════
+            /// Get latest memory hash and consensus status for an agent.
         fn agent_memory_hash(agent_id: Vec<u8>) -> MemoryHashResponse;
 
         /// Get agent memory snapshot at specific block.

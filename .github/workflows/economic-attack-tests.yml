@@ -1,342 +1,39 @@
-name: Economic Attack Tests Gate
+name: Economic Attack Gate
+
 on:
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'pallets/dex/**'
-      - 'pallets/oracle/**'
-      - 'pallets/flash-loans/**'
-      - 'pallets/governance/**'
-      - 'cross-vm/**'
-      - 'proof-forge/src/runners/flashloans.rs'
-      - 'proof-forge/src/runners/oracle.rs'
-      - 'proof-forge/src/runners/dex.rs'
-      - 'proof-forge/src/runners/economic.rs'
-      - 'tests/economic-attacks/**'
   push:
     branches: [main]
   workflow_dispatch:
 
 env:
-  RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  economic-attack-tests:
-    name: Run Economic Attack Scenario Tests
+  economic-gate:
+    name: Economic Attack Gate (S0)
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        test-category:
-          - flash-loan-attacks
-          - mev-attacks
-          - oracle-manipulation
-          - cross-vm-arbitrage
-          - governance-attacks
-    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Install Rust Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-economic
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Build x3-proof CLI
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release
+
+      - name: Run Economic Gate
         run: |
-          cd proof-forge
-          cargo build --release --verbose
-          echo "✅ x3-proof CLI built"
+          ./target/release/x3-proof economic-gate --strict --fail-hard 2>&1 | tee economic-gate-results.txt
 
-      - name: Run Economic Attack Tests - ${{ matrix.test-category }}
-        id: economic-test
-        run: |
-          echo "🔍 Running economic attack tests: ${{ matrix.test-category }}..."
-          ./target/release/x3-proof economic-gate --workspace . --category ${{ matrix.test-category }} --strict
-        continue-on-error: false
-
-      - name: Generate Category Report
-        if: always()
-        run: |
-          echo "📊 Generating economic attack report for ${{ matrix.test-category }}..."
-          ./target/release/x3-proof economic-gate --workspace . --category ${{ matrix.test-category }} --report > economic-${{ matrix.test-category }}-report.txt
-          cat economic-${{ matrix.test-category }}-report.txt
-
-      - name: Upload Category Report
+      - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: economic-${{ matrix.test-category }}-report
-          path: economic-${{ matrix.test-category }}-report.txt
+          name: economic-gate-results-${{ github.run_number }}
+          path: economic-gate-results.txt
           retention-days: 30
-
-  aggregate-results:
-    name: Aggregate All Economic Attack Test Results
-    needs: economic-attack-tests
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: Build x3-proof CLI
-        run: |
-          cd proof-forge
-          cargo build --release
-
-      - name: Run Full Economic Gate
-        id: full-economic-gate
-        run: |
-          echo "🔍 Running FULL economic attack gate (all categories)..."
-          ./target/release/x3-proof economic-gate --workspace . --strict
-        continue-on-error: false
-
-      - name: Generate Comprehensive Report
-        if: always()
-        run: |
-          echo "📊 Generating comprehensive economic security report..."
-          ./target/release/x3-proof economic-gate --workspace . --report > economic-comprehensive-report.txt
-          
-          echo ""
-          echo "=== ECONOMIC SECURITY SUMMARY ==="
-          echo ""
-          cat economic-comprehensive-report.txt
-
-      - name: Upload Comprehensive Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: economic-comprehensive-report
-          path: economic-comprehensive-report.txt
-          retention-days: 90
-
-      - name: Check Attack Prevention Status
-        if: always()
-        run: |
-          if [ "${{ steps.full-economic-gate.outcome }}" != "success" ]; then
-            echo "❌ ECONOMIC ATTACK TESTS FAILED"
-            echo ""
-            echo "One or more economic attack scenarios succeeded (attacks were NOT prevented):"
-            echo ""
-            echo "Categories tested:"
-            echo "1. Flash Loan Attacks (oracle manipulation, reentrancy, repayment bypass)"
-            echo "2. MEV Attacks (sandwich, front-running)"
-            echo "3. Oracle Manipulation (TWAP, front-running)"
-            echo "4. Cross-VM Arbitrage Exploits"
-            echo "5. Governance Attacks (flash loan takeover)"
-            echo ""
-            echo "See economic-comprehensive-report.txt artifact for details."
-            echo ""
-            echo "🚨 THIS PR IS BLOCKED - All attacks must be prevented before merge."
-            exit 1
-          else
-            echo "✅ ECONOMIC ATTACK TESTS PASSED"
-            echo "All 15 economic attack scenarios were successfully prevented!"
-            echo ""
-            echo "Verified attack prevention:"
-            echo "✅ Flash loan oracle manipulation: PREVENTED"
-            echo "✅ Flash loan reentrancy: PREVENTED"
-            echo "✅ Flash loan repayment bypass: PREVENTED"
-            echo "✅ Sandwich attacks: PREVENTED"
-            echo "✅ Front-running: PREVENTED"
-            echo "✅ Oracle TWAP manipulation: PREVENTED"
-            echo "✅ Oracle front-running: PREVENTED"
-            echo "✅ Cross-VM arbitrage: PREVENTED"
-            echo "✅ Governance takeover: PREVENTED"
-          fi
-
-      - name: Comment on PR (On Failure)
-        if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## ❌ Economic Attack Tests Failed
-              
-              One or more economic attack scenarios **succeeded** (attacks were not prevented). This PR is **BLOCKED** until all attacks are mitigated.
-              
-              ### Test Results
-              See the [economic-comprehensive-report artifact](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for full details.
-              
-              ### Attack Categories Tested
-              1. **Flash Loan Attacks**
-                 - Oracle manipulation via flash loan
-                 - Reentrancy during flash loan callback
-                 - Repayment bypass
-              
-              2. **MEV Attacks**
-                 - Sandwich attacks
-                 - Front-running
-              
-              3. **Oracle Manipulation**
-                 - TWAP manipulation
-                 - Oracle front-running
-              
-              4. **Cross-VM Arbitrage**
-                 - EVM ↔ WASM price discrepancies
-              
-              5. **Governance Attacks**
-                 - Flash loan governance takeover
-              
-              ### Next Steps
-              1. Review which attack succeeded in the report
-              2. Fix the vulnerability:
-                 - Add reentrancy guards
-                 - Implement TWAP oracle with delay
-                 - Add flash loan detection
-                 - Enforce governance timelock
-                 - Add cross-VM price checks
-              3. Re-run: \`./target/release/x3-proof economic-gate --workspace . --strict\`
-              4. Push fix and re-run CI
-              
-              ### Historical Context
-              Real DeFi exploits using these vectors:
-              - **bZx (2020):** $1M via flash loan + oracle manipulation
-              - **Harvest Finance (2020):** $34M via flash loan arbitrage
-              - **Cream Finance (2021):** $130M via flash loan + reentrancy
-              - **Mango Markets (2022):** $114M via oracle manipulation
-              
-              **⚠️ Do not bypass this gate - economic exploits = total loss of user funds.**`
-            })
-
-      - name: Comment on PR (On Success)
-        if: success() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## ✅ Economic Attack Tests Passed
-              
-              All 15 economic attack scenarios were **successfully prevented**! DeFi security is verified.
-              
-              ### Attack Prevention Verified
-              
-              **Flash Loan Attacks (3/3 prevented)**
-              - ✅ Oracle manipulation via flash loan
-              - ✅ Reentrancy during flash loan callback
-              - ✅ Repayment bypass attempt
-              
-              **MEV Attacks (2/2 prevented)**
-              - ✅ Sandwich attacks
-              - ✅ Front-running
-              
-              **Oracle Manipulation (2/2 prevented)**
-              - ✅ TWAP manipulation
-              - ✅ Oracle front-running
-              
-              **Cross-VM Arbitrage (1/1 prevented)**
-              - ✅ EVM ↔ WASM price exploitation
-              
-              **Governance Attacks (1/1 prevented)**
-              - ✅ Flash loan governance takeover
-              
-              ### Security Measures Active
-              - ✅ Reentrancy guards in place
-              - ✅ TWAP oracles with time delays
-              - ✅ Flash loan detection and blocking
-              - ✅ Governance timelocks enforced
-              - ✅ Cross-VM price consistency checks
-              
-              See the [economic-comprehensive-report artifact](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for full test details.
-              
-              **This code is protected against the attacks that drained $500M+ from DeFi protocols 2020-2024.**`
-            })
-
-  mainnet-gate-integration:
-    name: Update Mainnet Gate with Economic Security Status
-    needs: aggregate-results
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Mark Economic Security Complete
-        run: |
-          echo "✅ Economic attack tests passed - updating mainnet gate status"
-          echo "economic_security_status: PASSED" >> mainnet-gate-status.yml
-          echo "attack_vectors_tested: 15" >> mainnet-gate-status.yml
-          echo "flash_loan_protection: VERIFIED" >> mainnet-gate-status.yml
-          echo "mev_protection: VERIFIED" >> mainnet-gate-status.yml
-          echo "oracle_protection: VERIFIED" >> mainnet-gate-status.yml
-
-      - name: Commit Status Update
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add mainnet-gate-status.yml || true
-          git commit -m "chore: update mainnet gate - economic security verified" || true
-          # git push || true  # Uncomment when ready to auto-commit
-
-  security-scorecard:
-    name: Generate Security Scorecard
-    needs: aggregate-results
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Generate Security Scorecard
-        run: |
-          echo "# X3 Economic Security Scorecard" > security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> security-scorecard.md
-          echo "**Commit:** ${{ github.sha }}" >> security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "## Attack Prevention Status" >> security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "| Category | Tests | Status |" >> security-scorecard.md
-          echo "|----------|-------|--------|" >> security-scorecard.md
-          echo "| Flash Loan Attacks | 3 | ✅ PASSED |" >> security-scorecard.md
-          echo "| MEV Attacks | 2 | ✅ PASSED |" >> security-scorecard.md
-          echo "| Oracle Manipulation | 2 | ✅ PASSED |" >> security-scorecard.md
-          echo "| Cross-VM Arbitrage | 1 | ✅ PASSED |" >> security-scorecard.md
-          echo "| Governance Attacks | 1 | ✅ PASSED |" >> security-scorecard.md
-          echo "| **TOTAL** | **15** | **✅ ALL PREVENTED** |" >> security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "## Historical Comparison" >> security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "X3 is protected against the same attack vectors that exploited:" >> security-scorecard.md
-          echo "- bZx: $1M (2020)" >> security-scorecard.md
-          echo "- Harvest Finance: $34M (2020)" >> security-scorecard.md
-          echo "- Cream Finance: $130M (2021)" >> security-scorecard.md
-          echo "- Mango Markets: $114M (2022)" >> security-scorecard.md
-          echo "" >> security-scorecard.md
-          echo "**Total protected value:** $279M+ in historical DeFi exploits" >> security-scorecard.md
-
-      - name: Upload Security Scorecard
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-scorecard
-          path: security-scorecard.md
-          retention-days: 90

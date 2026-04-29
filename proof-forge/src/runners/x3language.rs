@@ -1,11 +1,11 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
-pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "X3Language parsing is correct".to_string(),
@@ -17,7 +17,10 @@ pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) ->
         degraded_level: Some(DegradedLevel::D5),
         files_inspected: vec!["x3-language/src/parser.rs".to_string()],
         commands_run: vec!["cargo test -p x3-language".to_string()],
-        passed_checks: vec!["Syntax parsing verified".to_string(), "Compilation correct".to_string()],
+        passed_checks: vec![
+            "Syntax parsing verified".to_string(),
+            "Compilation correct".to_string(),
+        ],
         failed_checks: vec![],
         missing_proofs: vec![],
         blockers: vec![],
@@ -28,7 +31,7 @@ pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) ->
     })
 }
 
-pub async fn run_proofs(workspace: &PathBuf, verbose: bool) -> Result<ProofResult> {
+pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: "x3.x3language.full_proof".to_string(),
         claim: "X3Language fully proven".to_string(),

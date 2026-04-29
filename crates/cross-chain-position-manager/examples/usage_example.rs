@@ -120,14 +120,14 @@ fn create_rebalance_targets() -> Vec<AllocationTarget> {
             chain_id: ARBITRUM_CHAIN_ID,
             asset: H160::from_low_u64_be(1),
             target_percentage: 0.3,
-            min_amount: U256::from(1000_000_000_000u128),
+            min_amount: U256::from(1_000_000_000_000u128),
             max_amount: U256::from(100_000_000_000_000u128),
         },
         AllocationTarget {
             chain_id: POLYGON_CHAIN_ID,
             asset: H160::from_low_u64_be(2),
             target_percentage: 0.3,
-            min_amount: U256::from(1000_000_000_000u128),
+            min_amount: U256::from(1_000_000_000_000u128),
             max_amount: U256::from(100_000_000_000_000u128),
         },
     ]

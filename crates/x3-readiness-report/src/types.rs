@@ -1,39 +1,91 @@
-//! Type definitions for readiness reports
+//! Type definitions for readiness reports.
+//!
+//! Every check is tri-state (`Pass`, `Fail`, `Unknown`).  `Unknown` means the
+//! collector could not prove the check; it must never be silently treated as
+//! `Pass`.  The overall ready flag requires *all* checks to be `Pass`.
 
 use serde::{Deserialize, Serialize};
 
-/// Comprehensive readiness report for X3 Atomic Star v0.4
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessReport {
-    /// ISO 8601 timestamp when report was generated
-    pub timestamp: String,
-    /// Version string (e.g., "0.4.0")
-    pub version: String,
-    /// Current kernel status snapshot
-    pub kernel_status: KernelStatus,
-    /// Canonical supply invariant verified
-    pub supply_invariant: bool,
-    /// Emergency halt mechanism working
-    pub halt_functional: bool,
-    /// Permission controls enforced
-    pub permissions_enforced: bool,
-    /// Cross-domain balance reconciliation OK
-    pub balance_reconciliation: bool,
-    /// Computed overall readiness flag
-    pub overall_ready: bool,
+/// Tri-state check status.  Never collapse `Unknown` into `Pass`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CheckStatus {
+    Pass,
+    Fail,
+    Unknown,
 }
 
-/// Snapshot of kernel status at report time
+impl CheckStatus {
+    pub fn is_pass(self) -> bool {
+        matches!(self, CheckStatus::Pass)
+    }
+}
+
+/// A single readiness check with status + a human-readable reason.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessCheck {
+    pub status: CheckStatus,
+    pub reason: String,
+}
+
+impl ReadinessCheck {
+    pub fn pass(reason: impl Into<String>) -> Self {
+        Self {
+            status: CheckStatus::Pass,
+            reason: reason.into(),
+        }
+    }
+    pub fn fail(reason: impl Into<String>) -> Self {
+        Self {
+            status: CheckStatus::Fail,
+            reason: reason.into(),
+        }
+    }
+    pub fn unknown(reason: impl Into<String>) -> Self {
+        Self {
+            status: CheckStatus::Unknown,
+            reason: reason.into(),
+        }
+    }
+    pub fn is_pass(&self) -> bool {
+        self.status.is_pass()
+    }
+}
+
+impl Default for ReadinessCheck {
+    fn default() -> Self {
+        Self::unknown("not yet evaluated")
+    }
+}
+
+/// Snapshot of kernel state at report time.  All fields `Option<_>` because
+/// the collector may be unable to prove them; never substitute defaults.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct KernelStatus {
-    /// Total canonical supply
-    pub supply: u128,
-    /// Number of active accounts
-    pub account_count: usize,
-    /// System halted state
-    pub halted: bool,
-    /// Total amount locked across all accounts
-    pub total_locked: u128,
+    pub supply: Option<u128>,
+    pub account_count: Option<usize>,
+    pub halted: Option<bool>,
+    pub total_locked: Option<u128>,
+}
+
+impl KernelStatus {
+    pub fn unknown() -> Self {
+        Self::default()
+    }
+}
+
+/// Comprehensive readiness report for X3 Atomic Star v0.4.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessReport {
+    pub timestamp: String,
+    pub version: String,
+    pub kernel_status: KernelStatus,
+    pub supply_invariant: ReadinessCheck,
+    pub halt_functional: ReadinessCheck,
+    pub permissions_enforced: ReadinessCheck,
+    pub balance_reconciliation: ReadinessCheck,
+    /// Computed; only `true` when every check is `Pass`.
+    pub overall_ready: bool,
 }
 
 impl Default for ReadinessReport {
@@ -43,51 +95,74 @@ impl Default for ReadinessReport {
 }
 
 impl ReadinessReport {
-    /// Create a new readiness report with default/current values
     pub fn new() -> Self {
         Self {
             timestamp: chrono::Utc::now().to_rfc3339(),
             version: "0.4.0".to_string(),
-            kernel_status: KernelStatus {
-                supply: 0,
-                account_count: 0,
-                halted: false,
-                total_locked: 0,
-            },
-            supply_invariant: false,
-            halt_functional: false,
-            permissions_enforced: false,
-            balance_reconciliation: false,
+            kernel_status: KernelStatus::unknown(),
+            supply_invariant: ReadinessCheck::default(),
+            halt_functional: ReadinessCheck::default(),
+            permissions_enforced: ReadinessCheck::default(),
+            balance_reconciliation: ReadinessCheck::default(),
             overall_ready: false,
         }
     }
 
-    /// Check if all readiness criteria are met
+    /// Recompute the overall flag.  `true` only when *all* checks are `Pass`.
+    pub fn recompute_overall(&mut self) {
+        self.overall_ready = self.supply_invariant.is_pass()
+            && self.halt_functional.is_pass()
+            && self.permissions_enforced.is_pass()
+            && self.balance_reconciliation.is_pass();
+    }
+
     pub fn is_ready(&self) -> bool {
-        self.supply_invariant
-            && self.halt_functional
-            && self.permissions_enforced
-            && self.balance_reconciliation
+        self.overall_ready
     }
 
-    /// Set all readiness flags to true (fully ready state)
-    pub fn mark_ready(&mut self) {
-        self.supply_invariant = true;
-        self.halt_functional = true;
-        self.permissions_enforced = true;
-        self.balance_reconciliation = true;
-        self.overall_ready = self.is_ready();
-    }
-
-    /// Return readiness percentage (0-100)
     pub fn readiness_percentage(&self) -> u32 {
         let checks = [
-            self.supply_invariant,
-            self.halt_functional,
-            self.permissions_enforced,
-            self.balance_reconciliation,
+            self.supply_invariant.is_pass(),
+            self.halt_functional.is_pass(),
+            self.permissions_enforced.is_pass(),
+            self.balance_reconciliation.is_pass(),
         ];
         let passed = checks.iter().filter(|&&x| x).count() as u32;
-        (passed * 100) / 4
+        (passed * 100) / checks.len() as u32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fresh_report_is_not_ready() {
+        let r = ReadinessReport::new();
+        assert!(!r.is_ready());
+        assert_eq!(r.readiness_percentage(), 0);
+    }
+
+    #[test]
+    fn unknown_blocks_ready() {
+        let mut r = ReadinessReport::new();
+        r.supply_invariant = ReadinessCheck::pass("ok");
+        r.halt_functional = ReadinessCheck::pass("ok");
+        r.permissions_enforced = ReadinessCheck::pass("ok");
+        r.balance_reconciliation = ReadinessCheck::unknown("not yet wired");
+        r.recompute_overall();
+        assert!(!r.is_ready());
+    }
+
+    #[test]
+    fn all_pass_is_ready() {
+        let mut r = ReadinessReport::new();
+        r.supply_invariant = ReadinessCheck::pass("ok");
+        r.halt_functional = ReadinessCheck::pass("ok");
+        r.permissions_enforced = ReadinessCheck::pass("ok");
+        r.balance_reconciliation = ReadinessCheck::pass("ok");
+        r.recompute_overall();
+        assert!(r.is_ready());
+        assert_eq!(r.readiness_percentage(), 100);
     }
 }

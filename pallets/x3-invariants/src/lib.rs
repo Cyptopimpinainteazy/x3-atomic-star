@@ -371,9 +371,7 @@ pub mod pallet {
                             "X3 INVARIANT VIOLATION: total issuance {} exceeds max supply {} (block {:?})",
                             observed, max_supply, block,
                         );
-                        frame_support::defensive!(
-                            "x3-invariants: max supply violated"
-                        );
+                        frame_support::defensive!("x3-invariants: max supply violated");
                         Self::deposit_event(Event::ChainHaltRequested {
                             block,
                             invariant: InvariantKind::MaxSupply,
@@ -405,9 +403,7 @@ pub mod pallet {
                             "X3 INVARIANT VIOLATION: agent count {} exceeds max {} (block {:?})",
                             observed, max_agents, block,
                         );
-                        frame_support::defensive!(
-                            "x3-invariants: agent count violated"
-                        );
+                        frame_support::defensive!("x3-invariants: agent count violated");
                         Self::deposit_event(Event::ChainHaltRequested {
                             block,
                             invariant: InvariantKind::MaxAgents,
@@ -439,9 +435,7 @@ pub mod pallet {
                             "X3 INVARIANT VIOLATION: proposal depth {} exceeds max {} (block {:?})",
                             observed, max_depth, block,
                         );
-                        frame_support::defensive!(
-                            "x3-invariants: proposal depth violated"
-                        );
+                        frame_support::defensive!("x3-invariants: proposal depth violated");
                         Self::deposit_event(Event::ChainHaltRequested {
                             block,
                             invariant: InvariantKind::MaxProposalDepth,

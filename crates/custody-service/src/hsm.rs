@@ -29,6 +29,12 @@ pub struct MockHSM {
     keys: parking_lot::RwLock<std::collections::HashMap<String, HSMKeyReference>>,
 }
 
+impl Default for MockHSM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockHSM {
     pub fn new() -> Self {
         Self {

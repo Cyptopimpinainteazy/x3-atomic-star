@@ -364,7 +364,7 @@ fn test_s0_005_t04_bundle_consistency_valid() {
     let leg_count: u32 = 3;
     let legs_hash = H256::repeat_byte(0x01);
     let executor: Option<u64> = Some(42);
-    
+
     assert!(leg_count > 0, "leg_count is positive");
     assert_ne!(legs_hash, H256::zero(), "legs_hash is non-zero");
     assert!(executor.is_some(), "executor is assigned");
@@ -383,7 +383,7 @@ fn test_s0_005_t05_poae_proof_zero_receipt_root() {
         legs_hash: H256::repeat_byte(0x04),
         leg_count: 2,
     };
-    
+
     // validate_structure should reject zero receipt_root
     assert!(
         !invalid_proof.validate_structure(),
@@ -409,7 +409,7 @@ fn test_s0_005_t06_poae_proof_legs_hash_field() {
         legs_hash: H256::zero(), // Present but zero
         leg_count: 2,
     };
-    
+
     // validate_structure() passes (doesn't check legs_hash)
     // The actual legs_hash check happens in do_finalize_bundle via
     // verify_bundle_consistency() which checks BundleRecord.legs_hash != H256::zero()
@@ -417,7 +417,7 @@ fn test_s0_005_t06_poae_proof_legs_hash_field() {
         proof_with_zero_legs_hash.validate_structure(),
         "PoAE proof structure valid even with zero legs_hash (checked separately in bundle)"
     );
-    
+
     // Verify legs_hash field is accessible for external verification
     assert_eq!(
         proof_with_zero_legs_hash.legs_hash,
@@ -439,7 +439,7 @@ fn test_s0_005_t07_poae_proof_zero_leg_count() {
         legs_hash: H256::repeat_byte(0x04),
         leg_count: 0, // INVALID
     };
-    
+
     assert!(
         !invalid_proof.validate_structure(),
         "Proof with zero leg_count must be rejected"
@@ -454,7 +454,7 @@ fn test_s0_005_t07_poae_proof_zero_leg_count() {
 #[test]
 fn test_s0_005_t08_bundle_record_structure() {
     use crate::BundleStatus;
-    
+
     // Verify bundle record fields are properly typed and accessible
     let submitter_id: u64 = 1;
     let legs_hash = H256::repeat_byte(0xAA);
@@ -463,7 +463,7 @@ fn test_s0_005_t08_bundle_record_structure() {
     let deadline_block: u64 = 2000;
     let submitted_at: u64 = 500;
     let executor: Option<u64> = None;
-    
+
     // Verify all fields are accessible and correctly typed
     assert_eq!(submitter_id, 1);
     assert_eq!(legs_hash, H256::repeat_byte(0xAA));
@@ -480,22 +480,28 @@ fn test_s0_005_t08_bundle_record_structure() {
 #[test]
 fn test_s0_005_t09_bundle_status_states() {
     use crate::BundleStatus;
-    
+
     // Verify all status states are distinct
     assert_ne!(BundleStatus::Pending, BundleStatus::Executing);
     assert_ne!(BundleStatus::Executing, BundleStatus::Finalized);
     assert_ne!(BundleStatus::Finalized, BundleStatus::RolledBack);
-    
+
     // Valid state transitions (conceptual - actual enforcement in pallet code)
     let initial = BundleStatus::Pending;
     let executing = BundleStatus::Executing;
     let finalized = BundleStatus::Finalized;
     let rolled_back = BundleStatus::RolledBack;
-    
+
     // Expected transitions: Pending → Executing → (Finalized | RolledBack)
     assert!(initial != executing, "Pending and Executing are distinct");
-    assert!(executing != finalized, "Executing and Finalized are distinct");
-    assert!(executing != rolled_back, "Executing and RolledBack are distinct");
+    assert!(
+        executing != finalized,
+        "Executing and Finalized are distinct"
+    );
+    assert!(
+        executing != rolled_back,
+        "Executing and RolledBack are distinct"
+    );
     assert!(finalized != rolled_back, "Terminal states are distinct");
 }
 
@@ -528,7 +534,7 @@ fn test_s0_005_t11_bundle_leg_structure() {
             writes: Default::default(),
         },
     };
-    
+
     // Verify structure integrity
     assert!(matches!(leg.vm_type, VmType::Evm));
     assert_eq!(leg.token_in, H256::repeat_byte(0x11));
@@ -552,9 +558,9 @@ fn test_s0_005_t12_proof_hash_determinism_for_atomicity() {
         legs_hash: H256::repeat_byte(0x40),
         leg_count: 4,
     };
-    
+
     let proof2 = proof1.clone();
-    
+
     // Determinism is CRITICAL for atomic operations:
     // If proof_hash() is non-deterministic, rollback decisions could be inconsistent
     assert_eq!(
@@ -562,7 +568,7 @@ fn test_s0_005_t12_proof_hash_determinism_for_atomicity() {
         proof2.proof_hash(),
         "Proof hash must be deterministic for atomic rollback consistency"
     );
-    
+
     // Different proofs MUST have different hashes
     let proof3 = PoaeProof {
         receipt_root: H256::repeat_byte(0xFF), // Changed field

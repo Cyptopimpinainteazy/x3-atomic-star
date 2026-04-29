@@ -1,4 +1,4 @@
-#![allow(unused, dead_code, deprecated)]
+#![warn(unused_imports, unused_variables)]
 
 //! Quantum-Resistant Cryptography for X3 Chain
 //!

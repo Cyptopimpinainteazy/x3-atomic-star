@@ -1,10 +1,10 @@
 // TodoProof Scanner - Detects TODO/FIXME/HACK/stub/mock/fake code
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TodoSeverity {
@@ -87,18 +87,38 @@ impl TodoScanner {
 
     pub fn scan(&self, verbose: bool) -> Result<TodoReport> {
         let mut items = Vec::new();
-        
+
         // Keywords to search for
         let keywords = vec![
-            "TODO", "FIXME", "HACK", "XXX", 
-            "stub", "mock", "placeholder", "temporary",
-            "for now", "later", "not implemented",
-            "unimplemented!", "todo!", "panic!",
-            "unwrap(", "expect(",
-            "Ok(true)", "Ok(())", "Ok(vec![])", "Default::default()",
-            "fake finality", "mock verifier", "dummy signature",
-            "hardcoded timestamp", "hardcoded price", "hardcoded admin",
-            "FAKE_", "MOCK_", "TEST_ONLY",
+            "TODO",
+            "FIXME",
+            "HACK",
+            "XXX",
+            "stub",
+            "mock",
+            "placeholder",
+            "temporary",
+            "for now",
+            "later",
+            "not implemented",
+            "unimplemented!",
+            "todo!",
+            "panic!",
+            "unwrap(",
+            "expect(",
+            "Ok(true)",
+            "Ok(())",
+            "Ok(vec![])",
+            "Default::default()",
+            "fake finality",
+            "mock verifier",
+            "dummy signature",
+            "hardcoded timestamp",
+            "hardcoded price",
+            "hardcoded admin",
+            "FAKE_",
+            "MOCK_",
+            "TEST_ONLY",
         ];
 
         for entry in WalkDir::new(&self.workspace)
@@ -123,7 +143,7 @@ impl TodoScanner {
             let entry = entry?;
             if entry.file_type().is_file() {
                 let path = entry.path();
-                
+
                 // Only scan code files
                 if let Some(ext) = path.extension() {
                     if !["rs", "sol", "ts", "js", "toml"].contains(&ext.to_str().unwrap_or("")) {
@@ -163,12 +183,16 @@ impl TodoScanner {
 
     fn is_exempt(&self, path: &std::path::Path) -> bool {
         let path_str = path.to_string_lossy();
-        self.exempt_paths.iter().any(|exempt| path_str.contains(exempt))
+        self.exempt_paths
+            .iter()
+            .any(|exempt| path_str.contains(exempt))
     }
 
     fn is_critical_path(&self, path: &std::path::Path) -> bool {
         let path_str = path.to_string_lossy();
-        self.critical_paths.iter().any(|critical| path_str.contains(critical))
+        self.critical_paths
+            .iter()
+            .any(|critical| path_str.contains(critical))
     }
 
     fn classify_severity(&self, line: &str, path: &std::path::Path) -> TodoSeverity {
@@ -176,7 +200,10 @@ impl TodoScanner {
         let in_critical = self.is_critical_path(path);
 
         // T9: False completion markers
-        if lower.contains("fake finality") || lower.contains("mock verifier") || lower.contains("dummy signature") {
+        if lower.contains("fake finality")
+            || lower.contains("mock verifier")
+            || lower.contains("dummy signature")
+        {
             return TodoSeverity::T9;
         }
 
@@ -186,14 +213,19 @@ impl TodoScanner {
         }
 
         // T7: Funds-at-risk
-        if in_critical && (lower.contains("vault") || lower.contains("custody") || lower.contains("treasury")) {
+        if in_critical
+            && (lower.contains("vault") || lower.contains("custody") || lower.contains("treasury"))
+        {
             return TodoSeverity::T7;
         }
 
         // T6: Security debt — specific dangerous patterns only (not broad 'security' keyword)
-        if lower.contains("hardcoded admin") || lower.contains("hardcoded timestamp") ||
-           lower.contains("hardcoded price") || lower.contains("dummy signature") ||
-           (in_critical && lower.contains("fake finality")) {
+        if lower.contains("hardcoded admin")
+            || lower.contains("hardcoded timestamp")
+            || lower.contains("hardcoded price")
+            || lower.contains("dummy signature")
+            || (in_critical && lower.contains("fake finality"))
+        {
             return TodoSeverity::T6;
         }
 
@@ -207,8 +239,9 @@ impl TodoScanner {
         }
 
         // T4: Mock debt in test code, or panic! in non-critical app code
-        if lower.contains("mock") && (path.to_string_lossy().contains("test") || 
-                                       path.to_string_lossy().contains("mock")) {
+        if lower.contains("mock")
+            && (path.to_string_lossy().contains("test") || path.to_string_lossy().contains("mock"))
+        {
             return TodoSeverity::T4;
         }
         if lower.contains("panic!") {
@@ -245,15 +278,22 @@ impl TodoScanner {
             *by_severity.entry(severity_str).or_insert(0) += 1;
 
             // Check if blocks mainnet
-            if matches!(item.severity, 
-                TodoSeverity::T5 | TodoSeverity::T6 | TodoSeverity::T7 | 
-                TodoSeverity::T8 | TodoSeverity::T9) {
+            if matches!(
+                item.severity,
+                TodoSeverity::T5
+                    | TodoSeverity::T6
+                    | TodoSeverity::T7
+                    | TodoSeverity::T8
+                    | TodoSeverity::T9
+            ) {
                 mainnet_blockers.push(item.clone());
             }
 
             // Check if blocks testnet
-            if matches!(item.severity, 
-                TodoSeverity::T6 | TodoSeverity::T7 | TodoSeverity::T8 | TodoSeverity::T9) {
+            if matches!(
+                item.severity,
+                TodoSeverity::T6 | TodoSeverity::T7 | TodoSeverity::T8 | TodoSeverity::T9
+            ) {
                 testnet_blockers.push(item.clone());
             }
 
@@ -278,12 +318,8 @@ impl TodoScanner {
 
     pub fn check_gates(&self, report: &TodoReport, gate: &str) -> Result<bool> {
         match gate {
-            "mainnet" => {
-                Ok(report.mainnet_blockers.is_empty())
-            },
-            "testnet" => {
-                Ok(report.testnet_blockers.is_empty())
-            },
+            "mainnet" => Ok(report.mainnet_blockers.is_empty()),
+            "testnet" => Ok(report.testnet_blockers.is_empty()),
             _ => Ok(true),
         }
     }
@@ -296,12 +332,12 @@ mod tests {
     #[test]
     fn test_severity_classification() {
         let scanner = TodoScanner::new(PathBuf::from("."));
-        
+
         assert_eq!(
             scanner.classify_severity("// TODO: fake finality", &PathBuf::from("test.rs")),
             TodoSeverity::T9
         );
-        
+
         assert_eq!(
             scanner.classify_severity("unimplemented!()", &PathBuf::from("test.rs")),
             TodoSeverity::T8

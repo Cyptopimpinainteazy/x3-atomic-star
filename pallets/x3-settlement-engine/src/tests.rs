@@ -495,13 +495,13 @@ mod tests {
     fn create_solana_proof() -> SettlementProof {
         // Fixed blockhash that we'll use and match in proof.block_hash
         let blockhash_bytes = [5u8; 32];
-        
+
         // Create a fixed keypair for testing (seed for reproducibility)
         // Using a simple seed pattern for deterministic testing
         let seed = [1u8; 32];
         let pair = ed25519::Pair::from_seed(&seed);
         let pubkey = pair.public();
-        
+
         // Build the Solana message
         // Format: [header (3 bytes)] [num_accounts (1 byte)] [accounts (32 bytes each)] [blockhash (32 bytes)] [instructions]
         let mut message = vec![
@@ -510,24 +510,24 @@ mod tests {
             0x00, // 0 readonly unsigned accounts
             0x01, // 1 static account (the signer)
         ];
-        
+
         // Add the signer's public key (32 bytes)
         message.extend_from_slice(pubkey.as_ref());
-        
+
         // Add the blockhash (32 bytes)
         message.extend_from_slice(&blockhash_bytes);
-        
+
         // Add instructions (0 instructions for simplicity)
         message.push(0x00);
-        
+
         // Sign the message
         let signature = pair.sign(&message);
-        
+
         // Build the complete transaction: [sig_count (1 byte)] [signatures] [message]
         let mut tx_data = vec![0x01]; // 1 signature
         tx_data.extend_from_slice(signature.as_ref()); // 64-byte signature
         tx_data.extend_from_slice(&message);
-        
+
         SettlementProof {
             proof_type: ProofType::SolanaProof,
             tx_hash: H256::from([4u8; 32]),
@@ -1218,8 +1218,9 @@ mod tests {
 
             // Submit a unique proof
             let evm_proof = create_evm_receipt_proof();
-            let _proof_message_hash = H256::from(sp_io::hashing::keccak_256(evm_proof.receipt_data.as_ref()));
-            
+            let _proof_message_hash =
+                H256::from(sp_io::hashing::keccak_256(evm_proof.receipt_data.as_ref()));
+
             assert_ok!(Pallet::<Test>::submit_proof(
                 RuntimeOrigin::signed(maker),
                 intent_id1,
@@ -1295,7 +1296,10 @@ mod tests {
             );
 
             // Should fail because proof is already cached
-            assert!(result.is_err(), "Replay of proof should be rejected by cache");
+            assert!(
+                result.is_err(),
+                "Replay of proof should be rejected by cache"
+            );
         });
     }
 
@@ -1306,7 +1310,7 @@ mod tests {
             // Create 3 independent settlements running in parallel
             // Track intent_id -> secret mapping to handle non-deterministic iteration order
             let mut settlement_secrets = std::collections::BTreeMap::new();
-            
+
             for settlement_num in 0..3 {
                 let maker = ALICE;
                 let taker = BOB;
@@ -1342,7 +1346,7 @@ mod tests {
             for settlement_num in 0..3 {
                 let secret = H256::from([50u8 + settlement_num as u8; 32]);
                 let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
-                
+
                 // Find intent with this secret_hash
                 for intent_id in &intent_ids {
                     if let Some(intent) = crate::SettlementIntents::<Test>::get(intent_id) {
@@ -1356,7 +1360,9 @@ mod tests {
 
             // Lock and settle each independently
             for intent_id in &intent_ids {
-                let secret = settlement_secrets.get(intent_id).cloned()
+                let secret = settlement_secrets
+                    .get(intent_id)
+                    .cloned()
                     .expect("Secret should be found for intent");
 
                 // Lock both legs
@@ -1397,7 +1403,7 @@ mod tests {
                         .into_iter()
                         .chain(vec![intent_bytes[0]; 3])
                         .collect();
-                    
+
                     // tx_hash MUST be keccak256 of the receipt_data (this is what verify_proof checks)
                     let tx_hash = H256::from(sp_io::hashing::keccak_256(&receipt_data));
 
@@ -1639,7 +1645,10 @@ mod tests {
 
             // State 0: Created
             let state = crate::IntentStates::<Test>::get(intent_id);
-            assert!(matches!(state, IntentState::Created), "Initial state should be Created");
+            assert!(
+                matches!(state, IntentState::Created),
+                "Initial state should be Created"
+            );
 
             // Transition: Created -> FundingInProgress
             assert_ok!(Pallet::<Test>::lock_escrow(
@@ -1828,9 +1837,15 @@ mod tests {
 
             let events = frame_system::Pallet::<Test>::events();
             let has_lock_event = events.iter().any(|event| {
-                matches!(event.event, RuntimeEvent::X3SettlementEngine(crate::Event::<Test>::X3AssetsLocked { .. }))
+                matches!(
+                    event.event,
+                    RuntimeEvent::X3SettlementEngine(crate::Event::<Test>::X3AssetsLocked { .. })
+                )
             });
-            assert!(has_lock_event, "X3AssetsLocked event should be emitted for leg 0");
+            assert!(
+                has_lock_event,
+                "X3AssetsLocked event should be emitted for leg 0"
+            );
 
             // Lock leg 1 to complete funding
             frame_system::Pallet::<Test>::reset_events();
@@ -1845,9 +1860,15 @@ mod tests {
 
             let events = frame_system::Pallet::<Test>::events();
             let has_lock_event = events.iter().any(|event| {
-                matches!(event.event, RuntimeEvent::X3SettlementEngine(crate::Event::<Test>::X3AssetsLocked { .. }))
+                matches!(
+                    event.event,
+                    RuntimeEvent::X3SettlementEngine(crate::Event::<Test>::X3AssetsLocked { .. })
+                )
             });
-            assert!(has_lock_event, "X3AssetsLocked event should be emitted for leg 1");
+            assert!(
+                has_lock_event,
+                "X3AssetsLocked event should be emitted for leg 1"
+            );
 
             // Submit proof
             frame_system::Pallet::<Test>::reset_events();
@@ -1861,9 +1882,17 @@ mod tests {
 
             let events = frame_system::Pallet::<Test>::events();
             let has_proof_event = events.iter().any(|event| {
-                matches!(event.event, RuntimeEvent::X3SettlementEngine(crate::Event::<Test>::ExternalProofSubmitted { .. }))
+                matches!(
+                    event.event,
+                    RuntimeEvent::X3SettlementEngine(
+                        crate::Event::<Test>::ExternalProofSubmitted { .. }
+                    )
+                )
             });
-            assert!(has_proof_event, "ExternalProofSubmitted event should be emitted");
+            assert!(
+                has_proof_event,
+                "ExternalProofSubmitted event should be emitted"
+            );
         });
     }
 
@@ -2024,11 +2053,8 @@ mod tests {
             ));
 
             // Second claim from same party should fail (already claimed for that leg)
-            let result = Pallet::<Test>::claim_settlement(
-                RuntimeOrigin::signed(taker),
-                intent_id,
-                secret,
-            );
+            let result =
+                Pallet::<Test>::claim_settlement(RuntimeOrigin::signed(taker), intent_id, secret);
 
             // Should fail because this leg was already claimed
             assert!(result.is_err());
@@ -2036,9 +2062,9 @@ mod tests {
     }
 
     /// BLOCKER 5: Verify vault solvency invariant across all operations.
-    /// 
+    ///
     /// Critical invariant: locked_reserves >= pending_transfers
-    /// 
+    ///
     /// This test ensures:
     /// 1. Vault never becomes insolvent after any transfer operation
     /// 2. Edge cases: zero balance, max balance, concurrent transfers
@@ -2050,25 +2076,25 @@ mod tests {
         // Purpose: Verify blockchain never becomes insolvent (locked_reserves >= pending_transfers)
         // This test verifies that the settlement engine maintains solvency invariants
         // by tracking locked reserves and pending transfers.
-        
+
         new_test_ext().execute_with(|| {
             // Verify that settlement intents storage can be accessed
             // This confirms the pallet structure supports solvency tracking
             let total_intents = SettlementIntents::<Test>::iter().count();
             assert_eq!(total_intents, 0, "Starting with zero settlement intents");
-            
+
             // Verify invariant: At any point, sum of pending transfers <= total supply
             // locked_reserves >= pending_transfers
-            
+
             // In MVP, we verify that:
             // 1. Settlement intents storage exists and is accessible
             // 2. Pallet can track locked reserves vs pending transfers
             // 3. No test panics during invariant checks
-            
+
             let pending_sum: u128 = SettlementIntents::<Test>::iter()
                 .map(|(_, intent)| intent.asset_a.amount)
                 .sum();
-                
+
             // Invariant check: pending transfers should never exceed system capacity
             // This demonstrates the solvency check mechanism
             assert!(

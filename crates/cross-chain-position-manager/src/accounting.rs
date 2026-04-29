@@ -92,6 +92,8 @@ pub struct InventoryManager {
     obligations: BTreeMap<H256, RouteObligation>,
 }
 
+type AssetBreakdownEntry = (String, U256, Vec<(u64, U256)>);
+
 impl InventoryManager {
     pub fn new() -> Self {
         Self::default()
@@ -564,7 +566,7 @@ impl AccountingEngine {
     pub async fn get_portfolio_summary(&self) -> Result<PortfolioSummary> {
         let mut total_value_usd = U256::zero();
         let mut chain_breakdown = Vec::new();
-        let mut asset_breakdown: BTreeMap<H160, (String, U256, Vec<(u64, U256)>)> = BTreeMap::new();
+        let mut asset_breakdown: BTreeMap<H160, AssetBreakdownEntry> = BTreeMap::new();
 
         for balance in self.current_balances.values() {
             total_value_usd = total_value_usd.saturating_add(balance.value_usd);

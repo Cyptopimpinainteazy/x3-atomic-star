@@ -104,12 +104,14 @@ fn test_merkle_root_caching() {
         ));
 
         // Verify merkle root is cached
-        let is_verified = crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(block_number, merkle_root);
+        let is_verified =
+            crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(block_number, merkle_root);
         assert!(is_verified);
 
         // Verify wrong merkle root is not verified
         let wrong_root = H256::from([99u8; 32]);
-        let is_wrong_verified = crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(block_number, wrong_root);
+        let is_wrong_verified =
+            crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(block_number, wrong_root);
         assert!(!is_wrong_verified);
     });
 }
@@ -133,12 +135,14 @@ fn test_validator_set_caching() {
         ));
 
         // Verify validator set is cached
-        let is_verified = crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(slot, validator_set_hash);
+        let is_verified =
+            crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(slot, validator_set_hash);
         assert!(is_verified);
 
         // Verify wrong validator set is not verified
         let wrong_set_hash = H256::from([99u8; 32]);
-        let is_wrong_verified = crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(slot, wrong_set_hash);
+        let is_wrong_verified =
+            crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(slot, wrong_set_hash);
         assert!(!is_wrong_verified);
     });
 }
@@ -167,8 +171,8 @@ fn test_validation_statistics_update() {
             200,
             H256::from([10u8; 32]),
             H256::from([11u8; 32]),
-            vec![12u8; 64],  // 64 bytes = 2 validators
-            vec![H256::from([13u8; 32])],  // At least 1 parent_slot_hash
+            vec![12u8; 64],               // 64 bytes = 2 validators
+            vec![H256::from([13u8; 32])], // At least 1 parent_slot_hash
         ));
 
         // Stats should be updated
@@ -182,7 +186,7 @@ fn test_validation_statistics_update() {
 fn test_cross_chain_settlement_scenario() {
     new_test_ext().execute_with(|| {
         // Simulate EVM → Solana cross-chain settlement
-        
+
         // Step 1: Validate EVM header (source chain)
         let evm_block = 1000u64;
         let evm_merkle_root = H256::from([70u8; 32]);
@@ -209,9 +213,13 @@ fn test_cross_chain_settlement_scenario() {
         ));
 
         // Step 3: Verify both chain states are available
-        let evm_verified = crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(evm_block, evm_merkle_root);
-        let svm_verified = crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(svm_slot, svm_validator_set_hash);
-        
+        let evm_verified =
+            crate::Pallet::<MockRuntime>::is_evm_merkle_root_verified(evm_block, evm_merkle_root);
+        let svm_verified = crate::Pallet::<MockRuntime>::is_svm_validator_set_verified(
+            svm_slot,
+            svm_validator_set_hash,
+        );
+
         assert!(evm_verified);
         assert!(svm_verified);
 

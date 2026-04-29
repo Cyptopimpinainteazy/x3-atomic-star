@@ -1,7 +1,6 @@
 /// Liquidity Mining Rewards — Proportional X3 token emissions to LP providers
 /// Incentivizes liquidity provision with transparent reward distribution
 use parity_scale_codec::{Decode, Encode};
-use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
 pub struct LiquidityMiningReward {
@@ -51,7 +50,6 @@ pub struct LiquidityMiningEngine;
 impl LiquidityMiningEngine {
     const MIN_REWARDS_PER_BLOCK: u64 = 1;
     const MAX_REWARDS_PER_BLOCK: u64 = 1_000_000_000_000; // 1 trillion max
-    const PRECISION: u128 = 1_000_000_000_000_000_000; // 1e18 for fixed-point
 
     /// Create a new liquidity mining campaign for a pool
     pub fn create_mining_reward(
@@ -61,8 +59,7 @@ impl LiquidityMiningEngine {
         duration_blocks: u64,
         start_block: u64,
     ) -> Result<LiquidityMiningReward, &'static str> {
-        if rewards_per_block < Self::MIN_REWARDS_PER_BLOCK
-            || rewards_per_block > Self::MAX_REWARDS_PER_BLOCK
+        if !(Self::MIN_REWARDS_PER_BLOCK..=Self::MAX_REWARDS_PER_BLOCK).contains(&rewards_per_block)
         {
             return Err("Rewards per block out of range");
         }

@@ -48,42 +48,132 @@ pub mod cpu_validator;
 pub mod crypto;
 pub mod deterministic;
 pub mod error;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod gpu_bytecode;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod gpu_fallback_chain;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod gpu_memory_pool;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod gpu_receipt;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod health;
 pub mod metrics;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod multi_gpu_dispatcher;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod network;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod orchestrator;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod payment;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod proof_aggregator;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod proof_integration;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod protocol;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod quarantine;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod state_merkle_proof;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod telemetry;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod unified_proof;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod validator;
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub mod x3_kernel_versioning;
 
 pub use config::{SwarmConfig, ValidatorConfig};
@@ -97,44 +187,119 @@ pub use crypto::{
 };
 pub use deterministic::{DeterministicEngine, ExecutionMode, VerificationLevel};
 pub use error::{SwarmError, SwarmResult};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use gpu_fallback_chain::{DegradationStrategy, FallbackChain, FallbackStats};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use gpu_memory_pool::{GpuMemoryManager, GpuMemoryPool, MemoryPoolStats, SlabHandle};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use gpu_receipt::{GpuClass, GpuReceipt, GpuReceiptValidator, ProofType};
 pub use metrics::{HealthCheck, HealthStatus, MetricsCollector, SwarmMetrics, ValidatorHealth};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use multi_gpu_dispatcher::{GpuDeviceInfo, JobResult, MultiGpuDispatcher, PerformanceStats};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use network::{
     Network, NetworkConfig, NetworkEvent, NetworkManager, NetworkMessage, NetworkPeer,
 };
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use orchestrator::{OrchestratorEvent, SwarmOrchestrator};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use payment::{PaymentSystem, ProviderAccount, ProviderStatus, WorkRecord, WorkType};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use proof_aggregator::{AggregationState, AggregatorStats, ProofAggregator};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use protocol::{SwarmMessage, TaskAssignment, TaskResult, ValidatorMessage, ValidatorProof};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use quarantine::{DivergenceRecord, QuarantineManager, QuarantineReason};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use state_merkle_proof::{
     compute_merkle_root, generate_merkle_proof, MerkleNode, MerkleProofPath, StateMerkleProof,
     StateRootVerification,
 };
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use telemetry::{TelemetryConfig, TelemetrySink};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use unified_proof::{
     AtomicVmProof, ByzantineConsensus, GpuValidatorAttestation, ProofHeader, ProofValidationResult,
     UnifiedProof,
 };
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use validator::{Validator, ValidatorEvent, ValidatorState};
-#[cfg(any(feature = "cuda", feature = "opencl", feature = "metal", feature = "vulkan"))]
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 pub use x3_kernel_versioning::{X3KernelManifest, X3KernelRegistry, X3KernelRuntime};
 
 /// Current version of the X3 GPU Validator Swarm protocol

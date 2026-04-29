@@ -23,8 +23,12 @@ mod bridge_integration_tests {
         let state_root = H256::from_low_u64_be(2);
         let merkle_root = H256::from_low_u64_be(3);
 
-        let result =
-            NoOpCrossChainValidator::verify_evm_proof(block_number, block_hash, state_root, merkle_root);
+        let result = NoOpCrossChainValidator::verify_evm_proof(
+            block_number,
+            block_hash,
+            state_root,
+            merkle_root,
+        );
 
         assert!(result, "No-op validator should accept all EVM proofs");
     }
@@ -37,7 +41,12 @@ mod bridge_integration_tests {
         let state_root = H256::from_low_u64_be(5);
         let validator_set_hash = H256::from_low_u64_be(6);
 
-        let result = NoOpCrossChainValidator::verify_svm_proof(slot, block_hash, state_root, validator_set_hash);
+        let result = NoOpCrossChainValidator::verify_svm_proof(
+            slot,
+            block_hash,
+            state_root,
+            validator_set_hash,
+        );
 
         assert!(result, "No-op validator should accept all SVM proofs");
     }
@@ -48,8 +57,14 @@ mod bridge_integration_tests {
         let evm_header = NoOpCrossChainValidator::get_latest_evm_header_hash();
         let svm_header = NoOpCrossChainValidator::get_latest_svm_header_hash();
 
-        assert_eq!(evm_header, None, "No-op validator should return None for EVM header");
-        assert_eq!(svm_header, None, "No-op validator should return None for SVM header");
+        assert_eq!(
+            evm_header, None,
+            "No-op validator should return None for EVM header"
+        );
+        assert_eq!(
+            svm_header, None,
+            "No-op validator should return None for SVM header"
+        );
     }
 
     #[test]
@@ -62,7 +77,11 @@ mod bridge_integration_tests {
                 H256::default(),
                 H256::default(),
             );
-            assert!(result, "No-op should accept any block number: {}", block_num);
+            assert!(
+                result,
+                "No-op should accept any block number: {}",
+                block_num
+            );
         }
     }
 
@@ -88,10 +107,18 @@ mod bridge_integration_tests {
         let state_root = H256::from_low_u64_be(200);
         let merkle_root = H256::from_low_u64_be(300);
 
-        let result1 =
-            NoOpCrossChainValidator::verify_evm_proof(block_number, block_hash, state_root, merkle_root);
-        let result2 =
-            NoOpCrossChainValidator::verify_evm_proof(block_number, block_hash, state_root, merkle_root);
+        let result1 = NoOpCrossChainValidator::verify_evm_proof(
+            block_number,
+            block_hash,
+            state_root,
+            merkle_root,
+        );
+        let result2 = NoOpCrossChainValidator::verify_evm_proof(
+            block_number,
+            block_hash,
+            state_root,
+            merkle_root,
+        );
 
         assert_eq!(
             result1, result2,
@@ -143,10 +170,7 @@ mod bridge_integration_tests {
                     *state_root,
                     *merkle_root,
                 );
-                assert!(
-                    result,
-                    "No-op should accept any hash values for EVM proof"
-                );
+                assert!(result, "No-op should accept any hash values for EVM proof");
             }
         }
     }
@@ -168,10 +192,7 @@ mod bridge_integration_tests {
                     *state_root,
                     *validator_set_hash,
                 );
-                assert!(
-                    result,
-                    "No-op should accept any hash values for SVM proof"
-                );
+                assert!(result, "No-op should accept any hash values for SVM proof");
             }
         }
     }
@@ -203,8 +224,18 @@ mod bridge_integration_tests {
         ];
 
         for (block_num, hash) in proofs_to_validate.iter() {
-            let evm_result = NoOpCrossChainValidator::verify_evm_proof(*block_num, *hash, H256::default(), H256::default());
-            let svm_result = NoOpCrossChainValidator::verify_svm_proof(*block_num, *hash, H256::default(), H256::default());
+            let evm_result = NoOpCrossChainValidator::verify_evm_proof(
+                *block_num,
+                *hash,
+                H256::default(),
+                H256::default(),
+            );
+            let svm_result = NoOpCrossChainValidator::verify_svm_proof(
+                *block_num,
+                *hash,
+                H256::default(),
+                H256::default(),
+            );
 
             assert!(evm_result, "EVM proof validation should succeed");
             assert!(svm_result, "SVM proof validation should succeed");

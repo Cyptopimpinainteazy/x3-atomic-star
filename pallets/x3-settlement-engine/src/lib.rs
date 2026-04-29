@@ -506,9 +506,7 @@ pub mod pallet {
 
         /// Refund triggered for transfer that exceeded timeout (PHASE C STUB)
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
-        RefundTriggered {
-            transfer_id: H256,
-        },
+        RefundTriggered { transfer_id: H256 },
 
         /// Settlement timeout expired (block-based finality deadline exceeded)
         /// Indicates the settlement exceeded SettlementTimeoutBlocks without finalizing.
@@ -778,8 +776,8 @@ pub mod pallet {
             // Iterate through all pending settlements and check for timeouts
             let mut to_refund: Vec<H256> = Vec::new();
 
-            for (intent_id, creation_block) in SettlementCreationBlocks::<T>::iter()
-                .take(MAX_TIMEOUTS_PER_BLOCK)
+            for (intent_id, creation_block) in
+                SettlementCreationBlocks::<T>::iter().take(MAX_TIMEOUTS_PER_BLOCK)
             {
                 let creation_block_u32: u32 = creation_block.saturated_into::<u32>();
                 let age = current_block_u32.saturating_sub(creation_block_u32);
@@ -793,7 +791,9 @@ pub mod pallet {
                         // Only process if still in a pending state (not already finalized/refunded)
                         if matches!(
                             state,
-                            IntentState::Created | IntentState::FundingInProgress | IntentState::FullyFunded
+                            IntentState::Created
+                                | IntentState::FundingInProgress
+                                | IntentState::FullyFunded
                         ) {
                             to_refund.push(intent_id);
 
@@ -813,7 +813,7 @@ pub mod pallet {
                             );
 
                             weight = weight.saturating_add(
-                                <T as frame_system::Config>::DbWeight::get().reads(2)
+                                <T as frame_system::Config>::DbWeight::get().reads(2),
                             );
                         }
                     }
@@ -826,7 +826,7 @@ pub mod pallet {
                 if let Some(intent) = SettlementIntents::<T>::get(&intent_id) {
                     let _ = Self::process_refund(intent_id, &intent, RefundReason::Timeout);
                     weight = weight.saturating_add(
-                        <T as frame_system::Config>::DbWeight::get().reads_writes(4, 4)
+                        <T as frame_system::Config>::DbWeight::get().reads_writes(4, 4),
                     );
                 }
             }
@@ -901,11 +901,11 @@ pub mod pallet {
             // Store intent
             SettlementIntents::<T>::insert(intent_id, intent);
             IntentStates::<T>::insert(intent_id, IntentState::Created);
-            
+
             // Track creation block for timeout enforcement
             let current_block = frame_system::Pallet::<T>::block_number();
             SettlementCreationBlocks::<T>::insert(intent_id, current_block);
-            
+
             PendingIntents::<T>::mutate(&maker, |p| *p = p.saturating_add(1));
             TotalIntents::<T>::mutate(|t| *t = t.saturating_add(1));
 
@@ -1137,12 +1137,12 @@ pub mod pallet {
             ensure!(is_valid, Error::<T>::InvalidProof);
 
             // Emit proof verification event for bridge integration tracking
-            let current_block: u32 = frame_system::Pallet::<T>::block_number()
-                .saturated_into::<u32>();
+            let current_block: u32 =
+                frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
             let block_or_slot = u64::from_le_bytes(
                 proof.tx_hash.as_bytes()[0..8]
                     .try_into()
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             );
             Self::deposit_event(Event::SettlementProofVerified {
                 intent_id,
@@ -1264,8 +1264,8 @@ pub mod pallet {
 
             frame_support::storage::with_storage_layer(|| {
                 // Verify intent exists
-                let intent = SettlementIntents::<T>::get(intent_id)
-                    .ok_or(Error::<T>::IntentNotFound)?;
+                let intent =
+                    SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
 
                 // Verify caller is maker or taker
                 ensure!(
@@ -1541,8 +1541,8 @@ pub mod pallet {
             let executor = ensure_signed(origin)?;
 
             // P1: Load transfer state from storage
-            let mut transfer = SettlementTransfers::<T>::get(transfer_id)
-                .ok_or(Error::<T>::UnknownTransfer)?;
+            let mut transfer =
+                SettlementTransfers::<T>::get(transfer_id).ok_or(Error::<T>::UnknownTransfer)?;
 
             // P2: Verify executor is authorized via x3-kernel AuthorizedAccounts registry.
             // AuthorizedAccounts is secure-by-default: an empty registry rejects all callers.
@@ -1610,15 +1610,12 @@ pub mod pallet {
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         #[pallet::call_index(32)]
         #[pallet::weight(T::SettlementWeightInfo::trigger_refund())]
-        pub fn trigger_refund(
-            origin: OriginFor<T>,
-            transfer_id: H256,
-        ) -> DispatchResult {
+        pub fn trigger_refund(origin: OriginFor<T>, transfer_id: H256) -> DispatchResult {
             let _caller = ensure_signed(origin)?;
 
             // P1: Load transfer state from storage
-            let mut transfer = SettlementTransfers::<T>::get(transfer_id)
-                .ok_or(Error::<T>::UnknownTransfer)?;
+            let mut transfer =
+                SettlementTransfers::<T>::get(transfer_id).ok_or(Error::<T>::UnknownTransfer)?;
 
             // P2: Verify transfer status is Pending (0) — can only refund pending transfers
             ensure!(transfer.status == 0, Error::<T>::TransferNotPending);
@@ -1638,9 +1635,7 @@ pub mod pallet {
             let _ = <T as Config>::Currency::unreserve(&transfer.initiator, transfer.amount);
 
             // P6: Emit RefundTriggered event
-            Self::deposit_event(Event::RefundTriggered {
-                transfer_id,
-            });
+            Self::deposit_event(Event::RefundTriggered { transfer_id });
 
             Ok(())
         }
@@ -1726,7 +1721,7 @@ pub mod pallet {
             let block_number = u64::from_le_bytes(
                 proof.tx_hash.as_bytes()[0..8]
                     .try_into()
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             );
 
             // Use block_hash directly from proof
@@ -1892,7 +1887,7 @@ pub mod pallet {
             let slot = u64::from_le_bytes(
                 proof.tx_hash.as_bytes()[0..8]
                     .try_into()
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             );
 
             // Use block_hash directly from proof (already validated above)

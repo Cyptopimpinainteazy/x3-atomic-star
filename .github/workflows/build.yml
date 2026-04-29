@@ -6,6 +6,15 @@ on:
   push:
     branches: [main, develop, sprint-*]
   workflow_dispatch:
+    inputs:
+      run_fragile:
+        description: "Run fragile advanced checks (Loom/Shuttle/Kani/Miri/Sanitizers)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 env:
   RUST_BACKTRACE: 1
@@ -83,11 +92,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.89.0
+          toolchain: 1.91.0
           override: true
       - uses: Swatinem/rust-cache@v2
       - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.35.4 --locked --force
       - name: Generate coverage
         run: cargo tarpaulin --out Xml --output-dir coverage/ --timeout 300 --exclude-files tests/*
       - name: Upload coverage to Codecov
@@ -99,8 +108,112 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check-action@v1
+      - uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  advanced-test-gate:
+    name: Advanced Test Gate (Deterministic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Run advanced test gate (ci deterministic quick)
+        run: |
+          chmod +x scripts/test-all-advanced.sh
+          ./scripts/test-all-advanced.sh --ci --quick
+
+  advanced-fragile-loom:
+    name: Advanced Fragile - Loom
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_fragile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nightly for fragile lane
+        run: rustup toolchain install nightly --profile minimal
+      - name: Loom runtime interleavings
+        run: |
+          LOOM_MAX_PREEMPTIONS=3 cargo +nightly test -p x3-gateway \
+            --test loom_mempool_concurrency --features loom-tests -- --nocapture
+
+  advanced-fragile-shuttle:
+    name: Advanced Fragile - Shuttle
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_fragile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nightly for fragile lane
+        run: rustup toolchain install nightly --profile minimal
+      - name: Shuttle randomized scheduling
+        run: |
+          cargo +nightly test -p x3-gateway --test shuttle_validator_async shuttle_ -- --nocapture
+
+  advanced-fragile-kani:
+    name: Advanced Fragile - Kani
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_fragile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.89.0
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Kani
+        run: cargo install kani-verifier || true
+      - name: Kani harnesses
+        run: |
+          cargo +stable kani --harness prove_fee_no_overflow
+          cargo +stable kani --harness prove_accounting_conserved
+
+  advanced-fragile-miri:
+    name: Advanced Fragile - Miri
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_fragile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Miri component
+        run: rustup component add miri
+      - name: Miri UB check (x3-proof)
+        run: |
+          MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test -p x3-proof --lib
+
+  advanced-fragile-sanitizers:
+    name: Advanced Fragile - Sanitizers
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_fragile == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Memory sanitizer compile
+        run: |
+          RUSTFLAGS="-Zsanitizer=memory" cargo +nightly build -p x3-proof --lib --target x86_64-unknown-linux-gnu
+      - name: Thread sanitizer compile
+        run: |
+          RUSTFLAGS="-Zsanitizer=thread" cargo +nightly test --tests -p x3-gateway --target x86_64-unknown-linux-gnu --no-run

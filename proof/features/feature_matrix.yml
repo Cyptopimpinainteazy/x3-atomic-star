@@ -55,7 +55,7 @@ features:
       - docs/consensus.md
     code:
       - node/src/service.rs
-      - pallets/x3-consensus/src/lib.rs
+      - pallets/x3-kernel/src/lib.rs
     wiring:
       - "node service includes consensus"
       - "block production enabled"
@@ -107,7 +107,7 @@ features:
     docs:
       - docs/validators.md
     code:
-      - pallets/staking/src/lib.rs
+      - pallets/swarm/src/lib.rs
     wiring:
       - "validator set pallet in runtime"
     tests:
@@ -157,7 +157,7 @@ features:
     docs:
       - docs/fees.md
     code:
-      - pallets/transaction-payment/src/lib.rs
+      - runtime/src/lib.rs
     wiring:
       - "transaction payment in runtime"
     tests:
@@ -182,7 +182,7 @@ features:
     docs:
       - docs/accounts.md
     code:
-      - pallets/system/src/lib.rs
+      - runtime/src/lib.rs
     wiring:
       - "system pallet in runtime"
     tests:
@@ -207,7 +207,7 @@ features:
     docs:
       - docs/balances.md
     code:
-      - pallets/balances/src/lib.rs
+      - pallets/x3-coin/src/lib.rs
     wiring:
       - "balances pallet in runtime"
     tests:
@@ -311,10 +311,10 @@ features:
     owner_area: asset-kernel
     docs:
       - docs/asset-kernel.md
-      - pallets/x3-kernel/README.md
+      - pallets/x3-kernel/src/lib.rs
     code:
       - pallets/x3-kernel/src/lib.rs
-      - crates/x3-asset-kernel/src/lib.rs
+      - pallets/x3-asset-registry/src/lib.rs
     wiring:
       - "x3-kernel pallet in runtime"
       - "canonical supply callable"
@@ -351,7 +351,7 @@ features:
     docs:
       - docs/canonical-supply.md
     code:
-      - pallets/x3-kernel/src/supply.rs
+      - pallets/x3-supply-ledger/src/lib.rs
     wiring:
       - "supply tracker in asset kernel"
     tests:
@@ -377,7 +377,7 @@ features:
     docs:
       - docs/asset-registry.md
     code:
-      - pallets/x3-kernel/src/registry.rs
+      - pallets/x3-asset-registry/src/lib.rs
     wiring:
       - "asset registry in runtime"
     tests:
@@ -402,7 +402,7 @@ features:
     docs:
       - docs/asset-mapping.md
     code:
-      - pallets/x3-kernel/src/mapping.rs
+      - pallets/x3-asset-registry/src/lib.rs
     wiring:
       - "asset mapping in kernel"
     tests:
@@ -427,7 +427,7 @@ features:
     docs:
       - docs/mint-burn.md
     code:
-      - pallets/x3-kernel/src/mint_burn.rs
+      - pallets/x3-supply-ledger/src/mint_idempotency.rs
     wiring:
       - "mint/burn controller in kernel"
     tests:
@@ -454,7 +454,7 @@ features:
     docs:
       - docs/external-locked.md
     code:
-      - pallets/x3-kernel/src/external_locked.rs
+      - pallets/x3-supply-ledger/src/supply_verification.rs
     wiring:
       - "external locked tracking in kernel"
     tests:
@@ -479,7 +479,7 @@ features:
     docs:
       - docs/pending-transfer.md
     code:
-      - pallets/x3-kernel/src/pending_transfer.rs
+      - pallets/x3-supply-ledger/src/supply_verification.rs
     wiring:
       - "pending transfer tracking in kernel"
     tests:
@@ -504,7 +504,7 @@ features:
     docs:
       - docs/supply-invariant.md
     code:
-      - pallets/x3-kernel/src/invariant.rs
+      - pallets/x3-invariants/src/lib.rs
     wiring:
       - "invariant guard in kernel"
     tests:
@@ -531,7 +531,7 @@ features:
     criticality: catastrophic
     owner_area: x3vm
     docs:
-      - crates/x3-vm/README.md
+      - crates/x3-vm/src/lib.rs
     code:
       - crates/x3-vm/src/lib.rs
     wiring:
@@ -558,7 +558,7 @@ features:
     docs:
       - docs/x3vm-bytecode.md
     code:
-      - crates/x3-vm/src/bytecode.rs
+      - crates/x3-vm/src/vm.rs
     wiring:
       - "bytecode parser in x3vm"
     tests:
@@ -583,7 +583,7 @@ features:
     docs:
       - docs/x3vm-gas.md
     code:
-      - crates/x3-vm/src/gas.rs
+      - crates/x3-vm/src/gas_metering_audit.rs
     wiring:
       - "gas metering in x3vm"
     tests:
@@ -608,7 +608,7 @@ features:
     docs:
       - docs/x3vm-storage.md
     code:
-      - crates/x3-vm/src/storage.rs
+      - crates/evm-integration/src/state.rs
     wiring:
       - "storage interface in x3vm"
     tests:
@@ -633,7 +633,7 @@ features:
     docs:
       - docs/x3vm-events.md
     code:
-      - crates/x3-vm/src/events.rs
+      - crates/x3-vm/src/hostcall.rs
     wiring:
       - "event emission in x3vm"
     tests:
@@ -658,7 +658,7 @@ features:
     docs:
       - docs/x3vm-revert.md
     code:
-      - crates/x3-vm/src/revert.rs
+      - crates/x3-vm/src/execution_guards.rs
     wiring:
       - "revert mechanism in x3vm"
     tests:
@@ -683,7 +683,7 @@ features:
     docs:
       - docs/cpu-gpu-parity.md
     code:
-      - crates/x3-vm/src/gpu.rs
+      - crates/x3-vm/src/gpu_hostcalls.rs
     wiring:
       - "GPU execution path exists"
     tests:
@@ -708,7 +708,7 @@ features:
     criticality: catastrophic
     owner_area: evm
     docs:
-      - crates/evm-integration/README.md
+      - crates/evm-integration/src/lib.rs
     code:
       - crates/evm-integration/src/lib.rs
     wiring:
@@ -733,7 +733,7 @@ features:
     criticality: catastrophic
     owner_area: svm
     docs:
-      - crates/svm-integration/README.md
+      - crates/svm-integration/src/lib.rs
     code:
       - crates/svm-integration/src/lib.rs
     wiring:
@@ -758,7 +758,7 @@ features:
     criticality: catastrophic
     owner_area: cross-vm
     docs:
-      - pallets/x3-cross-vm-router/README.md
+      - pallets/x3-cross-vm-router/src/lib.rs
     code:
       - pallets/x3-cross-vm-router/src/lib.rs
     wiring:
@@ -786,7 +786,7 @@ features:
     docs:
       - docs/evm-precompiles.md
     code:
-      - crates/evm-integration/src/precompiles.rs
+      - crates/evm-integration/src/frontier.rs
     wiring:
       - "precompiles in EVM adapter"
     tests:
@@ -811,7 +811,7 @@ features:
     docs:
       - docs/svm-syscalls.md
     code:
-      - crates/svm-integration/src/syscalls.rs
+      - crates/svm-integration/src/interp.rs
     wiring:
       - "syscalls in SVM adapter"
     tests:
@@ -836,7 +836,7 @@ features:
     docs:
       - docs/vm-isolation.md
     code:
-      - crates/x3-vm/src/isolation.rs
+      - crates/x3-vm/src/execution_guards.rs
     wiring:
       - "isolation layer in VM stack"
     tests:
@@ -861,7 +861,7 @@ features:
     docs:
       - docs/vm-state-transition.md
     code:
-      - crates/x3-vm/src/state.rs
+      - crates/evm-integration/src/state.rs
     wiring:
       - "state transition in x3vm"
     tests:
@@ -886,7 +886,7 @@ features:
     docs:
       - docs/vm-fallback.md
     code:
-      - pallets/x3-cross-vm-router/src/fallback.rs
+      - pallets/x3-cross-vm-router/src/lib.rs
     wiring:
       - "fallback in cross-vm router"
     tests:
@@ -911,7 +911,7 @@ features:
     docs:
       - docs/vm-metering.md
     code:
-      - pallets/x3-cross-vm-router/src/metering.rs
+      - pallets/x3-cross-vm-router/src/lib.rs
     wiring:
       - "metering in cross-vm router"
     tests:
@@ -937,9 +937,9 @@ features:
     criticality: catastrophic
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/parser.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/parser.rs
+      - crates/x3-compiler/src/compiler.rs
     wiring:
       - "parser in compiler"
     tests:
@@ -962,9 +962,9 @@ features:
     criticality: catastrophic
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/typechecker.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/typechecker.rs
+      - crates/x3-compiler/src/compiler.rs
     wiring:
       - "type checker in compiler"
     tests:
@@ -987,7 +987,7 @@ features:
     criticality: catastrophic
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/README.md
+      - crates/x3-compiler/src/lib.rs
     code:
       - crates/x3-compiler/src/lib.rs
     wiring:
@@ -1012,9 +1012,9 @@ features:
     criticality: catastrophic
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/ir.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/ir.rs
+      - crates/x3-compiler/src/compiler.rs
     wiring:
       - "IR in compiler"
     tests:
@@ -1037,9 +1037,9 @@ features:
     criticality: high
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/optimizer.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/optimizer.rs
+      - crates/x3-compiler/src/options.rs
     wiring:
       - "optimizer in compiler"
     tests:
@@ -1062,9 +1062,9 @@ features:
     criticality: catastrophic
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/codegen.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/codegen.rs
+      - crates/x3-compiler/src/compiler.rs
     wiring:
       - "codegen in compiler"
     tests:
@@ -1087,9 +1087,9 @@ features:
     criticality: critical
     owner_area: x3lang
     docs:
-      - crates/x3-compiler/docs/abi.md
+      - crates/x3-compiler/src/lib.rs
     code:
-      - crates/x3-compiler/src/abi.rs
+      - crates/x3-compiler/src/compiler.rs
     wiring:
       - "ABI generator in compiler"
     tests:
@@ -1112,7 +1112,7 @@ features:
     criticality: critical
     owner_area: x3lang
     docs:
-      - crates/x3-stdlib/README.md
+      - crates/x3-stdlib/src/lib.rs
     code:
       - crates/x3-stdlib/src/lib.rs
     wiring:
@@ -1407,7 +1407,7 @@ features:
     criticality: catastrophic
     owner_area: flashloan
     docs: [pallets/x3-flashloan/README.md]
-    code: [pallets/x3-flashloan/src/lib.rs]
+    code: [crates/x3-flashloan/src/lib.rs]
     wiring: ["flashloan pallet in runtime"]
     tests:
       unit: [flashloan_borrow_repay]
@@ -1422,7 +1422,7 @@ features:
     criticality: critical
     owner_area: dex
     docs: [pallets/x3-dex/README.md]
-    code: [pallets/x3-dex/src/lib.rs]
+    code: [crates/x3-dex/src/lib.rs]
     wiring: ["DEX pallet in runtime"]
     tests:
       unit: [pool_creation, swap]
@@ -1467,7 +1467,7 @@ features:
     criticality: high
     owner_area: frontend
     docs: [dashboard/README.md]
-    code: [dashboard/src/]
+    code: [apps/inferstructor-dashboard/src/]
     wiring: ["dashboard accessible"]
     tests:
       unit: [component_tests]

@@ -56,7 +56,7 @@ pub use adapters::{
 };
 
 pub use packet_adapters::{
-    deserialize_packet, validate_packet, route_packet, get_domain_mask, get_packet_type,
+    deserialize_packet, get_domain_mask, get_packet_type, route_packet, validate_packet,
     DomainRoute, PacketAdapterError, PacketAdapterResult,
 };
 
@@ -259,10 +259,7 @@ pub enum ComitFailureReason {
     },
     /// Packet deserialization failed or packet has incorrect domain targeting.
     /// Error Code: 0x08
-    PacketDeserializationFailed {
-        code: u32,
-        reason: Vec<u8>,
-    },
+    PacketDeserializationFailed { code: u32, reason: Vec<u8> },
     /// EVM execution failed with error code.
     /// Error Code: 0x10
     EvmExecutionFailed {

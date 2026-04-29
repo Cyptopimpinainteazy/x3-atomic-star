@@ -173,7 +173,7 @@ impl FallbackChain {
     fn execute_on_gpu(
         &mut self,
         op: &str,
-        args: &[u64],
+        _args: &[u64],
         _block_height: u32,
     ) -> Result<Vec<u64>, String> {
         let kernel = self

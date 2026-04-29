@@ -1,11 +1,50 @@
 {
-  "claim_id": "x3.evolution.no_regression",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "425e2e98ef77a5d83a54200ec3a4853939034be9",
+  "command_run": "x3-proof verify x3.evolution.no_regression",
+  "artifact_hash": "9fb820c5a7e0cdc1df9acdec690f7bb5610d26c059119b3f314479cb07a884a9",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "proof/claims/registry.yml",
+    "pallets/evolution-core/src/lib.rs",
+    "proof/baselines/claim_scores.yml"
   ],
-  "hash": "42268c6aee3e3ae0645957cb6adfa8e8c2dc3c991c06f0be718bd33b3af41f97"
+  "timestamp": "2026-04-28T23:16:27.436905136Z",
+  "result": {
+    "claim_id": "x3.evolution.no_regression",
+    "claim": "New generations must beat prior generations without S0/S1 regressions",
+    "status": "verified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "proof/claims/registry.yml",
+      "pallets/evolution-core/src/lib.rs",
+      "proof/baselines/claim_scores.yml"
+    ],
+    "commands_run": [],
+    "passed_checks": [
+      "All 10 S0 claims verified — no S0 regressions",
+      "All 4 S1 claims verified — no S1 regressions",
+      "evolution-core pallet exists",
+      "No score regressions across 16 claim receipts (vs 16 baseline pins)"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "s0_total": "10",
+      "s0_verified": "10",
+      "s1_total": "4",
+      "s1_verified": "4",
+      "receipts_compared": "16",
+      "baseline_entries": "16"
+    },
+    "timestamp": "2026-04-28T23:16:27.434313768Z",
+    "duration_ms": 1
+  },
+  "limitations": [],
+  "binding_hash": "27f026023cbc2943bd1a3a9dac36e32abdfaedc678d792d8f26ceea9dcd6b819"
 }

@@ -67,7 +67,7 @@ impl AtomicRegistry {
     pub async fn register_swap(&self, record: &AtomicSwapRecord) -> Result<()> {
         let conn = self
             .redis_client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
 
@@ -90,7 +90,7 @@ impl AtomicRegistry {
     pub async fn get_swap(&self, swap_id: &str) -> Result<Option<AtomicSwapRecord>> {
         let conn = self
             .redis_client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
 
@@ -145,7 +145,7 @@ impl AtomicRegistry {
     pub async fn delete_swap(&self, swap_id: &str) -> Result<()> {
         let conn = self
             .redis_client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
 

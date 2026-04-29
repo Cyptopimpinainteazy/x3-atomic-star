@@ -38,10 +38,7 @@ pub enum SvmPacket {
     },
 
     /// Initialize state account
-    InitializeState {
-        account: [u8; 32],
-        state: Vec<u8>,
-    },
+    InitializeState { account: [u8; 32], state: Vec<u8> },
 }
 
 #[cfg(test)]

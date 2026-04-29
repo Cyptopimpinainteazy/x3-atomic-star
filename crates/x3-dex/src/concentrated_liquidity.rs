@@ -1,7 +1,6 @@
 /// Concentrated Liquidity — Uniswap V3 model with capital efficiency
 /// LPs set custom price ranges for 10-100x capital efficiency vs basic AMM
 use parity_scale_codec::{Decode, Encode};
-use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
 pub struct ConcentratedPosition {
@@ -54,12 +53,12 @@ pub struct FeeAccrual {
 pub struct ConcentratedLiquidityEngine;
 
 impl ConcentratedLiquidityEngine {
-    const TICK_SPACING_BASE: i32 = 1;
     const MIN_LIQUIDITY: u128 = 1;
     const MAX_TICK: i32 = 887_272;
     const MIN_TICK: i32 = -887_272;
 
     /// Create a concentrated liquidity position
+    #[allow(clippy::too_many_arguments)]
     pub fn create_position(
         lp: [u8; 32],
         token0: u128,
@@ -145,7 +144,7 @@ impl ConcentratedLiquidityEngine {
             return Err("Cannot remove more liquidity than deposited");
         }
 
-        let ratio = (liquidity_to_remove as u128) * 1_000_000 / position.liquidity as u128;
+        let ratio = liquidity_to_remove * 1_000_000 / position.liquidity;
 
         let amount0_out = ((position.amount0_deposited as u128) * ratio / 1_000_000) as u64;
         let amount1_out = ((position.amount1_deposited as u128) * ratio / 1_000_000) as u64;
@@ -281,7 +280,7 @@ impl ConcentratedLiquidityEngine {
     fn derive_position_id(
         lp: [u8; 32],
         token0: u128,
-        token1: u128,
+        _token1: u128,
         lower_tick: i32,
         upper_tick: i32,
     ) -> [u8; 32] {

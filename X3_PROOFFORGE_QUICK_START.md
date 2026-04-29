@@ -20,6 +20,10 @@
 
 ## 📋 MOST IMPORTANT COMMANDS
 
+| Command | Purpose |
+|---|---|
+| `x3-proof economic-gate --strict` | Run all 9 economic attack tests |
+
 ### For Developers (Day-to-Day)
 
 **Before committing code:**
@@ -33,6 +37,12 @@ Runs: compile + lint + unit tests + mutation tests
 x3-proof hack --strict
 ```
 Runs: security tests + adversarial tests + secret scan
+
+**Before merging DeFi-critical code:**
+```bash
+x3-proof economic-gate --strict
+```
+Runs: flashloan + MEV + oracle + cross-VM + governance economic attack checks
 
 **If you're working on edge cases:**
 ```bash

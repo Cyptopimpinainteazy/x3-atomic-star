@@ -69,10 +69,7 @@ pub struct BatchSwapRouter;
 
 impl BatchSwapRouter {
     const MAX_SWAPS_PER_BATCH: u32 = 10;
-    const MIN_OUTPUT_AMOUNT: u64 = 1;
     const ROUTE_VALIDITY_BLOCKS: u64 = 10;
-    const MAX_PRICE_IMPACT_BPS: u32 = 50_000; // 500% max (highly discouraged)
-    const MEV_PROTECTION_DEFAULT_SLIPPAGE: u32 = 50; // 0.5% default
 
     /// Create a batch swap
     pub fn create_batch_swap(

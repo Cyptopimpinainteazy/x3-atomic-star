@@ -1,11 +1,11 @@
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::proof::*;
+use anyhow::Result;
 use chrono::Utc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
-pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "Upgrade safety verified".to_string(),
@@ -28,7 +28,7 @@ pub async fn verify_claim(workspace: &PathBuf, claim_id: &str, verbose: bool) ->
     })
 }
 
-pub async fn run_proofs(workspace: &PathBuf, verbose: bool) -> Result<ProofResult> {
+pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: "x3.upgrade_safety.full_proof".to_string(),
         claim: "Upgrade safety fully proven".to_string(),

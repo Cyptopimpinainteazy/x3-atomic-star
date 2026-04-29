@@ -24,9 +24,9 @@ pub enum SwapStatus {
 /// Main orchestrator for atomic cross-chain swaps
 pub struct AtomicSwapOrchestrator {
     registry: Arc<AtomicRegistry>,
-    evm_validator: Arc<EvmValidator>,
-    svm_validator: Arc<SvmValidator>,
-    failover: Arc<FailoverManager>,
+    _evm_validator: Arc<EvmValidator>,
+    _svm_validator: Arc<SvmValidator>,
+    _failover: Arc<FailoverManager>,
     default_timeout: Duration,
 }
 
@@ -39,9 +39,9 @@ impl AtomicSwapOrchestrator {
 
         Ok(Self {
             registry,
-            evm_validator,
-            svm_validator,
-            failover,
+            _evm_validator: evm_validator,
+            _svm_validator: svm_validator,
+            _failover: failover,
             default_timeout: Duration::from_secs(default_timeout_secs),
         })
     }
@@ -203,7 +203,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // Requires Redis running
     async fn test_orchestrator_creation() {
-        let result = AtomicSwapOrchestrator::new("redis://localhost:6379", 60).await;
+        let _result = AtomicSwapOrchestrator::new("redis://localhost:6379", 60).await;
         // Would succeed if Redis is running
     }
 }

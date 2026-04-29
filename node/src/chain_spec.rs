@@ -10,8 +10,8 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature,
-    SystemConfig, X3CoinConfig, WASM_BINARY,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, X3CoinConfig,
+    WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.

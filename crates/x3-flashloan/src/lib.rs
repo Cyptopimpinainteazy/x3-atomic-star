@@ -51,6 +51,18 @@ pub use settlement::SettlementEngine;
 pub use types::*;
 
 #[cfg(test)]
+#[path = "tests/attack_oracle_manipulation.rs"]
+mod attack_oracle_manipulation;
+
+#[cfg(test)]
+#[path = "tests/attack_reentrancy.rs"]
+mod attack_reentrancy;
+
+#[cfg(test)]
+#[path = "tests/attack_repayment_bypass.rs"]
+mod attack_repayment_bypass;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

@@ -81,11 +81,7 @@ pub struct AssetSupplyProof {
 
 impl AssetSupplyProof {
     /// Create a proof from a supply ledger.
-    pub fn from_ledger(
-        asset_id: AssetId,
-        ledger: &SupplyLedger,
-        merkle_index: u32,
-    ) -> Self {
+    pub fn from_ledger(asset_id: AssetId, ledger: &SupplyLedger, merkle_index: u32) -> Self {
         let leaf_hash = Self::compute_leaf_hash(asset_id, ledger);
 
         AssetSupplyProof {
@@ -142,7 +138,18 @@ impl AssetSupplyProof {
 
     /// Verify this proof's merkle branch leads to the claimed root.
     pub fn verify_merkle_branch(&self, expected_root: H256) -> bool {
-        let mut hash = self.leaf_hash;
+        let ledger = SupplyLedger {
+            canonical_supply: self.canonical_supply,
+            native_supply: self.native_supply,
+            evm_supply: self.evm_supply,
+            svm_supply: self.svm_supply,
+            external_locked_supply: self.external_locked_supply,
+            pending_supply: self.pending_supply,
+        };
+
+        // Recompute the leaf from proof fields so tampering with proof payload
+        // cannot pass by reusing a stale `leaf_hash`.
+        let mut hash = Self::compute_leaf_hash(self.asset_id, &ledger);
 
         for (i, sibling) in self.merkle_branch.iter().enumerate() {
             let position = (self.merkle_index >> i) & 1;
@@ -208,7 +215,7 @@ impl SupplyMerkleTree {
 
         // Build tree bottom-up
         while level_size > 1 {
-            let next_level_size = (level_size + 1) / 2;
+            let next_level_size = level_size.div_ceil(2);
             let level_start = tree.len() - level_size;
 
             for i in 0..next_level_size {
@@ -240,11 +247,11 @@ impl SupplyMerkleTree {
         let mut level_start = 0;
 
         while level_size > 1 {
-            let sibling_index = if index % 2 == 0 {
-                index + 1
-            } else {
-                index - 1
-            };
+                    let sibling_index = if index.is_multiple_of(2) {
+                        index + 1
+                    } else {
+                        index - 1
+                    };
 
             let sibling = if sibling_index < level_size {
                 tree[level_start + sibling_index]
@@ -257,7 +264,7 @@ impl SupplyMerkleTree {
 
             // Move to next level
             level_start += level_size;
-            level_size = (level_size + 1) / 2;
+            level_size = level_size.div_ceil(2);
             index /= 2;
         }
 
@@ -299,7 +306,12 @@ impl From<SupplyVerificationError> for DispatchError {
 mod tests {
     use super::*;
 
-    fn create_test_ledger(canonical: Balance, native: Balance, evm: Balance, svm: Balance) -> SupplyLedger {
+    fn create_test_ledger(
+        canonical: Balance,
+        native: Balance,
+        evm: Balance,
+        svm: Balance,
+    ) -> SupplyLedger {
         SupplyLedger {
             canonical_supply: canonical,
             native_supply: native,
@@ -373,7 +385,9 @@ mod tests {
 
         // Tamper with the proof
         proofs[0].canonical_supply = 2000;
-        proofs[0].leaf_hash = AssetSupplyProof::compute_leaf_hash(H256([1u8; 32]), &ledger);
+        let tampered_ledger = create_test_ledger(2000, 1000, 0, 0);
+        proofs[0].leaf_hash =
+            AssetSupplyProof::compute_leaf_hash(H256([1u8; 32]), &tampered_ledger);
 
         // Should fail verification
         assert!(!proofs[0].verify_merkle_branch(root));

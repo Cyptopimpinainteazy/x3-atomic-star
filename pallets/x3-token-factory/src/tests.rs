@@ -213,7 +213,11 @@ fn launch(config: TokenFactoryConfig) -> AssetId {
 
 fn addr_for(domain: DomainId) -> AccountBytes {
     match domain {
-        DomainId::X3Native => AccountBytes::X3Native([1u8; 32]),
+        DomainId::X3Native => {
+            let mut native = [0u8; 32];
+            native[0] = CREATOR as u8;
+            AccountBytes::X3Native(native)
+        }
         DomainId::X3Evm => AccountBytes::Evm([2u8; 20]),
         DomainId::X3Svm => AccountBytes::Svm([3u8; 32]),
         _ => unreachable!("only internal domains in factory tests"),

@@ -24,6 +24,10 @@ pub mod merkle_proof_validator;
 // Gap #3: Merkle settlement integration for bridge commit phase
 pub mod merkle_settlement_bridge;
 
+#[cfg(test)]
+#[path = "tests/attack_arbitrage.rs"]
+mod attack_arbitrage;
+
 /// Canonical cross-VM types (v1): `VmId`, `CrossVmCall`, `CrossVmReceipt`,
 /// bounded payloads, domain-separated `call_hash`, and protocol constants.
 ///

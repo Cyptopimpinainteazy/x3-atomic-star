@@ -1,11 +1,39 @@
 {
-  "claim_id": "x3.governance.proof_gated_upgrade",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.governance.proof_gated_upgrade",
+  "artifact_hash": "7265b729a8ff42bf875e307ea60e6d06b3786fd4a60e460af84f89982d77f474",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "pallets/governance/src/lib.rs"
   ],
-  "hash": "c6e709df7a72a270b998f8d94bf625e89cab37201db0d2e355f35a80f49646c2"
+  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "result": {
+    "claim_id": "x3.governance.proof_gated_upgrade",
+    "claim": "Governance is tamper-proof",
+    "status": "verified",
+    "proof_level": "P7",
+    "edge_case_level": "E8",
+    "hack_level": "H9",
+    "operator_level": "I8",
+    "degraded_level": "D6",
+    "files_inspected": [
+      "pallets/governance/src/lib.rs"
+    ],
+    "commands_run": [
+      "cargo test -p pallet-governance"
+    ],
+    "passed_checks": [
+      "Permission checks verified",
+      "Vote tally correct"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.96,
+    "evidence": {},
+    "timestamp": "2026-04-27T23:19:56.680108919Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "5e523720760727c8d2a927522e34fc861e380abba0b5b40fc7e6679f0f065ccc"
 }

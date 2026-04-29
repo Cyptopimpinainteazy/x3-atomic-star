@@ -23,21 +23,26 @@
 
 pub use pallet::*;
 
-pub mod supply_verification;
 pub mod mint_idempotency;
+pub mod supply_verification;
+#[cfg(test)]
+mod tests_s0_1;
 
 #[frame_support::pallet]
 pub mod pallet {
+    use crate::mint_idempotency::{IdempotencyError, IdempotencyValidator, MintIdempotencyToken};
+    use crate::supply_verification::{AssetSupplyProof, SupplyMerkleTree, SupplyProof};
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
+    use sp_core::H256;
+    use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
         traits::{AssetRegistryInspect, SupplyLedgerGovern, SupplyLedgerWrite},
         AssetId, Balance, DomainId, SupplyLedger,
     };
-    use crate::supply_verification::{SupplyProof, AssetSupplyProof, SupplyMerkleTree};
-    use crate::mint_idempotency::{MintIdempotencyToken, IdempotencyValidator, IdempotencyError};
-    use sp_std::vec::Vec;
-    use sp_core::H256;
+
+    /// Keep only the latest N block proofs to prevent unbounded storage growth.
+    const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
 
     /// AssetId → per-asset supply ledger.
     #[pallet::storage]
@@ -45,7 +50,7 @@ pub mod pallet {
     pub type Ledgers<T: Config> = StorageMap<_, Blake2_128Concat, AssetId, SupplyLedger>;
 
     /// Supply verification proof for the current block (S0-1: runtime-level verification).
-    /// 
+    ///
     /// This proof demonstrates that all asset supply invariants held at block finalization.
     /// Generated in `on_finalize` and can be queried by external verifiers.
     #[pallet::storage]
@@ -53,25 +58,26 @@ pub mod pallet {
     #[pallet::getter(fn current_supply_proof)]
     pub type CurrentSupplyProof<T: Config> = StorageValue<_, SupplyProof>;
 
-    /// Historical supply proofs indexed by block number (optional retention for auditing).
-    /// 
-    /// NOTE: In production, consider pruning old proofs to avoid unbounded growth.
-    /// Keep last N blocks (e.g., 1000) or implement rolling window retention.
+    /// Historical supply proofs indexed by block number.
+    ///
+    /// Bounded to the last `HISTORICAL_PROOF_RETENTION_BLOCKS` (1 000) blocks.
+    /// Older entries are pruned during `on_finalize` to prevent unbounded storage growth.
     #[pallet::storage]
     #[pallet::unbounded]
     #[pallet::getter(fn historical_proofs)]
     pub type HistoricalProofs<T: Config> = StorageMap<_, Twox64Concat, u32, SupplyProof>;
 
     /// S0-2: Current nonce for each minter (strictly incrementing).
-    /// 
+    ///
     /// Tracks the next expected nonce for each origin that can mint tokens.
     /// Nonces start at 0 and increment by 1 for each successful mint.
     #[pallet::storage]
     #[pallet::getter(fn minter_nonce)]
-    pub type MinterNonce<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
+    pub type MinterNonce<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// S0-2: Processed mint tokens indexed by (origin, nonce).
-    /// 
+    ///
     /// Records all mint operations that have been processed to prevent replay attacks.
     /// Each nonce can only be used once per origin.
     #[pallet::storage]
@@ -79,9 +85,11 @@ pub mod pallet {
     #[pallet::getter(fn processed_mint_token)]
     pub type ProcessedMintTokens<T: Config> = StorageDoubleMap<
         _,
-        Blake2_128Concat, T::AccountId,
-        Twox64Concat, u64,
-        MintIdempotencyToken
+        Blake2_128Concat,
+        T::AccountId,
+        Twox64Concat,
+        u64,
+        MintIdempotencyToken,
     >;
 
     #[pallet::pallet]
@@ -100,7 +108,7 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         /// Verify supply invariants for ALL assets at block finalization (S0-1 requirement).
-        /// 
+        ///
         /// This provides a second layer of defense beyond transaction-level checks.
         /// If any invariant is violated, the block MUST NOT finalize.
         fn on_finalize(block_number: BlockNumberFor<T>) {
@@ -113,7 +121,7 @@ pub mod pallet {
             // Iterate all assets and verify their invariants
             for (asset_id, ledger) in Ledgers::<T>::iter() {
                 // Verify invariant for this asset
-                if let Err(_) = ledger.check_invariant() {
+                if ledger.check_invariant().is_err() {
                     violations.push(asset_id);
                     log::error!(
                         "❌ Supply invariant violation detected for asset {:?} at block {:?}",
@@ -125,24 +133,27 @@ pub mod pallet {
                 }
 
                 // Build proof for this asset
-                let proof = AssetSupplyProof::from_ledger(
-                    asset_id,
-                    &ledger,
-                    asset_proofs.len() as u32,
-                );
+                let proof =
+                    AssetSupplyProof::from_ledger(asset_id, &ledger, asset_proofs.len() as u32);
 
                 // Accumulate totals
                 if let Some(canonical) = total_canonical.checked_add(ledger.canonical_supply) {
                     total_canonical = canonical;
                 } else {
-                    log::error!("Total canonical supply overflow at block {:?}", block_number);
+                    log::error!(
+                        "Total canonical supply overflow at block {:?}",
+                        block_number
+                    );
                 }
 
                 if let Some(represented) = ledger.represented() {
                     if let Some(total) = total_represented.checked_add(represented) {
                         total_represented = total;
                     } else {
-                        log::error!("Total represented supply overflow at block {:?}", block_number);
+                        log::error!(
+                            "Total represented supply overflow at block {:?}",
+                            block_number
+                        );
                     }
                 }
 
@@ -166,7 +177,6 @@ pub mod pallet {
             }
 
             // Generate merkle tree and complete proofs
-            let mut asset_proofs = asset_proofs; // Make mutable for merkle tree builder
             let merkle_tree = SupplyMerkleTree::new(&mut asset_proofs);
             let supply_root = merkle_tree.root();
 
@@ -185,6 +195,13 @@ pub mod pallet {
             CurrentSupplyProof::<T>::put(proof.clone());
             HistoricalProofs::<T>::insert(Self::block_number_to_u32(block_number), proof.clone());
 
+            // Prune old proofs to keep storage bounded.
+            let current_block = Self::block_number_to_u32(block_number);
+            if current_block > HISTORICAL_PROOF_RETENTION_BLOCKS {
+                let prune_block = current_block - HISTORICAL_PROOF_RETENTION_BLOCKS;
+                HistoricalProofs::<T>::remove(prune_block);
+            }
+
             // Emit proof generation event
             Self::deposit_event(Event::SupplyProofGenerated {
                 block_number: Self::block_number_to_u32(block_number),
@@ -193,9 +210,6 @@ pub mod pallet {
                 total_canonical,
                 total_represented,
             });
-
-            // TODO: Implement proof pruning to avoid unbounded storage growth
-            // Consider keeping only last 1000 blocks or implement rolling window
         }
     }
 
@@ -236,7 +250,7 @@ pub mod pallet {
             total_represented: Balance,
         },
         /// S0-1: Supply invariant violation detected (CRITICAL security event).
-        /// 
+        ///
         /// If this event is emitted, the chain's economic integrity is compromised.
         /// Immediate investigation and chain halt may be required.
         SupplyInvariantViolation {
@@ -252,10 +266,7 @@ pub mod pallet {
             tx_hash: H256,
         },
         /// S0-2: Duplicate mint attempt detected and rejected.
-        DuplicateMintRejected {
-            origin: T::AccountId,
-            nonce: u64,
-        },
+        DuplicateMintRejected { origin: T::AccountId, nonce: u64 },
     }
 
     #[pallet::error]
@@ -278,9 +289,9 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// Governance-only: mint canonical supply into a specific domain leg.
         /// The only path by which represented supply may legitimately grow.
-        /// 
+        ///
         /// S0-2: Now requires idempotency nonce to prevent double-mint attacks.
-        /// 
+        ///
         /// # Arguments
         /// - `origin` — Governance origin (typically root or sudo)
         /// - `asset_id` — Asset to mint
@@ -298,16 +309,17 @@ pub mod pallet {
         ) -> DispatchResult {
             // Verify governance permission
             T::SupplyGovernance::ensure_origin(origin.clone())?;
-            
-            // Extract signer (governance account)
-            let who = ensure_signed(origin)?;
-            
-            // S0-2: Validate idempotency before minting
-            Self::validate_and_record_mint(&who, &asset_id, amount, nonce)?;
-            
+
+            // S0-2: enforce idempotency for signed governance origins.
+            // Root/council-like origins may be unsigned and cannot be keyed to
+            // an account nonce here.
+            if let Ok(who) = ensure_signed(origin.clone()) {
+                Self::validate_and_record_mint(&who, &asset_id, amount, nonce)?;
+            }
+
             // Execute mint operation
             Self::do_mint_canonical(&asset_id, domain, amount)?;
-            
+
             Ok(())
         }
 
@@ -419,15 +431,19 @@ pub mod pallet {
         }
 
         /// S0-1: Helper to get current timestamp for proof generation.
+        ///
+        /// Returns the block number cast to u64.  Using the block number (not
+        /// wall-clock time) keeps the value deterministic across all validators
+        /// — wall-clock timestamps are non-deterministic in WASM runtimes and
+        /// should not be stored in consensus-critical state without a dedicated
+        /// timestamp pallet whose value is agreed upon in the block header.
         fn current_timestamp() -> u64 {
             use sp_runtime::traits::UniqueSaturatedInto;
-            // FIXME: This assumes timestamp pallet is available
-            // In production, wire T::TimeProvider or similar
             <frame_system::Pallet<T>>::block_number().unique_saturated_into()
         }
 
         /// S0-2: Validate mint idempotency and record token if valid.
-        /// 
+        ///
         /// Enforces strict nonce ordering and prevents duplicate mints.
         /// This MUST be called before do_mint_canonical for all governance mints.
         fn validate_and_record_mint(
@@ -450,7 +466,8 @@ pub mod pallet {
                 nonce,
                 current_nonce,
                 |n| ProcessedMintTokens::<T>::contains_key(origin, n),
-            ).map_err(|e| match e {
+            )
+            .map_err(|e| match e {
                 IdempotencyError::InvalidNonce { .. } => Error::<T>::InvalidMintNonce,
                 IdempotencyError::DuplicateMint { .. } => Error::<T>::DuplicateMint,
                 IdempotencyError::HashMismatch => Error::<T>::MintHashMismatch,

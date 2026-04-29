@@ -1,19 +1,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use crc32fast::Hasher;
 use parity_scale_codec::{Decode, Encode};
 use scale_info::prelude::vec::Vec;
 use scale_info::TypeInfo;
-use crc32fast::Hasher;
 
-mod header;
 mod evm;
+mod header;
 mod svm;
 mod x3vm;
 
+pub use evm::{EvmCall, EvmPacket, U256};
 pub use header::PacketHeader;
-pub use evm::{EvmPacket, EvmCall, U256};
-pub use svm::{SvmPacket, SvmAccount, SvmDeployMetadata};
-pub use x3vm::{X3VmPacket, X3Condition};
+pub use svm::{SvmAccount, SvmDeployMetadata, SvmPacket};
+pub use x3vm::{X3Condition, X3VmPacket};
 
 /// Top-level packet wrapper for router dispatch
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
@@ -51,7 +51,11 @@ impl Packet {
     }
 
     /// Create a new packet with automatic header generation
-    pub fn new(packet_type: PacketType, payload: Vec<u8>, domain_mask: u8) -> Result<Self, &'static str> {
+    pub fn new(
+        packet_type: PacketType,
+        payload: Vec<u8>,
+        domain_mask: u8,
+    ) -> Result<Self, &'static str> {
         if domain_mask == 0 {
             return Err("Must target at least one domain");
         }
@@ -64,17 +68,17 @@ impl Packet {
                 let evm_packet = EvmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode EVM packet payload")?;
                 Packet::Evm(evm_packet)
-            },
+            }
             PacketType::Svm => {
                 let svm_packet = SvmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode SVM packet payload")?;
                 Packet::Svm(svm_packet)
-            },
+            }
             PacketType::X3Vm => {
                 let x3vm_packet = X3VmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode X3VM packet payload")?;
                 Packet::X3Vm(x3vm_packet)
-            },
+            }
         };
 
         Ok(packet)
@@ -93,11 +97,10 @@ impl Packet {
     /// Serialize to full wire format: [Header: 32][Type: 1][Payload: n][CRC32: 4]
     pub fn to_wire_format(&self) -> Result<Vec<u8>, &'static str> {
         let payload = self.encode();
-        let payload_size = payload.len() as u16;
-
-        if payload_size > 65535 {
+        if payload.len() > u16::MAX as usize {
             return Err("Payload exceeds maximum size");
         }
+        let payload_size = payload.len() as u16;
 
         let domain_mask = self.domain_mask();
         let packet_type = self.packet_type();
@@ -130,8 +133,8 @@ impl Packet {
     pub fn from_wire_format(bytes: &[u8]) -> Result<Self, &'static str> {
         // Streaming decode: header first
         let mut cursor = bytes;
-        let header = PacketHeader::decode(&mut cursor)
-            .map_err(|_| "Failed to decode packet header")?;
+        let header =
+            PacketHeader::decode(&mut cursor).map_err(|_| "Failed to decode packet header")?;
 
         // Compute header bytes for CRC (portion already consumed)
         let header_bytes = &bytes[..bytes.len() - cursor.len()];
@@ -146,8 +149,7 @@ impl Packet {
         }
 
         // Decode packet type (u8, 1 byte)
-        let packet_type = u8::decode(&mut cursor)
-            .map_err(|_| "Failed to decode packet type")?;
+        let packet_type = u8::decode(&mut cursor).map_err(|_| "Failed to decode packet type")?;
 
         // Extract payload (exact size from header)
         let payload = &cursor[..header.payload_size as usize];
@@ -163,9 +165,8 @@ impl Packet {
         hasher.update(payload);
         let computed_crc = hasher.finalize();
 
-        let expected_crc = u32::from_le_bytes(
-            crc_bytes.try_into().map_err(|_| "Invalid CRC length")?
-        );
+        let expected_crc =
+            u32::from_le_bytes(crc_bytes.try_into().map_err(|_| "Invalid CRC length")?);
 
         if computed_crc != expected_crc {
             return Err("CRC32 mismatch");
@@ -177,17 +178,17 @@ impl Packet {
                 let evm_packet = EvmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode EVM packet")?;
                 Packet::Evm(evm_packet)
-            },
+            }
             1 => {
                 let svm_packet = SvmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode SVM packet")?;
                 Packet::Svm(svm_packet)
-            },
+            }
             2 => {
                 let x3vm_packet = X3VmPacket::decode(&mut &payload[..])
                     .map_err(|_| "Failed to decode X3VM packet")?;
                 Packet::X3Vm(x3vm_packet)
-            },
+            }
             _ => return Err("Unknown packet type"),
         };
 
@@ -197,8 +198,8 @@ impl Packet {
 
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
     use super::header::PacketHeader;
+    use super::*;
 
     #[test]
     fn test_packet_wrapper_round_trip() {
@@ -470,7 +471,7 @@ mod integration_tests {
         });
 
         let mut wire = packet.to_wire_format().unwrap();
-        
+
         // Corrupt CRC bytes
         let len = wire.len();
         wire[len - 1] = 0xFF;
@@ -519,11 +520,11 @@ mod integration_tests {
         // Create payload at the boundary (65535 is max)
         let large_payload = vec![0u8; 65535];
         let domain_mask = 0b0001;
-        
+
         let header = PacketHeader::new(1, domain_mask, 65535);
         let header_bytes = header.encode();
         let type_byte = 0u8.encode();
-        
+
         let mut hasher = Hasher::new();
         hasher.update(&header_bytes);
         hasher.update(&type_byte);
@@ -539,7 +540,7 @@ mod integration_tests {
         // Should succeed at boundary
         let result = Packet::from_wire_format(&wire);
         assert!(result.is_ok());
-        
+
         // Now test with header claiming 65536 (impossible due to u16) but we simulate by lying in header bytes
         // Actually u16 can't represent 65536, so the boundary test is sufficient
     }
@@ -569,10 +570,10 @@ mod integration_tests {
         let packet = Packet::Evm(evm_packet);
 
         let wire = packet.to_wire_format().unwrap();
-        
+
         // Should be at least header (30 encoded) + type (1) + payload + crc (4)
         assert!(wire.len() >= 35);
-        
+
         // Verify structure: CRC at the end
         let (_header_type, crc) = wire.split_at(wire.len() - 4);
         assert_eq!(crc.len(), 4);
@@ -594,16 +595,22 @@ mod integration_tests {
     fn test_packet_batch_round_trip() {
         let packet = EvmPacket::Batch {
             calls: vec![
-                (EvmCall {
-                    contract: [0x11; 20],
-                    function_selector: [0x12, 0x34, 0x56, 0x78],
-                    args: vec![],
-                }, None),
-                (EvmCall {
-                    contract: [0x22; 20],
-                    function_selector: [0x98, 0x76, 0x54, 0x32],
-                    args: vec![1, 2, 3],
-                }, Some(U256::from(1000))),
+                (
+                    EvmCall {
+                        contract: [0x11; 20],
+                        function_selector: [0x12, 0x34, 0x56, 0x78],
+                        args: vec![],
+                    },
+                    None,
+                ),
+                (
+                    EvmCall {
+                        contract: [0x22; 20],
+                        function_selector: [0x98, 0x76, 0x54, 0x32],
+                        args: vec![1, 2, 3],
+                    },
+                    Some(U256::from(1000)),
+                ),
             ],
             continue_on_revert: false,
         };
@@ -623,10 +630,10 @@ mod integration_tests {
         ]);
         let payload = condition.encode();
         let packet = Packet::new(PacketType::X3Vm, payload, 0b0100).unwrap();
-        
+
         let wire = packet.to_wire_format().unwrap();
         let decoded = Packet::from_wire_format(&wire).unwrap();
-        
+
         assert_eq!(packet, decoded);
     }
 
@@ -654,7 +661,7 @@ mod integration_tests {
             checksum: PacketHeader::calculate_checksum(payload),
             ..Default::default()
         };
-        let corrupted = &payload[0..5];  // Different data
+        let corrupted = &payload[0..5]; // Different data
         assert!(!header.verify_checksum(corrupted));
     }
 
@@ -669,16 +676,19 @@ mod integration_tests {
 
     #[test]
     fn test_packet_header_validation_single_domains() {
-        let mut h_evm = PacketHeader::default(); h_evm.domain_mask = 0b0001;
-        let mut h_svm = PacketHeader::default(); h_svm.domain_mask = 0b0010;
-        let mut h_x3 = PacketHeader::default(); h_x3.domain_mask = 0b0100;
+        let mut h_evm = PacketHeader::default();
+        h_evm.domain_mask = 0b0001;
+        let mut h_svm = PacketHeader::default();
+        h_svm.domain_mask = 0b0010;
+        let mut h_x3 = PacketHeader::default();
+        h_x3.domain_mask = 0b0100;
 
-        assert!( h_evm.targets_evm() && !h_evm.targets_svm() && !h_evm.targets_x3vm() );
-        assert!( h_svm.targets_svm() && !h_svm.targets_evm() && !h_svm.targets_x3vm() );
-        assert!( h_x3.targets_x3vm() && !h_x3.targets_evm() && !h_x3.targets_svm() );
+        assert!(h_evm.targets_evm() && !h_evm.targets_svm() && !h_evm.targets_x3vm());
+        assert!(h_svm.targets_svm() && !h_svm.targets_evm() && !h_svm.targets_x3vm());
+        assert!(h_x3.targets_x3vm() && !h_x3.targets_evm() && !h_x3.targets_svm());
     }
 }
 
 pub mod prelude {
-    pub use crate::{Packet, PacketHeader, PacketType, EvmPacket, SvmPacket, X3VmPacket};
+    pub use crate::{EvmPacket, Packet, PacketHeader, PacketType, SvmPacket, X3VmPacket};
 }

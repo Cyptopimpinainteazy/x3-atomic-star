@@ -714,7 +714,8 @@ pub mod pallet {
 
                 // Only Pending or Executing bundles can be rolled back
                 ensure!(
-                    record.status == BundleStatus::Pending || record.status == BundleStatus::Executing,
+                    record.status == BundleStatus::Pending
+                        || record.status == BundleStatus::Executing,
                     Error::<T>::InvalidBundleState
                 );
 
@@ -880,9 +881,9 @@ pub mod pallet {
                         tag.extend_from_slice(finality_cert.as_bytes());
                         ValidTransaction::with_tag_prefix("X3AtomicFinalize")
                             .priority(if *finality_cert == H256::zero() {
-                                TransactionPriority::max_value() / 4
+                                TransactionPriority::MAX / 4
                             } else {
-                                TransactionPriority::max_value() / 2
+                                TransactionPriority::MAX / 2
                             })
                             .and_provides([tag.as_slice()])
                             .longevity(5)
@@ -911,7 +912,7 @@ pub mod pallet {
                     return InvalidTransaction::Stale.into();
                 }
                 ValidTransaction::with_tag_prefix("X3FinalityAnchor")
-                    .priority(TransactionPriority::max_value() / 8)
+                    .priority(TransactionPriority::MAX / 8)
                     .and_provides([(b"anchor", block_num.to_le_bytes()).encode().as_slice()])
                     .longevity(10)
                     .propagate(true)
@@ -944,17 +945,20 @@ pub mod pallet {
         fn verify_bundle_consistency(record: &BundleRecord<T>) -> DispatchResult {
             // Verify leg count is valid
             ensure!(record.leg_count > 0, Error::<T>::TooManyLegs);
-            
+
             // Verify legs_hash is not zero (prevents hash collision attacks)
-            ensure!(record.legs_hash != H256::zero(), Error::<T>::InvalidBundleData);
-            
+            ensure!(
+                record.legs_hash != H256::zero(),
+                Error::<T>::InvalidBundleData
+            );
+
             // Verify executor is assigned (required for finalization authorization)
             ensure!(record.executor.is_some(), Error::<T>::InvalidBundleState);
-            
+
             // Verify deadline has not expired
             let now = <frame_system::Pallet<T>>::block_number();
             ensure!(now <= record.deadline_block, Error::<T>::DeadlineExpired);
-            
+
             Ok(())
         }
 
@@ -986,7 +990,8 @@ pub mod pallet {
                 let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
 
                 ensure!(
-                    record.status == BundleStatus::Pending || record.status == BundleStatus::Executing,
+                    record.status == BundleStatus::Pending
+                        || record.status == BundleStatus::Executing,
                     Error::<T>::InvalidBundleState
                 );
 

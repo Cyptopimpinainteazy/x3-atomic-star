@@ -86,11 +86,10 @@ pub struct TradeHistoryEngine;
 
 impl TradeHistoryEngine {
     const DEFAULT_HOLDING_PERIOD_YEAR: u32 = 365; // Days to classify as long-term
-    const BLOCKS_PER_DAY: u64 = 28_800; // Assuming 3 second blocks
     const PRICE_SCALE: u64 = 10_000_000_000; // For fixed-point price storage
-    const TAX_REPORT_VERSION: u32 = 1;
 
     /// Record a trade in history
+    #[allow(clippy::too_many_arguments)]
     pub fn record_trade(
         user: [u8; 32],
         token_in: u128,
@@ -228,7 +227,7 @@ impl TradeHistoryEngine {
 
         let mut total_volume = 0u64;
         let mut total_fees = 0u64;
-        let mut total_gain_loss = 0i64;
+        let total_gain_loss = 0i64;
         let mut realized_gains = 0u64;
         let mut realized_losses = 0u64;
         let mut total_holding = 0u64;
@@ -425,7 +424,7 @@ impl TradeHistoryEngine {
             id[i + 11] = *byte;
         }
         let qty_bytes = qty.to_le_bytes();
-        for (i, byte) in qty_bytes.iter().take(13).enumerate() {
+        for (i, byte) in qty_bytes.iter().enumerate() {
             id[i + 19] = *byte;
         }
         id
@@ -446,7 +445,7 @@ impl TradeHistoryEngine {
     }
 
     /// Derive tax report ID
-    fn derive_report_id(user: [u8; 32], start: u64, end: u64) -> [u8; 32] {
+    fn derive_report_id(user: [u8; 32], start: u64, _end: u64) -> [u8; 32] {
         let mut id = [0u8; 32];
         for (i, byte) in user.iter().enumerate().take(16) {
             id[i] = *byte;

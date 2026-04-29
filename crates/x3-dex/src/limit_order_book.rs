@@ -49,6 +49,9 @@ pub struct OrderBookStats {
     pub avg_execution_price: u64,
 }
 
+type DepthLevel = (u64, u64);
+type OrderBookDepth = (Vec<DepthLevel>, Vec<DepthLevel>);
+
 pub struct LimitOrderBookEngine;
 
 impl LimitOrderBookEngine {
@@ -68,7 +71,7 @@ impl LimitOrderBookEngine {
         is_buy: bool,
         current_block: u64,
     ) -> Result<LimitOrder, &'static str> {
-        if amount_in < Self::MIN_ORDER_AMOUNT || amount_in > Self::MAX_ORDER_AMOUNT {
+        if !(Self::MIN_ORDER_AMOUNT..=Self::MAX_ORDER_AMOUNT).contains(&amount_in) {
             return Err("Order amount out of range");
         }
 
@@ -94,7 +97,7 @@ impl LimitOrderBookEngine {
     }
 
     /// Cancel an existing limit order
-    pub fn cancel_order(order: &mut LimitOrder, current_block: u64) -> Result<bool, &'static str> {
+    pub fn cancel_order(order: &mut LimitOrder, _current_block: u64) -> Result<bool, &'static str> {
         if order.status == 3 {
             return Err("Order already cancelled");
         }
@@ -246,7 +249,7 @@ impl LimitOrderBookEngine {
         buy_orders: &[LimitOrder],
         sell_orders: &[LimitOrder],
         levels: u32,
-    ) -> Result<(Vec<(u64, u64)>, Vec<(u64, u64)>), &'static str> {
+    ) -> Result<OrderBookDepth, &'static str> {
         if levels == 0 {
             return Err("Depth levels must be > 0");
         }
@@ -314,7 +317,7 @@ impl LimitOrderBookEngine {
     fn derive_order_id(
         user: [u8; 32],
         token_in: u128,
-        token_out: u128,
+        _token_out: u128,
         amount: u64,
         nonce: u64,
     ) -> [u8; 32] {

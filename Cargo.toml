@@ -1,5 +1,13 @@
 [workspace]
-exclude = ["quantum-kernel-voyager/src-tauri", "apps/x3-desktop/src-tauri", "apps/inferstructor-dashboard/src-tauri"]
+exclude = [
+    "quantum-kernel-voyager/src-tauri",
+    "apps/x3-desktop/src-tauri",
+    "apps/inferstructor-dashboard/src-tauri",
+    # X3-contracts is a separate dual-stack contracts workspace
+    # (Foundry for EVM, Anchor for SVM). Excluding it prevents the parent
+    # cargo from picking up SVM program crates and confusing build graphs.
+    "X3-contracts",
+]
 members = [
     "pallets/x3-kernel",
     "pallets/atomic-trade-engine",
@@ -112,6 +120,7 @@ members = [
         # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
         "crates/x3-asset-kernel-types",
         "pallets/x3-asset-registry",
+        "pallets/x3-account-registry",
         "pallets/x3-supply-ledger",
         "crates/x3-packet-schema",
         "pallets/x3-cross-vm-router",
@@ -121,6 +130,13 @@ members = [
         "pallets/x3-jury-anchor",
         # Phase 0: Sprint 0 Infrastructure
         "crates/x3-readiness-report",
+        # v0.4 internal-mainnet path: packet lifecycle + IXL instruction layer
+        "crates/x3-packet-standard",
+        "crates/x3-ixl",
+        "crates/x3-parallel-executor",
+        "crates/x3-appzone-factory",
+        "crates/x3-liquidity-core",
+        "crates/x3-universal-contracts",
         # ProofForge: Complete proof system for X3 blockchain (v0-v7)
         "proof-forge",
         # Note: crates/dylint-determinism is intentionally NOT listed here.
@@ -380,10 +396,14 @@ sp-weights = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" 
 frame-support = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
 frame-system = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
 sp-io = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-trie = { path = "patches/sp-trie" }
+sp-state-machine = { path = "patches/sp-state-machine" }
 
 # Patch Substrate git sources for prometheus fix and executor bulk-memory support
 [patch."https://github.com/paritytech/substrate"]
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+sp-trie = { path = "patches/sp-trie" }
+sp-state-machine = { path = "patches/sp-state-machine" }
 sc-executor = { path = "patches/sc-executor" }
 sc-network = { path = "patches/sc-network" }
 sc-network-common = { path = "patches/sc-network/common" }

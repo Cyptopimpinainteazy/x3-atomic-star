@@ -224,7 +224,7 @@ impl OperatorDashboard {
         let history_views: Vec<RebalanceSummaryView> = rebalance
             .history(history_limit)
             .iter()
-            .map(|p| RebalanceSummaryView::from(p))
+            .map(RebalanceSummaryView::from)
             .collect();
 
         views.extend(history_views);

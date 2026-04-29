@@ -1,11 +1,42 @@
 {
-  "claim_id": "x3.proofforge.receipt_integrity",
-  "status": "VERIFIED",
-  "date": "2026-04-27",
-  "verifier": "x3-proof-2400b15",
-  "evidence": [
-    "SecurityGate PASS - 9/9 S0/S1 blockers passing",
-    "Codebase review complete as of commit 2400b15"
+  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "command_run": "x3-proof verify x3.proofforge.receipt_integrity",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "proof/receipts/claims"
   ],
-  "hash": "a53673b4ffd58e86b87b39d919b5641b8a6a627a2efe47b2a02a81126372ba39"
+  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "result": {
+    "claim_id": "x3.proofforge.receipt_integrity",
+    "claim": "ProofForge receipt integrity and freshness",
+    "status": "verified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "proof/receipts/claims"
+    ],
+    "commands_run": [
+      "x3-proof verify <claim> --strict"
+    ],
+    "passed_checks": [
+      "15 fresh receipts"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "invalid_receipts": "0",
+      "stale_receipts": "0",
+      "fresh_receipts": "15"
+    },
+    "timestamp": "2026-04-27T23:22:09.420301208Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "7ac7772ab57f3bb3b2d554f41cfa2c69cefbf5b744d79ee0327d3a223e3d2c00"
 }

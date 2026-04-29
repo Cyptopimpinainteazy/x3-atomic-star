@@ -6,7 +6,7 @@
 use crate::crypto::HashAlgorithm;
 use tracing::debug;
 use x3_backend::bc_format::{
-    BytecodeModule, ConstPool, ConstValue, FeatureFlags, FunctionEntry, ModuleFlags, VersionInfo,
+    BytecodeModule, ConstPool, FeatureFlags, FunctionEntry, ModuleFlags, VersionInfo,
 };
 use x3_backend::opcode::Opcode;
 

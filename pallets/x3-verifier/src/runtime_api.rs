@@ -146,4 +146,3 @@ sp_api::decl_runtime_apis! {
         fn query_cross_chain_status(chain_id: u32, transfer_id: H256) -> Option<u8>;
     }
 }
-

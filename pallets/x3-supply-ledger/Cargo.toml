@@ -24,6 +24,10 @@ log = { workspace = true, default-features = false }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 
+[dev-dependencies]
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+
 [features]
 default = ["std"]
 std = [

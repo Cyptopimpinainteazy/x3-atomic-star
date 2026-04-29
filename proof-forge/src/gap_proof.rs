@@ -1,10 +1,10 @@
 // GapProof Scanner - Detects missing implementations, tests, wiring
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum GapType {
@@ -102,7 +102,7 @@ impl GapScanner {
         {
             if entry.file_type().is_file() {
                 let path = entry.path();
-                
+
                 if path.extension().and_then(|s| s.to_str()) == Some("rs") {
                     if let Ok(content) = fs::read_to_string(path) {
                         for (line_num, line) in content.lines().enumerate() {
@@ -110,7 +110,8 @@ impl GapScanner {
                                 gaps.push(GapItem {
                                     gap_type: GapType::G1,
                                     area: self.path_to_area(path),
-                                    description: "Function declared but not implemented".to_string(),
+                                    description: "Function declared but not implemented"
+                                        .to_string(),
                                     file: Some(path.to_path_buf()),
                                     line: Some(line_num + 1),
                                     blocks_mainnet: false,
@@ -134,7 +135,7 @@ impl GapScanner {
         if pallets_dir.exists() {
             let runtime_file = self.workspace.join("runtime/src/lib.rs");
             let runtime_cargo = self.workspace.join("runtime/Cargo.toml");
-            
+
             if runtime_file.exists() {
                 let runtime_content = fs::read_to_string(&runtime_file)?;
                 // Also check Cargo.toml — pallets listed as deps are staged for integration
@@ -143,19 +144,19 @@ impl GapScanner {
                 } else {
                     String::new()
                 };
-                
+
                 for entry in fs::read_dir(pallets_dir)? {
                     let entry = entry?;
                     if entry.file_type()?.is_dir() {
                         let pallet_name = entry.file_name().to_string_lossy().to_string();
                         let pallet_snake = pallet_name.replace("-", "_");
-                        
+
                         // Pallet is wired if it appears in construct_runtime! or runtime Cargo.toml
-                        let in_runtime_lib = runtime_content.contains(&pallet_name) || 
-                                            runtime_content.contains(&pallet_snake);
-                        let in_cargo = cargo_content.contains(&pallet_name) ||
-                                      cargo_content.contains(&pallet_snake);
-                        
+                        let in_runtime_lib = runtime_content.contains(&pallet_name)
+                            || runtime_content.contains(&pallet_snake);
+                        let in_cargo = cargo_content.contains(&pallet_name)
+                            || cargo_content.contains(&pallet_snake);
+
                         if !in_runtime_lib && !in_cargo {
                             gaps.push(GapItem {
                                 gap_type: GapType::G2,
@@ -202,11 +203,11 @@ impl GapScanner {
             if entry.file_type().is_file() {
                 let path = entry.path();
                 let path_str = path.to_string_lossy();
-                
+
                 if path.extension().and_then(|s| s.to_str()) == Some("rs") {
                     let module_name = self.path_to_module(path);
                     all_modules.insert(module_name.clone());
-                    
+
                     if path_str.contains("test") || path_str.contains("tests") {
                         modules_with_tests.insert(module_name);
                     } else if let Ok(content) = fs::read_to_string(path) {
@@ -220,10 +221,11 @@ impl GapScanner {
 
         // Find modules without tests
         for module in &all_modules {
-            if !modules_with_tests.contains(module) && 
-               !module.contains("test") && 
-               !module.contains("mock") &&
-               self.is_critical_module(module) {
+            if !modules_with_tests.contains(module)
+                && !module.contains("test")
+                && !module.contains("mock")
+                && self.is_critical_module(module)
+            {
                 gaps.push(GapItem {
                     gap_type: GapType::G3,
                     area: module.clone(),
@@ -263,17 +265,17 @@ impl GapScanner {
         {
             if entry.file_type().is_file() {
                 let path = entry.path();
-                
+
                 if path.extension().and_then(|s| s.to_str()) == Some("rs") {
                     if let Ok(content) = fs::read_to_string(path) {
                         if content.contains("invariant:") || content.contains("INVARIANT") {
                             // Check if there's a corresponding test
-                            if !content.contains("test_invariant") && 
-                               !content.contains("#[test]") {
+                            if !content.contains("test_invariant") && !content.contains("#[test]") {
                                 gaps.push(GapItem {
                                     gap_type: GapType::G5,
                                     area: self.path_to_area(path),
-                                    description: "Invariant mentioned but no test found".to_string(),
+                                    description: "Invariant mentioned but no test found"
+                                        .to_string(),
                                     file: Some(path.to_path_buf()),
                                     line: None,
                                     blocks_mainnet: false,
@@ -306,7 +308,7 @@ impl GapScanner {
 
         for (area, description, test_marker) in s0_checks {
             let mut found = false;
-            
+
             // Search for test marker in relevant directories
             let search_dirs = vec![
                 format!("pallets/{}", area),
@@ -332,7 +334,9 @@ impl GapScanner {
                         }
                     }
                 }
-                if found { break; }
+                if found {
+                    break;
+                }
             }
 
             if !found {
@@ -364,7 +368,7 @@ impl GapScanner {
                 for line in content.lines() {
                     if line.contains("x3.") && line.contains(":") {
                         let claim_id = line.trim().trim_end_matches(":");
-                        
+
                         // Check if receipt exists
                         let receipt_file = receipts_dir.join(format!("{}.receipt.json", claim_id));
                         if !receipt_file.exists() {
@@ -388,14 +392,18 @@ impl GapScanner {
 
     fn path_to_area(&self, path: &Path) -> String {
         let path_str = path.to_string_lossy();
-        
+
         if path_str.contains("pallets/") {
-            path_str.split("pallets/").nth(1)
+            path_str
+                .split("pallets/")
+                .nth(1)
                 .and_then(|s| s.split("/").next())
                 .unwrap_or("unknown")
                 .to_string()
         } else if path_str.contains("crates/") {
-            path_str.split("crates/").nth(1)
+            path_str
+                .split("crates/")
+                .nth(1)
                 .and_then(|s| s.split("/").next())
                 .unwrap_or("unknown")
                 .to_string()
@@ -412,12 +420,21 @@ impl GapScanner {
     }
 
     fn is_critical_module(&self, module: &str) -> bool {
-        let critical = vec![
-            "kernel", "bridge", "atomic", "flashloan", 
-            "dex", "vm", "compiler", "governance", "treasury",
-            "settlement", "router", "verifier"
+        let critical = [
+            "kernel",
+            "bridge",
+            "atomic",
+            "flashloan",
+            "dex",
+            "vm",
+            "compiler",
+            "governance",
+            "treasury",
+            "settlement",
+            "router",
+            "verifier",
         ];
-        
+
         critical.iter().any(|c| module.contains(c))
     }
 
@@ -456,12 +473,8 @@ impl GapScanner {
 
     pub fn check_gates(&self, report: &GapReport, gate: &str) -> Result<bool> {
         match gate {
-            "mainnet" => {
-                Ok(report.s0_gaps.is_empty() && report.mainnet_blockers.is_empty())
-            },
-            "testnet" => {
-                Ok(report.testnet_blockers.is_empty())
-            },
+            "mainnet" => Ok(report.s0_gaps.is_empty() && report.mainnet_blockers.is_empty()),
+            "testnet" => Ok(report.testnet_blockers.is_empty()),
             _ => Ok(true),
         }
     }

@@ -13,10 +13,23 @@
 
 set -euo pipefail
 
-PROOF_LOG="${1:-.}/launch-gates/evidence/proof-fresh-machine.log"
+# Absolutize the workspace root so cd-ing into TEMP_DIR doesn't break logging
+WORKSPACE_ROOT="$(cd "${1:-.}" && pwd)"
+PROOF_LOG="${WORKSPACE_ROOT}/launch-gates/evidence/proof-fresh-machine.log"
 TEMP_DIR="/tmp/x3-fresh-machine-$$"
 PASS_COUNT=0
 FAIL_COUNT=0
+NODE_BIN=""
+
+# Limit parallel C++/Rust jobs to avoid g++ ICE under memory pressure
+# (rocksdb-sys spawns its own C++ pool; cap with NUM_JOBS).
+# Override with X3_BUILD_JOBS=N if you have plenty of RAM.
+: "${X3_BUILD_JOBS:=4}"
+export CARGO_BUILD_JOBS="$X3_BUILD_JOBS"
+export NUM_JOBS="$X3_BUILD_JOBS"
+export MAKEFLAGS="-j${X3_BUILD_JOBS}"
+# Source repo URL: prefer X3_REPO_URL, else this repo's origin, else fall back.
+REPO_URL="${X3_REPO_URL:-$(git -C "$WORKSPACE_ROOT" remote get-url origin 2>/dev/null || echo https://github.com/Cyptopimpinainteazy/x3-atomic-star.git)}"
 
 # Color output
 RED='\033[0;31m'
@@ -30,12 +43,12 @@ log_step() {
 
 log_pass() {
     echo -e "${GREEN}✅ PASS${NC}: $1" | tee -a "$PROOF_LOG"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT+1))
 }
 
 log_fail() {
     echo -e "${RED}❌ FAIL${NC}: $1" | tee -a "$PROOF_LOG"
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT+1))
 }
 
 mkdir -p "$(dirname "$PROOF_LOG")"
@@ -47,9 +60,9 @@ mkdir -p "$(dirname "$PROOF_LOG")"
 } | tee "$PROOF_LOG"
 
 # Step 1: Clone repo (fresh)
-log_step "Step 1: Cloning repo to fresh directory..."
+log_step "Step 1: Cloning repo from $REPO_URL ..."
 if mkdir -p "$TEMP_DIR" && cd "$TEMP_DIR"; then
-    if git clone --depth 1 https://github.com/x3-chain/x3-atomic-star.git x3-repo 2>&1 | tail -5 >> "$PROOF_LOG"; then
+    if git clone --depth 1 "$REPO_URL" x3-repo 2>&1 | tail -5 >> "$PROOF_LOG"; then
         log_pass "Repo cloned to $TEMP_DIR/x3-repo"
         cd x3-repo
     else
@@ -68,7 +81,7 @@ if rustc --version >> "$PROOF_LOG" 2>&1; then
     log_pass "Rust toolchain available"
 else
     log_fail "Rust toolchain not found (install rustup)"
-    ((FAIL_COUNT += 10))
+    FAIL_COUNT=$((FAIL_COUNT+10))
 fi
 
 # Step 3: Cargo check workspace
@@ -83,9 +96,9 @@ fi
 log_step "Step 4: Running critical module tests..."
 CRITICAL_MODULES=(
     "pallet-x3-settlement-engine"
-    "pallet-x3-bridge"
     "pallet-cross-chain-validator"
-    "pallet-universal-asset-kernel"
+    "pallet-x3-asset-registry"
+    "pallet-x3-atomic-kernel"
 )
 
 for module in "${CRITICAL_MODULES[@]}"; do
@@ -113,8 +126,8 @@ else
 fi
 
 # Step 7: Build node binary
-log_step "Step 7: Building node binary (release mode, 5min timeout)..."
-if timeout 300 cargo build -p x3-chain-node --release 2>&1 | tail -10 >> "$PROOF_LOG"; then
+log_step "Step 7: Building node binary (release mode, 60min timeout)..."
+if timeout 3600 cargo build -p x3-chain-node --release 2>&1 | tail -10 >> "$PROOF_LOG"; then
     NODE_BIN="target/release/x3-chain-node"
     if [ -f "$NODE_BIN" ]; then
         log_pass "Node binary built: $NODE_BIN"
@@ -129,7 +142,7 @@ fi
 
 # Step 8: Generate chain spec
 log_step "Step 8: Generating chain spec..."
-if [ -f "$NODE_BIN" ]; then
+if [ -n "${NODE_BIN:-}" ] && [ -f "$NODE_BIN" ]; then
     if timeout 60 "$NODE_BIN" build-spec --chain dev --raw > chain-spec-dev.json 2>> "$PROOF_LOG"; then
         if [ -s chain-spec-dev.json ]; then
             SPEC_SIZE=$(wc -c < chain-spec-dev.json)
@@ -146,13 +159,13 @@ fi
 
 # Step 9: Node startup test (dev mode, 30 seconds)
 log_step "Step 9: Testing node startup (30 second timeout)..."
-if [ -f "$NODE_BIN" ]; then
+if [ -n "${NODE_BIN:-}" ] && [ -f "$NODE_BIN" ]; then
     timeout 30 "$NODE_BIN" \
         --chain dev \
+        --tmp \
         --rpc-external \
         --rpc-port 9945 \
-        --ws-external \
-        --ws-port 9946 \
+        --rpc-cors all \
         --no-prometheus \
         2>&1 | head -50 >> "$PROOF_LOG" &
     

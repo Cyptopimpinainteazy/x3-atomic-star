@@ -32,9 +32,11 @@ pub async fn generate_schemas(output_dir: &str) -> Result<()> {
 
     // Generate pallet list
     let pallets: Vec<_> = registry.pallets.keys().collect();
-    let pallet_list = format!("# X3 Event Pallets\n\nTotal: {} pallets\n\n{}\n",
+    let pallet_list = format!(
+        "# X3 Event Pallets\n\nTotal: {} pallets\n\n{}\n",
         pallets.len(),
-        pallets.iter()
+        pallets
+            .iter()
             .map(|p| format!("- {}", p))
             .collect::<Vec<_>>()
             .join("\n")

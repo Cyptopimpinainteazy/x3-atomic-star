@@ -73,20 +73,21 @@ jobs:
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y opam
-          opam init -y --disable-sandboxing
-          eval $(opam env)
-          opam install -y coq
+          sudo apt-get install -y coq
           echo "✅ Coq installed"
 
       - name: Install K Framework
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get install -y maven
+          sudo apt-get update
+          sudo apt-get install -y git maven
           cd /opt
-          sudo git clone https://github.com/runtimeverification/k.git
+          sudo rm -rf k
+          sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git
           cd k
           sudo mvn package -DskipTests
+          test -x /opt/k/k-distribution/target/release/k/bin/kprove
+          sudo ln -sf /opt/k/k-distribution/target/release/k/bin/kprove /usr/local/bin/kprove
           echo "✅ K Framework installed"
 
       - name: Install Dafny (Optional)
@@ -101,30 +102,30 @@ jobs:
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
-          java -jar /opt/tla2tools.jar || echo "⚠️ TLA+ verification needed"
-          eval $(opam env) && coqc --version || echo "⚠️ Coq verification needed"
-          /opt/k/k-distribution/target/release/k/bin/kompile --version || echo "⚠️ K verification needed"
-          /opt/dafny/dafny --version || echo "⚠️ Dafny verification needed"
+          java -jar /opt/tla2tools.jar >/dev/null
+          coqc --version
+          kprove --version
+          /opt/dafny/dafny --version
           echo "✅ Tool verification complete"
 
       - name: Build x3-proof CLI
         run: |
-          cd proof-forge
-          cargo build --release --verbose
+          cargo build -p proof-forge --release --verbose
+          test -x target/release/x3-proof
           echo "✅ x3-proof CLI built"
 
       - name: Run Formal Verification
         id: formal-gate
         run: |
           echo "🔍 Running formal verification proofs..."
-          ./target/release/x3-proof formal --workspace . --strict
+          target/release/x3-proof formal --workspace . --strict
         continue-on-error: false
 
       - name: Generate Formal Verification Report
         if: always()
         run: |
           echo "📊 Generating verification report..."
-          ./target/release/x3-proof formal --workspace . --report > formal-verification-report.txt
+          target/release/x3-proof formal --workspace . --report > formal-verification-report.txt
           cat formal-verification-report.txt
 
       - name: Upload Formal Verification Report

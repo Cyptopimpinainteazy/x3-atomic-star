@@ -61,7 +61,6 @@ impl FlashLoanEngine {
     const FLASH_LOAN_FEE_BPS: u64 = 9; // 0.09%
     const MIN_LOAN_AMOUNT: u64 = 1;
     const MAX_LOAN_AMOUNT: u64 = u64::MAX / 2; // Prevent overflow
-    const EXECUTION_TIMEOUT_BLOCKS: u64 = 1; // Must repay in same block/transaction
     const DEFAULT_PENALTY_BPS: u64 = 1_000; // 10% penalty on default
 
     /// Initiate a flash loan
@@ -71,7 +70,7 @@ impl FlashLoanEngine {
         amount: u64,
         current_block: u64,
     ) -> Result<FlashLoan, &'static str> {
-        if amount < Self::MIN_LOAN_AMOUNT || amount > Self::MAX_LOAN_AMOUNT {
+        if !(Self::MIN_LOAN_AMOUNT..=Self::MAX_LOAN_AMOUNT).contains(&amount) {
             return Err("Loan amount out of range");
         }
 
@@ -101,7 +100,7 @@ impl FlashLoanEngine {
     pub fn execute_flash_loan(
         loan: &mut FlashLoan,
         pool: &mut FlashLoanPool,
-        current_block: u64,
+        _current_block: u64,
     ) -> Result<(u64, u64), &'static str> {
         if loan.status != 0 {
             return Err("Loan not in pending state");
@@ -130,7 +129,7 @@ impl FlashLoanEngine {
         loan: &mut FlashLoan,
         pool: &mut FlashLoanPool,
         repayment_amount: u64,
-        current_block: u64,
+        _current_block: u64,
     ) -> Result<bool, &'static str> {
         if loan.status != 1 {
             return Err("Loan is not executing");

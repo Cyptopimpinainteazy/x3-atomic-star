@@ -68,23 +68,25 @@ pub struct ProofVerifier;
 
 impl ProofVerifier {
     /// Verify cross-chain proof with finality verification
-    /// 
+    ///
     /// # Arguments
     /// * `proof` - The cross-chain proof to verify
     /// * `validators` - Current validator set for signature verification
-    pub fn verify(proof: &CrossChainProof, validators: &[ValidatorInfo]) -> Result<bool, &'static str> {
+    pub fn verify(
+        proof: &CrossChainProof,
+        validators: &[ValidatorInfo],
+    ) -> Result<bool, &'static str> {
         // Implement Court VM on-chain client logic (analogous to IBC)
         // 1. Check finality proof based on chain ID
         let is_final = match &proof.finality_proof {
-            FinalityProof::HotStuffQC { validator_set_hash, signatures } => {
-                Self::verify_hotstuff_qc(validator_set_hash, signatures, proof, validators)?
-            }
+            FinalityProof::HotStuffQC {
+                validator_set_hash,
+                signatures,
+            } => Self::verify_hotstuff_qc(validator_set_hash, signatures, proof, validators)?,
             FinalityProof::TendermintCommit { precommits } => {
                 Self::verify_tendermint_commit(precommits, proof, validators)?
             }
-            FinalityProof::ZKProof { proof_data } => {
-                Self::verify_zk_proof(proof_data, proof)?
-            }
+            FinalityProof::ZKProof { proof_data } => Self::verify_zk_proof(proof_data, proof)?,
         };
 
         if !is_final {
@@ -131,9 +133,9 @@ impl ProofVerifier {
             }
 
             // Parse validator index (first 4 bytes, little-endian)
-            let validator_index = u32::from_le_bytes([
-                sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]
-            ]) as usize;
+            let validator_index =
+                u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
+                    as usize;
 
             // Check for duplicate validator votes
             if !seen_validators.insert(validator_index) {
@@ -189,7 +191,10 @@ impl ProofVerifier {
             }
 
             let validator_index = u32::from_le_bytes([
-                precommit_bytes[0], precommit_bytes[1], precommit_bytes[2], precommit_bytes[3]
+                precommit_bytes[0],
+                precommit_bytes[1],
+                precommit_bytes[2],
+                precommit_bytes[3],
             ]) as usize;
 
             if !seen_validators.insert(validator_index) {
@@ -219,10 +224,7 @@ impl ProofVerifier {
     }
 
     /// Verify ZK proof (placeholder - requires ZK verifier library)
-    fn verify_zk_proof(
-        _proof_data: &[u8],
-        _proof: &CrossChainProof,
-    ) -> Result<bool, &'static str> {
+    fn verify_zk_proof(_proof_data: &[u8], _proof: &CrossChainProof) -> Result<bool, &'static str> {
         // TODO: Implement ZK proof verification
         // This requires integration with a ZK proof system (e.g., Groth16, PLONK)
         // For now, reject ZK proofs until verification is implemented
@@ -232,7 +234,7 @@ impl ProofVerifier {
     /// Compute validator set hash for verification
     fn compute_validator_set_hash(validators: &[ValidatorInfo]) -> Hash {
         use sp_core::hashing::blake2_256;
-        
+
         // Concatenate all validator grandpa keys and hash
         let mut data = Vec::new();
         for validator in validators {
@@ -244,14 +246,14 @@ impl ProofVerifier {
     /// Compute the finality message hash that validators sign
     fn compute_finality_message_hash(proof: &CrossChainProof) -> [u8; 32] {
         use sp_core::hashing::blake2_256;
-        
+
         // Create canonical message for signing:
         // [source_chain: 8 bytes][block_hash: 32 bytes][block_height: 8 bytes]
         let mut message = Vec::new();
         message.extend_from_slice(&proof.source_chain.to_le_bytes());
         message.extend_from_slice(&proof.block_hash);
         message.extend_from_slice(&proof.block_height.to_le_bytes());
-        
+
         blake2_256(&message)
     }
 }
@@ -292,11 +294,7 @@ mod tests {
     }
 
     /// Helper to sign message and create signature bytes
-    fn create_signature_bytes(
-        keypair: &Pair,
-        validator_index: u32,
-        message: &[u8; 32],
-    ) -> Vec<u8> {
+    fn create_signature_bytes(keypair: &Pair, validator_index: u32, message: &[u8; 32]) -> Vec<u8> {
         let signature = keypair.sign(message);
         let mut sig_bytes = Vec::new();
         sig_bytes.extend_from_slice(&validator_index.to_le_bytes());
@@ -322,7 +320,11 @@ mod tests {
         // Create 5 valid signatures (exactly at threshold)
         let mut signatures = Vec::new();
         for i in 0..5 {
-            signatures.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            signatures.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_sigs = CrossChainProof {
@@ -354,7 +356,11 @@ mod tests {
         // Create only 4 signatures (below threshold of 5)
         let mut signatures = Vec::new();
         for i in 0..4 {
-            signatures.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            signatures.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_sigs = CrossChainProof {
@@ -368,7 +374,10 @@ mod tests {
         // Should reject insufficient signatures
         let result = ProofVerifier::verify(&proof_with_sigs, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Insufficient valid signatures for supermajority");
+        assert_eq!(
+            result.unwrap_err(),
+            "Insufficient valid signatures for supermajority"
+        );
     }
 
     #[test]
@@ -402,7 +411,10 @@ mod tests {
         // Should reject duplicate validator
         let result = ProofVerifier::verify(&proof_with_sigs, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Duplicate validator signature detected");
+        assert_eq!(
+            result.unwrap_err(),
+            "Duplicate validator signature detected"
+        );
     }
 
     #[test]
@@ -421,7 +433,11 @@ mod tests {
         // Create valid signatures
         let mut signatures = Vec::new();
         for i in 0..5 {
-            signatures.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            signatures.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_sigs = CrossChainProof {
@@ -454,11 +470,11 @@ mod tests {
         let mut signatures = Vec::new();
         signatures.push(create_signature_bytes(&keypairs[0], 0, &message_hash));
         signatures.push(create_signature_bytes(&keypairs[1], 1, &message_hash));
-        
+
         // Create invalid signature (wrong message)
         let wrong_message = [255u8; 32];
         signatures.push(create_signature_bytes(&keypairs[2], 2, &wrong_message));
-        
+
         signatures.push(create_signature_bytes(&keypairs[3], 3, &message_hash));
         signatures.push(create_signature_bytes(&keypairs[4], 4, &message_hash));
 
@@ -473,7 +489,10 @@ mod tests {
         // Should reject: only 4 valid signatures (need 5)
         let result = ProofVerifier::verify(&proof_with_sigs, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Insufficient valid signatures for supermajority");
+        assert_eq!(
+            result.unwrap_err(),
+            "Insufficient valid signatures for supermajority"
+        );
     }
 
     #[test]
@@ -544,7 +563,10 @@ mod tests {
         // Should reject invalid length
         let result = ProofVerifier::verify(&proof, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid signature length (expected 68 bytes)");
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid signature length (expected 68 bytes)"
+        );
     }
 
     #[test]
@@ -552,16 +574,18 @@ mod tests {
         // Create 7 validators
         let (validators, keypairs) = create_test_validators(7);
 
-        let proof = create_test_proof(FinalityProof::TendermintCommit {
-            precommits: vec![],
-        });
+        let proof = create_test_proof(FinalityProof::TendermintCommit { precommits: vec![] });
 
         let message_hash = ProofVerifier::compute_finality_message_hash(&proof);
 
         // Create 5 valid precommits
         let mut precommits = Vec::new();
         for i in 0..5 {
-            precommits.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            precommits.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_commits = CrossChainProof {
@@ -585,7 +609,10 @@ mod tests {
         // Should reject ZK proof (not yet implemented)
         let result = ProofVerifier::verify(&proof, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "ZK proof verification not yet implemented");
+        assert_eq!(
+            result.unwrap_err(),
+            "ZK proof verification not yet implemented"
+        );
     }
 
     #[test]
@@ -605,7 +632,11 @@ mod tests {
         // Create exactly 7 signatures (at threshold)
         let mut signatures = Vec::new();
         for i in 0..7 {
-            signatures.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            signatures.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_sigs = CrossChainProof {
@@ -637,7 +668,11 @@ mod tests {
         // Create 6 signatures (one below threshold of 7)
         let mut signatures = Vec::new();
         for i in 0..6 {
-            signatures.push(create_signature_bytes(&keypairs[i], i as u32, &message_hash));
+            signatures.push(create_signature_bytes(
+                &keypairs[i],
+                i as u32,
+                &message_hash,
+            ));
         }
 
         let proof_with_sigs = CrossChainProof {
@@ -651,6 +686,9 @@ mod tests {
         // Should reject one below threshold
         let result = ProofVerifier::verify(&proof_with_sigs, &validators);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Insufficient valid signatures for supermajority");
+        assert_eq!(
+            result.unwrap_err(),
+            "Insufficient valid signatures for supermajority"
+        );
     }
 }

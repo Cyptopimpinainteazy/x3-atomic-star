@@ -416,6 +416,82 @@ fn cannot_finalize_during_voting() {
     });
 }
 
+#[test]
+fn proposal_snapshot_cleared_on_finalize() {
+    new_test_ext().execute_with(|| {
+        let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
+        let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Finalize".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> =
+            b"Snapshot cleanup check on finalize".to_vec().try_into().unwrap();
+
+        assert_ok!(Governance::submit_proposal(
+            RuntimeOrigin::signed(account(1)),
+            Box::new(call),
+            title,
+            description,
+            false,
+            None,
+            None,
+        ));
+
+        let snapshot_count_before = ProposalBalanceSnapshot::<Test>::iter_prefix(0).count();
+        assert!(
+            snapshot_count_before > 0,
+            "proposal snapshots must exist after submission"
+        );
+
+        run_to_block(102);
+        assert_ok!(Governance::finalize_proposal(
+            RuntimeOrigin::signed(account(3)),
+            0
+        ));
+
+        let snapshot_count_after = ProposalBalanceSnapshot::<Test>::iter_prefix(0).count();
+        assert_eq!(snapshot_count_after, 0);
+    });
+}
+
+#[test]
+fn flash_loan_governance_takeover_fails() {
+    new_test_ext().execute_with(|| {
+        // Proposal is created at block N, while attacker has no voting balance.
+        let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
+        let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Attack".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> =
+            b"Flash-loan governance takeover attempt".to_vec().try_into().unwrap();
+
+        assert_ok!(Governance::submit_proposal(
+            RuntimeOrigin::signed(account(1)),
+            Box::new(call),
+            title,
+            description,
+            false,
+            None,
+            None,
+        ));
+
+        // Move to block N+1 and simulate flash-loaned voting power arriving after snapshot.
+        run_to_block(2);
+        assert_ok!(Balances::transfer_allow_death(
+            RuntimeOrigin::signed(account(3)),
+            account(99),
+            9_000
+        ));
+
+        // Expected mitigation behavior: vote should be rejected (or voting power forced to zero).
+        assert_noop!(
+            Governance::vote(
+                RuntimeOrigin::signed(account(99)),
+                0,
+                VoteDirection::Aye,
+                9_000,
+                Conviction::None,
+            ),
+            Error::<Test>::InsufficientBalance
+        );
+    });
+}
+
 // ============================================================================
 // Fast Track Tests
 // ============================================================================
@@ -472,6 +548,37 @@ fn cancel_proposal_works() {
         assert_ok!(Governance::cancel_proposal(RuntimeOrigin::root(), 0));
 
         assert!(Governance::proposals(0).is_none());
+    });
+}
+
+#[test]
+fn proposal_snapshot_cleared_on_cancel() {
+    new_test_ext().execute_with(|| {
+        let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
+        let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Cancel".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> =
+            b"Snapshot cleanup check on cancel".to_vec().try_into().unwrap();
+
+        assert_ok!(Governance::submit_proposal(
+            RuntimeOrigin::signed(account(1)),
+            Box::new(call),
+            title,
+            description,
+            false,
+            None,
+            None,
+        ));
+
+        let snapshot_count_before = ProposalBalanceSnapshot::<Test>::iter_prefix(0).count();
+        assert!(
+            snapshot_count_before > 0,
+            "proposal snapshots must exist after submission"
+        );
+
+        assert_ok!(Governance::cancel_proposal(RuntimeOrigin::root(), 0));
+
+        let snapshot_count_after = ProposalBalanceSnapshot::<Test>::iter_prefix(0).count();
+        assert_eq!(snapshot_count_after, 0);
     });
 }
 
