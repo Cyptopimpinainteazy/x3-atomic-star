@@ -1,5 +1,13 @@
 [workspace]
-exclude = ["quantum-kernel-voyager/src-tauri", "apps/x3-desktop/src-tauri", "apps/inferstructor-dashboard/src-tauri"]
+exclude = [
+    "quantum-kernel-voyager/src-tauri",
+    "apps/x3-desktop/src-tauri",
+    "apps/inferstructor-dashboard/src-tauri",
+    # X3-contracts is a separate dual-stack contracts workspace
+    # (Foundry for EVM, Anchor for SVM). Excluding it prevents the parent
+    # cargo from picking up SVM program crates and confusing build graphs.
+    "X3-contracts",
+]
 members = [
     "pallets/x3-kernel",
     "pallets/atomic-trade-engine",
