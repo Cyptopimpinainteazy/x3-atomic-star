@@ -108,6 +108,8 @@ members = [
     "pallets/x3-vrf",
     # Automation pallet for keeper network
     "pallets/x3-automation",
+    # DEX pallet for AMM operations
+    "pallets/x3-dex",
     # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
     "crates/x3-bridge-adapters",
     "crates/cross-chain-position-manager",

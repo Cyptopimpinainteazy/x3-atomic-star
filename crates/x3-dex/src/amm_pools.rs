@@ -196,6 +196,115 @@ impl AMMPool {
         }
     }
 
+    /// Calculate liquidity addition with optimal amounts
+    pub fn add_liquidity_calculate(
+        pool: &LiquidityPool,
+        amount_a_desired: u128,
+        amount_b_desired: u128,
+        amount_a_min: u128,
+        amount_b_min: u128,
+    ) -> Result<(u128, u128, u128), &'static str> {
+        if pool.reserve_a == 0 || pool.reserve_b == 0 {
+            // First liquidity provision - accept provided amounts
+            if amount_a_desired < amount_a_min || amount_b_desired < amount_b_min {
+                return Err("Insufficient amounts for first liquidity provision");
+            }
+            let lp_tokens = Self::sqrt(amount_a_desired.saturating_mul(amount_b_desired));
+            return Ok((amount_a_desired, amount_b_desired, lp_tokens));
+        }
+
+        // Calculate optimal amounts based on current ratio
+        let amount_b_optimal = (amount_a_desired as f64) * (pool.reserve_b as f64) / (pool.reserve_a as f64);
+        let amount_a_optimal = (amount_b_desired as f64) * (pool.reserve_a as f64) / (pool.reserve_b as f64);
+
+        let (amount_a, amount_b) = if amount_b_optimal <= amount_b_desired as f64 {
+            (amount_a_desired, amount_b_optimal as u128)
+        } else {
+            (amount_a_optimal as u128, amount_b_desired)
+        };
+
+        // Check minimums
+        if (amount_a as u128) < amount_a_min || (amount_b as u128) < amount_b_min {
+            return Err("Output amounts below minimums");
+        }
+
+        // Calculate LP tokens
+        let lp_tokens = if pool.total_lp_supply == 0 {
+            Self::sqrt(amount_a.saturating_mul(amount_b))
+        } else {
+            let lp_from_a = (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
+            let lp_from_b = (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
+            lp_from_a.min(lp_from_b) as u128
+        };
+
+        Ok((amount_a, amount_b, lp_tokens))
+    }
+
+    /// Calculate liquidity removal amounts
+    pub fn remove_liquidity_calculate(
+        pool: &LiquidityPool,
+        lp_amount: u128,
+        amount_a_min: u128,
+        amount_b_min: u128,
+    ) -> Result<(u128, u128), &'static str> {
+        if lp_amount == 0 {
+            return Err("LP amount must be positive");
+        }
+        if lp_amount > pool.total_lp_supply {
+            return Err("Insufficient LP balance");
+        }
+
+        let amount_a = (lp_amount as f64) * (pool.reserve_a as f64) / (pool.total_lp_supply as f64);
+        let amount_b = (lp_amount as f64) * (pool.reserve_b as f64) / (pool.total_lp_supply as f64);
+
+        if (amount_a as u128) < amount_a_min || (amount_b as u128) < amount_b_min {
+            return Err("Output amounts below minimums");
+        }
+
+        Ok((amount_a as u128, amount_b as u128))
+    }
+
+    /// Calculate swap output amount
+    pub fn swap_calculate(
+        pool: &LiquidityPool,
+        token_in: &TokenId,
+        amount_in: u128,
+        min_out: u128,
+    ) -> Result<u128, &'static str> {
+        if amount_in == 0 {
+            return Err("Input amount must be positive");
+        }
+        if pool.reserve_a == 0 || pool.reserve_b == 0 {
+            return Err("Pool has no liquidity");
+        }
+
+        // Determine which token is being swapped
+        let (reserve_in, reserve_out) = if *token_in == pool.token_a {
+            (pool.reserve_a, pool.reserve_b)
+        } else if *token_in == pool.token_b {
+            (pool.reserve_b, pool.reserve_a)
+        } else {
+            return Err("Token not in pool");
+        };
+
+        // Apply fee
+        let fee = (amount_in as f64) * (pool.fee_basis_points as f64) / 10000.0;
+        let amount_in_after_fee = (amount_in as f64) - fee;
+
+        // Constant product formula
+        let amount_out = ((amount_in_after_fee * (reserve_out as f64))
+            / ((reserve_in as f64) + amount_in_after_fee)) as u128;
+
+        if amount_out < min_out {
+            return Err("Slippage exceeds limit");
+        }
+        if amount_out > reserve_out {
+            return Err("Insufficient liquidity");
+        }
+
+        Ok(amount_out)
+    }
+
     /// Get current pool state
     pub fn get_pool_state(pool: &LiquidityPool) -> (u128, u128, u128, u32) {
         (
