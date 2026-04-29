@@ -1,10 +1,10 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "a080b548e40010715166ddb4b1f74f8e161fd2f2",
   "command_run": "x3-proof verify x3.x3vm.determinism",
   "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [],
-  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "timestamp": "2026-04-29T06:38:03.813160884Z",
   "result": {
     "claim_id": "x3.x3vm.determinism",
     "claim": "X3VM execution is safe",
@@ -29,9 +29,9 @@
     "blockers": [],
     "score": 0.95,
     "evidence": {},
-    "timestamp": "2026-04-27T23:19:53.699712451Z",
+    "timestamp": "2026-04-29T06:38:03.806290577Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "e77670735051eb1b5cf5e7910030675526e8b1ba3b4bc1b504580358ea28421b"
+  "binding_hash": "839c6ccba49338e647a0ed792e38fd88a957f3733aa7dafd1a753938dc90bf93"
 }

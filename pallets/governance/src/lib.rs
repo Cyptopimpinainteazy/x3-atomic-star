@@ -1214,82 +1214,12 @@ pub mod pallet {
         }
 
         /// Execute AI proposal in sandbox
+        /// DISABLED FOR MAINNET-V1: AI governance execution is not ready for production
         #[pallet::call_index(12)]
         #[pallet::weight(T::WeightInfo::submit_proposal())]
-        pub fn execute_ai_proposal(origin: OriginFor<T>, proposal_id: u64) -> DispatchResult {
-            T::EmergencyOrigin::ensure_origin(origin)?; // High authorization required
-
-            let proposal =
-                AIProposals::<T>::get(proposal_id).ok_or(Error::<T>::AIProposalNotFound)?;
-            ensure!(
-                proposal.status == AIProposalStatus::Approved,
-                Error::<T>::AIProposalInvalidStatus
-            );
-
-            // Check time lock
-            let current_block = frame_system::Pallet::<T>::block_number();
-            let auth_reqs =
-                AIAuthorizations::<T>::get(proposal_id).ok_or(Error::<T>::AuthorizationFailed)?;
-            let execution_approvals = AIExecutionApprovals::<T>::iter_prefix(proposal_id)
-                .filter(|(_, approved)| *approved)
-                .count() as u32;
-            ensure!(
-                execution_approvals >= auth_reqs.multisig_threshold,
-                Error::<T>::AuthorizationFailed
-            );
-            ensure!(
-                current_block
-                    >= proposal
-                        .proposed_at
-                        .saturating_add(auth_reqs.time_lock_blocks),
-                Error::<T>::AuthorizationFailed
-            );
-
-            // Check kill switch level
-            ensure!(
-                KillSwitchLevelStorage::<T>::get() < KillSwitchLevel::UpgradeFreeze,
-                Error::<T>::EmergencyModeActive
-            );
-
-            // Create sandboxed execution
-            let sandbox = SandboxedExecution {
-                gas_ceiling: proposal.simulation_requirements.gas_limit,
-                block_limit: proposal.simulation_requirements.simulation_blocks,
-                rollback_checkpoint: Self::create_rollback_checkpoint(),
-                status: ExecutionStatus::Executing,
-            };
-
-            SandboxedExecutions::<T>::insert(proposal_id, sandbox);
-
-            // Execute in sandbox (simulated for now)
-            let success = Self::execute_in_sandbox(&proposal);
-
-            AIProposals::<T>::try_mutate(proposal_id, |p| {
-                if let Some(prop) = p {
-                    prop.status = if success {
-                        AIProposalStatus::Executed
-                    } else {
-                        AIProposalStatus::Rejected
-                    };
-                }
-                Ok::<(), Error<T>>(())
-            })?;
-
-            AIAuthorizations::<T>::remove(proposal_id);
-            let execution_signers: Vec<T::AccountId> =
-                AIExecutionApprovals::<T>::iter_prefix(proposal_id)
-                    .map(|(signer, _)| signer)
-                    .collect();
-            for signer in execution_signers {
-                AIExecutionApprovals::<T>::remove(proposal_id, signer);
-            }
-
-            Self::deposit_event(Event::AIProposalExecuted {
-                proposal_id,
-                success,
-            });
-
-            Ok(())
+        pub fn execute_ai_proposal(_origin: OriginFor<T>, _proposal_id: u64) -> DispatchResult {
+            // AI governance execution disabled for mainnet-v1
+            Err(Error::<T>::EmergencyModeActive.into())
         }
 
         /// Activate kill switch (graduated emergency controls)

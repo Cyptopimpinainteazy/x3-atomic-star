@@ -148,9 +148,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                 evidence.insert("test_result".to_string(), "PASSED".to_string());
             } else if output.status.success() && tests_passed_count == 0 {
                 // Filter matched zero tests — treat as missing proof, not pass.
-                missing_proofs.push(
-                    "canonical_supply test filter matched 0 cases".to_string(),
-                );
+                missing_proofs.push("canonical_supply test filter matched 0 cases".to_string());
                 evidence.insert("test_result".to_string(), "NO_MATCH".to_string());
             } else {
                 failed_checks.push(format!(

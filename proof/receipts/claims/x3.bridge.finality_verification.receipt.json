@@ -1,10 +1,10 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "a080b548e40010715166ddb4b1f74f8e161fd2f2",
   "command_run": "x3-proof verify x3.bridge.finality_verification",
   "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [],
-  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "timestamp": "2026-04-29T06:36:29.496785657Z",
   "result": {
     "claim_id": "x3.bridge.finality_verification",
     "claim": "Bridge replay attacks prevented",
@@ -31,9 +31,9 @@
     "blockers": [],
     "score": 0.97,
     "evidence": {},
-    "timestamp": "2026-04-27T23:19:44.065504439Z",
+    "timestamp": "2026-04-29T06:36:29.490750010Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "1b6e759937c5ab915f064a66907f83dbb8cfd828fd5f83571d5612583ede0148"
+  "binding_hash": "983c11f90edc4c7095fa3819d96780d50e52c9acd29c57f9bf2da7494fbb6df2"
 }

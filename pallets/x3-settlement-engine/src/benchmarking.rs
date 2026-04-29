@@ -13,6 +13,7 @@
 
 use super::*;
 use frame_benchmarking::{benchmarks, whitelisted_caller, BenchmarkError};
+use frame_support::traits::Currency;
 use frame_system::RawOrigin;
 use sp_core::H256;
 use sp_std::vec;
@@ -110,52 +111,7 @@ benchmarks! {
         assert!(ClaimedLegs::<T>::get(intent_id, 0u32));
     }
 
-    finalize_intent {
-        let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
-
-        // Create intent
-        let create_origin = RawOrigin::Signed(maker.clone()).into();
-        Pallet::<T>::create_intent(
-            create_origin,
-            taker.clone(),
-            asset_a.clone(),
-            asset_b.clone(),
-            secret_hash,
-            Some(86400u64),
-        ).ok();
-
-        let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
-
-        // Lock both escrows
-        let escrow_origin_1 = RawOrigin::Signed(maker.clone()).into();
-        Pallet::<T>::lock_escrow(
-            escrow_origin_1,
-            intent_id,
-            0u32,
-            ExternalChainId::Ethereum,
-            1_000_000u128,
-            vec![1u8; 64],
-        ).ok();
-
-        let escrow_origin_2 = RawOrigin::Signed(taker.clone()).into();
-        Pallet::<T>::lock_escrow(
-            escrow_origin_2,
-            intent_id,
-            1u32,
-            ExternalChainId::Bitcoin,
-            5_000_000u128,
-            vec![2u8; 64],
-        ).ok();
-
-        let secret = H256::from_low_u64_be(1);
-        let origin = RawOrigin::Signed(maker.clone());
-    }: _(origin, intent_id, secret)
-    verify {
-        let state = IntentStates::<T>::get(intent_id);
-        assert!(matches!(state, IntentState::Finalized));
-    }
-
-    refund_intent {
+    refund_settlement {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
 
         // Create intent with very short timeout
@@ -186,10 +142,10 @@ benchmarks! {
     }: _(origin, intent_id)
     verify {
         let state = IntentStates::<T>::get(intent_id);
-        assert!(matches!(state, IntentState::Refunded | IntentState::RefundInitiated));
+        assert!(matches!(state, IntentState::Refunded));
     }
 
-    verify_btc_proof {
+    submit_btc_proof {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
 
         // Create intent
@@ -205,16 +161,25 @@ benchmarks! {
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
         let btc_txid = H256::from_low_u64_be(2);
-        let merkle_proof = vec![1u8; 256]; // 256-byte merkle path
+        let merkle_proof: Vec<H256> = vec![H256::from_low_u64_be(0)];
+        let block_header = BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from_low_u64_be(0),
+            merkle_root: H256::from_low_u64_be(1),
+            timestamp: 1234567890u32,
+            bits: 0x207fffff,
+            nonce: 0,
+            height: 0u64,
+        };
 
         let origin = RawOrigin::Signed(maker.clone());
-    }: _(origin, intent_id, btc_txid, 1u32, merkle_proof)
+    }: _(origin, intent_id, btc_txid, 0u32, 0u32, 0u64, merkle_proof, block_header)
     verify {
         // Just verify the extrinsic succeeds; actual BTC proof validation
         // depends on external chain state
     }
 
-    update_btc_block_header {
+    submit_btc_header {
         let header = BtcBlockHeader {
             version: 1,
             prev_block_hash: H256::from_low_u64_be(0),
@@ -225,13 +190,13 @@ benchmarks! {
             height: 0u64,
         };
 
-        let origin = RawOrigin::Root.into();
+        let origin = RawOrigin::Root;
     }: _(origin, header)
     verify {
         assert!(BtcBestHeight::<T>::get() > 0);
     }
 
-    submit_external_proof {
+    submit_proof {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
 
         // Create intent
@@ -246,17 +211,24 @@ benchmarks! {
         ).ok();
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
-        let proof = vec![1u8; 512];
+        let proof = SettlementProof {
+            proof_type: ProofType::MerkleTrie,
+            tx_hash: H256::from_low_u64_be(2),
+            block_hash: H256::from_low_u64_be(3),
+            confirmations: 6u32,
+            merkle_proof: Default::default(),
+            receipt_data: Default::default(),
+        };
 
         let origin = RawOrigin::Signed(maker.clone());
-    }: _(origin, intent_id, 0u32, proof)
+    }: _(origin, intent_id, ExternalChainId::Ethereum, proof)
     verify {
         // Verify submission succeeds
     }
 
     deposit_bond {
         let depositor: T::AccountId = frame_benchmarking::account("depositor", 0, SEED);
-        let amount = T::Currency::minimum_balance() * 100u32.into();
+        let amount = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::minimum_balance() * 100u32.into();
 
         let origin = RawOrigin::Signed(depositor.clone());
     }: _(origin, vec![1u8; 32], amount, 0u8)
@@ -267,7 +239,7 @@ benchmarks! {
 
     finalize_bond_withdraw {
         let depositor: T::AccountId = frame_benchmarking::account("depositor", 0, SEED);
-        let amount = T::Currency::minimum_balance() * 100u32.into();
+        let amount = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::minimum_balance() * 100u32.into();
 
         // Create bond first
         let create_origin = RawOrigin::Signed(depositor.clone()).into();

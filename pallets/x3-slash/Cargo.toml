@@ -28,6 +28,7 @@ frame-benchmarking = { workspace = true, optional = true }
 [features]
 default = ["std"]
 std = [
+    "frame-benchmarking?/std",
     "frame-support/std",
     "frame-system/std",
     "sp-runtime/std",

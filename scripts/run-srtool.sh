@@ -256,12 +256,129 @@ cmd_info() {
   fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# test — CI-friendly non-interactive validation suite
+#   1. Docker is running
+#   2. srtool image is available (or can be pulled)
+#   3. WASM binary exists and has correct magic bytes
+#   4. WASM size is within expected range
+#   5. srtool report exists (if previously built)
+#   6. Report has expected JSON fields
+#   7. Runtime Cargo.toml has correct package name
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_test() {
+  local PASS=0 FAIL=0
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo "  srtool — CI Test Suite"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  _check() {
+    local label="$1"; shift
+    echo -n "  Checking: $label … "
+    if "$@" &>/dev/null 2>&1; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC}"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  # 1. Docker daemon running
+  _check "Docker daemon running" docker info
+
+  # 2. srtool image available locally (non-fatal if not pulled yet)
+  echo -n "  Checking: srtool Docker image ($SRTOOL_IMAGE) … "
+  if docker image inspect "$SRTOOL_IMAGE" &>/dev/null; then
+    echo -e "${GREEN}✓ PASS${NC} (cached)"
+    PASS=$((PASS + 1))
+  else
+    echo -e "${YELLOW}⚠ WARN${NC} (not cached — will pull on first build)"
+  fi
+
+  # 3. WASM binary exists
+  local wasm_path="$REPO_ROOT/target/release/wbuild/${PACKAGE}/${PACKAGE//-/_}.compact.compressed.wasm"
+  _check "Compressed WASM exists" test -f "$wasm_path"
+
+  if [[ -f "$wasm_path" ]]; then
+    # 4. WASM magic bytes
+    echo -n "  Checking: WASM magic bytes (\\x00asm) … "
+    local magic
+    magic=$(xxd -p -l4 "$wasm_path" 2>/dev/null || hexdump -e '1/1 "%02x"' -n4 "$wasm_path" 2>/dev/null || echo "")
+    if [[ "$magic" == "0061736d" ]]; then
+      echo -e "${GREEN}✓ PASS${NC} (magic: $magic)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC} (expected 0061736d, got: $magic)"
+      FAIL=$((FAIL + 1))
+    fi
+
+    # 5. WASM size: >100KB <20MB
+    local wasm_size
+    wasm_size=$(wc -c < "$wasm_path")
+    echo -n "  Checking: WASM size (100KB–20MB) … "
+    if [[ $wasm_size -gt 102400 && $wasm_size -lt 20971520 ]]; then
+      echo -e "${GREEN}✓ PASS${NC} ($(( wasm_size / 1024 )) KB)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC} (size: ${wasm_size} bytes)"
+      FAIL=$((FAIL + 1))
+    fi
+  fi
+
+  # 6. srtool report exists (if a build was done)
+  mkdir -p "$REPORT_DIR"
+  if [[ -f "$LATEST_REPORT" ]]; then
+    _check "Latest srtool report readable" test -r "$LATEST_REPORT"
+
+    # 7. Report has blake2_256 field
+    echo -n "  Checking: report has blake2_256 hash … "
+    if command -v python3 &>/dev/null && python3 -c "
+import json,sys
+d=json.load(open('$LATEST_REPORT'))
+assert d.get('runtimes',{}).get('compact',{}).get('blake2_256')
+" 2>/dev/null; then
+      local b2
+      b2=$(python3 -c "import json; d=json.load(open('$LATEST_REPORT')); print(d['runtimes']['compact']['blake2_256'])")
+      echo -e "${GREEN}✓ PASS${NC} ($b2)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${YELLOW}⚠ WARN${NC} (report exists but blake2_256 field not found)"
+    fi
+  else
+    echo -e "  ${YELLOW}⚠ SKIP${NC}: No srtool report found (run './scripts/run-srtool.sh build' first)"
+  fi
+
+  # 8. Runtime Cargo.toml has correct package name
+  local rt_toml="$REPO_ROOT/$RUNTIME_DIR/Cargo.toml"
+  echo -n "  Checking: runtime package name matches $PACKAGE … "
+  if grep -q "^name.*=.*\"$PACKAGE\"" "$rt_toml" 2>/dev/null; then
+    echo -e "${GREEN}✓ PASS${NC}"
+    PASS=$((PASS + 1))
+  else
+    echo -e "${RED}✗ FAIL${NC} (package name mismatch in $rt_toml)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo -e "  Results: ${GREEN}✓ $PASS PASSED${NC}  |  ${RED}✗ $FAIL FAILED${NC}"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  [[ $FAIL -eq 0 ]] && success "All srtool CI tests passed." || die "$FAIL test(s) failed."
+}
+
 # ─────────── dispatch ──────────────────────────────────────────────────────
 COMMAND="${1:-help}"
 case "$COMMAND" in
   build)          cmd_build ;;
   verify)         cmd_verify ;;
   info)           cmd_info ;;
+  test)           cmd_test ;;
   help|--help|-h) print_help ;;
   *)              warn "Unknown command: $COMMAND"; print_help; exit 1 ;;
 esac

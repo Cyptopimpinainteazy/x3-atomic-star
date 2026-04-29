@@ -53,7 +53,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_runtime::traits::SaturatedConversion;
-    use sp_std::vec::Vec;
+    use sp_std::{vec, vec::Vec};
     use x3_asset_kernel_types::{
         derive_message_id,
         traits::{AssetRegistryInspect, RouteInspect, SupplyLedgerWrite},
@@ -361,21 +361,18 @@ pub mod pallet {
             expires_at: BlockNumberFor<T>,
         ) -> DispatchResult {
             // Ensure origin is signed and validate sender authorization
-            let _who = ensure_signed(origin)?;
+            let who = ensure_signed(origin)?;
 
-            // Authorization check (currently disabled for MVP):
-            // - In production: verify sender matches the calling origin (cross-domain bridge safety)
-            // - In tests: test runtime controls all accounts; authorization is delegated to precompiles
-            //
-            // For production X3Native domain calls, the precompile MUST validate sender
-            // matches the calling origin before invoking this extrinsic.
-            // For EVM/SVM domains, the precompile validates the sender address.
-            //
-            // TODO Phase 3.1: Re-enable authorization check after precompile integration is complete
-            // NOTE: This check was originally gated with #[cfg(not(test))], but that caused
-            // test failures because the cfg attribute doesn't reliably skip checks during `cargo test`.
-            // The proper solution is to move authorization to precompiles and re-enable here
-            // only after validation that precompiles are calling correctly.
+            // Authorization check: verify sender matches the calling origin for X3Native domain
+            // This prevents account forgery across domains
+            if matches!(source, DomainId::X3Native) {
+                let encoded = who.encode();
+                let mut account_bytes = [0u8; 32];
+                account_bytes.copy_from_slice(&encoded[..32]);
+                let expected_sender = AccountBytes::X3Native(account_bytes);
+                ensure!(sender == expected_sender, Error::<T>::UnauthorizedSender);
+            }
+            // For EVM/SVM domains, authorization is handled by the respective precompiles
 
             Self::do_initiate_transfer(
                 asset_id,

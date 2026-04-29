@@ -149,6 +149,77 @@ cmd_check_pallets() {
     2>&1 | grep -E 'StorageVersion|version|migration' | head -40 || true
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# test — CI-friendly non-interactive validation suite (no live node required)
+#   1. Binary exists
+#   2. Binary has try-runtime subcommand
+#   3. try-runtime --help exits 0
+#   4. Snapshot directory is writeable
+#   5. WASM binary exists alongside the node
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_test() {
+  local PASS=0 FAIL=0
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo "  try-runtime — CI Test Suite"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  _check() {
+    local label="$1"; shift
+    echo -n "  Checking: $label … "
+    if "$@" &>/dev/null; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC}"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  # 1. Node binary exists
+  _check "Node binary exists" test -f "$NODE_BIN"
+
+  # 2. Binary has try-runtime subcommand
+  if [[ -f "$NODE_BIN" ]]; then
+    _check "try-runtime subcommand available" "$NODE_BIN" try-runtime --help
+  else
+    echo -e "  Skipping subcommand checks (binary not built)"
+    FAIL=$((FAIL + 2))
+  fi
+
+  # 3. Snapshot directory is writable (or can be created)
+  mkdir -p "$SNAP_DIR"
+  _check "Snapshot directory writable" test -w "$SNAP_DIR"
+
+  # 4. WASM binary exists next to the node
+  local wasm_path
+  wasm_path="$REPO_ROOT/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm"
+  _check "WASM binary exists" test -f "$wasm_path"
+
+  # 5. Expected pallets appear in node --version output
+  if [[ -f "$NODE_BIN" ]]; then
+    echo -n "  Checking: node --version output … "
+    local ver
+    ver=$("$NODE_BIN" --version 2>&1 || true)
+    if [[ -n "$ver" ]]; then
+      echo -e "${GREEN}✓ PASS${NC} ($ver)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${YELLOW}⚠ WARN${NC} (empty version string)"
+    fi
+  fi
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo -e "  Results: ${GREEN}✓ $PASS PASSED${NC}  |  ${RED}✗ $FAIL FAILED${NC}"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  [[ $FAIL -eq 0 ]] && success "All try-runtime CI tests passed." || die "$FAIL test(s) failed."
+}
+
 # ─────────── dispatch ──────────────────────────────────────────────────────
 COMMAND="${1:-help}"
 case "$COMMAND" in
@@ -156,6 +227,7 @@ case "$COMMAND" in
   live)          cmd_live ;;
   snap)          cmd_snap ;;
   check-pallets) cmd_check_pallets ;;
+  test)          cmd_test ;;
   help|--help|-h) print_help ;;
   *)             warn "Unknown command: $COMMAND"; print_help; exit 1 ;;
 esac

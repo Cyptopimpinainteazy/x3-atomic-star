@@ -3,10 +3,12 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as X3AtomicKernel;
 use frame_benchmarking::{benchmarks, whitelisted_caller};
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, Get};
+use frame_support::BoundedVec;
 use frame_system::pallet_prelude::BlockNumberFor;
 use frame_system::RawOrigin;
 use sp_core::H256;
+use sp_runtime::traits::SaturatedConversion;
 
 benchmarks! {
     // Benchmark submitting an atomic bundle with variable number of legs.
@@ -31,8 +33,9 @@ benchmarks! {
             });
         }
 
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(legs)
+            .expect("legs within MaxLegsPerBundle");
 
     }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into())
     verify {
@@ -48,10 +51,9 @@ benchmarks! {
     assign_bundle_executor {
         let caller: T::AccountId = whitelisted_caller();
         let executor: T::AccountId = whitelisted_caller();
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
-        let legs = vec![proof::BundleLeg {
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
             vm_type: proof::VmType::Svm,
             token_in: H256::repeat_byte(0),
             token_out: H256::repeat_byte(1),
@@ -62,7 +64,7 @@ benchmarks! {
                 reads: Default::default(),
                 writes: Default::default(),
             },
-        }];
+        }]).expect("within MaxLegsPerBundle");
         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
@@ -79,11 +81,10 @@ benchmarks! {
     finalize_atomic_bundle {
         let caller: T::AccountId = whitelisted_caller();
         let executor: T::AccountId = whitelisted_caller();
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
-        let _ = T::Currency::make_free_balance_be(&executor, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
+        let _ = T::Currency::make_free_balance_be(&executor, (T::MinBond::get() * 10u128).saturated_into());
 
-        let legs = vec![proof::BundleLeg {
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
             vm_type: proof::VmType::Svm,
             token_in: H256::repeat_byte(0),
             token_out: H256::repeat_byte(1),
@@ -94,7 +95,7 @@ benchmarks! {
                 reads: Default::default(),
                 writes: Default::default(),
             },
-        }];
+        }]).expect("within MaxLegsPerBundle");
         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
@@ -116,10 +117,9 @@ benchmarks! {
     // Slashes a portion of the submitter's bond.
     rollback_atomic_bundle {
         let caller: T::AccountId = whitelisted_caller();
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
-        let legs = vec![proof::BundleLeg {
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
             vm_type: proof::VmType::Svm,
             token_in: H256::repeat_byte(0),
             token_out: H256::repeat_byte(1),
@@ -130,7 +130,7 @@ benchmarks! {
                 reads: Default::default(),
                 writes: Default::default(),
             },
-        }];
+        }]).expect("within MaxLegsPerBundle");
         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
@@ -144,10 +144,9 @@ benchmarks! {
     // No slashing - full bond returned to submitter.
     rollback_atomic_bundle_cancel {
         let caller: T::AccountId = whitelisted_caller();
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
-        let legs = vec![proof::BundleLeg {
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
             vm_type: proof::VmType::Svm,
             token_in: H256::repeat_byte(0),
             token_out: H256::repeat_byte(1),
@@ -158,7 +157,7 @@ benchmarks! {
                 reads: Default::default(),
                 writes: Default::default(),
             },
-        }];
+        }]).expect("within MaxLegsPerBundle");
         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
@@ -172,10 +171,9 @@ benchmarks! {
     // This is the on-chain finalization path called by the off-chain orchestrator.
     submit_finalization_result {
         let caller: T::AccountId = whitelisted_caller();
-        let bond = T::MinBond::get();
-        let _ = T::Currency::make_free_balance_be(&caller, bond.saturating_mul(10u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
-        let legs = vec![proof::BundleLeg {
+        let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
             vm_type: proof::VmType::Svm,
             token_in: H256::repeat_byte(0),
             token_out: H256::repeat_byte(1),
@@ -186,7 +184,7 @@ benchmarks! {
                 reads: Default::default(),
                 writes: Default::default(),
             },
-        }];
+        }]).expect("within MaxLegsPerBundle");
         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 

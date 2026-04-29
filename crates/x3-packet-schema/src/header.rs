@@ -1,5 +1,6 @@
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
+#[cfg(feature = "std")]
 use sp_core::hashing::blake2_256;
 
 /// Fixed 32-byte packet header for all packet types

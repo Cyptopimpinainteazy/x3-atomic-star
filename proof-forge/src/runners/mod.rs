@@ -13,8 +13,8 @@ pub mod atomic;
 pub mod bridge;
 pub mod bug_bounty;
 pub mod consensus;
-pub mod custody;
 pub mod cross_vm;
+pub mod custody;
 pub mod dex;
 pub mod ecosystem_quality;
 pub mod flashloans;
@@ -601,7 +601,12 @@ pub async fn check_security_gate(workspace: &Path, fail_hard: bool, verbose: boo
                 ProofStatus::Unverified => "UNVERIFIED".yellow().to_string(),
                 ProofStatus::Blocked => "BLOCKED".bright_red().to_string(),
             };
-            println!("  {} status={} score={:.1}%", "•".cyan(), status_label, formal.score * 100.0);
+            println!(
+                "  {} status={} score={:.1}%",
+                "•".cyan(),
+                status_label,
+                formal.score * 100.0
+            );
 
             if formal.status.is_blocking() || !formal.missing_proofs.is_empty() {
                 s0_failed.push("formal_verification_blocked");
@@ -774,7 +779,9 @@ pub async fn check_formal_proofs(
     let area_label = area.as_deref().unwrap_or("all");
     println!(
         "{}",
-        format!("Checking formal proofs: {}", area_label).bold().cyan()
+        format!("Checking formal proofs: {}", area_label)
+            .bold()
+            .cyan()
     );
 
     let formal = formal_proofs::run_proofs(workspace, verbose).await?;
@@ -894,7 +901,10 @@ pub async fn check_mainnet_readiness(
     // 1. Workspace compile — provable now via cargo check (cheap surface check).
     //    Without re-running cargo here, treat the existence of target/release/x3-proof
     //    (the binary running this code) as proof of a recent successful compile.
-    gates.push(("Workspace compile", Pass("x3-proof binary present".to_string())));
+    gates.push((
+        "Workspace compile",
+        Pass("x3-proof binary present".to_string()),
+    ));
 
     // 2. All tests passing — look for the most recent proof-02-test-workspace-* log
     //    in launch-gates/evidence/ and check its tail for `test result: ok` / failures.
@@ -926,11 +936,20 @@ pub async fn check_mainnet_readiness(
                     let lower = body.to_lowercase();
                     if lower.contains("test result: failed") || lower.contains("error: test failed")
                     {
-                        Fail(format!("failures in {}", path.file_name().unwrap_or_default().to_string_lossy()))
+                        Fail(format!(
+                            "failures in {}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ))
                     } else if lower.contains("test result: ok") {
-                        Pass(format!("ok in {}", path.file_name().unwrap_or_default().to_string_lossy()))
+                        Pass(format!(
+                            "ok in {}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ))
                     } else {
-                        Unknown(format!("inconclusive {}", path.file_name().unwrap_or_default().to_string_lossy()))
+                        Unknown(format!(
+                            "inconclusive {}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ))
                     }
                 }
             },
@@ -940,7 +959,11 @@ pub async fn check_mainnet_readiness(
 
     // 3. Integration tests — same idea but for any *integration* / *e2e* log.
     let integ_state = (|| -> GateState {
-        for stem in ["proof-07-bridge-tests", "proof-08-atomic-tests", "proof-09-atlas-tests"] {
+        for stem in [
+            "proof-07-bridge-tests",
+            "proof-08-atomic-tests",
+            "proof-09-atlas-tests",
+        ] {
             let p = evidence.join(format!("{}.log", stem));
             if p.is_file() {
                 if let Ok(body) = std::fs::read_to_string(&p) {
@@ -952,7 +975,11 @@ pub async fn check_mainnet_readiness(
             }
         }
         // If at least one integration log exists and none failed, count as pass.
-        for stem in ["proof-07-bridge-tests", "proof-08-atomic-tests", "proof-09-atlas-tests"] {
+        for stem in [
+            "proof-07-bridge-tests",
+            "proof-08-atomic-tests",
+            "proof-09-atlas-tests",
+        ] {
             if evidence.join(format!("{}.log", stem)).is_file() {
                 return Pass(format!("integration logs present"));
             }
@@ -1122,10 +1149,7 @@ pub async fn check_mainnet_readiness(
     println!("{}", verdict);
 
     if fail_count > 0 && (fail_hard || strict) {
-        anyhow::bail!(
-            "mainnet readiness blocked: {} failed gate(s)",
-            fail_count
-        );
+        anyhow::bail!("mainnet readiness blocked: {} failed gate(s)", fail_count);
     }
     if unknown_count > 0 && strict {
         anyhow::bail!(

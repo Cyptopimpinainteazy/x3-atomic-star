@@ -1,10 +1,10 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "a080b548e40010715166ddb4b1f74f8e161fd2f2",
   "command_run": "x3-proof verify x3.x3lang.compiler_reproducibility",
   "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [],
-  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "timestamp": "2026-04-29T06:38:03.837145485Z",
   "result": {
     "claim_id": "x3.x3lang.compiler_reproducibility",
     "claim": "X3Language parsing is correct",
@@ -29,9 +29,9 @@
     "blockers": [],
     "score": 0.93,
     "evidence": {},
-    "timestamp": "2026-04-27T23:19:54.692802738Z",
+    "timestamp": "2026-04-29T06:38:03.832839457Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "cc743b18c6dfb14ea05ce6e67acdc6bd28a1806739524fcd92bc2af7fc1c9949"
+  "binding_hash": "d9d7ce6b1d2fb33307e8822d439f8faba816bdb651ebc8d08d0f258e94ae6eff"
 }

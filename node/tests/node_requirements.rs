@@ -187,30 +187,22 @@ mod config_separation_tests {
         assert_eq!(configs.len(), 3, "Should have exactly 3 default configs");
     }
 
-    /// Test that development config allows missing WASM
+    /// Test that development config requires embedded WASM
     #[test]
-    fn dev_config_supports_native_only_execution() {
-        // Development chains should allow native-dev builds without WASM
-        // This is tested implicitly in chain_spec.rs with `unwrap_or(&[])`
+    fn dev_config_requires_wasm() {
         let wasm_binary_dev = Option::<&[u8]>::None;
-        let fallback = wasm_binary_dev.unwrap_or(&[]);
-        assert_eq!(
-            fallback.len(),
-            0,
-            "Dev config should fall back to empty WASM blob"
-        );
+        let result = wasm_binary_dev.ok_or("WASM binary required for development");
+
+        assert!(result.is_err(), "Dev config should require WASM binary");
     }
 
-    /// Test that local testnet allows missing WASM
+    /// Test that local testnet requires embedded WASM
     #[test]
-    fn local_config_supports_native_only_execution() {
+    fn local_config_requires_wasm() {
         let wasm_binary_local = Option::<&[u8]>::None;
-        let fallback = wasm_binary_local.unwrap_or(&[]);
-        assert_eq!(
-            fallback.len(),
-            0,
-            "Local config should fall back to empty WASM blob"
-        );
+        let result = wasm_binary_local.ok_or("WASM binary required for local");
+
+        assert!(result.is_err(), "Local config should require WASM binary");
     }
 
     /// Test that staging requires WASM

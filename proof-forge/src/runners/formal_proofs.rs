@@ -70,7 +70,12 @@ async fn run_tla_specs(
     missing_proofs: &mut Vec<String>,
 ) -> BackendOutcome {
     let mut tla_specs = Vec::new();
-    collect_files_with_ext(&workspace.join("formal-proofs/tla"), "tla", 4, &mut tla_specs);
+    collect_files_with_ext(
+        &workspace.join("formal-proofs/tla"),
+        "tla",
+        4,
+        &mut tla_specs,
+    );
     tla_specs.retain(|spec| {
         let rel_path = rel(workspace, spec);
         rel_path.contains("formal-proofs/tla/consensus/")
@@ -96,7 +101,9 @@ async fn run_tla_specs(
     } else if system_jar.exists() {
         system_jar
     } else {
-        missing_proofs.push("TLA+ tool missing (expected tools/tla2tools.jar or /opt/tla2tools.jar)".to_string());
+        missing_proofs.push(
+            "TLA+ tool missing (expected tools/tla2tools.jar or /opt/tla2tools.jar)".to_string(),
+        );
         return BackendOutcome {
             name: "tla",
             passed: 0,
@@ -164,8 +171,7 @@ async fn run_tla_specs(
             .arg("-metadir")
             .arg(&metadir);
         if cfg.exists() {
-            cmd.arg("-config")
-                .arg(cfg.file_name().unwrap_or_default());
+            cmd.arg("-config").arg(cfg.file_name().unwrap_or_default());
         }
         cmd.arg(&module_name);
 
@@ -231,19 +237,19 @@ async fn run_coq_specs(
     let coqc = match resolve_tool(workspace, "coqc") {
         Some(path) => path,
         None => {
-        let local = workspace.join("tools").join("coqc");
-        missing_proofs.push(format!(
-            "coqc not found in PATH (local check: {} exists={} file={})",
-            local.display(),
-            local.exists(),
-            local.is_file()
-        ));
-        return BackendOutcome {
-            name: "coq",
-            passed: 0,
-            failed: 0,
-            missing: specs.len(),
-        };
+            let local = workspace.join("tools").join("coqc");
+            missing_proofs.push(format!(
+                "coqc not found in PATH (local check: {} exists={} file={})",
+                local.display(),
+                local.exists(),
+                local.is_file()
+            ));
+            return BackendOutcome {
+                name: "coq",
+                passed: 0,
+                failed: 0,
+                missing: specs.len(),
+            };
         }
     };
 
@@ -318,38 +324,38 @@ async fn run_k_specs(
     let kprove = match resolve_tool(workspace, "kprove") {
         Some(path) => path,
         None => {
-        let local = workspace.join("tools").join("kprove");
-        missing_proofs.push(format!(
-            "kprove not found in PATH (local check: {} exists={} file={})",
-            local.display(),
-            local.exists(),
-            local.is_file()
-        ));
-        return BackendOutcome {
-            name: "k",
-            passed: 0,
-            failed: 0,
-            missing: specs.len(),
-        };
+            let local = workspace.join("tools").join("kprove");
+            missing_proofs.push(format!(
+                "kprove not found in PATH (local check: {} exists={} file={})",
+                local.display(),
+                local.exists(),
+                local.is_file()
+            ));
+            return BackendOutcome {
+                name: "k",
+                passed: 0,
+                failed: 0,
+                missing: specs.len(),
+            };
         }
     };
 
     let kompile = match resolve_tool(workspace, "kompile") {
         Some(path) => path,
         None => {
-        let local = workspace.join("tools").join("kompile");
-        missing_proofs.push(format!(
-            "kompile not found in PATH (local check: {} exists={} file={})",
-            local.display(),
-            local.exists(),
-            local.is_file()
-        ));
-        return BackendOutcome {
-            name: "k",
-            passed: 0,
-            failed: 0,
-            missing: specs.len(),
-        };
+            let local = workspace.join("tools").join("kompile");
+            missing_proofs.push(format!(
+                "kompile not found in PATH (local check: {} exists={} file={})",
+                local.display(),
+                local.exists(),
+                local.is_file()
+            ));
+            return BackendOutcome {
+                name: "k",
+                passed: 0,
+                failed: 0,
+                missing: specs.len(),
+            };
         }
     };
 
@@ -386,9 +392,12 @@ async fn run_k_specs(
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let definition_dir = workspace
-            .join("target/k")
-            .join(format!("{}-kompiled-{}-{}", stem, std::process::id(), now_ns));
+        let definition_dir = workspace.join("target/k").join(format!(
+            "{}-kompiled-{}-{}",
+            stem,
+            std::process::id(),
+            now_ns
+        ));
         let _ = std::fs::create_dir_all(definition_dir.parent().unwrap_or(workspace));
 
         commands_run.push(format!(
@@ -422,7 +431,10 @@ async fn run_k_specs(
             }
             Err(e) => {
                 failed += 1;
-                failed_checks.push(format!("K kompile invocation error for {}: {}", spec_rel, e));
+                failed_checks.push(format!(
+                    "K kompile invocation error for {}: {}",
+                    spec_rel, e
+                ));
                 continue;
             }
         }
@@ -535,7 +547,15 @@ pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> 
     if verbose {
         passed_checks.push(format!(
             "backend summary: TLA(p={},f={},m={}) Coq(p={},f={},m={}) K(p={},f={},m={})",
-            tla.passed, tla.failed, tla.missing, coq.passed, coq.failed, coq.missing, k.passed, k.failed, k.missing
+            tla.passed,
+            tla.failed,
+            tla.missing,
+            coq.passed,
+            coq.failed,
+            coq.missing,
+            k.passed,
+            k.failed,
+            k.missing
         ));
     }
 

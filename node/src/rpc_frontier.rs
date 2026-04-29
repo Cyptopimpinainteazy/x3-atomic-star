@@ -168,35 +168,8 @@ where
             .get("to")
             .and_then(|v| v.as_str())
             .ok_or_else(|| jsonrpsee::core::Error::Custom("Missing to address".into()))?;
-        let _target_bytes = decode_address(target)?;
-        let _caller = tx_obj
-            .get("from")
-            .and_then(|v| v.as_str())
-            .map(decode_address)
-            .transpose()?;
-
-        let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
-        let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
-        let _input_data = hex::decode(data_stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid data: {}", e)))?;
-        let _gas_limit = parse_gas_limit(&tx_obj)?;
-
-        // Fallback: return empty result for eth_call (read-only call not fully supported yet)
-        Ok(format!("0x"))
-    })?;
-
-    // eth_estimateGas — estimate gas using runtime EVM dry-run logic.
-    module.register_method("eth_estimateGas", move |params, _| {
-        let tx_obj: serde_json::Value = params
-            .one()
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid params: {}", e)))?;
-
-        let _target_bytes = if let Some(target) = tx_obj.get("to").and_then(|v| v.as_str()) {
-            decode_address(target)?
-        } else {
-            vec![0u8; 20]
-        };
-        let _caller = tx_obj
+        let target_bytes = decode_address(target)?;
+        let caller = tx_obj
             .get("from")
             .and_then(|v| v.as_str())
             .map(decode_address)
@@ -206,12 +179,49 @@ where
         let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
         let input_data = hex::decode(data_stripped)
             .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid data: {}", e)))?;
-        let _gas_limit = parse_gas_limit(&tx_obj)?;
+        let gas_limit = parse_gas_limit(&tx_obj)?;
 
-        // Fallback gas estimation: base 21000 + 16 per byte of calldata
-        let calldata_cost = (input_data.len() as u64).saturating_mul(16);
-        let estimated_gas = 21_000u64.saturating_add(calldata_cost);
-        Ok(format!("0x{:x}", estimated_gas))
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let result: Result<Vec<u8>, Vec<u8>> = api.call_evm(at, caller, target_bytes, input_data, gas_limit);
+
+        match result {
+            Ok(output) => Ok(format!("0x{}", hex::encode(output))),
+            Err(err) => Err(jsonrpsee::core::Error::Custom(format!("EVM call failed: {}", String::from_utf8_lossy(&err)))),
+        }
+    })?;
+
+    // eth_estimateGas — estimate gas using runtime EVM dry-run logic.
+    module.register_method("eth_estimateGas", move |params, _| {
+        let tx_obj: serde_json::Value = params
+            .one()
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid params: {}", e)))?;
+
+        let target_bytes = if let Some(target) = tx_obj.get("to").and_then(|v| v.as_str()) {
+            decode_address(target)?
+        } else {
+            vec![0u8; 20] // Contract creation
+        };
+        let caller = tx_obj
+            .get("from")
+            .and_then(|v| v.as_str())
+            .map(decode_address)
+            .transpose()?;
+
+        let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
+        let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
+        let input_data = hex::decode(data_stripped)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid data: {}", e)))?;
+        let gas_limit = parse_gas_limit(&tx_obj)?;
+
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let result: Result<u64, Vec<u8>> = api.estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit);
+
+        match result {
+            Ok(gas) => Ok(format!("0x{:x}", gas)),
+            Err(err) => Err(jsonrpsee::core::Error::Custom(format!("Gas estimation failed: {}", String::from_utf8_lossy(&err)))),
+        }
     })?;
 
     // eth_sendRawTransaction — submit a signed RLP-encoded Ethereum transaction

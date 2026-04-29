@@ -518,16 +518,16 @@ impl pallet_evm::Config for Runtime {
 }
 
 // Helper types for pallet_x3_kernel::Config bridge escrow bindings
-pub struct BridgeEvmEscrowZero;
-impl frame_support::traits::Get<sp_core::H160> for BridgeEvmEscrowZero {
+pub struct BridgeEvmEscrowStorage;
+impl frame_support::traits::Get<sp_core::H160> for BridgeEvmEscrowStorage {
     fn get() -> sp_core::H160 {
-        sp_core::H160::zero()
+        pallet_x3_kernel::BridgeEvmEscrow::<Runtime>::get()
     }
 }
-pub struct BridgeSvmEscrowZero;
-impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowZero {
+pub struct BridgeSvmEscrowStorage;
+impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowStorage {
     fn get() -> [u8; 32] {
-        [0u8; 32]
+        pallet_x3_kernel::BridgeSvmEscrow::<Runtime>::get()
     }
 }
 parameter_types! {
@@ -848,8 +848,8 @@ impl pallet_x3_kernel::Config for Runtime {
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type CrossChainProofVerifier = SubstrateProofVerifier;
-    type BridgeEvmEscrow = BridgeEvmEscrowZero;
-    type BridgeSvmEscrow = BridgeSvmEscrowZero;
+    type BridgeEvmEscrow = BridgeEvmEscrowStorage;
+    type BridgeSvmEscrow = BridgeSvmEscrowStorage;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
 }
 
@@ -1055,7 +1055,7 @@ mod native_vm_adapters {
                     Some(target),
                     &pre_balances,
                 )),
-                Err(e) => Err(e),
+                Err(_e) => Err(DispatchError::Other("EVM execution failed")),
             }
         }
 

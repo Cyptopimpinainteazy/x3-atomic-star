@@ -196,6 +196,82 @@ cmd_upgrade() {
     2>&1 | tee "$LOG_FILE"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# test — CI-friendly non-interactive validation suite (no live node required)
+#   1. Chopsticks binary / npx reachable
+#   2. Config YAML exists and has required fields
+#   3. WASM binary exists (for upgrade mode)
+#   4. DB dir is writable
+#   5. curl available (used by mutate/replay)
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_test() {
+  local PASS=0 FAIL=0
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo "  Chopsticks — CI Test Suite"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  _check() {
+    local label="$1"; shift
+    echo -n "  Checking: $label … "
+    if "$@" &>/dev/null 2>&1; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC}"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  _check_grep() {
+    local label="$1"; local file="$2"; local pattern="$3"
+    echo -n "  Checking: $label … "
+    if grep -qE "$pattern" "$file" 2>/dev/null; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC} (pattern '$pattern' not found in $file)"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  # 1. Chopsticks binary / npx reachable
+  if [[ "$CHOPSTICKS_BIN" == *"npx"* ]]; then
+    _check "npx available" command -v npx
+  else
+    _check "chopsticks binary found" command -v "$CHOPSTICKS_BIN"
+  fi
+
+  # 2. Config YAML exists with expected content
+  _check "Config YAML exists" test -f "$CONFIG"
+  _check_grep "Config has endpoint"    "$CONFIG" 'endpoint'
+  _check_grep "Config has port"        "$CONFIG" 'port'
+  _check_grep "Config has 9944/local"  "$CONFIG" '9944|localhost|127\.0\.0\.1'
+
+  # 3. WASM binary exists (required for upgrade mode)
+  _check "Compressed WASM exists (upgrade mode)" test -f "$WASM"
+
+  # 4. DB dir writeable
+  mkdir -p "$DB_DIR"
+  _check "DB directory writable" test -w "$DB_DIR"
+
+  # 5. curl available (used for RPC calls in mutate/replay)
+  _check "curl available (for RPC calls)" command -v curl
+
+  # 6. python3 available (used for JSON pretty-print)
+  _check "python3 available (JSON formatting)" command -v python3
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo -e "  Results: ${GREEN}✓ $PASS PASSED${NC}  |  ${RED}✗ $FAIL FAILED${NC}"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  [[ $FAIL -eq 0 ]] && success "All Chopsticks CI tests passed." || die "$FAIL test(s) failed."
+}
+
 # ─────────── dispatch ──────────────────────────────────────────────────────
 COMMAND="${1:-help}"
 case "$COMMAND" in
@@ -203,6 +279,7 @@ case "$COMMAND" in
   replay)         cmd_replay "${2:-latest}" ;;
   mutate)         cmd_mutate ;;
   upgrade)        cmd_upgrade ;;
+  test)           cmd_test ;;
   help|--help|-h) print_help ;;
   *)              warn "Unknown command: $COMMAND"; print_help; exit 1 ;;
 esac

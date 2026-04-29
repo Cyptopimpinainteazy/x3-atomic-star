@@ -659,11 +659,23 @@ pub mod pallet {
         frame_support::BoundedVec<u8, frame_support::traits::ConstU32<65_536>>,
     >;
 
+    /// Bridge escrow address for EVM cross-chain operations.
+    #[pallet::storage]
+    pub type BridgeEvmEscrow<T: Config> = StorageValue<_, sp_core::H160, ValueQuery>;
+
+    /// Bridge escrow address for SVM cross-chain operations.
+    #[pallet::storage]
+    pub type BridgeSvmEscrow<T: Config> = StorageValue<_, [u8; 32], ValueQuery>;
+
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
         /// Initial asset registry entries.
         pub assets: Vec<(T::AssetId, Vec<u8>, u8)>,
+        /// Bridge escrow address for EVM cross-chain operations.
+        pub evm_escrow: sp_core::H160,
+        /// Bridge escrow address for SVM cross-chain operations.
+        pub svm_escrow: [u8; 32],
     }
 
     #[pallet::genesis_build]
@@ -699,6 +711,10 @@ pub mod pallet {
                 };
                 AssetRegistry::<T>::insert(asset_id, metadata);
             }
+
+            // Set escrow addresses
+            BridgeEvmEscrow::<T>::set(self.evm_escrow);
+            BridgeSvmEscrow::<T>::set(self.svm_escrow);
         }
     }
 
@@ -2089,9 +2105,8 @@ pub mod pallet {
             });
 
             let dispatcher = KernelCrossVmDispatcher::<T>::new();
-            Self::cross_vm_prepare_checks(&dispatcher, &operation).map_err(|e| {
+            Self::cross_vm_prepare_checks(&dispatcher, &operation).inspect_err(|_| {
                 T::Currency::unreserve(who, max_fee.into());
-                e
             })?;
 
             let expires_at = current_block + T::CrossVmPrepareTtl::get();
@@ -2112,9 +2127,8 @@ pub mod pallet {
                     .map_err(|_| Error::<T>::CrossVmPreparedQueueFull)?;
                 Ok(())
             })
-            .map_err(|e| {
+            .inspect_err(|_| {
                 T::Currency::unreserve(who, max_fee.into());
-                e
             })?;
 
             PreparedCrossVmOps::<T>::insert(comit_id, prepared);
@@ -2579,20 +2593,20 @@ pub mod pallet {
         /// This explicit authorization model prevents unauthorized access and ensures
         /// governance has full control over who can submit Comits.
         fn auth_check(
-            caller: &T::AccountId,
+            _caller: &T::AccountId,
             _operation_context: &[u8],
         ) -> Result<(), DispatchError> {
             #[cfg(feature = "dev-bypass")]
             {
                 // Development bypass: accept all signed callers
-                return Ok(());
+                Ok(())
             }
 
             #[cfg(not(feature = "dev-bypass"))]
             {
                 // Production: check authorization list
                 // If no authorized accounts exist, reject (explicit authorization required)
-                if AuthorizedAccounts::<T>::contains_key(caller) {
+                if AuthorizedAccounts::<T>::contains_key(_caller) {
                     Ok(())
                 } else {
                     Err(Error::<T>::Unauthorized.into())
@@ -3095,6 +3109,12 @@ pub mod pallet {
     impl<T: Config> KernelCrossVmDispatcher<T> {
         pub fn new() -> Self {
             Self(PhantomData)
+        }
+    }
+
+    impl<T: Config> Default for KernelCrossVmDispatcher<T> {
+        fn default() -> Self {
+            Self::new()
         }
     }
 

@@ -189,8 +189,9 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                     String::from_utf8_lossy(&out.stderr)
                 );
                 if out.status.success() && !combined.contains(" FAILED") {
-                    passed_checks
-                        .push("X3-contracts gpu-parity-core hash-vector harness PASSED".to_string());
+                    passed_checks.push(
+                        "X3-contracts gpu-parity-core hash-vector harness PASSED".to_string(),
+                    );
                     evidence.insert("gpu_parity_vectors".to_string(), "ok".to_string());
                 } else {
                     let snippet = combined
@@ -211,8 +212,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                 }
             }
             Err(e) => {
-                missing_proofs
-                    .push(format!("Could not run gpu-parity-core harness: {}", e));
+                missing_proofs.push(format!("Could not run gpu-parity-core harness: {}", e));
             }
         }
     } else {

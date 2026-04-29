@@ -147,12 +147,92 @@ DSSL
   info "Generated DSSL assertions → $TEST_FILE"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# test — CI-friendly non-interactive validation suite (no live network needed)
+#   1. zombienet binary exists
+#   2. node binary exists
+#   3. TOML config is valid (has expected validators)
+#   4. DSSL test file exists or can be generated
+#   5. zombienet --version runs
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_ci_test() {
+  local PASS=0 FAIL=0
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo "  Zombienet — CI Test Suite"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  _check() {
+    local label="$1"; shift
+    echo -n "  Checking: $label … "
+    if "$@" &>/dev/null 2>&1; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC}"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  _check_grep() {
+    local label="$1"; local file="$2"; local pattern="$3"
+    echo -n "  Checking: $label … "
+    if grep -qE "$pattern" "$file" 2>/dev/null; then
+      echo -e "${GREEN}✓ PASS${NC}"
+      PASS=$((PASS + 1))
+    else
+      echo -e "${RED}✗ FAIL${NC} (pattern '$pattern' not found in $file)"
+      FAIL=$((FAIL + 1))
+    fi
+  }
+
+  # 1. zombienet binary
+  _check "zombienet binary found" test -n "$ZOMBIENET_BIN"
+  if [[ -n "$ZOMBIENET_BIN" ]]; then
+    _check "zombienet --version exits 0" "$ZOMBIENET_BIN" --version
+  fi
+
+  # 2. node binary
+  _check "x3-chain-node binary exists" test -f "$NODE_BIN"
+
+  # 3. TOML config exists and has expected content
+  _check "TOML config exists" test -f "$CONFIG"
+  _check_grep "TOML has [relaychain] section" "$CONFIG" '\[relaychain\]|\[\[relaychain'
+  _check_grep "TOML has Alice validator"       "$CONFIG" 'alice|Alice'
+  _check_grep "TOML has Bob validator"         "$CONFIG" 'bob|Bob'
+  _check_grep "TOML has Charlie validator"     "$CONFIG" 'charlie|Charlie'
+
+  # 4. DSSL assertions file
+  if [[ ! -f "$TEST_FILE" ]]; then
+    info "DSSL file missing — generating …"
+    generate_dssl 2>/dev/null || true
+  fi
+  _check "DSSL assertions file exists" test -f "$TEST_FILE"
+  _check_grep "DSSL has alice: is up"  "$TEST_FILE" 'alice: is up'
+  _check_grep "DSSL has finality check" "$TEST_FILE" 'finalized block'
+
+  # 5. Log dir writable
+  mkdir -p "$LOG_DIR"
+  _check "Log directory writable" test -w "$LOG_DIR"
+
+  echo ""
+  echo "══════════════════════════════════════════════════════"
+  echo -e "  Results: ${GREEN}✓ $PASS PASSED${NC}  |  ${RED}✗ $FAIL FAILED${NC}"
+  echo "══════════════════════════════════════════════════════"
+  echo ""
+
+  [[ $FAIL -eq 0 ]] && success "All Zombienet CI tests passed." || die "$FAIL test(s) failed."
+}
+
 # ─────────── dispatch ──────────────────────────────────────────────────────
 COMMAND="${1:-help}"
 case "$COMMAND" in
   build)         cmd_build ;;
   spawn)         cmd_spawn ;;
   test)          cmd_test ;;
+  ci-test)       cmd_ci_test ;;
   help|--help|-h) print_help ;;
   *)             warn "Unknown command: $COMMAND"; print_help; exit 1 ;;
 esac

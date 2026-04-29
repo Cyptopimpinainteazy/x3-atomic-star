@@ -1,4 +1,5 @@
 use parity_scale_codec::{Decode, Encode};
+use scale_info::prelude::vec::Vec;
 use scale_info::TypeInfo;
 
 /// U256 type for Ethereum

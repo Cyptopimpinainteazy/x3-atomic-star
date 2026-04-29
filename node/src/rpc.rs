@@ -58,9 +58,13 @@ where
         pallet_transaction_payment_rpc::TransactionPaymentApiServer::into_rpc(tx_payment_rpc),
     )?;
 
-    // Merge Frontier ETH-compatible + SVM JSON-RPC endpoints.
+    // Merge Frontier ETH-compatible JSON-RPC endpoints.
     let frontier_module = crate::rpc_frontier::create_frontier_rpc(client.clone())?;
     module.merge(frontier_module)?;
+
+    // Merge SVM-compatible JSON-RPC endpoints.
+    let svm_module = crate::rpc_frontier::create_svm_rpc(client.clone())?;
+    module.merge(svm_module)?;
 
     Ok(module)
 }

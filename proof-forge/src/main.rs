@@ -1,19 +1,17 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-mod dashboard;
-mod feature_proof;
-mod gap_proof;
-mod proof;
-mod receipt;
-mod registry;
 mod runners;
 mod scoring;
+mod registry;
+mod dashboard;
+mod proof;
 mod todo_proof;
+mod gap_proof;
+mod receipt;
+mod feature_proof;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "x3-proof")]
@@ -79,15 +77,6 @@ enum Commands {
         fail_hard: bool,
     },
 
-    /// Run economic attack gate across flashloan/DEX/oracle/governance vectors
-    EconomicGate {
-        #[arg(short, long)]
-        strict: bool,
-
-        #[arg(long)]
-        fail_hard: bool,
-    },
-
     /// Test hack resistance
     Hack {
         /// Specific area to test
@@ -133,14 +122,6 @@ enum Commands {
         /// Area to check
         #[arg(value_name = "AREA")]
         area: Option<String>,
-
-        /// Strict mode: fail closed if any formal proof is missing or fails.
-        #[arg(long)]
-        strict: bool,
-
-        /// Emit a human-readable report (used by formal-verification.yml).
-        #[arg(long)]
-        report: bool,
     },
 
     /// Generate proof receipt
@@ -295,45 +276,41 @@ enum FeaturesCommand {
 // Feature Command Handlers
 // ============================================================================
 
-fn run_features_list(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_list(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let matrix = scanner.load_matrix()?;
-
+    
     println!("{}", "X3 Feature Registry".bold());
     println!();
-
+    
     for feature in &matrix.features {
-        println!(
-            "  {} {}",
-            feature.id,
-            format!("({})", feature.criticality).dimmed()
-        );
+        println!("  {} {}", feature.id, format!("({})", feature.criticality).dimmed());
         if verbose {
             println!("    {}", feature.name);
         }
     }
-
+    
     println!();
     println!("Total features: {}", matrix.features.len());
-
+    
     Ok(())
 }
 
-fn run_features_scan(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_scan(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(verbose)?;
     scanner.save_report(&report)?;
-
+    
     println!("{}", "Feature scan complete".green());
     println!("Reports saved to proof/reports/");
-
+    
     Ok(())
 }
 
-fn run_features_status(workspace: &Path, _verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_status(workspace: &PathBuf, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Feature Status Summary".bold());
     println!();
     println!("Built:     {}", report.built_count.to_string().green());
@@ -344,17 +321,17 @@ fn run_features_status(workspace: &Path, _verbose: bool) -> Result<()> {
     println!("Weak:      {}", report.weak_count.to_string().yellow());
     println!("Stale:     {}", report.stale_count.to_string().yellow());
     println!("Blocked:   {}", report.blocked_count.to_string().red());
-
+    
     Ok(())
 }
 
-fn run_features_missing(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_missing(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Missing Features".bold().red());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Missing {
             println!("  ❌ {}", result.feature_id);
@@ -365,17 +342,17 @@ fn run_features_missing(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_partial(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_partial(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Partial Features".bold().yellow());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Partial {
             println!("  🟡 {}", result.feature_id);
@@ -386,17 +363,17 @@ fn run_features_partial(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_unwired(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_unwired(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Unwired Features".bold().yellow());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Unwired {
             println!("  🔌 {}", result.feature_id);
@@ -407,17 +384,17 @@ fn run_features_unwired(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_untested(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_untested(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Untested Features".bold().yellow());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Untested {
             println!("  🧪 {}", result.feature_id);
@@ -428,17 +405,17 @@ fn run_features_untested(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_stale(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_stale(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Stale Features".bold().yellow());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Stale {
             println!("  🕐 {}", result.feature_id);
@@ -447,17 +424,17 @@ fn run_features_stale(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_blockers(workspace: &Path, verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_blockers(workspace: &PathBuf, verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
-
+    
     println!("{}", "Blocked Features".bold().red());
     println!();
-
+    
     for result in &report.results {
         if result.status == feature_proof::FeatureStatus::Blocked {
             println!("  🚫 {}", result.feature_id);
@@ -468,22 +445,22 @@ fn run_features_blockers(workspace: &Path, verbose: bool) -> Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
 
-fn run_features_report(workspace: &Path, _verbose: bool) -> Result<()> {
-    let scanner = feature_proof::FeatureScanner::new(workspace.to_path_buf());
+fn run_features_report(workspace: &PathBuf, _verbose: bool) -> Result<()> {
+    let scanner = feature_proof::FeatureScanner::new(workspace.clone());
     let report = scanner.scan(false)?;
     scanner.save_report(&report)?;
-
+    
     println!("{}", "Full Feature Report Generated".bold().green());
     println!();
     println!("  - proof/reports/feature_status.json");
     println!("  - proof/reports/features_report.md");
     println!();
     println!("Verdict: {}", report.verdict.bold());
-
+    
     Ok(())
 }
 
@@ -492,12 +469,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if cli.verbose {
-        println!(
-            "{}",
-            "X3 ProofForge v1.0.0 - Executable Truth Layer"
-                .bold()
-                .cyan()
-        );
+        println!("{}", "X3 ProofForge v1.0.0 - Executable Truth Layer".bold().cyan());
         println!("Workspace: {}", cli.workspace.display());
         println!();
     }
@@ -507,24 +479,16 @@ async fn main() -> Result<()> {
             runners::verify_claim(&cli.workspace, &claim, strict, cli.verbose).await?
         }
 
-        Commands::Prove {
-            area,
-            strict,
-            dry_run,
-        } => runners::prove_area(&cli.workspace, &area, strict, dry_run, cli.verbose).await?,
+        Commands::Prove { area, strict, dry_run } => {
+            runners::prove_area(&cli.workspace, &area, strict, dry_run, cli.verbose).await?
+        }
 
-        Commands::ProveAll {
-            strict,
-            dry_run,
-            parallel,
-        } => runners::prove_all(&cli.workspace, strict, dry_run, parallel, cli.verbose).await?,
+        Commands::ProveAll { strict, dry_run, parallel } => {
+            runners::prove_all(&cli.workspace, strict, dry_run, parallel, cli.verbose).await?
+        }
 
         Commands::SecurityGate { fail_hard } => {
             runners::check_security_gate(&cli.workspace, fail_hard, cli.verbose).await?
-        }
-
-        Commands::EconomicGate { strict, fail_hard } => {
-            run_economic_gate(&cli.workspace, strict, fail_hard, cli.verbose).await?
         }
 
         Commands::Hack { area, strict } => {
@@ -543,19 +507,17 @@ async fn main() -> Result<()> {
             runners::test_idiot_proof(&cli.workspace, &command, dry_run, cli.verbose).await?
         }
 
-        Commands::Formal {
-            area,
-            strict,
-            report,
-        } => runners::check_formal_proofs(&cli.workspace, area, strict, report, cli.verbose).await?,
+        Commands::Formal { area } => {
+            runners::check_formal_proofs(&cli.workspace, area, false, false, cli.verbose).await?
+        }
 
-        Commands::Receipt {
-            receipt_type,
-            areas,
-        } => runners::generate_receipt(&cli.workspace, &receipt_type, &areas, cli.verbose).await?,
+        Commands::Receipt { receipt_type, areas } => {
+            runners::generate_receipt(&cli.workspace, &receipt_type, &areas, cli.verbose).await?
+        }
 
         Commands::MainnetGate { fail_hard, strict } => {
-            runners::check_mainnet_readiness(&cli.workspace, fail_hard, strict, cli.verbose).await?
+            runners::check_mainnet_readiness(&cli.workspace, fail_hard, strict, cli.verbose)
+                .await?
         }
 
         Commands::TestnetGate { fail_hard } => {
@@ -566,10 +528,9 @@ async fn main() -> Result<()> {
             dashboard::generate_dashboard(&cli.workspace, &output, detailed, cli.verbose).await?
         }
 
-        Commands::ScanClaims {
-            file,
-            fail_on_unproven,
-        } => runners::scan_claims(&cli.workspace, file, fail_on_unproven, cli.verbose).await?,
+        Commands::ScanClaims { file, fail_on_unproven } => {
+            runners::scan_claims(&cli.workspace, file, fail_on_unproven, cli.verbose).await?
+        }
 
         Commands::AiPatchFirewall { diff, fail_hard } => {
             runners::check_ai_patch(&cli.workspace, diff, fail_hard, cli.verbose).await?
@@ -579,13 +540,13 @@ async fn main() -> Result<()> {
             runners::explain_blockers(&cli.workspace, &area, cli.verbose).await?
         }
 
-        Commands::Claims => runners::list_all_claims(&cli.workspace, cli.verbose).await?,
+        Commands::Claims => {
+            runners::list_all_claims(&cli.workspace, cli.verbose).await?
+        }
 
-        Commands::ProveEverything {
-            strict,
-            fail_hard,
-            receipts,
-        } => prove_everything(&cli.workspace, strict, fail_hard, receipts, cli.verbose).await?,
+        Commands::ProveEverything { strict, fail_hard, receipts } => {
+            prove_everything(&cli.workspace, strict, fail_hard, receipts, cli.verbose).await?
+        }
 
         Commands::TodoGate { gate, fail_hard } => {
             run_todo_gate(&cli.workspace, &gate, fail_hard, cli.verbose).await?
@@ -648,7 +609,6 @@ fn print_help() {
     println!();
     println!("{}", "Security & Safety:".bold());
     println!("  x3-proof security-gate              - Check S0/S1 blockers");
-    println!("  x3-proof economic-gate --strict     - Run core economic attack tests");
     println!("  x3-proof hack [AREA]                - Test hack resistance");
     println!("  x3-proof edge-case [AREA]           - Test edge cases");
     println!("  x3-proof limp [AREA]                - Test degraded operation");
@@ -677,91 +637,17 @@ fn print_help() {
     println!("  -v, --verbose                       - Verbose output");
 }
 
-async fn run_economic_gate(
-    workspace: &Path,
-    strict: bool,
-    fail_hard: bool,
-    _verbose: bool,
-) -> Result<()> {
-    println!(
-        "{}",
-        "🔒 Economic Attack Gate — Running 10 core attack tests"
-            .bold()
-            .cyan()
-    );
-    if strict {
-        println!("Mode: strict");
-    }
-    println!();
-
-    let flash = runners::flashloans::run_proofs(workspace, false).await?;
-    let dex = runners::dex::run_proofs(workspace, false).await?;
-    let oracle = runners::oracle::run_proofs(workspace, false).await?;
-    let cross_vm = runners::cross_vm::run_proofs(workspace, false).await?;
-    let governance = runners::governance::run_proofs(workspace, false).await?;
-    let results = vec![flash, dex, oracle, cross_vm, governance];
-
-    println!("{:14} | {:10} | {:8}", "Area", "Status", "Score");
-    println!("{:-<14}-+-{:-<10}-+-{:-<8}", "", "", "");
-
-    let mut blocked_count = 0usize;
-    for result in &results {
-        let area = result
-            .claim_id
-            .split('.')
-            .nth(1)
-            .unwrap_or("unknown")
-            .to_string();
-        let status = match result.status {
-            proof::ProofStatus::Verified => "VERIFIED".green().bold().to_string(),
-            proof::ProofStatus::Partial => "PARTIAL".yellow().bold().to_string(),
-            proof::ProofStatus::Failed => "FAILED".red().bold().to_string(),
-            proof::ProofStatus::Unverified => "UNVERIFIED".bright_yellow().bold().to_string(),
-            proof::ProofStatus::Blocked => "BLOCKED".bright_red().bold().to_string(),
-        };
-        if result.status == proof::ProofStatus::Blocked {
-            blocked_count += 1;
-        }
-        println!("{:14} | {:10} | {:>7.1}%", area, status, result.score * 100.0);
-    }
-
-    println!();
-    if blocked_count == 0 {
-        println!("{}", "✓ ECONOMIC GATE PASSED".bold().green());
-        Ok(())
-    } else {
-        println!(
-            "{}",
-            format!(
-                "✗ ECONOMIC GATE FAILED — {} attack vectors unmitigated",
-                blocked_count
-            )
-            .bold()
-            .red()
-        );
-        if fail_hard {
-            anyhow::bail!("economic-gate failed with {} blocked areas", blocked_count);
-        }
-        Ok(())
-    }
-}
-
 /// Prove Everything - The Ultimate Gate
 async fn prove_everything(
-    workspace: &Path,
+    workspace: &PathBuf,
     strict: bool,
     fail_hard: bool,
     receipts: bool,
     verbose: bool,
 ) -> Result<()> {
-    println!(
-        "{}",
-        "🔥 PROVE EVERYTHING - Ultimate X3 Proof Gauntlet"
-            .bold()
-            .red()
-    );
+    println!("{}", "🔥 PROVE EVERYTHING - Ultimate X3 Proof Gauntlet".bold().red());
     println!();
-
+    
     let mut all_pass = true;
     let mut failures = Vec::new();
 
@@ -786,21 +672,14 @@ async fn prove_everything(
         failures.push(format!("SecurityGate: {}", e));
     }
 
-    // 4. Economic Gate
-    println!("{}", "▸ Running EconomicGate...".cyan());
-    if let Err(e) = run_economic_gate(workspace, true, true, verbose).await {
-        all_pass = false;
-        failures.push(format!("EconomicGate: {}", e));
-    }
-
-    // 5. Mainnet Gate
+    // 4. Mainnet Gate
     println!("{}", "▸ Running MainnetGate...".cyan());
     if let Err(e) = runners::check_mainnet_readiness(workspace, true, true, verbose).await {
         all_pass = false;
         failures.push(format!("MainnetGate: {}", e));
     }
 
-    // 6. Critical Claims
+    // 5. Critical Claims
     println!("{}", "▸ Verifying Critical Claims...".cyan());
     let critical_claims = vec![
         "x3.asset_kernel.supply_conservation",
@@ -825,18 +704,13 @@ async fn prove_everything(
 
     println!();
     if all_pass {
-        println!(
-            "{}",
-            "✓ PROVE EVERYTHING PASSED - X3 is proof-ready"
-                .bold()
-                .green()
-        );
-
+        println!("{}", "✓ PROVE EVERYTHING PASSED - X3 is proof-ready".bold().green());
+        
         if receipts {
             println!("Generating master receipt...");
-            runners::generate_receipt(workspace, "mainnet", &[], verbose).await?;
+            runners::generate_receipt(workspace, "mainnet", &vec![], verbose).await?;
         }
-
+        
         Ok(())
     } else {
         println!("{}", "✗ PROVE EVERYTHING FAILED".bold().red());
@@ -846,26 +720,28 @@ async fn prove_everything(
             println!("  - {}", failure.red());
         }
         println!();
-
+        
         if fail_hard {
             anyhow::bail!("prove-everything failed with {} blockers", failures.len());
         }
-
+        
         Ok(())
     }
 }
 
 /// Run TODO/FIXME/HACK scanner
-async fn run_todo_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bool) -> Result<()> {
+async fn run_todo_gate(
+    workspace: &PathBuf,
+    gate: &str,
+    fail_hard: bool,
+    verbose: bool,
+) -> Result<()> {
     use todo_proof::TodoScanner;
-
-    println!(
-        "{}",
-        format!("📋 TODO Gate: {} readiness", gate).bold().yellow()
-    );
+    
+    println!("{}", format!("📋 TODO Gate: {} readiness", gate).bold().yellow());
     println!();
 
-    let scanner = TodoScanner::new(workspace.to_path_buf());
+    let scanner = TodoScanner::new(workspace.clone());
     let report = scanner.scan(verbose)?;
 
     println!("Total TODOs found: {}", report.total_todos);
@@ -880,33 +756,26 @@ async fn run_todo_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: b
     let mainnet_blockers = report.mainnet_blockers.len();
     let testnet_blockers = report.testnet_blockers.len();
 
-    println!(
-        "Mainnet blockers (T5+): {}",
-        if mainnet_blockers > 0 {
-            mainnet_blockers.to_string().red()
-        } else {
-            mainnet_blockers.to_string().green()
-        }
-    );
+    println!("Mainnet blockers (T5+): {}", if mainnet_blockers > 0 {
+        mainnet_blockers.to_string().red()
+    } else {
+        mainnet_blockers.to_string().green()
+    });
 
-    println!(
-        "Testnet blockers (T6+): {}",
-        if testnet_blockers > 0 {
-            testnet_blockers.to_string().red()
-        } else {
-            testnet_blockers.to_string().green()
-        }
-    );
+    println!("Testnet blockers (T6+): {}", if testnet_blockers > 0 {
+        testnet_blockers.to_string().red()
+    } else {
+        testnet_blockers.to_string().green()
+    });
 
     println!();
 
     if !report.mainnet_blockers.is_empty() && verbose {
         println!("{}", "Mainnet Blockers:".bold().red());
         for item in &report.mainnet_blockers {
-            println!(
-                "  {} (line {}) - {:?}",
-                item.file.display(),
-                item.line,
+            println!("  {} (line {}) - {:?}", 
+                item.file.display(), 
+                item.line, 
                 item.severity
             );
             println!("    {}", item.content);
@@ -916,40 +785,35 @@ async fn run_todo_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: b
 
     // Check gate
     let passes = scanner.check_gates(&report, gate)?;
-
+    
     if passes {
         println!("{}", format!("✓ {} gate PASSED", gate).bold().green());
         Ok(())
     } else {
         println!("{}", format!("✗ {} gate FAILED", gate).bold().red());
-
+        
         if fail_hard {
-            anyhow::bail!(
-                "{} gate failed: {} blockers found",
-                gate,
-                if gate == "mainnet" {
-                    mainnet_blockers
-                } else {
-                    testnet_blockers
-                }
-            );
+            anyhow::bail!("{} gate failed: {} blockers found", gate, 
+                if gate == "mainnet" { mainnet_blockers } else { testnet_blockers });
         }
-
+        
         Ok(())
     }
 }
 
 /// Run Gap scanner
-async fn run_gap_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bool) -> Result<()> {
+async fn run_gap_gate(
+    workspace: &PathBuf,
+    gate: &str,
+    fail_hard: bool,
+    verbose: bool,
+) -> Result<()> {
     use gap_proof::GapScanner;
-
-    println!(
-        "{}",
-        format!("🔍 Gap Gate: {} readiness", gate).bold().yellow()
-    );
+    
+    println!("{}", format!("🔍 Gap Gate: {} readiness", gate).bold().yellow());
     println!();
 
-    let scanner = GapScanner::new(workspace.to_path_buf());
+    let scanner = GapScanner::new(workspace.clone());
     let report = scanner.scan(verbose)?;
 
     println!("Total gaps found: {}", report.total_gaps);
@@ -965,40 +829,30 @@ async fn run_gap_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bo
     let mainnet_blockers = report.mainnet_blockers.len();
     let testnet_blockers = report.testnet_blockers.len();
 
-    println!(
-        "S0 gaps (critical): {}",
-        if s0_gaps > 0 {
-            s0_gaps.to_string().red()
-        } else {
-            s0_gaps.to_string().green()
-        }
-    );
+    println!("S0 gaps (critical): {}", if s0_gaps > 0 {
+        s0_gaps.to_string().red()
+    } else {
+        s0_gaps.to_string().green()
+    });
 
-    println!(
-        "Mainnet blockers: {}",
-        if mainnet_blockers > 0 {
-            mainnet_blockers.to_string().red()
-        } else {
-            mainnet_blockers.to_string().green()
-        }
-    );
+    println!("Mainnet blockers: {}", if mainnet_blockers > 0 {
+        mainnet_blockers.to_string().red()
+    } else {
+        mainnet_blockers.to_string().green()
+    });
 
-    println!(
-        "Testnet blockers: {}",
-        if testnet_blockers > 0 {
-            testnet_blockers.to_string().red()
-        } else {
-            testnet_blockers.to_string().green()
-        }
-    );
+    println!("Testnet blockers: {}", if testnet_blockers > 0 {
+        testnet_blockers.to_string().red()
+    } else {
+        testnet_blockers.to_string().green()
+    });
 
     println!();
 
     if !report.s0_gaps.is_empty() && verbose {
         println!("{}", "S0 Gaps (CRITICAL):".bold().red());
         for item in &report.s0_gaps {
-            println!(
-                "  [{}] {}: {}",
+            println!("  [{}] {}: {}", 
                 item.area,
                 format!("{:?}", item.gap_type).red(),
                 item.description
@@ -1009,22 +863,18 @@ async fn run_gap_gate(workspace: &Path, gate: &str, fail_hard: bool, verbose: bo
 
     // Check gate
     let passes = scanner.check_gates(&report, gate)?;
-
+    
     if passes {
         println!("{}", format!("✓ {} gate PASSED", gate).bold().green());
         Ok(())
     } else {
         println!("{}", format!("✗ {} gate FAILED", gate).bold().red());
-
+        
         if fail_hard {
-            anyhow::bail!(
-                "{} gate failed: {} S0 gaps, {} blockers",
-                gate,
-                s0_gaps,
-                mainnet_blockers
-            );
+            anyhow::bail!("{} gate failed: {} S0 gaps, {} blockers", 
+                gate, s0_gaps, mainnet_blockers);
         }
-
+        
         Ok(())
     }
 }

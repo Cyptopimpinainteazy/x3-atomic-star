@@ -1,13 +1,21 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "a080b548e40010715166ddb4b1f74f8e161fd2f2",
   "command_run": "x3-proof verify x3.flashloan.repay_or_revert",
-  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "artifact_hash": "b06c6b6e310c08f269cb337a403cdb424bc0b68d69deb2e4428e9d6df1f4750c",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
-  "relevant_files": [],
-  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "relevant_files": [
+    "crates/x3-flashloan/src/lib.rs",
+    "crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs",
+    "crates/x3-flashloan/src/tests/attack_reentrancy.rs",
+    "crates/x3-flashloan/src/tests/attack_repayment_bypass.rs",
+    "X3-contracts/shared/parity-core/src/lib.rs",
+    "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
+    "X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json"
+  ],
+  "timestamp": "2026-04-29T06:38:03.792704827Z",
   "result": {
     "claim_id": "x3.flashloan.repay_or_revert",
-    "claim": "Flashloans are atomic",
+    "claim": "Flashloan attack resistance",
     "status": "verified",
     "proof_level": "P6",
     "edge_case_level": "E7",
@@ -15,23 +23,37 @@
     "operator_level": "I6",
     "degraded_level": "D5",
     "files_inspected": [
-      "pallets/flashloans/src/lib.rs"
+      "crates/x3-flashloan/src/lib.rs",
+      "crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs",
+      "crates/x3-flashloan/src/tests/attack_reentrancy.rs",
+      "crates/x3-flashloan/src/tests/attack_repayment_bypass.rs",
+      "X3-contracts/shared/parity-core/src/lib.rs",
+      "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
+      "X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json"
     ],
     "commands_run": [
-      "cargo test -p pallet-flashloans"
+      "cargo test -p x3-flashloan attack_ -- --nocapture",
+      "cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors"
     ],
     "passed_checks": [
-      "Atomicity verified",
-      "No escape possible"
+      "flash_loan_oracle_manipulation_fails passed",
+      "flash_loan_reentrancy_rejected passed",
+      "flash_loan_repayment_bypass_reverts passed",
+      "X3-contracts parity vectors (flashloan/repay_or_revert) ok"
     ],
     "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
-    "score": 0.94,
-    "evidence": {},
-    "timestamp": "2026-04-27T23:19:52.719529692Z",
-    "duration_ms": 0
+    "score": 1.0,
+    "evidence": {
+      "passed_attack_tests": "3",
+      "expected_attack_tests": "3",
+      "failed_attack_tests": "0",
+      "parity_vector_harness": "ok"
+    },
+    "timestamp": "2026-04-29T06:38:03.783131921Z",
+    "duration_ms": 2670
   },
   "limitations": [],
-  "binding_hash": "394564cbbe01d7ebc619f596037ee627917a601d6438293c0ce07d3793702d20"
+  "binding_hash": "25996dabbf1d4ed9fccf89cc14682750519fd4ae5cf49d92e6e4dbfb57ab0c77"
 }

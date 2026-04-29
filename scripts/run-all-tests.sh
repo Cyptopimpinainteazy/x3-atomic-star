@@ -210,6 +210,94 @@ run_test "Mutation Testing: List Mutations" \
     true
 
 # ═══════════════════════════════════════════════════════════════
+# SECTION 9: SUBSTRATE TOOLING CI VALIDATION
+# ═══════════════════════════════════════════════════════════════
+
+echo ""
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║ SECTION 9: SUBSTRATE TOOLING CI VALIDATION            ║"
+echo "║ Validates: binary, WASM, configs, weights files       ║"
+echo "╚════════════════════════════════════════════════════════╝"
+
+echo ""
+echo -e "${BLUE}ℹ Runs fast static/config checks — no live node required${NC}"
+echo ""
+
+run_test "Benchmark Binary: runtime-benchmarks feature built" \
+    "test -f target/release/x3-chain-node && target/release/x3-chain-node benchmark --help 2>&1 | grep -q 'benchmark'"
+
+run_test "Weights Validation: all 4 pallet weights.rs" \
+    "./scripts/run-frame-benchmarks.sh verify-weights"
+
+run_test "WASM Binary: exists and has correct magic bytes" \
+    "f=target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm && test -f \"\$f\" && magic=\$(xxd -p -l4 \"\$f\" 2>/dev/null || hexdump -e '1/1 \"%02x\"' -n4 \"\$f\" 2>/dev/null) && test \"\$magic\" = '0061736d'"
+
+run_test "Zombienet Config: TOML valid + has 3 validators" \
+    "cfg=zombienet/x3-local-testnet.toml && test -f \"\$cfg\" && grep -q 'alice\\|Alice' \"\$cfg\" && grep -q 'bob\\|Bob' \"\$cfg\" && grep -q 'charlie\\|Charlie' \"\$cfg\""
+
+run_test "Zombienet: Binary available" \
+    "command -v zombienet || (ls ~/.local/bin/zombienet 2>/dev/null)"
+
+run_test "Chopsticks Config: YAML valid + has endpoint" \
+    "cfg=chopsticks/x3-dev.yml && test -f \"\$cfg\" && grep -q 'endpoint' \"\$cfg\" && grep -q '9944' \"\$cfg\""
+
+run_test "Chopsticks: Binary available (chopsticks or npx)" \
+    "command -v chopsticks || command -v npx"
+
+run_test "try-runtime: subcommand available in node binary" \
+    "target/release/x3-chain-node try-runtime --help 2>&1 | grep -q 'try-runtime\\|on-runtime-upgrade'"
+
+run_test "srtool: Docker daemon running" \
+    "docker info"
+
+run_test "srtool: Docker image pulled or pullable" \
+    "docker image inspect paritytech/srtool:1.75.0 2>/dev/null || docker manifest inspect paritytech/srtool:1.75.0 2>/dev/null"
+
+run_test "Benchmarking: benchmarking.rs exists for all 4 pallets" \
+    "test -f pallets/x3-atomic-kernel/src/benchmarking.rs && \
+     test -f pallets/x3-settlement-engine/src/benchmarking.rs && \
+     test -f pallets/cross-chain-validator/src/benchmarking.rs && \
+     test -f pallets/x3-slash/src/benchmarking.rs"
+
+# ═══════════════════════════════════════════════════════════════
+# SECTION 10: MULTI-PALLET UNIT TESTS (expanded coverage)
+# ═══════════════════════════════════════════════════════════════
+
+echo ""
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║ SECTION 10: MULTI-PALLET UNIT TESTS (expanded)        ║"
+echo "║ Runs unit tests for the 6 highest-coverage pallets    ║"
+echo "╚════════════════════════════════════════════════════════╝"
+
+echo ""
+echo -e "${BLUE}ℹ Tests the pallets with largest test suites first${NC}"
+echo ""
+
+run_test "Unit Tests: pallet-x3-kernel (2891 test lines)" \
+    "cargo test -p pallet-x3-kernel --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-x3-settlement-engine (2106 test lines)" \
+    "cargo test -p pallet-x3-settlement-engine --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-atomic-trade-engine (920 test lines)" \
+    "cargo test -p pallet-atomic-trade-engine --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-x3-coin (875 test lines)" \
+    "cargo test -p pallet-x3-coin --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-x3-cross-vm-router (840 test lines)" \
+    "cargo test -p pallet-x3-cross-vm-router --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-governance (615 test lines)" \
+    "cargo test -p pallet-governance --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-x3-slash (benchmarked pallet)" \
+    "cargo test -p pallet-x3-slash --lib -- --test-threads=4 2>&1 | tail -10"
+
+run_test "Unit Tests: pallet-cross-chain-validator (benchmarked pallet)" \
+    "cargo test -p pallet-cross-chain-validator --lib -- --test-threads=4 2>&1 | tail -10"
+
+# ═══════════════════════════════════════════════════════════════
 # FINAL SUMMARY
 # ═══════════════════════════════════════════════════════════════
 

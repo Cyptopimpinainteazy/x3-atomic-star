@@ -8,7 +8,9 @@ pub const WASM_BINARY_BLOATY: Option<&[u8]> = None;
 "#;
 
     fs::write(&wasm_binary_path, stub).expect("failed to write wasm_binary.rs stub");
-    let _ = reason;
+    println!(
+        "cargo:warning=runtime/build.rs wrote stub wasm_binary.rs ({reason}); embedded runtime WASM will be unavailable"
+    );
 }
 
 fn main() {

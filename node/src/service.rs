@@ -125,7 +125,8 @@ impl NetworkSpeed {
 }
 
 /// Rollout feature flags for consensus and execution paths.
-/// All flags default to off; enable per-validator via CLI or env on canary set first.
+/// All flags default to off for mainnet-v1; enable per-validator via CLI or env on canary set first.
+/// Experimental features (flash finality, PoH, GPU validator, sidecar) are disabled for mainnet-v1.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NodeFeatureFlags {
     /// Enable the parallel proposer pipeline.
@@ -1307,9 +1308,9 @@ pub fn new_full(
     // assets into X3. It must be lifecycle-managed so crashes trigger restarts.
     {
         let sidecar_enabled = std::env::var("X3_ENABLE_SIDECAR")
-            .unwrap_or_else(|_| "true".to_string())
+            .unwrap_or_else(|_| "false".to_string())
             .parse::<bool>()
-            .unwrap_or(true);
+            .unwrap_or(false);
 
         if sidecar_enabled {
             log::info!("🔌 Cross-VM Sidecar Service: initializing lifecycle management");

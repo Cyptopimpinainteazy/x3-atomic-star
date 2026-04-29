@@ -10,7 +10,7 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, X3CoinConfig,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, TreasuryConfig, X3CoinConfig,
     WASM_BINARY,
 };
 
@@ -79,6 +79,29 @@ fn parse_authorities_from_env(var: &str) -> Result<Vec<(AuraId, GrandpaId)>, Str
         .collect()
 }
 
+fn parse_endowed_accounts_from_env(var: &str) -> Result<Vec<AccountId>, String> {
+    let raw = std::env::var(var).map_err(|_| {
+        format!(
+            "Missing {}. Expected JSON array of SS58 account IDs",
+            var
+        )
+    })?;
+
+    let decoded: Vec<String> =
+        serde_json::from_str(&raw).map_err(|e| format!("Invalid {} JSON: {}", var, e))?;
+    if decoded.is_empty() {
+        return Err(format!("{} cannot be empty", var));
+    }
+
+    decoded
+        .into_iter()
+        .map(|ss58| {
+            AccountId::from_ss58check(&ss58)
+                .map_err(|e| format!("Invalid SS58 account in {}: {}", var, e))
+        })
+        .collect()
+}
+
 fn load_bootnodes() -> Vec<sc_network::config::MultiaddrWithPeerId> {
     if let Ok(raw) = std::env::var("TESTNET_BOOTNODES") {
         return raw
@@ -125,6 +148,30 @@ fn assert_no_forbidden_live_seed() -> Result<(), String> {
     Ok(())
 }
 
+fn assert_no_seed_accounts(endowed_accounts: &[AccountId]) -> Result<(), String> {
+    const FORBIDDEN_SEEDS: &[&str] = &[
+        "Alice", "Bob", "Charlie", "Dave", "Eve", "Ferdie",
+        "AtlasFoundation", "AtlasEcosystem", "AtlasCommunity",
+        "TestnetFaucet", "TestnetAlice", "TestnetBob", "TestnetCharlie", "TestnetDave",
+        "TreasuryFoundation", "CommunityFund", "DevelopmentAllocation",
+    ];
+
+    for account in endowed_accounts {
+        for seed in FORBIDDEN_SEEDS {
+            if let Ok(seed_account) = get_account_id_from_seed::<sr25519::Public>(seed) {
+                if account == &seed_account {
+                    return Err(format!(
+                        "Endowed account {} matches forbidden seed '{}'. Live networks must use pre-generated accounts from config, not seeds.",
+                        account.to_ss58check(),
+                        seed
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Load the named `ChainSpec` via the supplied identifier string.
 ///
 /// Chain specs can be loaded by:
@@ -136,8 +183,17 @@ fn assert_no_forbidden_live_seed() -> Result<(), String> {
 /// - `CHAIN_SPEC`: Override default chain spec (e.g., "dev", "staging", "production")
 /// - `X3_ENVIRONMENT`: Set environment tier for auto-config selection
 /// - `X3_STAGING_AUTHORITIES`: JSON array of staging validator keys (format: [{"aura":"SS58","grandpa":"SS58"},...])
+/// - `X3_STAGING_ENDOWED_ACCOUNTS`: JSON array of staging endowed account SS58 IDs
+/// - `X3_STAGING_COUNCIL_MEMBERS`: JSON array of staging council member SS58 IDs
+/// - `X3_STAGING_TREASURY_SIGNERS`: JSON array of staging treasury signer SS58 IDs
 /// - `X3_TESTNET_AUTHORITIES`: JSON array of testnet validator keys
+/// - `X3_TESTNET_ENDOWED_ACCOUNTS`: JSON array of testnet endowed account SS58 IDs
+/// - `X3_TESTNET_COUNCIL_MEMBERS`: JSON array of testnet council member SS58 IDs
+/// - `X3_TESTNET_TREASURY_SIGNERS`: JSON array of testnet treasury signer SS58 IDs
 /// - `X3_PRODUCTION_AUTHORITIES`: JSON array of production validator keys
+/// - `X3_PRODUCTION_ENDOWED_ACCOUNTS`: JSON array of production endowed account SS58 IDs
+/// - `X3_PRODUCTION_COUNCIL_MEMBERS`: JSON array of production council member SS58 IDs
+/// - `X3_PRODUCTION_TREASURY_SIGNERS`: JSON array of production treasury signer SS58 IDs
 /// - `TESTNET_BOOTNODES`: Comma-separated list of bootnode multiaddrs
 /// - `X3_DEV_SEED`: Development seed hint (must not contain forbidden seeds like "Alice", "Bob")
 pub fn load_spec(id: &str) -> Result<Box<dyn ServiceChainSpec>, String> {
@@ -159,14 +215,19 @@ pub fn load_spec(id: &str) -> Result<Box<dyn ServiceChainSpec>, String> {
     }
 }
 
+fn require_embedded_wasm(chain_name: &str) -> Result<&'static [u8], String> {
+    WASM_BINARY.ok_or_else(|| {
+        format!(
+            "Embedded runtime WASM is missing for '{chain_name}'. \
+This node requires an embedded runtime blob at startup. \
+Ensure SKIP_WASM_BUILD is unset and rebuild (for example: SKIP_WASM_BUILD= cargo run -p x3-chain-node -- --chain={chain_name})."
+        )
+    })
+}
+
 /// Build the `ChainSpec` powering the development network (local node).
 pub fn development_config() -> Result<ChainSpec, String> {
-    // For native-dev builds (e.g., with `skip-wasm-build`), we still want to be
-    // able to construct a development chain spec even if no WASM runtime blob
-    // is embedded. In that case, we fall back to an empty code blob and rely
-    // entirely on the native runtime. Runtime upgrades via `set_code` will not
-    // work in this mode, which is acceptable for local development.
-    let wasm_binary = WASM_BINARY.unwrap_or(&[]);
+    let wasm_binary = require_embedded_wasm("dev")?;
     let initial_authorities = vec![authority_keys_from_seed("Alice")?];
     let mut endowed_accounts = vec![
         get_account_id_from_seed::<sr25519::Public>("Alice")?,
@@ -192,6 +253,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
                 council_members.clone(),
+                Vec::new(),
                 sp_core::H160::zero(),
                 [0u8; 32],
             )
@@ -207,9 +269,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 
 /// Build the local testnet `ChainSpec` used during development.
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
-    // Mirror the development config behavior: allow local testnets to run
-    // without an embedded WASM blob when using native-only execution.
-    let wasm_binary = WASM_BINARY.unwrap_or(&[]);
+    let wasm_binary = require_embedded_wasm("local")?;
     let initial_authorities = vec![
         authority_keys_from_seed("Alice")?,
         authority_keys_from_seed("Bob")?,
@@ -239,6 +299,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
                 council_members.clone(),
+                Vec::new(),
                 sp_core::H160::zero(),
                 [0u8; 32],
             )
@@ -254,9 +315,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 /// Build a local 3-validator `ChainSpec` (Alice/Bob/Charlie) for MVP consensus validation.
 pub fn local_three_validator_config() -> Result<ChainSpec, String> {
-    // Mirror the development config behavior: allow local testnets to run
-    // without an embedded WASM blob when using native-only execution.
-    let wasm_binary = WASM_BINARY.unwrap_or(&[]);
+    let wasm_binary = require_embedded_wasm("local3")?;
     let initial_authorities = vec![
         authority_keys_from_seed("Alice")?,
         authority_keys_from_seed("Bob")?,
@@ -288,6 +347,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
                 council_members.clone(),
+                Vec::new(),
                 sp_core::H160::zero(),
                 [0u8; 32],
             )
@@ -311,11 +371,24 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         WASM_BINARY.ok_or_else(|| "X3 Chain WASM binary not available".to_string())?;
     let initial_authorities = parse_authorities_from_env("X3_STAGING_AUTHORITIES")?;
     let bootnodes = load_bootnodes();
-    let endowed_accounts = vec![
-        get_account_id_from_seed::<sr25519::Public>("AtlasFoundation")?,
-        get_account_id_from_seed::<sr25519::Public>("AtlasEcosystem")?,
-        get_account_id_from_seed::<sr25519::Public>("AtlasCommunity")?,
-    ];
+    let endowed_accounts = parse_endowed_accounts_from_env("X3_STAGING_ENDOWED_ACCOUNTS")?;
+    assert_no_seed_accounts(&endowed_accounts)?;
+    let council_members = parse_endowed_accounts_from_env("X3_STAGING_COUNCIL_MEMBERS")?;
+    let treasury_signers = parse_endowed_accounts_from_env("X3_STAGING_TREASURY_SIGNERS")?;
+    if council_members.is_empty() {
+        return Err("Staging network requires at least one council member".to_string());
+    }
+    if treasury_signers.is_empty() {
+        return Err("Staging network requires at least one treasury signer".to_string());
+    }
+    let evm_escrow = parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR");
+    let svm_escrow = parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR");
+    if evm_escrow.is_zero() {
+        return Err("Staging network requires non-zero EVM escrow address".to_string());
+    }
+    if svm_escrow == [0u8; 32] {
+        return Err("Staging network requires non-zero SVM escrow address".to_string());
+    }
 
     Ok(ChainSpec::from_genesis(
         "X3 Chain Staging",
@@ -326,9 +399,10 @@ pub fn staging_config() -> Result<ChainSpec, String> {
                 wasm_binary,
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
-                Vec::new(),
-                parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR"),
-                parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR"),
+                council_members.clone(),
+                treasury_signers.clone(),
+                evm_escrow,
+                svm_escrow,
             )
         },
         bootnodes,
@@ -362,15 +436,24 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
     let initial_authorities = parse_authorities_from_env("X3_TESTNET_AUTHORITIES")?;
     let bootnodes = load_bootnodes();
 
-    let endowed_accounts = vec![
-        // Validator accounts (auto-endowed in genesis fn)
-        // Faucet and test accounts
-        get_account_id_from_seed::<sr25519::Public>("TestnetFaucet")?,
-        get_account_id_from_seed::<sr25519::Public>("TestnetAlice")?,
-        get_account_id_from_seed::<sr25519::Public>("TestnetBob")?,
-        get_account_id_from_seed::<sr25519::Public>("TestnetCharlie")?,
-        get_account_id_from_seed::<sr25519::Public>("TestnetDave")?,
-    ];
+    let endowed_accounts = parse_endowed_accounts_from_env("X3_TESTNET_ENDOWED_ACCOUNTS")?;
+    assert_no_seed_accounts(&endowed_accounts)?;
+    let council_members = parse_endowed_accounts_from_env("X3_TESTNET_COUNCIL_MEMBERS")?;
+    let treasury_signers = parse_endowed_accounts_from_env("X3_TESTNET_TREASURY_SIGNERS")?;
+    if council_members.is_empty() {
+        return Err("Testnet network requires at least one council member".to_string());
+    }
+    if treasury_signers.is_empty() {
+        return Err("Testnet network requires at least one treasury signer".to_string());
+    }
+    let evm_escrow = parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR");
+    let svm_escrow = parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR");
+    if evm_escrow.is_zero() {
+        return Err("Testnet network requires non-zero EVM escrow address".to_string());
+    }
+    if svm_escrow == [0u8; 32] {
+        return Err("Testnet network requires non-zero SVM escrow address".to_string());
+    }
 
     Ok(ChainSpec::from_genesis(
         "X3 Chain Testnet",
@@ -381,9 +464,10 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
                 wasm_binary,
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
-                Vec::new(),
-                parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR"),
-                parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR"),
+                council_members.clone(),
+                treasury_signers.clone(),
+                evm_escrow,
+                svm_escrow,
             )
         },
         bootnodes,
@@ -414,11 +498,24 @@ pub fn production_config() -> Result<ChainSpec, String> {
     let initial_authorities = parse_authorities_from_env("X3_PRODUCTION_AUTHORITIES")?;
     let bootnodes = load_bootnodes();
 
-    let endowed_accounts = vec![
-        get_account_id_from_seed::<sr25519::Public>("TreasuryFoundation")?,
-        get_account_id_from_seed::<sr25519::Public>("CommunityFund")?,
-        get_account_id_from_seed::<sr25519::Public>("DevelopmentAllocation")?,
-    ];
+    let endowed_accounts = parse_endowed_accounts_from_env("X3_PRODUCTION_ENDOWED_ACCOUNTS")?;
+    assert_no_seed_accounts(&endowed_accounts)?;
+    let council_members = parse_endowed_accounts_from_env("X3_PRODUCTION_COUNCIL_MEMBERS")?;
+    let treasury_signers = parse_endowed_accounts_from_env("X3_PRODUCTION_TREASURY_SIGNERS")?;
+    if council_members.is_empty() {
+        return Err("Production network requires at least one council member".to_string());
+    }
+    if treasury_signers.is_empty() {
+        return Err("Production network requires at least one treasury signer".to_string());
+    }
+    let evm_escrow = parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR");
+    let svm_escrow = parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR");
+    if evm_escrow.is_zero() {
+        return Err("Production network requires non-zero EVM escrow address".to_string());
+    }
+    if svm_escrow == [0u8; 32] {
+        return Err("Production network requires non-zero SVM escrow address".to_string());
+    }
 
     Ok(ChainSpec::from_genesis(
         "X3 Chain Production",
@@ -429,9 +526,10 @@ pub fn production_config() -> Result<ChainSpec, String> {
                 wasm_binary,
                 initial_authorities.clone(),
                 endowed_accounts.clone(),
-                Vec::new(),
-                parse_escrow_addr_from_env("X3_EVM_ESCROW_ADDR"),
-                parse_svm_escrow_from_env("X3_SVM_ESCROW_ADDR"),
+                council_members.clone(),
+                treasury_signers.clone(),
+                evm_escrow,
+                svm_escrow,
             )
         },
         bootnodes,
@@ -496,8 +594,9 @@ fn x3_chain_genesis(
     initial_authorities: Vec<(AuraId, GrandpaId)>,
     endowed_accounts: Vec<AccountId>,
     council_members: Vec<AccountId>,
-    _evm_escrow_addr: sp_core::H160,
-    _svm_escrow_addr: [u8; 32],
+    treasury_signers: Vec<AccountId>,
+    evm_escrow_addr: sp_core::H160,
+    svm_escrow_addr: [u8; 32],
 ) -> RuntimeGenesisConfig {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
@@ -541,6 +640,8 @@ fn x3_chain_genesis(
         },
         atlas_kernel: AtlasKernelConfig {
             assets: x3_kernel_default_assets(),
+            evm_escrow: evm_escrow_addr,
+            svm_escrow: svm_escrow_addr,
         },
         transaction_payment: Default::default(),
         council: CouncilConfig {
@@ -549,7 +650,9 @@ fn x3_chain_genesis(
         },
         evm: Default::default(),
         governance: Default::default(),
-        treasury: Default::default(),
+        treasury: TreasuryConfig {
+            initial_signers: treasury_signers,
+        },
         x3_coin: X3CoinConfig {
             team_allocations: Vec::new(),
             ecosystem_allocations: Vec::new(),

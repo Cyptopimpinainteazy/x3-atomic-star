@@ -76,7 +76,11 @@ async fn run_cross_vm_attack_suite(
         status,
         proof_level: Some(ProofLevel::P6),
         edge_case_level: Some(EdgeCaseLevel::E7),
-        hack_level: Some(if blocked { HackLevel::H0 } else { HackLevel::H8 }),
+        hack_level: Some(if blocked {
+            HackLevel::H0
+        } else {
+            HackLevel::H8
+        }),
         operator_level: Some(OperatorLevel::I7),
         degraded_level: Some(DegradedLevel::D6),
         files_inspected: vec![

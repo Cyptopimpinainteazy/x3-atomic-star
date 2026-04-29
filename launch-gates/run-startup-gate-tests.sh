@@ -25,11 +25,14 @@ if [[ "${TARGET_MODE}" == "shared" ]] && pgrep -f -- "--target-dir ${TARGET_DIR}
 fi
 LOCK_FILE="${STARTUP_GATE_LOCK_FILE:-${REPO_ROOT}/launch-gates/evidence/ci/startup-gate.lock}"
 TMP_DIR="${STARTUP_GATE_TMPDIR:-${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-tmp}"
-RUSTFLAGS_VALUE="${STARTUP_GATE_RUSTFLAGS:--C debuginfo=0 -C link-arg=-fuse-ld=lld}"
+RUSTFLAGS_VALUE="${STARTUP_GATE_RUSTFLAGS:--C debuginfo=0 -C codegen-units=1 -C link-arg=-fuse-ld=lld}"
 ALLOW_CONCURRENT="${STARTUP_GATE_ALLOW_CONCURRENT:-0}"
 SKIP_WASM_BUILD_VALUE="${STARTUP_GATE_SKIP_WASM_BUILD:-1}"
 CXXFLAGS_VALUE="${STARTUP_GATE_CXXFLAGS:--pipe -g0}"
 MALLOC_ARENA_MAX_VALUE="${STARTUP_GATE_MALLOC_ARENA_MAX:-2}"
+NUM_JOBS_VALUE="${STARTUP_GATE_NUM_JOBS:-1}"
+CMAKE_BUILD_PARALLEL_LEVEL_VALUE="${STARTUP_GATE_CMAKE_BUILD_PARALLEL_LEVEL:-1}"
+BINARYEN_CORES_VALUE="${STARTUP_GATE_BINARYEN_CORES:-1}"
 
 if [[ -n "${STARTUP_GATE_TARGET_DIR:-}" ]]; then
   RUNTIME_TARGET_DIR="${TARGET_DIR}"
@@ -79,6 +82,9 @@ echo "startup-gate-run: rustflags=${RUSTFLAGS_VALUE}"
 echo "startup-gate-run: skip_wasm_build=${SKIP_WASM_BUILD_VALUE}"
 echo "startup-gate-run: cxxflags=${CXXFLAGS_VALUE}"
 echo "startup-gate-run: malloc_arena_max=${MALLOC_ARENA_MAX_VALUE}"
+echo "startup-gate-run: num_jobs=${NUM_JOBS_VALUE}"
+echo "startup-gate-run: cmake_build_parallel_level=${CMAKE_BUILD_PARALLEL_LEVEL_VALUE}"
+echo "startup-gate-run: binaryen_cores=${BINARYEN_CORES_VALUE}"
 echo "startup-gate-run: tmp_dir=${TMP_DIR}"
 
 {
@@ -92,6 +98,9 @@ echo "startup-gate-run: tmp_dir=${TMP_DIR}"
   echo "skip_wasm_build=${SKIP_WASM_BUILD_VALUE}"
   echo "cxxflags=${CXXFLAGS_VALUE}"
   echo "malloc_arena_max=${MALLOC_ARENA_MAX_VALUE}"
+  echo "num_jobs=${NUM_JOBS_VALUE}"
+  echo "cmake_build_parallel_level=${CMAKE_BUILD_PARALLEL_LEVEL_VALUE}"
+  echo "binaryen_cores=${BINARYEN_CORES_VALUE}"
 } > "${OUT_DIR}/summary.env"
 
 echo "job,result,exit_code,duration_sec,log_file" > "${OUT_DIR}/matrix.csv"
@@ -147,7 +156,7 @@ run_job() {
   return ${ec}
 }
 
-COMMON_ENV=(env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX_VALUE}" SKIP_WASM_BUILD="${SKIP_WASM_BUILD_VALUE}" RUSTFLAGS="${RUSTFLAGS_VALUE}" TMPDIR="${TMP_DIR}" CXXFLAGS="${CXXFLAGS_VALUE}")
+COMMON_ENV=(env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 NUM_JOBS="${NUM_JOBS_VALUE}" CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL_VALUE}" BINARYEN_CORES="${BINARYEN_CORES_VALUE}" MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX_VALUE}" SKIP_WASM_BUILD="${SKIP_WASM_BUILD_VALUE}" RUSTFLAGS="${RUSTFLAGS_VALUE}" TMPDIR="${TMP_DIR}" CXXFLAGS="${CXXFLAGS_VALUE}")
 
 run_job runtime_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_passes_with_reference_scheduler --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true
 run_job runtime_gate_deterministic "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_is_deterministic --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true

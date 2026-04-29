@@ -3,7 +3,7 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use frame_benchmarking::{benchmarks, whitemp};
+use frame_benchmarking::{benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
 use sp_core::H256;
 

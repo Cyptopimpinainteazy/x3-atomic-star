@@ -227,6 +227,7 @@ sp-timestamp = { git = "https://github.com/paritytech/substrate", rev = "948fbd2
 pallet-session = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
 pallet-staking = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
 pallet-offences = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
+pallet-authorship = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
 
 # Substrate client (node) workspace deps used by `node` member
 sc-basic-authorship = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
