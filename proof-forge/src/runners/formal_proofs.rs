@@ -75,6 +75,7 @@ async fn run_tla_specs(
         let rel_path = rel(workspace, spec);
         rel_path.contains("formal-proofs/tla/consensus/")
             || rel_path.contains("formal-proofs/tla/asset_kernel/")
+            || rel_path.contains("formal-proofs/tla/contracts/")
     });
     tla_specs.sort();
 
