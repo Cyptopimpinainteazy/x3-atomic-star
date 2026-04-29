@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X3 ProofForge Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e1e8ed; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #38444d; }
+    h1 { font-size: 2em; margin-bottom: 5px; color: #1da1f2; }
+    .subtitle { color: #aab8c2; font-size: 0.9em; }
+    .panel { background: #192734; border: 1px solid #38444d; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .label { color: #aab8c2; font-size: 0.85em; text-transform: uppercase; margin-bottom: 8px; }
+    .value { font-size: 1.2em; font-weight: 600; color: #1da1f2; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #111820; border: 1px solid #38444d; border-radius: 8px; padding: 16px; margin-top: 12px; }
+    footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #38444d; color: #657786; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔐 X3 ProofForge Dashboard</h1>
+      <p class="subtitle">Generated from live proof gate outputs</p>
+    </header>
+
+    <div class="panel">
+      <div class="label">Generated At (UTC)</div>
+      <div class="value" id="generated-at">loading...</div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Raw Dashboard JSON</div>
+      <pre id="payload">loading...</pre>
+    </div>
+
+    <footer>
+      <p>Last updated: <span id="timestamp"></span></p>
+      <p>X3 ProofForge v1.0.0 • Automated Proof Verification System</p>
+    </footer>
+  </div>
+  <script>
+    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    Promise.all([
+      fetch('./metadata.json').then((r) => r.json()),
+      fetch('./proof-score.json').then((r) => r.json()),
+    ]).then(([meta, score]) => {
+      document.getElementById('generated-at').textContent = meta.generated_at || 'unknown';
+      document.getElementById('payload').textContent = JSON.stringify(score, null, 2);
+    }).catch((err) => {
+      document.getElementById('generated-at').textContent = 'unavailable';
+      document.getElementById('payload').textContent = `Failed to load dashboard JSON: ${err}`;
+    });
+  </script>
+</body>
+</html>
