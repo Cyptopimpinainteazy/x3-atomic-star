@@ -87,11 +87,107 @@ async fn verify_onboarding(workspace: &Path, claim_id: &str, verbose: bool) -> R
 
     // Measure: time-to-first-value is S1 — we can only prove the DOCUMENTATION exists,
     // not the measured time. Flag as partial if we have docs but no benchmark.
-    missing_proofs.push(
-        "No measured time-to-first-value benchmark — \
-         add a CI step that times `cargo build` + node startup + first block"
-            .to_string(),
-    );
+    // ----------------------------------------------------------------------
+    // Real time-to-first-value gate.
+    //
+    // The measurement is produced by `scripts/onboarding/measure_ttfv.sh`,
+    // which times an actual fresh-clone first-value flow (build + two
+    // verify calls) and writes a structured benchmark to
+    //   proof/onboarding/ttfv_benchmark.json.
+    // This runner reads that file and asserts:
+    //   1. it parses,
+    //   2. every step succeeded,
+    //   3. total_seconds <= budget_seconds (within_budget == true),
+    //   4. it was measured within TTFV_FRESHNESS_DAYS (default 30) days.
+    // ----------------------------------------------------------------------
+    let ttfv_path = workspace.join("proof/onboarding/ttfv_benchmark.json");
+    if ttfv_path.exists() {
+        files_inspected.push("proof/onboarding/ttfv_benchmark.json".to_string());
+        match std::fs::read_to_string(&ttfv_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        {
+            Some(json) => {
+                let total_seconds = json
+                    .get("total_seconds")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(f64::INFINITY);
+                let budget_seconds = json
+                    .get("budget_seconds")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let within_budget = json
+                    .get("within_budget")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let passed = json.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
+                let measured_at = json
+                    .get("measured_at")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                evidence.insert("ttfv_total_seconds".to_string(), format!("{:.3}", total_seconds));
+                evidence.insert(
+                    "ttfv_budget_seconds".to_string(),
+                    format!("{:.0}", budget_seconds),
+                );
+                evidence.insert("ttfv_measured_at".to_string(), measured_at.clone());
+
+                // Freshness: parse as RFC3339 and require <= 30 days old.
+                let freshness_days: i64 = std::env::var("TTFV_FRESHNESS_DAYS")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(30);
+                let fresh = chrono::DateTime::parse_from_rfc3339(&measured_at)
+                    .map(|t| {
+                        let age = Utc::now().signed_duration_since(t.with_timezone(&Utc));
+                        age.num_days() <= freshness_days
+                    })
+                    .unwrap_or(false);
+
+                if passed {
+                    passed_checks.push("All TTFV benchmark steps succeeded".to_string());
+                } else {
+                    failed_checks.push("TTFV benchmark recorded a failed step".to_string());
+                }
+                if within_budget {
+                    passed_checks.push(format!(
+                        "TTFV {:.2}s ≤ budget {:.0}s",
+                        total_seconds, budget_seconds
+                    ));
+                } else {
+                    failed_checks.push(format!(
+                        "TTFV {:.2}s exceeds budget {:.0}s",
+                        total_seconds, budget_seconds
+                    ));
+                }
+                if fresh {
+                    passed_checks.push(format!(
+                        "TTFV benchmark fresh (≤ {} days, measured {})",
+                        freshness_days, measured_at
+                    ));
+                } else {
+                    missing_proofs.push(format!(
+                        "TTFV benchmark stale (> {} days old or unparseable timestamp: '{}'); rerun scripts/onboarding/measure_ttfv.sh",
+                        freshness_days, measured_at
+                    ));
+                }
+            }
+            None => {
+                failed_checks.push(
+                    "proof/onboarding/ttfv_benchmark.json exists but did not parse as JSON"
+                        .to_string(),
+                );
+            }
+        }
+    } else {
+        missing_proofs.push(
+            "No measured time-to-first-value benchmark — \
+             run scripts/onboarding/measure_ttfv.sh to populate proof/onboarding/ttfv_benchmark.json"
+                .to_string(),
+        );
+    }
 
     let total_checks = passed_checks.len() + failed_checks.len();
     let score = if total_checks == 0 {
@@ -190,19 +286,151 @@ async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Resu
         missing_proofs.push("proof/receipts/claims/ directory missing".to_string());
     }
 
-    // Hard gap: no explicit funding→milestone→receipt linkage file
-    let link_file_exists = workspace
-        .join("proof/funding/milestone-receipt-map.yml")
-        .exists()
-        || workspace.join("docs/funding-milestones.yml").exists();
-    if link_file_exists {
-        passed_checks.push("Funding→milestone→receipt linkage file found".to_string());
-    } else {
+    // Hard gate: parse the explicit funding→milestone→receipt linkage file and
+    // assert every referenced receipt actually exists and is `verified`.
+    let map_path = workspace.join("proof/funding/milestone-receipt-map.yml");
+    if !map_path.exists() {
         missing_proofs.push(
             "No proof/funding/milestone-receipt-map.yml — \
-             create a file linking each funding ask to a milestone ID and a proof receipt"
+             create a file linking each funding ask to a milestone ID, deliverable, \
+             budget and a proof-forge receipt"
                 .to_string(),
         );
+    } else {
+        files_inspected.push("proof/funding/milestone-receipt-map.yml".to_string());
+        match std::fs::read_to_string(&map_path)
+            .map_err(|e| e.to_string())
+            .and_then(|s| serde_yaml::from_str::<serde_yaml::Value>(&s).map_err(|e| e.to_string()))
+        {
+            Err(e) => {
+                failed_checks.push(format!(
+                    "proof/funding/milestone-receipt-map.yml failed to parse: {}",
+                    e
+                ));
+            }
+            Ok(doc) => {
+                let milestones = doc.get("milestones").and_then(|v| v.as_sequence());
+                match milestones {
+                    None => failed_checks.push(
+                        "milestone-receipt-map.yml missing top-level `milestones:` sequence"
+                            .to_string(),
+                    ),
+                    Some(items) if items.is_empty() => {
+                        failed_checks.push(
+                            "milestone-receipt-map.yml has zero milestones — at least one \
+                             funding ask must be mapped"
+                                .to_string(),
+                        );
+                    }
+                    Some(items) => {
+                        let mut seen_ids = std::collections::HashSet::new();
+                        let mut total_budget: u64 = 0;
+                        let mut bad_items = 0usize;
+                        let mut verified_receipt_count = 0usize;
+                        for (idx, m) in items.iter().enumerate() {
+                            let id = m.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                            let deliverable = m
+                                .get("deliverable")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let budget = m
+                                .get("funding_ask_usd")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let receipt_rel = m
+                                .get("receipt")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            if id.is_empty() || deliverable.is_empty() || receipt_rel.is_empty() {
+                                failed_checks.push(format!(
+                                    "milestones[{}]: missing required field (id/deliverable/receipt)",
+                                    idx
+                                ));
+                                bad_items += 1;
+                                continue;
+                            }
+                            if !seen_ids.insert(id.to_string()) {
+                                failed_checks
+                                    .push(format!("milestones[{}]: duplicate id `{}`", idx, id));
+                                bad_items += 1;
+                                continue;
+                            }
+                            if budget == 0 {
+                                failed_checks.push(format!(
+                                    "milestones[{}] (`{}`): funding_ask_usd must be > 0",
+                                    idx, id
+                                ));
+                                bad_items += 1;
+                                continue;
+                            }
+                            let receipt_path = workspace.join(receipt_rel);
+                            if !receipt_path.exists() {
+                                failed_checks.push(format!(
+                                    "milestones[{}] (`{}`): receipt `{}` does not exist",
+                                    idx, id, receipt_rel
+                                ));
+                                bad_items += 1;
+                                continue;
+                            }
+                            // The receipt must itself be `verified`.
+                            let receipt_status = std::fs::read_to_string(&receipt_path)
+                                .ok()
+                                .and_then(|s| {
+                                    serde_json::from_str::<serde_json::Value>(&s).ok()
+                                })
+                                .and_then(|j| {
+                                    j.get("result")
+                                        .and_then(|r| r.get("status"))
+                                        .and_then(|s| s.as_str())
+                                        .map(|s| s.to_string())
+                                });
+                            match receipt_status.as_deref() {
+                                Some("verified") => {
+                                    verified_receipt_count += 1;
+                                    total_budget = total_budget.saturating_add(budget);
+                                }
+                                Some(other) => {
+                                    failed_checks.push(format!(
+                                        "milestones[{}] (`{}`): receipt status is `{}`, not `verified`",
+                                        idx, id, other
+                                    ));
+                                    bad_items += 1;
+                                }
+                                None => {
+                                    failed_checks.push(format!(
+                                        "milestones[{}] (`{}`): receipt `{}` has no result.status field",
+                                        idx, id, receipt_rel
+                                    ));
+                                    bad_items += 1;
+                                }
+                            }
+                        }
+                        evidence.insert(
+                            "funding_milestones_total".to_string(),
+                            items.len().to_string(),
+                        );
+                        evidence.insert(
+                            "funding_milestones_verified".to_string(),
+                            verified_receipt_count.to_string(),
+                        );
+                        evidence.insert(
+                            "funding_total_budget_usd".to_string(),
+                            total_budget.to_string(),
+                        );
+                        if bad_items == 0 {
+                            passed_checks.push(format!(
+                                "All {} funding milestones map to existing verified receipts",
+                                items.len()
+                            ));
+                            passed_checks.push(format!(
+                                "Funding map total budget = ${} USD",
+                                total_budget
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     let total_checks = passed_checks.len() + failed_checks.len();
@@ -340,6 +568,139 @@ async fn verify_evolution(workspace: &Path, claim_id: &str, verbose: bool) -> Re
             "pallets/evolution-core/ not found — no automated regression detection pallet"
                 .to_string(),
         );
+    }
+
+    // ----------------------------------------------------------------------
+    // Real executable no-regression gate.
+    //
+    // For every prior claim receipt under proof/receipts/claims/, compare the
+    // current score against a persisted baseline at
+    //   proof/baselines/claim_scores.yml
+    // If a claim's score has dropped below its baseline, that is a regression
+    // and this check fails. Missing baselines are bootstrapped at current
+    // score (first-run pin) but flagged so the bootstrap is auditable.
+    //
+    // The own receipt for x3.evolution.no_regression is excluded to avoid
+    // self-reference loops.
+    // ----------------------------------------------------------------------
+    let receipts_dir = workspace.join("proof/receipts/claims");
+    let baseline_path = workspace.join("proof/baselines/claim_scores.yml");
+    files_inspected.push("proof/baselines/claim_scores.yml".to_string());
+
+    let mut baseline: HashMap<String, f64> = HashMap::new();
+    if baseline_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&baseline_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if let Some((k, v)) = line.split_once(':') {
+                    if let Ok(score) = v.trim().parse::<f64>() {
+                        baseline.insert(k.trim().to_string(), score);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut current_scores: HashMap<String, f64> = HashMap::new();
+    let mut receipts_seen = 0usize;
+    if receipts_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&receipts_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                    continue;
+                }
+                let Ok(text) = std::fs::read_to_string(&path) else { continue };
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { continue };
+                let Some(cid) = json
+                    .get("result")
+                    .and_then(|r| r.get("claim_id"))
+                    .and_then(|v| v.as_str())
+                else { continue };
+                if cid == claim_id {
+                    continue; // skip self
+                }
+                let Some(score) = json
+                    .get("result")
+                    .and_then(|r| r.get("score"))
+                    .and_then(|v| v.as_f64())
+                else { continue };
+                current_scores.insert(cid.to_string(), score);
+                receipts_seen += 1;
+            }
+        }
+    }
+
+    evidence.insert("receipts_compared".to_string(), receipts_seen.to_string());
+    evidence.insert("baseline_entries".to_string(), baseline.len().to_string());
+
+    let mut regressions: Vec<String> = vec![];
+    let mut new_pins: Vec<(String, f64)> = vec![];
+    // Tolerance: treat tiny floating-point differences as no-change.
+    const EPS: f64 = 1e-9;
+    for (cid, current) in &current_scores {
+        match baseline.get(cid) {
+            Some(prev) => {
+                if *current + EPS < *prev {
+                    regressions.push(format!(
+                        "{}: score regressed {:.3} -> {:.3}",
+                        cid, prev, current
+                    ));
+                }
+            }
+            None => {
+                new_pins.push((cid.clone(), *current));
+            }
+        }
+    }
+
+    if regressions.is_empty() {
+        passed_checks.push(format!(
+            "No score regressions across {} claim receipts (vs {} baseline pins)",
+            receipts_seen,
+            baseline.len()
+        ));
+    } else {
+        for r in &regressions {
+            failed_checks.push(r.clone());
+        }
+    }
+
+    // Persist (or bootstrap) the baseline so the next run has something to
+    // compare against. We only ever raise the floor: take max(prev, current)
+    // for known claims, and pin first-seen claims at their current score.
+    if !current_scores.is_empty() {
+        let mut merged: Vec<(String, f64)> =
+            baseline.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        for (cid, score) in &current_scores {
+            if let Some(entry) = merged.iter_mut().find(|(k, _)| k == cid) {
+                entry.1 = entry.1.max(*score);
+            } else {
+                merged.push((cid.clone(), *score));
+            }
+        }
+        merged.sort_by(|a, b| a.0.cmp(&b.0));
+        if let Some(parent) = baseline_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let mut out = String::new();
+        out.push_str("# Auto-maintained by proof-forge / evolution.no_regression runner.\n");
+        out.push_str("# Each line pins the historical floor score for a claim. Scores can\n");
+        out.push_str("# only ratchet upward; any drop becomes a regression failure.\n");
+        for (k, v) in &merged {
+            out.push_str(&format!("{}: {:.6}\n", k, v));
+        }
+        let _ = std::fs::write(&baseline_path, out);
+    }
+
+    if !new_pins.is_empty() {
+        missing_proofs.push(format!(
+            "{} new claim receipt(s) bootstrapped into baseline this run (auditable; future runs will gate against them)",
+            new_pins.len()
+        ));
     }
 
     let total_checks = passed_checks.len() + failed_checks.len();

@@ -110,13 +110,11 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                     || stderr.contains("parity");
                 if has_parity_test {
                     passed_checks.push("Deterministic/parity test confirmed in output".to_string());
-                } else {
-                    missing_proofs.push(
-                        "No test explicitly named 'parity' or 'deterministic' in output; \
-                         add test_cpu_gpu_parity that asserts CPU and GPU results match"
-                            .to_string(),
-                    );
                 }
+                // No `else` branch: --quiet hides test names; the dedicated
+                // gpu-parity-core JSON-vector gate below is the binding
+                // proof of CPU↔GPU parity, so absence of the literal token
+                // here is not a missing_proof.
             } else {
                 let err_snippet = stderr.lines().take(5).collect::<Vec<_>>().join(" | ");
                 failed_checks.push(format!("GPU validator tests failed: {}", err_snippet));
@@ -151,6 +149,77 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                     .to_string(),
             );
         }
+    }
+
+    // ── 4b. Drive the X3-contracts gpu-parity-core JSON-vector harness ───────
+    // Mirrors the EVM↔SVM parity gate. Asserts every pinned hash vector
+    // produces the same canonical 32-byte digest on both validator paths.
+    let parity_manifest = "X3-contracts/shared/gpu-parity-core/Cargo.toml";
+    let parity_vectors = "X3-contracts/shared/test-vectors/gpu_hash_parity.json";
+    if workspace.join(parity_manifest).exists() && workspace.join(parity_vectors).exists() {
+        files_inspected.push(parity_manifest.to_string());
+        files_inspected.push(parity_vectors.to_string());
+
+        let cmd_str = format!(
+            "cargo test --manifest-path {} --test parity_vectors",
+            parity_manifest
+        );
+        commands_run.push(cmd_str.clone());
+        if verbose {
+            println!("    Running: {}", cmd_str);
+        }
+
+        let parity_out = Command::new("cargo")
+            .args([
+                "test",
+                "--manifest-path",
+                parity_manifest,
+                "--test",
+                "parity_vectors",
+                "--quiet",
+            ])
+            .current_dir(workspace)
+            .output();
+
+        match parity_out {
+            Ok(out) => {
+                let combined = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&out.stdout),
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                if out.status.success() && !combined.contains(" FAILED") {
+                    passed_checks
+                        .push("X3-contracts gpu-parity-core hash-vector harness PASSED".to_string());
+                    evidence.insert("gpu_parity_vectors".to_string(), "ok".to_string());
+                } else {
+                    let snippet = combined
+                        .lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .rev()
+                        .take(8)
+                        .collect::<Vec<_>>()
+                        .join(" | ");
+                    failed_checks.push(format!(
+                        "gpu-parity-core hash-vector harness FAILED: {}",
+                        snippet
+                    ));
+                    blockers.push(
+                        "CPU↔GPU canonical hash digests diverge from pinned spec vectors"
+                            .to_string(),
+                    );
+                }
+            }
+            Err(e) => {
+                missing_proofs
+                    .push(format!("Could not run gpu-parity-core harness: {}", e));
+            }
+        }
+    } else {
+        missing_proofs.push(format!(
+            "{} or {} missing — install gpu-parity-core to enable spec-level CPU↔GPU parity gate",
+            parity_manifest, parity_vectors
+        ));
     }
 
     // ── 5. Score and status ──────────────────────────────────────────────────
