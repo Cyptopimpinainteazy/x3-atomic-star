@@ -11,6 +11,6 @@ module X3VM-SPEC
   configuration <k> $PGM:Program </k>
 
   rule <k> NOOP ; REST => REST ...</k>
-  rule <k> HALT ; _ => .List ...</k>
+  rule <k> HALT ; _ => .Program ...</k>
 
 endmodule

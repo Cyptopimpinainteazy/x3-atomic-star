@@ -29,8 +29,8 @@ Theorem supply_conservation :
     end.
 Proof.
   intros s s' tx H.
-  destruct tx; simpl in H.
+  destruct tx as [amt | amt | amt]; simpl in H.
   - inversion H; reflexivity.
   - inversion H; reflexivity.
-  - destruct (n <=? total_supply s) eqn:HB; inversion H; reflexivity.
+  - destruct (amt <=? total_supply s) eqn:HB; inversion H; reflexivity.
 Qed.
