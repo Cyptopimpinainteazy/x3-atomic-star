@@ -120,14 +120,20 @@ async fn verify_onboarding(workspace: &Path, claim_id: &str, verbose: bool) -> R
                     .get("within_budget")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                let passed = json.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
+                let passed = json
+                    .get("passed")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let measured_at = json
                     .get("measured_at")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
 
-                evidence.insert("ttfv_total_seconds".to_string(), format!("{:.3}", total_seconds));
+                evidence.insert(
+                    "ttfv_total_seconds".to_string(),
+                    format!("{:.3}", total_seconds),
+                );
                 evidence.insert(
                     "ttfv_budget_seconds".to_string(),
                     format!("{:.0}", budget_seconds),
@@ -329,18 +335,14 @@ async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Resu
                         let mut verified_receipt_count = 0usize;
                         for (idx, m) in items.iter().enumerate() {
                             let id = m.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                            let deliverable = m
-                                .get("deliverable")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
+                            let deliverable =
+                                m.get("deliverable").and_then(|v| v.as_str()).unwrap_or("");
                             let budget = m
                                 .get("funding_ask_usd")
                                 .and_then(|v| v.as_u64())
                                 .unwrap_or(0);
-                            let receipt_rel = m
-                                .get("receipt")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
+                            let receipt_rel =
+                                m.get("receipt").and_then(|v| v.as_str()).unwrap_or("");
                             if id.is_empty() || deliverable.is_empty() || receipt_rel.is_empty() {
                                 failed_checks.push(format!(
                                     "milestones[{}]: missing required field (id/deliverable/receipt)",
@@ -375,9 +377,7 @@ async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Resu
                             // The receipt must itself be `verified`.
                             let receipt_status = std::fs::read_to_string(&receipt_path)
                                 .ok()
-                                .and_then(|s| {
-                                    serde_json::from_str::<serde_json::Value>(&s).ok()
-                                })
+                                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
                                 .and_then(|j| {
                                     j.get("result")
                                         .and_then(|r| r.get("status"))
@@ -422,10 +422,8 @@ async fn verify_funding(workspace: &Path, claim_id: &str, verbose: bool) -> Resu
                                 "All {} funding milestones map to existing verified receipts",
                                 items.len()
                             ));
-                            passed_checks.push(format!(
-                                "Funding map total budget = ${} USD",
-                                total_budget
-                            ));
+                            passed_checks
+                                .push(format!("Funding map total budget = ${} USD", total_budget));
                         }
                     }
                 }
@@ -613,13 +611,19 @@ async fn verify_evolution(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                 if path.extension().and_then(|s| s.to_str()) != Some("json") {
                     continue;
                 }
-                let Ok(text) = std::fs::read_to_string(&path) else { continue };
-                let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { continue };
+                let Ok(text) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    continue;
+                };
                 let Some(cid) = json
                     .get("result")
                     .and_then(|r| r.get("claim_id"))
                     .and_then(|v| v.as_str())
-                else { continue };
+                else {
+                    continue;
+                };
                 if cid == claim_id {
                     continue; // skip self
                 }
@@ -627,7 +631,9 @@ async fn verify_evolution(workspace: &Path, claim_id: &str, verbose: bool) -> Re
                     .get("result")
                     .and_then(|r| r.get("score"))
                     .and_then(|v| v.as_f64())
-                else { continue };
+                else {
+                    continue;
+                };
                 current_scores.insert(cid.to_string(), score);
                 receipts_seen += 1;
             }

@@ -128,10 +128,7 @@ async fn verify_evm_svm_parity(workspace: &Path, claim_id: &str) -> Result<Proof
             ));
         }
     } else {
-        failed_checks.push(format!(
-            "parity vectors missing at {}",
-            vectors.display()
-        ));
+        failed_checks.push(format!("parity vectors missing at {}", vectors.display()));
     }
 
     // 4. Run the executable parity harness (single source of truth).
@@ -166,9 +163,7 @@ async fn verify_evm_svm_parity(workspace: &Path, claim_id: &str) -> Result<Proof
 
     let score = if test_passed && stacks_present {
         // 0.7 base for executable harness pass + 0.15 EVM + 0.15 SVM presence.
-        0.7
-            + (if sol_count > 0 { 0.15 } else { 0.0 })
-            + (if svm_rs_count > 0 { 0.15 } else { 0.0 })
+        0.7 + (if sol_count > 0 { 0.15 } else { 0.0 }) + (if svm_rs_count > 0 { 0.15 } else { 0.0 })
     } else if test_passed {
         0.5
     } else {
@@ -177,8 +172,7 @@ async fn verify_evm_svm_parity(workspace: &Path, claim_id: &str) -> Result<Proof
 
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
-        claim: "Core EVM contracts and SVM programs implement equivalent X3 behavior"
-            .to_string(),
+        claim: "Core EVM contracts and SVM programs implement equivalent X3 behavior".to_string(),
         status,
         proof_level: Some(ProofLevel::P5),
         edge_case_level: Some(EdgeCaseLevel::E6),
@@ -244,11 +238,7 @@ fn unverified_stub(claim_id: &str) -> ProofResult {
     }
 }
 
-pub async fn verify_claim(
-    workspace: &Path,
-    claim_id: &str,
-    _verbose: bool,
-) -> Result<ProofResult> {
+pub async fn verify_claim(workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
     let suffix = claim_id.rsplit('.').next().unwrap_or("");
     match suffix {
         "evm_svm_parity" => verify_evm_svm_parity(workspace, claim_id).await,

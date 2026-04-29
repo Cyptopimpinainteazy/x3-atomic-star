@@ -6,7 +6,7 @@
   "relevant_files": [
     "pallets/governance/src/lib.rs"
   ],
-  "timestamp": "2026-04-27T23:19:56.685980060Z",
+  "timestamp": "2026-04-29T02:01:28.063509497Z",
   "result": {
     "claim_id": "x3.governance.proof_gated_upgrade",
     "claim": "Governance is tamper-proof",

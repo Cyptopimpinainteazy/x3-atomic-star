@@ -6,7 +6,7 @@
   "relevant_files": [
     "proof/receipts/claims"
   ],
-  "timestamp": "2026-04-27T23:22:09.423055340Z",
+  "timestamp": "2026-04-29T02:01:28.063509497Z",
   "result": {
     "claim_id": "x3.proofforge.receipt_integrity",
     "claim": "ProofForge receipt integrity and freshness",

@@ -57,19 +57,14 @@ pub type X3Result<T> = Result<T, X3Error>;
 // Value
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum MiniValue {
     I64(i64),
     F64(f64),
     Bool(bool),
     Bytes(Vec<u8>),
+    #[default]
     Unit,
-}
-
-impl Default for MiniValue {
-    fn default() -> Self {
-        MiniValue::Unit
-    }
 }
 
 impl MiniValue {
@@ -355,7 +350,7 @@ impl<'m> Vm<'m> {
                 module
                     .const_pool
                     .get(g.init_const as usize)
-                    .map(|c| mini_value_from_const(c))
+                    .map(mini_value_from_const)
                     .unwrap_or(MiniValue::Unit)
             })
             .collect();
@@ -1067,7 +1062,7 @@ impl<'m> Vm<'m> {
             } // chain_id
 
             // Atomic ops — tracked but no real isolation here (single-threaded WASM)
-            0x90 | 0x91 | 0x92 => {
+            0x90..=0x92 => {
                 self.r16(ip + 1)?;
                 Ok(Step::Continue(ip + 3))
             }
@@ -1276,7 +1271,6 @@ mod tests {
     #[test]
     fn test_add_operation() {
         // LoadImm r0, 5; LoadImm r1, 3; AddI r2, r0, r1; Ret r2
-        let mut b = make_simple_module();
         // Replace code section
         let code: &[u8] = &[
             0x18, 0x00, 5, // LoadImm r0, 5

@@ -8,7 +8,7 @@
     "pallets/x3-atomic-kernel/src/tests.rs",
     "pallets/x3-cross-vm-router/src/lib.rs"
   ],
-  "timestamp": "2026-04-27T23:21:53.474248907Z",
+  "timestamp": "2026-04-29T02:01:28.063509497Z",
   "result": {
     "claim_id": "x3.atomic.rollback_safety",
     "claim": "If any EVM/SVM/X3VM leg fails, the operation rolls back or refunds safely",
