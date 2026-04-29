@@ -157,7 +157,7 @@ parameter_types! {
     pub const CrossVmPrepareTtl: BlockNumber = 50; // 50 blocks (~10s at 200ms)
     pub const MaxPreparedCrossVmOps: u32 = 1024;
     pub const MaxPreparedOpsPerBlock: u32 = 64;
-    pub const RequireCrossVmProof: bool = false;
+    pub const RequireCrossVmProof: bool = true;
     pub BlockWeights: limits::BlockWeights = limits::BlockWeights::with_sensible_defaults(
         // Keep max execution budget below slot time (200ms) to avoid author/import divergence.
         Weight::from_parts((WEIGHT_REF_TIME_PER_SECOND / 1000) * 150, 5 * 1024 * 1024),
@@ -215,7 +215,7 @@ parameter_types! {
     pub const FraudProofMaxTxCount: u32 = 256;
     /// Blocks within which a fraud proof must be submitted after the disputed block.
     /// At 200 ms/block this is approximately 24 hours.
-    pub const FraudProofDisputeWindowBlocks: u32 = 7_200;
+    pub const FraudProofDisputeWindowBlocks: u32 = 7_200 * 30;
     /// Reward paid to the reporter on accepted fraud proof (1 ATLAS).
     pub const FraudProofReporterReward: Balance = X3;
 }
@@ -420,9 +420,10 @@ impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     // KeyOwnerProof is Void when we don't have session pallet
     type KeyOwnerProof = sp_core::Void;
-    // Equivocation reporting disabled without session/offences pallets
-    // To fully enable, add: session, historical, offences, authorship pallets
-    // For now, equivocations are still detected and logged in GRANDPA
+    // Equivocation reporting disabled for mainnet-v1 (authority-operated network)
+    // Equivocations are detected and logged but not slashed automatically
+    // This is acceptable for tightly controlled validator sets with manual intervention
+    // To fully enable slashing, add: session, historical, offences, authorship pallets
     type EquivocationReportSystem = ();
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
@@ -1054,11 +1055,7 @@ mod native_vm_adapters {
                     Some(target),
                     &pre_balances,
                 )),
-                Err(_) => {
-                    // As a safe fallback in tests or non-fully-initialized environments,
-                    // delegate to the Kernel's mock adapter for deterministic behavior.
-                    pallet_x3_kernel::MockEvmAdapter::execute(payload, gas_limit)
-                }
+                Err(e) => Err(e),
             }
         }
 
@@ -1384,14 +1381,14 @@ impl pallet_preimage::Config for Runtime {
 // ===== Governance Pallet Configuration =====
 parameter_types! {
     pub const ProposalDeposit: Balance = 100 * X3;
-    pub const VotingPeriod: BlockNumber = 7 * 24 * 60 * 10; // ~7 days at 6s blocks
-    pub const EnactmentPeriod: BlockNumber = 24 * 60 * 10; // ~1 day at 6s blocks
+    pub const VotingPeriod: BlockNumber = 7 * 24 * 60 * 10 * 30; // ~7 days at 200ms blocks
+    pub const EnactmentPeriod: BlockNumber = 24 * 60 * 10 * 30; // ~1 day at 200ms blocks
     pub const GovernanceQuorum: sp_runtime::Percent = sp_runtime::Percent::from_percent(10);
     pub const ApprovalThreshold: sp_runtime::Percent = sp_runtime::Percent::from_percent(51);
     pub const MaxGovernanceProposals: u32 = 100;
     pub const MaxVotes: u32 = 1000;
     pub const MaxDelegations: u32 = 100;
-    pub const ConvictionPeriod: BlockNumber = 28 * 24 * 60 * 10; // ~28 days at 6s blocks
+    pub const ConvictionPeriod: BlockNumber = 28 * 24 * 60 * 10 * 30; // ~28 days at 200ms blocks
 
     // ============================================================================
     // AI Governance Parameters
@@ -1476,7 +1473,7 @@ parameter_types! {
     pub const DefaultComputePerBlock: u128 = 1_000_000;
     pub const DefaultGasPerEpoch: u128 = 100_000_000;
     pub const DefaultComputePerEpoch: u128 = 100_000_000;
-    pub const BlocksPerEpoch: BlockNumber = 14400; // ~1 day at 6s blocks
+    pub const BlocksPerEpoch: BlockNumber = 14400 * 30; // ~1 day at 200ms blocks
 }
 
 impl pallet_agent_accounts::Config for Runtime {
@@ -1499,8 +1496,8 @@ parameter_types! {
     pub const MaxEntriesPerChunk: u32 = 100;
     pub const MaxChunksPerAgent: u32 = 1_000;
     pub const StorageByteCost: Balance = X3 / 1000; // 0.001 X3 per byte
-    pub const DefaultTtl: BlockNumber = 365 * 24 * 600; // ~1 year at 6s blocks
-    pub const MemoryRetentionBlocks: BlockNumber = 30 * 24 * 600; // ~30 days
+    pub const DefaultTtl: BlockNumber = 365 * 24 * 600 * 30; // ~1 year at 200ms blocks
+    pub const MemoryRetentionBlocks: BlockNumber = 30 * 24 * 600 * 30; // ~30 days
     pub const MemoryConsensusThreshold: u32 = 3u32;
 }
 
@@ -1522,7 +1519,7 @@ parameter_types! {
     pub const MinApprovalQuorum: sp_runtime::Percent = sp_runtime::Percent::from_percent(66);
     pub const MaxPendingProposals: u32 = 100;
     pub const MaxReasonLength: u32 = 256;
-    pub const ProposalLifetime: BlockNumber = 7 * 24 * 60 * 10; // ~7 days
+    pub const ProposalLifetime: BlockNumber = 7 * 24 * 60 * 10 * 30; // ~7 days at 200ms blocks
     pub const MetricsHistoryDepth: u32 = 100;
     pub const AutoEvolutionBounds: (u32, u32) = (80, 120); // min 80%, max 120%
 }
@@ -1698,7 +1695,7 @@ impl pallet_x3_settlement_engine::Config for Runtime {
 parameter_types! {
     pub const MinContributorStake: Balance = 1000 * X3;
     pub const SwarmHeartbeatInterval: BlockNumber = 100;    // ~10 min at 6s blocks
-    pub const SwarmUnstakeCooldown: BlockNumber = 14400;    // ~1 day at 6s blocks
+    pub const SwarmUnstakeCooldown: BlockNumber = 14400 * 30;    // ~1 day at 200ms blocks
     pub const SwarmDefaultTaskTimeout: BlockNumber = 600;   // ~1 hour at 6s blocks
     pub const SwarmCommitPhaseDuration: BlockNumber = 50;   // ~5 min at 6s blocks
     pub const SwarmRevealPhaseDuration: BlockNumber = 50;   // ~5 min at 6s blocks
@@ -1736,7 +1733,7 @@ parameter_types! {
     pub const StakerShareBps: u16 = 2000;        // 20% to stakers
     pub const MinProviderStake: Balance = 1_000 * X3;
     pub const MaxJobsPerProvider: u32 = 16;
-    pub const MaxJobDuration: BlockNumber = 14400;   // ~1 day at 6s blocks
+    pub const MaxJobDuration: BlockNumber = 14400 * 30;   // ~1 day at 200ms blocks
     pub const MaxPendingOrders: u32 = 256;
     pub const DepinSlashFraction: Perbill = Perbill::from_percent(10);
 }
@@ -1808,18 +1805,25 @@ impl pallet_x3_da::Config for Runtime {
     type RetentionBlocks = DaRetentionBlocks;
 }
 
-// Session trait implementations for minimal runtime
+// Session trait implementations for authority-operated runtime
+// For mainnet-v1, we use a simplified session handler since validator sets
+// are managed manually through genesis and runtime upgrades.
+// Equivocation detection is logged but not automatically slashed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
 pub struct SessionHandler;
 
 impl GetValidatorCount for SessionHandler {
     fn validator_count(&self) -> u32 {
+        // Return 0 for simplified authority-based operation
+        // Real validator count is managed through AURA/GRANDPA authorities
         0
     }
 }
 
 impl GetSessionNumber for SessionHandler {
     fn session(&self) -> u32 {
+        // Return 0 for simplified authority-based operation
+        // Session tracking not implemented for mainnet-v1
         0
     }
 }
