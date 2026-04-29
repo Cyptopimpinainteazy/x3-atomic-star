@@ -34,12 +34,12 @@ log_step() {
 
 log_pass() {
     echo -e "${GREEN}✅ PASS${NC}: $1" | tee -a "$PROOF_LOG"
-    ((PASS_COUNT++))
+    PASS_COUNT=$((PASS_COUNT+1))
 }
 
 log_fail() {
     echo -e "${RED}❌ FAIL${NC}: $1" | tee -a "$PROOF_LOG"
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT+1))
 }
 
 mkdir -p "$(dirname "$PROOF_LOG")"
@@ -72,7 +72,7 @@ if rustc --version >> "$PROOF_LOG" 2>&1; then
     log_pass "Rust toolchain available"
 else
     log_fail "Rust toolchain not found (install rustup)"
-    ((FAIL_COUNT += 10))
+    FAIL_COUNT=$((FAIL_COUNT+10))
 fi
 
 # Step 3: Cargo check workspace
