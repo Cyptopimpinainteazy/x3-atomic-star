@@ -483,17 +483,21 @@ jobs:
           </html>
           EOF
 
-      - name: Upload Dashboard to GitHub Pages
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Pages Artifact
         run: |
-          mkdir -p public
-          cp -r dashboard-data/* public/
+          echo "proofforge.x3.dev" > dashboard-data/CNAME
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dashboard-data
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          cname: proofforge.x3.dev
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       - name: Create GitHub Pages Index
         run: |
