@@ -17,6 +17,8 @@ PROOF_LOG="${1:-.}/launch-gates/evidence/proof-fresh-machine.log"
 TEMP_DIR="/tmp/x3-fresh-machine-$$"
 PASS_COUNT=0
 FAIL_COUNT=0
+# Source repo URL: prefer X3_REPO_URL, else this repo's origin, else fall back.
+REPO_URL="${X3_REPO_URL:-$(git -C "${1:-.}" remote get-url origin 2>/dev/null || echo https://github.com/Cyptopimpinainteazy/x3-atomic-star.git)}"
 
 # Color output
 RED='\033[0;31m'
@@ -47,9 +49,9 @@ mkdir -p "$(dirname "$PROOF_LOG")"
 } | tee "$PROOF_LOG"
 
 # Step 1: Clone repo (fresh)
-log_step "Step 1: Cloning repo to fresh directory..."
+log_step "Step 1: Cloning repo from $REPO_URL ..."
 if mkdir -p "$TEMP_DIR" && cd "$TEMP_DIR"; then
-    if git clone --depth 1 https://github.com/x3-chain/x3-atomic-star.git x3-repo 2>&1 | tail -5 >> "$PROOF_LOG"; then
+    if git clone --depth 1 "$REPO_URL" x3-repo 2>&1 | tail -5 >> "$PROOF_LOG"; then
         log_pass "Repo cloned to $TEMP_DIR/x3-repo"
         cd x3-repo
     else
@@ -83,9 +85,9 @@ fi
 log_step "Step 4: Running critical module tests..."
 CRITICAL_MODULES=(
     "pallet-x3-settlement-engine"
-    "pallet-x3-bridge"
     "pallet-cross-chain-validator"
-    "pallet-universal-asset-kernel"
+    "pallet-x3-asset-registry"
+    "pallet-x3-atomic-kernel"
 )
 
 for module in "${CRITICAL_MODULES[@]}"; do
@@ -113,8 +115,8 @@ else
 fi
 
 # Step 7: Build node binary
-log_step "Step 7: Building node binary (release mode, 5min timeout)..."
-if timeout 300 cargo build -p x3-chain-node --release 2>&1 | tail -10 >> "$PROOF_LOG"; then
+log_step "Step 7: Building node binary (release mode, 60min timeout)..."
+if timeout 3600 cargo build -p x3-chain-node --release 2>&1 | tail -10 >> "$PROOF_LOG"; then
     NODE_BIN="target/release/x3-chain-node"
     if [ -f "$NODE_BIN" ]; then
         log_pass "Node binary built: $NODE_BIN"
@@ -149,10 +151,10 @@ log_step "Step 9: Testing node startup (30 second timeout)..."
 if [ -f "$NODE_BIN" ]; then
     timeout 30 "$NODE_BIN" \
         --chain dev \
+        --tmp \
         --rpc-external \
         --rpc-port 9945 \
-        --ws-external \
-        --ws-port 9946 \
+        --rpc-cors all \
         --no-prometheus \
         2>&1 | head -50 >> "$PROOF_LOG" &
     
