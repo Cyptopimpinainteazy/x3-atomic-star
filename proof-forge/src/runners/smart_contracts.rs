@@ -17,6 +17,8 @@
 //! false-green pattern that the proof-forge truth principle is supposed
 //! to prevent.
 
+#![allow(dead_code)] // intentional scaffold; tracked in readiness backlog
+
 use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;

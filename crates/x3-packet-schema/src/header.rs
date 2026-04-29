@@ -1,7 +1,5 @@
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-#[cfg(feature = "std")]
-use sp_core::hashing::blake2_256;
 
 /// Fixed 32-byte packet header for all packet types
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
@@ -57,7 +55,7 @@ impl PacketHeader {
 
     /// Calculate blake2_256 checksum of payload (returns first 8 bytes as u64)
     pub fn calculate_checksum(payload: &[u8]) -> u64 {
-        let hash = blake2_256(payload);
+        let hash = sp_io::hashing::blake2_256(payload);
         let mut bytes = [0u8; 8];
         bytes.copy_from_slice(&hash[0..8]);
         u64::from_be_bytes(bytes)

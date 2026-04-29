@@ -1,8 +1,15 @@
-# ✅ STATUS AUDIT — April 27, 2026 (FINAL)
+# ✅ STATUS AUDIT — April 27, 2026 (FINAL) + SCOPE FREEZE
 
 **Type:** Evidence-based reconciliation sweep — COMPLETED.  
 **Authoritative:** This file supersedes all earlier "0% / NOT READY" blanket statements.  
 **Final State:** All ProofForge gates PASS (commit `0b7710c`). `prove-everything` = PASSED.
+
+## SCOPE FREEZE (v0.4 Internal-Only Mainnet RC)
+
+**Decision:** Freeze X3 v0.4 scope to internal-only mainnet: X3Native/X3Evm/X3Svm asset movement, atomic bundle pipeline, spot-swap path, packet standard MVP, IXL MVP.  
+**Rationale:** External liquidity gateway, parallel executor, AppZone factory, PQ integration deferred to post-minimal RC.  
+**Impact:** ExternalBridgesEnabled = false at genesis; governance must explicitly enable after audit.  
+**Evidence:** pallets/x3-cross-vm-router explicitly rejects non-internal routes; bridge functions marked Phase C stubs.
 
 ---
 

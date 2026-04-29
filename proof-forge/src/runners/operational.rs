@@ -2,7 +2,7 @@ use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 /// Verify operational / evidence-based claims:

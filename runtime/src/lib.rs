@@ -5,6 +5,11 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::single_component_path_imports)]
 
+// SCOPE FREEZE (v0.4 internal-only mainnet RC):
+// - Only internal cross-VM routes enabled (X3Native/X3Evm/X3Svm)
+// - External liquidity gateway disabled at genesis
+// - Governance must explicitly enable external bridges after audit
+
 // Required for impl_runtime_apis! macro in no_std
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -30,6 +35,8 @@ use pallet_aura;
 use pallet_balances;
 use pallet_collective;
 use pallet_cross_chain_validator;
+use pallet_offences;
+use pallet_session;
 use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
@@ -44,6 +51,7 @@ use pallet_treasury;
 use pallet_x3_asset_registry;
 use pallet_x3_cross_vm_router;
 use pallet_x3_kernel;
+use pallet_x3_invariants;
 use pallet_x3_settlement_engine;
 use pallet_x3_supply_ledger;
 use pallet_x3_token_factory;
@@ -173,6 +181,9 @@ parameter_types! {
     pub const ChainId: u64 = 650_000;
     pub const GasLimitPovSizeRatio: u64 = 40;
     pub WeightPerGas: Weight = Weight::from_parts(20_000, 0);
+    pub const InvariantsDefaultMaxSupply: Balance = 1_000_000_000 * X3; // 1 billion X3
+    pub const InvariantsDefaultMaxAgents: u32 = 10_000;
+    pub const InvariantsDefaultMaxProposalDepth: u32 = 100;
 }
 
 pub struct BlockGasLimit;
@@ -251,12 +262,16 @@ construct_runtime!(
         Timestamp: pallet_timestamp,
         Aura: pallet_aura,
         Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
         Balances: pallet_balances,
         TransactionPayment: pallet_transaction_payment,
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
         EVM: pallet_evm,
         AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -290,12 +305,16 @@ construct_runtime!(
         Timestamp: pallet_timestamp,
         Aura: pallet_aura,
         Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
         Balances: pallet_balances,
         TransactionPayment: pallet_transaction_payment,
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
         EVM: pallet_evm,
         AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -326,8 +345,12 @@ pub type UncheckedExtrinsic =
     generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 // Runtime storage migrations tuple. Add migration structs for pallets that need upgrades.
-// Note: Only x3-kernel has migrations currently implemented
-pub type Migrations = (pallet_x3_kernel::migrations::Migration<Runtime>,);
+pub type Migrations = (
+    pallet_x3_kernel::migrations::Migration<Runtime>,
+    pallet_treasury::migrations::Migration<Runtime>,
+    pallet_agent_memory::migrations::Migration<Runtime>,
+    pallet_agent_accounts::migrations::Migration<Runtime>,
+);
 
 // Use the migrations tuple in the executive so migrations run on runtime upgrades
 pub type Executive = frame_executive::Executive<
@@ -342,6 +365,7 @@ pub type Executive = frame_executive::Executive<
 impl_opaque_keys! {
     pub struct SessionKeys {
         pub aura: Aura,
+        pub grandpa: Grandpa,
     }
 }
 
@@ -418,17 +442,35 @@ impl pallet_aura::Config for Runtime {
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    // KeyOwnerProof is Void when we don't have session pallet
-    type KeyOwnerProof = sp_core::Void;
-    // Equivocation reporting disabled for mainnet-v1 (authority-operated network)
-    // Equivocations are detected and logged but not slashed automatically
-    // This is acceptable for tightly controlled validator sets with manual intervention
-    // To fully enable slashing, add: session, historical, offences, authorship pallets
-    type EquivocationReportSystem = ();
+    type KeyOwnerProof = sp_session::MembershipProof;
+    type EquivocationReportSystem =
+        pallet_grandpa::EquivocationReportSystem<Self, Offences, (), ()>;
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
-    // Set to non-zero for proper set tracking (enables historical set queries)
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
+}
+
+impl pallet_session::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type ValidatorId = <Self as frame_system::Config>::AccountId;
+    type ValidatorIdOf = pallet_session::historical::NoteHistoricalRoot<Self, Offences>;
+    type ShouldEndSession = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
+    type NextSessionRotation = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
+    type SessionManager = ();
+    type SessionHandler = <SessionKeys as sp_runtime::traits::OpaqueKeys>::KeyTypeIdProviders;
+    type Keys = SessionKeys;
+    type WeightInfo = pallet_session::weights::SubstrateWeight<Self>;
+}
+
+impl pallet_session::historical::Config for Runtime {
+    type FullIdentification = ();
+    type FullIdentificationOf = ();
+}
+
+impl pallet_offences::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
+    type OnOffenceHandler = ();
 }
 
 impl pallet_balances::Config for Runtime {
@@ -807,6 +849,17 @@ impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVeri
         }
     }
 }
+
+impl pallet_x3_invariants::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type UpdateOrigin = EnsureRootOrHalfCouncil;
+    type DefaultMaxSupply = InvariantsDefaultMaxSupply;
+    type DefaultMaxAgents = InvariantsDefaultMaxAgents;
+    type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
+    type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
+}
+
+
 
 impl pallet_x3_kernel::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
@@ -1604,6 +1657,9 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
+    // TODO: Implement proper VM adapter origin that can only be created by verified kernel execution
+    // For now, restrict to root to prevent unauthorized VM adapter calls
+    type VmAdapterOrigin = frame_system::EnsureRoot<AccountId>;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {

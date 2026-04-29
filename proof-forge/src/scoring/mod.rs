@@ -1,8 +1,6 @@
 // Scoring module for proof score calculation
 // Formula: 15% compile + 15% unit + 20% integration + 20% invariants + 15% adversarial + 5% benchmarks + 5% wiring + 5% drift
 
-use crate::proof::{ProofResult, ProofStatus};
-
 pub mod formula;
 
 /// Scoring context with all measurements

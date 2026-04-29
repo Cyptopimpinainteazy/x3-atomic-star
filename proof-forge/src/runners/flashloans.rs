@@ -1,3 +1,5 @@
+#![allow(dead_code)] // intentional scaffold; tracked in readiness backlog
+
 use crate::proof::*;
 use crate::runners::run_cargo_test_and_parse;
 use anyhow::Result;

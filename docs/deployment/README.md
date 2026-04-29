@@ -10,18 +10,18 @@
 - **[PUBLIC_RPC.md](PUBLIC_RPC.md)** - Run public RPC (dev/local/staging/testnet) safely
 
 ### Deployment Scripts
-- **[../../deployment/deploy-local-testnet.sh](deploy-local-testnet.sh)** - Automated single-server deployment
-- **[../../deployment/deploy-multi-server.sh](deploy-multi-server.sh)** - Multi-server deployment automation
-- **[../../deployment/manage-testnet.sh](manage-testnet.sh)** - Control and monitor your testnet
+- **[../../deployment/deploy-local-testnet.sh](../../deployment/deploy-local-testnet.sh)** - Automated single-server deployment
+- **[../../deployment/deploy-multi-server.sh](../../deployment/deploy-multi-server.sh)** - Multi-server deployment automation
+- **[../../deployment/manage-testnet.sh](../../deployment/manage-testnet.sh)** - Control and monitor your testnet
 
 ### Build & Keys
-- **[../../deployment/build-and-keygen.sh](build-and-keygen.sh)** - Build binary and generate validator keys
-- **[../../deployment/inventory.yaml](../../deployment/inventory.yaml)** - Hardware-backed inventory with real roles and null fields that must be filled before deployment
-- **[../../deployment/servers.env.example](../../deployment/servers.env.example)** - Copy to `deployment/servers.env` and set real SSH targets for multi-server deployment
-- **[../../deployment/systemd/x3-chain-node@.service](../../deployment/systemd/x3-chain-node@.service)** - Reusable node service template for rack hosts
-- **[../../deployment/systemd/examples](../../deployment/systemd/examples)** - Rack-specific env examples for the current hardware plan
-- **[../../deployment/keys](keys/)** - Validator keys and bootnode key (KEEP SECURE!)
-- **[chain-specs/](chain-specs/)** - Chain specification files
+- **[../../deployment/build-and-keygen.sh](../../deployment/build-and-keygen.sh)** - Build binary and generate validator keys
+- **[inventory.yaml](../../deployment/inventory.yaml)** - Hardware-backed inventory with real roles and null fields that must be filled before deployment
+- **[servers.env.example](../../deployment/servers.env.example)** - Copy to `deployment/servers.env` and set real SSH targets for multi-server deployment
+- **[x3-chain-node@.service](../../deployment/systemd/x3-chain-node@.service)** - Reusable node service template for rack hosts
+- **[systemd/examples](../../deployment/systemd/examples)** - Rack-specific env examples for the current hardware plan
+- **[keys/](../../deployment/keys/)** - Validator keys and bootnode key (KEEP SECURE!)
+- **[chain-specs/](../../deployment/chain-specs/)** - Chain specification files
 
 ---
 
@@ -40,7 +40,7 @@
 ### 2️⃣ Local Testnet (Production-Like)
 **Full testnet on one machine:**
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 ./deploy-local-testnet.sh
 ```
 - ✅ 3 validators + bootnode

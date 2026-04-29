@@ -13,17 +13,18 @@ X3 Chain is a next-generation Layer-1 blockchain purpose-built to host dual virt
 5. [Build Instructions](#build-instructions)
 6. [Quick Start](#quick-start)
 7. [Running a Node](#running-a-node)
-8. [Consensus](#consensus)
-9. [Network Configuration](#network-configuration)
-10. [Key Management](#key-management)
-11. [Basic Usage Examples](#basic-usage-examples)
-12. [Account Authorization](#account-authorization)
-13. [Testing & Quality Gates](#testing--quality-gates)
-14. [Contribution Guidelines](#contribution-guidelines)
-15. [Roadmap Snapshot](#roadmap-snapshot)
-16. [Developer Templates](#developer-templates)
-17. [Resources & Further Reading](#resources--further-reading)
-18. [License](#license)
+8. [RPC API Surface](#rpc-api-surface)
+9. [Consensus](#consensus)
+10. [Network Configuration](#network-configuration)
+11. [Key Management](#key-management)
+12. [Basic Usage Examples](#basic-usage-examples)
+13. [Account Authorization](#account-authorization)
+14. [Testing & Quality Gates](#testing--quality-gates)
+15. [Contribution Guidelines](#contribution-guidelines)
+16. [Roadmap Snapshot](#roadmap-snapshot)
+17. [Developer Templates](#developer-templates)
+18. [Resources & Further Reading](#resources--further-reading)
+19. [License](#license)
 
 ---
 
@@ -185,15 +186,158 @@ cargo build
    subxt event watch --url ws://127.0.0.1:9944 atlasKernel
    ```
 
-### WebSocket & Standard RPCs
+### JSON-RPC API Surface
 
-- **WebSocket endpoint:** `ws://127.0.0.1:9944` (Polkadot.js/subxt compatible). Connect after the node starts to stream `newHeads`, `finalizedHeads`, and other subscriptions.
-- **HTTP endpoint:** `http://127.0.0.1:9933` for curl, automation, and health probes.
-- **Health check:** `GET /health` on the HTTP endpoint proxies to `system_health`, so `curl http://127.0.0.1:9933/health` should return node health JSON.
-- **System RPCs:** `system_health`, `system_chain`, `system_name`, `system_accountNextIndex`, and `system_account` are now available over HTTP and WS via the integrated Substrate RPC helpers.
-- **Chain RPCs:** `chain_getHeader`, `chain_getBlockHash`, `chain_getFinalizedHead`, `chain_subscribeNewHeads`, and finalized-head subscriptions are available over HTTP and WS.
-- **State RPCs:** `state_getStorage`, `state_queryStorage`, `state_getMetadata`, `state_subscribeStorage`, and related child-state methods are exposed through `sc_rpc::state`, letting explorers and indexers query storage directly.
-- **Transaction Payment RPCs:** `payment_queryInfo`, `payment_queryFeeDetails`, `payment_weightToFee`, and `payment_lengthToFee` are exposed so frontends can preview fees before submitting extrinsics.
+The X3 Chain node exposes a comprehensive JSON-RPC interface assembled in `node/src/rpc.rs::create_full()` combining standard Substrate system RPCs, transaction-payment RPCs, X3-specific kernel RPCs, and optional Ethereum/SVM-compatible RPC endpoints.
+
+**Endpoints:**
+- **HTTP RPC:** `http://127.0.0.1:9933` (curl, automation, health probes)
+- **WebSocket RPC:** `ws://127.0.0.1:9944` (Polkadot.js, subxt, subscriptions for `newHeads`, `finalizedHeads`, events)
+
+---
+
+#### **Substrate System RPCs** (Standard)
+
+These are wired through `io.merge(sc_rpc::system::SystemApi::to_rpc_methods())` and provide core node metadata, health monitoring, and peer information:
+
+- `system_health` – Node health status (peers, syncing, finalized blocks)
+- `system_name` – Node implementation name
+- `system_version` – Node version string
+- `system_chain` – Chain name (e.g., "X3 Chain")
+- `system_chainType` – Chain type (Development, Local, Live)
+- `system_properties` – Chain properties (token symbol, decimals, SS58 format)
+- `system_accountNextIndex` – Next nonce for an account
+- `system_addReservedPeer` – Add reserved peer (permissioned networks)
+- `system_removeReservedPeer` – Remove reserved peer
+- `system_peers` – List connected peers
+- `system_networkState` – Full network state (peer IDs, addresses)
+- `system_nodeRoles` – Node role (full, authority, light)
+- `system_localPeerId` – Local peer ID
+- `system_localListenAddresses` – Listening multiaddrs
+
+---
+
+#### **Chain RPCs** (Standard)
+
+Wired via `io.merge(sc_rpc::chain::ChainApi::to_rpc_methods())` for block and header retrieval:
+
+- `chain_getHeader` – Block header by hash
+- `chain_getBlock` – Full block by hash
+- `chain_getBlockHash` – Block hash by number
+- `chain_getFinalizedHead` – Hash of finalized head
+- `chain_subscribeNewHeads` – Subscribe to new block headers (WebSocket)
+- `chain_subscribeFinalizedHeads` – Subscribe to finalized headers (WebSocket)
+- `chain_unsubscribeNewHeads` – Unsubscribe from new heads
+- `chain_unsubscribeFinalizedHeads` – Unsubscribe from finalized heads
+
+---
+
+#### **State RPCs** (Standard)
+
+Wired via `io.merge(sc_rpc::state::StateApi::to_rpc_methods())` for direct storage queries and metadata:
+
+- `state_call` – Call into runtime API at block hash
+- `state_getMetadata` – Runtime metadata (types, pallets, calls, events)
+- `state_getStorage` – Storage value at key
+- `state_getStorageHash` – Storage hash at key
+- `state_getStorageSize` – Storage size at key
+- `state_queryStorage` – Query storage across block range
+- `state_queryStorageAt` – Query storage at specific block
+- `state_subscribeStorage` – Subscribe to storage changes (WebSocket)
+- `state_unsubscribeStorage` – Unsubscribe from storage changes
+- `state_getRuntimeVersion` – Runtime version (spec_name, spec_version, apis)
+- `state_subscribeRuntimeVersion` – Subscribe to runtime version changes (WebSocket)
+- `state_unsubscribeRuntimeVersion` – Unsubscribe from runtime version changes
+
+---
+
+#### **Transaction Payment RPCs** (Standard)
+
+Wired via `io.merge(pallet_transaction_payment_rpc::TransactionPayment::to_rpc_methods())` for fee estimation:
+
+- `payment_queryInfo` – Fee estimation for an extrinsic (weight, partial_fee, class)
+- `payment_queryFeeDetails` – Detailed fee breakdown (base, length, adjusted_weight_fee)
+- `payment_queryCallInfo` – Fee estimation for runtime call without extrinsic
+- `payment_queryCallFeeDetails` – Detailed fee breakdown for runtime call
+
+---
+
+#### **X3 Kernel RPCs** (Custom)
+
+Custom X3-specific methods defined in `pallet_x3_kernel::rpc` and wired in `node/src/rpc.rs`. These query canonical ledger state, asset metadata, and authorization:
+
+- `atlasKernel_getCanonicalBalance(account, asset_id, at?)` – Query canonical ledger balance for account and asset
+- `atlasKernel_getAssetMetadata(asset_id, at?)` – Get asset symbol, decimals, and metadata
+- `atlasKernel_isAuthorized(account, at?)` – Check if account is authorized for privileged operations
+- `atlasKernel_getAuthorizedAccounts(at?)` – List all authorized accounts
+- `atlasKernel_getAuthorities(at?)` – Get current validator authority set
+
+**Example:**
+```bash
+curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
+     -d '{"id":1,"jsonrpc":"2.0","method":"atlasKernel_getCanonicalBalance","params":["5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",0,null]}'
+```
+
+---
+
+#### **Ethereum-Compatible RPCs** (Experimental via Frontier)
+
+⚠️ **Status: Experimental** – Wired via `node/src/rpc_frontier.rs::create_frontier_rpc()` when `frontier` feature is enabled. These methods are backed by runtime API calls to the X3 Kernel EVM adapter and provide Ethereum JSON-RPC compatibility for EVM contract interactions.
+
+**Available Methods:**
+- `eth_getBalance(address, block?)` – Query native balance for EVM address (returns hex wei)
+- `eth_getCode(address, block?)` – Retrieve contract bytecode for EVM address
+- `eth_getStorageAt(address, slot, block?)` – Read EVM storage slot
+- `eth_getTransactionCount(address, block?)` – Get account nonce
+- `eth_call(tx_object, block?)` – Execute read-only EVM call (gas-free)
+- `eth_estimateGas(tx_object)` – Estimate gas required for transaction
+- `eth_sendRawTransaction(signed_rlp_tx)` – Submit signed Ethereum transaction (returns keccak256 tx hash)
+
+**Partial Implementation Notes:**
+- Transaction receipts (`eth_getTransactionReceipt`) not yet exposed
+- Block and transaction history queries not yet implemented
+- Event logs (`eth_getLogs`) not yet exposed
+- Subscription methods (`eth_subscribe`, `eth_newFilter`) not yet implemented
+
+**Example:**
+```bash
+# Query EVM balance
+curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
+     -d '{"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb","latest"]}'
+
+# Execute read-only EVM call
+curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
+     -d '{"id":1,"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb","data":"0x70a08231000000000000000000000000742d35Cc6634C0532925a3b844Bc9e7595f0bEb"},"latest"]}'
+```
+
+---
+
+#### **SVM-Compatible RPCs** (Experimental)
+
+⚠️ **Status: Experimental** – Wired via `node/src/rpc_frontier.rs::create_svm_rpc()` for querying SVM (Solana Virtual Machine) state. These methods are backed by runtime API calls to the X3 Kernel SVM adapter.
+
+**Available Methods:**
+- `svm_getBalance(pubkey)` – Query lamport balance for base58 or hex SVM pubkey (returns `{ "value": u64 }`)
+- `svm_isProgram(pubkey)` – Check if pubkey has deployed executable program (returns `{ "result": bool }`)
+
+**Partial Implementation Notes:**
+- SVM transaction submission not yet exposed
+- SVM account data queries not yet implemented
+- SVM program execution RPC not yet exposed
+- SVM logs and signatures not yet available
+
+**Example:**
+```bash
+# Query SVM balance
+curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
+     -d '{"id":1,"jsonrpc":"2.0","method":"svm_getBalance","params":["11111111111111111111111111111111"]}'
+```
+
+---
+
+**Rate Limiting:** The RPC server integrates `RateLimiter` from `node/src/rpc.rs` for DOS protection. Default limits apply per-connection.
+
+**FlashFinalityGadget:** `node/src/rpc.rs::create_full()` passes `finality_proof_provider` to enable finality proofs for light clients and cross-chain bridges.
 
    You should see `ComitSubmitted`, `ComitExecutionStarted`, `ComitExecutionCompleted`, and `ComitFinalized` events in order as the runtime processes the transaction.
 
@@ -337,14 +481,25 @@ curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
      -d '{"id":1,"jsonrpc":"2.0","method":"atlasKernel_getAuthorizedAccounts","params":[null]}'
 ```
 
-**Available X3 Kernel RPC Methods:**
+**Available RPC Methods:**
+
+The node exposes a comprehensive JSON-RPC interface combining:
+- **Substrate System RPCs** (`system_*`) – Node health, metadata, peer information
+- **Chain RPCs** (`chain_*`) – Block and header retrieval, subscriptions
+- **State RPCs** (`state_*`) – Storage queries, runtime metadata, versioning
+- **Transaction Payment RPCs** (`payment_*`) – Fee estimation and breakdown
+- **X3 Kernel RPCs** (`atlasKernel_*`) – Canonical ledger, asset metadata, authorization
+- **Ethereum-compatible RPCs** (`eth_*`) – EVM balance, code, storage, call, estimateGas, sendRawTransaction (experimental)
+- **SVM-compatible RPCs** (`svm_*`) – SVM balance, program queries (experimental)
+
+See the **JSON-RPC API Surface** section below for complete method reference and examples.
+
+**X3 Kernel RPC Methods:**
 - `atlasKernel_getCanonicalBalance(account, asset_id, at?)` – Query canonical ledger balance
 - `atlasKernel_getAssetMetadata(asset_id, at?)` – Get asset symbol and decimals
 - `atlasKernel_isAuthorized(account, at?)` – Check account authorization status
 - `atlasKernel_getAuthorizedAccounts(at?)` – List all authorized accounts
 - `atlasKernel_getAuthorities(at?)` – Get current authority set
-
-**Note:** Only X3 Kernel RPC methods are currently exposed by `node/src/rpc.rs::create_full()`. Standard Substrate RPC methods (e.g., `system_*`, `chain_*`) are not yet wired.
 
 ### 2. Deploy Solidity Contracts
 

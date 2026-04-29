@@ -2,27 +2,9 @@
 name = "x3-parallel-executor"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
-description = "X3 deterministic parallel transaction executor: scheduler, access-list analysis, conflict detection, optimistic execution, and serial-equivalent commit."
 
 [dependencies]
-parity-scale-codec = { workspace = true, features = ["max-encoded-len"] }
-scale-info = { workspace = true }
-sp-core = { workspace = true }
-sp-runtime = { workspace = true }
-sp-std = { workspace = true }
-x3-ixl = { path = "../x3-ixl", default-features = false }
-
-[features]
-default = ["std"]
-std = [
-    "parity-scale-codec/std",
-    "scale-info/std",
-    "sp-core/std",
-    "sp-runtime/std",
-    "sp-std/std",
-    "x3-ixl/std",
-]
-
-[dev-dependencies]
-proptest = "1.4"
+parity-scale-codec = { version = "3.6", default-features = false, features = ["derive"] }
+scale-info = { version = "2.10", default-features = false, features = ["derive"] }
+sp-std = { version = "8.0", default-features = false }
+sp-io = { version = "23.0", default-features = false }

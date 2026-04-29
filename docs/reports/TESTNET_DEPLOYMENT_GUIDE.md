@@ -46,7 +46,9 @@ X3 Chain Testnet v1 is a **developer preview network** designed for:
 
 ### 1. Build Release Binary
 ```bash
-cd /home/lojak/Desktop/x3-chain
+# Clone repository
+git clone https://github.com/Cyptopimpinainteazy/x3-chain.git X3_ATOMIC_STAR
+cd X3_ATOMIC_STAR
 cargo build --release
 ```
 

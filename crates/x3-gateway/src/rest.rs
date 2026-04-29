@@ -1,7 +1,8 @@
 //! REST API routes and handlers.
 
+use crate::cache::RedisCache;
 use crate::db::{
-    Database, NewApprovalCase, NewEvidenceBundle, NewOrchestraIntent, NewVoteReceipt,
+    ChainStats, Database, NewApprovalCase, NewEvidenceBundle, NewOrchestraIntent, NewVoteReceipt,
     NewVoteWindow, StoredBenchmarkReport,
 };
 use crate::error::GatewayError;
@@ -16,7 +17,10 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
@@ -29,6 +33,32 @@ pub struct AppState {
     pub schema: AppSchema,
     pub benchmark_publish_token: Option<String>,
     pub orchestra_client: Option<Arc<ControlPlaneClient>>,
+    pub redis_cache: Option<RedisCache>,
+    pub cache_metrics: Arc<CacheMetrics>,
+}
+
+#[derive(Debug, Default)]
+pub struct CacheMetrics {
+    hits: AtomicU64,
+    misses: AtomicU64,
+    fallbacks: AtomicU64,
+}
+
+impl CacheMetrics {
+    fn snapshot(&self) -> CacheMetricsSnapshot {
+        CacheMetricsSnapshot {
+            hits: self.hits.load(Ordering::Relaxed),
+            misses: self.misses.load(Ordering::Relaxed),
+            fallbacks: self.fallbacks.load(Ordering::Relaxed),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CacheMetricsSnapshot {
+    hits: u64,
+    misses: u64,
+    fallbacks: u64,
 }
 
 /// Pagination parameters.
@@ -53,12 +83,15 @@ pub fn create_router(
     db: Database,
     schema: AppSchema,
     orchestra_client: Option<Arc<ControlPlaneClient>>,
+    redis_cache: Option<RedisCache>,
 ) -> Router {
     let state = AppState {
         db,
         schema,
         benchmark_publish_token: std::env::var("X3_GATEWAY_BENCHMARK_TOKEN").ok(),
         orchestra_client,
+        redis_cache,
+        cache_metrics: Arc::new(CacheMetrics::default()),
     };
 
     let cors = CorsLayer::new()
@@ -164,6 +197,7 @@ struct StatusResponse {
     latest_block: Option<i64>,
     total_blocks: i64,
     total_comits: i64,
+    cache: Option<CacheMetricsSnapshot>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,13 +221,14 @@ struct VoteWindowClosureResponse {
 }
 
 async fn status(State(state): State<AppState>) -> Result<Json<StatusResponse>, GatewayError> {
-    let stats = state.db.get_stats().await?;
+    let stats = load_chain_stats(&state).await?;
 
     Ok(Json(StatusResponse {
         status: "ok".to_string(),
         latest_block: stats.latest_block,
         total_blocks: stats.total_blocks,
         total_comits: stats.total_comits,
+        cache: state.redis_cache.as_ref().map(|_| state.cache_metrics.snapshot()),
     }))
 }
 
@@ -229,7 +264,7 @@ async fn get_blocks(
 async fn get_latest_block(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, GatewayError> {
-    let block = state.db.get_latest_block().await?;
+    let block = load_latest_block(&state).await?;
     match block {
         Some(b) => Ok(Json(b)),
         None => Err(GatewayError::NotFound("No blocks indexed yet".to_string())),
@@ -476,8 +511,69 @@ async fn get_account_comits(
 // ============================================================================
 
 async fn get_stats(State(state): State<AppState>) -> Result<impl IntoResponse, GatewayError> {
-    let stats = state.db.get_stats().await?;
+    let stats = load_chain_stats(&state).await?;
     Ok(Json(stats))
+}
+
+async fn load_chain_stats(state: &AppState) -> Result<ChainStats, GatewayError> {
+    if let Some(cache) = &state.redis_cache {
+        match cache.get_chain_stats().await {
+            Ok(Some(stats)) => {
+                state.cache_metrics.hits.fetch_add(1, Ordering::Relaxed);
+                return Ok(stats);
+            }
+            Ok(None) => {
+                state.cache_metrics.misses.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(err) => {
+                state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(error = %err, "redis cache read failed, falling back to database");
+            }
+        }
+    }
+
+    let stats = state.db.get_stats().await?;
+
+    if let Some(cache) = &state.redis_cache {
+        if let Err(err) = cache.set_chain_stats(&stats).await {
+            tracing::warn!(error = %err, "redis cache write failed");
+        }
+    }
+
+    Ok(stats)
+}
+
+async fn load_latest_block(
+    state: &AppState,
+) -> Result<Option<crate::db::Block>, GatewayError> {
+    const KEY: &str = "x3-gateway:latest-block";
+    const TTL_SECS: u64 = 3;
+
+    if let Some(cache) = &state.redis_cache {
+        match cache.get_json::<crate::db::Block>(KEY).await {
+            Ok(Some(block)) => {
+                state.cache_metrics.hits.fetch_add(1, Ordering::Relaxed);
+                return Ok(Some(block));
+            }
+            Ok(None) => {
+                state.cache_metrics.misses.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(err) => {
+                state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(error = %err, "redis latest-block cache read failed");
+            }
+        }
+    }
+
+    let block = state.db.get_latest_block().await?;
+
+    if let (Some(cache), Some(block_ref)) = (&state.redis_cache, block.as_ref()) {
+        if let Err(err) = cache.set_json(KEY, block_ref, TTL_SECS).await {
+            tracing::warn!(error = %err, "redis latest-block cache write failed");
+        }
+    }
+
+    Ok(block)
 }
 
 async fn create_orchestra_intent(
@@ -684,6 +780,10 @@ async fn get_benchmark_reports(
     State(state): State<AppState>,
     Query(query): Query<BenchmarkReportQuery>,
 ) -> Result<impl IntoResponse, GatewayError> {
+    if let Some(cached) = load_benchmark_reports_from_cache(&state, &query).await? {
+        return Ok(Json::<Vec<BenchmarkReport>>(cached));
+    }
+
     let fetch_limit = if query.min_high_conflict_ratio.is_some()
         || query.min_serial_fraction.is_some()
         || query.log_class.is_some()
@@ -720,7 +820,62 @@ async fn get_benchmark_reports(
     );
 
     filtered.truncate(query.pagination.limit.min(100) as usize);
+    write_benchmark_reports_cache(&state, &query, &filtered).await;
     Ok(Json::<Vec<BenchmarkReport>>(filtered))
+}
+
+fn benchmark_reports_cache_key(query: &BenchmarkReportQuery) -> String {
+    format!(
+        "x3-gateway:benchmark-reports:tenant={}:min_hcr={:?}:min_sf={:?}:log={}:sort_by={}:sort_order={}:limit={}:offset={}",
+        query.tenant_id.as_deref().unwrap_or(""),
+        query.min_high_conflict_ratio,
+        query.min_serial_fraction,
+        query.log_class.as_deref().unwrap_or(""),
+        query.sort_by.as_deref().unwrap_or(""),
+        query.sort_order.as_deref().unwrap_or(""),
+        query.pagination.limit,
+        query.pagination.offset
+    )
+}
+
+async fn load_benchmark_reports_from_cache(
+    state: &AppState,
+    query: &BenchmarkReportQuery,
+) -> Result<Option<Vec<BenchmarkReport>>, GatewayError> {
+    let Some(cache) = &state.redis_cache else {
+        return Ok(None);
+    };
+
+    let key = benchmark_reports_cache_key(query);
+    match cache.get_json::<Vec<BenchmarkReport>>(&key).await {
+        Ok(Some(reports)) => {
+            state.cache_metrics.hits.fetch_add(1, Ordering::Relaxed);
+            Ok(Some(reports))
+        }
+        Ok(None) => {
+            state.cache_metrics.misses.fetch_add(1, Ordering::Relaxed);
+            Ok(None)
+        }
+        Err(err) => {
+            state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(error = %err, "redis benchmark report cache read failed");
+            Ok(None)
+        }
+    }
+}
+
+async fn write_benchmark_reports_cache(
+    state: &AppState,
+    query: &BenchmarkReportQuery,
+    reports: &[BenchmarkReport],
+) {
+    const TTL_SECS: u64 = 5;
+    if let Some(cache) = &state.redis_cache {
+        let key = benchmark_reports_cache_key(query);
+        if let Err(err) = cache.set_json(&key, &reports, TTL_SECS).await {
+            tracing::warn!(error = %err, "redis benchmark report cache write failed");
+        }
+    }
 }
 
 async fn get_benchmark_report(
@@ -1342,6 +1497,8 @@ mod tests {
             db,
             benchmark_publish_token: None,
             orchestra_client: None,
+            redis_cache: None,
+            cache_metrics: Arc::new(CacheMetrics::default()),
         };
 
         Router::new()
@@ -1358,6 +1515,8 @@ mod tests {
             db,
             benchmark_publish_token: None,
             orchestra_client: Some(orchestra_client),
+            redis_cache: None,
+            cache_metrics: Arc::new(CacheMetrics::default()),
         };
 
         Router::new()

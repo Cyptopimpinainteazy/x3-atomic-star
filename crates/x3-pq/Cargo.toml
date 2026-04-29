@@ -1,0 +1,12 @@
+[package]
+name = "x3-pq"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parity-scale-codec = { version = "3.6", default-features = false, features = ["derive"] }
+scale-info = { version = "2.10", default-features = false, features = ["derive"] }
+sp-std = { version = "8.0", default-features = false }
+sp-io = { version = "23.0", default-features = false }
+sp-core = { version = "21.0", default-features = false }
+thiserror = "1.0"

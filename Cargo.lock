@@ -11330,6 +11330,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-automation"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking 4.0.0-dev (git+https://github.com/paritytech/substrate?rev=948fbd2)",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0",
+ "x3-automation",
+]
+
+[[package]]
 name = "pallet-x3-coin"
 version = "0.1.0"
 dependencies = [
@@ -11465,7 +11481,9 @@ dependencies = [
  "minicbor",
  "pallet-balances",
  "pallet-timestamp",
+ "pallet-x3-invariants",
  "parity-scale-codec",
+ "proptest",
  "scale-info",
  "serde",
  "serde_json",
@@ -11479,6 +11497,21 @@ dependencies = [
  "x3-packet-schema",
  "x3-svm-integration",
  "x3-x3-integration",
+]
+
+[[package]]
+name = "pallet-x3-oracle"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking 4.0.0-dev (git+https://github.com/paritytech/substrate?rev=948fbd2)",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0",
 ]
 
 [[package]]
@@ -11611,6 +11644,22 @@ dependencies = [
  "sp-io 23.0.0",
  "sp-runtime 24.0.0",
  "sp-std 8.0.0",
+]
+
+[[package]]
+name = "pallet-x3-vrf"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking 4.0.0-dev (git+https://github.com/paritytech/substrate?rev=948fbd2)",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0",
+ "x3-vrf",
 ]
 
 [[package]]
@@ -23746,11 +23795,18 @@ dependencies = [
 name = "x3-appzone-factory"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "clap",
  "parity-scale-codec",
  "scale-info",
+ "serde",
+ "serde_json",
  "sp-core 21.0.0",
- "sp-runtime 24.0.0",
+ "sp-io 23.0.0",
  "sp-std 8.0.0",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -23795,6 +23851,18 @@ name = "x3-atomic-trade"
 version = "0.1.0"
 dependencies = [
  "parity-scale-codec",
+ "sp-std 8.0.0",
+]
+
+[[package]]
+name = "x3-automation"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
  "sp-std 8.0.0",
 ]
 
@@ -24012,12 +24080,14 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-treasury",
+ "pallet-x3-account-registry",
  "pallet-x3-asset-registry",
  "pallet-x3-atomic-kernel",
  "pallet-x3-coin",
  "pallet-x3-cross-vm-router",
  "pallet-x3-da",
  "pallet-x3-domain-registry",
+ "pallet-x3-invariants",
  "pallet-x3-jury-anchor",
  "pallet-x3-kernel",
  "pallet-x3-sequencer",
@@ -24352,6 +24422,7 @@ dependencies = [
  "hyper 1.9.0",
  "loom",
  "proptest",
+ "redis",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
@@ -24371,6 +24442,14 @@ dependencies = [
 [[package]]
 name = "x3-gateway-risk-engine"
 version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0",
+]
 
 [[package]]
 name = "x3-genesis-builder"
@@ -24604,6 +24683,7 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "sp-core 21.0.0",
+ "sp-io 23.0.0",
 ]
 
 [[package]]
@@ -24624,12 +24704,9 @@ name = "x3-parallel-executor"
 version = "0.1.0"
 dependencies = [
  "parity-scale-codec",
- "proptest",
  "scale-info",
- "sp-core 21.0.0",
- "sp-runtime 24.0.0",
+ "sp-io 23.0.0",
  "sp-std 8.0.0",
- "x3-ixl",
 ]
 
 [[package]]
@@ -24657,6 +24734,18 @@ dependencies = [
  "sp-inherents",
  "sp-runtime 24.0.0",
  "tracing",
+]
+
+[[package]]
+name = "x3-pq"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-std 8.0.0",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -24847,21 +24936,12 @@ dependencies = [
 name = "x3-swap-router"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "frame-support",
- "log",
  "parity-scale-codec",
- "proptest",
- "rand 0.8.6",
  "scale-info",
- "serde",
- "serde_json",
  "sp-core 21.0.0",
+ "sp-io 23.0.0",
  "sp-runtime 24.0.0",
  "sp-std 8.0.0",
- "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]
@@ -24964,6 +25044,19 @@ dependencies = [
  "x3-common",
  "x3-evm-integration",
  "x3-svm-integration",
+]
+
+[[package]]
+name = "x3-vrf"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-application-crypto 23.0.0",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0",
 ]
 
 [[package]]

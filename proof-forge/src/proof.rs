@@ -184,6 +184,7 @@ pub struct OperatorControl {
 }
 
 impl ProofStatus {
+    #[allow(dead_code)]
     pub fn is_passing(&self) -> bool {
         matches!(self, ProofStatus::Verified)
     }
@@ -194,6 +195,7 @@ impl ProofStatus {
 }
 
 impl ProofLevel {
+    #[allow(dead_code)]
     pub fn as_number(&self) -> u32 {
         match self {
             ProofLevel::P0 => 0,
@@ -209,6 +211,7 @@ impl ProofLevel {
 }
 
 impl EdgeCaseLevel {
+    #[allow(dead_code)]
     pub fn as_number(&self) -> u32 {
         match self {
             EdgeCaseLevel::E0 => 0,
@@ -227,6 +230,7 @@ impl EdgeCaseLevel {
 }
 
 impl HackLevel {
+    #[allow(dead_code)]
     pub fn as_number(&self) -> u32 {
         match self {
             HackLevel::H0 => 0,
@@ -245,6 +249,7 @@ impl HackLevel {
 }
 
 impl OperatorLevel {
+    #[allow(dead_code)]
     pub fn as_number(&self) -> u32 {
         match self {
             OperatorLevel::I0 => 0,
@@ -263,6 +268,7 @@ impl OperatorLevel {
 }
 
 impl DegradedLevel {
+    #[allow(dead_code)]
     pub fn as_number(&self) -> u32 {
         match self {
             DegradedLevel::D0 => 0,

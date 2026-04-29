@@ -57,7 +57,7 @@ spec:
       # ── Containers ──────────────────────────────────────────────────
       containers:
         - name: validator
-          image: docker.io/x3-chain/x3-chain-node:latest
+          image: docker.io/x3-chain/x3-chain-node:v1.0.0
           imagePullPolicy: IfNotPresent
           
           # ── Ports ──────────────────────────────────────────────────
@@ -95,13 +95,10 @@ spec:
             - --base-path=/data/validator
             - --port=30333
             - --rpc-port=9933
-            - --unsafe-rpc-external
-            - --rpc-methods=Unsafe
+            - --rpc-methods=safe
             - --prometheus-port=9616
             - --prometheus-external
             - --log=info
-            # Note: remove --tmp for production to persist state
-            - --tmp
           
           # ── Health Checks ──────────────────────────────────────────
           livenessProbe:

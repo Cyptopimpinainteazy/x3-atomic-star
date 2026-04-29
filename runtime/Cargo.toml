@@ -45,6 +45,8 @@ pallet-evm-precompile-sha3fips = { workspace = true, default-features = false }
 fp-evm = { workspace = true, default-features = false }
 
 pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
+pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false }
+pallet-x3-account-registry = { path = "../pallets/x3-account-registry", default-features = false }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge", default-features = false }
 pallet-x3-coin = { path = "../pallets/x3-coin", default-features = false }
 pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", default-features = false }
@@ -77,7 +79,7 @@ x3-ixl = { path = "../crates/x3-ixl", default-features = false }
 x3-packet-standard = { path = "../crates/x3-packet-standard", default-features = false }
 # Post-quantum crypto (std-only; thiserror/anyhow are not no_std — gated via "pq" feature).
 quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
-# staged-pallets (wiring in progress): svm-runtime x3-invariants x3-inventory x3-reservation x3-slash x3-solvency x3-wallet-pallet
+# staged-pallets (wiring in progress): svm-runtime x3-inventory x3-reservation x3-slash x3-solvency x3-wallet-pallet
 
 sp-api = { workspace = true, default-features = false }
 sp-block-builder = { workspace = true, default-features = false }
@@ -136,6 +138,7 @@ std = [
 	"pallet-evm-precompile-sha3fips/std",
 	"fp-evm/std",
 	"pallet-x3-kernel/std",
+	"pallet-x3-invariants/std",
 	"x3-cross-vm-bridge/std",
 	"pallet-atomic-trade-engine/std",
 	"pallet-governance/std",
@@ -186,6 +189,7 @@ runtime-benchmarks = [
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
 	"pallet-x3-kernel/runtime-benchmarks",
+	"pallet-x3-invariants/runtime-benchmarks",
 	"pallet-atomic-trade-engine/runtime-benchmarks",
 	"pallet-evolution-core/runtime-benchmarks",
 	"pallet-x3-verifier/runtime-benchmarks",
@@ -217,4 +221,5 @@ disable-runtime-api = []
 try-runtime = [
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
+	"pallet-x3-invariants/try-runtime",
 ]

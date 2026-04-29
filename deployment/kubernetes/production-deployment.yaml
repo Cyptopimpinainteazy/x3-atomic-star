@@ -22,9 +22,9 @@ metadata:
   name: chain-spec
   namespace: x3-chain
 data:
-  testnet-raw.json: |
+  production-raw.json: |
     # Chain spec will be generated and inserted here
-    # Generated via: x3-chain-node build-spec --chain=testnet --raw
+    # Generated via: x3-chain-node build-spec --chain=production --raw
 
 ---
 # Secret - Validator keys (sealed secret in production)
@@ -35,8 +35,12 @@ metadata:
   namespace: x3-chain
 type: Opaque
 data:
-  # Base64 encoded validator keys
-  # Created via: kubectl create secret generic validator-keys --from-file=...
+  # Base64 encoded validator keys (MUST be replaced with actual keys)
+  # Generate with: ed25519-dalek or use existing keys from secure storage
+  # bootnode-key: <BASE64_BOOTNODE_KEY>
+  # validator-0-key: <BASE64_VALIDATOR_0_KEY>
+  # validator-1-key: <BASE64_VALIDATOR_1_KEY>
+  # validator-2-key: <BASE64_VALIDATOR_2_KEY>
   
 ---
 # Secret - Database credentials
@@ -47,9 +51,11 @@ metadata:
   namespace: x3-chain
 type: Opaque
 stringData:
+  # Set these values via environment variables when applying:
+  # export POSTGRES_PASSWORD="your-secure-password"
   POSTGRES_USER: x3
-  POSTGRES_PASSWORD: CHANGE_ME_IN_PRODUCTION
-  DATABASE_URL: postgresql://x3:CHANGE_ME_IN_PRODUCTION@postgres:5432/x3_analytics
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+  DATABASE_URL: "postgresql://x3:${POSTGRES_PASSWORD}@postgres:5432/x3_analytics"
 
 ---
 # PersistentVolumeClaim - Bootnode data
@@ -153,8 +159,8 @@ spec:
         runAsNonRoot: true
       containers:
       - name: bootnode
-        image: x3-chain/node:latest
-        imagePullPolicy: Always
+        image: x3-chain/node:v1.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 30333
           name: p2p
@@ -176,7 +182,6 @@ spec:
         - --base-path=/data
         - --node-key-file=/data/node-key
         - --name=X3-Bootnode-K8s
-        - --rpc-external
         - --rpc-cors=all
         - --rpc-methods=safe
         - --prometheus-external
@@ -186,7 +191,7 @@ spec:
           mountPath: /data
         - name: chain-spec
           mountPath: /data/chain-spec.json
-          subPath: testnet-raw.json
+          subPath: production-raw.json
         - name: node-key
           mountPath: /data/node-key
           subPath: bootnode-key
@@ -198,16 +203,26 @@ spec:
             cpu: "4"
             memory: 8Gi
         livenessProbe:
-          httpGet:
-            path: /health
-            port: 9933
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
           initialDelaySeconds: 60
           periodSeconds: 30
           timeoutSeconds: 10
         readinessProbe:
-          httpGet:
-            path: /health
-            port: 9933
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
           initialDelaySeconds: 30
           periodSeconds: 10
       volumes:
@@ -272,8 +287,8 @@ spec:
         runAsNonRoot: true
       containers:
       - name: validator
-        image: x3-chain/node:latest
-        imagePullPolicy: Always
+        image: x3-chain/node:v1.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 30333
           name: p2p
@@ -293,8 +308,11 @@ spec:
         - --base-path=/data
         - --validator
         - --name=X3-Validator-$(POD_NAME)
+        # BOOTNODE_PEER_ID must be generated via:
+        # ./x3-chain-node key generate-node-key --file /tmp/bootnode-key
+        # ./x3-chain-node key inspect-node-key --file /tmp/bootnode-key
+        # Copy the peer ID from the output and replace below
         - --bootnodes=/dns/bootnode.x3-chain.svc.cluster.local/tcp/30333/p2p/BOOTNODE_PEER_ID
-        - --rpc-external
         - --rpc-cors=all
         - --rpc-methods=safe
         - --prometheus-external
@@ -304,7 +322,7 @@ spec:
           mountPath: /data
         - name: chain-spec
           mountPath: /data/chain-spec.json
-          subPath: testnet-raw.json
+          subPath: production-raw.json
         resources:
           requests:
             cpu: "2"
@@ -313,15 +331,25 @@ spec:
             cpu: "4"
             memory: 16Gi
         livenessProbe:
-          httpGet:
-            path: /health
-            port: 9933
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
           initialDelaySeconds: 60
           periodSeconds: 30
         readinessProbe:
-          httpGet:
-            path: /health
-            port: 9933
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
           initialDelaySeconds: 30
           periodSeconds: 10
       volumes:
@@ -529,9 +557,9 @@ spec:
         - name: NODE_ENV
           value: "production"
         - name: NEXT_PUBLIC_NETWORK
-          value: "testnet"
+          value: "production"
         - name: NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT
-          value: "wss://rpc.testnet.x3-chain.io:9944"
+          value: "wss://rpc.x3-chain.io:9944"
         resources:
           requests:
             cpu: "250m"
@@ -587,10 +615,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - rpc.testnet.x3-chain.io
+    - rpc.x3-chain.io
     secretName: rpc-tls-cert
   rules:
-  - host: rpc.testnet.x3-chain.io
+  - host: rpc.x3-chain.io
     http:
       paths:
       - path: /rpc

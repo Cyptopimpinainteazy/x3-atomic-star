@@ -6,7 +6,7 @@
 **Perfect for testing everything on your current machine RIGHT NOW:**
 
 ```bash
-cd /home/lojak/Desktop/x3-chain
+# From repository root
 ./target/release/x3-chain-node --dev --tmp --rpc-external --rpc-cors all
 ```
 
@@ -18,7 +18,7 @@ cd /home/lojak/Desktop/x3-chain
 **Full 3-validator testnet on ONE machine with systemd services:**
 
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 ./deploy-local-testnet.sh
 ```
 
@@ -52,7 +52,7 @@ declare -A SERVERS=(
 
 2. **Run deployment:**
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 ./deploy-multi-server.sh
 ```
 

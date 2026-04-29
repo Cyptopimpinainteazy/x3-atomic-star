@@ -1,470 +1,403 @@
 # Getting Started with X3 Chain
 
-This guide will get you up and running with X3 Chain in under 10 minutes. We'll cover local development setup, connecting your wallet, and deploying your first contract.
+This guide will help you build and run X3 Chain from source. All commands are based on the actual repository implementation.
 
 ## Prerequisites
 
-- Node.js 18+ or Rust 1.70+
-- Git
-- 4GB+ available disk space
-- Basic knowledge of Solidity or Rust
+### System Requirements
+- **Operating System**: Linux or macOS (Windows via WSL2)
+- **Rust**: 1.89.0 or later (as specified in `rust-toolchain.toml`)
+- **Build Tools**: `cmake`, `pkg-config`, `libssl-dev`, `clang`
+- **Memory**: Minimum 8GB RAM (16GB recommended)
+- **Disk Space**: 20GB free space for build artifacts
 
-## Quick Start (5 minutes)
-
-### 1. Install X3 CLI
+### Install Rust Toolchain
 
 ```bash
-# Install via npm
-npm install -g @x3-chain/cli
+# Install rustup if not already installed
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Or via curl
-curl -sSL https://x3-chain.io/install | bash
-
+# The repository includes rust-toolchain.toml which will auto-select Rust 1.89.0
 # Verify installation
-x3 --version
+rustup show
+cargo --version
+
+# Add WebAssembly target (required for runtime)
+rustup target add wasm32-unknown-unknown
 ```
 
-**Why this matters**: The X3 CLI provides unified commands for both EVM and SVM development, simplifying your workflow.
+### Install Build Dependencies
 
-### 2. Start Local Node
-
+**Ubuntu/Debian:**
 ```bash
-# Start development node (creates fresh chain)
-x3 node start --dev
-
-# Or with specific configuration
-x3 node start --dev --port 9944 --rpc-port 9933
+sudo apt update
+sudo apt install -y build-essential cmake pkg-config libssl-dev git clang libclang-dev
 ```
 
-The node will:
-- Start on `ws://localhost:9944` (WebSocket RPC)
-- Expose HTTP RPC on `http://localhost:9933`
-- Create a development account with 1000 X3 tokens
-- Enable both EVM and SVM execution
-
-**Expected output:**
-```
-2025-12-10 14:00:00 INFO X3 Chain Node v1.0.0
-2025-12-10 14:00:01 INFO Dual-VM runtime initialized
-2025-12-10 14:00:02 INFO EVM adapter: Ready
-2025-12-10 14:00:02 INFO SVM adapter: Ready
-2025-12-10 14:00:03 INFO RPC server started on ws://localhost:9944
-2025-12-10 14:00:03 INFO Development account: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
-```
-
-### 3. Connect Your Wallet
-
-#### MetaMask Setup
-```javascript
-// Add X3 Chain to MetaMask
-await window.ethereum.request({
-  method: 'wallet_addEthereumChain',
-  params: [{
-    chainId: '0x1234', // Replace with actual chain ID
-    chainName: 'X3 Chain Dev',
-    nativeCurrency: {
-      name: 'X3',
-      symbol: 'X3',
-      decimals: 12
-    },
-    rpcUrls: ['http://localhost:9933'],
-    blockExplorerUrls: ['http://localhost:3000']
-  }]
-});
-```
-
-#### X3 SDK Setup
+**macOS:**
 ```bash
-npm install @x3-chain/sdk
+brew install cmake pkg-config openssl
 ```
-
-```javascript
-import { AtlasSphereProvider } from '@x3-chain/sdk';
-
-const provider = new AtlasSphereProvider({
-  network: 'local',
-  rpcUrl: 'ws://localhost:9944',
-  timeout: 30000
-});
-
-await provider.connect();
-console.log('Connected to X3 Chain!');
-```
-
-**Why this matters**: X3 Chain provides both standard Ethereum Web3 compatibility and enhanced dual-VM features through the X3 SDK.
-
-## Choose Your VM
-
-X3 Chain supports three development approaches:
-
-### EVM-Only Development
-**Best for**: Existing Ethereum projects, DeFi protocols, familiar tooling
-
-```solidity
-// Deploy with standard tools
-npx hardhat compile --network x3
-npx hardhat run scripts/deploy.js --network x3
-```
-
-**Use cases**: 
-- DeFi protocols (DEX, lending, derivatives)
-- DAOs and governance
-- NFT marketplaces
-- Standard Ethereum patterns
-
-### SVM-Only Development  
-**Best for**: High-throughput apps, gaming, microtransactions
-
-```bash
-# Anchor project setup
-anchor init my-svm-app
-cd my-svm-app
-
-# Configure for X3 Chain
-anchor set provider cluster http://localhost:9933
-anchor set provider wallet ~/.config/solana/id.json
-
-# Build and deploy
-anchor build
-anchor deploy
-```
-
-**Use cases**:
-- Real-time gaming
-- High-frequency trading
-- Social media applications
-- Microtransaction platforms
-
-### Cross-VM Development
-**Best for**: Maximum flexibility, atomic operations, arbitrage
-
-```solidity
-// EVM contract calling SVM program
-pragma solidity ^0.8.0;
-
-import "@x3-chain/contracts/CrossVM.sol";
-
-contract AtomicArb is CrossVM {
-    function executeArb(uint256 amount) external {
-        // 1. Check EVM balances
-        require(balanceOf(msg.sender) > amount, "Insufficient balance");
-        
-        // 2. Call SVM program atomically
-        bytes32 result = crossVMCall(
-            SVM_PROGRAM_ID,
-            "executeTrade",
-            abi.encode(amount)
-        );
-        
-        // 3. Process SVM result in EVM
-        uint256 profit = decodeProfit(result);
-        if (profit > 0) {
-            _settleProfit(profit);
-        }
-    }
-}
-```
-
-**Use cases**:
-- Cross-chain arbitrage
-- Unified liquidity protocols
-- Multi-domain applications
-- Atomic swaps and trades
-
-## Deploy Your First Contract
-
-### EVM Contract Example
-
-**contracts/HelloWorld.sol**
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-contract HelloWorld {
-    string public message;
-    uint256 public counter;
-    
-    event MessageChanged(string oldMessage, string newMessage, uint256 timestamp);
-    
-    constructor(string memory _message) {
-        message = _message;
-        counter = 0;
-    }
-    
-    function setMessage(string memory _message) external {
-        string memory oldMessage = message;
-        message = _message;
-        counter++;
-        
-        emit MessageChanged(oldMessage, _message, block.timestamp);
-    }
-    
-    function getMessage() external view returns (string memory) {
-        return message;
-    }
-    
-    function getCounter() external view returns (uint256) {
-        return counter;
-    }
-}
-```
-
-**Deploy script (scripts/deploy.js)**
-```javascript
-const hre = require("hardhat");
-
-async function main() {
-    console.log("Deploying HelloWorld contract to X3 Chain...");
-    
-    const HelloWorld = await hre.ethers.getContractFactory("HelloWorld");
-    const helloWorld = await HelloWorld.deploy("Hello X3 Chain!");
-    
-    await helloWorld.deployed();
-    
-    console.log("HelloWorld deployed to:", helloWorld.address);
-    
-    // Interact with the contract
-    const message = await helloWorld.getMessage();
-    console.log("Initial message:", message);
-    
-    const tx = await helloWorld.setMessage("Updated via X3 Chain!");
-    await tx.wait();
-    
-    const updatedMessage = await helloWorld.getMessage();
-    const counter = await helloWorld.getCounter();
-    
-    console.log("Updated message:", updatedMessage);
-    console.log("Transaction count:", counter.toString());
-}
-
-main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-});
-```
-
-**Deploy with Hardhat**
-```bash
-# Install dependencies
-npm install --save-dev hardhat @nomiclabs/hardhat-ethers
-
-# Configure Hardhat (hardhat.config.js)
-require("@nomiclabs/hardhat-ethers");
-
-module.exports = {
-  solidity: "0.8.0",
-  networks: {
-    x3: {
-      url: "http://localhost:9933",
-      chainId: 1234,
-      accounts: ["0x..."] // Your private key
-    }
-  }
-};
-
-# Deploy
-npx hardhat run scripts/deploy.js --network x3
-```
-
-### SVM Program Example
-
-**programs/hello-world/src/lib.rs**
-```rust
-use anchor_lang::prelude::*;
-
-declare_id!("YourProgramIDHere");
-
-#[program]
-pub mod hello_world {
-    use super::*;
-
-    pub fn initialize(ctx: Context<Initialize>, message: String) -> Result<()> {
-        let account = &mut ctx.accounts.message_account;
-        account.message = message;
-        account.counter = 0;
-        account.authority = ctx.accounts.authority.key();
-        Ok(())
-    }
-
-    pub fn update_message(ctx: Context<UpdateMessage>, new_message: String) -> Result<()> {
-        let account = &mut ctx.accounts.message_account;
-        let old_message = account.message.clone();
-        account.message = new_message;
-        account.counter += 1;
-        
-        msg!("Updated message from '{}' to '{}'", old_message, account.message);
-        Ok(())
-    }
-
-    pub fn get_message(ctx: Context<GetMessage>) -> Result<String> {
-        Ok(ctx.accounts.message_account.message.clone())
-    }
-}
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(init, payer = authority, space = 8 + 32 + 8 + 4 + 200)]
-    pub message_account: Account<'info, MessageAccount>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct UpdateMessage<'info> {
-    #[account(mut, seeds = [b"message", authority.key().as_ref()], bump)]
-    pub message_account: Account<'info, MessageAccount>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct GetMessage<'info> {
-    #[account(seeds = [b"message", authority.key().as_ref()], bump)]
-    pub message_account: Account<'info, MessageAccount>,
-    pub authority: Signer<'info>,
-}
-
-#[account]
-pub struct MessageAccount {
-    pub message: String,
-    pub counter: u64,
-    pub authority: Pubkey,
-}
-```
-
-**Deploy with Anchor**
-```bash
-# Build and deploy
-anchor build
-anchor deploy
-
-# Interact via CLI
-anchor run initialize --message "Hello X3 Chain!"
-anchor run update_message --new_message "Updated via Anchor!"
-```
-
-## Test Your Deployment
-
-### EVM Testing
-```javascript
-// test/hello-world.test.js
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-
-describe("HelloWorld", function () {
-  it("Should deploy and interact with HelloWorld", async function () {
-    const HelloWorld = await ethers.getContractFactory("HelloWorld");
-    const helloWorld = await HelloWorld.deploy("Hello X3!");
-    await helloWorld.deployed();
-
-    expect(await helloWorld.getMessage()).to.equal("Hello X3!");
-    
-    await helloWorld.setMessage("Updated!");
-    expect(await helloWorld.getMessage()).to.equal("Updated!");
-    expect(await helloWorld.getCounter()).to.equal(1);
-  });
-});
-```
-
-```bash
-# Run tests
-npx hardhat test --network x3
-```
-
-### SVM Testing
-```rust
-// tests/hello-world.ts
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
-import { HelloWorld } from "../target/types/hello_world";
-import { expect } from "chai";
-
-describe("hello-world", () => {
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
-  const program = anchor.workspace.HelloWorld as Program<HelloWorld>;
-
-  it("Initialize message account", async () => {
-    const message = "Hello X3 Chain!";
-    
-    await program.methods
-      .initialize(message)
-      .accounts({
-        messageAccount: anchor.web3.Keypair.generate().publicKey,
-        authority: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    const storedMessage = await program.methods.getMessage().rpc();
-    expect(storedMessage).to.equal(message);
-  });
-});
-```
-
-```bash
-# Run tests
-anchor test
-```
-
-## Next Steps
-
-### Explore Examples
-- **[Cross-VM Atomic Operations](./tutorials/cross-vm-atomic.md)** - Build apps that use both VMs
-- **[RPC Integration Example](./examples/rpc_integration.rs)** - Connect to chain endpoints and flows
-- **[Arbitrage Bot Example](./examples/arbitrage_bot_config.rs)** - Explore advanced strategy configuration
-
-### Advanced Features
-- **[RPC API Reference](./rpc.md)** - Detailed API documentation
-- **[Cross-VM Tutorial](./tutorials/cross-vm-atomic.md)** - End-to-end cross-VM development flow
-- **[Gas Model](./x3-lang/spec/gas-model.md)** - Understand execution and fee model
-
-### Join the Community
-- **[Discord](https://discord.gg/x3-chain)** - Get help and share projects
-- **[GitHub](https://github.com/x3-chain)** - Contribute and report issues
-- **[Twitter](https://twitter.com/atlassphere)** - Follow updates
-
-## Troubleshooting
-
-### Common Issues
-
-**Node won't start**
-```bash
-# Check if port is already in use
-lsof -i :9944
-
-# Kill existing processes
-pkill -f x3-chain-node
-
-# Start with different ports
-x3 node start --dev --port 9945 --rpc-port 9934
-```
-
-**Wallet connection fails**
-```bash
-# Verify node is running
-curl -X POST http://localhost:9933 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-
-# Check WebSocket connection
-wscat -c ws://localhost:9944
-```
-
-**Contract deployment fails**
-```bash
-# Check gas estimation
-x3 node logs --tail 50
-
-# Verify account has funds
-curl -X POST http://localhost:9933 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xYourAddress","latest"],"id":1}'
-```
-
-**Why this matters**: X3 Chain provides detailed logging and debugging tools to help you resolve issues quickly and understand what's happening under the hood.
 
 ---
 
-*Ready to build something amazing? Check out our [tutorials](./tutorials/) for step-by-step guides to common patterns and use cases.*
+## Step 1: Clone and Build
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/your-org/x3-chain.git
+cd x3-chain
+```
+
+### Build the Node Binary
+
+This compiles the blockchain node (`x3-chain-node`):
+
+```bash
+cargo build --release --package x3-chain-node
+```
+
+Build artifacts location: `target/release/x3-chain-node`
+
+Expected build time: 30-60 minutes on first build (uses all CPU cores)
+
+### Build the X3 CLI Tool (Optional)
+
+The X3 CLI provides development tools for compiling X3 contracts:
+
+```bash
+cargo build --release --package x3-cli
+```
+
+Build artifact location: `target/release/x3`
+
+To enable full SDK features (deploy, simulate, tx commands):
+
+```bash
+cargo build --release --package x3-cli --features sdk
+```
+
+---
+
+## Step 2: Run Your First Node
+
+### Option A: Development Mode (Quickest)
+
+Run a single-node development chain with temporary storage:
+
+```bash
+./target/release/x3-chain-node --dev --tmp
+```
+
+This starts:
+- ✅ Single validator node (Alice)
+- ✅ Aura + GRANDPA consensus
+- ✅ HTTP JSON-RPC on `127.0.0.1:9933`
+- ✅ WebSocket JSON-RPC on `127.0.0.1:9944`
+- ⚠️ All data deleted when node stops (use `--tmp` flag)
+
+**To persist data**, omit `--tmp`:
+```bash
+./target/release/x3-chain-node --dev
+```
+
+Data location: `~/.local/share/x3-chain-node/chains/dev/`
+
+### Option B: Local Testnet (Multi-Validator)
+
+For production-like environment with multiple validators:
+
+```bash
+cd deployment
+./deploy-local-testnet.sh
+```
+
+This script:
+- Generates validator keys (3 validators + 1 bootnode)
+- Creates chain specification
+- Starts 4 systemd services
+- Configures persistent storage
+
+See [deployment/README.md](./deployment/README.md) for details.
+
+---
+
+## Step 3: Verify Node is Running
+
+### Check Node Logs
+
+If running in foreground mode, you should see:
+```
+✅ Role: AUTHORITY
+✅ Best: #1234 (0x1a2b3c...)
+✅ Finalized #1230 (0x4d5e6f...)
+```
+
+### Query via RPC
+
+**HTTP JSON-RPC** (system health):
+```bash
+curl http://127.0.0.1:9933 -H "Content-Type: application/json" \
+  -d '{"id":1,"jsonrpc":"2.0","method":"system_health","params":[]}'
+```
+
+Expected response:
+```json
+{"jsonrpc":"2.0","result":{"isSyncing":false,"peers":0,"shouldHavePeers":false},"id":1}
+```
+
+**WebSocket** (subscribe to new blocks):
+```bash
+# Install websocat for WebSocket testing
+cargo install websocat
+
+# Subscribe to new block headers
+websocat ws://127.0.0.1:9944 \
+  -t -text '{"id":1,"jsonrpc":"2.0","method":"chain_subscribeNewHeads","params":[]}'
+```
+
+---
+
+## Step 4: Using the X3 CLI
+
+The X3 CLI provides development tools for compiling and testing X3 contracts.
+
+### Initialize a New Project
+
+```bash
+./target/release/x3 init my-project
+cd my-project
+```
+
+This creates:
+- `x3.toml` - Project configuration
+- `src/` - Source code directory
+- `tests/` - Test directory
+
+### Compile a Contract
+
+**Compile all contracts in project:**
+```bash
+./target/release/x3 build
+```
+
+**Compile a single X3 source file** (standalone):
+```bash
+./target/release/x3 compile src/my_contract.x3
+```
+
+Output: `my_contract.wasm` and `my_contract.abi.json`
+
+### Run Tests
+
+```bash
+./target/release/x3 test
+```
+
+### Interactive REPL
+
+Start an interactive X3 language REPL:
+
+```bash
+./target/release/x3 repl
+```
+
+Try:
+```x3
+let x: i32 = 42;
+let y = x * 2;
+print(y);
+```
+
+---
+
+## Step 5: Interact with the Blockchain (SDK Features)
+
+To use blockchain interaction commands, rebuild with SDK features:
+
+```bash
+cargo build --release --package x3-cli --features sdk
+```
+
+### Account Management
+
+**Create a new account:**
+```bash
+./target/release/x3 account create --name alice
+```
+
+**List accounts:**
+```bash
+./target/release/x3 account list
+```
+
+### Query Blockchain State
+
+**Get account balance:**
+```bash
+./target/release/x3 query balance 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+```
+
+**Get canonical ledger state:**
+```bash
+./target/release/x3 query ledger --asset-id 0 --account <ACCOUNT_ID>
+```
+
+### Deploy a Contract
+
+```bash
+./target/release/x3 deploy \
+  --wasm target/wasm32-unknown-unknown/release/my_contract.wasm \
+  --account alice \
+  --url ws://127.0.0.1:9944
+```
+
+### Send Transactions
+
+```bash
+./target/release/x3 tx transfer \
+  --to 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY \
+  --amount 1000000000000 \
+  --account alice
+```
+
+### Simulate Transactions
+
+Test a transaction without broadcasting:
+
+```bash
+./target/release/x3 simulate \
+  --comit <COMIT_HEX> \
+  --url ws://127.0.0.1:9944
+```
+
+---
+
+## Step 6: Cross-Chain Atomic Swaps
+
+X3 CLI includes native cross-chain swap support for 103 EVM chains:
+
+### List Supported Chains
+
+```bash
+./target/release/x3 chains list
+```
+
+**Search for specific chains:**
+```bash
+./target/release/x3 chains search ethereum
+./target/release/x3 chains search polygon
+```
+
+### Execute Atomic Swap
+
+```bash
+./target/release/x3 swap \
+  --from-chain ethereum \
+  --to-chain polygon \
+  --amount 1000000000000000000 \
+  --token 0x... \
+  --account alice
+```
+
+---
+
+## Common Commands Reference
+
+### Node Operations
+
+| Command | Purpose |
+|---------|---------|
+| `./target/release/x3-chain-node --dev --tmp` | Start development node (temporary storage) |
+| `./target/release/x3-chain-node --dev` | Start development node (persistent storage) |
+| `./target/release/x3-chain-node --help` | Show all node options |
+
+### X3 CLI (Contract Development)
+
+| Command | Purpose |
+|---------|---------|
+| `x3 init <name>` | Create new project |
+| `x3 build` | Build all contracts |
+| `x3 compile <file>` | Compile single file |
+| `x3 test` | Run tests |
+| `x3 repl` | Start interactive REPL |
+| `x3 docgen` | Generate documentation |
+
+### X3 CLI (SDK Features - Requires `--features sdk`)
+
+| Command | Purpose |
+|---------|---------|
+| `x3 account create` | Create account |
+| `x3 account list` | List accounts |
+| `x3 query balance <addr>` | Query balance |
+| `x3 deploy --wasm <path>` | Deploy contract |
+| `x3 tx transfer --to <addr>` | Send transfer |
+| `x3 simulate --comit <hex>` | Simulate transaction |
+| `x3 swap --from-chain <chain>` | Cross-chain swap |
+| `x3 chains list` | List supported chains |
+
+---
+
+## Next Steps
+
+- **Architecture**: See [TRI_VM_ARCHITECTURE.md](./TRI_VM_ARCHITECTURE.md) for EVM+SVM+X3VM design
+- **Language Spec**: See [X3_LANGUAGE_SPECIFICATION.md](./X3_LANGUAGE_SPECIFICATION.md) for X3 language reference
+- **Deployment**: See [deployment/README.md](./deployment/README.md) for production deployment
+- **Testing**: See [testing/README.md](./testing/README.md) for test frameworks
+- **Security**: See [../00-START-HERE-MAINNET-READINESS.md](../00-START-HERE-MAINNET-READINESS.md) for audit status
+
+---
+
+## Troubleshooting
+
+### Build Failures
+
+**Error: "linker `cc` not found"**
+```bash
+# Ubuntu/Debian
+sudo apt install build-essential
+
+# macOS
+xcode-select --install
+```
+
+**Error: "failed to load source for dependency"**
+```bash
+# Clean and rebuild
+cargo clean
+cargo build --release
+```
+
+### Node Won't Start
+
+**Error: "Port 9944 already in use"**
+```bash
+# Find and kill existing process
+lsof -i :9944
+kill -9 <PID>
+
+# Or use different ports
+./target/release/x3-chain-node --dev --ws-port 9945 --rpc-port 9934
+```
+
+**Error: "Database version mismatch"**
+```bash
+# Purge chain data
+./target/release/x3-chain-node purge-chain --dev
+```
+
+### RPC Connection Issues
+
+**Error: "Connection refused"**
+- Ensure node is running (`ps aux | grep x3-chain-node`)
+- Verify RPC is enabled (development mode enables by default)
+- Check firewall rules
+
+---
+
+## Support & Community
+
+- **Documentation**: [docs/master/INDEX.md](./master/INDEX.md)
+- **Issues**: [GitHub Issues](https://github.com/your-org/x3-chain/issues)
+- **Security**: See [../S0_BLOCKERS_REMEDIATION_PLAN.md](../S0_BLOCKERS_REMEDIATION_PLAN.md) for current security status

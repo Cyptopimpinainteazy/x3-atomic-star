@@ -218,17 +218,17 @@ If you already have VMs provisioned and configured:
 
 ### Binary Location
 ```bash
-/home/lojak/Desktop/x3-chain/target/release/x3-chain-node
+target/release/x3-chain-node
 ```
 
 ### Chain Spec (Deploy This)
 ```bash
-/home/lojak/Desktop/x3-chain/deployment/chain-specs/x3-testnet-raw.json
+deployment/chain-specs/x3-testnet-raw.json
 ```
 
 ### Keys Directory (SECURE THIS)
 ```bash
-/home/lojak/Desktop/x3-chain/deployment/keys/
+deployment/keys/
 ```
 
 ### Deployment Scripts

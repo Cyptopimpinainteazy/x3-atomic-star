@@ -17,6 +17,7 @@ pub mod perpetuals;
 pub mod pool_analytics;
 pub mod real_slippage;
 pub mod route_finder;
+pub mod settlement_bridge; // NEW: Limit order → settlement engine integration
 pub mod stop_loss_trigger;
 pub mod trade_history;
 pub mod twap_executor;
@@ -70,6 +71,9 @@ pub use pool_analytics::{
 };
 pub use real_slippage::{
     PoolReserves, PriceImpact, RealSlippageCalculator, SlippageProtection, SlippageQuote,
+};
+pub use settlement_bridge::{
+    LimitOrderSettlementBridge, OrderSettlementIntent, SettlementStatus,
 };
 pub use stop_loss_trigger::{
     GridTradingConfig, StopLossTakeProfitEngine, StopLossTrigger, TakeProfitTrigger,

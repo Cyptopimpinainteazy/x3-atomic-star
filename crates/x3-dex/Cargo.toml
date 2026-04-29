@@ -6,12 +6,24 @@ license.workspace = true
 publish = false
 
 [dependencies]
-parity-scale-codec = { workspace = true, features = ["derive"] }
+parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
 sp-std = { workspace = true, default-features = false }
-sp-core = { workspace = true, default-features = false, features = ["std"] }
-sp-runtime = { workspace = true, default-features = false, features = ["std"] }
-parking_lot = "0.12"
-tokio = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+sp-core = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+parking_lot = { version = "0.12", optional = true }
+tokio = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], default-features = false }
 
 [dev-dependencies]
+
+[features]
+default = ["std"]
+std = [
+    "parity-scale-codec/std",
+    "sp-std/std",
+    "sp-core/std",
+    "sp-runtime/std",
+    "serde/std",
+    "parking_lot",
+    "tokio",
+]

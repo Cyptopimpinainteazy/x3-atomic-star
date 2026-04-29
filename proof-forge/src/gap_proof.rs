@@ -1,5 +1,5 @@
 // GapProof Scanner - Detects missing implementations, tests, wiring
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -482,8 +482,6 @@ impl GapScanner {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_gap_detection() {
         // Test gap detection logic

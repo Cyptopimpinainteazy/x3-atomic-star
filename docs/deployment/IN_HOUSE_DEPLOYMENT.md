@@ -30,7 +30,7 @@ Perfect for testing everything locally on ONE machine:
 
 ```bash
 # Already have the binary built!
-cd /home/lojak/Desktop/x3-chain
+cd X3_ATOMIC_STAR
 
 # Run in dev mode (single validator, instant blocks)
 ./target/release/x3-chain-node --dev --tmp
@@ -75,7 +75,7 @@ One Beefy Server:
 ### Option A: Copy to Remote Servers
 ```bash
 # From your build machine
-cd /home/lojak/Desktop/x3-chain
+cd X3_ATOMIC_STAR
 
 # Copy to each server
 for server in server1 server2 server3; do
@@ -104,7 +104,7 @@ You already have keys in `deployment/keys/`:
 
 ### Deploy Keys to Servers
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 
 # For each validator server:
 # Copy the ENTIRE keystore folder
@@ -122,7 +122,7 @@ sudo chown -R $USER:$USER /var/lib/x3-chain
 
 ### Get Bootnode Key
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 BOOTNODE_KEY=$(cat keys/bootnode-key.txt)
 echo "Bootnode Secret: $BOOTNODE_KEY"
 ```
@@ -162,7 +162,7 @@ x3-chain-node key inspect-node-key --file keys/bootnode-key.txt
 # Replace BOOTNODE_IP with your bootnode's IP (or 127.0.0.1 if same machine)
 
 x3-chain-node \
-  --chain /home/lojak/Desktop/x3-chain/deployment/chain-specs/x3-testnet-raw.json \
+  --chain $REPO_ROOT/deployment/chain-specs/x3-testnet-raw.json \
   --base-path /var/lib/x3-chain/validator-01 \
   --name "Validator-01" \
   --validator \
@@ -178,7 +178,7 @@ x3-chain-node \
 ### Validator 02
 ```bash
 x3-chain-node \
-  --chain /home/lojak/Desktop/x3-chain/deployment/chain-specs/x3-testnet-raw.json \
+  --chain $REPO_ROOT/deployment/chain-specs/x3-testnet-raw.json \
   --base-path /var/lib/x3-chain/validator-02 \
   --name "Validator-02" \
   --validator \
@@ -191,7 +191,7 @@ x3-chain-node \
 ### Validator 03
 ```bash
 x3-chain-node \
-  --chain /home/lojak/Desktop/x3-chain/deployment/chain-specs/x3-testnet-raw.json \
+  --chain $REPO_ROOT/deployment/chain-specs/x3-testnet-raw.json \
   --base-path /var/lib/x3-chain/validator-03 \
   --name "Validator-03" \
   --validator \
@@ -273,7 +273,7 @@ Type=simple
 User=$USER
 WorkingDirectory=/home/$USER
 ExecStart=/usr/local/bin/x3-chain-node \\
-  --chain /home/lojak/Desktop/x3-chain/deployment/chain-specs/x3-testnet-raw.json \\
+  --chain $REPO_ROOT/deployment/chain-specs/x3-testnet-raw.json \\
   --base-path /var/lib/x3-chain/validator-01 \\
   --name "Validator-01" \\
   --validator \\
@@ -304,7 +304,7 @@ sudo journalctl -u x3-validator-01 -f
 
 ### Super Easy Local Deploy
 ```bash
-cd /home/lojak/Desktop/x3-chain/deployment
+cd deployment
 
 # This will:
 # 1. Copy binary to /usr/local/bin

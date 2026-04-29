@@ -22,6 +22,9 @@ members = [
     "pallets/x3-settlement-engine",
     "pallets/meme-overlord",
     "pallets/swarm",
+    "crates/x3-parallel-executor",
+    "crates/x3-appzone-factory",
+    "crates/x3-pq",
     "crates/evm-integration",
     "crates/svm-integration",
     "crates/svm-counter",
@@ -99,6 +102,12 @@ members = [
     "crates/x3-launch-validator",
     # On-chain invariant enforcement pallet (Article IV / checklist §10)
     "pallets/x3-invariants",
+    # Native oracle pallet for decentralized price feeds
+    "pallets/x3-oracle",
+    # VRF pallet for verifiable randomness
+    "pallets/x3-vrf",
+    # Automation pallet for keeper network
+    "pallets/x3-automation",
     # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
     "crates/x3-bridge-adapters",
     "crates/cross-chain-position-manager",
@@ -112,6 +121,9 @@ members = [
     "crates/x3-validator-attestation",
     "crates/x3-proof-dispute",
     "crates/x3-gateway-risk-engine",
+    "crates/x3-vrf",
+    "crates/x3-automation",
+    "crates/x3-swap-router",
     "crates/x3-genesis-builder",
     "tests/e2e",
         # Phase 4.5: Liquidity, Inventory, and Solvency control plane

@@ -21,6 +21,7 @@ frame-system = { workspace = true, default-features = false }
 frame-benchmarking = { workspace = true, default-features = false, optional = true }
 pallet-balances = { workspace = true, default-features = false }
 pallet-timestamp = { workspace = true, default-features = false }
+pallet-x3-invariants = { path = "../x3-invariants", default-features = false }
 sp-api = { workspace = true, default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 minicbor = { version = "0.24.0", default-features = false, features = ["derive", "alloc"] }
@@ -47,6 +48,7 @@ std = [
     "frame-system/std",
     "pallet-balances/std",
     "pallet-timestamp/std",
+    "pallet-x3-invariants/std",
     "parity-scale-codec/std",
     "scale-info/std",
     "sp-api/std",
@@ -76,3 +78,6 @@ try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
 ]
+
+[dev-dependencies]
+proptest = "1.4"

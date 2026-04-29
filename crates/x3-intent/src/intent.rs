@@ -42,6 +42,7 @@ pub struct ArbIntent {
 
 impl ArbIntent {
     /// Create a new ArbIntent. Starts in Submitted state.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: IntentId,
         agent_id: AgentIdentity,
@@ -74,21 +75,21 @@ impl ArbIntent {
     /// Compute the canonical hash of this intent.
     fn compute_hash(&self) -> Hash256 {
         let mut hasher = Sha256::new();
-        hasher.update(&self.id.0.to_le_bytes());
-        hasher.update(&self.agent_id.pubkey);
-        hasher.update(&[self.agent_id.ephemeral as u8]);
-        hasher.update(&self.program_hash);
-        hasher.update(&[
+        hasher.update(self.id.0.to_le_bytes());
+        hasher.update(self.agent_id.pubkey);
+        hasher.update([self.agent_id.ephemeral as u8]);
+        hasher.update(self.program_hash);
+        hasher.update([
             self.flags.private_execution as u8,
             self.flags.flashloan as u8,
             self.flags.zk_proof as u8,
             self.flags.slashable as u8,
             self.flags.partial_fill as u8,
         ]);
-        hasher.update(&self.bond_amount.to_le_bytes());
-        hasher.update(&self.fee_cap.to_le_bytes());
-        hasher.update(&self.submitted_at.to_le_bytes());
-        hasher.update(&self.expires_at.to_le_bytes());
+        hasher.update(self.bond_amount.to_le_bytes());
+        hasher.update(self.fee_cap.to_le_bytes());
+        hasher.update(self.submitted_at.to_le_bytes());
+        hasher.update(self.expires_at.to_le_bytes());
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&result);

@@ -1,11 +1,10 @@
 // Registry module for claim management and verification tracking
 
-use crate::proof::{Claim, ClaimRegistry, ProofResult, ProofStatus};
+use crate::proof::{Claim, ProofResult, ProofStatus};
 use std::collections::HashMap;
 
 pub mod claims;
 
-pub use claims::{parse_claims, serialize_claims, ClaimFile};
 
 /// Claim registry with verification tracking
 #[derive(Debug, Clone)]

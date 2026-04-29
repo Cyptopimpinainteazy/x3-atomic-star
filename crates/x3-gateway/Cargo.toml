@@ -28,6 +28,7 @@ async-graphql-axum = "7.0"
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+redis = { version = "0.25", features = ["aio", "tokio-comp"] }
 
 # Serialization
 serde = { workspace = true, features = ["derive", "std"] }

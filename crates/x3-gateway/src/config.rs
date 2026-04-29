@@ -10,6 +10,8 @@ pub struct GatewayConfig {
     pub database: DatabaseConfig,
     pub cors: CorsConfig,
     #[serde(default)]
+    pub redis: RedisConfig,
+    #[serde(default)]
     pub orchestra_control_plane: Option<OrchestraControlPlaneConfig>,
 }
 
@@ -49,6 +51,27 @@ pub struct OrchestraControlPlaneConfig {
     pub auth_token: Option<String>,
 }
 
+/// Optional Redis cache configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RedisConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_redis_url")]
+    pub url: String,
+    #[serde(default = "default_stats_ttl_secs")]
+    pub stats_ttl_secs: u64,
+}
+
+impl Default for RedisConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            url: default_redis_url(),
+            stats_ttl_secs: default_stats_ttl_secs(),
+        }
+    }
+}
+
 fn default_host() -> String {
     "127.0.0.1".to_string()
 }
@@ -73,6 +96,14 @@ fn default_cors_methods() -> Vec<String> {
     vec!["GET".to_string(), "POST".to_string(), "OPTIONS".to_string()]
 }
 
+fn default_redis_url() -> String {
+    "redis://127.0.0.1:6379".to_string()
+}
+
+fn default_stats_ttl_secs() -> u64 {
+    5
+}
+
 impl Default for GatewayConfig {
     fn default() -> Self {
         Self {
@@ -89,6 +120,7 @@ impl Default for GatewayConfig {
                 allowed_origins: default_cors_origins(),
                 allowed_methods: default_cors_methods(),
             },
+            redis: RedisConfig::default(),
             orchestra_control_plane: None,
         }
     }

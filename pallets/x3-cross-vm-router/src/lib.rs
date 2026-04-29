@@ -205,6 +205,9 @@ pub mod pallet {
         /// Use `EnsureRoot` for governance-only, or a custom council origin.
         /// Defaults to `EnsureRoot<AccountId>` in the runtime configuration.
         type ExternalExecutorOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
+        /// Origin for verified VM adapter calls (EVM/SVM).
+        /// This ensures only properly authenticated VM execution can initiate cross-VM transfers.
+        type VmAdapterOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
@@ -306,6 +309,8 @@ pub mod pallet {
         RootHashMismatch,
         /// Caller not authorized to use the claimed sender identity
         UnauthorizedSender,
+        /// Invalid domain for this operation
+        InvalidDomain,
         /// External bridge surface is paused by runtime scope-freeze.
         /// Governance must call `enable_external_bridges` after audit.
         ExternalBridgesDisabled,
@@ -347,32 +352,70 @@ pub mod pallet {
         ///   4. Calls the ledger: debit source → pending.
         ///   5. Stores record as `SourceDebited`.
         ///
+        /// Initiate cross-VM transfer from X3Native domain (signed extrinsic).
+        /// Only X3Native accounts can call this directly.
+        ///
         /// Emits `TransferInitiated`.
         #[pallet::call_index(0)]
         #[pallet::weight(Weight::from_parts(40_000, 0))]
         pub fn xvm_transfer(
             origin: OriginFor<T>,
             asset_id: AssetId,
-            source: DomainId,
             destination: DomainId,
-            sender: AccountBytes,
             recipient: AccountBytes,
             amount: Balance,
             expires_at: BlockNumberFor<T>,
         ) -> DispatchResult {
-            // Ensure origin is signed and validate sender authorization
+            // Ensure origin is signed
             let who = ensure_signed(origin)?;
 
-            // Authorization check: verify sender matches the calling origin for X3Native domain
-            // This prevents account forgery across domains
-            if matches!(source, DomainId::X3Native) {
-                let encoded = who.encode();
-                let mut account_bytes = [0u8; 32];
-                account_bytes.copy_from_slice(&encoded[..32]);
-                let expected_sender = AccountBytes::X3Native(account_bytes);
-                ensure!(sender == expected_sender, Error::<T>::UnauthorizedSender);
-            }
-            // For EVM/SVM domains, authorization is handled by the respective precompiles
+            // Source is always X3Native for this extrinsic
+            let source = DomainId::X3Native;
+
+            // Construct sender from signed origin (prevents forgery)
+            let encoded = who.encode();
+            let mut account_bytes = [0u8; 32];
+            account_bytes.copy_from_slice(&encoded[..32]);
+            let sender = AccountBytes::X3Native(account_bytes);
+
+            Self::do_initiate_transfer(
+                asset_id,
+                source,
+                destination,
+                sender,
+                recipient,
+                amount,
+                expires_at,
+            )
+        }
+
+        /// Initiate cross-VM transfer from EVM/SVM domains (VM adapter origin only).
+        /// Only verified VM adapters can call this with authenticated sender identity.
+        ///
+        /// Emits `TransferInitiated`.
+        #[pallet::call_index(1)]
+        #[pallet::weight(Weight::from_parts(40_000, 0))]
+        pub fn xvm_transfer_from_vm(
+            origin: OriginFor<T>,
+            asset_id: AssetId,
+            source: DomainId,
+            sender: AccountBytes,
+            destination: DomainId,
+            recipient: AccountBytes,
+            amount: Balance,
+            expires_at: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            // Ensure origin is from verified VM adapter
+            T::VmAdapterOrigin::ensure_origin(origin)?;
+
+            // Source must be X3Evm or X3Svm (VM adapter calls only)
+            ensure!(
+                matches!(source, DomainId::X3Evm | DomainId::X3Svm),
+                Error::<T>::InvalidDomain
+            );
+
+            // Sender identity is verified by the VM adapter origin
+            // No additional authorization needed - adapter ensures authenticity
 
             Self::do_initiate_transfer(
                 asset_id,
@@ -390,7 +433,7 @@ pub mod pallet {
         /// unprivileged — the kernel itself is the proof.
         ///
         /// Drives `SourceDebited → DestinationCredited → Finalized` in one call.
-        #[pallet::call_index(1)]
+        #[pallet::call_index(2)]
         #[pallet::weight(Weight::from_parts(30_000, 0))]
         pub fn complete_xvm_transfer(origin: OriginFor<T>, message_id: H256) -> DispatchResult {
             let _who = ensure_signed(origin)?;
@@ -401,7 +444,7 @@ pub mod pallet {
         ///
         /// Only permissible once `block_number > message.expires_at`. Drives
         /// `SourceDebited → Expired → Refunded`.
-        #[pallet::call_index(2)]
+        #[pallet::call_index(3)]
         #[pallet::weight(Weight::from_parts(25_000, 0))]
         pub fn cancel_expired_xvm_transfer(
             origin: OriginFor<T>,
@@ -418,7 +461,7 @@ pub mod pallet {
         /// Register external chain root for bridge verification
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         /// Only verifier/executor authority can call this
-        #[pallet::call_index(3)]
+        #[pallet::call_index(4)]
         #[pallet::weight(Weight::from_parts(50_000, 0))]
         pub fn register_external_root(
             origin: OriginFor<T>,
@@ -474,7 +517,7 @@ pub mod pallet {
         /// Emergency pause bridge operations for a specific external chain
         /// Only governance/admin authority can call this
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
-        #[pallet::call_index(4)]
+        #[pallet::call_index(5)]
         #[pallet::weight(Weight::from_parts(35_000, 0))]
         pub fn emergency_pause_bridge(
             origin: OriginFor<T>,
@@ -516,7 +559,7 @@ pub mod pallet {
         /// gateway path (`x3-relayer`, `x3-finality-oracle`, `x3-gateway-risk-engine`)
         /// has shipped audited proof verification. Calling with `enabled = true`
         /// before that point is operationally equivalent to opening a hole.
-        #[pallet::call_index(5)]
+        #[pallet::call_index(6)]
         #[pallet::weight(Weight::from_parts(15_000, 0))]
         pub fn set_external_bridges_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
             ensure_root(origin)?;

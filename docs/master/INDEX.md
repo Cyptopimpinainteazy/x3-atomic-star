@@ -15,9 +15,9 @@ place as stubs that point to the new locations.
 - Setup completion: [getting-started/SETUP_COMPLETE.md](getting-started/SETUP_COMPLETE.md)
 
 ## Desktop Apps
-- Desktop complete guide: [desktop/X3_DESKTOP_COMPLETE_GUIDE.md](desktop/X3_DESKTOP_COMPLETE_GUIDE.md)
-- Desktop quick reference: [desktop/X3_DESKTOP_docs/runbooks/getting-started/QUICK_REFERENCE.md](desktop/X3_DESKTOP_docs/runbooks/getting-started/QUICK_REFERENCE.md)
-- Desktop verification: [desktop/X3_DESKTOP_VERIFICATION.md](desktop/X3_DESKTOP_VERIFICATION.md)
+- Desktop complete guide: [desktop/ATLAS_DESKTOP_COMPLETE_GUIDE.md](desktop/ATLAS_DESKTOP_COMPLETE_GUIDE.md)
+- Desktop quick reference: [desktop/ATLAS_DESKTOP_QUICK_REFERENCE.md](desktop/ATLAS_DESKTOP_QUICK_REFERENCE.md)
+- Desktop verification: [desktop/ATLAS_DESKTOP_VERIFICATION.md](desktop/ATLAS_DESKTOP_VERIFICATION.md)
 
 ## Architecture and Specifications
 - Architecture overview: [../ARCHITECTURE.md](../ARCHITECTURE.md)

@@ -42,7 +42,7 @@
 ### 1. Clone and Setup
 
 ```bash
-cd /home/lojak/Desktop/x3-chain-master
+cd X3_ATOMIC_STAR
 python3 -m venv venv
 source venv/bin/activate
 pip install -r swarm/requirements.txt

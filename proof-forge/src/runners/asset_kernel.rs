@@ -1,8 +1,8 @@
 use crate::proof::*;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
 
@@ -103,7 +103,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
     match test_output {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let _stderr = String::from_utf8_lossy(&output.stderr);
 
             if verbose {
                 println!("    Test output (last 10 lines):");

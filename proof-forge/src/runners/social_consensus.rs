@@ -1,11 +1,13 @@
+#![allow(dead_code)] // intentional scaffold; tracked in readiness backlog
+
 use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
-pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(_workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: claim_id.to_string(),
         claim: "Social consensus mechanisms are working".to_string(),
@@ -28,7 +30,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
     })
 }
 
-pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
+pub async fn run_proofs(_workspace: &Path, _verbose: bool) -> Result<ProofResult> {
     Ok(ProofResult {
         claim_id: "x3.social_consensus.full_proof".to_string(),
         claim: "Social consensus fully proven".to_string(),

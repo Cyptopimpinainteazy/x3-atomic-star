@@ -2,10 +2,10 @@ use crate::proof::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
-pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(_workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     Ok(ProofResult {
@@ -37,7 +37,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
     })
 }
 
-pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
+pub async fn run_proofs(_workspace: &Path, _verbose: bool) -> Result<ProofResult> {
     let start = Instant::now();
 
     Ok(ProofResult {

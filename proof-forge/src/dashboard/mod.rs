@@ -1,6 +1,6 @@
 // Dashboard module for proof metrics export and visualization
 
-use crate::proof::{ProofResult, ProofStatus};
+use crate::proof::ProofResult;
 use crate::scoring::ScoreGrade;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

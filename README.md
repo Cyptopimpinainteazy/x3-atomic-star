@@ -246,12 +246,12 @@ cargo test --lib
 
 ### Launch Multi-Validator Testnet
 ```bash
-./deployment/deploy-testnet.sh --validators 3 --config testnet/
+./deployment/deploy-local-testnet.sh
 ```
 
 ### Check Settlement Engine
 ```bash
-cargo test --lib x3_settlement_engine -- --nocapture
+cargo test --package pallet-x3-settlement-engine --lib
 ```
 
 ### Monitor Live

@@ -3,6 +3,7 @@
 //! X3 Gateway - REST and GraphQL API for indexed blockchain data.
 
 mod config;
+mod cache;
 mod db;
 mod error;
 mod graphql;
@@ -10,6 +11,7 @@ mod orchestra;
 mod rest;
 
 use crate::config::GatewayConfig;
+use crate::cache::RedisCache;
 use crate::db::Database;
 use crate::error::{GatewayError, Result};
 use crate::graphql::create_schema;
@@ -54,6 +56,10 @@ struct Args {
     /// Orchestra control-plane bearer token
     #[arg(long, env = "GATEWAY_ORCHESTRA_CONTROL_PLANE_TOKEN")]
     orchestra_control_plane_token: Option<String>,
+
+    /// Redis URL for optional cache
+    #[arg(long, env = "GATEWAY_REDIS_URL")]
+    redis_url: Option<String>,
 }
 
 fn init_logging(level: &str) {
@@ -90,6 +96,10 @@ async fn main() -> Result<()> {
                     auth_token: args.orchestra_control_plane_token,
                 });
             }
+            if let Some(url) = args.redis_url {
+                config.redis.enabled = true;
+                config.redis.url = url;
+            }
             config
         }
     };
@@ -117,8 +127,20 @@ async fn main() -> Result<()> {
     // Create GraphQL schema
     let schema = create_schema(db.clone(), orchestra_client.clone());
 
+    let redis_cache = if config.redis.enabled {
+        let cache = RedisCache::new(&config.redis.url, config.redis.stats_ttl_secs)?;
+        info!(
+            redis_url = %config.redis.url,
+            stats_ttl_secs = config.redis.stats_ttl_secs,
+            "redis cache enabled"
+        );
+        Some(cache)
+    } else {
+        None
+    };
+
     // Create REST router
-    let app = create_router(db, schema, orchestra_client);
+    let app = create_router(db, schema, orchestra_client, redis_cache);
 
     // Start server
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port)
@@ -129,8 +151,11 @@ async fn main() -> Result<()> {
     info!("GraphQL endpoint: http://{}/graphql", addr);
     info!("GraphQL playground: http://{}/graphql/playground", addr);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| GatewayError::Internal(format!("failed to bind gateway listener: {e}")))?;
+
+    axum::serve(listener, app)
         .with_graceful_shutdown(async {
             if let Err(err) = shutdown_signal().await {
                 tracing::error!("graceful shutdown setup failed: {}", err);

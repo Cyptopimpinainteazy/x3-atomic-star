@@ -155,6 +155,7 @@ where
     })?;
 
     // eth_call — execute a read-only EVM call and return raw output bytes.
+    let c = client.clone();
     module.register_method("eth_call", move |params, _| {
         let (tx_obj, _block): (serde_json::Value, serde_json::Value) =
             params.parse().unwrap_or_else(|_| {
@@ -183,7 +184,8 @@ where
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
-        let result: Result<Vec<u8>, Vec<u8>> = api.call_evm(at, caller, target_bytes, input_data, gas_limit);
+        let result: Result<Vec<u8>, Vec<u8>> = api.call_evm(at, caller, target_bytes, input_data, gas_limit)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
 
         match result {
             Ok(output) => Ok(format!("0x{}", hex::encode(output))),
@@ -192,6 +194,7 @@ where
     })?;
 
     // eth_estimateGas — estimate gas using runtime EVM dry-run logic.
+    let c = client.clone();
     module.register_method("eth_estimateGas", move |params, _| {
         let tx_obj: serde_json::Value = params
             .one()
@@ -216,7 +219,8 @@ where
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
-        let result: Result<u64, Vec<u8>> = api.estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit);
+        let result: Result<u64, Vec<u8>> = api.estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
 
         match result {
             Ok(gas) => Ok(format!("0x{:x}", gas)),

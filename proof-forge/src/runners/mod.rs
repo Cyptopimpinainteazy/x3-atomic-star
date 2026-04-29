@@ -366,7 +366,7 @@ pub async fn prove_all(
     workspace: &Path,
     strict: bool,
     dry_run: bool,
-    parallel: bool,
+    _parallel: bool,
     verbose: bool,
 ) -> Result<()> {
     if dry_run {
@@ -465,6 +465,7 @@ fn grep_file(file: &Path, pattern: &str) -> bool {
 }
 
 /// Count lines matching pattern in directory (excluding tests).
+#[allow(dead_code)]
 fn grep_count_non_test(root: &Path, pattern: &str) -> usize {
     use std::process::Command as StdCommand;
     // grep in non-test files: exclude #[cfg(test)] blocks heuristically via -l then inspect
@@ -654,10 +655,10 @@ pub async fn check_security_gate(workspace: &Path, fail_hard: bool, verbose: boo
 }
 
 pub async fn test_hack_resistance(
-    workspace: &Path,
+    _workspace: &Path,
     area: Option<String>,
-    strict: bool,
-    verbose: bool,
+    _strict: bool,
+    _verbose: bool,
 ) -> Result<()> {
     let target = area.as_deref().unwrap_or("all");
     println!(
@@ -683,10 +684,10 @@ pub async fn test_hack_resistance(
 }
 
 pub async fn test_edge_cases(
-    workspace: &Path,
+    _workspace: &Path,
     area: Option<String>,
-    strict: bool,
-    verbose: bool,
+    _strict: bool,
+    _verbose: bool,
 ) -> Result<()> {
     let target = area.as_deref().unwrap_or("all");
     println!(
@@ -712,10 +713,10 @@ pub async fn test_edge_cases(
 }
 
 pub async fn test_limp_mode(
-    workspace: &Path,
+    _workspace: &Path,
     area: Option<String>,
-    strict: bool,
-    verbose: bool,
+    _strict: bool,
+    _verbose: bool,
 ) -> Result<()> {
     let target = area.as_deref().unwrap_or("all");
     println!(
@@ -742,10 +743,10 @@ pub async fn test_limp_mode(
 }
 
 pub async fn test_idiot_proof(
-    workspace: &Path,
+    _workspace: &Path,
     command: &str,
     dry_run: bool,
-    verbose: bool,
+    _verbose: bool,
 ) -> Result<()> {
     println!(
         "{}",
@@ -843,10 +844,10 @@ pub async fn check_formal_proofs(
 }
 
 pub async fn generate_receipt(
-    workspace: &Path,
+    _workspace: &Path,
     receipt_type: &str,
     areas: &[String],
-    verbose: bool,
+    _verbose: bool,
 ) -> Result<()> {
     println!(
         "{}",
@@ -1162,9 +1163,9 @@ pub async fn check_mainnet_readiness(
 }
 
 pub async fn check_testnet_readiness(
-    workspace: &Path,
-    fail_hard: bool,
-    verbose: bool,
+    _workspace: &Path,
+    _fail_hard: bool,
+    _verbose: bool,
 ) -> Result<()> {
     println!("{}", "Checking Testnet Readiness...".bold().cyan());
 
@@ -1184,10 +1185,10 @@ pub async fn check_testnet_readiness(
 }
 
 pub async fn scan_claims(
-    workspace: &Path,
-    file: Option<PathBuf>,
-    fail_on_unproven: bool,
-    verbose: bool,
+    _workspace: &Path,
+    _file: Option<PathBuf>,
+    _fail_on_unproven: bool,
+    _verbose: bool,
 ) -> Result<()> {
     println!("{}", "Scanning for unproven claims...".bold().cyan());
 
@@ -1217,10 +1218,10 @@ pub async fn scan_claims(
 }
 
 pub async fn check_ai_patch(
-    workspace: &Path,
-    diff: Option<String>,
-    fail_hard: bool,
-    verbose: bool,
+    _workspace: &Path,
+    _diff: Option<String>,
+    _fail_hard: bool,
+    _verbose: bool,
 ) -> Result<()> {
     println!("{}", "Checking AI patch safety...".bold().cyan());
 
@@ -1239,7 +1240,7 @@ pub async fn check_ai_patch(
     Ok(())
 }
 
-pub async fn explain_blockers(workspace: &Path, area: &str, verbose: bool) -> Result<()> {
+pub async fn explain_blockers(_workspace: &Path, area: &str, _verbose: bool) -> Result<()> {
     println!(
         "{}",
         format!("Explaining blockers for: {}", area).bold().cyan()
@@ -1260,7 +1261,7 @@ pub async fn explain_blockers(workspace: &Path, area: &str, verbose: bool) -> Re
     Ok(())
 }
 
-pub async fn list_all_claims(workspace: &Path, verbose: bool) -> Result<()> {
+pub async fn list_all_claims(_workspace: &Path, _verbose: bool) -> Result<()> {
     println!("{}", "All Claims in Registry:".bold().cyan());
 
     println!();

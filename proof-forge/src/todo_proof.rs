@@ -1,5 +1,5 @@
 // TodoProof Scanner - Detects TODO/FIXME/HACK/stub/mock/fake code
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

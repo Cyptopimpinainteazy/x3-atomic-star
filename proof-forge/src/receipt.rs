@@ -309,6 +309,7 @@ pub fn generate_claim_receipt(
 }
 
 /// Load claim receipt
+#[allow(dead_code)]
 pub fn load_claim_receipt(claim_id: &str) -> Result<Receipt> {
     let receipt_path = PathBuf::from(format!("proof/receipts/claims/{}.receipt.json", claim_id));
     Receipt::load(&receipt_path)
