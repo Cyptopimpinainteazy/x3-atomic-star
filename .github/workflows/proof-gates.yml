@@ -34,7 +34,7 @@ jobs:
     name: Pre-Commit Gate - Claim Scanning
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || contains(github.event.inputs.gate_type, 'all') || contains(github.event.inputs.gate_type, 'pre-commit'))
     
     steps:
       - name: Checkout code
@@ -123,7 +123,7 @@ jobs:
     name: S0 Security Gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || contains(github.event.inputs.gate_type, 'all') || contains(github.event.inputs.gate_type, 's0'))
     needs: pre-commit-gate
     
     steps:
@@ -162,20 +162,17 @@ jobs:
               body: `### 🔒 S0 Security Gate Results\n\`\`\`\n${results}\n\`\`\``
             });
 
-      - name: Upload S0 Results
+      - name: Report S0 Artifact Path
         if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: s0-gate-results
-          path: s0-gate-results.txt
-          retention-days: 30
+        run: |
+          echo "S0 results file: s0-gate-results.txt" >> $GITHUB_STEP_SUMMARY
 
   # S1 SECURITY GATE: Runs on PR and main branch
   s1-security-gate:
     name: S1 Security Gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || contains(github.event.inputs.gate_type, 'all') || contains(github.event.inputs.gate_type, 's1'))
     needs: pre-commit-gate
     
     steps:
@@ -219,6 +216,7 @@ jobs:
     name: Testnet Readiness Gate (≥0.85)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: github.event_name != 'workflow_dispatch' || contains(github.event.inputs.gate_type, 'all') || contains(github.event.inputs.gate_type, 'testnet')
     
     steps:
       - name: Checkout code
@@ -245,13 +243,10 @@ jobs:
           echo "testnet_verdict=$VERDICT" >> $GITHUB_OUTPUT
           echo "testnet_score=$SCORE" >> $GITHUB_OUTPUT
 
-      - name: Upload Testnet Results
+      - name: Report Testnet Artifact Path
         if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: testnet-gate-results
-          path: testnet-gate-results.txt
-          retention-days: 30
+        run: |
+          echo "Testnet results file: testnet-gate-results.txt" >> $GITHUB_STEP_SUMMARY
 
       - name: Report Testnet Status
         run: |
@@ -266,7 +261,7 @@ jobs:
     name: Mainnet Readiness Gate (≥0.95)
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.gate_type, 'all') || contains(github.event.inputs.gate_type, 'mainnet')))
     
     steps:
       - name: Checkout code
@@ -301,13 +296,10 @@ jobs:
           fi
           exit $EXIT_CODE
 
-      - name: Upload Mainnet Results
+      - name: Report Mainnet Artifact Path
         if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: mainnet-gate-results
-          path: mainnet-gate-results.txt
-          retention-days: 30
+        run: |
+          echo "Mainnet results file: mainnet-gate-results.txt" >> $GITHUB_STEP_SUMMARY
 
       - name: Report Mainnet Status
         if: always()
@@ -331,12 +323,10 @@ jobs:
             echo "This release has passed all mainnet readiness gates and is approved for production deployment."
           } > RELEASE_NOTES.md
 
-      - name: Upload Release Notes
+      - name: Report Release Notes Path
         if: success()
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-notes
-          path: RELEASE_NOTES.md
+        run: |
+          echo "Release notes file: RELEASE_NOTES.md" >> $GITHUB_STEP_SUMMARY
 
   # DAILY PROOF RUN: Scheduled daily execution
   daily-proof-run:
@@ -377,14 +367,10 @@ jobs:
           cat daily-dashboard.json | jq '.' > /tmp/dashboard-formatted.json
           cp /tmp/dashboard-formatted.json daily-dashboard.json
 
-      - name: Upload Daily Results
-        uses: actions/upload-artifact@v5
-        with:
-          name: daily-proof-run-${{ github.run_number }}
-          path: |
-            daily-proof-results.txt
-            daily-dashboard.json
-          retention-days: 90
+      - name: Report Daily Result Paths
+        run: |
+          echo "Daily results: daily-proof-results.txt" >> $GITHUB_STEP_SUMMARY
+          echo "Daily dashboard: daily-dashboard.json" >> $GITHUB_STEP_SUMMARY
 
       - name: Publish Dashboard Metrics
         run: |
@@ -401,7 +387,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push')
-    needs: [testnet-gate]
+    needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]
     permissions:
       contents: write
       pages: write
