@@ -13,12 +13,14 @@
 
 set -euo pipefail
 
-PROOF_LOG="${1:-.}/launch-gates/evidence/proof-fresh-machine.log"
+# Absolutize the workspace root so cd-ing into TEMP_DIR doesn't break logging
+WORKSPACE_ROOT="$(cd "${1:-.}" && pwd)"
+PROOF_LOG="${WORKSPACE_ROOT}/launch-gates/evidence/proof-fresh-machine.log"
 TEMP_DIR="/tmp/x3-fresh-machine-$$"
 PASS_COUNT=0
 FAIL_COUNT=0
 # Source repo URL: prefer X3_REPO_URL, else this repo's origin, else fall back.
-REPO_URL="${X3_REPO_URL:-$(git -C "${1:-.}" remote get-url origin 2>/dev/null || echo https://github.com/Cyptopimpinainteazy/x3-atomic-star.git)}"
+REPO_URL="${X3_REPO_URL:-$(git -C "$WORKSPACE_ROOT" remote get-url origin 2>/dev/null || echo https://github.com/Cyptopimpinainteazy/x3-atomic-star.git)}"
 
 # Color output
 RED='\033[0;31m'
