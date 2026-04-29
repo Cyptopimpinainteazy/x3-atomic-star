@@ -29,3 +29,16 @@ target_phase3_test/
 target_phase3_validation/
 target_strict/
 target_warning_fix/
+
+# Coq build artifacts
+*.vo
+*.vok
+*.vos
+*.glob
+.*.aux
+
+# K framework dump
+kore-exec.tar.gz
+
+# Embedded Cargo target dirs in vendored contracts
+X3-contracts/**/target/
