@@ -42,7 +42,7 @@ jobs:
     name: Pre-Commit Gate - Claim Scanning
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'pre-commit')
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'pre-commit' || github.event.inputs.gate_type == 's0' || github.event.inputs.gate_type == 's1')
     
     steps:
       - name: Checkout code
@@ -537,6 +537,9 @@ jobs:
             echo "- S0 Security Gate: ${{ needs.s0-security-gate.result }}"
             echo "- S1 Security Gate: ${{ needs.s1-security-gate.result }}"
             echo "- Testnet Gate: ${{ needs.testnet-gate.result }}"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "- Manual gate selection: ${{ github.event.inputs.gate_type }}"
+            fi
             echo ""
             echo "### Deployment Status"
             echo "- Testnet gate result above determines readiness."
