@@ -5,26 +5,48 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-${TIMESTAMP}"
-# Use shared startup-gate targets by default so reruns reuse prior build
-# artifacts. Each job gets a dedicated subdirectory to avoid lock contention.
-TARGET_MODE="${STARTUP_GATE_TARGET_MODE:-shared}"
+# Use an isolated startup-gate target cache by default so reruns reuse prior
+# artifacts without interference from unrelated shared target users.
+TARGET_MODE="${STARTUP_GATE_TARGET_MODE:-isolated}"
 SHARED_TARGET_DIR="${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-target"
+ISOLATED_TARGET_DIR="${STARTUP_GATE_ISOLATED_TARGET_DIR:-${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-target-isolated}"
 if [[ -n "${STARTUP_GATE_TARGET_DIR:-}" ]]; then
   TARGET_DIR="${STARTUP_GATE_TARGET_DIR}"
 elif [[ "${TARGET_MODE}" == "shared" ]]; then
   TARGET_DIR="${SHARED_TARGET_DIR}"
 else
-  TARGET_DIR="${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-target-${TIMESTAMP}"
+  TARGET_DIR="${ISOLATED_TARGET_DIR}"
 fi
 
 if [[ "${TARGET_MODE}" == "shared" ]] && pgrep -f -- "--target-dir ${TARGET_DIR}" >/dev/null 2>&1; then
   echo "startup-gate-run: shared target busy; falling back to isolated target for this run"
   TARGET_MODE="isolated-fallback"
-  TARGET_DIR="${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-target-${TIMESTAMP}"
+  TARGET_DIR="${ISOLATED_TARGET_DIR}"
 fi
 LOCK_FILE="${STARTUP_GATE_LOCK_FILE:-${REPO_ROOT}/launch-gates/evidence/ci/startup-gate.lock}"
 TMP_DIR="${STARTUP_GATE_TMPDIR:-${REPO_ROOT}/launch-gates/evidence/ci/startup-gate-tmp}"
 RUSTFLAGS_VALUE="${STARTUP_GATE_RUSTFLAGS:--C debuginfo=0 -C link-arg=-fuse-ld=lld}"
+ALLOW_CONCURRENT="${STARTUP_GATE_ALLOW_CONCURRENT:-0}"
+SKIP_WASM_BUILD_VALUE="${STARTUP_GATE_SKIP_WASM_BUILD:-1}"
+CXXFLAGS_VALUE="${STARTUP_GATE_CXXFLAGS:--pipe -g0}"
+MALLOC_ARENA_MAX_VALUE="${STARTUP_GATE_MALLOC_ARENA_MAX:-2}"
+
+if [[ -n "${STARTUP_GATE_TARGET_DIR:-}" ]]; then
+  RUNTIME_TARGET_DIR="${TARGET_DIR}"
+  NODE_TARGET_DIR="${TARGET_DIR}"
+else
+  RUNTIME_TARGET_DIR="${TARGET_DIR}/runtime"
+  NODE_TARGET_DIR="${TARGET_DIR}/node"
+fi
+
+if [[ "${ALLOW_CONCURRENT}" != "1" ]]; then
+  EXISTING_STARTUP_GATE_PIDS="$(pgrep -f 'cargo test -p x3-chain-runtime .*fraud_proofs::startup_gate::tests::|cargo test -p x3-chain-node startup_gate_passes_for_reference_authority_build' || true)"
+  if [[ -n "${EXISTING_STARTUP_GATE_PIDS}" ]]; then
+    echo "startup-gate-run: detected existing startup-gate cargo process(es): ${EXISTING_STARTUP_GATE_PIDS}"
+    echo "startup-gate-run: set STARTUP_GATE_ALLOW_CONCURRENT=1 to override"
+    exit 76
+  fi
+fi
 
 mkdir -p "$(dirname "${LOCK_FILE}")"
 exec 9>"${LOCK_FILE}"
@@ -37,10 +59,26 @@ mkdir -p "${OUT_DIR}"
 mkdir -p "${TMP_DIR}"
 mkdir -p "${TARGET_DIR}"
 
+on_interrupt() {
+  local sig="$1"
+  {
+    echo "finished_at=$(date -Is)"
+    echo "interrupted_signal=${sig}"
+  } >> "${OUT_DIR}/summary.env"
+  echo "startup-gate-run: interrupted by ${sig}"
+  exit 128
+}
+
+trap 'on_interrupt SIGTERM' TERM
+trap 'on_interrupt SIGINT' INT
+
 echo "startup-gate-run: out_dir=${OUT_DIR}"
 echo "startup-gate-run: target_dir=${TARGET_DIR}"
 echo "startup-gate-run: target_mode=${TARGET_MODE}"
 echo "startup-gate-run: rustflags=${RUSTFLAGS_VALUE}"
+echo "startup-gate-run: skip_wasm_build=${SKIP_WASM_BUILD_VALUE}"
+echo "startup-gate-run: cxxflags=${CXXFLAGS_VALUE}"
+echo "startup-gate-run: malloc_arena_max=${MALLOC_ARENA_MAX_VALUE}"
 echo "startup-gate-run: tmp_dir=${TMP_DIR}"
 
 {
@@ -50,6 +88,10 @@ echo "startup-gate-run: tmp_dir=${TMP_DIR}"
   echo "target_mode=${TARGET_MODE}"
   echo "target_dir=${TARGET_DIR}"
   echo "rustflags=${RUSTFLAGS_VALUE}"
+  echo "allow_concurrent=${ALLOW_CONCURRENT}"
+  echo "skip_wasm_build=${SKIP_WASM_BUILD_VALUE}"
+  echo "cxxflags=${CXXFLAGS_VALUE}"
+  echo "malloc_arena_max=${MALLOC_ARENA_MAX_VALUE}"
 } > "${OUT_DIR}/summary.env"
 
 echo "job,result,exit_code,duration_sec,log_file" > "${OUT_DIR}/matrix.csv"
@@ -105,11 +147,11 @@ run_job() {
   return ${ec}
 }
 
-COMMON_ENV=(env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 RUSTFLAGS="${RUSTFLAGS_VALUE}" TMPDIR="${TMP_DIR}" CXXFLAGS=-pipe)
+COMMON_ENV=(env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX_VALUE}" SKIP_WASM_BUILD="${SKIP_WASM_BUILD_VALUE}" RUSTFLAGS="${RUSTFLAGS_VALUE}" TMPDIR="${TMP_DIR}" CXXFLAGS="${CXXFLAGS_VALUE}")
 
-run_job runtime_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_passes_with_reference_scheduler --lib --target-dir "${TARGET_DIR}/runtime" -- --nocapture || true
-run_job runtime_gate_deterministic "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_is_deterministic --lib --target-dir "${TARGET_DIR}/runtime" -- --nocapture || true
-run_job node_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-node startup_gate_passes_for_reference_authority_build --lib --target-dir "${TARGET_DIR}/node" -- --nocapture || true
+run_job runtime_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_passes_with_reference_scheduler --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true
+run_job runtime_gate_deterministic "${COMMON_ENV[@]}" cargo test -p x3-chain-runtime fraud_proofs::startup_gate::tests::gate_is_deterministic --lib --target-dir "${RUNTIME_TARGET_DIR}" -- --nocapture || true
+run_job node_gate_reference "${COMMON_ENV[@]}" cargo test -p x3-chain-node startup_gate_passes_for_reference_authority_build --lib --target-dir "${NODE_TARGET_DIR}" -- --nocapture || true
 
 FAILS=$(awk -F, 'NR>1 && $2=="FAIL" {c++} END {print c+0}' "${OUT_DIR}/matrix.csv")
 PASSES=$(awk -F, 'NR>1 && $2=="PASS" {c++} END {print c+0}' "${OUT_DIR}/matrix.csv")
