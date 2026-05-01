@@ -18,7 +18,7 @@ pub type ProtocolAddress = BoundedVec<u8, frame_support::traits::ConstU32<64>>;
 // ============================================================================
 
 /// Identifies the target VM for execution.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum VmType {
     /// Ethereum Virtual Machine
@@ -68,7 +68,7 @@ pub enum AmmProtocol {
 // ============================================================================
 
 /// Represents a tradeable asset in the system.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct Asset {
     /// Unique asset identifier (H256 for cross-VM compatibility)
     pub id: H256,
@@ -83,7 +83,7 @@ pub struct Asset {
 }
 
 /// Liquidity pool information for trade routing.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct LiquidityPool {
     /// Pool identifier
     pub pool_id: H256,
@@ -217,7 +217,7 @@ impl LiquidityPool {
 }
 
 /// Route step in a multi-hop trade path.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct RouteStep {
     /// Pool to use for this step
@@ -233,7 +233,7 @@ pub struct RouteStep {
 }
 
 /// Complete trade route with expected outputs.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct TradeRoute {
     /// Ordered steps in the route
@@ -275,7 +275,7 @@ impl TradeRoute {
 }
 
 /// Quote response for trade simulation.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct TradeQuote {
     /// Best route found
     pub route: TradeRoute,
@@ -290,7 +290,7 @@ pub struct TradeQuote {
 }
 
 /// Single price observation for oracle storage.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct PriceObservation {
     /// Observed price (scaled by 1e18)
@@ -304,7 +304,7 @@ pub struct PriceObservation {
 }
 
 /// Price oracle data point.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct PricePoint {
     /// Asset pair
     pub token_a: H256,
@@ -320,7 +320,7 @@ pub struct PricePoint {
 }
 
 /// Time-weighted average price data.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct TwapData {
     /// Asset pair
     pub token_a: H256,
@@ -349,7 +349,7 @@ impl TwapData {
 }
 
 /// Arbitrage opportunity detection result.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ArbitrageOpportunity {
     /// Circular path for arbitrage
     pub path: Vec<RouteStep>,
@@ -377,7 +377,7 @@ impl ArbitrageOpportunity {
 }
 
 /// Order type for limit orders.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum OrderType {
     /// Market order - execute immediately at current price
     Market,
@@ -390,14 +390,14 @@ pub enum OrderType {
 }
 
 /// Order side.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum OrderSide {
     Buy,
     Sell,
 }
 
 /// Pending limit order.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct LimitOrder<AccountId> {
     /// Order ID
     pub order_id: H256,

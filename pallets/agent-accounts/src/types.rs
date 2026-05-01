@@ -9,7 +9,7 @@ use sp_std::prelude::*;
 pub type AgentId = u32;
 
 /// Agent status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
 pub enum AgentStatus {
     /// Agent is active and can operate.
     #[default]
@@ -21,7 +21,7 @@ pub enum AgentStatus {
 }
 
 /// Agent record.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct Agent<AccountId, Balance, BlockNumber> {
     /// Unique agent ID.
     pub id: AgentId,
@@ -46,7 +46,7 @@ pub struct Agent<AccountId, Balance, BlockNumber> {
 }
 
 /// Agent quota limits.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
 pub struct AgentQuota<BlockNumber: Default> {
     /// Maximum gas per block.
     pub gas_per_block: u128,
@@ -61,7 +61,7 @@ pub struct AgentQuota<BlockNumber: Default> {
 }
 
 /// Agent permissions.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct AgentPermissions {
     /// Can deploy contracts.
     pub can_deploy: bool,
@@ -91,7 +91,7 @@ impl Default for AgentPermissions {
 }
 
 /// Permission type for checking.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub enum PermissionType {
     Deploy,
     Stake,
@@ -102,7 +102,7 @@ pub enum PermissionType {
 }
 
 /// Agent activity tracking.
-#[derive(Clone, Default, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct AgentActivity {
     /// Gas used this block.
     pub gas_used_block: u128,
@@ -117,7 +117,7 @@ pub struct AgentActivity {
 }
 
 /// Action types for event streaming.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub enum ActionType {
     /// Agent executed a trade.
     Trade,
@@ -138,7 +138,7 @@ pub enum ActionType {
 }
 
 /// Combined agent state for runtime API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct AgentState<AccountId, Balance, BlockNumber: Default> {
     /// Agent details.
     pub agent: Agent<AccountId, Balance, BlockNumber>,
@@ -151,7 +151,7 @@ pub struct AgentState<AccountId, Balance, BlockNumber: Default> {
 }
 
 /// Agent summary for listing.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct AgentSummary<AccountId, BlockNumber> {
     pub id: AgentId,
     pub name: BoundedVec<u8, ConstU32<64>>,
@@ -162,7 +162,7 @@ pub struct AgentSummary<AccountId, BlockNumber> {
 }
 
 /// Statistics snapshot.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct AgentStats {
     pub total_agents: u32,
     pub active_agents: u32,

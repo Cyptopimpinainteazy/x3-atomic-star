@@ -58,7 +58,7 @@ wgpu = { version = "23", optional = true }
 
 # Metrics & logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 prometheus = "0.14.0"
 
 # HTTP admin UI and web server

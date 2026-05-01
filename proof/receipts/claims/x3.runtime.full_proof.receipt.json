@@ -1,0 +1,55 @@
+{
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "command_run": "x3-proof verify x3.runtime.full_proof",
+  "artifact_hash": "af78992509c5a4fd99766418a2c400cbc83ea6579ff76408ec0428a66ed55616",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "runtime/Cargo.toml",
+    "runtime/src/lib.rs",
+    "scripts/run-try-runtime.sh",
+    "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json"
+  ],
+  "timestamp": "2026-04-30T19:15:45.299017384Z",
+  "result": {
+    "claim_id": "x3.runtime.full_proof",
+    "claim": "Runtime upgrade-safety artifacts are present",
+    "status": "partial",
+    "proof_level": "P6",
+    "edge_case_level": "E7",
+    "hack_level": "H8",
+    "operator_level": "I8",
+    "degraded_level": "D6",
+    "files_inspected": [
+      "runtime/Cargo.toml",
+      "runtime/src/lib.rs",
+      "scripts/run-try-runtime.sh",
+      "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json"
+    ],
+    "commands_run": [
+      "cargo check -p x3-chain-runtime --quiet"
+    ],
+    "passed_checks": [
+      "Runtime crate manifest exists",
+      "Runtime implementation exists",
+      "Try-runtime script exists",
+      "Proof-gated runtime upgrade receipt exists"
+    ],
+    "failed_checks": [
+      "Runtime executable check failed: warning: use of deprecated constant `pallet::RuntimeEvent::_w`: "
+    ],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.8,
+    "evidence": {
+      "runtime/Cargo.toml": "true",
+      "scripts/run-try-runtime.sh": "true",
+      "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json": "true",
+      "runtime_check": "false",
+      "runtime/src/lib.rs": "true"
+    },
+    "timestamp": "2026-04-30T19:15:45.289663473Z",
+    "duration_ms": 9691
+  },
+  "limitations": [],
+  "binding_hash": "89f055fc03c1d9515a81f9e7753fac3333512c92bddc3b67a83c79612765ac59"
+}

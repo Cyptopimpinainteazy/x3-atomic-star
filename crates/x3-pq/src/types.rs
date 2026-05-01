@@ -1,31 +1,31 @@
 //! Types for X3 Post-Quantum Cryptography
 
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQKeyPair {
     pub public_key: PQPublicKey,
     pub private_key: PQPrivateKey,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQPublicKey(pub Vec<u8>);
 
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQPrivateKey(pub Vec<u8>);
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQSignature(pub Vec<u8>);
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct HybridSignature {
     pub classical: sp_core::sr25519::Signature,
     pub post_quantum: PQSignature,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PQScheme {
     /// CRYSTALS-Dilithium3 (NIST Round 3 finalist)
     Dilithium3,
@@ -35,7 +35,7 @@ pub enum PQScheme {
     Sphincs256,
 }
 
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct KeyRotationSchedule {
     /// Last rotation timestamp
     pub last_rotation: u64,
@@ -43,7 +43,7 @@ pub struct KeyRotationSchedule {
     pub rotation_interval: u64,
 }
 
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQValidatorIdentity {
     /// Validator ID
     pub validator_id: u64,
@@ -53,7 +53,7 @@ pub struct PQValidatorIdentity {
     pub last_rotation: u64,
 }
 
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PQAccountConfig {
     /// Account address
     pub account: sp_core::H160,

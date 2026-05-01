@@ -18,7 +18,7 @@ pub type SnapshotHash = [u8; 32];
 
 /// Each value represents one dimension the solvency engine evaluated.
 /// Failed checks are surfaced in `SolvencyResult::failed_checks`.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub enum SolvencyCheck {
     // Pre-quote / pre-reservation
     LaneFrozen,
@@ -42,7 +42,7 @@ pub enum SolvencyCheck {
 // ──────────────────────────────────────────────
 
 /// Returned by every gate function.  `passed == true` iff `failed_checks` is empty.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(MaxChecks))]
 pub struct SolvencyResult<MaxChecks: frame_support::traits::Get<u32> + Clone> {
     pub passed: bool,
@@ -68,7 +68,7 @@ impl<MaxChecks: frame_support::traits::Get<u32> + Clone> SolvencyResult<MaxCheck
 // ──────────────────────────────────────────────
 
 /// Context supplied by callers of `check_pre_quote`.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct QuoteContext<Balance: Parameter + MaxEncodedLen> {
     pub lane_id: LaneId,
     pub vault_id: VaultId,
@@ -77,7 +77,7 @@ pub struct QuoteContext<Balance: Parameter + MaxEncodedLen> {
 }
 
 /// Context supplied by callers of `check_pre_reservation`.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct ReservationContext<Balance: Parameter + MaxEncodedLen> {
     pub lane_id: LaneId,
     pub vault_id: VaultId,
@@ -86,7 +86,7 @@ pub struct ReservationContext<Balance: Parameter + MaxEncodedLen> {
 }
 
 /// Context supplied by callers of `check_pre_submission`.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct SubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen>
 {
     pub reservation_id: ReservationId,
@@ -100,7 +100,7 @@ pub struct SubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Pa
 }
 
 /// Context supplied by callers of `record_post_submission`.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct PostSubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen>
 {
     pub reservation_id: ReservationId,
@@ -117,7 +117,7 @@ pub struct PostSubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber
 // ──────────────────────────────────────────────
 
 /// Sealed record of a solvency gate evaluation stored on-chain.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(MaxChecks))]
 pub struct SolvencySnapshotRecord<BlockNumber: Parameter + MaxEncodedLen, MaxChecks: frame_support::traits::Get<u32> + Clone> {
     pub block_number: BlockNumber,
@@ -134,7 +134,7 @@ pub struct SolvencySnapshotRecord<BlockNumber: Parameter + MaxEncodedLen, MaxChe
 // Pending obligation record (TICKET-4.5-009)
 // ──────────────────────────────────────────────
 
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct PendingObligation<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen> {
     pub route_id: RouteId,
     pub reservation_id: ReservationId,
@@ -145,7 +145,7 @@ pub struct PendingObligation<Balance: Parameter + MaxEncodedLen, BlockNumber: Pa
 }
 
 /// Evidence record sealed after a successful submission.
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct EvidenceRecord<BlockNumber: Parameter + MaxEncodedLen> {
     pub route_id: RouteId,
     pub reservation_id: ReservationId,

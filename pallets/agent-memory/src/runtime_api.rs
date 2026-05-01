@@ -2,12 +2,13 @@
 //!
 //! Provides offchain access to agent memory chunks.
 
+use frame_support::pallet_prelude::{DecodeWithMemTracking, *};
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_std::prelude::*;
 
 /// Memory entry for API response.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryEntryResponse {
     /// Entry ID.
@@ -25,7 +26,7 @@ pub struct MemoryEntryResponse {
 }
 
 /// Memory chunk response for API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryChunkResponse {
     /// Chunk index.
@@ -45,7 +46,7 @@ pub struct MemoryChunkResponse {
 }
 
 /// JSONL-formatted memory dump.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryJsonlResponse {
     /// JSONL lines (each line is a JSON object).
@@ -59,7 +60,7 @@ pub struct MemoryJsonlResponse {
 }
 
 /// Response for agent_memory_hash RPC method
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemoryHashResponse {
     /// Latest memory hash (merkle root)
@@ -75,7 +76,7 @@ pub struct MemoryHashResponse {
 }
 
 /// Response for agent_memory_at_block RPC method
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct MemorySnapshotResponse {
     /// Agent ID
@@ -93,7 +94,7 @@ pub struct MemorySnapshotResponse {
 }
 
 /// Response for agent_query RPC method
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct QueryResponse {
     /// Whether query succeeded
@@ -109,7 +110,7 @@ pub struct QueryResponse {
 }
 
 /// Attestation entry in consensus status
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct AttestationEntry {
     /// Validator account ID
@@ -119,7 +120,7 @@ pub struct AttestationEntry {
 }
 
 /// Response for agent_memory_consensus RPC method
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConsensusStatusResponse {
     /// Agent ID

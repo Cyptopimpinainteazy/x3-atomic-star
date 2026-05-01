@@ -18,7 +18,7 @@
 
 use crate::{PeerSync, PeerSyncState};
 use fork_tree::ForkTree;
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use log::{debug, trace, warn};
 use sc_network_common::sync::metrics::Metrics;
 use sp_blockchain::Error as ClientError;

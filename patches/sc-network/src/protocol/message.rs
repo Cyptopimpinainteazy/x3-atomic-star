@@ -38,7 +38,7 @@ pub type Message<B> = generic::Message<
 >;
 
 /// Remote call response.
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 pub struct RemoteCallResponse {
 	/// Id of a request this response was made for.
 	pub id: RequestId,
@@ -46,7 +46,7 @@ pub struct RemoteCallResponse {
 	pub proof: StorageProof,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 /// Remote read response.
 pub struct RemoteReadResponse {
 	/// Id of a request this response was made for.
@@ -71,7 +71,7 @@ pub mod generic {
 	use sp_runtime::ConsensusEngineId;
 
 	/// Consensus is mostly opaque to us
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub struct ConsensusMessage {
 		/// Identifies consensus engine.
 		pub protocol: ConsensusEngineId,
@@ -80,7 +80,7 @@ pub mod generic {
 	}
 
 	/// A network message.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub enum Message<Header, Hash, Number, Extrinsic> {
 		/// Status packet.
 		Status(Status<Hash, Number>),
@@ -135,7 +135,7 @@ pub mod generic {
 	// removal (https://github.com/paritytech/substrate/pull/4665)
 	//
 	// and set MIN_VERSION to 6.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub struct CompactStatus<Hash, Number> {
 		/// Protocol version.
 		pub version: u32,
@@ -205,7 +205,7 @@ pub mod generic {
 		}
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote call request.
 	pub struct RemoteCallRequest<H> {
 		/// Unique request id.
@@ -218,7 +218,7 @@ pub mod generic {
 		pub data: Vec<u8>,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote storage read request.
 	pub struct RemoteReadRequest<H> {
 		/// Unique request id.
@@ -229,7 +229,7 @@ pub mod generic {
 		pub keys: Vec<Vec<u8>>,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote storage read child request.
 	pub struct RemoteReadChildRequest<H> {
 		/// Unique request id.
@@ -242,7 +242,7 @@ pub mod generic {
 		pub keys: Vec<Vec<u8>>,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote header request.
 	pub struct RemoteHeaderRequest<N> {
 		/// Unique request id.
@@ -251,7 +251,7 @@ pub mod generic {
 		pub block: N,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote header response.
 	pub struct RemoteHeaderResponse<Header> {
 		/// Id of a request this response was made for.
@@ -262,7 +262,7 @@ pub mod generic {
 		pub proof: StorageProof,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote changes request.
 	pub struct RemoteChangesRequest<H> {
 		/// Unique request id.
@@ -282,7 +282,7 @@ pub mod generic {
 		pub key: Vec<u8>,
 	}
 
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	/// Remote changes response.
 	pub struct RemoteChangesResponse<N, H> {
 		/// Id of a request this response was made for.

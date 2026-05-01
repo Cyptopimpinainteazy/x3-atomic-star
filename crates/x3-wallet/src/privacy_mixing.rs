@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MixingPool {
     pub id: [u8; 32],
     pub pool_size: u128,
@@ -14,7 +14,7 @@ pub struct MixingPool {
     pub last_mixed_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MixingTransaction {
     pub id: [u8; 32],
     pub pool_id: [u8; 32],

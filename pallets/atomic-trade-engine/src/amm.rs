@@ -16,7 +16,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 /// Swap parameters for AMM execution
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct SwapParams {
     /// Input token
     pub token_in: H256,
@@ -35,7 +35,7 @@ pub struct SwapParams {
 }
 
 /// Result of a swap execution
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct SwapResult {
     /// Actual output amount
     pub amount_out: u128,

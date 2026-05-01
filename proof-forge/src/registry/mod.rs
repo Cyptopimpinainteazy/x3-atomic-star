@@ -1,3 +1,5 @@
+#![allow(dead_code)] // intentional registry scaffold; tracked in readiness backlog
+
 // Registry module for claim management and verification tracking
 
 use crate::proof::{Claim, ProofResult, ProofStatus};

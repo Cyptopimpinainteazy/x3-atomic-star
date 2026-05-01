@@ -54,7 +54,7 @@ pub type BlockNumber = u64;
 
 /// Flash Finality proposal message.
 /// Emitted by the current round leader after receiving a valid block.
-#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, Hash)]
 pub struct Proposal {
     pub block_hash: BlockHash,
     pub block_number: BlockNumber,
@@ -93,7 +93,7 @@ impl Proposal {
 
 /// Flash Finality vote message.
 /// Emitted by each validator upon receiving a valid proposal.
-#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, Hash)]
 pub struct Vote {
     pub block_hash: BlockHash,
     pub block_number: BlockNumber,
@@ -128,7 +128,7 @@ impl Vote {
 /// Flash Finality certificate.
 /// Produced when ≥ 2/3 + 1 validators vote for the same block in the same round.
 /// This is the artifact that becomes a PoAE proof anchor.
-#[derive(Debug, Clone, Encode, Decode, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, serde::Serialize, serde::Deserialize)]
 pub struct FinalityCertificate {
     pub block_hash: BlockHash,
     pub block_number: BlockNumber,
@@ -162,7 +162,7 @@ impl FinalityCertificate {
 pub const FLASH_FINALITY_PROTOCOL_ID: &str = "/x3/flash/1";
 
 /// Messages gossiped over the Flash Finality P2P network.
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking)]
 pub enum GossipMessage {
     /// A new block proposal from the leader.
     Proposal(Proposal),

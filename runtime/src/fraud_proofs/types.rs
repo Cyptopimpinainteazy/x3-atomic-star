@@ -18,7 +18,7 @@ pub const PROOF_TYPE_SCHED_MISMATCH_V1: ProofTypeTag = 0x01;
 
 // ── Block reference ───────────────────────────────────────────────────────────
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
 pub struct HeaderRef {
     pub block_number: u32,
     pub block_hash: H256,
@@ -29,7 +29,7 @@ pub struct HeaderRef {
 /// The on-chain fraud proof submitted by a reporter.
 ///
 /// `MAX_WITNESS_BYTES` is a const-generic bound matching the runtime constant.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct FraudProofV1<AccountId> {
     /// Must be `PROOF_TYPE_SCHED_MISMATCH_V1` in v0.
     pub proof_type: ProofTypeTag,
@@ -54,7 +54,7 @@ pub struct FraudProofV1<AccountId> {
 
 // ── Metadata the verifier needs about the disputed block ──────────────────────
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 #[scale_info(skip_type_params(AccountId))]
 pub struct DisputedBlockMeta<AccountId> {
     pub block_hash: H256,
@@ -66,7 +66,7 @@ pub struct DisputedBlockMeta<AccountId> {
 
 // ── Event body ────────────────────────────────────────────────────────────────
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct FraudProofAcceptedRecord<AccountId, Balance> {
     pub proof_id: H256,
     pub block_hash: H256,

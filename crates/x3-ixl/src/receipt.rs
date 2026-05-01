@@ -5,14 +5,14 @@
 //! the relayer / explorer.
 
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 
 use crate::instruction::{AccountAddr, AssetId, AssetKind};
 
 /// One side-effect performed by the interpreter.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ReceiptEntry {
     /// Funds were debited from `payer` and added to custody slot.
     Locked {
@@ -67,7 +67,7 @@ pub enum ReceiptEntry {
 }
 
 /// Append-only receipt.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Receipt {
     pub entries: Vec<ReceiptEntry>,
 }

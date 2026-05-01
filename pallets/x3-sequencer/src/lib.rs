@@ -100,7 +100,7 @@ pub mod pallet {
     // ── Types ──────────────────────────────────────────────────────────────
 
     /// A single sequenced transaction.
-    #[derive(Debug, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     pub struct SequencedTx {
         /// Global sequence number (monotonically increasing).
         pub sequence: u64,
@@ -116,7 +116,7 @@ pub mod pallet {
 
     /// A finalized batch of sequenced transactions.
     /// Uses concrete types to enable `MaxEncodedLen` derivation.
-    #[derive(Debug, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     pub struct SequencingBatch {
         /// Batch identifier.
         pub batch_id: u64,

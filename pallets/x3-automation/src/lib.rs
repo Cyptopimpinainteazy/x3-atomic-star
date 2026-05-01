@@ -21,17 +21,31 @@ pub use weights::WeightInfo;
 #[frame_support::pallet]
 pub mod pallet {
     use super::WeightInfo;
-    use frame_support::{pallet_prelude::*, traits::Get, BoundedVec};
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{Get, Currency},
+        sp_runtime::{Saturating, SaturatedConversion},
+        ensure,
+        BoundedVec
+    };
     use frame_system::pallet_prelude::*;
-    use sp_core::H256;
-    use x3_automation::{Action, Condition, Task, TaskId, TaskRegistry, TaskStatus};
+    use parity_scale_codec::Encode;
+    use sp_core::{H256, Get as SpGet};
+    use x3_automation::{Action, Condition, Task, TaskId, TaskStatus, ExecutionResult};
     // Note: Would integrate with oracle pallet for price data
+
+    /// Balance type alias
+    pub type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
     /// Maximum number of tasks per account
     #[pallet::config]
-    pub trait Config: frame_system::Config + x3_oracle::Config {
+    pub trait Config: frame_system::Config {
         /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+        /// Currency type for fees
+        type Currency: Currency<Self::AccountId> + frame_support::traits::ReservableCurrency<Self::AccountId>;
 
         /// Maximum tasks per account
         #[pallet::constant]
@@ -285,8 +299,9 @@ pub mod pallet {
             Ok(())
         }
     }
+}
 
-    impl<T: Config> Pallet<T> {
+impl<T: Config> Pallet<T> {
         /// Generate a unique task ID
         fn generate_task_id(counter: u64, account: &T::AccountId) -> TaskId {
             let mut data = Vec::new();
@@ -331,16 +346,9 @@ pub mod pallet {
                     let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
                     current_block >= *target_block
                 }
-                Condition::PriceThreshold { asset_id, threshold, above } => {
-                    if let Some(price_data) = AssetPrices::<T>::get(asset_id) {
-                        if *above {
-                            price_data.price > *threshold
-                        } else {
-                            price_data.price < *threshold
-                        }
-                    } else {
-                        false
-                    }
+                Condition::PriceThreshold { asset_id: _, threshold: _, above: _ } => {
+                    // TODO: Integrate with oracle pallet for price conditions
+                    false
                 }
                 Condition::Custom(_) => {
                     // Custom conditions would need custom logic
@@ -388,4 +396,3 @@ pub mod pallet {
             cleaned
         }
     }
-}

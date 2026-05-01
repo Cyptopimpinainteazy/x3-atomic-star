@@ -26,8 +26,18 @@ use evm::{
     },
     Config, Context, ExitError, ExitReason, ExitSucceed,
 };
-use sp_core::{H160, U256};
+use primitive_types::{H160 as EvmH160, U256 as EvmU256};
+use sp_core::{H160 as SpH160, U256 as SpU256};
 use sp_std::collections::btree_map::BTreeMap;
+
+fn to_evm_u256(value: SpU256) -> EvmU256 {
+    let buf = value.to_big_endian();
+    EvmU256::from_big_endian(&buf)
+}
+
+fn to_evm_h160(value: SpH160) -> EvmH160 {
+    EvmH160::from_slice(value.as_bytes())
+}
 use sp_std::prelude::Vec;
 use sp_std::vec;
 
@@ -43,8 +53,8 @@ pub const X3_DEFAULT_CHAIN_ID: u64 = 42;
 /// chain_id, gas_price, block context, etc.
 pub fn execute_evm(
     payload: &[u8],
-    caller: H160,
-    value: U256,
+    caller: SpH160,
+    value: SpU256,
     evm_config: &crate::EvmConfig,
 ) -> EvmResult<EvmExecutionResult> {
     if payload.is_empty() {
@@ -54,30 +64,39 @@ pub fn execute_evm(
     let gas_limit = evm_config.gas_limit;
     let config = Config::shanghai();
 
+    let gas_price_evm: EvmU256 = EvmU256::from_big_endian(&evm_config.gas_price.to_big_endian());
+    let origin = to_evm_h160(caller);
+    let block_number_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.block_number).to_big_endian());
+    let block_coinbase = to_evm_h160(evm_config.coinbase);
+    let block_timestamp_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.block_timestamp).to_big_endian());
+    let block_gas_limit_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(gas_limit).to_big_endian());
+    let chain_id_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.chain_id).to_big_endian());
+    let block_base_fee_per_gas_evm: EvmU256 = EvmU256::from_big_endian(&evm_config.base_fee.to_big_endian());
+
     let vicinity = MemoryVicinity {
-        gas_price: evm_config.gas_price,
-        origin: caller,
+        gas_price: gas_price_evm,
+        origin,
         block_hashes: vec![],
-        block_number: U256::from(evm_config.block_number),
-        block_coinbase: evm_config.coinbase,
-        block_timestamp: U256::from(evm_config.block_timestamp),
-        block_difficulty: U256::zero(),
-        block_gas_limit: U256::from(gas_limit),
-        chain_id: U256::from(evm_config.chain_id),
-        block_base_fee_per_gas: evm_config.base_fee,
+        block_number: block_number_evm,
+        block_coinbase,
+        block_timestamp: block_timestamp_evm,
+        block_difficulty: EvmU256::zero(),
+        block_gas_limit: block_gas_limit_evm,
+        chain_id: chain_id_evm,
+        block_base_fee_per_gas: block_base_fee_per_gas_evm,
         block_randomness: None,
     };
 
     // Derive a deterministic contract address from the payload hash
     let target_addr = derive_target(payload);
 
-    let mut state_map: BTreeMap<H160, MemoryAccount> = BTreeMap::new();
+    let mut state_map: BTreeMap<EvmH160, MemoryAccount> = BTreeMap::new();
     // Caller account seeded with enough balance for gas + value transfer
     state_map.insert(
-        caller,
+        to_evm_h160(caller),
         MemoryAccount {
-            nonce: U256::zero(),
-            balance: U256::from(u128::MAX),
+            nonce: EvmU256::zero(),
+            balance: EvmU256::from(u128::MAX),
             storage: BTreeMap::new(),
             code: vec![],
         },
@@ -86,8 +105,8 @@ pub fn execute_evm(
     state_map.insert(
         target_addr,
         MemoryAccount {
-            nonce: U256::one(),
-            balance: U256::zero(),
+            nonce: EvmU256::one(),
+            balance: EvmU256::zero(),
             storage: BTreeMap::new(),
             code: payload.to_vec(),
         },
@@ -100,10 +119,10 @@ pub fn execute_evm(
     let mut executor = StackExecutor::new_with_precompiles(stack_state, &config, &precompiles);
 
     let (exit_reason, return_data) = executor.transact_call(
-        caller,           // caller
-        target_addr,      // target
-        value,            // value
-        payload.to_vec(), // call data
+        to_evm_h160(caller), // caller
+        target_addr,         // target
+        to_evm_u256(value),  // value
+        payload.to_vec(),    // call data
         gas_limit,
         vec![], // access_list
     );
@@ -179,9 +198,9 @@ pub fn validate_evm(payload: &[u8]) -> EvmResult<()> {
 
 /// Derive a stable H160 target address from payload bytes via keccak-256
 /// (consistent with Ethereum's CREATE address derivation).
-fn derive_target(payload: &[u8]) -> H160 {
+fn derive_target(payload: &[u8]) -> EvmH160 {
     let hash = sp_io::hashing::keccak_256(payload);
-    H160::from_slice(&hash[12..32])
+    EvmH160::from_slice(&hash[12..32])
 }
 
 fn map_exit_reason(reason: &ExitReason, gas_used: u64) -> EvmError {
@@ -201,7 +220,7 @@ fn map_exit_reason(reason: &ExitReason, gas_used: u64) -> EvmError {
 // ---------------------------------------------------------------------------
 
 /// Build a BTreeMap of standard Ethereum precompiled contracts.
-fn standard_precompiles() -> BTreeMap<H160, PrecompileFn> {
+fn standard_precompiles() -> BTreeMap<EvmH160, PrecompileFn> {
     let mut map = BTreeMap::new();
     map.insert(addr(1), precompile_ecrecover as PrecompileFn);
     map.insert(addr(2), precompile_sha256 as PrecompileFn);
@@ -216,10 +235,10 @@ fn standard_precompiles() -> BTreeMap<H160, PrecompileFn> {
 }
 
 /// Convert a small integer into an H160 precompile address.
-fn addr(n: u8) -> H160 {
+fn addr(n: u8) -> EvmH160 {
     let mut bytes = [0u8; 20];
     bytes[19] = n;
-    H160(bytes)
+    EvmH160::from_slice(&bytes)
 }
 
 /// Gas cost helper: base + per-word cost.

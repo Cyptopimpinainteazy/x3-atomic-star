@@ -12,7 +12,7 @@ use sp_std::vec::Vec;
 // Note: Would integrate with oracle pallet for price data
 
 /// Risk levels for transactions/operations
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum RiskLevel {
     /// Low risk - proceed normally
     Low,
@@ -25,7 +25,7 @@ pub enum RiskLevel {
 }
 
 /// Risk assessment result
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RiskAssessment {
     /// Overall risk level
     pub level: RiskLevel,
@@ -38,7 +38,7 @@ pub struct RiskAssessment {
 }
 
 /// Risk factors that contribute to assessment
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum RiskFactor {
     /// Large transaction amount relative to liquidity
     LargeTransactionAmount,
@@ -55,7 +55,7 @@ pub enum RiskFactor {
 }
 
 /// Recommended actions based on risk assessment
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum RiskRecommendation {
     /// Require additional confirmations
     RequireAdditionalConfirmations,
@@ -70,7 +70,7 @@ pub enum RiskRecommendation {
 }
 
 /// Transaction data for risk assessment
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct TransactionData {
     /// Transaction amount
     pub amount: U256,
@@ -85,7 +85,7 @@ pub struct TransactionData {
 }
 
 /// Transaction types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum TransactionType {
     /// Asset transfer
     Transfer,

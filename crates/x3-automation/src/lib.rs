@@ -14,7 +14,7 @@ use sp_std::vec::Vec;
 pub type TaskId = H256;
 
 /// Task condition types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum Condition {
     /// Time-based: execute at specific block number
     BlockNumber(u64),
@@ -29,7 +29,7 @@ pub enum Condition {
 }
 
 /// Task action types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum Action {
     /// Call a pallet extrinsic
     Extrinsic {
@@ -42,7 +42,7 @@ pub enum Action {
 }
 
 /// Automated task definition
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub struct Task<AccountId, Balance> {
     /// Unique task identifier
     pub id: TaskId,
@@ -61,7 +61,7 @@ pub struct Task<AccountId, Balance> {
 }
 
 /// Task execution status
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub enum TaskStatus {
     /// Task is active and waiting for condition
     Active,
@@ -76,7 +76,7 @@ pub enum TaskStatus {
 }
 
 /// Task execution result
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ExecutionResult {
     /// Task that was executed
     pub task_id: TaskId,
@@ -109,7 +109,7 @@ pub trait TaskRegistry<AccountId, Balance> {
 }
 
 /// Automation errors
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum AutomationError {
     /// Task ID already exists
     TaskAlreadyExists,
@@ -134,7 +134,7 @@ pub enum AutomationError {
 }
 
 /// Keeper network participant
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub struct Keeper<AccountId> {
     /// Keeper account
     pub account: AccountId,

@@ -8,6 +8,7 @@ pub mod build;
 pub mod compile;
 #[cfg(feature = "sdk")]
 pub mod deploy;
+pub mod demo;
 pub mod docgen;
 pub mod init;
 #[cfg(feature = "sdk")]
@@ -83,4 +84,7 @@ pub enum Commands {
 
     /// List and search supported chains
     Chains(swap::ChainsArgs),
+
+    /// Grant/showcase demos (atomic-swap orchestrator, ...)
+    Demo(demo::DemoArgs),
 }

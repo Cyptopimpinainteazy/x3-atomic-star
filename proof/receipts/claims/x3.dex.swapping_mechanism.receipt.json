@@ -1,0 +1,47 @@
+{
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "command_run": "x3-proof verify x3.dex.swapping_mechanism",
+  "artifact_hash": "d84cebea7990cf0e250f1da1bd0d3523555399abed5a321dd5bf7a36b3502305",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "crates/x3-dex/src/lib.rs",
+    "crates/x3-dex/src/tests/attack_sandwich.rs",
+    "crates/x3-dex/src/tests/attack_liquidation_frontrun.rs"
+  ],
+  "timestamp": "2026-04-30T16:51:14.948849752Z",
+  "result": {
+    "claim_id": "x3.dex.swapping_mechanism",
+    "claim": "DEX economic attack resistance",
+    "status": "verified",
+    "proof_level": "P6",
+    "edge_case_level": "E7",
+    "hack_level": "H8",
+    "operator_level": "I6",
+    "degraded_level": "D5",
+    "files_inspected": [
+      "crates/x3-dex/src/lib.rs",
+      "crates/x3-dex/src/tests/attack_sandwich.rs",
+      "crates/x3-dex/src/tests/attack_liquidation_frontrun.rs"
+    ],
+    "commands_run": [
+      "cargo test -p x3-dex attack_ -- --nocapture"
+    ],
+    "passed_checks": [
+      "sandwich_attack_profit_bounded_by_slippage passed",
+      "liquidation_frontrun_eliminated_by_fair_ordering passed"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "failed_attack_tests": "0",
+      "expected_attack_tests": "2",
+      "passed_attack_tests": "2"
+    },
+    "timestamp": "2026-04-30T16:51:14.945289872Z",
+    "duration_ms": 1781
+  },
+  "limitations": [],
+  "binding_hash": "80f8586cea3e654e931a7f760d8d533167db786b33adfc9f81fb8fd569e2ee3e"
+}

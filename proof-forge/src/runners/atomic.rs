@@ -288,3 +288,7 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
         duration_ms: start.elapsed().as_millis() as u64,
     })
 }
+
+pub async fn run_proofs(workspace: &Path, verbose: bool) -> Result<ProofResult> {
+    verify_claim(workspace, "x3.atomic.one_terminal_state", verbose).await
+}

@@ -1,9 +1,9 @@
 /// veX3 Governance Engine — Vote-Escrow tokenomics for decentralized protocol governance
 /// Users lock X3 tokens (1-4 years) to gain voting power and direct liquidity mining rewards
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct VeX3Lock {
     pub lock_id: [u8; 32],
     pub user: [u8; 32],
@@ -15,7 +15,7 @@ pub struct VeX3Lock {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Proposal {
     pub proposal_id: [u8; 32],
     pub proposer: [u8; 32],
@@ -30,7 +30,7 @@ pub struct Proposal {
     pub status: u8, // 0=voting, 1=passed, 2=rejected, 3=executed
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Vote {
     pub vote_id: [u8; 32],
     pub proposal_id: [u8; 32],
@@ -40,7 +40,7 @@ pub struct Vote {
     pub vote_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LiquidityMiningAllocation {
     pub allocation_id: [u8; 32],
     pub pool_id: [u8; 32],
@@ -50,7 +50,7 @@ pub struct LiquidityMiningAllocation {
     pub proposed_by: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct EscrowInfo {
     pub escrow_id: [u8; 32],
     pub total_locked: u64,
@@ -59,7 +59,7 @@ pub struct EscrowInfo {
     pub last_update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct GovernanceReward {
     pub reward_id: [u8; 32],
     pub user: [u8; 32],

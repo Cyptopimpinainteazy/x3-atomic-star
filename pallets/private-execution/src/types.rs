@@ -21,7 +21,7 @@ pub const MAX_STATE_DIFF_LEN: u32 = 524_288; // 512 KB
 pub const MAX_ZK_PROOF_LEN: u32 = 65_536; // 64 KB
 
 /// Enclave attestation status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub enum EnclaveStatus {
     /// Attestation verified, accepting private TXs.
     Verified,
@@ -32,7 +32,7 @@ pub enum EnclaveStatus {
 }
 
 /// Private transaction status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub enum PrivateTxStatus {
     /// In encrypted mempool, waiting for execution.
     Pending,
@@ -47,7 +47,7 @@ pub enum PrivateTxStatus {
 }
 
 /// Attestation record for a confidential validator.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct EnclaveAttestation<T: frame_system::Config> {
     /// Validator account.
@@ -65,7 +65,7 @@ pub struct EnclaveAttestation<T: frame_system::Config> {
 }
 
 /// Record of a private transaction.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct PrivateTxRecord<T: frame_system::Config> {
     /// Transaction hash.
@@ -87,7 +87,7 @@ pub struct PrivateTxRecord<T: frame_system::Config> {
 }
 
 /// An encrypted state diff committed on-chain.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct EncryptedDiff {
     /// Transaction hash this diff belongs to.
     pub tx_hash: sp_core::H256,

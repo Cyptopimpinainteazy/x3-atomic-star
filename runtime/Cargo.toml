@@ -33,7 +33,7 @@ pallet-offences = { workspace = true, default-features = false }
 pallet-timestamp = { workspace = true, default-features = false }
 pallet-balances = { workspace = true, default-features = false }
 pallet-transaction-payment = { workspace = true, default-features = false }
-pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
 pallet-sudo = { workspace = true, default-features = false, optional = true }
 pallet-collective = { workspace = true, default-features = false }
 pallet-scheduler = { workspace = true, default-features = false }
@@ -72,6 +72,9 @@ pallet-x3-supply-ledger = { path = "../pallets/x3-supply-ledger", default-featur
 pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false }
 pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
+pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
+pallet-x3-vrf = { path = "../pallets/x3-vrf", default-features = false }
+pallet-x3-dex = { path = "../pallets/x3-dex", default-features = false }
 x3-svm-integration = { path = "../crates/svm-integration", default-features = false }
 pallet-meme-overlord = { path = "../pallets/meme-overlord", default-features = false }
 # IXL instruction-set and IBC-style packet standard (no_std, safe in WASM).
@@ -161,6 +164,9 @@ std = [
 	"pallet-x3-supply-ledger/std",
 	"pallet-x3-cross-vm-router/std",
 	"pallet-x3-token-factory/std",
+	"pallet-x3-oracle/std",
+	"pallet-x3-vrf/std",
+	"pallet-x3-dex/std",
 	"x3-svm-integration/std",
 	"x3-ixl/std",
 	"x3-packet-standard/std",
@@ -195,6 +201,9 @@ runtime-benchmarks = [
 	"pallet-x3-verifier/runtime-benchmarks",
 	"pallet-x3-domain-registry/runtime-benchmarks",
 	"pallet-x3-settlement-engine/runtime-benchmarks",
+	"pallet-x3-oracle/runtime-benchmarks",
+	"pallet-x3-vrf/runtime-benchmarks",
+	"pallet-x3-dex/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 

@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct CosmosChainInfo {
     pub chain_id: Vec<u8>,
     pub client_id: Vec<u8>,
@@ -13,14 +13,14 @@ pub struct CosmosChainInfo {
     pub is_frozen: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ConsensusState {
     pub timestamp: u64,
     pub root: [u8; 32],
     pub next_validators_hash: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Header {
     pub height: u64,
     pub timestamp: u64,
@@ -32,14 +32,14 @@ pub struct Header {
     pub signatures: Vec<ValidatorSignature>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ValidatorSignature {
     pub validator_address: [u8; 20],
     pub signature: Vec<u8>,
     pub power: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct IBCPacket {
     pub sequence: u64,
     pub source_port: Vec<u8>,
@@ -51,7 +51,7 @@ pub struct IBCPacket {
     pub timeout_timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MerkleProof {
     pub proofs: Vec<[u8; 32]>,
     pub key: Vec<u8>,

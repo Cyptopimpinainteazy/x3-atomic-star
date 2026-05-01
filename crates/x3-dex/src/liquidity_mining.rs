@@ -1,8 +1,8 @@
 /// Liquidity Mining Rewards — Proportional X3 token emissions to LP providers
 /// Incentivizes liquidity provision with transparent reward distribution
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LiquidityMiningReward {
     pub pool_id: [u8; 32],
     pub reward_token: u128,
@@ -13,7 +13,7 @@ pub struct LiquidityMiningReward {
     pub end_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LPRewardAccumulator {
     pub lp: [u8; 32],
     pub pool_id: [u8; 32],
@@ -22,14 +22,14 @@ pub struct LPRewardAccumulator {
     pub pending_rewards: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RewardSnapshot {
     pub reward_per_lp_token: u128,
     pub block: u64,
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct EpochRewards {
     pub epoch: u32,
     pub total_rewards: u64,
@@ -37,7 +37,7 @@ pub struct EpochRewards {
     pub average_reward_per_lp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LPInfo {
     pub lp: [u8; 32],
     pub total_lp_tokens: u64,

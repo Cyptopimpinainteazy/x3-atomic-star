@@ -10,7 +10,7 @@ use sp_core::H256;
 use crate::templates::{Param, TemplateError, TemplateId};
 
 /// A validated, ready-to-submit AppZone deployment request.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct DeployRequest {
     /// Template this zone is based on.
     pub template_id: TemplateId,

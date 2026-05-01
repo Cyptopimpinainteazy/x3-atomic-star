@@ -1,9 +1,9 @@
 /// Real Slippage Calculator — Deterministic slippage calculation using constant-product AMM formula
 /// Provides users with transparent real-time slippage estimates before trade execution
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolReserves {
     pub pool_id: [u8; 32],
     pub token_a: u128,
@@ -15,7 +15,7 @@ pub struct PoolReserves {
     pub last_update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SlippageQuote {
     pub pool_id: [u8; 32],
     pub input_amount: u64,
@@ -28,14 +28,14 @@ pub struct SlippageQuote {
     pub is_valid: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PriceImpact {
     pub impact_bps: u32,
     pub description: Vec<u8>, // e.g., "0.5% price impact"
     pub impact_level: u8,     // 0=low, 1=medium, 2=high, 3=very_high
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SlippageProtection {
     pub quote_id: [u8; 32],
     pub min_output_amount: u64,
@@ -44,7 +44,7 @@ pub struct SlippageProtection {
     pub protected_address: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MarketPrice {
     pub token_pair: (u128, u128),
     pub price_a_to_b: u64, // How many B for 1 A (scaled)
@@ -52,7 +52,7 @@ pub struct MarketPrice {
     pub update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RoutePath {
     pub route_id: [u8; 32],
     pub hops: Vec<[u8; 32]>, // Pool IDs in sequence

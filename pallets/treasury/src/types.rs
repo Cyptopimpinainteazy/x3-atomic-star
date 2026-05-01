@@ -1,13 +1,25 @@
 //! Types for the Treasury pallet.
 
 use frame_support::pallet_prelude::*;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_runtime::Percent;
+use sp_runtime::{Percent, RuntimeDebug};
 use sp_std::vec::Vec;
 
 /// Spending track for proposals.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+    Default,
+)]
 pub enum SpendingTrack {
     /// Small spending - fast approval, low threshold (~33%)
     #[default]
@@ -21,7 +33,19 @@ pub enum SpendingTrack {
 }
 
 /// Status of a spending proposal.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+    Default,
+)]
 pub enum ProposalStatus {
     /// Awaiting approvals.
     #[default]
@@ -33,7 +57,7 @@ pub enum ProposalStatus {
 }
 
 /// A spending proposal.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct SpendingProposal<AccountId, Balance, BlockNumber> {
     /// Unique proposal ID.
@@ -59,7 +83,7 @@ pub struct SpendingProposal<AccountId, Balance, BlockNumber> {
 }
 
 /// A recurring payment schedule.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct RecurringPayment<AccountId, Balance, BlockNumber> {
     /// Unique payment ID.
@@ -83,7 +107,19 @@ pub struct RecurringPayment<AccountId, Balance, BlockNumber> {
 }
 
 /// Risk level for yield strategies.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+    Default,
+)]
 pub enum RiskLevel {
     /// Conservative - low risk, low return.
     #[default]
@@ -95,7 +131,7 @@ pub enum RiskLevel {
 }
 
 /// A yield strategy delegated to an AI agent.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct YieldStrategy<AccountId, Balance> {
     /// Unique strategy ID.
@@ -123,7 +159,7 @@ pub struct YieldStrategy<AccountId, Balance> {
 }
 
 /// Emergency pause information.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct EmergencyPause<AccountId, BlockNumber> {
     /// Account that paused.
     pub paused_by: AccountId,
@@ -134,7 +170,7 @@ pub struct EmergencyPause<AccountId, BlockNumber> {
 }
 
 /// Treasury statistics.
-#[derive(Clone, Default, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct TreasuryStats<Balance: Default> {
     /// Total deposited to treasury.
     pub total_deposited: Balance,
@@ -147,7 +183,7 @@ pub struct TreasuryStats<Balance: Default> {
 }
 
 /// Summary of a spending proposal for RPC.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct ProposalSummary<AccountId, Balance, BlockNumber> {
     pub id: u32,
     pub proposer: AccountId,
@@ -161,7 +197,7 @@ pub struct ProposalSummary<AccountId, Balance, BlockNumber> {
 }
 
 /// Treasury snapshot for runtime API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct TreasurySnapshot<AccountId, Balance: Default, BlockNumber> {
     /// Current treasury balance.
     pub balance: Balance,

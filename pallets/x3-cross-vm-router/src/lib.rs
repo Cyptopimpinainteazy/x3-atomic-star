@@ -75,7 +75,7 @@ pub mod pallet {
     // ── Storage ────────────────────────────────────────────────────────────
 
     /// Stored transfer record: the full message plus its current status.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
     #[scale_info(skip_type_params(T))]
     pub struct TransferRecord<T: Config> {
         pub message: X3TransferMessage<BlockNumberFor<T>>,

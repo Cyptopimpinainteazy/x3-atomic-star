@@ -41,6 +41,7 @@ mod tests;
 pub mod pallet {
     use frame_support::{pallet_prelude::*, traits::ConstU32, BoundedVec};
     use frame_system::pallet_prelude::*;
+    use parity_scale_codec::DecodeWithMemTracking;
     use sp_io::hashing::blake2_256;
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
@@ -59,7 +60,17 @@ pub mod pallet {
     pub type MaxEnabledDomains = ConstU32<8>;
 
     /// User-supplied launch configuration for [`create_token`].
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(
+        Clone,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        RuntimeDebug,
+    )]
     pub struct TokenFactoryConfig {
         /// Short ticker, e.g. `b"OMNI"`.
         pub symbol: BoundedVec<u8, MaxSymbolLen>,
@@ -81,7 +92,7 @@ pub mod pallet {
 
     /// Stored per-token record tying a factory-launched asset to its launch
     /// metadata and authority.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
     #[scale_info(skip_type_params(T))]
     pub struct TokenRecord<T: Config> {
         /// Creator account.

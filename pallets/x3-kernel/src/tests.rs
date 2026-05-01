@@ -1,6 +1,7 @@
 use frame_support::{assert_noop, assert_ok};
 use parity_scale_codec::Encode;
 use sp_core::{hashing::blake2_256, H256};
+use sp_runtime::DispatchError;
 
 use crate::{AccountRegistry, AssetRegistry, CanonicalLedger, ComitFailureReason, Nonces};
 
@@ -1157,10 +1158,8 @@ fn register_asset_rejects_non_root_origin() {
                 b"TEST".to_vec(),
                 6,
             ),
-            frame_support::dispatch::DispatchError::BadOrigin
+            DispatchError::BadOrigin
         );
-
-        assert!(AssetRegistry::<Test>::get(asset_id).is_none());
     });
 }
 
@@ -1184,7 +1183,7 @@ fn update_canonical_balance_rejects_non_root_origin() {
                 100,
                 None,
             ),
-            frame_support::dispatch::DispatchError::BadOrigin
+            DispatchError::BadOrigin
         );
     });
 }

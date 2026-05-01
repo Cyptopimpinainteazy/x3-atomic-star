@@ -57,6 +57,15 @@ pub use local_key::LocalKey;
 #[cfg(feature = "std")]
 pub use std::thread::LocalKey as StdLocalKey;
 
+// Ensure std::thread::LocalKey is always available as GlobalLocalKey for consistency
+#[doc(hidden)]
+#[cfg(feature = "std")]
+pub type GlobalLocalKey<T> = std::thread::LocalKey<T>;
+
+#[doc(hidden)]
+#[cfg(not(feature = "std"))]
+pub type GlobalLocalKey<T> = LocalKey<T>;
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! thread_local_impl {
@@ -83,11 +92,11 @@ pub type GlobalInner<T> = RefCell<Vec<Rc<RefCell<*mut T>>>>;
 
 #[doc(hidden)]
 #[cfg(feature = "std")]
-type Global<T> = StdLocalKey<GlobalInner<T>>;
+type Global<T> = GlobalLocalKey<GlobalInner<T>>;
 
 #[doc(hidden)]
 #[cfg(not(feature = "std"))]
-type Global<T> = LocalKey<GlobalInner<T>>;
+type Global<T> = GlobalLocalKey<GlobalInner<T>>;
 
 struct PopGlobal<'a, T: 'a + ?Sized> {
 	global_stack: &'a GlobalInner<T>,

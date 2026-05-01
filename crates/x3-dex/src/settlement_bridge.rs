@@ -90,11 +90,11 @@
 //! ```
 
 use crate::limit_order_book::{LimitOrder, OrderExecution};
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::H256;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderSettlementIntent {
     /// Unique settlement intent ID
     pub intent_id: H256,
@@ -122,7 +122,7 @@ pub struct OrderSettlementIntent {
     pub deadline: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum SettlementStatus {
     /// Intent created, awaiting asset lock
     Pending,

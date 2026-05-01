@@ -1,9 +1,9 @@
 /// Batch Swap Router — Execute multiple swaps atomically with MEV protection
 /// Enables batch execution, path optimization, and sandwich attack prevention
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SwapInstruction {
     pub pool_id: [u8; 32],
     pub token_in: u128,
@@ -13,7 +13,7 @@ pub struct SwapInstruction {
     pub sequence: u32, // Order in batch
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BatchSwap {
     pub batch_id: [u8; 32],
     pub initiator: [u8; 32],
@@ -24,7 +24,7 @@ pub struct BatchSwap {
     pub created_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SwapRoute {
     pub route_id: [u8; 32],
     pub token_in: u128,
@@ -36,7 +36,7 @@ pub struct SwapRoute {
     pub route_valid_until_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AtomicSwapExecution {
     pub execution_id: [u8; 32],
     pub router_address: [u8; 32],
@@ -47,7 +47,7 @@ pub struct AtomicSwapExecution {
     pub execution_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MEVProtection {
     pub protection_id: [u8; 32],
     pub min_output: u64,
@@ -56,7 +56,7 @@ pub struct MEVProtection {
     pub protected: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RouteMetrics {
     pub route_id: [u8; 32],
     pub efficiency_score: u32, // 0-10000 (higher = better)

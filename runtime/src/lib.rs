@@ -56,6 +56,7 @@ use pallet_x3_settlement_engine;
 use pallet_x3_supply_ledger;
 use pallet_x3_token_factory;
 use pallet_x3_verifier;
+
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
 use sp_api::impl_runtime_apis;
@@ -126,6 +127,7 @@ pub const NANO_ATLAS: Balance = 1;
 pub const MICRO_ATLAS: Balance = 1_000 * NANO_ATLAS;
 pub const MILLI_ATLAS: Balance = 1_000 * MICRO_ATLAS;
 pub const X3: Balance = 1_000 * MILLI_ATLAS;
+pub const DOLLARS: Balance = X3; // 1 X3 = 1 USD equivalent
 pub const NATIVE_GAS_PRICE: u64 = 1_000_000_000;
 
 #[sp_version::runtime_version]
@@ -295,6 +297,9 @@ construct_runtime!(
         FraudProofs: crate::fraud_proofs::pallet::pallet,
         X3Sequencer: pallet_x3_sequencer,
         X3Da: pallet_x3_da,
+        X3Oracle: pallet_x3_oracle,
+        X3Vrf: pallet_x3_vrf,
+        X3Dex: pallet_x3_dex,
     }
 );
 
@@ -337,6 +342,10 @@ construct_runtime!(
         FraudProofs: crate::fraud_proofs::pallet::pallet,
         X3Sequencer: pallet_x3_sequencer,
         X3Da: pallet_x3_da,
+        X3Oracle: pallet_x3_oracle,
+        X3Vrf: pallet_x3_vrf,
+        X3Dex: pallet_x3_dex,
+        X3Consensus: pallet_x3_consensus,
     }
 );
 
@@ -383,6 +392,63 @@ pub type SignedExtra = (
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 
 // ===== Config Impls (after construct_runtime!) =====
+
+parameter_types! {
+    pub const MaxSubmissionsPerBlock: u32 = 10;
+    pub const MaxAssets: u32 = 100;
+    pub const MaxSubmissionsPerAsset: u32 = 50;
+    pub const MinSubmissionsForMedian: u32 = 3;
+    pub const MaxSubmissionAge: u64 = 3600;
+}
+
+impl pallet_x3_oracle::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxSubmissionsPerBlock = MaxSubmissionsPerBlock;
+    type MaxAssets = MaxAssets;
+    type MaxSubmissionsPerAsset = MaxSubmissionsPerAsset;
+    type MinSubmissionsForMedian = MinSubmissionsForMedian;
+    type MaxSubmissionAge = MaxSubmissionAge;
+    type UpdateOrigin = EnsureRootOrHalfCouncil;
+    type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const MaxPendingRequests: u32 = 10;
+    pub const BaseFee: Balance = 100 * DOLLARS;
+    pub const FeePerByte: Balance = 1 * DOLLARS / 1000;
+    pub const MaxSeedLength: u32 = 100;
+}
+
+impl pallet_x3_vrf::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type Balance = Balance;
+    type MaxPendingRequests = MaxPendingRequests;
+    type BaseFee = BaseFee;
+    type FeePerByte = FeePerByte;
+    type MaxSeedLength = MaxSeedLength;
+    type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const MaxPools: u32 = 100;
+}
+
+impl pallet_x3_dex::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxPools = MaxPools;
+    type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const MaxValidators: u32 = 100;
+}
+
+impl pallet_x3_consensus::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxValidators = MaxValidators;
+    type WeightInfo = pallet_x3_consensus::weights::SubstrateWeight<Runtime>;
+}
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
 
@@ -1865,7 +1931,7 @@ impl pallet_x3_da::Config for Runtime {
 // For mainnet-v1, we use a simplified session handler since validator sets
 // are managed manually through genesis and runtime upgrades.
 // Equivocation detection is logged but not automatically slashed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SessionHandler;
 
 impl GetValidatorCount for SessionHandler {

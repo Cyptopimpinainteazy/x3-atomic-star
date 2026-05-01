@@ -78,6 +78,7 @@ pub mod migrations;
 pub use weights::WeightInfo;
 
 use frame_support::pallet_prelude::*;
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned, CheckedAdd, SaturatedConversion};
 use frame_support::sp_runtime::DispatchError;
 use frame_support::traits::BuildGenesisConfig;
@@ -98,7 +99,7 @@ use x3_cross_vm_bridge::{
 pub const EXECUTION_RECEIPT_VERSION: u32 = 1;
 
 /// Represents a Comit transaction submitted to the X3 Kernel.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(AccountId, Balance))]
 pub struct Comit<AccountId, Balance> {
     /// Globally unique Comit identifier.
@@ -121,7 +122,7 @@ pub struct Comit<AccountId, Balance> {
 ///
 /// This is intentionally a separate type from `Comit` to avoid breaking
 /// downstream code that relies on the original dual-VM shape.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(AccountId, Balance))]
 pub struct ComitV2<AccountId, Balance> {
     /// Globally unique Comit identifier.
@@ -143,7 +144,7 @@ pub struct ComitV2<AccountId, Balance> {
 }
 
 /// Execution receipt returned by VM runtimes after transaction execution.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ExecutionReceipt {
     /// Schema version for compatibility across runtime and sidecar consumers.
     pub version: u32,
@@ -166,7 +167,7 @@ pub struct ExecutionReceipt {
 }
 
 /// Log entry emitted during VM execution.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ExecutionLog {
     /// Address (EVM H160 or SVM 32-byte key) that emitted the log.
     pub address: Vec<u8>,
@@ -177,7 +178,7 @@ pub struct ExecutionLog {
 }
 
 /// State change resulting from VM execution.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct StateChange {
     /// Account/contract address affected (EVM H160 or SVM 32-byte key).
     pub address: Vec<u8>,
@@ -188,7 +189,7 @@ pub struct StateChange {
 }
 
 /// Unified state representation for the X3 Chain.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
 pub struct SphereState {
     /// State root hash representing the entire sphere state.
     pub state_root: H256,
@@ -199,7 +200,7 @@ pub struct SphereState {
 }
 
 /// Dual-VM transaction types that can be executed.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum VmTransaction {
     /// EVM transaction payload.
     Evm(Vec<u8>),
@@ -208,7 +209,7 @@ pub enum VmTransaction {
 }
 
 /// Reasons describing why a Comit failed verification or execution.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 /// Granular error codes for comit execution failures with diagnostic context.
 /// Each variant includes an error code and optional diagnostic message (max 256 bytes).
 pub enum ComitFailureReason {
@@ -344,7 +345,7 @@ pub trait DualVmDispatcher {
 }
 
 /// Proof types for cross-chain lock/receipt verification.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum CrossChainProof {
     /// No proof supplied.
     None,
@@ -527,7 +528,7 @@ pub mod pallet {
     >;
 
     /// Prepared cross-VM operation held during 2PC timeout window.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
     pub struct PreparedCrossVmOp<AccountId, Balance, BlockNumber> {
         /// Origin account that prepared the operation.
         pub origin: AccountId,
@@ -3283,7 +3284,7 @@ pub mod pallet {
     }
 
     /// Asset metadata stored alongside each asset id.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(Symbol))]
     pub struct AssetMetadata<Symbol: MaxEncodedLen> {
         pub symbol: Symbol,

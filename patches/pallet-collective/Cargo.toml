@@ -16,13 +16,13 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
 log = { version = "0.4.17", default-features = false }
 scale-info = { version = "2.5.0", default-features = false, features = ["derive"] }
-frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-core = { version = "21.0.0", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-runtime = { version = "24.0.0", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-std = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-core = { version = "21.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-runtime = { version = "24.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-std = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 
 [features]
 default = ["std"]

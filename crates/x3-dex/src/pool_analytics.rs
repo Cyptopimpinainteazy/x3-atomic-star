@@ -1,9 +1,9 @@
 /// Pool Analytics Engine — Real-time TVL, volume, APY, and performance tracking
 /// Aggregates pool metrics for liquidity provider decision-making and protocol analytics
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolAnalytics {
     pub pool_id: [u8; 32],
     pub token_a: u128,
@@ -16,7 +16,7 @@ pub struct PoolAnalytics {
     pub last_update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolMetrics {
     pub pool_id: [u8; 32],
     pub current_tvl: u64,
@@ -31,7 +31,7 @@ pub struct PoolMetrics {
     pub update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LiquidityProviderStats {
     pub provider: [u8; 32],
     pub pool_id: [u8; 32],
@@ -44,7 +44,7 @@ pub struct LiquidityProviderStats {
     pub positions_count: u32,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenMetrics {
     pub token_id: u128,
     pub token_name: Vec<u8>,
@@ -56,7 +56,7 @@ pub struct TokenMetrics {
     pub last_update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct VolumeBucket {
     pub bucket_id: [u8; 32],
     pub pool_id: [u8; 32],
@@ -67,7 +67,7 @@ pub struct VolumeBucket {
     pub avg_trade_size: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ProtocolMetrics {
     pub total_tvl: u64,
     pub total_volume_24h: u64,
@@ -77,7 +77,7 @@ pub struct ProtocolMetrics {
     pub generated_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolSnapshot {
     pub snapshot_id: [u8; 32],
     pub pool_id: [u8; 32],

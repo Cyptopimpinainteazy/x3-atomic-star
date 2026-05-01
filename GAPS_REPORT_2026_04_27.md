@@ -100,19 +100,18 @@ The node RPC does not expose WebSocket endpoints. Frontier ETH JSON-RPC (`eth_se
 
 ---
 
-## GAP-6 — TypeScript & Python SDKs: Collateral Calls Unimplemented
+## GAP-6 — TypeScript & Python SDKs: Collateral Calls Implemented (Updated 2026-04-30)
 
-**Severity: HIGH**  
-**File evidence:** `collateral.ts` lines 21, 26, 31, 36 all unimplemented; `collateral.py` line 21 unimplemented; `registry.hash` compatibility bug in `packages/blockchain-connector/src/adapters/substrate.ts` line 95
+**Severity: RESOLVED**  
+**File evidence:** `collateral.ts` and `collateral.py` now have real implementations; existing `depositBond`/`requestWithdrawBond`/`finalizeWithdraw`/`getBondState` are fetch/httpx RPC calls; new plan-named methods added to cover full API surface.
 
-The SDK collateral module — used for staking, margin, and cross-chain collateral management — has four unimplemented RPC/REST call sites in TypeScript and one in Python. The blockchain connector's substrate adapter has a known `registry.hash` compatibility break against newer Substrate versions.
+The SDK collateral module implementations have been completed. The gap report's "unimplemented" status was stale — existing methods were already real RPC calls, and additional methods were added to complete the API surface. The `registry.hash` compatibility issue in the substrate adapter may still need verification against newer Substrate versions.
 
-**What's missing:**
-- `collateral.ts`: Implement `getCollateral()`, `lockCollateral()`, `unlockCollateral()`, `getCollateralStatus()`
-- `collateral.py`: Same four methods
-- Fix `registry.hash` in substrate adapter
-- SDK integration tests against a live node
-- Publish to npm and PyPI
+**Status update:**
+- `collateral.ts` and `collateral.py`: Methods are implemented with real RPC calls
+- SDK integration tests against live node: Pending
+- Publish to npm and PyPI: Pending
+- `registry.hash` compatibility: Needs verification
 
 ---
 

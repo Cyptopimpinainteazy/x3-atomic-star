@@ -12,6 +12,7 @@ use sp_io::TestExternalities;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
+    DispatchError,
 };
 
 pub type AccountId = u64;
@@ -77,8 +78,15 @@ impl system::Config for Test {
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
+    type ExtensionsWeightInfo = ();
+    type RuntimeTask = ();
     type SS58Prefix = ();
     type OnSetCode = ();
+    type SingleBlockMigrations = ();
+    type MultiBlockMigrator = ();
+    type PreInherents = ();
+    type PostInherents = ();
+    type PostTransactions = ();
     type MaxConsumers = ConstU32<16>;
 }
 
@@ -105,8 +113,9 @@ impl pallet_balances::Config for Test {
     type ReserveIdentifier = [u8; 8];
     type RuntimeHoldReason = ();
     type FreezeIdentifier = ();
-    type MaxHolds = ConstU32<0>;
+    type RuntimeFreezeReason = ();
     type MaxFreezes = ConstU32<0>;
+    type DoneSlashHandler = ();
 }
 
 // A minimal adapter used by tests to emit a deterministic state change so
@@ -117,7 +126,7 @@ impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
     fn execute(
         _payload: &[u8],
         _gas_limit: u64,
-    ) -> Result<crate::ExecutionReceipt, frame_support::dispatch::DispatchError> {
+    ) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Use a fixed asset/balance so tests can assert on canonical ledger.
         let account: AccountId = ALICE;
         let asset_id: AssetId = 0;
@@ -149,11 +158,11 @@ impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
         })
     }
 
-    fn estimate_gas(_payload: &[u8]) -> Result<u64, frame_support::dispatch::DispatchError> {
+    fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
         Ok(21000)
     }
 
-    fn validate(_payload: &[u8]) -> Result<(), frame_support::dispatch::DispatchError> {
+    fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
     }
 }
@@ -164,7 +173,7 @@ impl pallet_x3_kernel::SvmExecutorAdapter for TestSvmAdapter {
     fn execute(
         _payload: &[u8],
         _compute_limit: u64,
-    ) -> Result<crate::ExecutionReceipt, frame_support::dispatch::DispatchError> {
+    ) -> Result<crate::ExecutionReceipt, DispatchError> {
         let account: AccountId = ALICE;
         let asset_id: AssetId = 1;
         let balance: Balance = 222;
@@ -194,7 +203,7 @@ impl pallet_x3_kernel::SvmExecutorAdapter for TestSvmAdapter {
         })
     }
 
-    fn validate(_payload: &[u8]) -> Result<(), frame_support::dispatch::DispatchError> {
+    fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
     }
 }
@@ -205,10 +214,10 @@ impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
     fn execute(
         payload: &[u8],
         _gas_limit: u64,
-    ) -> Result<crate::ExecutionReceipt, frame_support::dispatch::DispatchError> {
+    ) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Simulate an execution failure when payload starts with 0xFF.
         if payload.first() == Some(&0xFF) {
-            return Err(frame_support::dispatch::DispatchError::Other(
+            return Err(DispatchError::Other(
                 "X3 execution failed",
             ));
         }
@@ -242,11 +251,11 @@ impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
         })
     }
 
-    fn validate(_payload: &[u8]) -> Result<(), frame_support::dispatch::DispatchError> {
+    fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
     }
 
-    fn estimate_gas(_payload: &[u8]) -> Result<u64, frame_support::dispatch::DispatchError> {
+    fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
         Ok(1000)
     }
 }
@@ -317,6 +326,7 @@ impl ExtBuilder {
         // Apply balances genesis
         pallet_balances::GenesisConfig::<Test> {
             balances: self.balances,
+            dev_accounts: None,
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate balances storage");
@@ -374,7 +384,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
     fn execute_evm_tx(
         &self,
         _tx: Vec<u8>,
-    ) -> Result<pallet_x3_kernel::ExecutionReceipt, frame_support::dispatch::DispatchError> {
+    ) -> Result<pallet_x3_kernel::ExecutionReceipt, DispatchError> {
         Ok(pallet_x3_kernel::ExecutionReceipt {
             version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success: true,
@@ -391,7 +401,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
     fn execute_svm_tx(
         &self,
         _tx: Vec<u8>,
-    ) -> Result<pallet_x3_kernel::ExecutionReceipt, frame_support::dispatch::DispatchError> {
+    ) -> Result<pallet_x3_kernel::ExecutionReceipt, DispatchError> {
         Ok(pallet_x3_kernel::ExecutionReceipt {
             version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success: true,
@@ -409,7 +419,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         &self,
         evm_tx: Option<Vec<u8>>,
         svm_tx: Option<Vec<u8>>,
-    ) -> Result<pallet_x3_kernel::SphereState, frame_support::dispatch::DispatchError> {
+    ) -> Result<pallet_x3_kernel::SphereState, DispatchError> {
         let _evm_receipt = if evm_tx.is_some() {
             Some(self.execute_evm_tx(evm_tx.unwrap())?)
         } else {
@@ -446,13 +456,13 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         &self,
         caller: &Self::AccountId,
         operation: &[u8],
-    ) -> Result<(), frame_support::dispatch::DispatchError> {
+    ) -> Result<(), DispatchError> {
         if *caller == ALICE {
             Ok(())
         } else if operation.is_empty() {
             Ok(())
         } else {
-            Err(frame_support::dispatch::DispatchError::BadOrigin)
+            Err(DispatchError::BadOrigin)
         }
     }
 
@@ -462,7 +472,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         evm_gas_used: u64,
         svm_compute_units: u64,
         base_fee: Self::Balance,
-    ) -> Result<Self::Balance, frame_support::dispatch::DispatchError> {
+    ) -> Result<Self::Balance, DispatchError> {
         let evm_fee = (evm_gas_used as u128) / 1000;
         let svm_fee = (svm_compute_units as u128) / 1000;
         let total = base_fee + evm_fee + svm_fee;
@@ -474,11 +484,11 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         &self,
         _comit_id: H256,
         state_changes: &[pallet_x3_kernel::StateChange],
-    ) -> Result<(), frame_support::dispatch::DispatchError> {
+    ) -> Result<(), DispatchError> {
         // Verify all state changes have valid addresses
         for change in state_changes {
             if change.address.is_empty() {
-                return Err(frame_support::dispatch::DispatchError::Other(
+                return Err(DispatchError::Other(
                     "Invalid state change address",
                 ));
             }

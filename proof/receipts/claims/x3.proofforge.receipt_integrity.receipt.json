@@ -1,12 +1,12 @@
 {
-  "repo_commit_hash": "db91e2e35a36cb2c04efafd3906476f192e5e83c",
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
   "command_run": "x3-proof verify x3.proofforge.receipt_integrity",
   "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "proof/receipts/claims"
   ],
-  "timestamp": "2026-04-29T02:01:28.063509497Z",
+  "timestamp": "2026-04-30T16:55:28.678603477Z",
   "result": {
     "claim_id": "x3.proofforge.receipt_integrity",
     "claim": "ProofForge receipt integrity and freshness",
@@ -23,20 +23,20 @@
       "x3-proof verify <claim> --strict"
     ],
     "passed_checks": [
-      "15 fresh receipts"
+      "23 fresh receipts"
     ],
     "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
     "score": 1.0,
     "evidence": {
+      "fresh_receipts": "23",
       "invalid_receipts": "0",
-      "stale_receipts": "0",
-      "fresh_receipts": "15"
+      "stale_receipts": "0"
     },
-    "timestamp": "2026-04-27T23:22:09.420301208Z",
+    "timestamp": "2026-04-30T16:55:28.669106093Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "7ac7772ab57f3bb3b2d554f41cfa2c69cefbf5b744d79ee0327d3a223e3d2c00"
+  "binding_hash": "f44fd41941a1e0f82d15de6bfc580cf4e58ba10a3388ed85b1fe5486a7dde82d"
 }

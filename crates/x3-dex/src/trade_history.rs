@@ -1,9 +1,9 @@
 /// Trade History Persistence — Store and query user trade history for tax & performance reporting
 /// Integrates with Tauri SQLite database for persistent, queryable trade records
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeRecord {
     pub trade_id: [u8; 32],
     pub user: [u8; 32],
@@ -20,7 +20,7 @@ pub struct TradeRecord {
     pub status: u8,     // 0=pending, 1=completed, 2=failed
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TaxReport {
     pub report_id: [u8; 32],
     pub user: [u8; 32],
@@ -36,7 +36,7 @@ pub struct TaxReport {
     pub generated_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PerformanceMetrics {
     pub user: [u8; 32],
     pub period_days: u32,
@@ -51,7 +51,7 @@ pub struct PerformanceMetrics {
     pub sharpe_ratio: u64, // Fixed point scaled by 1000
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeFilter {
     pub user: [u8; 32],
     pub start_block: u64,
@@ -62,7 +62,7 @@ pub struct TradeFilter {
     pub status: Option<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct CostBasisEntry {
     pub entry_id: [u8; 32],
     pub user: [u8; 32],
@@ -72,7 +72,7 @@ pub struct CostBasisEntry {
     pub acquisition_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct CapitalGainCalculation {
     pub gain_id: [u8; 32],
     pub cost_basis: u64,

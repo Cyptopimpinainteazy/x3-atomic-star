@@ -92,4 +92,51 @@ export class CollateralManagerClient {
     );
     return result.state as BondState;
   }
+
+  // ---------------------------------------------------------------------------
+  // GAP-6 plan-named API surface
+  //
+  // The legacy bond-lifecycle methods above (depositBond / requestWithdrawBond
+  // / finalizeWithdraw / getBondState) describe a multi-step bond. The methods
+  // below expose the higher-level lock / unlock / status verbs called for in
+  // GAPS_REPORT_2026_04_27 §GAP-6, mapping directly onto the same RPC layer.
+  // They are real RPC calls, not stubs: any failure surfaces from rpcCall.
+  // ---------------------------------------------------------------------------
+
+  /** Get the total collateral balance for an account+asset pair. */
+  async getCollateral(
+    account: string,
+    asset: string,
+  ): Promise<{ account: string; asset: string; locked: bigint; available: bigint }> {
+    const result = await this.rpcCall<{ locked: string; available: string }>(
+      'collateral_getBalance',
+      { account, asset },
+    );
+    return {
+      account,
+      asset,
+      locked: BigInt(result.locked ?? '0'),
+      available: BigInt(result.available ?? '0'),
+    };
+  }
+
+  /** Lock collateral. Thin alias around `depositBond` for the named API. */
+  async lockCollateral(
+    account: string,
+    asset: string,
+    amount: bigint,
+  ): Promise<DepositReceipt> {
+    return this.depositBond(account, asset, amount);
+  }
+
+  /** Begin unlocking collateral. Returns the pending withdrawal request. */
+  async unlockCollateral(account: string, bondId: BondId): Promise<WithdrawRequest> {
+    return this.requestWithdrawBond(account, bondId);
+  }
+
+  /** Status of a specific bond / collateral position. */
+  async getCollateralStatus(bondId: BondId): Promise<{ bondId: BondId; state: BondState }> {
+    const state = await this.getBondState(bondId);
+    return { bondId, state };
+  }
 }

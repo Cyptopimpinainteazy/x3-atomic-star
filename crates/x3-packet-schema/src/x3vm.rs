@@ -1,4 +1,4 @@
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::prelude::{boxed::Box, vec::Vec};
 use scale_info::TypeInfo;
 
@@ -6,7 +6,7 @@ use crate::EvmPacket;
 use crate::SvmPacket;
 
 /// X3VM Condition for conditional execution
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum X3Condition {
     /// Check account balance threshold
     BalanceAbove {
@@ -40,7 +40,7 @@ pub enum X3Condition {
 }
 
 /// X3VM packet variants
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum X3VmPacket {
     /// Atomic cross-VM transaction
     AtomicCross {

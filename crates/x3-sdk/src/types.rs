@@ -33,7 +33,7 @@ pub type Gas = u64;
 // ============================================================================
 
 /// A Comit transaction payload for atomic cross-VM execution.
-#[derive(Clone, Debug, Default, Encode, Decode, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Encode, Decode, DecodeWithMemTracking, Serialize, Deserialize)]
 pub struct ComitPayload {
     /// EVM payload bytes (optional)
     pub evm_payload: Option<Vec<u8>>,

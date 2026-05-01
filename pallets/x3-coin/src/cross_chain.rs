@@ -12,7 +12,7 @@ pub mod relayer {
 
     pub type RelayerConfig<AccountId, Balance> = RelayerRuntimeConfig<AccountId, Balance>;
 
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
     pub struct RelayerPath<Balance> {
         pub source_chain: u32,
         pub target_chain: u32,

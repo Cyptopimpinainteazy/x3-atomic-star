@@ -1,7 +1,7 @@
 //! Types for the Agent Memory pallet.
 
 use frame_support::pallet_prelude::*;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_std::prelude::*;
 
@@ -12,7 +12,19 @@ use serde::{Deserialize, Serialize};
 pub const MAX_ENTRIES_PER_CHUNK: u32 = 100;
 
 /// Type of memory entry.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum EntryType {
     /// Observation from environment.
@@ -39,7 +51,7 @@ pub enum EntryType {
 }
 
 /// A single memory entry.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct MemoryEntry<BlockNumber> {
     /// Entry ID (sequential within agent).
     pub id: u64,
@@ -56,7 +68,7 @@ pub struct MemoryEntry<BlockNumber> {
 }
 
 /// A chunk of memory entries (bounded to prevent storage attacks).
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct MemoryChunk<BlockNumber> {
     /// Chunk ID.
     pub id: u32,
@@ -83,7 +95,7 @@ impl<BlockNumber: Default> Default for MemoryChunk<BlockNumber> {
 }
 
 /// Memory access permissions.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct MemoryAccess<AccountId> {
     /// Whether anyone can read.
     pub can_public_read: bool,
@@ -104,7 +116,7 @@ impl<AccountId> Default for MemoryAccess<AccountId> {
 }
 
 /// JSONL-friendly entry format for LLM consumption.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct JsonlEntry<BlockNumber> {
     /// Entry ID.
@@ -118,7 +130,7 @@ pub struct JsonlEntry<BlockNumber> {
 }
 
 /// Memory summary for API responses.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct MemorySummary<Balance> {
     /// Agent ID.
@@ -134,7 +146,7 @@ pub struct MemorySummary<Balance> {
 }
 
 /// Delta entry for compressed updates.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct DeltaEntry<BlockNumber> {
     /// Reference entry ID.
     pub base_id: u64,
@@ -145,7 +157,15 @@ pub struct DeltaEntry<BlockNumber> {
 }
 
 /// A single field change in a delta.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+)]
 pub struct FieldChange {
     /// Field path (e.g., "state.balance").
     pub path: BoundedVec<u8, ConstU32<64>>,
@@ -156,7 +176,18 @@ pub struct FieldChange {
 }
 
 /// Type of change operation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+)]
 pub enum ChangeOperation {
     /// Set field to value.
     Set,
@@ -171,7 +202,7 @@ pub enum ChangeOperation {
 }
 
 /// Memory statistics.
-#[derive(Clone, Default, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct MemoryStats {
     /// Total entries across all agents.
     pub total_entries: u64,

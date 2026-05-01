@@ -22,7 +22,7 @@ use codec::{Decode, Encode, Input, Output};
 use sp_std::iter::once;
 
 /// A node header
-#[derive(Copy, Clone, PartialEq, Eq, sp_core::RuntimeDebug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum NodeHeader {
 	Null,
 	// contains wether there is a value and nibble count

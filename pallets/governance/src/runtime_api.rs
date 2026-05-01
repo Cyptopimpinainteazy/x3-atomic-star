@@ -2,12 +2,13 @@
 //!
 //! Provides offchain access to governance state snapshots.
 
+use frame_support::pallet_prelude::{DecodeWithMemTracking, *};
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_std::prelude::*;
 
 /// Proposal snapshot for API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProposalSnapshot {
     /// Proposal ID.
@@ -37,7 +38,7 @@ pub struct ProposalSnapshot {
 }
 
 /// Governance configuration snapshot.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GovernanceConfigSnapshot {
     /// Voting period in blocks.
@@ -55,7 +56,7 @@ pub struct GovernanceConfigSnapshot {
 }
 
 /// Full governance snapshot for API responses.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GovernanceSnapshotResponse {
     /// Current block number.
@@ -69,7 +70,7 @@ pub struct GovernanceSnapshotResponse {
 }
 
 /// Vote record for API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct VoteRecord {
     /// Voter account (as bytes).

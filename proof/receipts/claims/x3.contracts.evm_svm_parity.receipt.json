@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "55bbd9db5a3e7dfb5d79d4257a972771d3fc25f7",
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
   "command_run": "x3-proof verify x3.contracts.evm_svm_parity",
   "artifact_hash": "50531fdf4b5530309f74a3d0a25243e5f9e2d203470ddc0f47909e5f2699a3ec",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -10,7 +10,7 @@
     "X3-contracts/shared/parity-core/src/lib.rs",
     "X3-contracts/shared/parity-core/tests/parity_vectors.rs"
   ],
-  "timestamp": "2026-04-28T21:10:32.961885841Z",
+  "timestamp": "2026-04-30T16:07:51.683906813Z",
   "result": {
     "claim_id": "x3.contracts.evm_svm_parity",
     "claim": "Core EVM contracts and SVM programs implement equivalent X3 behavior",
@@ -41,14 +41,14 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "svm_rs_files": "1",
       "evm_sol_files": "2",
+      "svm_rs_files": "1",
       "parity_harness": "ok",
       "vectors_bytes": "1296"
     },
-    "timestamp": "2026-04-28T21:10:32.958315117Z",
-    "duration_ms": 79
+    "timestamp": "2026-04-30T16:07:51.679777137Z",
+    "duration_ms": 86
   },
   "limitations": [],
-  "binding_hash": "038a24958f803a376b93646377bc78a70bd494971120274a5b7d3e3583e54f4c"
+  "binding_hash": "a29460d99b4067753d1bef68840a5f49b3ab2e1aae9cc573c5b6f06717b75972"
 }

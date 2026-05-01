@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "425e2e98ef77a5d83a54200ec3a4853939034be9",
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
   "command_run": "x3-proof verify x3.funding.milestone_receipts",
-  "artifact_hash": "eb0f22b919b0e0d8356a49052788f3dd41e7869f059e9aa557657d10ee942fd6",
+  "artifact_hash": "03fdcc30eef8cbdfe02910e435a798aa0d8b808c80c6e803ca60254bf4d8bb7f",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "docs/ATLAS_SPHERE_ROADMAP.md",
@@ -11,7 +11,7 @@
     "proof/receipts/claims/",
     "proof/funding/milestone-receipt-map.yml"
   ],
-  "timestamp": "2026-04-28T23:14:33.045123029Z",
+  "timestamp": "2026-05-01T02:14:32.992704Z",
   "result": {
     "claim_id": "x3.funding.milestone_receipts",
     "claim": "Every funding ask maps to a milestone, deliverable, budget, and proof receipt",
@@ -32,7 +32,7 @@
     "commands_run": [],
     "passed_checks": [
       "4 milestone/phase documents found",
-      "17 proof receipts exist as deliverable evidence",
+      "26 proof receipts exist as deliverable evidence",
       "All 14 funding milestones map to existing verified receipts",
       "Funding map total budget = $795000 USD"
     ],
@@ -41,15 +41,15 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "funding_milestones_verified": "14",
+      "proof_receipts": "26",
       "funding_total_budget_usd": "795000",
       "funding_milestones_total": "14",
-      "proof_receipts": "17",
-      "milestone_docs": "4"
+      "milestone_docs": "4",
+      "funding_milestones_verified": "14"
     },
-    "timestamp": "2026-04-28T23:14:33.042852722Z",
-    "duration_ms": 0
+    "timestamp": "2026-05-01T02:14:32.987277366Z",
+    "duration_ms": 2
   },
   "limitations": [],
-  "binding_hash": "eb6949cb06223a63705158892493f69af2ca2679a1f22b81f3f73ccc24fc1904"
+  "binding_hash": "9a83d863b1cca9e007f96f37fea6e6a97be1306e9c979aadc6847d756c392701"
 }

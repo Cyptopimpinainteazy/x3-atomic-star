@@ -23,13 +23,13 @@ default-features = false
 features = ["derive"]
 
 [dependencies.sp-core]
-version = "21.0"
+workspace = true
 default-features = false
 
 [dependencies.sp-std]
-version = "8.0"
+workspace = true
 default-features = false
 
 [dependencies.sp-io]
-version = "23.0"
+workspace = true
 default-features = false

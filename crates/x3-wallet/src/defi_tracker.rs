@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LPPosition {
     pub id: [u8; 32],
     pub holder: [u8; 32],
@@ -17,7 +17,7 @@ pub struct LPPosition {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct StakingPosition {
     pub id: [u8; 32],
     pub staker: [u8; 32],
@@ -29,7 +29,7 @@ pub struct StakingPosition {
     pub is_locked: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BorrowPosition {
     pub id: [u8; 32],
     pub borrower: [u8; 32],
@@ -42,7 +42,7 @@ pub struct BorrowPosition {
     pub health_factor: u32, // scaled by 1000 (e.g., 1500 = 1.5x)
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct DeFiPortfolio {
     pub owner: [u8; 32],
     pub lp_positions: Vec<[u8; 32]>,      // LP position IDs

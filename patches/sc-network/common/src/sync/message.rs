@@ -85,7 +85,7 @@ impl Decode for BlockAttributes {
 	}
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Encode, Decode, DecodeWithMemTracking)]
 /// Block enumeration direction.
 pub enum Direction {
 	/// Enumerate in ascending order (from child to parent).
@@ -95,7 +95,7 @@ pub enum Direction {
 }
 
 /// Block state in the chain.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Encode, Decode, DecodeWithMemTracking)]
 pub enum BlockState {
 	/// Block is not part of the best chain.
 	Normal,
@@ -131,7 +131,7 @@ pub mod generic {
 	use sp_runtime::{EncodedJustification, Justifications};
 
 	/// Block data sent in the response.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub struct BlockData<Header, Hash, Extrinsic> {
 		/// Block header hash.
 		pub hash: Hash,
@@ -152,7 +152,7 @@ pub mod generic {
 	}
 
 	/// Request block data from a peer.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub struct BlockRequest<Hash, Number> {
 		/// Unique request id.
 		pub id: RequestId,
@@ -168,7 +168,7 @@ pub mod generic {
 	}
 
 	/// Identifies starting point of a block sequence.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub enum FromBlock<Hash, Number> {
 		/// Start with given hash.
 		Hash(Hash),
@@ -177,7 +177,7 @@ pub mod generic {
 	}
 
 	/// Response to `BlockRequest`
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 	pub struct BlockResponse<Header, Hash, Extrinsic> {
 		/// Id of a request this response was made for.
 		pub id: RequestId,
@@ -222,7 +222,7 @@ pub mod generic {
 }
 
 /// Handshake sent when we open a block announces substream.
-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
 pub struct BlockAnnouncesHandshake<B: BlockT> {
 	/// Roles of the node.
 	pub roles: Roles,

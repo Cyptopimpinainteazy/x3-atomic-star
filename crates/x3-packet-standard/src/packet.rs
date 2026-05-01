@@ -6,7 +6,7 @@
 //! timeouts, and an opaque payload interpreted by the destination port.
 
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 
@@ -21,7 +21,7 @@ pub type PortId = [u8; 32];
 pub type Sequence = u64;
 
 /// Errors that can be raised by the lifecycle.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PacketError {
     /// Sequence number reused on this stream.
     SequenceReplay,
@@ -39,7 +39,7 @@ pub enum PacketError {
 
 /// On-wire packet.  This is what the source chain commits and the destination
 /// chain consumes.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Packet {
     pub src_chain: ChainId,
     pub src_port: PortId,
@@ -100,7 +100,7 @@ impl Packet {
 
 /// Quad-tuple identifying a unidirectional packet stream.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, TypeInfo, MaxEncodedLen,
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
 )]
 pub struct StreamKey {
     pub src_chain: ChainId,
@@ -110,7 +110,7 @@ pub struct StreamKey {
 }
 
 /// A packet commitment is just the hash; we wrap it for type safety.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
 pub struct PacketCommitment(pub H256);
 
 impl PacketCommitment {
@@ -121,7 +121,7 @@ impl PacketCommitment {
 
 /// Receipt stored by the destination chain to prevent the same packet from
 /// being processed twice.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PacketReceipt {
     pub stream: StreamKey,
     pub sequence: Sequence,
@@ -135,7 +135,7 @@ pub struct PacketReceipt {
 /// `success = true` means the destination committed the side-effects; the
 /// source can release escrow.  `success = false` means the destination
 /// refused; the source must refund.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Acknowledgement {
     pub stream: StreamKey,
     pub sequence: Sequence,

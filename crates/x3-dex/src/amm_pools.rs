@@ -1,9 +1,9 @@
 /// AMM Liquidity Pools — ConstantProduct (Uniswap V2-style) pool implementation with LP token management.
 /// Enables AMM-based trading across X3, supports multi-pool routing, and governs LP rewards.
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use sp_runtime::scale_info::TypeInfo;
 
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
 pub struct LiquidityPool {
     pub pool_id: u64,
     pub token_a: TokenId,
@@ -15,20 +15,30 @@ pub struct LiquidityPool {
     pub created_block: u32,
 }
 
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Debug,
+    PartialEq,
+    Eq,
+)]
 pub struct TokenId {
     pub chain_id: u32,
     pub asset_id: u128,
 }
 
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
 pub struct LPPosition {
     pub position_id: u64,
     pub pool_id: u64,
     pub lp_balance: u128,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SwapEvent {
     pub pool_id: u64,
     pub amount_in: u128,

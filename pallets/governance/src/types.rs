@@ -10,7 +10,7 @@ use sp_std::prelude::*;
 
 /// Conviction multiplier for voting power.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
+    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Conviction {
@@ -61,7 +61,7 @@ impl Conviction {
 }
 
 /// Direction of a vote.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum VoteDirection {
     /// Vote in favor.
@@ -74,7 +74,7 @@ pub enum VoteDirection {
 
 /// Status of a proposal.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
+    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum ProposalStatus {
@@ -101,7 +101,7 @@ pub enum ProposalStatus {
 /// governance bounds) MUST include a non-zero `proof_commitment` and a
 /// `constitution_hash` matching the current on-chain constitution. Voting is
 /// **necessary but not sufficient** for execution. Proof verification is required.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proposal<AccountId, Balance, BlockNumber, Call> {
     /// Unique proposal ID.
@@ -146,7 +146,7 @@ pub struct Proposal<AccountId, Balance, BlockNumber, Call> {
 }
 
 /// Tally of votes for a proposal.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProposalTally<Balance: Default> {
     /// Total voting power for Aye.
@@ -164,7 +164,7 @@ pub struct ProposalTally<Balance: Default> {
 }
 
 /// An individual vote.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Vote<Balance> {
     /// Direction of vote.
@@ -178,7 +178,7 @@ pub struct Vote<Balance> {
 }
 
 /// Delegation of voting power.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Delegation<AccountId, Balance> {
     /// Account to delegate to.
@@ -190,7 +190,7 @@ pub struct Delegation<AccountId, Balance> {
 }
 
 /// Token lock for conviction voting.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct VoteLock<Balance, BlockNumber> {
     /// Locked amount.
@@ -202,7 +202,7 @@ pub struct VoteLock<Balance, BlockNumber> {
 }
 
 /// Governance configuration parameters.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GovernanceParams<Balance: Default, BlockNumber: Default> {
     /// Minimum percentage of issuance that must vote.
@@ -218,7 +218,7 @@ pub struct GovernanceParams<Balance: Default, BlockNumber: Default> {
 }
 
 /// Summary of a proposal for API responses.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProposalSummary<AccountId, Balance, BlockNumber> {
     /// Proposal ID.
@@ -238,7 +238,7 @@ pub struct ProposalSummary<AccountId, Balance, BlockNumber> {
 }
 
 /// Snapshot of governance state for offchain consumers.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GovernanceSnapshot<AccountId, Balance: Default, BlockNumber: Default> {
     /// Total proposals submitted.
@@ -257,7 +257,7 @@ pub struct GovernanceSnapshot<AccountId, Balance: Default, BlockNumber: Default>
 // ============================================================================
 
 /// AI Proposal inert object (no direct execution capability)
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 #[scale_info(skip_type_params(T))]
 pub struct AIProposal<T: GovernanceConfig> {
     /// Unique proposal ID
@@ -279,7 +279,7 @@ pub struct AIProposal<T: GovernanceConfig> {
 }
 
 /// Types of AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub enum AIProposalType {
     /// Runtime parameter evolution
     RuntimeEvolution,
@@ -296,7 +296,7 @@ pub enum AIProposalType {
 }
 
 /// Impact assessment for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct ImpactAssessment {
     /// Risk level (0-100)
     pub risk_level: u8,
@@ -309,7 +309,7 @@ pub struct ImpactAssessment {
 }
 
 /// Subsystems that can be affected by AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub enum Subsystem {
     Consensus,
     Execution,
@@ -320,7 +320,7 @@ pub enum Subsystem {
 }
 
 /// Simulation requirements for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SimulationRequirements {
     /// Required simulation duration (blocks)
     pub simulation_blocks: u32,
@@ -333,7 +333,7 @@ pub struct SimulationRequirements {
 }
 
 /// AI proposal status
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
 pub enum AIProposalStatus {
     #[default]
     Proposed,
@@ -347,7 +347,7 @@ pub enum AIProposalStatus {
 }
 
 /// Simulation result
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SimulationResult {
     /// Success status
     pub success: bool,
@@ -362,7 +362,7 @@ pub struct SimulationResult {
 }
 
 /// State change preview
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct StateChange {
     /// Storage key affected
     pub key: BoundedVec<u8, ConstU32<1024>>,
@@ -373,7 +373,7 @@ pub struct StateChange {
 }
 
 /// Authorization requirements for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 #[scale_info(skip_type_params(T))]
 pub struct AuthorizationRequirements<T: GovernanceConfig> {
     /// Required multisig approvals
@@ -385,7 +385,7 @@ pub struct AuthorizationRequirements<T: GovernanceConfig> {
 }
 
 /// Sandboxed execution context
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SandboxedExecution {
     /// Gas ceiling
     pub gas_ceiling: u64,
@@ -398,7 +398,7 @@ pub struct SandboxedExecution {
 }
 
 /// Execution status
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
 pub enum ExecutionStatus {
     #[default]
     Pending,
@@ -412,8 +412,7 @@ pub enum ExecutionStatus {
 #[derive(
     Clone,
     Copy,
-    Encode,
-    Decode,
+    Encode, Decode, DecodeWithMemTracking,
     TypeInfo,
     MaxEncodedLen,
     Debug,
@@ -438,7 +437,7 @@ pub enum KillSwitchLevel {
 }
 
 /// Kill switch activation record
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 #[scale_info(skip_type_params(T))]
 pub struct KillSwitchActivation<T: GovernanceConfig> {
     /// Activation level
@@ -454,7 +453,7 @@ pub struct KillSwitchActivation<T: GovernanceConfig> {
 }
 
 /// AI Governance configuration
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct AIGovernanceConfig {
     /// Maximum AI proposal payload size
     pub max_proposal_payload: u32,

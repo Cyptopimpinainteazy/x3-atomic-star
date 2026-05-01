@@ -50,7 +50,7 @@ use sp_runtime::{traits::Saturating, DispatchError, Percent};
 use sp_std::vec::Vec;
 
 /// AI Proposal inert object (no direct execution capability)
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 #[scale_info(skip_type_params(T))]
 pub struct AIProposal<T: Config> {
     /// Unique proposal ID
@@ -72,7 +72,7 @@ pub struct AIProposal<T: Config> {
 }
 
 /// Types of AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub enum AIProposalType {
     /// Runtime parameter evolution
     RuntimeEvolution,
@@ -89,7 +89,7 @@ pub enum AIProposalType {
 }
 
 /// Impact assessment for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct ImpactAssessment {
     /// Risk level (0-100)
     pub risk_level: u8,
@@ -102,7 +102,7 @@ pub struct ImpactAssessment {
 }
 
 /// Subsystems that can be affected by AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub enum Subsystem {
     Consensus,
     Execution,
@@ -113,7 +113,7 @@ pub enum Subsystem {
 }
 
 /// Simulation requirements for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SimulationRequirements {
     /// Required simulation duration (blocks)
     pub simulation_blocks: u32,
@@ -126,7 +126,7 @@ pub struct SimulationRequirements {
 }
 
 /// AI proposal status
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
 pub enum AIProposalStatus {
     #[default]
     Proposed,
@@ -140,7 +140,7 @@ pub enum AIProposalStatus {
 }
 
 /// Simulation result
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SimulationResult {
     /// Success status
     pub success: bool,
@@ -155,7 +155,7 @@ pub struct SimulationResult {
 }
 
 /// State change preview
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct StateChange {
     /// Storage key affected
     pub key: Vec<u8>,
@@ -166,7 +166,7 @@ pub struct StateChange {
 }
 
 /// Authorization requirements for AI proposals
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct AuthorizationRequirements {
     /// Required multisig approvals
     pub multisig_threshold: u32,
@@ -177,7 +177,7 @@ pub struct AuthorizationRequirements {
 }
 
 /// Sandboxed execution context
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct SandboxedExecution {
     /// Gas ceiling
     pub gas_ceiling: u64,
@@ -190,7 +190,7 @@ pub struct SandboxedExecution {
 }
 
 /// Execution status
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
 pub enum ExecutionStatus {
     #[default]
     Pending,
@@ -201,7 +201,7 @@ pub enum ExecutionStatus {
 }
 
 /// Kill switch levels (graduated emergency controls)
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum KillSwitchLevel {
     /// Normal operation
     Normal = 0,
@@ -216,7 +216,7 @@ pub enum KillSwitchLevel {
 }
 
 /// Kill switch activation record
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct KillSwitchActivation {
     /// Activation level
     pub level: KillSwitchLevel,
@@ -231,7 +231,7 @@ pub struct KillSwitchActivation {
 }
 
 /// AI Governance configuration
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
 pub struct AIGovernanceConfig {
     /// Maximum AI proposal payload size
     pub max_proposal_payload: u32,

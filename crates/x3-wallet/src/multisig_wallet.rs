@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MultisigWallet {
     pub id: [u8; 32],
     pub signers: Vec<[u8; 32]>, // list of authorized signers
@@ -14,7 +14,7 @@ pub struct MultisigWallet {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MultisigProposal {
     pub id: [u8; 32],
     pub wallet_id: [u8; 32],
@@ -29,7 +29,7 @@ pub struct MultisigProposal {
     pub status: u8,                // 0=pending, 1=approved (threshold met), 2=executed, 3=cancelled
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SignerApproval {
     pub signer: [u8; 32],
     pub proposal_id: [u8; 32],

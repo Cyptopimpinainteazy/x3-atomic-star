@@ -16,7 +16,7 @@ use crate::deploy::DeployRequest;
 pub type ZoneId = H256;
 
 /// Lifecycle state of a deployed zone.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ZoneStatus {
     /// Deployment submitted but not yet confirmed on-chain.
     Pending,
@@ -29,7 +29,7 @@ pub enum ZoneStatus {
 }
 
 /// A registered AppZone entry.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ZoneEntry {
     pub id: ZoneId,
     pub name: String,

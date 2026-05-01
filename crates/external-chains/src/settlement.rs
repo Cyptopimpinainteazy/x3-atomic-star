@@ -15,7 +15,7 @@ use sp_std::vec::Vec;
 pub type SettlementResult<T> = Result<T, ExternalChainError>;
 
 /// Settlement proof for cross-chain verification
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementProof {
     /// Proof type
     pub proof_type: ProofType,
@@ -34,7 +34,7 @@ pub struct SettlementProof {
 }
 
 /// Type of proof used for verification
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ProofType {
     /// Merkle Patricia Trie proof
     MerkleTrie,
@@ -55,7 +55,7 @@ impl Default for ProofType {
 }
 
 /// Settlement configuration for a chain
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementConfig {
     /// Chain type
     pub chain: ChainType,
@@ -128,7 +128,7 @@ impl SettlementConfig {
 }
 
 /// Settlement state for a transfer
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementState {
     /// Transfer being settled
     pub transfer_id: H256,
@@ -147,7 +147,7 @@ pub struct SettlementState {
 }
 
 /// Settlement status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SettlementStatus {
     /// Waiting for proof
     Pending,
@@ -166,7 +166,7 @@ pub enum SettlementStatus {
 }
 
 /// Settlement challenge
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementChallenge {
     /// Challenger address
     pub challenger: H160,
@@ -181,7 +181,7 @@ pub struct SettlementChallenge {
 }
 
 /// Reason for challenging a settlement
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ChallengeReason {
     /// Invalid merkle proof
     InvalidProof,
@@ -307,7 +307,7 @@ impl SettlementVerifier {
 }
 
 /// Settlement batch for efficiency
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementBatch {
     /// Batch ID
     pub id: H256,

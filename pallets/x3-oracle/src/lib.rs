@@ -24,6 +24,7 @@ pub mod pallet {
     use super::WeightInfo;
 use frame_support::{pallet_prelude::*, traits::Get};
 use frame_system::pallet_prelude::*;
+use parity_scale_codec::DecodeWithMemTracking;
 use sp_runtime::traits::SaturatedConversion;
 
 /// Asset identifier type for price feeds
@@ -36,7 +37,7 @@ pub type Price = u64;
 pub type Timestamp = u64;
 
 /// Price submission data
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
 pub struct PriceSubmission<BlockNumber> {
     /// Submitted price
     pub price: Price,
@@ -47,7 +48,7 @@ pub struct PriceSubmission<BlockNumber> {
 }
 
 /// Computed price data with metadata
-#[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
 pub struct PriceData<BlockNumber> {
     /// Median price across submissions
     pub price: Price,
@@ -181,7 +182,16 @@ pub struct PriceData<BlockNumber> {
     }
 
     /// Reasons why a price submission was rejected
-    #[derive(Clone, Encode, Decode, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
+        Debug,
+        PartialEq,
+    )]
     pub enum SubmissionRejectionReason {
         /// Oracle not authorized
         NotAuthorized,

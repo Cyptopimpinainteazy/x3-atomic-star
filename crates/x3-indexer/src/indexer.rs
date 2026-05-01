@@ -115,8 +115,8 @@ impl Indexer {
             .ok_or_else(|| IndexerError::Connection("Not connected".to_string()))?;
 
         // Get finalized head
-        let finalized = client.blocks().at_latest().await?;
-        let finalized_number = finalized.number() as u64;
+        let finalized = client.at_current_block().await?;
+        let finalized_number = finalized.block_number();
 
         // If we're caught up, subscribe to new blocks
         if *current_block > finalized_number {
@@ -156,7 +156,7 @@ impl Indexer {
 
         info!("Caught up, subscribing to new blocks...");
 
-        let mut block_sub = client.blocks().subscribe_finalized().await?;
+        let mut block_sub = client.stream_blocks().await?;
         drop(guard);
 
         while let Some(block_result) = block_sub.next().await {
@@ -193,30 +193,25 @@ impl Indexer {
     ) -> Result<()> {
         let start = std::time::Instant::now();
 
-        // Fetch block by number - iterate through blocks to find it
-        let block = client.blocks().at_latest().await?;
-
-        // If requesting an old block, we need to walk back through parents
-        // For simplicity, we'll use the RPC to get a block at a specific height
-        // This is a simplified approach - production would use block hash lookup
-        let target_block = if block.number() as u64 == block_num {
-            block
-        } else {
-            // For now, just work with what we have
-            // In production, you'd want to use RPC to get block hash at height
-            return Err(IndexerError::BlockNotFound(block_num));
-        };
+        // Fetch block-bound client at the requested block number.
+        let target_block = client
+            .at_block(block_num)
+            .await
+            .map_err(|_| IndexerError::BlockNotFound(block_num))?;
 
         // Extract block header info
-        let header = target_block.header();
-        let block_hash = target_block.hash();
+        let header = target_block
+            .block_header()
+            .await
+            .map_err(|e| IndexerError::Connection(e.to_string()))?;
+        let block_hash = target_block.block_hash();
 
         // Extract timestamp from events (Timestamp::set inherent)
-        let events = target_block.events().await?;
+        let events = target_block.events().fetch().await?;
         let timestamp = extract_timestamp_from_events(&events).unwrap_or_else(|| Utc::now());
 
         // Extract block author from Aura digest
-        let author = extract_author_from_header(header);
+        let author = extract_author_from_header(&header);
 
         let new_block = NewBlock {
             number: block_num as i64,
@@ -233,7 +228,7 @@ impl Indexer {
         self.db.insert_block(&new_block).await?;
 
         // Index extrinsics
-        let extrinsics = target_block.extrinsics().await?;
+        let extrinsics = target_block.extrinsics().fetch().await?;
         let mut ext_records = Vec::new();
         let mut ext_index = 0;
 
@@ -269,14 +264,14 @@ impl Indexer {
         self.db.insert_extrinsics(&ext_records).await?;
 
         // Index events
-        let events = target_block.events().await?;
+        let events = target_block.events().fetch().await?;
         let mut event_records = Vec::new();
         let mut event_index = 0;
 
         for event in events.iter() {
             if let Ok(event) = event {
                 let pallet = event.pallet_name().to_string();
-                let variant = event.variant_name().to_string();
+                let variant = event.event_name().to_string();
 
                 // Extract extrinsic index from phase
                 let extrinsic_index = match event.phase() {
@@ -323,7 +318,7 @@ impl Indexer {
     async fn process_comit_event(
         &self,
         variant: &str,
-        event: &subxt::events::EventDetails<PolkadotConfig>,
+        event: &subxt::events::Event<'_, PolkadotConfig>,
         block_number: u64,
         event_index: i32,
     ) -> Result<()> {
@@ -410,7 +405,7 @@ fn extract_timestamp_from_events(
 ) -> Option<chrono::DateTime<Utc>> {
     for event in events.iter() {
         if let Ok(event) = event {
-            if event.pallet_name() == "Timestamp" && event.variant_name() == "TimestampSet" {
+            if event.pallet_name() == "Timestamp" && event.event_name() == "TimestampSet" {
                 // Try to extract timestamp from event data
                 let bytes = event.field_bytes();
                 // Timestamp is typically a u64 in milliseconds
@@ -470,14 +465,14 @@ fn extract_author_from_header(
 }
 
 /// Decode event data to JSON for storage.
-fn decode_event_data(event: &subxt::events::EventDetails<PolkadotConfig>) -> serde_json::Value {
+fn decode_event_data(event: &subxt::events::Event<'_, PolkadotConfig>) -> serde_json::Value {
     let mut data = serde_json::Map::new();
 
     // Add basic event info
     data.insert("pallet".to_string(), serde_json::json!(event.pallet_name()));
     data.insert(
         "variant".to_string(),
-        serde_json::json!(event.variant_name()),
+        serde_json::json!(event.event_name()),
     );
 
     // Try to decode field bytes as hex
@@ -489,7 +484,7 @@ fn decode_event_data(event: &subxt::events::EventDetails<PolkadotConfig>) -> ser
 
     // Try common field patterns based on event type
     let pallet = event.pallet_name();
-    let variant = event.variant_name();
+    let variant = event.event_name();
 
     match (pallet, variant) {
         ("AtlasKernel", "ComitSubmitted") => {

@@ -10,7 +10,7 @@ use scale_info::TypeInfo;
 pub type X3Result<T> = Result<T, X3IntegrationError>;
 
 /// Errors that can occur during X3 integration
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
 pub enum X3IntegrationError {
     /// Bytecode verification failed
     VerificationFailed(String),

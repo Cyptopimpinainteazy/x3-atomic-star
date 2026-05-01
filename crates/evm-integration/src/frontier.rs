@@ -95,6 +95,7 @@ where
                     None,       // max_priority_fee_per_gas
                     None,       // nonce
                     Vec::new(), // access_list
+                    Vec::new(), // authorization_list
                     false,      // is_transactional
                     false,      // validate
                     None,       // weight_limit
@@ -121,6 +122,7 @@ where
                     None,
                     None,
                     Vec::new(),
+                    Vec::new(), // authorization_list
                     false,
                     false,
                     None,

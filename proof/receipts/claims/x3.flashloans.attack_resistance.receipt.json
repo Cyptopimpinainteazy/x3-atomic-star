@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "55bbd9db5a3e7dfb5d79d4257a972771d3fc25f7",
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
   "command_run": "x3-proof verify x3.flashloans.attack_resistance",
   "artifact_hash": "b06c6b6e310c08f269cb337a403cdb424bc0b68d69deb2e4428e9d6df1f4750c",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -12,7 +12,7 @@
     "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
     "X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json"
   ],
-  "timestamp": "2026-04-28T21:10:32.859875969Z",
+  "timestamp": "2026-04-30T16:08:33.874201700Z",
   "result": {
     "claim_id": "x3.flashloans.attack_resistance",
     "claim": "Flashloan attack resistance",
@@ -47,13 +47,13 @@
     "score": 1.0,
     "evidence": {
       "failed_attack_tests": "0",
-      "passed_attack_tests": "3",
       "parity_vector_harness": "ok",
-      "expected_attack_tests": "3"
+      "expected_attack_tests": "3",
+      "passed_attack_tests": "3"
     },
-    "timestamp": "2026-04-28T21:10:32.856097412Z",
-    "duration_ms": 1200
+    "timestamp": "2026-04-30T16:08:33.869880822Z",
+    "duration_ms": 2136
   },
   "limitations": [],
-  "binding_hash": "0c73331163c3d53dae6f501fde8b5afaaa68cafd50493bfd9199c6617e5c23a2"
+  "binding_hash": "cae26d8465d9f131e0be8ae62a6f5b0ab1593efd41c8c43323275fe111b598ac"
 }

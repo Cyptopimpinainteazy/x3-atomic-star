@@ -35,7 +35,7 @@ pub const MAX_RESERVED_BYTES: u32 = 32;
 /// All reasons a witness can be rejected, returned as `Err(WitnessError)`.
 /// The verifier MUST emit `InvalidWitnessEncoding` with the specific variant;
 /// never a generic mismatch error.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking)]
 pub enum WitnessError {
     /// `version` field != 1.
     BadVersion,
@@ -65,7 +65,7 @@ pub enum WitnessError {
 
 /// Domain tag for an access key.
 /// Values 0-3 are stable; 4 (`Custom`) is reserved for v1+.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking)]
 #[repr(u8)]
 pub enum AccessDomain {
     StorageKey = 0,
@@ -76,7 +76,7 @@ pub enum AccessDomain {
 }
 
 /// A single resource access: a (domain, key) pair.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking)]
 pub struct AccessKeyV1 {
     pub domain: u8, // raw byte; validated against known domain values implicitly
     pub key: H256,
@@ -94,7 +94,7 @@ impl AccessKeyV1 {
 }
 
 /// The access set for a single transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking)]
 pub struct AccessListV1 {
     /// Redundant length field (canonical: must equal `accesses.len()`).
     pub access_count: Compact<u32>,
@@ -105,7 +105,7 @@ pub struct AccessListV1 {
 // ── Witness ───────────────────────────────────────────────────────────────────
 
 /// Top-level v0 witness structure.  SCALE-encoded into `reexec_witness` bytes.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking)]
 pub struct SchedulerWitnessV1 {
     pub version: u8,
     pub rules_version: u32,

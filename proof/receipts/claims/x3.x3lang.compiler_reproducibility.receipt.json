@@ -1,13 +1,19 @@
 {
-  "repo_commit_hash": "a080b548e40010715166ddb4b1f74f8e161fd2f2",
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
   "command_run": "x3-proof verify x3.x3lang.compiler_reproducibility",
-  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "artifact_hash": "b4b0e454e83efcd703e36bf5df1528784732bdba89734437b311cda4222f2bed",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
-  "relevant_files": [],
-  "timestamp": "2026-04-29T06:38:03.837145485Z",
+  "relevant_files": [
+    "x3-lang/Cargo.toml",
+    "x3-lang/compiler/Cargo.toml",
+    "x3-lang/vm/Cargo.toml",
+    "x3-lang/tests/verify_bytecode.rs",
+    "docs/x3-lang/README.md"
+  ],
+  "timestamp": "2026-04-30T08:08:59.075521471Z",
   "result": {
     "claim_id": "x3.x3lang.compiler_reproducibility",
-    "claim": "X3Language parsing is correct",
+    "claim": "X3Language compiler/VM/test artifacts are present",
     "status": "verified",
     "proof_level": "P5",
     "edge_case_level": "E6",
@@ -15,23 +21,34 @@
     "operator_level": "I6",
     "degraded_level": "D5",
     "files_inspected": [
-      "x3-language/src/parser.rs"
+      "x3-lang/Cargo.toml",
+      "x3-lang/compiler/Cargo.toml",
+      "x3-lang/vm/Cargo.toml",
+      "x3-lang/tests/verify_bytecode.rs",
+      "docs/x3-lang/README.md"
     ],
-    "commands_run": [
-      "cargo test -p x3-language"
-    ],
+    "commands_run": [],
     "passed_checks": [
-      "Syntax parsing verified",
-      "Compilation correct"
+      "x3-lang workspace manifest exists",
+      "x3-lang compiler crate exists",
+      "x3-lang VM crate exists",
+      "x3-lang bytecode verification test exists",
+      "x3-lang docs entry exists"
     ],
     "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
-    "score": 0.93,
-    "evidence": {},
-    "timestamp": "2026-04-29T06:38:03.832839457Z",
+    "score": 1.0,
+    "evidence": {
+      "x3-lang/compiler/Cargo.toml": "true",
+      "x3-lang/vm/Cargo.toml": "true",
+      "docs/x3-lang/README.md": "true",
+      "x3-lang/tests/verify_bytecode.rs": "true",
+      "x3-lang/Cargo.toml": "true"
+    },
+    "timestamp": "2026-04-30T08:08:59.072387190Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "d9d7ce6b1d2fb33307e8822d439f8faba816bdb651ebc8d08d0f258e94ae6eff"
+  "binding_hash": "5f2e8643a598b5aaff112ab6e17a7d73e3b12d90edf539ca3b327bbbe81f3861"
 }

@@ -3,16 +3,19 @@
 use super::ScoringContext;
 
 /// Calculate proof score using weighted formula
+#[allow(dead_code)]
 pub fn calculate_proof_score(context: &ScoringContext) -> f64 {
     context.calculate_score()
 }
 
 /// Determine if a score meets mainnet readiness threshold
+#[allow(dead_code)]
 pub fn is_mainnet_ready(score: f64) -> bool {
     score >= 0.95
 }
 
 /// Determine if a score meets testnet readiness threshold
+#[allow(dead_code)]
 pub fn is_testnet_ready(score: f64) -> bool {
     score >= 0.85
 }

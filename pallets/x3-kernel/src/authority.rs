@@ -15,7 +15,7 @@ use sp_std::vec::Vec;
 // to avoid circular dependencies. The pallet implements these functions as helper methods.
 
 /// Authority set change type
-#[derive(Clone, RuntimeDebug, Encode, Decode, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, RuntimeDebug, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo)]
 pub enum AuthorityChange<AccountId> {
     /// New authority added
     Added(AccountId),

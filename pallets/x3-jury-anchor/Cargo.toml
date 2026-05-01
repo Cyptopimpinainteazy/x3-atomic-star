@@ -7,21 +7,21 @@ description = "Jury blockchain anchoring pallet for X3 Chain governance"
 license = "Apache-2.0"
 
 [dependencies]
-frame-benchmarking = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false, optional = true }
-frame-support = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-frame-system = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-pallet-timestamp = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-io = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false, optional = true }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
 
 codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
 scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
 serde = { version = "1.0.195", default-features = false, optional = true }
 
 [dev-dependencies]
-sp-io = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 
 [features]
 default = ["std"]

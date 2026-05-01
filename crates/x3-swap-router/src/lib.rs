@@ -11,7 +11,7 @@ use sp_std::vec::Vec;
 // Note: Would integrate with oracle pallet for price data
 
 /// Swap route segment
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
 pub struct RouteSegment {
     /// Input asset ID
     pub from_asset: u32,
@@ -24,7 +24,7 @@ pub struct RouteSegment {
 }
 
 /// Complete swap route
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SwapRoute {
     /// Route segments
     pub segments: Vec<RouteSegment>,
@@ -51,7 +51,7 @@ pub trait SwapRouter {
 }
 
 /// Router errors
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RouterError {
     /// No route found
     NoRouteFound,

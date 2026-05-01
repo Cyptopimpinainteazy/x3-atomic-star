@@ -53,7 +53,7 @@ pub(crate) mod migrations;
 pub mod pallet {
     use super::*;
     use frame_support::{
-        dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo},
+        dispatch::{GetDispatchInfo, PostDispatchInfo},
         pallet_prelude::*,
         traits::{
             schedule::Named as ScheduleNamed, Currency, LockableCurrency, ReservableCurrency,
@@ -61,6 +61,7 @@ pub mod pallet {
         Blake2_128Concat,
     };
     use frame_system::pallet_prelude::*;
+    use sp_runtime::traits::Dispatchable;
     use sp_runtime::{
         traits::{Saturating, Zero},
         DispatchError, Percent,

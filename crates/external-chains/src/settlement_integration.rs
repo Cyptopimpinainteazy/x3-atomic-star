@@ -20,7 +20,7 @@ use crate::settlement::{ProofType, SettlementProof, SettlementState, SettlementS
 
 /// Represents a bound route ready for submission.
 /// This ties together a reservation, solvency snapshot, and settlement binding.
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct BoundRoute {
     /// Unique route ID for accounting reconciliation.
     pub route_id: H256,
@@ -53,7 +53,7 @@ pub struct BoundRoute {
 }
 
 /// Pre-submission solvency check result.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PreSubmissionCheckResult {
     /// All checks passed.
     pub passed: bool,
@@ -62,7 +62,7 @@ pub struct PreSubmissionCheckResult {
 }
 
 /// Typed rejection reasons for pre-submission checks.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PreSubmissionRejection {
     /// Reservation is no longer valid.
     ReservationInvalid { reservation_id: H256 },
@@ -83,7 +83,7 @@ pub enum PreSubmissionRejection {
 }
 
 /// Post-submission debit event for accounting.
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementDebitEvent {
     /// Route this debit is tied to.
     pub route_id: H256,
@@ -100,7 +100,7 @@ pub struct SettlementDebitEvent {
 }
 
 /// Pending settlement obligation record.
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementObligation {
     /// Route this obligation maps to.
     pub route_id: H256,
@@ -127,7 +127,7 @@ pub struct SettlementObligation {
 }
 
 /// Settlement obligation status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SettlementOblStatus {
     PendingProof,
     ProofSubmitted,
@@ -139,7 +139,7 @@ pub enum SettlementOblStatus {
 }
 
 /// Settlement failure event with recovery binding.
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SettlementFailureEvent {
     /// Route that failed.
     pub route_id: H256,
@@ -154,7 +154,7 @@ pub struct SettlementFailureEvent {
 }
 
 /// Typed failure reasons.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SettlementFailureReason {
     /// Proof submission timed out or was rejected.
     ProofRejected { details: String },
@@ -173,7 +173,7 @@ pub enum SettlementFailureReason {
 }
 
 /// Recommended action after settlement failure.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RecoveryAction {
     /// Release reservation immediately.
     ReleaseReservation,

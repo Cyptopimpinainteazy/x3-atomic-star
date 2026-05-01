@@ -1,8 +1,8 @@
 /// Perpetual Futures Engine — Unlimited-expiry leveraged derivatives with funding rates
 /// Enables up to 10x leverage, funding rate equilibrium, and liquidation mechanics
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PerpetualPosition {
     pub position_id: [u8; 32],
     pub trader: [u8; 32],
@@ -17,7 +17,7 @@ pub struct PerpetualPosition {
     pub open_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FundingRate {
     pub rate_id: [u8; 32],
     pub base_token: u128,
@@ -28,7 +28,7 @@ pub struct FundingRate {
     pub accumulated_funding: i64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PerpetualLiquidation {
     pub liquidation_id: [u8; 32],
     pub position_id: [u8; 32],
@@ -40,7 +40,7 @@ pub struct PerpetualLiquidation {
     pub liquidation_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PerpetualMetrics {
     pub market_id: [u8; 32],
     pub base_token: u128,
@@ -53,7 +53,7 @@ pub struct PerpetualMetrics {
     pub total_collateral_locked: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PositionLeverage {
     pub maintenance_ratio: u32, // Minimum: 250 bps (2.5%)
     pub initial_ratio: u32,     // Initial: 500 bps (5%)

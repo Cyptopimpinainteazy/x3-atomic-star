@@ -1,9 +1,9 @@
 /// Stop-Loss / Take-Profit Triggers — Price-based automatic order execution
 /// Monitors price feeds and executes orders when thresholds are reached
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct StopLossTrigger {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -18,7 +18,7 @@ pub struct StopLossTrigger {
     pub execution_price: Option<u64>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TakeProfitTrigger {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -32,7 +32,7 @@ pub struct TakeProfitTrigger {
     pub entry_price: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TrailingStopTrigger {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -46,7 +46,7 @@ pub struct TrailingStopTrigger {
     pub created_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct GridTradingConfig {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -60,7 +60,7 @@ pub struct GridTradingConfig {
     pub status: u8,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TriggerExecution {
     pub trigger_id: [u8; 32],
     pub executed_at_price: u64,

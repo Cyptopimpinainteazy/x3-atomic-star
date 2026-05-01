@@ -1,9 +1,9 @@
 /// Limit Order Book — Offchain order book with on-chain settlement
 /// Enables users to place buy/sell limit orders that execute when price reaches target
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LimitOrder {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -18,7 +18,7 @@ pub struct LimitOrder {
     pub expires_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderBook {
     pub token_pair_id: [u8; 32],
     pub buy_orders: Vec<[u8; 32]>,  // Order IDs sorted by price desc
@@ -29,7 +29,7 @@ pub struct OrderBook {
     pub last_update_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderExecution {
     pub order_id: [u8; 32],
     pub executed_at_price: u64,
@@ -39,7 +39,7 @@ pub struct OrderExecution {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderBookStats {
     pub total_orders: u32,
     pub pending_orders: u32,

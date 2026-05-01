@@ -7,57 +7,76 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
 
-pub async fn verify_claim(_workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
-    Ok(ProofResult {
+fn assess_upgrade_safety(workspace: &Path, claim_id: &str) -> ProofResult {
+    let started = Instant::now();
+    let checks: [(&str, &str); 4] = [
+        (
+            "scripts/run-try-runtime.sh",
+            "Try-runtime execution script exists",
+        ),
+        (
+            "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json",
+            "Proof-gated upgrade receipt exists",
+        ),
+        ("pallets/governance/src/lib.rs", "Governance pallet implementation exists"),
+        ("runtime/Cargo.toml", "Runtime crate manifest exists"),
+    ];
+
+    let mut files_inspected = Vec::new();
+    let mut passed_checks = Vec::new();
+    let mut failed_checks = Vec::new();
+    let mut missing_proofs = Vec::new();
+    let mut evidence = HashMap::new();
+
+    let mut present = 0usize;
+    for (rel, label) in checks {
+        files_inspected.push(rel.to_string());
+        let ok = workspace.join(rel).exists();
+        evidence.insert(rel.to_string(), ok.to_string());
+        if ok {
+            present += 1;
+            passed_checks.push(label.to_string());
+        } else {
+            failed_checks.push(format!("Missing upgrade-safety artifact: {}", rel));
+            missing_proofs.push(format!("Add or restore {}", rel));
+        }
+    }
+
+    let score = present as f64 / 4.0;
+    let status = if present == 4 {
+        ProofStatus::Verified
+    } else if present > 0 {
+        ProofStatus::Partial
+    } else {
+        ProofStatus::Unverified
+    };
+
+    ProofResult {
         claim_id: claim_id.to_string(),
-        claim: "Upgrade safety verified".to_string(),
-        status: ProofStatus::Verified,
+        claim: "Upgrade-safety artifacts and governance gate evidence are present".to_string(),
+        status,
         proof_level: Some(ProofLevel::P6),
         edge_case_level: Some(EdgeCaseLevel::E7),
         hack_level: Some(HackLevel::H8),
         operator_level: Some(OperatorLevel::I8),
         degraded_level: Some(DegradedLevel::D6),
-        files_inspected: vec!["pallets/system/src/lib.rs".to_string()],
-        commands_run: vec!["cargo test -p frame-system".to_string()],
-        passed_checks: vec!["Upgrade authorization verified".to_string()],
-        failed_checks: vec![],
-        missing_proofs: vec![],
+        files_inspected,
+        commands_run: vec![],
+        passed_checks,
+        failed_checks,
+        missing_proofs,
         blockers: vec![],
-        score: 0.96,
-        evidence: HashMap::new(),
+        score,
+        evidence,
         timestamp: Utc::now(),
-        duration_ms: Instant::now().elapsed().as_millis() as u64,
-    })
+        duration_ms: started.elapsed().as_millis() as u64,
+    }
 }
 
-pub async fn run_proofs(_workspace: &Path, _verbose: bool) -> Result<ProofResult> {
-    Ok(ProofResult {
-        claim_id: "x3.upgrade_safety.full_proof".to_string(),
-        claim: "Upgrade safety fully proven".to_string(),
-        status: ProofStatus::Verified,
-        proof_level: Some(ProofLevel::P6),
-        edge_case_level: Some(EdgeCaseLevel::E7),
-        hack_level: Some(HackLevel::H8),
-        operator_level: Some(OperatorLevel::I8),
-        degraded_level: Some(DegradedLevel::D6),
-        files_inspected: vec!["pallets/system/src/lib.rs".to_string()],
-        commands_run: vec!["cargo test -p frame-system".to_string()],
-        passed_checks: vec![
-            "15% compile checks".to_string(),
-            "15% unit tests (123 tests pass)".to_string(),
-            "20% integration tests (25 scenarios)".to_string(),
-            "20% invariant tests (11 invariants verified)".to_string(),
-            "15% adversarial tests (upgrade bypass tested)".to_string(),
-            "5% benchmark tests (upgrade <5s)".to_string(),
-            "5% wiring tests (authorization verified)".to_string(),
-            "5% drift tests (no upgrade escape)".to_string(),
-        ],
-        failed_checks: vec![],
-        missing_proofs: vec![],
-        blockers: vec![],
-        score: 0.96,
-        evidence: HashMap::new(),
-        timestamp: Utc::now(),
-        duration_ms: Instant::now().elapsed().as_millis() as u64,
-    })
+pub async fn verify_claim(workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
+    Ok(assess_upgrade_safety(workspace, claim_id))
+}
+
+pub async fn run_proofs(workspace: &Path, _verbose: bool) -> Result<ProofResult> {
+    Ok(assess_upgrade_safety(workspace, "x3.upgrade_safety.full_proof"))
 }

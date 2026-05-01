@@ -13,7 +13,7 @@ use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 pub type AssetId = H256;
 
 /// Asset metadata
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AssetMetadata {
     /// Asset ID
     pub id: AssetId,
@@ -73,7 +73,7 @@ impl AssetMetadata {
 }
 
 /// Token mapping on a specific chain
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct TokenMapping {
     /// Chain ID
     pub chain_id: u64,
@@ -86,7 +86,7 @@ pub struct TokenMapping {
 }
 
 /// Mirrored asset representation
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct MirroredAsset {
     /// Asset metadata
     pub metadata: AssetMetadata,
@@ -122,7 +122,7 @@ impl MirroredAsset {
 }
 
 /// Unified asset registry
-#[derive(Debug, Clone, Default, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AssetRegistry {
     /// All registered assets by ID
     assets: BTreeMap<AssetId, MirroredAsset>,

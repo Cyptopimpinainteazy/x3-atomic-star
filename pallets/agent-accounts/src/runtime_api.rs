@@ -7,7 +7,7 @@ use scale_info::TypeInfo;
 use sp_std::prelude::*;
 
 /// Agent state snapshot for offchain subscribers.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct AgentStateSnapshot {
     /// Agent ID.
@@ -37,7 +37,7 @@ pub struct AgentStateSnapshot {
 }
 
 /// Agent list response.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct AgentListResponse {
     /// List of agent IDs.

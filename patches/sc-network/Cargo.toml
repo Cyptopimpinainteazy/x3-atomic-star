@@ -39,14 +39,14 @@ smallvec = "1.8.0"
 thiserror = "1.0"
 unsigned-varint = { version = "0.7.1", features = ["futures", "asynchronous_codec"] }
 zeroize = "1.4.3"
-prometheus-endpoint = { package = "substrate-prometheus-endpoint", git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+prometheus-endpoint = { package = "substrate-prometheus-endpoint", git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 sc-network-common = { version = "0.10.0-dev", path = "./common" }
-sc-utils = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-arithmetic = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sc-utils = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-arithmetic = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 wasm-timer = "0.2"
 
 [dev-dependencies]
@@ -60,10 +60,10 @@ tokio-util = { version = "0.7.4", features = ["compat"] }
 tokio-test = "0.4.2"
 sc-network-light = { version = "0.10.0-dev", path = "./light" }
 sc-network-sync = { version = "0.10.0-dev", path = "./sync" }
-sp-test-primitives = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-tracing = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-substrate-test-runtime = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-substrate-test-runtime-client = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-test-primitives = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-tracing = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+substrate-test-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 
 [features]
 default = []

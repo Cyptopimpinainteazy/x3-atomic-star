@@ -11,7 +11,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::{vec, vec::Vec};
 
 /// Escrow operation to be executed atomically
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum EscrowOp<AccountId, Balance> {
     /// Lock assets into escrow
     Lock {
@@ -33,7 +33,7 @@ pub enum EscrowOp<AccountId, Balance> {
 }
 
 /// Batch of escrow operations (for atomic execution)
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct EscrowBatch<AccountId, Balance> {
     /// Intent ID this batch belongs to
     pub intent_id: H256,
@@ -139,7 +139,7 @@ impl CrossVmEscrow {
 }
 
 /// EVM HTLC contract interface
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct EvmHtlcParams {
     /// Secret hash (32 bytes)
     pub secret_hash: H256,
@@ -212,7 +212,7 @@ impl EvmHtlcParams {
 }
 
 /// Solana escrow program interface
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct SvmEscrowParams {
     /// Secret hash
     pub secret_hash: H256,

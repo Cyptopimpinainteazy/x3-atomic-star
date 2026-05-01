@@ -13,19 +13,19 @@ reqwest = { version = "0.11", features = ["json"] }
 colored = "2.1"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # RPC client dependencies
-subxt = { version = "0.34", features = ["default"] }
-sp-core = { version = "26", features = ["default"] }
-sp-runtime = "26"
+subxt = { version = "0.50" }
+sp-core = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true }
 
 # Hardware wallet support
 ledger-device-sdk = "0.1"
 trezor-lib = "0.1"
 
 # Crypto utilities
-sp-keyring = "26"
+sp-keyring = { workspace = true }
 sha2 = "0.10"
 blake2 = "0.10"
 

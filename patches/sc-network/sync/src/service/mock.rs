@@ -17,7 +17,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use futures::channel::oneshot;
-use libp2p::{Multiaddr, PeerId};
+use libp2p::Multiaddr;
+use sc_network_types::PeerId;
 
 use sc_consensus::{BlockImportError, BlockImportStatus};
 use sc_network::{
@@ -45,19 +46,19 @@ mockall::mock! {
 
 	impl<B: BlockT> sc_consensus::Link<B> for ChainSyncInterface<B> {
 		fn blocks_processed(
-			&mut self,
+			&self,
 			imported: usize,
 			count: usize,
 			results: Vec<(Result<BlockImportStatus<NumberFor<B>>, BlockImportError>, B::Hash)>,
 		);
 		fn justification_imported(
-			&mut self,
+			&self,
 			who: PeerId,
 			hash: &B::Hash,
 			number: NumberFor<B>,
 			success: bool,
 		);
-		fn request_justification(&mut self, hash: &B::Hash, number: NumberFor<B>);
+		fn request_justification(&self, hash: &B::Hash, number: NumberFor<B>);
 	}
 }
 

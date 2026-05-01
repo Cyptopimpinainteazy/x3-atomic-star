@@ -1,9 +1,9 @@
 /// Options & Derivatives Engine — Black-Scholes pricing for call/put options with settlement
 /// Enables options trading, volatility trading, and hedging strategies
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Option {
     pub option_id: [u8; 32],
     pub holder: [u8; 32],
@@ -19,7 +19,7 @@ pub struct Option {
     pub greeks: OptionGreeks,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OptionGreeks {
     pub delta: u64, // ∂price/∂underlying [0, 10000]
     pub gamma: u64, // ∂delta/∂underlying [0, 10000]
@@ -28,7 +28,7 @@ pub struct OptionGreeks {
     pub rho: u64,   // ∂price/∂interest_rate [0, 10000]
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OptionQuote {
     pub quote_id: [u8; 32],
     pub underlying: u128,
@@ -43,7 +43,7 @@ pub struct OptionQuote {
     pub quote_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OptionExercise {
     pub exercise_id: [u8; 32],
     pub option_id: [u8; 32],
@@ -54,7 +54,7 @@ pub struct OptionExercise {
     pub profit_loss: i64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OptionPool {
     pub pool_id: [u8; 32],
     pub underlying: u128,
@@ -66,7 +66,7 @@ pub struct OptionPool {
     pub is_paused: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct VolatilitySurface {
     pub surface_id: [u8; 32],
     pub underlying: u128,

@@ -20,7 +20,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 /// BTC HTLC parameters
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct BtcHtlcParams {
     /// Secret hash (SHA256)
     pub secret_hash: H256,
@@ -134,7 +134,7 @@ impl BtcHtlcParams {
 }
 
 /// BTC SPV proof data
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct BtcSpvProof {
     /// Transaction (raw bytes)
     pub tx_bytes: Vec<u8>,
@@ -195,7 +195,7 @@ impl BtcSpvProof {
 /// 1. Maker creates adaptor signature with secret point
 /// 2. Taker can extract secret from completed signature
 /// 3. Secret revelation is atomic with BTC spend
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct BtcAdaptorSignature {
     /// Pre-signature (incomplete until adapted)
     pub pre_signature: [u8; 64],
@@ -291,7 +291,7 @@ impl BtcAdaptorSignature {
 }
 
 /// Track BTC reorg risk for a block
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct BtcReorgRisk {
     /// Block hash
     pub block_hash: H256,

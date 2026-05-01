@@ -43,7 +43,7 @@ use tracing::{debug, info};
 // ─── Core Types ───────────────────────────────────────────────────────────────
 
 /// VM type for a bundle leg.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
 pub enum VmType {
     Evm,
     Svm,
@@ -52,7 +52,7 @@ pub enum VmType {
 }
 
 /// Declared access set for parallel scheduling.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
 pub struct DeclaredAccess {
     pub reads: Vec<H256>,
     pub writes: Vec<H256>,
@@ -68,7 +68,7 @@ impl Default for DeclaredAccess {
 }
 
 /// A single leg in an atomic bundle.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
 pub struct BundleLeg {
     pub vm_type: VmType,
     pub token_in: H256,

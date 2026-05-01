@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ContactInfo {
     pub id: [u8; 32],
     pub owner: [u8; 32],
@@ -16,7 +16,7 @@ pub struct ContactInfo {
     pub added_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AddressBook {
     pub id: [u8; 32],
     pub owner: [u8; 32],

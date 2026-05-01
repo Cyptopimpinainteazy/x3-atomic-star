@@ -28,7 +28,7 @@
 //! [`SupplyLedger::check_invariant`] for the king invariant.
 
 use frame_support::{traits::ConstU32, BoundedVec};
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::RuntimeDebug;
@@ -123,6 +123,7 @@ pub fn derive_asset_id(
     Ord,
     Encode,
     Decode,
+    DecodeWithMemTracking,
     TypeInfo,
     MaxEncodedLen,
     RuntimeDebug,
@@ -168,7 +169,7 @@ pub const MAX_ACCOUNT_BYTES: u32 = 128;
 
 /// Typed recipient address. Domain and address type are always carried together
 /// so a `0x123...` hex blob is never ambiguous across VMs.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum AccountBytes {
     /// X3 native runtime account (32-byte sp_core::AccountId32-style).
@@ -229,7 +230,18 @@ impl AccountBytes {
 // ── Asset metadata & policy ─────────────────────────────────────────────────
 
 /// Classification of how supply is controlled for a given asset.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum SupplyPolicy {
     /// Asset is native to X3. Supply is minted/burned natively; representations
@@ -247,7 +259,17 @@ pub enum SupplyPolicy {
 
 /// Lifecycle status of an asset.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+    Default,
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum AssetStatus {
@@ -267,7 +289,18 @@ pub enum AssetStatus {
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 /// Route identifier: the tuple `(asset, source, destination)` uniquely names a route.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 pub struct RouteKey {
     /// Asset being transferred.
     pub asset_id: AssetId,
@@ -280,7 +313,18 @@ pub struct RouteKey {
 /// Per-route volume limits. Every route must declare these before being enabled.
 ///
 /// "Bridges do not die from being too cautious. They die from 'send it.'"
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct RouteLimits {
     /// Minimum transfer amount (in canonical units). Zero means no minimum.
@@ -316,7 +360,18 @@ impl RouteLimits {
 }
 
 /// Full route configuration.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct RouteConfig {
     /// Is this route currently accepting transfers?
@@ -357,7 +412,18 @@ impl RouteConfig {
 /// routes must use a real tier (1 = validator attestation quorum, 2 =
 /// light-client, 3 = zk). `MockForTesting` **must** panic under the
 /// `production-verifier` feature at the call site.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum ProofTier {
     /// Internal cross-VM: the X3 kernel itself is the proof.
@@ -379,7 +445,7 @@ pub enum ProofTier {
 /// The `message_id` is derived from the other fields plus the creation block,
 /// so no caller can forge or reuse one. Replay protection is enforced at both
 /// the message-id level (hash) and the per-(domain, sender, nonce) level.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct X3TransferMessage<BlockNumber: MaxEncodedLen> {
     /// Wire-format version. Must equal [`MESSAGE_FORMAT_VERSION`].
@@ -722,7 +788,18 @@ pub mod traits {
 /// policy — the supply ledger's invariant is the only authority on how much
 /// of each representation may exist. `TokenClass` merely dictates what the
 /// factory will let the creator's `mint_authority` do after launch.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum TokenClass {
     /// Initial supply minted once at launch. No further mint is ever permitted.
@@ -762,7 +839,7 @@ impl TokenClass {
 ///
 /// Carries the derived `AssetId`, the creator, and the initial supply. Indexers
 /// can treat this as the "token exists" event.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct TokenLaunchReceipt<AccountId, BlockNumber>
 where
     AccountId: MaxEncodedLen,

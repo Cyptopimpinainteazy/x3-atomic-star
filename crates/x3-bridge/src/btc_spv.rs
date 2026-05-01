@@ -15,7 +15,7 @@ use sp_std::vec::Vec;
 pub type SpvResult<T> = Result<T, SpvError>;
 
 /// SPV verification errors
-#[derive(Debug, Clone, Encode, Decode, PartialEq, Eq)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq)]
 pub enum SpvError {
     /// Invalid merkle proof path
     InvalidMerkleProof,
@@ -36,7 +36,7 @@ pub enum SpvError {
 }
 
 /// Bitcoin block header (80 bytes)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BitcoinBlockHeader {
     /// Block version
     pub version: u32,
@@ -97,7 +97,7 @@ impl BitcoinBlockHeader {
 }
 
 /// Bitcoin transaction in compact format
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BtcTransaction {
     pub tx_id: [u8; 32],
     pub vout_index: u32,
@@ -105,7 +105,7 @@ pub struct BtcTransaction {
 }
 
 /// Merkle proof for transaction inclusion
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MerkleProof {
     /// Transaction hash being verified
     pub tx_hash: [u8; 32],
@@ -147,7 +147,7 @@ impl MerkleProof {
 }
 
 /// Bitcoin blockchain state tracker
-#[derive(Clone, Encode, Decode, Debug, Default)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, Default)]
 pub struct BtcBlockchain {
     /// Current known block height
     pub current_height: u32,

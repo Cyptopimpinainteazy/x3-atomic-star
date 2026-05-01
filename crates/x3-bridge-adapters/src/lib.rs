@@ -310,7 +310,7 @@ where
 // ── EscrowPersistence trait + implementations ─────────────────────────────────
 
 /// Serialised form of an escrow ticket stored in the offchain DB.
-#[derive(Clone, Encode, Decode, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug)]
 pub struct EscrowPersistedEntry {
     /// Original lock holder (SVM pubkey or EVM H160).
     pub from: Vec<u8>,

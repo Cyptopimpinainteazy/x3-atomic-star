@@ -41,7 +41,7 @@ use x3_asset_kernel_types::Balance;
 /// - Nonce (strictly increasing sequence)
 /// - Transaction hash (cryptographic commitment)
 /// - Block number (when processed)
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub struct MintIdempotencyToken {
     /// Account that initiated the mint (governance, bridge relayer, etc.)
     pub origin: Vec<u8>, // AccountId encoded as bytes

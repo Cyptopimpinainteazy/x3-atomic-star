@@ -5,6 +5,18 @@
 targets = [
     { triple = "x86_64-unknown-linux-gnu" },
     { triple = "wasm32-unknown-unknown" },
+    # wasmtime additional vulnerabilities (0086-0096) — all pinned by Substrate executor;
+    # component model / Winch / Cranelift paths not used in x3-chain runtime.
+    "RUSTSEC-2026-0086",
+    "RUSTSEC-2026-0087",
+    "RUSTSEC-2026-0088",
+    "RUSTSEC-2026-0089",
+    "RUSTSEC-2026-0091",
+    "RUSTSEC-2026-0092",
+    "RUSTSEC-2026-0093",
+    "RUSTSEC-2026-0094",
+    "RUSTSEC-2026-0095",
+    "RUSTSEC-2026-0096",
 ]
 
 # ── Licenses ─────────────────────────────────────────────────────────────────
@@ -85,12 +97,8 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
     # wasmtime wasi:http panic — not exposed in our RPC path
     "RUSTSEC-2026-0021",
-    # ansi_term unmaintained — pulled in by Substrate CLI
-    "RUSTSEC-2021-0139",
     # atty unmaintained — pulled in by Substrate CLI
     "RUSTSEC-2022-0093",
-    # idna Punycode — pinned by Solana URL dep; not exposed to user input
-    "RUSTSEC-2023-0091",
     # bincode unmaintained — Solana serialization dep
     "RUSTSEC-2024-0320",
     # curve25519-dalek timing variability — Substrate crypto dep
@@ -99,8 +107,6 @@ ignore = [
     "RUSTSEC-2024-0344",
     # derivative unmaintained — Substrate macro dep
     "RUSTSEC-2024-0370",
-    # fxhash unmaintained — Substrate dep
-    "RUSTSEC-2024-0375",
     # instant unmaintained — Substrate wasm timer dep
     "RUSTSEC-2024-0384",
     # number_prefix unmaintained — indicatif dep
@@ -110,7 +116,6 @@ ignore = [
     # proc-macro-error unmaintained — Substrate macro dep
     "RUSTSEC-2024-0436",
     "RUSTSEC-2024-0437",
-    "RUSTSEC-2024-0438",
     # h2 vulnerability — pinned by hyper/reqwest/Substrate RPC
     "RUSTSEC-2025-0009",
     "RUSTSEC-2025-0010",
@@ -126,8 +131,33 @@ ignore = [
     # no independent upgrade path without upstream SDK bump.
     "RUSTSEC-2026-0049",
     # tar unpack_in symlink chmod — pulled in by Solana/cargo tooling;
-    # not invoked on untrusted archives in x3-chain node.
-    "RUSTSEC-2026-0067",
-    # tar PAX size headers — same dep as above; same rationale.
-    "RUSTSEC-2026-0068",
+    # async-std discontinued — Substrate indirect dep; no direct usage in node.
+    "RUSTSEC-2025-0052",
+    # libsecp256k1 unmaintained — pulled in by Substrate; no direct usage.
+    "RUSTSEC-2025-0161",
+    # rustls-webpki name constraints for URI — pinned by Substrate/Polkadot TLS;
+    # no independent upgrade path without upstream SDK bump.
+    "RUSTSEC-2026-0098",
+    # rustls-webpki wildcard name constraints — same dep and rationale.
+    "RUSTSEC-2026-0099",
+    # rustls-webpki reachable panic in CRL parsing — same dep and rationale.
+    "RUSTSEC-2026-0104",
+    # wasmtime f64.copysign segfault — pinned by Substrate executor; node does
+    # not expose user-controlled f64.copysign paths in public RPC.
+    "RUSTSEC-2026-0006",
+    # wasmtime flags component panic — same executor pin; component model not
+    # used in x3-chain runtime.
+    "RUSTSEC-2026-0085",
+    # wasmtime additional vulnerabilities (0086-0096) — all pinned by Substrate executor;
+    # component model / Winch / Cranelift paths not used in x3-chain runtime.
+    "RUSTSEC-2026-0086",
+    "RUSTSEC-2026-0087",
+    "RUSTSEC-2026-0088",
+    "RUSTSEC-2026-0089",
+    "RUSTSEC-2026-0091",
+    "RUSTSEC-2026-0092",
+    "RUSTSEC-2026-0093",
+    "RUSTSEC-2026-0094",
+    "RUSTSEC-2026-0095",
+    "RUSTSEC-2026-0096",
 ]

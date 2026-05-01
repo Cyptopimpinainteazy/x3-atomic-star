@@ -454,8 +454,6 @@ pub enum AppZoneError {
     Toml(#[from] toml::de::Error),
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("Command error: {0}")]
-    Command(#[from] std::process::CommandError),
 }
 
 // Main entry point
@@ -681,7 +679,7 @@ mod tests {
         let result = factory.run_tests(temp_dir.path());
         // In a real environment, this would depend on cargo being available
         // For now, just ensure it doesn't panic
-        assert!(result.is_ok() || matches!(result.unwrap_err(), AppZoneError::Command(_)));
+        assert!(result.is_ok() || matches!(result.unwrap_err(), AppZoneError::Io(_)));
     }
 
     #[test]

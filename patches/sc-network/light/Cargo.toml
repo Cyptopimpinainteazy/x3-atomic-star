@@ -25,9 +25,9 @@ futures = "0.3.21"
 libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 log = "0.4.16"
 prost = "0.11"
-sp-blockchain = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 sc-network = { version = "0.10.0-dev", path = "../" }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 thiserror = "1.0"

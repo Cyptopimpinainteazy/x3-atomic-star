@@ -14,14 +14,14 @@ use scale_info::TypeInfo;
 pub type TemplateId = [u8; 32];
 
 /// Template parameter key-value pair.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Param {
     pub key: String,
     pub value: String,
 }
 
 /// An AppZone template definition.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Template {
     /// 32-byte template fingerprint (typically blake2_256 of the canonical
     /// template descriptor).

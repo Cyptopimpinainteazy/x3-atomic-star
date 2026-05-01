@@ -17,10 +17,101 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
         verify_funding(workspace, claim_id, verbose).await
     } else if claim_id.contains("evolution") {
         verify_evolution(workspace, claim_id, verbose).await
+    } else if claim_id.contains("observability") {
+        verify_observability(workspace, claim_id, verbose).await
     } else {
         // Shouldn't happen, but handle gracefully
         Ok(unrecognized_claim(claim_id))
     }
+}
+
+async fn verify_observability(
+    workspace: &Path,
+    claim_id: &str,
+    verbose: bool,
+) -> Result<ProofResult> {
+    let start = Instant::now();
+
+    if verbose {
+        println!("  → Checking observability telemetry evidence...");
+    }
+
+    let mut files_inspected = vec![];
+    let mut passed_checks = vec![];
+    let mut failed_checks = vec![];
+    let mut missing_proofs = vec![];
+    let mut evidence = HashMap::new();
+
+    let required = [
+        (
+            "docs/testnet-config/prometheus-config.json",
+            "Prometheus scrape config present",
+        ),
+        (
+            "docs/testnet-config/grafana-dashboards.json",
+            "Grafana dashboard config present",
+        ),
+        (
+            "crates/x3-indexer/src/metrics.rs",
+            "Indexer metrics surface implemented",
+        ),
+        (
+            "crates/x3-sidecar/src/telemetry.rs",
+            "Sidecar telemetry surface implemented",
+        ),
+        (
+            "tests_phase4/x3_operator/test_telemetry.py",
+            "Operator telemetry test exists",
+        ),
+    ];
+
+    for (rel, label) in required {
+        files_inspected.push(rel.to_string());
+        let exists = workspace.join(rel).exists();
+        evidence.insert(rel.to_string(), exists.to_string());
+        if exists {
+            passed_checks.push(label.to_string());
+        } else {
+            failed_checks.push(format!("Missing observability artifact: {}", rel));
+            missing_proofs.push(format!("Add {}", rel));
+        }
+    }
+
+    let total_checks = passed_checks.len() + failed_checks.len();
+    let score = if total_checks == 0 {
+        0.0
+    } else {
+        passed_checks.len() as f64 / total_checks as f64
+    };
+    let status = if failed_checks.is_empty() && missing_proofs.is_empty() {
+        ProofStatus::Verified
+    } else if !failed_checks.is_empty() || !passed_checks.is_empty() {
+        ProofStatus::Partial
+    } else {
+        ProofStatus::Unverified
+    };
+
+    Ok(ProofResult {
+        claim_id: claim_id.to_string(),
+        claim: "Observability telemetry and dashboards are configured with executable evidence"
+            .to_string(),
+        status,
+        proof_level: None,
+        edge_case_level: None,
+        hack_level: None,
+        operator_level: None,
+        degraded_level: None,
+        files_inspected,
+        commands_run: vec![],
+        passed_checks,
+        failed_checks,
+        missing_proofs,
+        blockers: vec![],
+        score,
+        evidence,
+        timestamp: Utc::now(),
+        duration_ms: start.elapsed().as_millis() as u64,
+    })
 }
 
 async fn verify_onboarding(workspace: &Path, claim_id: &str, verbose: bool) -> Result<ProofResult> {

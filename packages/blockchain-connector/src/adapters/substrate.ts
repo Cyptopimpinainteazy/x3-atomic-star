@@ -3,6 +3,7 @@
  */
 
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import { blake2AsHex } from "@polkadot/util-crypto";
 import type { Block, Transaction, ChainDescriptor } from "../types";
 import { BaseChainAdapter } from "./base";
 
@@ -91,12 +92,27 @@ export class SubstrateAdapter extends BaseChainAdapter {
         const block = await api.rpc.chain.getBlock(bh);
         for (const ext of block.block.extrinsics) {
           try {
-            // compute hash of extrinsic bytes
-            // Note: registry.hash may not exist in all versions; fallback gracefully
-            const u8a = ext.toU8a ? ext.toU8a() : ext.toHex ? Buffer.from(ext.toHex().replace(/^0x/, ''), 'hex') : null;
-            if (u8a) {
-              const hashHex = (api as any).registry.hash(u8a).toHex?.() || (api as any).registry.hash(u8a).toString?.();
-              if (hashHex && hashHex.toLowerCase().replace(/^0x/, '') === hash.toLowerCase().replace(/^0x/, '')) {
+            // Use the extrinsic's own .hash accessor when available (current
+            // @polkadot/api). Fall back to blake2-256 over the SCALE-encoded
+            // bytes — that is the canonical Substrate extrinsic hash and
+            // works across all api versions, replacing the broken
+            // `registry.hash(...)` API that was removed.
+            let hashHex: string | undefined;
+            const extAny = ext as any;
+            if (extAny.hash && typeof extAny.hash.toHex === 'function') {
+              hashHex = extAny.hash.toHex();
+            } else {
+              const u8a = ext.toU8a
+                ? ext.toU8a()
+                : ext.toHex
+                  ? Buffer.from(ext.toHex().replace(/^0x/, ''), 'hex')
+                  : null;
+              if (u8a) {
+                hashHex = blake2AsHex(u8a, 256);
+              }
+            }
+            if (hashHex) {
+              if (hashHex.toLowerCase().replace(/^0x/, '') === hash.toLowerCase().replace(/^0x/, '')) {
                 // found
                 return {
                   hash,

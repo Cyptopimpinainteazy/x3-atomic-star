@@ -12,7 +12,7 @@ use sp_std::vec::Vec;
 pub type ExternalChainId = u32;
 
 /// Bridge root state information
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BridgeRootState {
     /// Merkle root hash for external chain state
@@ -26,7 +26,7 @@ pub struct BridgeRootState {
 }
 
 /// Cross-chain transfer status
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum CrossChainStatus {
     /// Transfer initiated on X3, awaiting external execution
@@ -40,7 +40,7 @@ pub enum CrossChainStatus {
 }
 
 /// Bridge route information
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BridgeRoute {
     /// Source chain ID (X3 = 0, Ethereum = 1, Solana = 2, Bitcoin = 3, etc.)
@@ -54,7 +54,7 @@ pub struct BridgeRoute {
 }
 
 /// Proof verification information
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProofVerificationState {
     /// Hash of the proof submitted

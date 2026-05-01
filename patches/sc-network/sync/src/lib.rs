@@ -40,12 +40,13 @@ use extra_requests::ExtraRequests;
 use futures::{
 	channel::oneshot, stream::FuturesUnordered, task::Poll, Future, FutureExt, StreamExt,
 };
-use libp2p::{request_response::OutboundFailure, PeerId};
+use libp2p::request_response::OutboundFailure;
 use log::{debug, error, info, trace, warn};
 use prost::Message;
 
 use prometheus_endpoint::{register, Counter, PrometheusError, Registry, U64};
-use sc_client_api::{BlockBackend, ProofProvider};
+use sc_client_api::{blockchain::BlockGap, BlockBackend, ProofProvider};
+use sc_network_types::PeerId;
 use sc_consensus::{
 	import_queue::ImportQueueService, BlockImportError, BlockImportStatus, IncomingBlock,
 };
@@ -1838,7 +1839,7 @@ where
 			}
 		}
 
-		if let Some((start, end)) = info.block_gap {
+		if let Some(BlockGap { start, end, .. }) = info.block_gap {
 			debug!(target: "sync", "Starting gap sync #{} - #{}", start, end);
 			self.gap_sync = Some(GapSync {
 				best_queued_number: start - One::one(),

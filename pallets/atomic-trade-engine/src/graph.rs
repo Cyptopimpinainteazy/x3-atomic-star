@@ -29,7 +29,7 @@ pub const MAX_PATHS_EVALUATED: usize = 10;
 pub const MIN_ARBITRAGE_PROFIT_BPS: u32 = 10; // 0.1%
 
 /// Edge in the trade graph (represents a pool)
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct GraphEdge {
     /// Pool ID
     pub pool_id: H256,
@@ -48,7 +48,7 @@ pub struct GraphEdge {
 }
 
 /// Node in the trade graph (represents a token)
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct GraphNode {
     pub token_id: H256,
     /// Outgoing edges (pools that accept this token)
@@ -56,7 +56,7 @@ pub struct GraphNode {
 }
 
 /// Trade graph for path finding
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
 pub struct TradeGraph {
     /// Nodes indexed by token ID
     pub nodes: BTreeMap<H256, GraphNode>,

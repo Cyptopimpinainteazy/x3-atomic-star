@@ -86,7 +86,7 @@ pub mod pallet {
         pallet_prelude::*,
         traits::{Currency, ReservableCurrency},
     };
-    use frame_system::offchain::SubmitTransaction;
+    use frame_system::offchain::{CreateBare, SubmitTransaction};
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_io::hashing::sha2_256;
@@ -105,7 +105,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-        frame_system::Config + frame_system::offchain::SendTransactionTypes<Call<Self>>
+        frame_system::Config + frame_system::offchain::CreateTransactionBase<Call<Self>> + frame_system::offchain::CreateBare<Call<Self>>
     {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -179,7 +179,7 @@ pub mod pallet {
     // ── Types ─────────────────────────────────────────────────────────────────
 
     /// Bundle execution status.
-    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     pub enum BundleStatus {
         /// Submitted, waiting for executor assignment.
         Pending,
@@ -192,7 +192,7 @@ pub mod pallet {
     }
 
     /// On-chain record for a submitted atomic bundle.
-    #[derive(Debug, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     #[scale_info(skip_type_params(T))]
     pub struct BundleRecord<T: Config> {
         /// Submitter / bond holder.
@@ -255,7 +255,7 @@ pub mod pallet {
     }
 
     /// Reason a bundle was rolled back.
-    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     pub enum BundleRollbackReason {
         /// One or more legs failed execution.
         ExecutionFailed,
@@ -347,9 +347,8 @@ pub mod pallet {
                     block_num: block_num_u64,
                     cert: finality_cert,
                 };
-                let _ = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(
-                    anchor_call.into(),
-                );
+                let xt = T::create_bare(anchor_call.into());
+                let _ = SubmitTransaction::<T, Call<T>>::submit_transaction(xt);
             }
 
             for (bundle_id, record) in Bundles::<T>::iter() {
@@ -387,7 +386,7 @@ pub mod pallet {
                     committed_at_ns,
                 };
 
-                match SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()) {
+                match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(call.into())) {
                     Ok(()) => {
                         // Clear the entry so we don't resubmit next block.
                         sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &key);

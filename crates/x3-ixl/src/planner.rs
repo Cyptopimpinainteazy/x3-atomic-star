@@ -15,7 +15,7 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 
 use crate::instruction::{Bundle, Instruction, IxlError};
@@ -28,7 +28,7 @@ enum SlotPhase {
 }
 
 /// A validated, ready-to-execute plan.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ExecutionPlan {
     pub instructions: Vec<Instruction>,
 }

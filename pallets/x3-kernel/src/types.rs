@@ -20,7 +20,7 @@ const BASE58_ALPHABET: &[u8; 58] =
 
 /// Canonical 32-byte identifier used to link Substrate accounts with X3 identities.
 /// Provides derivation, serialization, and address conversion helpers.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
 pub struct AtlasId([u8; 32]);
 
 impl AtlasId {
@@ -193,7 +193,7 @@ pub enum CborError {
 }
 
 /// Supported public key types for AtlasId derivation.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[repr(u8)]
 pub enum PubkeyType {
@@ -231,7 +231,7 @@ impl From<PubkeyType> for u8 {
 }
 
 /// Chain preference hint encoded alongside X3 identifiers.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[repr(u8)]
 pub enum ChainHint {
@@ -325,7 +325,7 @@ impl AtlasIdDerivation {
 pub type AssetId = H256;
 
 /// Describes metadata associated with a registered asset.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct AssetMetadata {
 	/// Human-readable asset symbol represented as UTF-8 bytes.
@@ -335,7 +335,7 @@ pub struct AssetMetadata {
 }
 
 /// Represents the lifecycle status of a Comit transaction.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum ComitStatus {
 	/// Comit has been accepted but not yet finalized.
@@ -347,7 +347,7 @@ pub enum ComitStatus {
 }
 
 /// Execution intent destined for the EVM environment.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct EvmPayload {
 	/// Target contract or account in the EVM represented by an H160 address.
@@ -359,7 +359,7 @@ pub struct EvmPayload {
 }
 
 /// Execution intent destined for the SVM environment.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct SvmPayload {
 	/// Identifier of the Solana program to invoke.

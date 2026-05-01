@@ -2038,14 +2038,14 @@ pub mod pallet {
 // ============================================================================
 
 /// Asset pair for trading.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct AssetPair {
     pub asset_in: H256,
     pub asset_out: H256,
 }
 
 /// Configuration for an AMM adapter.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AmmAdapterConfig {
     /// Target VM for this AMM
     pub vm_type: types::VmType,
@@ -2058,7 +2058,7 @@ pub struct AmmAdapterConfig {
 }
 
 /// Input structure for creating trade legs.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct TradeLegInput {
     /// AMM protocol to use
     pub amm_protocol: types::AmmProtocol,
@@ -2077,7 +2077,7 @@ pub struct TradeLegInput {
 }
 
 /// Internal trade leg representation.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct TradeLeg {
     pub amm_protocol: types::AmmProtocol,
     pub vm_type: types::VmType,
@@ -2105,7 +2105,7 @@ pub enum TradeLegStatus {
 }
 
 /// Reason for trade leg failure.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum TradeLegFailureReason {
     EvmExecutionFailed,
     SvmExecutionFailed,
@@ -2148,7 +2148,7 @@ impl From<TradeLegFailureReason> for sp_runtime::DispatchError {
 
 /// Trade batch containing multiple legs.
 /// MaxTradeLegs is the max number of legs per batch.
-#[derive(PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[scale_info(skip_type_params(MaxTradeLegs))]
 pub struct TradeBatch<AccountId, Balance, MaxTradeLegs: Get<u32>> {
     pub batch_id: H256,
@@ -2213,7 +2213,7 @@ pub enum BatchStatus {
 }
 
 /// Reason for batch failure.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum BatchFailureReason {
     LegExecutionFailed {
         leg_index: u32,
@@ -2231,7 +2231,7 @@ pub enum BatchFailureReason {
 }
 
 /// State checkpoint for rollback support.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct StateCheckpoint {
     pub checkpoint_id: u32,
     pub state_root: H256,

@@ -1,0 +1,37 @@
+{
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "command_run": "x3-proof verify x3.consensus.equivocation_detection",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [],
+  "timestamp": "2026-04-30T16:07:51.564739425Z",
+  "result": {
+    "claim_id": "x3.consensus.equivocation_detection",
+    "claim": "Consensus is safe and live",
+    "status": "verified",
+    "proof_level": "P7",
+    "edge_case_level": "E9",
+    "hack_level": "H10",
+    "operator_level": "I8",
+    "degraded_level": "D8",
+    "files_inspected": [
+      "pallets/consensus/src/lib.rs"
+    ],
+    "commands_run": [
+      "cargo test -p pallet-consensus"
+    ],
+    "passed_checks": [
+      "Fork choice rule verified",
+      "Finality proven"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.99,
+    "evidence": {},
+    "timestamp": "2026-04-30T16:07:51.562186531Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "3fe3a1432d80d86c433de51e0e598f8182fe8eff6dc120dfa815db0ef41f61a7"
+}

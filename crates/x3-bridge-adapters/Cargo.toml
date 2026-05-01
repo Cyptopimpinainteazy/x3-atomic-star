@@ -12,12 +12,12 @@ x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 pallet-x3-kernel = { path = "../../pallets/x3-kernel" }
 
 # Substrate node-side
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-api          = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-blockchain   = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-runtime      = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-core         = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
-sp-io           = { git = "https://github.com/paritytech/substrate", rev = "948fbd2" }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-api          = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-blockchain   = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-runtime      = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-core         = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+sp-io           = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 codec           = { package = "parity-scale-codec", version = "3.6.5", features = ["derive"] }
 
 # Logging

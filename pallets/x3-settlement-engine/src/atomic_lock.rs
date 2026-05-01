@@ -43,7 +43,7 @@ impl EscrowAccount {
 }
 
 /// 2PC Atomic lock state
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
 pub enum LockPhase {
     /// Funds locked during Prepare → ready for Commit
     LockedForCommit {
@@ -68,7 +68,7 @@ pub enum LockPhase {
 }
 
 /// Reason for lock release
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
 pub enum ReleaseReason {
     CommitSucceeded,
     CommitFailed,
@@ -77,7 +77,7 @@ pub enum ReleaseReason {
 }
 
 /// Per-intent atomic lock record
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AtomicLock<Balance, AccountId> {
     /// Intent being settled
     pub intent_id: [u8; 32],

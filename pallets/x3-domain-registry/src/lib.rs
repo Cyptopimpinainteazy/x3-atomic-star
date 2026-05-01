@@ -62,7 +62,7 @@ pub mod pallet {
 
     pub type DomainBytesOf<T> = BoundedVec<u8, <T as Config>::MaxDomainLen>;
 
-    #[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub enum X3RecordData<T: Config> {
         A([u8; 4]),
@@ -127,7 +127,7 @@ pub mod pallet {
         }
     }
 
-    #[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub struct X3DnsRecord<T: Config> {
         pub ttl: u32,
@@ -160,7 +160,7 @@ pub mod pallet {
         }
     }
 
-    #[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub struct DomainInfo<T: Config> {
         pub owner: T::AccountId,

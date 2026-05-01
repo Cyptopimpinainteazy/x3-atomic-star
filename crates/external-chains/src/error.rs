@@ -5,7 +5,7 @@ use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
 /// Errors that can occur during external chain operations
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ExternalChainError {
     /// Connection to external chain failed
     ConnectionFailed(Vec<u8>),

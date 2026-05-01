@@ -9,7 +9,7 @@ use alloc::vec;
 #[cfg(feature = "std")]
 use std::collections::HashSet;
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::DispatchError;
@@ -308,7 +308,7 @@ impl CrossVmDispatcher for NoOpDispatcher {
 }
 
 /// Two-phase commit phase for atomic cross-VM operations
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum TwoPhaseCommitPhase {
     /// Initial state — operation queued but not yet prepared
     Init,
@@ -321,7 +321,7 @@ pub enum TwoPhaseCommitPhase {
 }
 
 /// Prepared operation holding lock receipts from both VMs
-#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PreparedOperation {
     /// The nonce assigned when this operation was first queued via `queue_operation`.
     /// Carried unchanged through prepare → commit/abort for full lifecycle tracing.
@@ -345,7 +345,7 @@ pub struct PreparedOperation {
 }
 
 /// Bridge configuration controlling limits and safety
-#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct BridgeConfig {
     /// Maximum transfer amount per operation
     pub max_transfer_amount: u128,
@@ -372,7 +372,7 @@ impl Default for BridgeConfig {
 }
 
 /// Cross-VM event emitted during bridge operations
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum CrossVmEvent {
     /// Transfer initiated between VMs
     TransferInitiated {
@@ -418,7 +418,7 @@ pub enum CrossVmEvent {
 }
 
 /// VM type identifier
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum VmType {
     /// Ethereum Virtual Machine
     Evm,
@@ -429,7 +429,7 @@ pub enum VmType {
 }
 
 /// Cross-VM operation types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum CrossVmOperation {
     /// Transfer tokens from SVM to EVM
     TransferToEvm {
@@ -544,7 +544,7 @@ pub enum CrossVmOperation {
 }
 
 /// Cross-VM operation result
-#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct CrossVmResult {
     /// Operation succeeded
     pub success: bool,
@@ -631,7 +631,7 @@ impl CrossVmResult {
 }
 
 /// Cross-VM operation state
-#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum OperationState {
     /// Pending execution
     Pending,

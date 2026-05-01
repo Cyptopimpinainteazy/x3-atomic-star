@@ -71,5 +71,6 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Repl(args) => commands::repl::execute(args).await,
         Commands::Swap(args) => commands::swap::execute(args).await,
         Commands::Chains(args) => commands::swap::execute_chains(args).await,
+        Commands::Demo(args) => commands::demo::execute(args).await,
     }
 }

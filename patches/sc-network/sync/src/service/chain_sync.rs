@@ -17,7 +17,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use futures::{channel::oneshot, Stream};
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 
 use sc_consensus::{BlockImportError, BlockImportStatus, JustificationSyncLink, Link};
 use sc_network::{NetworkBlock, NetworkSyncForkRequest};
@@ -201,7 +201,7 @@ impl<B: BlockT> SyncStatusProvider<B> for SyncingService<B> {
 
 impl<B: BlockT> Link<B> for SyncingService<B> {
 	fn blocks_processed(
-		&mut self,
+		&self,
 		imported: usize,
 		count: usize,
 		results: Vec<(Result<BlockImportStatus<NumberFor<B>>, BlockImportError>, B::Hash)>,
@@ -212,7 +212,7 @@ impl<B: BlockT> Link<B> for SyncingService<B> {
 	}
 
 	fn justification_imported(
-		&mut self,
+		&self,
 		who: PeerId,
 		hash: &B::Hash,
 		number: NumberFor<B>,
@@ -223,7 +223,7 @@ impl<B: BlockT> Link<B> for SyncingService<B> {
 			.unbounded_send(ToServiceCommand::JustificationImported(who, *hash, number, success));
 	}
 
-	fn request_justification(&mut self, hash: &B::Hash, number: NumberFor<B>) {
+	fn request_justification(&self, hash: &B::Hash, number: NumberFor<B>) {
 		let _ = self.tx.unbounded_send(ToServiceCommand::RequestJustification(*hash, number));
 	}
 }

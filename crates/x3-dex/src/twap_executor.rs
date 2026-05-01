@@ -1,9 +1,9 @@
 /// TWAP Executor — Time-Weighted Average Price order execution
 /// Splits large orders across time to minimize price impact
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TWAPOrder {
     pub id: [u8; 32],
     pub user: [u8; 32],
@@ -18,7 +18,7 @@ pub struct TWAPOrder {
     pub status: u8, // 0=active, 1=completed, 2=cancelled
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TWAPSliceExecution {
     pub slice_index: u32,
     pub slice_amount: u64,
@@ -28,7 +28,7 @@ pub struct TWAPSliceExecution {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TWAPSlice {
     pub index: u32,
     pub amount: u64,
@@ -37,7 +37,7 @@ pub struct TWAPSlice {
     pub execution_price: Option<u64>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TWAPStatistics {
     pub order_id: [u8; 32],
     pub total_amount: u64,

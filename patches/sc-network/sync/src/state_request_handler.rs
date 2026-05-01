@@ -21,7 +21,7 @@ use crate::schema::v1::{KeyValueStateEntry, StateEntry, StateRequest, StateRespo
 
 use codec::{Decode, Encode};
 use futures::{channel::oneshot, stream::StreamExt};
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use log::{debug, trace};
 use prost::Message;
 use schnellru::{ByLength, LruMap};

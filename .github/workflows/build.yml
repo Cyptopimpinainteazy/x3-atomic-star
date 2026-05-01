@@ -5,6 +5,9 @@ on:
     branches: [main, develop, sprint-*]
   push:
     branches: [main, develop, sprint-*]
+  schedule:
+    # Run full test suite with advanced checks every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
   workflow_dispatch:
     inputs:
       run_fragile:
@@ -158,14 +161,75 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
       - uses: Swatinem/rust-cache@v2
-      - name: Run fuzz tests (quick mode)
+       - name: Run fuzz tests (quick mode)
+         run: |
+           # Run fuzz tests for 30 seconds each (quick CI mode)
+           timeout 30 cargo fuzz run fuzz_proof_validation --release --fuzz-dir pallets/x3-atomic-kernel/fuzz || true
+           timeout 30 cargo fuzz run bridge_proof_verify --release --fuzz-dir crates/x3-proof/fuzz || true
+           timeout 30 cargo fuzz run intent_decode --release --fuzz-dir crates/x3-intent/fuzz || true
+           timeout 30 cargo fuzz run router_transfer_validation --release --fuzz-dir pallets/x3-cross-vm-router/fuzz || true
+           timeout 30 cargo fuzz run settlement_intent_validation --release --fuzz-dir pallets/x3-settlement-engine/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-dex/fuzz || true
+           timeout 30 cargo fuzz run fuzz_add_liquidity --release --fuzz-dir pallets/x3-dex/fuzz || true
+           timeout 30 cargo fuzz run fuzz_remove_liquidity --release --fuzz-dir pallets/x3-dex/fuzz || true
+           timeout 30 cargo fuzz run fuzz_swap --release --fuzz-dir pallets/x3-dex/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-vrf/fuzz || true
+           timeout 30 cargo fuzz run fuzz_vrf_prove --release --fuzz-dir pallets/x3-vrf/fuzz || true
+           timeout 30 cargo fuzz run fuzz_vrf_verify --release --fuzz-dir pallets/x3-vrf/fuzz || true
+           timeout 30 cargo fuzz run fuzz_median_calculation --release --fuzz-dir pallets/x3-oracle/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-oracle/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/agent-accounts/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/agent-memory/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/atomic-trade-engine/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/cross-chain-validator/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/depin-marketplace/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/evolution-core/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/fraud-proofs/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/governance/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/meme-overlord/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/private-execution/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/svm-runtime/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/swarm/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/treasury/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-account-registry/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-asset-registry/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-automation/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-coin/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-da/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-domain-registry/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-invariants/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-inventory/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-jury-anchor/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-kernel/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-reservation/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-sequencer/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-slash/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-solvency/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-supply-ledger/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-token-factory/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-verifier/fuzz || true
+           timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-wallet-pallet/fuzz || true
+        continue-on-error: true
+
+  # Run advanced fragile tests on critical pallets (weekly)
+  advanced-fragile-critical:
+    name: Advanced Fragile - Critical Pallets
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nightly for fragile lane
+        run: rustup toolchain install nightly --profile minimal
+      - name: Memory sanitizer on critical pallets
         run: |
-          # Run fuzz tests for 30 seconds each (quick CI mode)
-          timeout 30 cargo fuzz run fuzz_proof_validation --release --fuzz-dir pallets/x3-atomic-kernel/fuzz || true
-          timeout 30 cargo fuzz run bridge_proof_verify --release --fuzz-dir crates/x3-proof/fuzz || true
-          timeout 30 cargo fuzz run intent_decode --release --fuzz-dir crates/x3-intent/fuzz || true
-          timeout 30 cargo fuzz run router_transfer_validation --release --fuzz-dir pallets/x3-cross-vm-router/fuzz || true
-          timeout 30 cargo fuzz run settlement_intent_validation --release --fuzz-dir pallets/x3-settlement-engine/fuzz || true
+          RUSTFLAGS="-Zsanitizer=memory" cargo +nightly build -p pallet-x3-atomic-kernel --lib --target x86_64-unknown-linux-gnu || true
+          RUSTFLAGS="-Zsanitizer=memory" cargo +nightly build -p pallet-x3-dex --lib --target x86_64-unknown-linux-gnu || true
+          RUSTFLAGS="-Zsanitizer=memory" cargo +nightly build -p pallet-x3-oracle --lib --target x86_64-unknown-linux-gnu || true
         continue-on-error: true
 
   # Multi-process consensus validator harness testing equivocation detection
@@ -333,6 +397,24 @@ jobs:
 
           # Generate checksums
           sha256sum target/release/x3-chain-node > target/release/x3-chain-node.sha256
+
+  pallet-security-audit:
+    name: Pallet-Specific Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.20.0
+      - name: Run security audit on all pallets
+        run: |
+          # Audit each pallet individually for better granularity
+          for pallet_dir in pallets/*/; do
+            if [ -f "${pallet_dir}Cargo.toml" ]; then
+              echo "Auditing ${pallet_dir}..."
+              (cd "${pallet_dir}" && cargo audit --format json || echo "Audit completed for ${pallet_dir}")
+            fi
+          done
+        continue-on-error: true
 
   sbom-generation:
     name: Generate SBOM

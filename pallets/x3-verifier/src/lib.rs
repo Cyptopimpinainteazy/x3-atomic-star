@@ -103,7 +103,7 @@ pub mod pallet {
 
     /// Execution receipt from swarm node
     #[allow(clippy::type_complexity)]
-    #[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub struct ExecutionReceipt<T: Config> {
         /// Unique job identifier
@@ -180,7 +180,7 @@ pub mod pallet {
     impl<T: Config> Eq for ExecutionReceipt<T> {}
 
     /// Job status
-    #[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
     pub enum JobStatus {
         #[default]
         Pending,
@@ -192,7 +192,7 @@ pub mod pallet {
     }
 
     /// Job record
-    #[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
     #[scale_info(skip_type_params(T))]
     pub struct JobRecord<T: Config> {
         /// Job submitter
@@ -216,7 +216,7 @@ pub mod pallet {
     }
 
     /// Registered executor
-    #[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
     #[scale_info(skip_type_params(T))]
     pub struct ExecutorRecord<T: Config> {
         /// Executor account

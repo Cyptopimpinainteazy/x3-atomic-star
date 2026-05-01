@@ -42,3 +42,27 @@ impl From<config::ConfigError> for IndexerError {
         IndexerError::Config(e.to_string())
     }
 }
+
+impl From<subxt::error::OnlineClientAtBlockError> for IndexerError {
+    fn from(e: subxt::error::OnlineClientAtBlockError) -> Self {
+        IndexerError::Connection(e.to_string())
+    }
+}
+
+impl From<subxt::error::BlocksError> for IndexerError {
+    fn from(e: subxt::error::BlocksError) -> Self {
+        IndexerError::Connection(e.to_string())
+    }
+}
+
+impl From<subxt::error::EventsError> for IndexerError {
+    fn from(e: subxt::error::EventsError) -> Self {
+        IndexerError::Decode(e.to_string())
+    }
+}
+
+impl From<subxt::error::ExtrinsicError> for IndexerError {
+    fn from(e: subxt::error::ExtrinsicError) -> Self {
+        IndexerError::Decode(e.to_string())
+    }
+}

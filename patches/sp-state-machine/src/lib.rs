@@ -312,7 +312,7 @@ mod execution {
 
 			let result = self
 				.exec
-				.call(&mut ext, self.runtime_code, self.method, self.call_data, false, self.context)
+				.call(&mut ext, self.runtime_code, self.method, self.call_data, self.context)
 				.0;
 
 			self.overlay
@@ -1477,7 +1477,7 @@ mod tests {
 
 	#[test]
 	fn remove_with_append_then_rollback_appended_then_append_again() {
-		#[derive(codec::Encode, codec::Decode)]
+		#[derive(codec::Encode, codec::Decode, DecodeWithMemTracking)]
 		enum Item {
 			InitializationItem,
 			DiscardedItem,

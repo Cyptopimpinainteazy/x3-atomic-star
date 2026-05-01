@@ -72,6 +72,12 @@ impl Borrow<str> for ProtocolName {
 	}
 }
 
+impl AsRef<str> for ProtocolName {
+	fn as_ref(&self) -> &str {
+		self
+	}
+}
+
 impl PartialEq for ProtocolName {
 	fn eq(&self, other: &Self) -> bool {
 		(self as &str) == (other as &str)

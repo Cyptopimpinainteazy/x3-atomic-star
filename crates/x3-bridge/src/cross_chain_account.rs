@@ -4,7 +4,7 @@ use parity_scale_codec::{Decode, Encode};
 use sp_core::{ed25519, sr25519};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct CrossChainAccount {
     pub account_id: [u8; 32],
     pub master_key: [u8; 32],
@@ -16,7 +16,7 @@ pub struct CrossChainAccount {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct DerivedAddress {
     pub chain_type: ChainType,
     pub address: Vec<u8>,
@@ -24,7 +24,7 @@ pub struct DerivedAddress {
     pub balance: String, // Stored as string for arbitrary precision
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum ChainType {
     X3,
     Ethereum,
@@ -33,7 +33,7 @@ pub enum ChainType {
     Bitcoin,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MultiChainSignature {
     pub signer: [u8; 32],
     pub message_hash: [u8; 32],
@@ -42,7 +42,7 @@ pub struct MultiChainSignature {
     pub nonce: u32,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct KeyRotationProposal {
     pub proposal_id: [u8; 32],
     pub account_id: [u8; 32],
@@ -54,7 +54,7 @@ pub struct KeyRotationProposal {
     pub status: ProposalStatus,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum ProposalStatus {
     Pending,
     Approved,

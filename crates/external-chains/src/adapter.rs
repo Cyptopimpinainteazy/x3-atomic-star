@@ -13,7 +13,7 @@ use sp_std::vec::Vec;
 pub type AdapterResult<T> = Result<T, ExternalChainError>;
 
 /// Chain configuration for external adapters
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ChainConfig {
     /// Chain type
     pub chain_type: u64, // Store as u64 for SCALE compatibility
@@ -156,7 +156,7 @@ impl ChainConfig {
 }
 
 /// Cross-chain message format
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ChainMessage {
     /// Source chain ID
     pub source_chain: u64,
@@ -210,7 +210,7 @@ impl ChainMessage {
 }
 
 /// Cross-chain transfer request
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct CrossChainTransfer {
     /// Transfer ID
     pub id: H256,
@@ -239,7 +239,7 @@ pub struct CrossChainTransfer {
 }
 
 /// Transfer status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum TransferStatus {
     /// Initiated on source chain
     Initiated,
@@ -314,7 +314,7 @@ pub trait ChainAdapter: Send + Sync {
 }
 
 /// Transaction receipt from external chain
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct TransactionReceipt {
     /// Transaction hash
     pub tx_hash: H256,
@@ -333,7 +333,7 @@ pub struct TransactionReceipt {
 }
 
 /// Log entry from transaction
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct LogEntry {
     /// Contract address
     pub address: H160,

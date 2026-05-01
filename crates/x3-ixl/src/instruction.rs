@@ -5,7 +5,7 @@
 //! against an `ExecutionContext`.
 
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 
@@ -33,7 +33,7 @@ pub type AccountAddr = [u8; 32];
 
 /// Errors raised during planning or execution.  Every variant maps cleanly
 /// onto a rollback action.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum IxlError {
     /// Bundle exceeded the configured maximum number of instructions.
     BundleTooLong,
@@ -56,7 +56,7 @@ pub enum IxlError {
 }
 
 /// One IXL instruction.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum Instruction {
     /// Move `amount` of `asset` from `payer` into router custody slot
     /// `slot_id`.  The custody slot is the unit of accounting the planner
@@ -117,7 +117,7 @@ impl Instruction {
 /// A bundle is just a vector of instructions plus the bundle-level salt that
 /// the planner uses to derive deterministic slot ids when callers do not
 /// pre-assign them.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct Bundle {
     pub salt: H256,
     pub instructions: Vec<Instruction>,

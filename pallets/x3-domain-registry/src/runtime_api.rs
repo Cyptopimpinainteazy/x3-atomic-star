@@ -14,7 +14,7 @@ use sp_std::vec::Vec;
 /// - CNAME = 5
 /// - TXT = 16
 /// - AAAA = 28
-#[derive(Clone, Copy, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum X3RecordType {
     A,
@@ -35,7 +35,7 @@ impl X3RecordType {
 }
 
 /// A single DNS record entry for runtime API responses.
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct X3DnsRecordResponse {
     /// IANA RR type code (e.g. 1, 5, 16, 28).
@@ -52,7 +52,7 @@ pub struct X3DnsRecordResponse {
 }
 
 /// Domain snapshot for runtime API responses.
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct X3DomainResponse<AccountId> {
     pub domain: Vec<u8>,

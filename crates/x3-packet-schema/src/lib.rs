@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crc32fast::Hasher;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::prelude::vec::Vec;
 use scale_info::TypeInfo;
 
@@ -16,7 +16,7 @@ pub use svm::{SvmAccount, SvmDeployMetadata, SvmPacket};
 pub use x3vm::{X3Condition, X3VmPacket};
 
 /// Top-level packet wrapper for router dispatch
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum Packet {
     Evm(EvmPacket),
     Svm(SvmPacket),

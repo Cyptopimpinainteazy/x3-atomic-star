@@ -1,8 +1,8 @@
 /// Concentrated Liquidity — Uniswap V3 model with capital efficiency
 /// LPs set custom price ranges for 10-100x capital efficiency vs basic AMM
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ConcentratedPosition {
     pub id: [u8; 32],
     pub lp: [u8; 32],
@@ -18,7 +18,7 @@ pub struct ConcentratedPosition {
     pub created_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TickLiquidity {
     pub tick: i32,
     pub liquidity_gross: u128,
@@ -28,7 +28,7 @@ pub struct TickLiquidity {
     pub initialized: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ConcentratedPool {
     pub pool_id: [u8; 32],
     pub token0: u128,
@@ -41,7 +41,7 @@ pub struct ConcentratedPool {
     pub fee_growth_global1: u128,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FeeAccrual {
     pub position_id: [u8; 32],
     pub fee0_unclaimed: u64,

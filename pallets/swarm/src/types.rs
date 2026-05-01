@@ -1,6 +1,6 @@
 //! Types for the Swarm pallet.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;
@@ -20,7 +20,7 @@ pub type TaskId = H256;
 pub type SessionId = H256;
 
 /// Contributor status on-chain.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
 pub enum ContributorStatus {
     /// Active and accepting tasks.
     #[default]
@@ -34,7 +34,18 @@ pub enum ContributorStatus {
 }
 
 /// GPU capability descriptor stored on-chain.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub struct GpuCapabilities {
     /// VRAM in megabytes.
     pub vram_mb: u32,
@@ -47,7 +58,7 @@ pub struct GpuCapabilities {
 }
 
 /// A registered swarm contributor.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct Contributor<AccountId, Balance, BlockNumber> {
     /// On-chain contributor ID.
     pub id: ContributorId,
@@ -87,6 +98,7 @@ pub struct Contributor<AccountId, Balance, BlockNumber> {
     Eq,
     Encode,
     Decode,
+    DecodeWithMemTracking,
     TypeInfo,
     MaxEncodedLen,
     Debug,
@@ -103,7 +115,19 @@ pub enum TaskPriority {
 }
 
 /// Type of compute workload.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub enum WorkloadType {
     /// X3 bytecode execution.
     #[default]
@@ -123,7 +147,7 @@ pub enum WorkloadType {
 }
 
 /// On-chain task status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
 pub enum TaskStatus {
     /// Waiting for a contributor to claim.
     #[default]
@@ -143,7 +167,7 @@ pub enum TaskStatus {
 }
 
 /// A compute task submitted on-chain.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct SwarmTask<AccountId, Balance, BlockNumber> {
     /// Task identifier (hash).
     pub id: TaskId,
@@ -180,7 +204,7 @@ pub struct SwarmTask<AccountId, Balance, BlockNumber> {
 // ============================================================================
 
 /// A submitted task result.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct TaskResult<AccountId, BlockNumber> {
     /// The task this result is for.
     pub task_id: TaskId,
@@ -197,7 +221,7 @@ pub struct TaskResult<AccountId, BlockNumber> {
 }
 
 /// Jury vote commitment (commit-reveal scheme).
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct VoteCommitment<AccountId, BlockNumber> {
     /// Voter account.
     pub voter: AccountId,
@@ -208,7 +232,7 @@ pub struct VoteCommitment<AccountId, BlockNumber> {
 }
 
 /// Revealed jury vote.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct VoteReveal<AccountId, BlockNumber> {
     /// Voter account.
     pub voter: AccountId,
@@ -221,7 +245,7 @@ pub struct VoteReveal<AccountId, BlockNumber> {
 }
 
 /// Jury verification session.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct JurySession<BlockNumber> {
     /// Session identifier.
     pub id: SessionId,
@@ -246,7 +270,7 @@ pub struct JurySession<BlockNumber> {
 }
 
 /// Phase of a jury session.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
 pub enum JuryPhase {
     /// Accepting vote commitments.
     #[default]
@@ -258,7 +282,7 @@ pub enum JuryPhase {
 }
 
 /// Swarm configuration parameters.
-#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct SwarmConfig<Balance, BlockNumber> {
     /// Minimum stake to register as contributor.
     pub min_stake: Balance,
@@ -283,7 +307,7 @@ pub struct SwarmConfig<Balance, BlockNumber> {
 }
 
 /// Swarm statistics for runtime API.
-#[derive(Clone, Encode, Decode, TypeInfo, Debug)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 pub struct SwarmStats {
     pub total_contributors: u32,
     pub active_contributors: u32,

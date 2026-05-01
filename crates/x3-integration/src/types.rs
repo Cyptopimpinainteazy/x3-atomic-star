@@ -8,7 +8,7 @@ use scale_info::TypeInfo;
 use sp_core::H256;
 
 /// Execution receipt from X3 VM
-#[derive(Clone, Debug, Default, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
 pub struct X3ExecutionReceipt {
     /// Whether execution succeeded
     pub success: bool,
@@ -27,7 +27,7 @@ pub struct X3ExecutionReceipt {
 }
 
 /// Log entry from X3 execution
-#[derive(Clone, Debug, Default, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
 pub struct X3ExecutionLog {
     /// Log topic (event identifier)
     pub topic: H256,
@@ -36,7 +36,7 @@ pub struct X3ExecutionLog {
 }
 
 /// State change from X3 execution
-#[derive(Clone, Debug, Default, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
 pub struct X3StateChange {
     /// Storage key (32 bytes)
     pub key: H256,
@@ -47,7 +47,7 @@ pub struct X3StateChange {
 }
 
 /// X3 module metadata for on-chain storage
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
 pub struct X3ModuleInfo {
     /// Module hash (blake2_256 of bytecode)
     pub code_hash: H256,
@@ -66,7 +66,7 @@ pub struct X3ModuleInfo {
 }
 
 /// Arguments for X3 function call
-#[derive(Clone, Debug, Encode, Decode, TypeInfo, PartialEq)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq)]
 pub enum X3Value {
     /// 64-bit signed integer
     I64(i64),
@@ -130,7 +130,7 @@ impl X3Value {
 }
 
 /// Gas cost configuration for X3 operations
-#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct X3GasConfig {
     /// Base cost per instruction
     pub instruction_base: u64,

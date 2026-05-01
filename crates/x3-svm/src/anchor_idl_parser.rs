@@ -4,7 +4,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AnchorIDL {
     pub version: Vec<u8>,
     pub name: Vec<u8>,
@@ -15,7 +15,7 @@ pub struct AnchorIDL {
     pub errors: Vec<ErrorDef>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct InstructionDef {
     pub name: Vec<u8>,
     pub docs: Option<Vec<u8>>,
@@ -24,7 +24,7 @@ pub struct InstructionDef {
     pub args: Vec<ArgumentDef>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AccountInput {
     pub name: Vec<u8>,
     pub is_signer: bool,
@@ -32,46 +32,46 @@ pub struct AccountInput {
     pub is_optional: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ArgumentDef {
     pub name: Vec<u8>,
     pub arg_type: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AccountDef {
     pub name: Vec<u8>,
     pub fields: Vec<FieldDef>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FieldDef {
     pub name: Vec<u8>,
     pub field_type: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TypeDef {
     pub name: Vec<u8>,
     pub kind: Vec<u8>,
     pub fields: Vec<FieldDef>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct EventDef {
     pub name: Vec<u8>,
     pub discriminator: [u8; 8],
     pub fields: Vec<FieldDef>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ErrorDef {
     pub code: u32,
     pub name: Vec<u8>,
     pub msg: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct GeneratedCode {
     pub module_name: Vec<u8>,
     pub instruction_handlers: Vec<Vec<u8>>,

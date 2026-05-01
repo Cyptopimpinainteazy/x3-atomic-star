@@ -932,8 +932,8 @@ where
 
 		if let Some(notifications_sizes_metric) = self.notifications_sizes_metric.as_ref() {
 			notifications_sizes_metric
-				.with_label_values(&["out", &protocol])
-				.observe(message.len() as f64);
+					.with_label_values(&["out", &*protocol])
+					.observe(message.len() as f64);
 		}
 
 		// Sending is communicated to the `NotificationsSink`.
@@ -965,7 +965,7 @@ where
 		let notification_size_metric = self
 			.notifications_sizes_metric
 			.as_ref()
-			.map(|histogram| histogram.with_label_values(&["out", &protocol]));
+			.map(|histogram| histogram.with_label_values(&["out", &*protocol]));
 
 		Ok(Box::new(NotificationSender { sink, protocol_name: protocol, notification_size_metric }))
 	}
@@ -1327,7 +1327,7 @@ where
 						Ok(serve_time) => {
 							metrics
 								.requests_in_success_total
-								.with_label_values(&[&protocol])
+								.with_label_values(&[&*protocol])
 								.observe(serve_time.as_secs_f64());
 						},
 						Err(err) => {
@@ -1349,7 +1349,7 @@ where
 							if let Some(reason) = reason {
 								metrics
 									.requests_in_failure_total
-									.with_label_values(&[&protocol, reason])
+									.with_label_values(&[&*protocol, reason])
 									.inc();
 							}
 						},
@@ -1367,7 +1367,7 @@ where
 						Ok(_) => {
 							metrics
 								.requests_out_success_total
-								.with_label_values(&[&protocol])
+								.with_label_values(&[&*protocol])
 								.observe(duration.as_secs_f64());
 						},
 						Err(err) => {
@@ -1387,7 +1387,7 @@ where
 
 							metrics
 								.requests_out_failure_total
-								.with_label_values(&[&protocol, reason])
+								.with_label_values(&[&*protocol, reason])
 								.inc();
 						},
 					}
@@ -1438,7 +1438,7 @@ where
 				if let Some(metrics) = self.metrics.as_ref() {
 					metrics
 						.notifications_streams_opened_total
-						.with_label_values(&[&protocol])
+						.with_label_values(&[&*protocol])
 						.inc();
 				}
 				{
@@ -1512,7 +1512,7 @@ where
 					for (protocol, message) in &messages {
 						metrics
 							.notifications_sizes
-							.with_label_values(&["in", protocol])
+							.with_label_values(&["in", &*protocol])
 							.observe(message.len() as f64);
 					}
 				}

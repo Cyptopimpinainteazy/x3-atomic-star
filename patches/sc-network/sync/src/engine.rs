@@ -27,7 +27,7 @@ use crate::{
 use codec::{Decode, Encode};
 use futures::{FutureExt, StreamExt};
 use futures_timer::Delay;
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use prometheus_endpoint::{
 	register, Gauge, GaugeVec, MetricSource, Opts, PrometheusError, Registry, SourcedGauge, U64,
 };

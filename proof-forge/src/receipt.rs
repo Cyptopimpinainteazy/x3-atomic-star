@@ -376,22 +376,6 @@ pub enum ReceiptStatus {
     Invalid,         // Failed to load or parse
 }
 
-impl ReceiptStatus {
-    pub fn is_valid(&self) -> bool {
-        matches!(self, ReceiptStatus::Fresh | ReceiptStatus::NotFresh)
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ReceiptStatus::Fresh => "FRESH",
-            ReceiptStatus::NotFresh => "NOT_FRESH",
-            ReceiptStatus::Stale => "STALE",
-            ReceiptStatus::IntegrityFailed => "INTEGRITY_FAILED",
-            ReceiptStatus::Invalid => "INVALID",
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

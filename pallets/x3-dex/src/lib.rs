@@ -12,6 +12,12 @@ pub use pallet::*;
 mod mock;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_amm_math;
+#[cfg(test)]
+mod tests_liquidity_provision;
+#[cfg(test)]
+mod tests_swapping;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 

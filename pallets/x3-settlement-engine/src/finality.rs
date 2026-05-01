@@ -11,7 +11,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 /// Chain finality status
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ChainStatus {
     /// Chain identifier
     pub chain: ExternalChainId,
@@ -199,7 +199,7 @@ impl FinalityOracle {
 }
 
 /// Settlement urgency level
-#[derive(Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
 pub enum Urgency {
     /// Accept minimal confirmations (risky)
     Immediate,
@@ -210,7 +210,7 @@ pub enum Urgency {
 }
 
 /// Light client header for X3 verification
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct LightClientHeader {
     /// Chain this header is from
     pub chain: ExternalChainId,
@@ -229,7 +229,7 @@ pub struct LightClientHeader {
 }
 
 /// Reorg detector
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ReorgDetector {
     /// Chain being monitored
     pub chain: ExternalChainId,

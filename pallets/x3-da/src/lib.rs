@@ -100,7 +100,7 @@ pub mod pallet {
     // ── Types ──────────────────────────────────────────────────────────────
 
     /// On-chain commitment for a data blob.
-    #[derive(Debug, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     #[scale_info(skip_type_params(T))]
     pub struct BlobCommitment<T: Config> {
         /// Blob identifier.
@@ -124,7 +124,7 @@ pub mod pallet {
     }
 
     /// A shard availability proof from a validator/archival node.
-    #[derive(Debug, Clone, Encode, Decode, MaxEncodedLen, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
     #[scale_info(skip_type_params(T))]
     pub struct ShardProof<T: Config> {
         /// Shard index within the erasure-coded blob.

@@ -5,7 +5,8 @@
 
 pub mod types;
 
-use crate::types::*;
+use parity_scale_codec::{Decode, Encode};
+use sp_core::crypto::Pair as PairCrypto;
 use sp_std::vec::Vec;
 
 /// Post-quantum cryptography manager
@@ -174,7 +175,8 @@ pub struct HybridSigner {
 impl HybridSigner {
     /// Create hybrid signer
     pub fn new(pq_scheme: PQScheme) -> Result<Self, PQError> {
-        let classical_key = sp_core::sr25519::Pair::generate();
+        let classical_key = sp_core::sr25519::Pair::from_string("//Alice", None)
+            .map_err(|_| PQError::KeyGenerationFailed)?;
         let pq_manager = PQManager::new(pq_scheme)?;
 
         Ok(Self {
@@ -185,7 +187,7 @@ impl HybridSigner {
 
     /// Sign with both classical and PQ algorithms
     pub fn sign_hybrid(&self, message: &[u8]) -> Result<HybridSignature, PQError> {
-        let classical_sig = self.classical_key.sign(message);
+        let classical_sig = <sp_core::sr25519::Pair as PairCrypto>::sign(&self.classical_key, message);
         let pq_sig = self.pq_manager.sign(message)?;
 
         Ok(HybridSignature {
@@ -203,8 +205,7 @@ impl HybridSigner {
         pq_pk: &PQPublicKey,
     ) -> Result<bool, PQError> {
         // Verify classical signature
-        let classical_valid = sp_core::sr25519::Signature::from_raw(signature.classical.0)
-            .verify(message, classical_pk);
+        let classical_valid = <sp_core::sr25519::Pair as PairCrypto>::verify(&signature.classical, message, classical_pk);
 
         // Verify PQ signature
         let pq_valid = self.pq_manager.verify(message, &signature.post_quantum, pq_pk)?;
@@ -348,7 +349,7 @@ pub struct PQKeyPair {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PQPublicKey(pub Vec<u8>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PQPrivateKey(pub Vec<u8>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]

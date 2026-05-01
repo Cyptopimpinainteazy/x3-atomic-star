@@ -1,9 +1,9 @@
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::prelude::vec::Vec;
 use scale_info::TypeInfo;
 
 /// U256 type for Ethereum
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 #[repr(transparent)]
 pub struct U256(pub [u8; 32]);
 
@@ -26,7 +26,7 @@ impl Default for U256 {
 }
 
 /// EVM contract call target
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmCall {
     /// Contract address (20 bytes)
     pub contract: [u8; 20],
@@ -39,7 +39,7 @@ pub struct EvmCall {
 }
 
 /// EVM packet variants
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum EvmPacket {
     /// Call smart contract
     Call {

@@ -1,9 +1,9 @@
 /// Arbitrage Bot Event System — WebSocket-based event streaming for MEV opportunities
 /// Enables bots to subscribe to detected arbitrage opportunities and capture discrepancies
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ArbOpportunity {
     pub opportunity_id: [u8; 32],
     pub pool_a: [u8; 32],
@@ -21,7 +21,7 @@ pub struct ArbOpportunity {
     pub expires_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BotSubscription {
     pub subscription_id: [u8; 32],
     pub bot_id: [u8; 32],
@@ -31,7 +31,7 @@ pub struct BotSubscription {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ExecutedArb {
     pub execution_id: [u8; 32],
     pub opportunity_id: [u8; 32],
@@ -45,7 +45,7 @@ pub struct ExecutedArb {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BotPerformance {
     pub bot_id: [u8; 32],
     pub total_executions: u64,

@@ -49,11 +49,25 @@ pub async fn verify_claim(
         "asset-kernel" => asset_kernel::verify_claim(workspace, claim_id, verbose).await?,
         "atomic" => atomic::verify_claim(workspace, claim_id, verbose).await?,
         "bridge" => bridge::verify_claim(workspace, claim_id, verbose).await?,
+        "bug-bounty" => bug_bounty::verify_claim(workspace, claim_id, verbose).await?,
         "consensus" => consensus::verify_claim(workspace, claim_id, verbose).await?,
+        "custody" => custody::verify_claim(workspace, claim_id, verbose).await?,
+        "ecosystem-quality" => {
+            ecosystem_quality::verify_claim(workspace, claim_id, verbose).await?
+        }
+        "formal-proofs" => formal_proofs::verify_claim(workspace, claim_id, verbose).await?,
         "gpu" => gpu::verify_claim(workspace, claim_id, verbose).await?,
+        "incident-response" => {
+            incident_response::verify_claim(workspace, claim_id, verbose).await?
+        }
+        "launchpad" => launchpad::verify_claim(workspace, claim_id, verbose).await?,
         "runtime" => runtime::verify_claim(workspace, claim_id, verbose).await?,
         "governance" => governance::verify_claim(workspace, claim_id, verbose).await?,
+        "social-consensus" => {
+            social_consensus::verify_claim(workspace, claim_id, verbose).await?
+        }
         "treasury" => treasury::verify_claim(workspace, claim_id, verbose).await?,
+        "upgrade-safety" => upgrade_safety::verify_claim(workspace, claim_id, verbose).await?,
         "dex" => dex::verify_claim(workspace, claim_id, verbose).await?,
         "oracle" => oracle::verify_claim(workspace, claim_id, verbose).await?,
         "x3vm" => x3vm::verify_claim(workspace, claim_id, verbose).await?,
@@ -61,7 +75,7 @@ pub async fn verify_claim(
         "flashloans" => flashloans::verify_claim(workspace, claim_id, verbose).await?,
         "cross-vm" => cross_vm::verify_claim(workspace, claim_id, verbose).await?,
         "smart-contracts" => smart_contracts::verify_claim(workspace, claim_id, verbose).await?,
-        "onboarding" | "funding" | "evolution" => {
+        "onboarding" | "funding" | "evolution" | "observability" => {
             operational::verify_claim(workspace, claim_id, verbose).await?
         }
         "proofforge" => verify_proofforge_claim(claim_id)?,
@@ -156,6 +170,12 @@ fn normalize_area(area: &str) -> String {
         "flashloan" | "flashloans" => "flashloans".to_string(),
         "cross_vm" | "cross-vm" | "crossvm" => "cross-vm".to_string(),
         "contracts" | "smart_contracts" | "smart-contracts" => "smart-contracts".to_string(),
+        "bug_bounty" | "bug-bounty" => "bug-bounty".to_string(),
+        "formal" | "formal_proofs" | "formal-proofs" => "formal-proofs".to_string(),
+        "incident_response" | "incident-response" => "incident-response".to_string(),
+        "social_consensus" | "social-consensus" => "social-consensus".to_string(),
+        "upgrade_safety" | "upgrade-safety" => "upgrade-safety".to_string(),
+        "ecosystem_quality" | "ecosystem-quality" => "ecosystem-quality".to_string(),
         "gpu" | "gpu_validator" => "gpu".to_string(),
         "atomic" | "atomic_kernel" => "atomic".to_string(),
         other => other.to_string(),
@@ -340,18 +360,8 @@ pub async fn prove_area(
 
     println!("{}", format!("Proving area: {}", area).bold().cyan());
 
-    let result = match area {
-        "asset-kernel" => asset_kernel::run_proofs(workspace, verbose).await?,
-        "bridge" => bridge::run_proofs(workspace, verbose).await?,
-        "consensus" => consensus::run_proofs(workspace, verbose).await?,
-        "runtime" => runtime::run_proofs(workspace, verbose).await?,
-        "governance" => governance::run_proofs(workspace, verbose).await?,
-        "treasury" => treasury::run_proofs(workspace, verbose).await?,
-        "dex" => dex::run_proofs(workspace, verbose).await?,
-        "oracle" => oracle::run_proofs(workspace, verbose).await?,
-        "x3vm" => x3vm::run_proofs(workspace, verbose).await?,
-        _ => return Err(anyhow::anyhow!("Unknown area: {}", area)),
-    };
+    let normalized = normalize_area(area);
+    let result = run_area_proofs(workspace, &normalized, verbose).await?;
 
     print_proof_summary(&result);
 
@@ -366,7 +376,7 @@ pub async fn prove_all(
     workspace: &Path,
     strict: bool,
     dry_run: bool,
-    _parallel: bool,
+    parallel: bool,
     verbose: bool,
 ) -> Result<()> {
     if dry_run {
@@ -378,39 +388,64 @@ pub async fn prove_all(
 
     let areas = vec![
         "asset-kernel",
+        "atomic",
         "bridge",
         "consensus",
+        "cross-vm",
+        "custody",
         "runtime",
         "governance",
         "treasury",
         "dex",
         "oracle",
+        "smart-contracts",
+        "flashloans",
+        "x3language",
         "x3vm",
+        "gpu",
+        "ecosystem-quality",
+        "incident-response",
+        "launchpad",
+        "social-consensus",
+        "upgrade-safety",
+        "formal-proofs",
+        "bug-bounty",
     ];
 
     let mut results = vec![];
+
+    if parallel {
+        let mut join_set = tokio::task::JoinSet::new();
+        let workspace = workspace.to_path_buf();
+        for area in areas {
+            let ws = workspace.clone();
+            let area_owned = area.to_string();
+            join_set.spawn(async move {
+                let result = run_area_proofs(&ws, &area_owned, verbose).await;
+                (area_owned, result)
+            });
+        }
+
+        while let Some(joined) = join_set.join_next().await {
+            let (area, result) =
+                joined.map_err(|e| anyhow::anyhow!("parallel prove task failed for {area}: {e}", area = "unknown"))?;
+            let resolved = result.map_err(|e| anyhow::anyhow!("area '{}' failed: {}", area, e))?;
+            results.push(resolved);
+        }
+    } else {
+        for area in areas {
+            let result = run_area_proofs(workspace, area, verbose).await?;
+            results.push(result);
+        }
+    }
+
     let mut total_score = 0.0;
     let mut blocked_count = 0;
-
-    for area in areas {
-        let result = match area {
-            "asset-kernel" => asset_kernel::run_proofs(workspace, verbose).await?,
-            "bridge" => bridge::run_proofs(workspace, verbose).await?,
-            "consensus" => consensus::run_proofs(workspace, verbose).await?,
-            "runtime" => runtime::run_proofs(workspace, verbose).await?,
-            "governance" => governance::run_proofs(workspace, verbose).await?,
-            "treasury" => treasury::run_proofs(workspace, verbose).await?,
-            "dex" => dex::run_proofs(workspace, verbose).await?,
-            "oracle" => oracle::run_proofs(workspace, verbose).await?,
-            "x3vm" => x3vm::run_proofs(workspace, verbose).await?,
-            _ => continue,
-        };
-
+    for result in &results {
+        total_score += result.score;
         if result.status.is_blocking() {
             blocked_count += 1;
         }
-        total_score += result.score;
-        results.push(result);
     }
 
     let avg_score = if !results.is_empty() {
@@ -439,6 +474,35 @@ pub async fn prove_all(
     }
 
     Ok(())
+}
+
+async fn run_area_proofs(workspace: &Path, area: &str, verbose: bool) -> Result<ProofResult> {
+    match area {
+        "asset-kernel" => asset_kernel::run_proofs(workspace, verbose).await,
+        "atomic" => atomic::run_proofs(workspace, verbose).await,
+        "bridge" => bridge::run_proofs(workspace, verbose).await,
+        "bug-bounty" => bug_bounty::run_proofs(workspace, verbose).await,
+        "consensus" => consensus::run_proofs(workspace, verbose).await,
+        "cross-vm" => cross_vm::run_proofs(workspace, verbose).await,
+        "custody" => custody::run_proofs(workspace, verbose).await,
+        "dex" => dex::run_proofs(workspace, verbose).await,
+        "ecosystem-quality" => ecosystem_quality::run_proofs(workspace, verbose).await,
+        "flashloans" => flashloans::run_proofs(workspace, verbose).await,
+        "formal-proofs" => formal_proofs::run_proofs(workspace, verbose).await,
+        "governance" => governance::run_proofs(workspace, verbose).await,
+        "gpu" => gpu::run_proofs(workspace, verbose).await,
+        "incident-response" => incident_response::run_proofs(workspace, verbose).await,
+        "launchpad" => launchpad::run_proofs(workspace, verbose).await,
+        "oracle" => oracle::run_proofs(workspace, verbose).await,
+        "runtime" => runtime::run_proofs(workspace, verbose).await,
+        "smart-contracts" => smart_contracts::run_proofs(workspace, verbose).await,
+        "social-consensus" => social_consensus::run_proofs(workspace, verbose).await,
+        "treasury" => treasury::run_proofs(workspace, verbose).await,
+        "upgrade-safety" => upgrade_safety::run_proofs(workspace, verbose).await,
+        "x3language" => x3language::run_proofs(workspace, verbose).await,
+        "x3vm" => x3vm::run_proofs(workspace, verbose).await,
+        _ => Err(anyhow::anyhow!("Unknown area: {}", area)),
+    }
 }
 
 /// Grep `root` directory recursively for `pattern`, returning true if found.

@@ -1,9 +1,9 @@
 /// LP Position NFT Engine — Mint liquidity provider positions as tradeable NFTs
 /// Enables LP position ownership transfer, collateralization, and secondary market trading
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LPPositionNFT {
     pub nft_id: [u8; 32],
     pub position_id: [u8; 32],
@@ -20,7 +20,7 @@ pub struct LPPositionNFT {
     pub accumulated_fees: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct NFTMetadata {
     pub nft_id: [u8; 32],
     pub name: Vec<u8>,
@@ -29,7 +29,7 @@ pub struct NFTMetadata {
     pub attributes: Vec<(Vec<u8>, Vec<u8>)>, // key-value pairs
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct NFTTransfer {
     pub nft_id: [u8; 32],
     pub from: [u8; 32],
@@ -39,7 +39,7 @@ pub struct NFTTransfer {
     pub transfer_hash: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct NFTListing {
     pub listing_id: [u8; 32],
     pub nft_id: [u8; 32],
@@ -49,7 +49,7 @@ pub struct NFTListing {
     pub created_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct NFTCollateral {
     pub collateral_id: [u8; 32],
     pub nft_id: [u8; 32],
@@ -61,7 +61,7 @@ pub struct NFTCollateral {
     pub is_liquidated: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct NFTRoyalty {
     pub nft_id: [u8; 32],
     pub creator: [u8; 32],

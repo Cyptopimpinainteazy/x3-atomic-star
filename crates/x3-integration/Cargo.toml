@@ -18,11 +18,11 @@ x3-evm-integration = { path = "../evm-integration", default-features = false }
 x3-svm-integration = { path = "../svm-integration", default-features = false }
 
 # Substrate primitives
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-runtime = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-sp-io = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
-frame-support = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
 
 # Encoding
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }

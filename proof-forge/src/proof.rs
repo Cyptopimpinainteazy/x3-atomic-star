@@ -1,3 +1,5 @@
+#![allow(dead_code)] // intentional proof model scaffold; tracked in readiness backlog
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

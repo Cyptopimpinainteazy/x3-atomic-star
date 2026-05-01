@@ -1,0 +1,55 @@
+{
+  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "command_run": "x3-proof verify x3.treasury.full_proof",
+  "artifact_hash": "8df01c471004fa56c490fa7b99f0a20b2aef24664d2f140f06484eebc327dcab",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "pallets/treasury/Cargo.toml",
+    "pallets/treasury/src/lib.rs",
+    "proof/funding/milestone-receipt-map.yml",
+    "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json"
+  ],
+  "timestamp": "2026-04-30T19:15:40.694725473Z",
+  "result": {
+    "claim_id": "x3.treasury.full_proof",
+    "claim": "Treasury and funding receipt artifacts are present",
+    "status": "partial",
+    "proof_level": "P5",
+    "edge_case_level": "E6",
+    "hack_level": "H7",
+    "operator_level": "I6",
+    "degraded_level": "D5",
+    "files_inspected": [
+      "pallets/treasury/Cargo.toml",
+      "pallets/treasury/src/lib.rs",
+      "proof/funding/milestone-receipt-map.yml",
+      "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json"
+    ],
+    "commands_run": [
+      "cargo check -p pallet-treasury --quiet"
+    ],
+    "passed_checks": [
+      "Treasury pallet manifest exists",
+      "Treasury pallet implementation exists",
+      "Funding milestone-to-receipt map exists",
+      "Funding milestone receipt exists"
+    ],
+    "failed_checks": [
+      "Treasury executable check failed: warning: use of deprecated constant `pallet::RuntimeEvent::_w`: "
+    ],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.8,
+    "evidence": {
+      "treasury_check": "false",
+      "pallets/treasury/src/lib.rs": "true",
+      "proof/funding/milestone-receipt-map.yml": "true",
+      "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json": "true",
+      "pallets/treasury/Cargo.toml": "true"
+    },
+    "timestamp": "2026-04-30T19:15:40.689433339Z",
+    "duration_ms": 5080
+  },
+  "limitations": [],
+  "binding_hash": "83495a6b10ff745a525d5fddb7a3ca925a3ed61bb4e772ff0026881b421c13cd"
+}

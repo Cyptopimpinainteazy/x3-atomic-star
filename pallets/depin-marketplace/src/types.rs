@@ -4,7 +4,7 @@
 
 use frame_support::pallet_prelude::ConstU32;
 use frame_support::BoundedVec;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
@@ -14,12 +14,32 @@ pub const MAX_GPU_MODEL_LEN: u32 = 128;
 
 /// Unique identifier for a marketplace job (128-bit).
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+    Default,
 )]
 pub struct JobId(pub [u8; 16]);
 
 /// GPU specification advertised by a provider.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub struct GpuSpecification {
     /// GPU model name (e.g., "NVIDIA A100 80GB")
     pub model: BoundedVec<u8, ConstU32<MAX_GPU_MODEL_LEN>>,
@@ -38,7 +58,18 @@ pub struct GpuSpecification {
 }
 
 /// GPU tier classification.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum GpuTier {
     /// Consumer GPUs (RTX 30/40 series)
     Consumer,
@@ -49,7 +80,17 @@ pub enum GpuTier {
 }
 
 /// GPU requirements for a compute job.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub struct GpuRequirements {
     /// Minimum GPU tier
     pub min_tier: GpuTier,
@@ -64,7 +105,17 @@ pub struct GpuRequirements {
 }
 
 /// Type of DePIN compute job.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum DePinJobType {
     /// AI model inference
     AiInference {
@@ -105,7 +156,7 @@ pub enum DePinJobType {
 }
 
 /// Provider status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub enum ProviderStatus {
     /// Actively accepting jobs
     Active,
@@ -118,7 +169,18 @@ pub enum ProviderStatus {
 }
 
 /// Reason for job failure.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum JobFailureReason {
     /// Execution error in the workload
     ExecutionError,
@@ -135,7 +197,7 @@ pub enum JobFailureReason {
 }
 
 /// Job status within the marketplace.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub enum JobStatus {
     /// Waiting in order book for a provider
     Pending,
@@ -152,7 +214,7 @@ pub enum JobStatus {
 }
 
 /// Information about a registered provider.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct ProviderInfo<T: frame_system::Config> {
     /// Provider account
@@ -176,7 +238,7 @@ pub struct ProviderInfo<T: frame_system::Config> {
 }
 
 /// A pending order in the order book.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct Order<T: frame_system::Config> {
     /// Unique job ID
@@ -196,7 +258,7 @@ pub struct Order<T: frame_system::Config> {
 }
 
 /// An active marketplace job.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(T))]
 pub struct MarketplaceJob<T: frame_system::Config> {
     /// Unique ID

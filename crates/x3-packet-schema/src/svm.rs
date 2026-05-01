@@ -1,9 +1,9 @@
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::prelude::{string::String, vec::Vec};
 use scale_info::TypeInfo;
 
 /// SVM account metadata
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmAccount {
     pub pubkey: [u8; 32],
     pub is_writable: bool,
@@ -14,7 +14,7 @@ pub struct SvmAccount {
 }
 
 /// SVM deployment metadata
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmDeployMetadata {
     pub name: String,
     pub version: String,
@@ -22,7 +22,7 @@ pub struct SvmDeployMetadata {
 }
 
 /// SVM packet variants
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SvmPacket {
     /// Invoke program
     Invoke {

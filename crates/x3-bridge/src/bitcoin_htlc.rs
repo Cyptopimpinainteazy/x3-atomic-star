@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct HTLCContract {
     pub contract_id: [u8; 32],
     pub initiator: Vec<u8>,     // Bitcoin address
@@ -16,7 +16,7 @@ pub struct HTLCContract {
     pub created_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum HTLCState {
     Open,
     Redeemed,
@@ -24,19 +24,19 @@ pub enum HTLCState {
     Expired,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Preimage {
     pub value: Vec<u8>,
     pub length: u32,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BitcoinAddress {
     pub address_type: AddressType,
     pub bytes: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum AddressType {
     P2PKH,  // Pay to Public Key Hash
     P2SH,   // Pay to Script Hash
@@ -44,7 +44,7 @@ pub enum AddressType {
     P2TR,   // Pay to Taproot (SegWit v1)
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BitcoinTxProof {
     pub tx_hash: [u8; 32],
     pub merkle_proof: Vec<[u8; 32]>,

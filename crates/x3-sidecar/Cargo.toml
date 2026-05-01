@@ -38,12 +38,12 @@ rand = "0.8"
 hex = "0.4"
 
 # Storage
-rocksdb = { version = "0.21", optional = true }
+# rocksdb = { version = "0.24", optional = true } # TEMPORARILY DISABLED: version conflict with polkadot-sdk
 sled = "0.34"
 
 # Metrics & logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 prometheus = "0.14.0"
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
@@ -77,5 +77,5 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 
 [features]
 default = []
-rocksdb-storage = ["rocksdb"]
+# rocksdb-storage = ["rocksdb"] # TEMPORARILY DISABLED: version conflict with polkadot-sdk
 gpu-accel = []

@@ -36,7 +36,7 @@
 //! encoding, the domain tag, or the set of hashed fields is a breaking
 //! replay-protection change and requires a coordinated migration.
 
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
@@ -113,6 +113,7 @@ pub type CrossVmPayload = BoundedVec<u8, ConstU32<MAX_CROSS_VM_PAYLOAD>>;
     Hash,
     Encode,
     Decode,
+    DecodeWithMemTracking,
     MaxEncodedLen,
     TypeInfo,
     RuntimeDebug,
@@ -144,7 +145,7 @@ impl VmId {
 /// A `CrossVmCall` is the input to the dispatcher. It is hashed together
 /// with the source chain's finalized block hash to produce a unique
 /// `call_hash` used for replay protection and receipt binding.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct CrossVmCall {
     /// Protocol version. Must equal `CROSS_VM_CALL_VERSION` at admission.
     pub version: u8,
@@ -237,7 +238,7 @@ impl CrossVmCall {
 // ───────────────────────────── CrossVmReceipt ────────────────────────────────
 
 /// Canonical outcome of a single cross-VM call execution.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub enum CrossVmStatus {
     /// Target VM executed the call to completion and committed its
     /// state changes.
@@ -263,7 +264,7 @@ pub enum CrossVmStatus {
 /// `logs` is unbounded here because receipts cross the off-chain /
 /// RPC boundary. Any pallet that stores receipts on-chain is
 /// responsible for imposing its own storage-level bound.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct CrossVmReceipt {
     /// Call hash from `CrossVmCall::call_hash` — binds the receipt to
     /// the call's replay-protection entry.

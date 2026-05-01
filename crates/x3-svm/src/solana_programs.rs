@@ -4,20 +4,20 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SystemProgram {
     pub version: u32,
     pub rent_exempt_balance: u128,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenProgram {
     pub mint_authority: Option<[u8; 32]>,
     pub supply: u128,
     pub decimals: u8,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenAccount {
     pub mint: [u8; 32],
     pub owner: [u8; 32],
@@ -27,7 +27,7 @@ pub struct TokenAccount {
     pub is_frozen: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct AssociatedTokenAccount {
     pub token_account: [u8; 32],
     pub owner: [u8; 32],
@@ -35,20 +35,20 @@ pub struct AssociatedTokenAccount {
     pub is_initialized: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MemoProgram {
     pub message: Vec<u8>,
     pub signer: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SolanaProgram {
     pub program_id: [u8; 32],
     pub program_type: ProgramType,
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum ProgramType {
     System,
     Token,

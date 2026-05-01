@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SigningTransaction {
     pub id: [u8; 32],
     pub creator: [u8; 32],
@@ -18,7 +18,7 @@ pub struct SigningTransaction {
     pub is_executed: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TransactionSignature {
     pub id: [u8; 32],
     pub transaction_id: [u8; 32],
@@ -28,7 +28,7 @@ pub struct TransactionSignature {
     pub is_valid: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SigningRequest {
     pub id: [u8; 32],
     pub transaction_id: [u8; 32],

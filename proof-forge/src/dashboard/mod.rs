@@ -1,3 +1,5 @@
+#![allow(dead_code)] // intentional dashboard scaffold; tracked in readiness backlog
+
 // Dashboard module for proof metrics export and visualization
 
 use crate::proof::ProofResult;

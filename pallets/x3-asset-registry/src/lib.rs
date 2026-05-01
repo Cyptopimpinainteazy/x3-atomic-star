@@ -42,7 +42,7 @@ pub mod pallet {
     pub type MaxOriginAddressLen = ConstU32<64>;
 
     /// Full on-chain asset metadata record.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
     #[scale_info(skip_type_params(T))]
     pub struct AssetMetadata<T: Config> {
         pub asset_id: AssetId,

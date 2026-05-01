@@ -103,14 +103,23 @@ impl pallet_balances::Config for Test {
     type RuntimeFreezeReason = ();
 }
 
-// ── SendTransactionTypes for unsigned transactions ────────────────────────
+// ── CreateTransactionBase + CreateBare for unsigned transactions ─────────
 
-impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Test
 where
     RuntimeCall: From<LocalCall>,
 {
-    type OverarchingCall = RuntimeCall;
+    type RuntimeCall = RuntimeCall;
     type Extrinsic = UncheckedExtrinsic;
+}
+
+impl<LocalCall> frame_system::offchain::CreateBare<LocalCall> for Test
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_bare(call: RuntimeCall) -> UncheckedExtrinsic {
+        UncheckedExtrinsic::new_bare(call)
+    }
 }
 
 // ── Atomic Kernel Config ──────────────────────────────────────────────────

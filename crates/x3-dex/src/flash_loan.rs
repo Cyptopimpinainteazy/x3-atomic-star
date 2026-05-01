@@ -1,9 +1,9 @@
 /// Flash Loan Engine — Uncollateralized single-transaction loans with 0.09% fee
 /// Enables risk-free arbitrage and liquidations within atomic transactions
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FlashLoan {
     pub id: [u8; 32],
     pub borrower: [u8; 32],
@@ -16,7 +16,7 @@ pub struct FlashLoan {
     pub status: u8, // 0=pending, 1=executing, 2=repaid, 3=defaulted
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FlashLoanPool {
     pub pool_id: [u8; 32],
     pub token: u128,
@@ -26,7 +26,7 @@ pub struct FlashLoanPool {
     pub is_paused: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FlashLoanCallback {
     pub flash_loan_id: [u8; 32],
     pub borrower: [u8; 32],
@@ -36,7 +36,7 @@ pub struct FlashLoanCallback {
     pub callback_signature: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FlashLoanStats {
     pub total_loans: u64,
     pub total_repayments: u64,
@@ -45,7 +45,7 @@ pub struct FlashLoanStats {
     pub default_count: u32,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ArbitrageExecution {
     pub flash_loan_id: [u8; 32],
     pub initial_amount: u64,

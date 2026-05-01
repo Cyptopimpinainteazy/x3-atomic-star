@@ -1,7 +1,7 @@
 # X3 ProofForge Claims Registry
 # Every claim must have receipts and evidence to be VERIFIED
 version: "1.0.0"
-last_updated: "2026-04-28"
+last_updated: "2026-04-30"
 
 claims:
   # S0 Critical Claims - Must pass for mainnet
@@ -19,7 +19,91 @@ claims:
       - formal-proofs/tla/asset_kernel/AssetKernelSupply.tla
       - proof/receipts/claims/x3.asset_kernel.supply_conservation.receipt.json
     blockers: []
-    
+
+  x3.consensus.finality_safety:
+    statement: "GRANDPA finality never finalizes conflicting blocks"
+    criticality: S0
+    tags: [consensus, finality, safety]
+    status: VERIFIED
+    evidence_required:
+      - grandpa_finality_test
+      - conflicting_block_rejection_test
+      - finality_proof_verification_test
+    evidence:
+      - pallets/x3-consensus/src/tests/finality_safety.rs
+      - proof/receipts/claims/x3.consensus.finality_safety.receipt.json
+    blockers: []
+
+  x3.consensus.validator_rotation:
+    statement: "Validator set changes are properly scheduled and executed"
+    criticality: S0
+    tags: [consensus, validators, rotation]
+    status: VERIFIED
+    evidence_required:
+      - validator_set_transition_test
+      - session_rotation_test
+      - authority_change_verification_test
+    evidence:
+      - pallets/x3-consensus/src/tests/validator_rotation.rs
+      - proof/receipts/claims/x3.consensus.validator_rotation.receipt.json
+    blockers: []
+
+  x3.consensus.equivocation_detection:
+    statement: "Double signing and equivocation are detected and slashed"
+    criticality: S0
+    tags: [consensus, slashing, equivocation]
+    status: VERIFIED
+    evidence_required:
+      - double_sign_detection_test
+      - equivocation_slashing_test
+      - offence_reporting_test
+    evidence:
+      - pallets/x3-consensus/src/tests/equivocation_detection.rs
+      - proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json
+    blockers: []
+
+  x3.dex.amm_math_safety:
+    statement: "AMM calculations are mathematically correct and overflow-safe"
+    criticality: S0
+    tags: [dex, amm, math, safety]
+    status: VERIFIED
+    evidence_required:
+      - amm_calculation_test
+      - overflow_protection_test
+      - slippage_calculation_test
+    evidence:
+      - pallets/x3-dex/src/tests/amm_math.rs
+      - proof/receipts/claims/x3.dex.amm_math_safety.receipt.json
+    blockers: []
+
+  x3.dex.liquidity_provision:
+    statement: "Liquidity provision and LP token minting work correctly"
+    criticality: S0
+    tags: [dex, liquidity, lp-tokens]
+    status: VERIFIED
+    evidence_required:
+      - liquidity_add_test
+      - lp_token_mint_test
+      - proportional_calculation_test
+    evidence:
+      - pallets/x3-dex/src/tests/liquidity_provision.rs
+      - proof/receipts/claims/x3.dex.liquidity_provision.receipt.json
+    blockers: []
+
+  x3.dex.swapping_mechanism:
+    statement: "Token swapping respects AMM invariants and slippage limits"
+    criticality: S0
+    tags: [dex, swapping, amm, invariants]
+    status: VERIFIED
+    evidence_required:
+      - swap_execution_test
+      - invariant_preservation_test
+      - slippage_protection_test
+    evidence:
+      - pallets/x3-dex/src/tests/swapping.rs
+      - proof/receipts/claims/x3.dex.swapping_mechanism.receipt.json
+    blockers: []
+
   x3.bridge.replay_protection:
     statement: "A bridge message cannot execute more than once"
     criticality: S0
@@ -194,6 +278,25 @@ claims:
       - proof/baselines/claim_scores.yml
       - formal-proofs/tla/evolution/Evolution.tla
       - proof/receipts/claims/x3.evolution.no_regression.receipt.json
+    blockers: []
+
+  x3.observability.telemetry_pipeline:
+    statement: "Prometheus/Grafana telemetry pipeline is configured with concrete runtime evidence"
+    criticality: S1
+    tags: [observability, telemetry, metrics]
+    status: VERIFIED
+    evidence_required:
+      - prometheus_scrape_config
+      - grafana_dashboard_config
+      - telemetry_metrics_surface
+      - operator_telemetry_test
+    evidence:
+      - docs/testnet-config/prometheus-config.json
+      - docs/testnet-config/grafana-dashboards.json
+      - crates/x3-indexer/src/metrics.rs
+      - crates/x3-sidecar/src/telemetry.rs
+      - tests_phase4/x3_operator/test_telemetry.py
+      - proof/receipts/claims/x3.observability.telemetry_pipeline.receipt.json
     blockers: []
     notes: |
       Score-regression gate: every claim receipt is diffed against a persisted

@@ -50,7 +50,7 @@ pub const INHERENT_IDENTIFIER: sp_inherents::InherentIdentifier = *b"poh____0";
 ///
 /// Encoded as SCALE (or JSON in tests) and placed in the block header's
 /// `DigestItem::Consensus(POH_ENGINE_ID, payload)`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
 pub struct PoHDigest {
     /// Monotonically increasing tick counter (one per block).
     pub tick: u64,
@@ -85,7 +85,7 @@ impl PoHDigest {
 }
 
 /// Inherent data for PoH.
-#[derive(Encode, Decode)]
+#[derive(Encode, Decode, DecodeWithMemTracking)]
 pub struct PoHInherentData {
     pub digest: PoHDigest,
 }

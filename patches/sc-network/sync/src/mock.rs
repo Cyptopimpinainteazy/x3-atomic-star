@@ -20,7 +20,7 @@
 //! for testing calls made to `ChainSync`.
 
 use futures::task::Poll;
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use sc_network_common::sync::{
 	message::{BlockAnnounce, BlockData, BlockRequest, BlockResponse},
 	BadPeer, ChainSync as ChainSyncT, Metrics, OnBlockData, OnBlockJustification,

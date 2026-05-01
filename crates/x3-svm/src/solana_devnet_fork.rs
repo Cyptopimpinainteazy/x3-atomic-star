@@ -4,7 +4,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct DevnetForkConfig {
     pub fork_id: [u8; 32],
     pub fork_slot: u64,
@@ -15,14 +15,14 @@ pub struct DevnetForkConfig {
     pub is_deterministic: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ForkState {
     pub accounts: Vec<ForkedAccount>,
     pub last_snapshot_slot: u64,
     pub parent_fork_id: Option<[u8; 32]>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ForkedAccount {
     pub pubkey: [u8; 32],
     pub lamports: u64,
@@ -32,7 +32,7 @@ pub struct ForkedAccount {
     pub data: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ForkSnapshot {
     pub snapshot_id: [u8; 32],
     pub slot: u64,
@@ -43,7 +43,7 @@ pub struct ForkSnapshot {
     pub is_finalized: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TransactionLog {
     pub tx_hash: [u8; 32],
     pub slot: u64,
@@ -53,7 +53,7 @@ pub struct TransactionLog {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ComputeMetrics {
     pub total_instructions: u64,
     pub total_compute_units: u64,

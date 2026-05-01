@@ -5,7 +5,7 @@ use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 use sp_core::H256;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SPLTokenMint {
     pub solana_mint: [u8; 32],
     pub x3_wrapped_token_id: u128,
@@ -14,7 +14,7 @@ pub struct SPLTokenMint {
     pub total_supply: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BridgeVault {
     pub vault_owner: [u8; 32],
     pub token_mint: [u8; 32],
@@ -23,7 +23,7 @@ pub struct BridgeVault {
     pub chain_id: u32,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenBridgeRequest {
     pub id: [u8; 32],
     pub source_chain: u32,
@@ -35,7 +35,7 @@ pub struct TokenBridgeRequest {
     pub nonce: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct WrappedToken {
     pub original_mint: [u8; 32],
     pub original_chain: u32,
@@ -45,7 +45,7 @@ pub struct WrappedToken {
     pub is_canonical: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct BridgedBalance {
     pub user: [u8; 32],
     pub token_id: u128,

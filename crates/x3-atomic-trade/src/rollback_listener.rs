@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeBatchFailure {
     pub batch_id: [u8; 32],
     pub initiator: [u8; 32],
@@ -16,7 +16,7 @@ pub struct TradeBatchFailure {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum FailureReason {
     InsufficientLiquidity,
     SlippageExceeded,
@@ -28,7 +28,7 @@ pub enum FailureReason {
     Other,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum TradeState {
     Pending,
     PartiallyExecuted,
@@ -37,7 +37,7 @@ pub enum TradeState {
     RolledBack,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum RollbackStatus {
     PendingRollback,
     RollingBack,
@@ -46,7 +46,7 @@ pub enum RollbackStatus {
     ManualIntervention,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RollbackLog {
     pub batch_id: [u8; 32],
     pub completed_legs: Vec<u32>,
@@ -55,7 +55,7 @@ pub struct RollbackLog {
     pub compensation_amount: u128,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FailureNotification {
     pub notification_id: [u8; 32],
     pub batch_id: [u8; 32],
@@ -65,7 +65,7 @@ pub struct FailureNotification {
     pub is_read: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum SeverityLevel {
     Info,
     Warning,

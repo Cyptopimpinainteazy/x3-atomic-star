@@ -19,7 +19,7 @@ pub type StorageKey = [u8; 32];
 /// and escalates undeclared writes to a conflict.  This design mirrors the
 /// approach used in Block-STM and Aptos parallel execution:
 /// optimistic parallelism with deterministic serial fallback.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AccessList {
     /// Keys the transaction intends to read (but not write).
     pub reads: Vec<StorageKey>,

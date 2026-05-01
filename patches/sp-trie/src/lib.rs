@@ -29,6 +29,7 @@ pub mod recorder;
 mod storage_proof;
 mod trie_codec;
 mod trie_stream;
+pub mod proof_size_extension;
 
 /// Our `NodeCodec`-specific error.
 pub use error::Error;
@@ -46,6 +47,8 @@ pub use storage_proof::{CompactProof, StorageProof};
 pub use trie_codec::{decode_compact, encode_compact, Error as CompactProofError};
 pub use trie_db::proof::VerifyError;
 use trie_db::proof::{generate_proof, verify_proof};
+/// Proof size extension for cumulus compatibility
+pub use proof_size_extension::ProofSizeExt;
 /// Various re-exports from the `trie-db` crate.
 pub use trie_db::{
 	nibble_ops,

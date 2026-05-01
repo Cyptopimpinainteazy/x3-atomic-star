@@ -24,7 +24,7 @@ use std::{fmt, sync::Arc};
 pub struct EncodedProof(pub Vec<u8>);
 
 /// Warp sync request
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Debug)]
 pub struct WarpProofRequest<B: BlockT> {
 	/// Start collecting proofs from this block.
 	pub begin: B::Hash,

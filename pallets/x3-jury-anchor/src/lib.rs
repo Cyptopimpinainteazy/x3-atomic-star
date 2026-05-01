@@ -6,6 +6,7 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::pallet_prelude::*;
+    use frame_support::traits::Time;
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_std::vec::Vec;
@@ -24,7 +25,7 @@ pub mod pallet {
     }
 
     // Types
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo)]
     pub struct JuryDecisionRecord<BlockNumber, Moment, AccountId> {
         pub decision_hash: H256,
         pub block_number: BlockNumber,
@@ -33,7 +34,7 @@ pub mod pallet {
         pub metadata: JuryMetadata,
     }
 
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+    #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo)]
     pub struct JuryMetadata {
         pub member_count: u32,
         pub quorum_threshold: u32, // 0-100, e.g., 66

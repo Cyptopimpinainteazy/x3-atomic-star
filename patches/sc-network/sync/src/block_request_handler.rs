@@ -24,7 +24,7 @@ use crate::{
 
 use codec::{Decode, Encode};
 use futures::{channel::oneshot, stream::StreamExt};
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use log::debug;
 use prost::Message;
 use schnellru::{ByLength, LruMap};

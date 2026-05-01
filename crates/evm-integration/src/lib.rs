@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
@@ -29,7 +29,7 @@ pub use frontier::FrontierEvmExecutor;
 pub type EvmResult<T> = Result<T, EvmError>;
 
 /// Errors that can occur during EVM execution
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum EvmError {
     /// Invalid bytecode or transaction data
     InvalidPayload,
@@ -52,7 +52,7 @@ pub enum EvmError {
 }
 
 /// Represents the result of EVM execution
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmExecutionResult {
     /// Whether execution succeeded
     pub success: bool,
@@ -69,7 +69,7 @@ pub struct EvmExecutionResult {
 }
 
 /// Represents an EVM log entry
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmLog {
     /// Address that emitted the log
     pub address: H160,
@@ -80,7 +80,7 @@ pub struct EvmLog {
 }
 
 /// Represents a state change from EVM execution
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmStateChange {
     /// Account address affected
     pub address: H160,
@@ -95,7 +95,7 @@ pub struct EvmStateChange {
 }
 
 /// EVM execution environment configuration
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmConfig {
     /// Maximum gas per transaction
     pub gas_limit: u64,
@@ -198,7 +198,7 @@ pub trait EvmExecutor {
 }
 
 /// Deployed contract registry entry
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct DeployedContract {
     /// Contract address
     pub address: H160,
@@ -213,7 +213,7 @@ pub struct DeployedContract {
 }
 
 /// Gas metering report for an EVM execution
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct GasMeteringReport {
     /// Intrinsic gas (base tx cost)
     pub intrinsic_gas: u64,
@@ -228,7 +228,7 @@ pub struct GasMeteringReport {
 }
 
 /// EVM execution context snapshot for deterministic replay
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct EvmExecutionSnapshot {
     /// Config used for execution
     pub config: EvmConfig,

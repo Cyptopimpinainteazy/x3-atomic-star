@@ -23,7 +23,7 @@ redis = { version = "0.25", features = ["aio", "tokio-comp"] }
 # Logging
 log = "0.4"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # Error handling
 thiserror = "1"

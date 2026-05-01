@@ -19,7 +19,7 @@ pub const MAX_RECEIPT_DATA_SIZE: u32 = 1024;
 // ============================================================================
 
 /// Settlement intent: the source of truth for an atomic swap
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 #[scale_info(skip_type_params(AccountId))]
 pub struct SettlementIntent<AccountId> {
     /// Unique intent identifier
@@ -47,7 +47,7 @@ pub struct SettlementIntent<AccountId> {
 }
 
 /// Asset specification (chain + token + amount)
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub struct AssetSpec {
     /// Chain where asset resides
     pub chain: ExternalChainId,
@@ -58,7 +58,7 @@ pub struct AssetSpec {
 }
 
 /// Token identifier (chain-agnostic)
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub enum TokenId {
     /// Native currency (ETH, SOL, BTC)
     Native,
@@ -99,7 +99,7 @@ pub enum IntentState {
 }
 
 /// Settlement transfer: tracks individual cross-chain settlement operations
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 #[scale_info(skip_type_params(AccountId, Balance))]
 pub struct SettlementTransfer<AccountId, Balance> {
     /// Unique transfer identifier (H256)
@@ -127,7 +127,7 @@ pub struct SettlementTransfer<AccountId, Balance> {
 // ============================================================================
 
 /// Escrow leg for a settlement intent
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 #[scale_info(skip_type_params(AccountId))]
 pub struct EscrowLeg<AccountId> {
     /// Parent intent ID
@@ -171,7 +171,7 @@ pub enum EscrowLegState {
 // ============================================================================
 
 /// BTC UTXO state tracked by X3
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct BtcUtxoState {
     /// Transaction ID
     pub txid: H256,
@@ -190,7 +190,7 @@ pub struct BtcUtxoState {
 }
 
 /// BTC block header (80 bytes, compact)
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub struct BtcBlockHeader {
     /// Block version
     pub version: u32,
@@ -213,7 +213,7 @@ pub struct BtcBlockHeader {
 // ============================================================================
 
 /// Settlement proof for external chain verification
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub struct SettlementProof {
     /// Type of proof
     pub proof_type: ProofType,
@@ -288,7 +288,7 @@ pub enum ExternalChainId {
 }
 
 /// Finality configuration for a chain
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub struct FinalityConfig {
     /// Chain ID
     pub chain: ExternalChainId,
@@ -309,7 +309,7 @@ pub struct FinalityConfig {
 // ============================================================================
 
 /// Reason for settlement refund
-#[derive(Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub enum RefundReason {
     /// Settlement timeout expired
     Timeout,
@@ -326,7 +326,7 @@ pub enum RefundReason {
 }
 
 /// Types of invariant violations (CRITICAL)
-#[derive(Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
 pub enum InvariantViolationType {
     /// Settlement finalized with incomplete legs
     PartialExecution,
@@ -343,7 +343,7 @@ pub enum InvariantViolationType {
 // ============================================================================
 
 /// Canonical event: Trade matched
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct TradeMatchedEvent<AccountId> {
     pub match_id: H256,
     pub maker: AccountId,
@@ -354,7 +354,7 @@ pub struct TradeMatchedEvent<AccountId> {
 }
 
 /// Canonical event: Settlement intent created on X3
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct X3IntentCreatedEvent<AccountId> {
     pub intent_id: H256,
     pub maker: AccountId,
@@ -366,7 +366,7 @@ pub struct X3IntentCreatedEvent<AccountId> {
 }
 
 /// Canonical event: Assets locked in X3 escrow
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct X3AssetsLockedEvent {
     pub intent_id: H256,
     pub leg_index: u32,
@@ -376,7 +376,7 @@ pub struct X3AssetsLockedEvent {
 }
 
 /// Canonical event: External proof submitted
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct ExternalProofSubmittedEvent {
     pub intent_id: H256,
     pub chain: ExternalChainId,
@@ -386,7 +386,7 @@ pub struct ExternalProofSubmittedEvent {
 }
 
 /// Canonical event: Settlement finalized on X3
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct X3FinalizedEvent {
     pub intent_id: H256,
     pub maker_received: u128,
@@ -395,7 +395,7 @@ pub struct X3FinalizedEvent {
 }
 
 /// Canonical event: Settlement refunded
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct X3RefundedEvent {
     pub intent_id: H256,
     pub reason: RefundReason,

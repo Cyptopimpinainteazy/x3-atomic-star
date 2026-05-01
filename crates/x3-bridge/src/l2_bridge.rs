@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct L2BridgeDeposit {
     pub deposit_id: u64,
     pub depositor: [u8; 20],
@@ -14,7 +14,7 @@ pub struct L2BridgeDeposit {
     pub status: DepositStatus,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum DepositStatus {
     Pending,
     Confirmed,
@@ -23,7 +23,7 @@ pub enum DepositStatus {
     Refunded,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct L2Withdrawal {
     pub withdrawal_id: u64,
     pub sender: [u8; 32],
@@ -34,7 +34,7 @@ pub struct L2Withdrawal {
     pub status: WithdrawalStatus,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum WithdrawalStatus {
     Initiated,
     BatchedForL1,
@@ -43,7 +43,7 @@ pub enum WithdrawalStatus {
     Failed,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OutputRoot {
     pub l2_output_index: u64,
     pub output_root: [u8; 32],
@@ -51,14 +51,14 @@ pub struct OutputRoot {
     pub block_number: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct WithdrawalProof {
     pub output_root_proof: Vec<[u8; 32]>,
     pub withdrawal_proof: Vec<[u8; 32]>,
     pub output_index: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenConfig {
     pub l1_address: [u8; 20],
     pub l2_address: [u8; 20],

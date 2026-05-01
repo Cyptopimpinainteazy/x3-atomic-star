@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RelayerConfig {
     pub relayer_id: [u8; 32],
     pub accepted_tokens: Vec<[u8; 32]>,
@@ -12,7 +12,7 @@ pub struct RelayerConfig {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FeeRequest {
     pub request_id: [u8; 32],
     pub transaction_hash: [u8; 32],
@@ -25,7 +25,7 @@ pub struct FeeRequest {
     pub created_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub enum FeeRequestStatus {
     Pending,
     Settled,
@@ -33,21 +33,21 @@ pub enum FeeRequestStatus {
     Disputed,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenExchangeRate {
     pub token: [u8; 32],
     pub native_per_token: u128,
     pub updated_at: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct RelayerBalance {
     pub relayer: [u8; 32],
     pub token: [u8; 32],
     pub balance: u128,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SponsorPool {
     pub pool_id: [u8; 32],
     pub sponsor: [u8; 32],

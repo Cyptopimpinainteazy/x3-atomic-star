@@ -8,7 +8,7 @@ use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
 /// Evolvable parameters (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct EvolvableParamsResponse {
     /// Base gas price multiplier (100 = 1x)
@@ -26,7 +26,7 @@ pub struct EvolvableParamsResponse {
 }
 
 /// Block metrics (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockMetricsResponse {
     /// Block gas used
@@ -50,7 +50,7 @@ pub struct BlockMetricsResponse {
 }
 
 /// Mutation proposal status
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProposalResponse<AccountId, BlockNumber> {
     /// Proposal ID
@@ -68,7 +68,7 @@ pub struct ProposalResponse<AccountId, BlockNumber> {
 }
 
 /// Evolution status summary
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct EvolutionStatusResponse {
     /// Whether evolution is enabled

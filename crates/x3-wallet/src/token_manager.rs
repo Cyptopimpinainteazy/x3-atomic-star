@@ -3,7 +3,7 @@
 use parity_scale_codec::{Decode, Encode};
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Token {
     pub id: [u8; 32],
     pub address: [u8; 32],
@@ -16,7 +16,7 @@ pub struct Token {
     pub owner: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenBalance {
     pub token_id: [u8; 32],
     pub holder: [u8; 32],
@@ -24,7 +24,7 @@ pub struct TokenBalance {
     pub last_updated_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TokenWhitelist {
     pub id: [u8; 32],
     pub owner: [u8; 32],

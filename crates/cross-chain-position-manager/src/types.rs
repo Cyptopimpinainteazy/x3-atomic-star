@@ -11,7 +11,7 @@ use sp_std::string::String;
 use sp_std::vec::Vec;
 
 /// Position-manager-native route representation.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub struct SwapRoute {
     pub source_chain: u64,
     pub target_chain: u64,
@@ -25,7 +25,7 @@ pub struct SwapRoute {
 }
 
 /// Unique identifier for a cross-chain position
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PositionId(pub [u8; 32]);
 
 impl PositionId {
@@ -65,7 +65,7 @@ impl std::fmt::Display for PositionId {
 }
 
 /// Type of position held
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PositionType {
     /// Simple token balance
     Token,
@@ -116,7 +116,7 @@ impl PositionType {
 }
 
 /// Risk level classification
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RiskLevel {
     Low = 1,
     Medium = 2,
@@ -137,7 +137,7 @@ impl RiskLevel {
 }
 
 /// Current state of a position
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PositionState {
     /// Position is active and healthy
     Active,
@@ -154,7 +154,7 @@ pub enum PositionState {
 }
 
 /// Chain-specific configuration
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ChainSpecifics {
     pub chain_id: u64,
     pub gas_price_multiplier: f64,
@@ -167,7 +167,7 @@ pub struct ChainSpecifics {
 }
 
 /// Asset information
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AssetInfo {
     pub address: H160,
     pub symbol: String,
@@ -180,7 +180,7 @@ pub struct AssetInfo {
 }
 
 /// Source for price information
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PriceSource {
     /// Price from a specific oracle
     Oracle(H160),
@@ -199,7 +199,7 @@ pub enum PriceSource {
 }
 
 /// Position metadata
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PositionMetadata {
     pub id: PositionId,
     pub position_type: PositionType,
@@ -212,7 +212,7 @@ pub struct PositionMetadata {
 }
 
 /// Portfolio allocation target
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AllocationTarget {
     pub chain_id: u64,
     pub asset: H160,
@@ -222,7 +222,7 @@ pub struct AllocationTarget {
 }
 
 /// Risk threshold configuration
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RiskThreshold {
     pub max_position_size_usd: U256,
     pub max_exposure_per_chain: f64, // percentage
@@ -232,7 +232,7 @@ pub struct RiskThreshold {
 }
 
 /// Performance metrics
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PerformanceMetrics {
     pub total_return_usd: U256,
     pub daily_return: f64,
@@ -245,7 +245,7 @@ pub struct PerformanceMetrics {
 }
 
 /// Trade execution parameters
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ExecutionParams {
     pub slippage_tolerance: f64, // 0.001 = 0.1%
     pub gas_price_multiplier: f64,
@@ -255,7 +255,7 @@ pub struct ExecutionParams {
 }
 
 /// Cross-chain operation status
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum OperationStatus {
     Pending,
     InProgress,
@@ -265,7 +265,7 @@ pub enum OperationStatus {
 }
 
 /// Migration plan for moving positions
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct MigrationPlan {
     pub position_id: PositionId,
     pub from_chain: u64,
@@ -278,7 +278,7 @@ pub struct MigrationPlan {
 }
 
 /// Rebalancing action
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RebalanceAction {
     pub action_type: RebalanceActionType,
     pub chain_id: u64,
@@ -290,7 +290,7 @@ pub struct RebalanceAction {
 }
 
 /// Types of rebalancing actions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RebalanceActionType {
     Buy,
     Sell,
@@ -303,7 +303,7 @@ pub enum RebalanceActionType {
 }
 
 /// Arbitrage opportunity
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct ArbitrageOpportunity {
     pub id: H256,
     pub profit_usd: U256,
@@ -315,7 +315,7 @@ pub struct ArbitrageOpportunity {
 }
 
 /// Route optimization parameters
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RouteOptimizationParams {
     pub max_hops: u8,
     pub preferred_chains: Vec<u64>,
@@ -327,7 +327,7 @@ pub struct RouteOptimizationParams {
 }
 
 /// Operational vault classes for Phase 4.5 liquidity controls.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum VaultType {
     GasReserve,
     SettlementFloat,
@@ -336,7 +336,7 @@ pub enum VaultType {
 }
 
 /// Route-support lane classes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum LaneClass {
     MarketOnly,
     PartnerBacked,
@@ -344,7 +344,7 @@ pub enum LaneClass {
 }
 
 /// Threshold state for inventory or lane health.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum ThresholdTier {
     Normal,
     Warning,
@@ -353,7 +353,7 @@ pub enum ThresholdTier {
 }
 
 /// Live route lane status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum LaneStatus {
     Active,
     Warning,
@@ -368,7 +368,7 @@ impl LaneStatus {
 }
 
 /// Supported liquidity source categories.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum LiquiditySourceType {
     InternalNetting,
     ExternalMarket,
@@ -377,7 +377,7 @@ pub enum LiquiditySourceType {
 }
 
 /// Inventory bands for a `(chain, asset)` domain.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub struct InventoryBand {
     pub critical_min: U256,
     pub min: U256,
@@ -400,7 +400,7 @@ impl InventoryBand {
 }
 
 /// Policy attached to an execution lane.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub struct LanePolicy {
     pub lane_id: H256,
     pub source_chain: u64,
@@ -414,7 +414,7 @@ pub struct LanePolicy {
 }
 
 /// Reservation lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum ReservationStatus {
     Active,
     Released,
@@ -423,14 +423,14 @@ pub enum ReservationStatus {
 }
 
 /// Route certainty after routing and reservation checks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub enum RouteFirmness {
     Indicative,
     Firm,
 }
 
 /// Explicit route reservation record.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Serialize, Deserialize)]
 pub struct ReservationRecord {
     pub reservation_id: H256,
     pub route_id: H256,
@@ -471,7 +471,7 @@ pub struct RouteExecutionCandidate {
 }
 
 /// Risk assessment result
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RiskAssessment {
     pub position_id: PositionId,
     pub overall_risk: RiskLevel,
@@ -481,7 +481,7 @@ pub struct RiskAssessment {
 }
 
 /// Individual risk factor
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct RiskFactor {
     pub factor_type: RiskFactorType,
     pub severity: RiskLevel,
@@ -490,7 +490,7 @@ pub struct RiskFactor {
 }
 
 /// Types of risk factors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RiskFactorType {
     Liquidity,
     Market,
@@ -502,7 +502,7 @@ pub enum RiskFactorType {
 }
 
 /// Kill switch configuration
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct KillSwitchConfig {
     pub enabled: bool,
     pub trigger_conditions: Vec<TriggerCondition>,
@@ -511,7 +511,7 @@ pub struct KillSwitchConfig {
 }
 
 /// Kill switch trigger condition
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct TriggerCondition {
     pub condition_type: TriggerConditionType,
     pub threshold_value: f64,
@@ -520,7 +520,7 @@ pub struct TriggerCondition {
 }
 
 /// Types of trigger conditions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum TriggerConditionType {
     PriceDrop,
     VolumeSpike,
@@ -532,7 +532,7 @@ pub enum TriggerConditionType {
 }
 
 /// Event types for the event system
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum EventType {
     PositionCreated,
     PositionUpdated,
@@ -547,7 +547,7 @@ pub enum EventType {
 }
 
 /// Cross-chain message
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct CrossChainMessage {
     pub id: H256,
     pub source_chain: u64,
@@ -559,7 +559,7 @@ pub struct CrossChainMessage {
 }
 
 /// Types of cross-chain messages
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum MessageType {
     PositionUpdate,
     MigrationRequest,
@@ -570,7 +570,7 @@ pub enum MessageType {
 }
 
 /// State synchronization data
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct StateSync {
     pub snapshot_hash: H256,
     pub positions: Vec<PositionId>,
@@ -579,7 +579,7 @@ pub struct StateSync {
 }
 
 /// Performance benchmarking
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct PerformanceBenchmark {
     pub operation: String,
     pub duration_ms: u64,
@@ -590,7 +590,7 @@ pub struct PerformanceBenchmark {
 }
 
 /// Configuration for automated operations
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct AutomationConfig {
     pub auto_rebalance: bool,
     pub auto_arbitrage: bool,
@@ -601,7 +601,7 @@ pub struct AutomationConfig {
 }
 
 /// Health check status
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum HealthStatus {
     Healthy,
     Warning,
@@ -610,7 +610,7 @@ pub enum HealthStatus {
 }
 
 /// Health check result
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct HealthCheck {
     pub component: String,
     pub status: HealthStatus,

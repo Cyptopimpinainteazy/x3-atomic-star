@@ -46,7 +46,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// Gossip message wrapper for the Flash Finality protocol
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking)]
 pub enum FlashGossipMessage {
     /// Block proposal from the leader
     Proposal {

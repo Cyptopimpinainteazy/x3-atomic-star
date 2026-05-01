@@ -77,7 +77,7 @@ pub mod pallet {
     // Types
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo)]
     pub struct EvmHeaderInfo {
         pub block_number: u64,
         pub block_hash: H256,
@@ -88,7 +88,7 @@ pub mod pallet {
         pub validation_proof: Vec<u8>,
     }
 
-    #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, TypeInfo)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo)]
     pub struct SvmHeaderInfo {
         pub slot: u64,
         pub block_hash: H256,
@@ -99,7 +99,7 @@ pub mod pallet {
         pub parent_slot_hashes: Vec<H256>,
     }
 
-    #[derive(Debug, Clone, Encode, Decode, PartialEq, Eq, TypeInfo, Default)]
+    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo, Default)]
     pub struct ValidationStatistics {
         pub evm_headers_validated: u64,
         pub svm_headers_validated: u64,

@@ -29,8 +29,8 @@ blake3 = "1.5"
 subtle = "2.5"
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 # Optional: for production persistence with substrate offchain storage
-sc-client-api = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", optional = true }
-sp-core = { git = "https://github.com/paritytech/substrate", rev = "948fbd2", optional = true }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", optional = true }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

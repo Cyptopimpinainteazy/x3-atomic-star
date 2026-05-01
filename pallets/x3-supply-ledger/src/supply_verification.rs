@@ -38,7 +38,7 @@ use x3_asset_kernel_types::{AssetId, Balance, InvariantError, SupplyLedger};
 /// This proof demonstrates that all asset supply invariants held at the
 /// end of a block. External verifiers can validate the chain's economic
 /// integrity without replaying all transactions.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct SupplyProof {
     /// Block number this proof covers.
     pub block_number: u32,
@@ -57,7 +57,7 @@ pub struct SupplyProof {
 }
 
 /// Supply proof for a single asset.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 pub struct AssetSupplyProof {
     /// Asset identifier.
     pub asset_id: AssetId,

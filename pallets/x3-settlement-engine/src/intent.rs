@@ -10,7 +10,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::{vec, vec::Vec};
 
 /// Intent creation parameters
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct CreateIntentParams<AccountId> {
     /// Maker (initiator)
     pub maker: AccountId,
@@ -27,7 +27,7 @@ pub struct CreateIntentParams<AccountId> {
 }
 
 /// Intent settlement plan
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct SettlementPlan {
     /// Ordered list of legs to execute
     pub legs: Vec<SettlementLeg>,
@@ -38,7 +38,7 @@ pub struct SettlementPlan {
 }
 
 /// Individual settlement leg
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct SettlementLeg {
     /// Leg index
     pub index: u32,
@@ -53,7 +53,7 @@ pub struct SettlementLeg {
 }
 
 /// Settlement risk level
-#[derive(Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
 pub enum RiskLevel {
     /// Low risk (X3-internal swaps)
     Low,

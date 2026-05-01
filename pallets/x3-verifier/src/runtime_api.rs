@@ -12,7 +12,7 @@ use sp_std::vec::Vec;
 pub type JobId = H256;
 
 /// Executor information (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutorResponse<AccountId, Balance> {
     /// Executor account
@@ -30,7 +30,7 @@ pub struct ExecutorResponse<AccountId, Balance> {
 }
 
 /// Job information (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct JobResponse<AccountId, Balance, BlockNumber> {
     /// Job ID
@@ -56,7 +56,7 @@ pub struct JobResponse<AccountId, Balance, BlockNumber> {
 }
 
 /// Receipt information (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReceiptResponse<AccountId> {
     /// Job ID this receipt is for
@@ -78,7 +78,7 @@ pub struct ReceiptResponse<AccountId> {
 }
 
 /// Verifier status summary
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifierStatusResponse {
     /// Whether verification is enabled

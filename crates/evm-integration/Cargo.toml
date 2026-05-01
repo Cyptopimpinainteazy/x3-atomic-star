@@ -22,6 +22,7 @@ fp-evm = { workspace = true, default-features = false }
 # Ethereum types
 ethereum = { version = "0.14", default-features = false, features = ["with-codec"] }
 ethereum-types = { version = "0.14", default-features = false }
+primitive-types = { version = "0.12.2", default-features = false }
 
 # Serialization
 parity-scale-codec = { workspace = true, default-features = false }

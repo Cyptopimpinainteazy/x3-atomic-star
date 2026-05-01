@@ -8,7 +8,7 @@
 
 extern crate alloc;
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_std::vec;
 use sp_std::vec::Vec;
@@ -33,7 +33,7 @@ pub struct InterpSvmExecutor;
 pub type SvmResult<T> = Result<T, SvmError>;
 
 /// Errors that can occur during SVM execution
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SvmError {
     /// Invalid program or transaction data
     InvalidPayload,
@@ -60,7 +60,7 @@ pub enum SvmError {
 }
 
 /// Represents the result of SVM program execution
-#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmExecutionResult {
     /// Whether execution succeeded
     pub success: bool,
@@ -77,7 +77,7 @@ pub struct SvmExecutionResult {
 }
 
 /// Represents an update to an account during SVM execution
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Default)]
 pub struct AccountUpdate {
     /// Account public key (32 bytes)
     pub pubkey: [u8; 32],
@@ -133,7 +133,7 @@ pub fn compute_svm_state_root(result: &SvmExecutionResult) -> [u8; 32] {
 }
 
 /// SVM execution environment configuration
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmConfig {
     /// Maximum compute units per transaction
     pub compute_unit_limit: u64,
@@ -199,7 +199,7 @@ impl SvmConfig {
 }
 
 /// Instruction for SVM execution
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmInstruction {
     /// Program ID to invoke
     pub program_id: [u8; 32],
@@ -210,7 +210,7 @@ pub struct SvmInstruction {
 }
 
 /// Account metadata for SVM instruction
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct SvmAccountMeta {
     /// Account public key
     pub pubkey: [u8; 32],
@@ -425,7 +425,7 @@ impl ComputeMeter {
 }
 
 /// Program deployment entry
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct DeployedProgram {
     /// Program public key
     pub program_id: [u8; 32],

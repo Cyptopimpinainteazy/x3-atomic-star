@@ -87,8 +87,11 @@ claim_to_category() {
     x3.asset_kernel.*) echo "Universal Asset Kernel" ;;
     x3.bridge.*) echo "Bridge Security" ;;
     x3.atomic.*) echo "Atomic Cross-VM Execution" ;;
+    x3.consensus.*) echo "Consensus & Finality" ;;
+    x3.dex.*) echo "DEX / Liquidity" ;;
     x3.governance.*) echo "Governance / Launch Gates" ;;
     x3.gpu.*) echo "Validator Operations" ;;
+    x3.observability.*) echo "Observability" ;;
     x3.flashloan.*|x3.x3vm.*|x3.x3lang.*|x3.contracts.*) echo "Runtime / Pallets" ;;
     x3.onboarding.*|x3.funding.*|x3.evolution.*) echo "Documentation / Code Drift" ;;
     *) echo "Runtime / Pallets" ;;

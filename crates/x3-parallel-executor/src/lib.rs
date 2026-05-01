@@ -6,7 +6,6 @@
 
 pub mod types;
 
-use crate::types::*;
 use sp_std::collections::btree_map::BTreeMap;
 use sp_std::vec::Vec;
 

@@ -12,7 +12,7 @@ use sp_std::vec::Vec;
 pub type TransferId = H256;
 
 /// Settlement status enumeration
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum SettlementStatus {
     /// Transfer intent created, awaiting external execution
@@ -26,7 +26,7 @@ pub enum SettlementStatus {
 }
 
 /// Settlement transfer information (serializable version for RPC)
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct SettlementResponse<AccountId, Balance, BlockNumber> {
     /// Transfer ID
@@ -50,7 +50,7 @@ pub struct SettlementResponse<AccountId, Balance, BlockNumber> {
 }
 
 /// Pending settlement with timeout information
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct PendingSettlement<AccountId> {
     /// Transfer ID
@@ -64,7 +64,7 @@ pub struct PendingSettlement<AccountId> {
 }
 
 /// Settlement engine status summary
-#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct SettlementStatusResponse {
     /// Whether settlement engine is enabled

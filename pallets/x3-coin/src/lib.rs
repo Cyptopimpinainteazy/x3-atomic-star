@@ -89,7 +89,7 @@ pub const BONUS_CLAIM_PERIOD: u64 = 3_942_000; // 3,942,000 blocks ≈ 3 months
 pub const MAX_BONUS_CLAIMS: u32 = 10;
 
 /// Vesting schedule for team allocation
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct VestingSchedule {
     /// Total amount to be vested
     pub total_amount: u128,
@@ -104,7 +104,7 @@ pub struct VestingSchedule {
 }
 
 /// Bonus pool claim record
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct BonusClaim {
     /// Amount claimed
     pub amount: u128,
@@ -115,7 +115,7 @@ pub struct BonusClaim {
 }
 
 /// Runtime relayer configuration entry
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct RelayerRuntimeConfig<AccountId, Balance> {
     pub relayer: AccountId,
     pub enabled_chains: Vec<u32>,
@@ -124,7 +124,7 @@ pub struct RelayerRuntimeConfig<AccountId, Balance> {
 }
 
 /// Runtime cross-chain event record
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct CrossChainRuntimeEvent {
     pub operation_id: H256,
     pub chain_id: u32,
@@ -134,7 +134,7 @@ pub struct CrossChainRuntimeEvent {
 }
 
 /// Proof types for cross-chain operations
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum X3Proof {
     /// No proof
     None,
@@ -159,7 +159,7 @@ pub enum X3Proof {
 }
 
 /// Cross-chain operation types
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum CrossChainOperation {
     /// Mint X3 tokens from external chain
     Mint {
