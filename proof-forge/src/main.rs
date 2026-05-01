@@ -8,7 +8,7 @@ mod gap_proof;
 mod receipt;
 mod feature_proof;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use std::path::PathBuf;
@@ -597,44 +597,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn print_help() {
-    println!("{}", "X3 ProofForge - Available Commands".bold().green());
-    println!();
-    println!("{}", "Core Verification:".bold());
-    println!("  x3-proof verify CLAIM_ID            - Verify a specific claim");
-    println!("  x3-proof prove AREA                 - Run proofs for an area");
-    println!("  x3-proof prove-all                  - Run all proofs");
-    println!();
-    println!("{}", "Security & Safety:".bold());
-    println!("  x3-proof security-gate              - Check S0/S1 blockers");
-    println!("  x3-proof hack [AREA]                - Test hack resistance");
-    println!("  x3-proof edge-case [AREA]           - Test edge cases");
-    println!("  x3-proof limp [AREA]                - Test degraded operation");
-    println!("  x3-proof idiot COMMAND              - Test operator safety");
-    println!();
-    println!("{}", "Readiness & Gates:".bold());
-    println!("  x3-proof mainnet-gate               - Check mainnet readiness");
-    println!("  x3-proof testnet-gate               - Check testnet readiness");
-    println!("  x3-proof formal [AREA]              - Check formal proofs");
-    println!();
-    println!("{}", "Reporting & Dashboards:".bold());
-    println!("  x3-proof dashboard                  - Generate proof score dashboard");
-    println!("  x3-proof receipt TYPE [AREAS]       - Generate proof receipt");
-    println!("  x3-proof claims                     - List all claims");
-    println!("  x3-proof scan-claims [FILE]         - Scan for unproven claims");
-    println!();
-    println!("{}", "Development:".bold());
-    println!("  x3-proof ai-patch-firewall [DIFF]   - Check AI patch safety");
-    println!("  x3-proof explain-blockers AREA      - Show blockers for area");
-    println!();
-    println!("{}", "Global Flags:".bold());
-    println!("  --workspace PATH                    - X3 codebase path (default: current)");
-    println!("  --strict                            - Strict mode (require all proofs)");
-    println!("  --fail-hard                         - Fail on any error");
-    println!("  --dry-run                           - Show what would execute");
-    println!("  -v, --verbose                       - Verbose output");
 }
 
 /// Prove Everything - The Ultimate Gate
