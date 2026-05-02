@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "7708cbbe00bb6b6113264860572e65a642e56e3b",
   "command_run": "x3-proof verify x3.funding.milestone_receipts",
   "artifact_hash": "03fdcc30eef8cbdfe02910e435a798aa0d8b808c80c6e803ca60254bf4d8bb7f",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -11,11 +11,11 @@
     "proof/receipts/claims/",
     "proof/funding/milestone-receipt-map.yml"
   ],
-  "timestamp": "2026-05-01T02:14:32.992704Z",
+  "timestamp": "2026-05-02T01:37:50.882284009Z",
   "result": {
     "claim_id": "x3.funding.milestone_receipts",
     "claim": "Every funding ask maps to a milestone, deliverable, budget, and proof receipt",
-    "status": "verified",
+    "status": "unverified",
     "proof_level": null,
     "edge_case_level": null,
     "hack_level": null,
@@ -32,24 +32,24 @@
     "commands_run": [],
     "passed_checks": [
       "4 milestone/phase documents found",
-      "26 proof receipts exist as deliverable evidence",
-      "All 14 funding milestones map to existing verified receipts",
-      "Funding map total budget = $795000 USD"
+      "27 proof receipts exist as deliverable evidence"
     ],
-    "failed_checks": [],
+    "failed_checks": [
+      "milestones[11] (`M12.proofforge-receipt-integrity`): receipt status is `partial`, not `verified`"
+    ],
     "missing_proofs": [],
     "blockers": [],
-    "score": 1.0,
+    "score": 0.6666666666666666,
     "evidence": {
-      "proof_receipts": "26",
-      "funding_total_budget_usd": "795000",
-      "funding_milestones_total": "14",
       "milestone_docs": "4",
-      "funding_milestones_verified": "14"
+      "funding_total_budget_usd": "745000",
+      "proof_receipts": "27",
+      "funding_milestones_total": "14",
+      "funding_milestones_verified": "13"
     },
-    "timestamp": "2026-05-01T02:14:32.987277366Z",
+    "timestamp": "2026-05-02T01:37:50.876832310Z",
     "duration_ms": 2
   },
   "limitations": [],
-  "binding_hash": "9a83d863b1cca9e007f96f37fea6e6a97be1306e9c979aadc6847d756c392701"
+  "binding_hash": "51bf9e71b62b5808b4ef8adfd01c05104e5179d6f89ea7e04bf65c08fc9898a7"
 }

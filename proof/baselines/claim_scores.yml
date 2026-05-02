@@ -19,6 +19,7 @@ x3.flashloans.attack_resistance: 1.000000
 x3.funding.milestone_receipts: 1.000000
 x3.governance.proof_gated_upgrade: 1.000000
 x3.gpu.cpu_gpu_parity: 1.000000
+x3.observability.telemetry_pipeline: 1.000000
 x3.onboarding.developer_first_value: 1.000000
 x3.proofforge.receipt_integrity: 1.000000
 x3.runtime.full_proof: 0.800000

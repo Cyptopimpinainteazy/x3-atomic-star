@@ -1,18 +1,18 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "7708cbbe00bb6b6113264860572e65a642e56e3b",
   "command_run": "x3-proof verify x3.evolution.no_regression",
-  "artifact_hash": "6f82166e9f2c4153f443c046edb7a1a916d65e1342b36c9fdc1779681b4dd65c",
+  "artifact_hash": "bb36f0991806565bcee18a645140aa74934348f623caed99efe255e22d9484ee",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "proof/claims/registry.yml",
     "pallets/evolution-core/src/lib.rs",
     "proof/baselines/claim_scores.yml"
   ],
-  "timestamp": "2026-05-01T02:26:13.828735324Z",
+  "timestamp": "2026-05-02T01:37:50.856079681Z",
   "result": {
     "claim_id": "x3.evolution.no_regression",
     "claim": "New generations must beat prior generations without S0/S1 regressions",
-    "status": "verified",
+    "status": "unverified",
     "proof_level": null,
     "edge_case_level": null,
     "hack_level": null,
@@ -27,24 +27,29 @@
     "passed_checks": [
       "All 16 S0 claims verified — no S0 regressions",
       "All 5 S1 claims verified — no S1 regressions",
-      "evolution-core pallet exists",
-      "No score regressions across 25 claim receipts (vs 25 baseline pins)"
+      "evolution-core pallet exists"
     ],
-    "failed_checks": [],
-    "missing_proofs": [],
+    "failed_checks": [
+      "x3.proofforge.receipt_integrity: score regressed 1.000 -> 0.500"
+    ],
+    "missing_proofs": [
+      "1 new claim receipt(s) bootstrapped into baseline this run (auditable; future runs will gate against them)"
+    ],
     "blockers": [],
-    "score": 1.0,
+    "score": 0.75,
     "evidence": {
       "s0_verified": "16",
-      "s1_verified": "5",
-      "s1_total": "5",
-      "receipts_compared": "25",
       "s0_total": "16",
-      "baseline_entries": "25"
+      "baseline_entries": "25",
+      "s1_total": "5",
+      "s1_verified": "5",
+      "receipts_compared": "26"
     },
-    "timestamp": "2026-05-01T02:26:13.823693370Z",
-    "duration_ms": 4
+    "timestamp": "2026-05-02T01:37:50.851698410Z",
+    "duration_ms": 2
   },
-  "limitations": [],
-  "binding_hash": "35b3dc5d06da1af06d11174e5efab10673c821c135187d0fa19d0d4c25f68926"
+  "limitations": [
+    "1 new claim receipt(s) bootstrapped into baseline this run (auditable; future runs will gate against them)"
+  ],
+  "binding_hash": "79ef8066ba6f56a65b222ea9e797dc2f9e94346946e0deac3abc07a558afa6e8"
 }
