@@ -993,8 +993,7 @@ pub async fn check_mainnet_readiness(
         for ent in dir.flatten() {
             let name = ent.file_name();
             let n = name.to_string_lossy();
-            if (n.starts_with("proof-02-mainnet-rc-")
-                || n.starts_with("proof-02-test-workspace-"))
+            if (n.starts_with("proof-02-mainnet-rc-") || n.starts_with("proof-02-test-workspace-"))
                 && n.ends_with(".log")
             {
                 if let Ok(meta) = ent.metadata() {
