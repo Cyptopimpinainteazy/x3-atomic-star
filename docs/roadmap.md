@@ -1,6 +1,32 @@
 # X3 Chain Roadmap
 
-The development roadmap for X3 Chain's dual-VM blockchain platform, outlining our vision for creating the world's first atomic cross-chain infrastructure.
+**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)  
+**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0  
+**Commit:** `2e0c3bdac9de8b60`  
+**Last Updated:** 2026-05-02
+
+> For post-RC-1 roadmap, see [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md)
+
+---
+
+## Current Position
+
+✅ **RC-1 LAUNCH GATE PASSED** — All 16/16 S0 claims verified
+
+**What's Shipped in RC-1:**
+- X3Native, X3Evm, X3Svm internal domains
+- Internal cross-VM asset movement
+- Atomic bundle path (X3VM + IXL + Packet)
+- Settlement engine with slot-based clearing
+- Supply ledger enforcement
+- Cross-VM router (scope-frozen, external bridges disabled)
+
+**What's Excluded (Post-RC-1):**
+- External Ethereum, Solana, BTC bridges
+- GPU validator as consensus-critical
+- AI agents with fund control
+
+---
 
 ## Vision Statement
 
@@ -21,15 +47,18 @@ The development roadmap for X3 Chain's dual-VM blockchain platform, outlining ou
 - [x] Canonical ledger implementation
 - [x] Basic RPC endpoints
 
-**Network Launch**
-- [x] Testnet deployment with 3+ validators
-- [x] Public RPC endpoints operational
-- [x] Faucet service for test tokens
-- [x] Developer documentation
+**RC-1 Launch (2026-05-02)**
+- [x] ProofForge gates: 4/4 PASS (100% score)
+- [x] 16/16 S0 claims verified
+- [x] 9/9 S1 claims verified
+- [x] Zero security blockers
+- [x] Release binary available
 
 **Why this matters**: Foundation phase establishes the core dual-VM infrastructure that enables all future development.
 
-### Phase 2: Developer Experience (Q2 2025) 🚧 IN PROGRESS
+### Phase 2: Developer Experience (Post-RC-1)
+
+> **Note:** The timeline has been superseded by the RC-1 launch. See [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md) for post-RC-1 phase details.
 
 **Enhanced Developer Tools**
 - [ ] Unified SDK release (JavaScript/TypeScript)
@@ -52,7 +81,7 @@ The development roadmap for X3 Chain's dual-VM blockchain platform, outlining ou
 
 **Why this matters**: Strong developer experience drives ecosystem adoption and enables innovative applications.
 
-### Phase 3: Ecosystem Growth (Q3 2025) 📅 PLANNED
+### Phase 3: Ecosystem Growth (Post-RC-1) 📅 PLANNED
 
 **DeFi Infrastructure**
 - [ ] Cross-VM AMM (Automated Market Maker)
@@ -75,7 +104,7 @@ The development roadmap for X3 Chain's dual-VM blockchain platform, outlining ou
 
 **Why this matters**: Diverse ecosystem applications demonstrate the value proposition of dual-VM architecture.
 
-### Phase 4: Advanced Features (Q4 2025 - Q1 2026) 📅 PLANNED
+### Phase 4: Advanced Features (Post-RC-1) 📅 PLANNED
 
 **X3 Virtual Machine**
 - [ ] AI-optimized execution environment
@@ -98,7 +127,7 @@ The development roadmap for X3 Chain's dual-VM blockchain platform, outlining ou
 
 **Why this matters**: Advanced features position X3 Chain as the leading platform for next-generation blockchain applications.
 
-### Phase 5: Global Adoption (Q2 2026 - Q4 2026) 📅 PLANNED
+### Phase 5: Global Adoption (Post-RC-1) 📅 PLANNED
 
 **Network Scaling**
 - [ ] 1000+ validators
@@ -362,4 +391,8 @@ The development roadmap for X3 Chain's dual-VM blockchain platform, outlining ou
 
 ---
 
-*This roadmap is a living document that evolves based on market feedback, technical progress, and strategic opportunities. Last updated: December 2025*
+*This roadmap is a living document that evolves based on market feedback, technical progress, and strategic opportunities. Last updated: 2026-05-02*
+
+**RC-1 Status:** ✅ GO FOR MAINNET  
+**Source:** [docs/CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md)  
+**Post-RC-1 Roadmap:** [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md)

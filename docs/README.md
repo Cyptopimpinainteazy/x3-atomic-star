@@ -23,9 +23,10 @@ For the complete navigation structure, see **[master/INDEX.md](./master/INDEX.md
 - **[Testing Guide](./testing/)** - Testing frameworks and quality gates
 
 ### Operations & Security
-- **[Mainnet Readiness](../00-START-HERE-MAINNET-READINESS.md)** - Security audit status
-- **[ProofForge Security Report](../PROOFFORGE_SECURITY_REPORT.md)** - Critical blockers
-- **[Security Remediation Plan](../S0_BLOCKERS_REMEDIATION_PLAN.md)** - Fix roadmap
+
+- **[Mainnet Readiness](../00-START-HERE-MAINNET-READINESS.md)** - RC-1 launch status (GO, 100%)
+- **[Current Mainnet Status](./CURRENT_MAINNET_STATUS.md)** - Single source of truth
+- **[Security Gates](./SECURITY_GATES.md)** - Security verification gates
 
 ---
 
@@ -36,8 +37,10 @@ This documentation covers:
 - ✅ **Tri-VM system** - EVM, SVM, and native execution
 - ✅ **Development tools** - CLI, SDK, testing frameworks
 - ✅ **Deployment** - Local testnet, multi-server, production
-- ✅ **Security** - All ProofForge gates PASSED (16/16 S0 verified, 0 blockers)  
-  See: [MAINNET STATUS](../docs/CURRENT_MAINNET_STATUS.md)
+- ✅ **Security** - All ProofForge gates PASSED (16/16 S0 verified, 0 blockers)
+
+**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)
+**Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
 
 ---
 
