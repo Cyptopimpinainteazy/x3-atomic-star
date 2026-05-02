@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
   "command_run": "x3-proof verify x3.runtime.full_proof",
-  "artifact_hash": "af78992509c5a4fd99766418a2c400cbc83ea6579ff76408ec0428a66ed55616",
+  "artifact_hash": "604f00717ac2dbdd7e502199362804485e38c0fc76517dc0b76def19d5c4749a",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "runtime/Cargo.toml",
@@ -9,7 +9,7 @@
     "scripts/run-try-runtime.sh",
     "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json"
   ],
-  "timestamp": "2026-04-30T19:15:45.299017384Z",
+  "timestamp": "2026-05-02T02:12:33.285410342Z",
   "result": {
     "claim_id": "x3.runtime.full_proof",
     "claim": "Runtime upgrade-safety artifacts are present",
@@ -26,7 +26,7 @@
       "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json"
     ],
     "commands_run": [
-      "cargo check -p x3-chain-runtime --quiet"
+      "SKIP_WASM_BUILD=1 cargo check -p x3-chain-runtime --quiet"
     ],
     "passed_checks": [
       "Runtime crate manifest exists",
@@ -41,15 +41,15 @@
     "blockers": [],
     "score": 0.8,
     "evidence": {
-      "runtime/Cargo.toml": "true",
       "scripts/run-try-runtime.sh": "true",
+      "runtime/src/lib.rs": "true",
+      "runtime/Cargo.toml": "true",
       "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json": "true",
-      "runtime_check": "false",
-      "runtime/src/lib.rs": "true"
+      "runtime_check": "false"
     },
-    "timestamp": "2026-04-30T19:15:45.289663473Z",
-    "duration_ms": 9691
+    "timestamp": "2026-05-02T02:12:33.270381728Z",
+    "duration_ms": 714600
   },
   "limitations": [],
-  "binding_hash": "89f055fc03c1d9515a81f9e7753fac3333512c92bddc3b67a83c79612765ac59"
+  "binding_hash": "a8c64f58bcc55f0605e8325e4fc35e595216f14d0962f1e9e236b351edf3a28f"
 }

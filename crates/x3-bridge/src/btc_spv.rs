@@ -343,7 +343,10 @@ mod tests {
             }
         }
 
-        assert!(valid, "Failed to find a valid nonce for easy difficulty header");
+        assert!(
+            valid,
+            "Failed to find a valid nonce for easy difficulty header"
+        );
         assert_eq!(blockchain.current_height, 0);
     }
 

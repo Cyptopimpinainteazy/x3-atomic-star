@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "ad21592eaa40f4d38efc52980c6cf0d94f5f9422",
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
   "command_run": "x3-proof verify x3.gpu.cpu_gpu_parity",
   "artifact_hash": "6d45e66489c55d4fe48b1eb8367817e0c5679c8339056fe0ea98b9074ebc092f",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -10,7 +10,7 @@
     "X3-contracts/shared/gpu-parity-core/Cargo.toml",
     "X3-contracts/shared/test-vectors/gpu_hash_parity.json"
   ],
-  "timestamp": "2026-05-02T01:36:08.227896699Z",
+  "timestamp": "2026-05-02T02:25:41.393980768Z",
   "result": {
     "claim_id": "x3.gpu.cpu_gpu_parity",
     "claim": "GPU-accelerated execution/verification matches CPU reference results",
@@ -46,17 +46,17 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "parity_references": "63",
       "gpu_parity_vectors": "ok",
-      "swarm_aux_tests_snippet": "  process didn't exit successfully: `/home/lojak/Desktop/X3_ATOMIC_STAR/target/debug/build/prometheus-ff47d1800b0bee46/build-script-build` (signal: 11, SIGSEGV: invalid memory reference) | Caused by: | error: failed to run custom build command for `prometheus v0.14.0` |    Compiling prometheus v0.14.0 | warning: /home/lojak/Desktop/X3_ATOMIC_STAR/crates/x3-integration/Cargo.toml: unused manifest key: dependencies.codec.package",
-      "swarm_aux_tests": "failed",
-      "cpu_fallback": "present"
+      "cpu_fallback": "present",
+      "swarm_aux_tests_snippet": "  process didn't exit successfully: `/home/lojak/Desktop/X3_ATOMIC_STAR/target/debug/build/prometheus-ff47d1800b0bee46/build-script-build` (signal: 11, SIGSEGV: invalid memory reference) | Caused by: | error: failed to run custom build command for `prometheus v0.14.0` |    Compiling prometheus v0.14.0 |     Blocking waiting for file lock on build directory |     Blocking waiting for file lock on package cache |     Blocking waiting for file lock on package cache |     Blocking waiting for file lock on packa",
+      "parity_references": "63",
+      "swarm_aux_tests": "failed"
     },
-    "timestamp": "2026-05-02T01:36:08.222331083Z",
-    "duration_ms": 2636
+    "timestamp": "2026-05-02T02:25:41.387919603Z",
+    "duration_ms": 5281
   },
   "limitations": [
     "Auxiliary x3-gpu-validator-swarm crate test run did not exit cleanly; canonical CPU↔GPU parity is asserted by the gpu-parity-core JSON-vector harness (binding proof). See evidence.swarm_aux_tests_snippet."
   ],
-  "binding_hash": "e677ba69a3263880a8efe063125f43e29d3ee4b6787ed878b66f0850b99f9407"
+  "binding_hash": "67ac3646e30ccd7022594d978d81f6fb75125b7b80e7749146e95dbaa1e55a49"
 }

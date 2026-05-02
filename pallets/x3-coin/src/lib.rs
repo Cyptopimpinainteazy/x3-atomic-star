@@ -617,6 +617,9 @@ pub mod pallet {
             // Update canonical balance via X3 Kernel
             Self::increase_canonical_balance(&who, available);
 
+            // 🔒 SECURITY: Verify supply conservation invariant after vesting claim
+            Self::verify_supply_invariant()?;
+
             // Emit event
             Self::deposit_event(Event::TeamVestingClaimed {
                 account: who,
@@ -682,6 +685,9 @@ pub mod pallet {
 
             // Update canonical balance via X3 Kernel
             Self::increase_canonical_balance(&who, claim_amount);
+
+            // 🔒 SECURITY: Verify supply conservation invariant after bonus claim
+            Self::verify_supply_invariant()?;
 
             // Emit event
             Self::deposit_event(Event::BonusClaimed {
@@ -778,6 +784,9 @@ pub mod pallet {
                         // Execute mint
                         let account_id = Self::decode_account_id(&target_account)?;
                         Self::increase_canonical_balance(&account_id, amount.saturated_into());
+
+                        // 🔒 SECURITY: Verify supply conservation invariant after cross-chain mint
+                        Self::verify_supply_invariant()?;
                     }
                     CrossChainOperation::Burn {
                         source_account,
@@ -791,6 +800,9 @@ pub mod pallet {
                         ensure!(current_balance >= amount, Error::<T>::InsufficientBalance);
 
                         Self::decrease_canonical_balance(&account_id, amount)?;
+
+                        // 🔒 SECURITY: Verify supply conservation invariant after cross-chain burn
+                        Self::verify_supply_invariant()?;
                     }
                     CrossChainOperation::Transfer {
                         source_account,
@@ -808,6 +820,9 @@ pub mod pallet {
 
                         Self::decrease_canonical_balance(&source_id, amount)?;
                         Self::increase_canonical_balance(&target_id, amount);
+
+                        // 🔒 SECURITY: Verify supply conservation invariant after cross-chain transfer
+                        Self::verify_supply_invariant()?;
                     }
                 }
             }

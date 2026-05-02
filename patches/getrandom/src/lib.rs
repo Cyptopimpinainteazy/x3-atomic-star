@@ -1,8 +1,9 @@
 //! Patched getrandom v0.3.4 for Substrate WASM runtime builds.
 //! For wasm32-unknown-unknown (no-std), provides stub implementation.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(any(not(feature = "std"), target_arch = "wasm32"), no_std)]
 
+use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 /// Error type for getrandom operations.
@@ -39,7 +40,9 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
+// Implement `std::error::Error` for non-wasm std targets.
+// This is required by rand_core 0.9+ which uses `getrandom::Error` in trait bounds.
+#[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
 impl std::error::Error for Error {}
 
 /// Fill `dest` with random bytes.

@@ -1,5 +1,7 @@
 # X3 Atomic Star — Mainnet RC-1 Scope
 
+> **Status:** LOCKED — all RC-1 gates passed 2026-05-02
+>
 > **Rule**: Anything not listed in RC-1 below is disabled, feature-gated, or excluded from genesis.
 >
 > This document is machine-verified by `crates/x3-readiness-report`.

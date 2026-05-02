@@ -116,6 +116,10 @@ pub mod pallet {
         OptionQuery,
     >;
 
+    /// S1-3: Authorized minters for token operations
+    #[pallet::storage]
+    pub type Minters<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -321,8 +325,9 @@ pub mod pallet {
             to: T::AccountId,
             amount: u128,
         ) -> DispatchResult {
-            // S1-3: only governance / root may mint.
-            ensure_root(origin)?;
+            let who = ensure_signed(origin)?;
+            // S1-3: only authorized minters may mint.
+            Self::ensure_minter(&who)?;
             ensure!(amount > 0, Error::<T>::InvalidAmount);
 
             let current = TokenBalances::<T>::get((to.clone(), token_id));
@@ -337,6 +342,33 @@ pub mod pallet {
                 amount: new_balance,
             });
 
+            Ok(())
+        }
+
+        /// S1-3: Add authorized minter
+        #[pallet::call_index(6)]
+        #[pallet::weight(5_000)]
+        pub fn add_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+            Minters::<T>::insert(&who, ());
+            Ok(())
+        }
+
+        /// S1-3: Remove authorized minter
+        #[pallet::call_index(7)]
+        #[pallet::weight(5_000)]
+        pub fn remove_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
+            ensure_root(origin)?;
+            Minters::<T>::remove(&who);
+            Ok(())
+        }
+
+        /// S1-3: Ensure caller is authorized minter
+        fn ensure_minter(who: &T::AccountId) -> Result<(), Error<T>> {
+            ensure!(
+                Minters::<T>::contains_key(who),
+                Error::<T>::Unauthorized
+            );
             Ok(())
         }
     }

@@ -272,6 +272,7 @@ construct_runtime!(
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
         EVM: pallet_evm,
+        Ethereum: pallet_ethereum,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
@@ -318,6 +319,7 @@ construct_runtime!(
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
         EVM: pallet_evm,
+        Ethereum: pallet_ethereum,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
@@ -626,6 +628,11 @@ impl pallet_evm::Config for Runtime {
     type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 }
 
+impl pallet_ethereum::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type StateRoot = pallet_ethereum::IntermediateStateRoot<Self>;
+}
+
 // Helper types for pallet_x3_kernel::Config bridge escrow bindings
 pub struct BridgeEvmEscrowStorage;
 impl frame_support::traits::Get<sp_core::H160> for BridgeEvmEscrowStorage {
@@ -926,6 +933,15 @@ impl pallet_x3_invariants::Config for Runtime {
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
 }
 
+pub struct RuntimeEmergencyHaltController;
+
+impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltController {
+    fn trigger() {
+        pallet_x3_invariants::Halted::<Runtime>::put(true);
+        pallet_x3_supply_ledger::TransferHalted::<Runtime>::put(true);
+    }
+}
+
 impl pallet_x3_kernel::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
@@ -955,7 +971,7 @@ impl pallet_x3_kernel::Config for Runtime {
     #[cfg(feature = "std")]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
     #[cfg(feature = "std")]
-    type SvmAdapter = native_vm_adapters::NativeSvmAdapter;
+    type SvmAdapter = pallet_x3_kernel::adapters::RbpfSvmAdapter;
     #[cfg(feature = "std")]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
     #[cfg(not(feature = "std"))]
@@ -969,6 +985,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type BridgeEvmEscrow = BridgeEvmEscrowStorage;
     type BridgeSvmEscrow = BridgeSvmEscrowStorage;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
+    type EmergencyHaltController = RuntimeEmergencyHaltController;
 }
 
 impl pallet_x3_coin::Config for Runtime {
@@ -1046,18 +1063,9 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     #[cfg(feature = "std")]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
     #[cfg(feature = "std")]
-    type SvmAdapter = native_vm_adapters::NativeSvmAdapter;
+    type SvmAdapter = pallet_x3_kernel::adapters::RbpfSvmAdapter;
     #[cfg(feature = "std")]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
-    #[cfg(not(feature = "std"))]
-    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
-    #[cfg(not(feature = "std"))]
-    type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
-    #[cfg(not(feature = "std"))]
-    type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
-    type MaxTradeLegs = MaxTradeLegs;
-    type MaxCheckpoints = MaxCheckpoints;
-    type MaxPendingBatchesPerAccount = MaxPendingBatchesPerAccount;
     type DefaultTradeEvmGasLimit = DefaultTradeEvmGasLimit;
     type DefaultTradeSvmComputeLimit = DefaultTradeSvmComputeLimit;
     type DefaultTradeX3GasLimit = DefaultTradeX3GasLimit;

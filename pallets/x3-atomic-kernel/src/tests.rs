@@ -1,6 +1,5 @@
 //! Tests for pallet-x3-atomic-kernel
 
-use super::pallet::*;
 use super::proof::*;
 use sp_core::H256;
 

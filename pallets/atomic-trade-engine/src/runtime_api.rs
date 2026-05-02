@@ -4,7 +4,7 @@
 //! enabling AI agents and frontends to query trade simulation, pricing, and
 //! execution cost estimation without submitting transactions.
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::RuntimeDebug;

@@ -92,7 +92,6 @@
 use crate::limit_order_book::{LimitOrder, OrderExecution};
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::H256;
-use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderSettlementIntent {
@@ -496,7 +495,7 @@ mod tests {
 
     #[test]
     fn test_can_finalize_intent_timeout() {
-        let mut intent = OrderSettlementIntent {
+        let intent = OrderSettlementIntent {
             intent_id: H256::zero(),
             buy_order_id: [1u8; 32],
             sell_order_id: [2u8; 32],

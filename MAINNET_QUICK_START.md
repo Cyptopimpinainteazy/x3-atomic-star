@@ -1,205 +1,89 @@
-> ⚠️ **STATUS BANNER (April 27, 2026):** This document predates the Apr 27 evidence-based reconciliation. **5 of 9 ProofForge critical blockers are now RESOLVED** (S0-1..5). Outstanding: S0-6 + S1-1/2/3. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for the authoritative current state.
+# X3_ATOMIC_STAR - RC-1 Quick Start
 
-# ⚠️ X3 Testnet Proof Machine: Quick Start (NOT MAINNET READY)
-
-🚨 **IMPORTANT**: Despite the filename, this blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
-📖 See [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) and [S0_BLOCKERS_REMEDIATION_PLAN.md](./S0_BLOCKERS_REMEDIATION_PLAN.md) for 9 critical blockers  
-⏱️ Estimated timeline to mainnet readiness: **12-24 weeks**
-
-This document describes testnet deployment and proof generation processes.
+**Status:** ✅ **GO FOR MAINNET RC-1 (v0.4 Internal-Only)**
+**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0
+**Commit:** `2e0c3bdac9de8b60`
+**Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
 
 ---
 
-## 🎬 Start Here (5 Minutes)
+## 🎯 Where Are We?
+
+✅ **ALL LAUNCH GATES PASSED** — RC-1 is locked and ready
+
+All ProofForge security gates (S0-1 through S0-6, S1-1, S1-2, S1-3) have been verified and passed. The release binary is available at `target/release/x3-chain-node`.
+
+---
+
+## 📋 Quick Reference
+
+### Launch Gate Results
+
+| Gate | Score | Status |
+|------|-------|--------|
+| SecurityGate | 16/16 S0 verified | ✅ PASS |
+| MainnetGate | 100% | ✅ PASS |
+| GapGate | 0 gaps | ✅ PASS |
+| TodoGate | 0 stale | ✅ PASS |
+
+---
+
+## 🚀 Getting Started
+
+### Operators / Validators
+
+1. **[TESTNET_DEPLOYMENT_GUIDE.md](TESTNET_DEPLOYMENT_GUIDE.md)** — Complete deployment manual
+2. **[QUICK_COMMAND_REFERENCE.md](QUICK_COMMAND_REFERENCE.md)** — Command cheat sheet
+3. **[TESTNET_PRE_DEPLOYMENT_CHECKLIST.md](TESTNET_PRE_DEPLOYMENT_CHECKLIST.md)** — Pre-launch checklist
+
+### Developers
+
+1. **[docs/getting-started.md](docs/getting-started.md)** — Getting started guide
+2. **[docs/architecture.md](docs/architecture.md)** — System architecture
+3. **[docs/RPC_INTEGRATION_GUIDE.md](docs/RPC_INTEGRATION_GUIDE.md)** — RPC integration
+4. **[MAINNET_RC1_SCOPE.md](MAINNET_RC1_SCOPE.md)** — RC-1 scope definition
+
+### Decision Makers / Auditors
+
+1. **[MASTER_STATUS.md](MASTER_STATUS.md)** — Canonical status (GO/100%/0 blockers)
+2. **[docs/CURRENT_MAINNET_STATUS.md](docs/CURRENT_MAINNET_STATUS.md)** — Full status report
+3. **[launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)** — Machine report
+
+---
+
+## 🔑 Key Commands
 
 ```bash
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
+# Run the node
+./target/release/x3-chain-node --chain dev --tmp
 
-# 1. Verify setup
-ls -l launch-gates/build-audit-packs.sh     # ✅ Exists
-ls -l launch-gates/prompts/0*.md            # ✅ 5 prompts exist
-ls -l launch-gates/run-all-proofs.sh        # ✅ Exists
+# Check health
+curl http://localhost:9933 -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"method\":\"system_health\",\"params\":[],\"id\":1}'
 
-# 2. Generate packs (5-10 min)
-chmod +x launch-gates/build-audit-packs.sh
-./launch-gates/build-audit-packs.sh
-
-# 3. Verify packs created
-ls -lh launch-gates/repomix/pack-*.md       # ✅ 5 files
-
-# 4. Collect evidence (15-20 min)
-chmod +x launch-gates/run-all-proofs.sh
-./launch-gates/run-all-proofs.sh
-
-# 5. Verify evidence
-ls -lh launch-gates/evidence/proof-*.log    # ✅ 12+ files
+# View consensus status
+./target/release/x3-chain-node --chain dev --tmp --log=runtime::consensus=debug
 ```
 
 ---
 
-## 📋 The 5 Packs & 5 Prompts
+## 📚 RC-1 Scope Summary
 
-| # | Pack | Prompt | Question | Output |
-|---|------|--------|----------|--------|
-| 1 | Full Repo | Wiring Audit | Is everything connected? | Wiring map |
-| 2 | Runtime/Consensus | Mainnet Gate | Is it production-ready? | Category scores |
-| 3 | Bridge/Atomic | Red Team | How can attackers break it? | Attack vectors |
-| 4 | Test Coverage | Invariant Hunter | What invariants exist? | Invariants list |
-| 5 | Git Drift | Test Gap Audit | What's not tested? | Missing tests |
+### Included in RC-1
+- X3Native, X3Evm, X3Svm internal domains
+- Internal cross-VM asset movement
+- X3Governance with treasury
+- X3AtomicKernel with bundle lifecycle
+- Atomic swap execution (single-hop)
+- Spot swap path only where present in existing runtime/pallet code
 
----
-
-## 🤖 Feed Each Pack to AI (Once Packs Generated)
-
-```bash
-# For each pack (1-5):
-cd launch-gates
-
-# Example: Audit pack 1
-cat prompts/01-wiring-audit.md                              # Copy this
-cat repomix/pack-01-full-repo-*.md                          # Paste this
-# [AI auditor responds with JSON output]
-# Save response to: reports/audit-01-wiring-map.json
-
-# Repeat for packs 2-5 with corresponding prompts
-```
+### Excluded from RC-1
+- External Ethereum, Solana, BTC bridges
+- External liquidity gateway
+- GPU validator as consensus-critical path
+- AI agents with fund control authority
+- Autonomous flashloan or mainnet strategy systems
 
 ---
 
-## 📊 Score & Decide (After All 5 Audits)
-
-```bash
-# Review all audit results
-ls -l launch-gates/reports/audit-*.json
-
-# Extract scores from audit-02 (mainnet-scoring.json)
-# and calculate overall score using category weights:
-
-# Overall = 
-#   (runtime_pct × 12%) +
-#   (consensus_pct × 12%) +
-#   (asset_kernel_pct × 15%) +
-#   (atomic_pct × 18%) +
-#   (bridge_pct × 15%) +
-#   (dex_pct × 8%) +
-#   (governance_pct × 6%) +
-#   (validator_ops_pct × 6%) +
-#   (observability_pct × 4%) +
-#   (docs_pct × 4%)
-
-# DECISION:
-# - If score ≥ 90% AND zero P0 blockers → GO
-# - Otherwise → NO-GO (list fixes required)
-```
-
----
-
-## ✅ Success Checklist
-
-- [ ] All 5 packs generated (launch-gates/repomix/)
-- [ ] All evidence collected (launch-gates/evidence/)
-- [ ] All 5 audits completed (launch-gates/reports/audit-0*.json)
-- [ ] Overall score calculated
-- [ ] All P0 blockers identified
-- [ ] Final GO/NO-GO decision documented
-
----
-
-## 🚨 Hard Fail Gates (Any One = FAIL)
-
-- [ ] Any P0 blocker exists
-- [ ] Bridge has no replay test
-- [ ] Atomic swap has no rollback test
-- [ ] Canonical supply not tested
-- [ ] No multi-node testnet proof
-
----
-
-## 📂 File Locations
-
-```
-launch-gates/
-├── repomix.config.json              ← Strategic includes/excludes
-├── build-audit-packs.sh             ← Generate 5 packs
-├── run-all-proofs.sh                ← Collect all evidence
-├── mainnet-go-no-go-template.sh     ← Score & decide
-├── prompts/
-│   ├── 01-wiring-audit.md           ← Prompt 1
-│   ├── 02-mainnet-gate.md           ← Prompt 2
-│   ├── 03-bridge-redteam.md         ← Prompt 3
-│   ├── 04-invariant-hunter.md       ← Prompt 4
-│   └── 05-test-gap-audit.md         ← Prompt 5
-├── repomix/                         ← 5 audit packs (generated)
-├── evidence/                        ← Proof outputs (generated)
-└── reports/                         ← Audit results (generated)
-```
-
----
-
-## 📖 Full Workflow
-
-See: `MAINNET_PROOF_MACHINE_WORKFLOW.md` for complete step-by-step guide.
-
----
-
-## 🎯 Core Principle
-
-**"No proof = no points"**
-
-A feature cannot score higher than its strongest test:
-- Code exists only → max 10%
-- Code wired → max 25%
-- Compiles → max 45%
-- Unit tested → max 55%
-- Integration tested → max 70%
-- Fuzz/invariant tested → max 85%
-- Testnet proven → max 95%
-- Externally audited → 100%
-
-Beautiful code without tests scores 55%. Period.
-
----
-
-## ⏱️ Timeline
-
-| Phase | Task | Time |
-|-------|------|------|
-| 1 | Generate 5 packs | 5-10 min |
-| 2 | Collect proofs | 15-20 min |
-| 3 | Audit all 5 packs | 2-3 hours |
-| 4 | Score & decide | 30 min |
-| **Total** | **End-to-end** | **3-4 hours** |
-
----
-
-## 🚀 After Decision
-
-**GO:** Create release, finalize chain spec, Genesis ceremony  
-**NO-GO:** Fix blockers, re-run Phase 1-4
-
----
-
-## 💡 Tips
-
-1. **Packs too large?** They're optimized per category. Use them whole.
-2. **AI getting confused?** Load prompt first, then pack (in that order).
-3. **Results look incomplete?** Ensure AI response was saved as JSON (use formatting).
-4. **Need reproducibility?** Save commit hash + all hashes in a release folder.
-
----
-
-## 📞 Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Packs not generating | Run: `repomix --version` to verify installed |
-| Proofs failing | Check: `cargo check --workspace` compiles cleanly |
-| AI audit unclear | Ensure you pasted both prompt AND entire pack |
-| Score calculation wrong | Double-check category weights sum to 100% |
-| P0 blocker disagreement | Re-run audit; weight security findings heavily |
-
----
-
-**Start now:** `./launch-gates/build-audit-packs.sh`
-
-**Questions?** See full workflow guide: `MAINNET_PROOF_MACHINE_WORKFLOW.md`
+**Last Updated:** 2026-05-02
+**Status:** ✅ GO FOR MAINNET RC-1

@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sp_core::{
     ed25519::{Public as Ed25519Public, Signature as Ed25519Signature},
-    ByteArray,
-    Pair as PairTrait,
+    ByteArray, Pair as PairTrait,
 };
 use std::collections::HashSet;
 

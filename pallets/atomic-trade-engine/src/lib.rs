@@ -2125,7 +2125,7 @@ pub struct TradeLeg {
 
 /// Status of a trade leg.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
+    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
 )]
 pub enum TradeLegStatus {
     #[default]
@@ -2235,7 +2235,7 @@ impl<AccountId, Balance, MaxTradeLegs: Get<u32>> TradeBatch<AccountId, Balance, 
 
 /// Status of a trade batch.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
+    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
 )]
 pub enum BatchStatus {
     #[default]

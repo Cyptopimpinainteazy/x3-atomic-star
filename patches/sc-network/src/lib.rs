@@ -262,7 +262,12 @@ pub mod utils;
 
 pub use event::{DhtEvent, Event, SyncEvent};
 #[doc(inline)]
-pub use libp2p::{multiaddr, Multiaddr, PeerId};
+// Use Multiaddr from sc-network-types for compatibility with sc-mixnet
+// (removed libp2p re-export to avoid type conflict)
+// Use PeerId from libp2p directly for compatibility
+pub use libp2p::multiaddr;
+pub type PeerId = libp2p::PeerId;
+pub use sc_network_types::multiaddr::Multiaddr;
 pub use request_responses::{Config, IfDisconnected, RequestFailure};
 pub use sc_network_common::{
 	role::ObservedRole,

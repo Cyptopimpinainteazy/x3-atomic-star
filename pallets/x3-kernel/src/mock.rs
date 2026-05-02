@@ -7,6 +7,7 @@ use frame_support::{
 };
 use frame_system as system;
 use parity_scale_codec::Encode;
+use core::sync::atomic::{AtomicBool, Ordering};
 use sp_core::{H160, H256};
 use sp_io::TestExternalities;
 use sp_runtime::{
@@ -25,6 +26,8 @@ pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 
+pub static EMERGENCY_HALT_TRIGGERED: AtomicBool = AtomicBool::new(false);
+
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
     pub const ExistentialDeposit: Balance = 1;
@@ -42,6 +45,13 @@ pub struct BridgeSvmEscrowValue;
 impl Get<[u8; 32]> for BridgeSvmEscrowValue {
     fn get() -> [u8; 32] {
         [0; 32]
+    }
+}
+
+pub struct TestEmergencyHaltController;
+impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
+    fn trigger() {
+        EMERGENCY_HALT_TRIGGERED.store(true, Ordering::SeqCst);
     }
 }
 
@@ -282,6 +292,7 @@ impl pallet_x3_kernel::Config for Test {
     type CrossChainProofVerifier = crate::NoopProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
+    type EmergencyHaltController = TestEmergencyHaltController;
 }
 
 pub struct ExtBuilder {
@@ -310,6 +321,7 @@ impl ExtBuilder {
     }
 
     pub fn build(self) -> TestExternalities {
+        EMERGENCY_HALT_TRIGGERED.store(false, Ordering::SeqCst);
         let mut storage = frame_system::GenesisConfig::<Test>::default()
             .build_storage()
             .expect("Failed to build system genesis storage");

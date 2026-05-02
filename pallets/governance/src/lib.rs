@@ -373,6 +373,12 @@ pub mod pallet {
         ValueQuery,
     >;
 
+    /// S1-2: Authorized governance accounts (only these can participate in governance)
+    /// Prevents governance bypass by restricting participation to vetted accounts.
+    #[pallet::storage]
+    pub type AuthorizedGovernanceAccounts<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
+
     // ========================================================================
     // Events
     // ========================================================================
@@ -484,6 +490,10 @@ pub mod pallet {
         AIConfigUpdated,
         /// S1-2: Canonical constitution hash was rotated by governance.
         CanonicalConstitutionHashUpdated { hash: [u8; 32] },
+        /// S1-2: Account added to authorized governance participants.
+        GovernanceAccountAuthorized { account: T::AccountId },
+        /// S1-2: Account removed from authorized governance participants.
+        GovernanceAccountDeauthorized { account: T::AccountId },
     }
 
     // ========================================================================
@@ -572,6 +582,8 @@ pub mod pallet {
         /// Proposal was authored against a superseded constitution hash.
         /// Must be re-submitted against the current constitution.
         ConstitutionHashMismatch,
+        /// S1-2: Caller is not authorized to participate in governance.
+        UnauthorizedGovernance,
     }
 
     // ========================================================================
@@ -653,6 +665,12 @@ pub mod pallet {
         ) -> DispatchResult {
             let proposer = T::SubmitOrigin::ensure_origin(origin)?;
 
+            // S1-2: Ensure caller is authorized for governance participation
+            ensure!(
+                AuthorizedGovernanceAccounts::<T>::contains_key(&proposer),
+                Error::<T>::UnauthorizedGovernance
+            );
+
             // Constitutional proof gate (Article IV): invariant-touching proposals
             // must carry a non-zero proof commitment at submission time.
             if touches_invariants {
@@ -732,6 +750,12 @@ pub mod pallet {
             conviction: Conviction,
         ) -> DispatchResult {
             let voter = ensure_signed(origin)?;
+
+            // S1-2: Ensure caller is authorized for governance participation
+            ensure!(
+                AuthorizedGovernanceAccounts::<T>::contains_key(&voter),
+                Error::<T>::UnauthorizedGovernance
+            );
 
             // Check voter is not delegating
             ensure!(
@@ -823,6 +847,12 @@ pub mod pallet {
             conviction: Conviction,
         ) -> DispatchResult {
             let delegator = ensure_signed(origin)?;
+
+            // S1-2: Ensure caller is authorized for governance participation
+            ensure!(
+                AuthorizedGovernanceAccounts::<T>::contains_key(&delegator),
+                Error::<T>::UnauthorizedGovernance
+            );
 
             ensure!(delegator != target, Error::<T>::SelfDelegation);
 
@@ -1325,6 +1355,36 @@ pub mod pallet {
                 CanonicalConstitutionHash::<T>::put(hash);
             }
             Self::deposit_event(Event::CanonicalConstitutionHashUpdated { hash });
+            Ok(())
+        }
+
+        /// S1-2: Add an account to the authorized governance participants list.
+        ///
+        /// Origin: `RuntimeUpgradeOrigin` (root / governance-bound).
+        #[pallet::call_index(18)]
+        #[pallet::weight(T::WeightInfo::update_config())]
+        pub fn authorize_governance_account(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::RuntimeUpgradeOrigin::ensure_origin(origin)?;
+            AuthorizedGovernanceAccounts::<T>::insert(&account, ());
+            Self::deposit_event(Event::GovernanceAccountAuthorized { account });
+            Ok(())
+        }
+
+        /// S1-2: Remove an account from the authorized governance participants list.
+        ///
+        /// Origin: `RuntimeUpgradeOrigin` (root / governance-bound).
+        #[pallet::call_index(19)]
+        #[pallet::weight(T::WeightInfo::update_config())]
+        pub fn deauthorize_governance_account(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::RuntimeUpgradeOrigin::ensure_origin(origin)?;
+            AuthorizedGovernanceAccounts::<T>::remove(&account);
+            Self::deposit_event(Event::GovernanceAccountDeauthorized { account });
             Ok(())
         }
     }

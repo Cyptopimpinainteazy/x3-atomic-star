@@ -55,6 +55,15 @@ pub use adapters::{
     MockEvmAdapter, MockSvmAdapter, MockX3Adapter, SvmExecutorAdapter, X3ExecutorAdapter,
 };
 
+/// Runtime-specific emergency halt hook.
+///
+/// The kernel uses this to flip the concrete halt state that downstream pallets
+/// actually inspect. Production runtimes should wire this into their canonical
+/// economic-halt / invariant-halt storage flags.
+pub trait EmergencyHaltController {
+    fn trigger();
+}
+
 pub use packet_adapters::{
     deserialize_packet, get_domain_mask, get_packet_type, route_packet, validate_packet,
     DomainRoute, PacketAdapterError, PacketAdapterResult,
@@ -519,6 +528,10 @@ pub mod pallet {
         /// Origin that can execute privileged governance functions.
         /// Typically EnsureRoot or a council-based origin.
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+        /// Concrete halt hook used by `emergency_halt` to flip the runtime's
+        /// production halt state.
+        type EmergencyHaltController: EmergencyHaltController;
     }
 
     type AssetSymbolOf<T> = BoundedVec<u8, <T as Config>::MaxAssetSymbolLength>;
@@ -969,11 +982,7 @@ pub mod pallet {
         #[pallet::weight(Weight::from_parts(15_000, 0))]
         pub fn emergency_halt(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
-
-            // TODO: Set the Halted flag in x3-invariants pallet at runtime level
-            // This will trigger asset freeze checks across all asset-related pallets
-            // Note: Direct access commented out due to trait bound requirements
-            // pallet_x3_invariants::Halted::<T>::put(true);
+            T::EmergencyHaltController::trigger();
 
             Self::deposit_event(Event::EmergencyHalted);
             Ok(())

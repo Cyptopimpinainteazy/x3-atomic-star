@@ -1,322 +1,90 @@
 # X3 Chain Documentation Index
 
-> **FORWARDING TO CANONICAL INDEX**: See **[master/INDEX.md](./master/INDEX.md)** for the complete, authoritative documentation navigation structure.
+**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)
+**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0
+**Commit:** `2e0c3bdac9de8b60`
 
 ---
 
-## 📚 Canonical Documentation Index
+## 🎯 START HERE (Pick Your Use Case)
 
-This file has been consolidated. For the complete documentation tree, navigation links, and all resources, see:
+### 👤 Operators / Validators
+1. [TESTNET_DEPLOYMENT_GUIDE.md](../TESTNET_DEPLOYMENT_GUIDE.md) - Complete deployment manual
+2. [QUICK_COMMAND_REFERENCE.md](../QUICK_COMMAND_REFERENCE.md) - Command cheat sheet
+3. [TESTNET_PRE_DEPLOYMENT_CHECKLIST.md](../TESTNET_PRE_DEPLOYMENT_CHECKLIST.md) - Pre-launch checklist
 
-### **[docs/master/INDEX.md](./master/INDEX.md)** ← Click here for full documentation
+### 👨‍💻 Developers
+1. [getting-started.md](./getting-started.md) - Getting started guide
+2. [architecture.md](./architecture.md) - System architecture
+3. [RPC_INTEGRATION_GUIDE.md](./RPC_INTEGRATION_GUIDE.md) - RPC integration
+4. [DEVELOPMENT_SETUP.md](./DEVELOPMENT_SETUP.md) - Dev environment setup
 
----
-
-## Quick Access Links (Subset)
-
-The following links are provided for quick reference. For the complete index, use master/INDEX.md above.
-
-| Document | Path |
-|----------|------|
-| Getting Started | [getting-started.md](./getting-started.md) |
-| X3 Language Specification | [X3_LANGUAGE_SPECIFICATION.md](./X3_LANGUAGE_SPECIFICATION.md) |
-| Tri-VM Architecture | [TRI_VM_ARCHITECTURE.md](./TRI_VM_ARCHITECTURE.md) |
-| X3Script DSL Specification | [X3SCRIPT_DSL_SPECIFICATION.md](./X3SCRIPT_DSL_SPECIFICATION.md) |
-| Developer Templates | [templates/X3_DEVELOPER_TEMPLATES.md](./templates/X3_DEVELOPER_TEMPLATES.md) |
+### 📊 Decision Makers / Auditors
+1. [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) - Full status report
+2. [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md) - Machine report
+3. [GAPS_REPORT_2026_04_27.md](../GAPS_REPORT_2026_04_27.md) - Gap tracker
 
 ---
 
-*This file exists for backward compatibility. All documentation navigation is maintained in [master/INDEX.md](./master/INDEX.md).*
+## 📚 Core Documentation
 
-
----
-
-## Quick Navigation
-
-| Document                                                      | Purpose                       | Audience       |
-| ------------------------------------------------------------- | ----------------------------- | -------------- |
-| [X3 Language Specification](#x3-language-specification)       | Formal language definition    | Compiler devs  |
-| [X3 Language Reference](#x3-language-reference)               | Practical guide with examples | All developers |
-| [Tri-VM Architecture](#tri-vm-architecture)                   | EVM+SVM+X3 integration        | Core devs      |
-| [X3Script DSL Specification](#x3script-dsl-specification)     | High-level DSL for contracts  | Contract devs  |
-| [AI Agent API Specification](#ai-agent-api-specification)     | Autonomous agent framework    | Agent devs     |
-| [Standard Library Reference](#standard-library-reference)     | 12-module stdlib              | All developers |
-| [Quantum Execution Whitepaper](#quantum-execution-whitepaper) | Speculative execution model   | Advanced users |
-| [Developer Templates](#8-developer-templates)                 | Starter templates matrix      | All developers |
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| [getting-started.md](./getting-started.md) | Quick start guide | All |
+| [architecture.md](./architecture.md) | System architecture | Core devs |
+| [RPC_INTEGRATION_GUIDE.md](./RPC_INTEGRATION_GUIDE.md) | RPC integration | API devs |
+| [DEVELOPMENT_SETUP.md](./DEVELOPMENT_SETUP.md) | Dev environment | All devs |
 
 ---
 
-## 1. X3 Language Specification
+## 🔐 Security & Verification
 
-**File:** [`docs/X3_LANGUAGE_SPECIFICATION.md`](./X3_LANGUAGE_SPECIFICATION.md)
-
-**Purpose:** Complete formal specification of the X3 programming language.
-
-**Key Topics:**
-- Type system (primitives, arrays, structs, enums)
-- Memory model (4 domains: register/stack/heap/global)
-- Control flow (branches, loops, function calls)
-- Built-in functions and hostcalls
-- Bytecode model and instruction encoding
-- 16-pass compilation pipeline
-
-**Audience:** Compiler developers, VM implementers, language contributors
-
-**Prerequisites:** Understanding of low-level programming, familiarity with assembly concepts
+| Document | Purpose |
+|----------|---------|
+| [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) | RC-1 status |
+| [SECURITY_GATES.md](./SECURITY_GATES.md) | Security verification |
+| [validation_checklist.md](./validation_checklist.md) | Validation checklist |
 
 ---
 
-## 2. X3 Language Reference
+## 🚀 Operational
 
-**File:** [`docs/X3_LANGUAGE_REFERENCE.md`](./X3_LANGUAGE_REFERENCE.md)
-
-**Purpose:** Practical developer reference with working examples.
-
-**Key Topics:**
-- AtomicSwap example walkthrough
-- Grammar sketch (BNF-style)
-- Glossary of 40+ terms
-- Frequently asked questions
-- Porting guide from Solidity/Rust
-
-**Audience:** All developers writing X3 code
-
-**Prerequisites:** Basic programming knowledge
+| Document | Purpose |
+|----------|---------|
+| [STAKING_OPERATIONS_MANUAL.md](./STAKING_OPERATIONS_MANUAL.md) | Validator guide |
+| [OWNER_RUNBOOK.md](./OWNER_RUNBOOK.md) | Node operator guide |
+| [SIDECAR_DEPLOYMENT.md](./SIDECAR_DEPLOYMENT.md) | Sidecar setup |
 
 ---
 
-## 3. Tri-VM Architecture
+## 📋 RC-1 Scope (Locked)
 
-**File:** [`docs/TRI_VM_ARCHITECTURE.md`](./TRI_VM_ARCHITECTURE.md)
+**Included:**
+- X3Native, X3Evm, X3Svm internal domains
+- Internal cross-VM asset movement
+- Atomic bundle path (X3VM + IXL + Packet)
+- Settlement engine with slot-based clearing
 
-**Purpose:** Technical specification for multi-VM execution.
+**Excluded (Feature-Gated):**
+- External bridges
+- GPU validator as consensus-critical
+- AI agents with fund control
 
-**Key Topics:**
-- Three-VM unified execution model
-- EVM integration (Frontier-based)
-- SVM integration (solana-rbpf)
-- X3 native VM execution
-- Atomic cross-VM transactions (Comit)
-- Warp engine speculative execution
-- Cross-VM ABI and message passing
-- Canonical ledger unification
-
-**Audience:** Core developers, protocol engineers
-
-**Prerequisites:** Understanding of EVM/SVM, blockchain consensus
+See [MAINNET_RC1_SCOPE.md](../MAINNET_RC1_SCOPE.md) for full scope.
 
 ---
 
-## 4. X3Script DSL Specification
+## 🔗 Related Resources
 
-**File:** [`docs/X3SCRIPT_DSL_SPECIFICATION.md`](./X3SCRIPT_DSL_SPECIFICATION.md)
+### Canonical Sources
+- [MASTER_STATUS.md](../MASTER_STATUS.md) - Root status
+- [ROADMAP.md](../ROADMAP.md) - Project roadmap
+- [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md) - Post-RC-1 roadmap
 
-**Purpose:** High-level domain-specific language for smart contracts.
-
-**Key Topics:**
-- Module system and imports
-- Function and task definitions
-- Storage declarations and memory regions
-- Cross-VM hostcalls (evm.call, svm.invoke)
-- AI-specific constructs (agent, strategy)
-- Safety rules and invariants
-- Complete ArbBot example
-
-**Audience:** Smart contract developers
-
-**Prerequisites:** Basic programming, familiarity with DeFi concepts
+### Archived Documentation
+Historical session/phase docs moved to [archive/sessions/](../archive/sessions/)
 
 ---
 
-## 5. AI Agent API Specification
-
-**File:** [`docs/AI_AGENT_API_SPECIFICATION.md`](./AI_AGENT_API_SPECIFICATION.md)
-
-**Purpose:** Framework for autonomous AI-powered agents.
-
-**Key Topics:**
-- Agent anatomy (file structure, manifest)
-- Four program unit types: contract, agent, strategy, kernel
-- Runtime API (hooks, lifecycle, IPC)
-- Evolution engine (mutation, crossover, selection)
-- Strategy system (prioritization, triggers, conditions)
-- Predictive execution and resource management
-- Multi-agent coordination (swarms, consensus)
-- Security model and sandboxing
-
-**Audience:** AI agent developers, DeFi strategists
-
-**Prerequisites:** X3Script knowledge, ML/optimization familiarity helpful
-
----
-
-## 6. Standard Library Reference
-
-**File:** [`docs/X3SCRIPT_STDLIB_REFERENCE.md`](./X3SCRIPT_STDLIB_REFERENCE.md)
-
-**Purpose:** Complete reference for the 12-module standard library.
-
-**Modules:**
-
-| Module      | Purpose        | Key Functions                                            |
-| ----------- | -------------- | -------------------------------------------------------- |
-| `core`      | Primitives     | `assert`, `require`, `keccak256`                         |
-| `token`     | ERC20/SPL      | `transfer`, `approve`, `balance_of`                      |
-| `dex`       | DEX operations | `get_price`, `swap_exact_in`, `add_liquidity`            |
-| `flashloan` | Flash loans    | `borrow`, `multi_borrow`, `repay`                        |
-| `oracle`    | Price feeds    | `get_price`, `get_twap`, `check_freshness`               |
-| `vault`     | Yield vaults   | `deposit`, `withdraw`, `harvest`                         |
-| `bridge`    | Cross-chain    | `initiate_transfer`, `claim`, `verify_proof`             |
-| `agent`     | Agent runtime  | `spawn`, `send`, `receive`, `mutate`                     |
-| `ai`        | AI/ML          | `predict`, `train_online`, `neural_forward`              |
-| `zk`        | Zero-knowledge | `verify_groth16`, `commit`, `reveal`                     |
-| `safety`    | Security       | `check_reentrancy`, `validate_oracle`, `assert_slippage` |
-| `devtools`  | Development    | `log`, `trace`, `measure_gas`, `dump_state`              |
-
-**Audience:** All X3Script developers
-
-**Prerequisites:** X3Script basics
-
----
-
-## 7. Quantum Execution Whitepaper
-
-**File:** [`docs/QUANTUM_EXECUTION_WHITEPAPER.md`](./QUANTUM_EXECUTION_WHITEPAPER.md)
-
-**Purpose:** Theoretical foundation for speculative parallel execution.
-
-**Key Topics:**
-- Superposition model (multiple execution paths)
-- Collapse mechanics (path selection)
-- Probabilistic execution and branching
-- Warp engine architecture
-- Runtime adaptation and optimization
-- Performance analysis and benchmarks
-- Security considerations
-
-**Audience:** Advanced developers, researchers
-
-**Prerequisites:** Strong CS fundamentals, probability theory
-
----
-
-## 8. Developer Templates
-
-**File:** [`docs/docs/docs/templates/X3_DEVELOPER_TEMPLATES.md`](./docs/docs/templates/X3_DEVELOPER_TEMPLATES.md)
-
-**Purpose:** Curated upstream template sources and adoption order for X3 Chain.
-
-**Local Starter Matrix:** [`docs/templates/x3-chain/README.md`](../docs/templates/x3-chain/README.md)
-
-**Key Topics:**
-- Polkadot SDK templates for L1/L2
-- PAPI TypeScript integration examples
-- Python substrate interface examples
-- iOS substrate SDK example
-- Recommended adoption sequence
-
----
-
-## Documentation by Use Case
-
-### Getting Started
-1. **New to X3 Chain?** → Start with [X3 Language Reference](#x3-language-reference)
-2. **Writing your first contract?** → [X3Script DSL Specification](#x3script-dsl-specification)
-3. **Using the stdlib?** → [Standard Library Reference](#standard-library-reference)
-
-### Building DeFi Applications
-1. [X3Script DSL Specification](#x3script-dsl-specification) — Contract structure
-2. [Standard Library Reference](#standard-library-reference) — `dex`, `flashloan`, `oracle` modules
-3. [Tri-VM Architecture](#tri-vm-architecture) — Cross-VM interactions
-
-### Building AI Agents
-1. [AI Agent API Specification](#ai-agent-api-specification) — Agent framework
-2. [Standard Library Reference](#standard-library-reference) — `agent`, `ai` modules
-3. [Quantum Execution Whitepaper](#quantum-execution-whitepaper) — Speculative strategies
-
-### Core Development
-1. [X3 Language Specification](#x3-language-specification) — Language internals
-2. [Tri-VM Architecture](#tri-vm-architecture) — VM integration
-3. [Quantum Execution Whitepaper](#quantum-execution-whitepaper) — Warp engine
-
-### Contract Auditing
-1. [X3 Language Specification](#x3-language-specification) — Type safety rules
-2. [Standard Library Reference](#standard-library-reference) — `safety` module
-3. [AI Agent API Specification](#ai-agent-api-specification) — Security model
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        X3 CHAIN STACK                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    X3SCRIPT DSL LAYER                        │   │
-│  │  Docs: X3Script DSL Spec, AI Agent API, Stdlib Reference    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼                                      │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                     X3 LANGUAGE LAYER                        │   │
-│  │  Docs: X3 Language Spec, X3 Language Reference              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼                                      │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    EXECUTION LAYER                           │   │
-│  │  ┌───────────┐  ┌───────────┐  ┌───────────┐               │   │
-│  │  │    EVM    │  │    SVM    │  │    X3     │               │   │
-│  │  │  Adapter  │  │  Adapter  │  │    VM     │               │   │
-│  │  └───────────┘  └───────────┘  └───────────┘               │   │
-│  │  Docs: Tri-VM Architecture, Quantum Execution Whitepaper    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼                                      │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                   SUBSTRATE RUNTIME                          │   │
-│  │  X3 Kernel Pallet • Consensus (Aura+GRANDPA)             │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Version History
-
-| Version | Date       | Changes                   |
-| ------- | ---------- | ------------------------- |
-| 1.0.0   | 2025-12-10 | Initial canonical release |
-
----
-
-## Related Resources
-
-### In-Repository
-- [`/pallets/x3-kernel/`](../pallets/x3-kernel/) — Core pallet implementation
-- [`/runtime/src/lib.rs`](../runtime/src/lib.rs) — Runtime composition
-- [`/crates/evm-integration/`](../crates/evm-integration/) — EVM adapter
-- [`/crates/svm-integration/`](../crates/svm-integration/) — SVM adapter
-- [`/apps/`](../apps/) — Frontend applications
-
-### External
-- [Substrate Documentation](https://docs.substrate.io/)
-- [Frontier (EVM)](https://github.com/polkadot-evm/frontier)
-- [Solana BPF](https://github.com/solana-labs/rbpf)
-
----
-
-## Contributing
-
-Documentation improvements welcome! See the main project's contributing guidelines.
-
-For questions: [X3 Chain Discord/Forums]
-
----
-
-**Document Version:** 1.0.0  
-**Specification Status:** Canonical  
-**Maintainer:** X3 Chain Core Engineering
+**Last Updated:** 2026-05-02
+**Status:** ✅ GO FOR RC-1

@@ -3,7 +3,7 @@
 //! This module contains additional type definitions for trade execution,
 //! path resolution, and AMM integration.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::BoundedVec;
 use scale_info::TypeInfo;
 use sp_core::{H256, U256};
@@ -50,6 +50,7 @@ pub enum VmType {
     Eq,
     Encode,
     Decode,
+    DecodeWithMemTracking,
     RuntimeDebug,
     TypeInfo,
     MaxEncodedLen,

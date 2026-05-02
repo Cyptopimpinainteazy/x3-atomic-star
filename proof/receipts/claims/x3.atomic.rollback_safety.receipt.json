@@ -1,14 +1,14 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
   "command_run": "x3-proof verify x3.atomic.rollback_safety",
-  "artifact_hash": "a9ac23cd8beb3ec81e5769ec66f7367683a75baa7a118b93cf18ae470fee8455",
+  "artifact_hash": "a54bd1321cd6c93e31d08b8db6485d1b736ddfbd83d51d8a5e9f6a932f46cef3",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "pallets/x3-atomic-kernel/src/lib.rs",
     "pallets/x3-atomic-kernel/src/tests.rs",
     "pallets/x3-cross-vm-router/src/lib.rs"
   ],
-  "timestamp": "2026-04-30T16:53:02.656327528Z",
+  "timestamp": "2026-05-02T02:29:16.081369545Z",
   "result": {
     "claim_id": "x3.atomic.rollback_safety",
     "claim": "If any EVM/SVM/X3VM leg fails, the operation rolls back or refunds safely",
@@ -41,13 +41,13 @@
     "score": 1.0,
     "evidence": {
       "tests_passed": "1",
-      "loom_rollback_visibility": "pass",
       "rollback_references": "29",
+      "loom_rollback_visibility": "pass",
       "router_atomic_references": "8"
     },
-    "timestamp": "2026-04-30T16:53:02.643525005Z",
-    "duration_ms": 12557
+    "timestamp": "2026-05-02T02:29:16.070161520Z",
+    "duration_ms": 27263
   },
   "limitations": [],
-  "binding_hash": "68cfd326f18b5ac083646cef816dc373104cfeb0d79296102a5941cc340d5aef"
+  "binding_hash": "af792b8292d44e467e172d33a8906afe80a757a2ea06b9fcf45144fafbb10e79"
 }

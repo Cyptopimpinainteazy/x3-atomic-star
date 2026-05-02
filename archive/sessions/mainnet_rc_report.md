@@ -1,5 +1,7 @@
 # Mainnet RC Report
 
+> **See also:** **[COMPLETE_BLOCKCHAIN_AUDIT_REPORT.md](./COMPLETE_BLOCKCHAIN_AUDIT_REPORT.md)** for the broader canonical audit summary.
+
 - Build Status: FAIL
 - Test Status: FAIL
 - Panic/Unwrap Audit: FAIL

@@ -66,7 +66,7 @@ pub mod pallet {
 
     /// Maximum number of authorized oracle accounts
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config: frame_system::Config + pallet_timestamp::Config {
         /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -104,7 +104,7 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn is_authorized_oracle)]
     pub type AuthorizedOracles<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, (), ValueQuery>;
+        StorageMap<_, Blake2_128Concat, T::AccountId, bool, ValueQuery>;
 
     /// Current price submissions for each asset
     /// Maps (asset_id, oracle_account) -> PriceSubmission
@@ -203,17 +203,17 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// Authorize an account to submit oracle prices
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::authorize_oracle())]
+        #[pallet::weight(<T as Config>::WeightInfo::authorize_oracle())]
         pub fn authorize_oracle(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
             T::UpdateOrigin::ensure_origin(origin)?;
-            AuthorizedOracles::<T>::insert(&account, ());
+            AuthorizedOracles::<T>::insert(&account, true);
             Self::deposit_event(Event::OracleAuthorized { account });
             Ok(())
         }
 
         /// Deauthorize an oracle account
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::deauthorize_oracle())]
+        #[pallet::weight(<T as Config>::WeightInfo::deauthorize_oracle())]
         pub fn deauthorize_oracle(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
             T::UpdateOrigin::ensure_origin(origin)?;
             AuthorizedOracles::<T>::remove(&account);
@@ -223,7 +223,7 @@ pub mod pallet {
 
         /// Submit a price for an asset
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::submit_price())]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_price())]
         pub fn submit_price(
             origin: OriginFor<T>,
             asset_id: AssetId,
@@ -233,7 +233,7 @@ pub mod pallet {
 
             // Check oracle authorization
             ensure!(
-                AuthorizedOracles::<T>::contains_key(&who),
+                AuthorizedOracles::<T>::get(&who),
                 Error::<T>::NotAuthorizedOracle
             );
 
@@ -282,10 +282,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// Get current timestamp (placeholder - should use pallet-timestamp)
         fn current_timestamp() -> Timestamp {
-            // TODO: Use pallet_timestamp::Pallet::<T>::now() when available
-            // For now, use block number as proxy
-            frame_system::Pallet::<T>::block_number().saturated_into::<u64>() * 12
-            // ~12 second blocks
+            pallet_timestamp::Pallet::<T>::get().saturated_into::<u64>()
         }
 
         /// Update the median price for an asset based on current submissions

@@ -11,7 +11,7 @@ keywords = ["random", "rng", "os"]
 categories = ["os", "no-std"]
 
 [features]
-default = ["std"]
+default = []
 std = []
 js = []
 wasm_js = []

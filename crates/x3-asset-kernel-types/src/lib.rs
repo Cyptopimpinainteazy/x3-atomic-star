@@ -493,7 +493,17 @@ pub struct X3TransferMessage<BlockNumber: MaxEncodedLen> {
 /// State of a pending transfer. Only transitions listed in [`TransferStatus::can_transition_to`]
 /// are allowed. All others are rejected by the router.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+    Default,
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum TransferStatus {

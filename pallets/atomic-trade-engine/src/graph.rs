@@ -9,7 +9,7 @@
 use crate::types::{
     AmmProtocol, ArbitrageOpportunity, LiquidityPool, RouteStep, TradeRoute, VmType,
 };
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;

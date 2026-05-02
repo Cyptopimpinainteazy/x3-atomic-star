@@ -1,13 +1,13 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
   "command_run": "x3-proof verify x3.governance.proof_gated_upgrade",
-  "artifact_hash": "32fdf3efe2f7ac6124d8e29421d3deec604c53fec92d63452d0faebdcd11a84f",
+  "artifact_hash": "7347440e77f82d50c8faa9d3313d02c6fd43259a12e08a8d4c090035d37bdf36",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "pallets/governance/src/lib.rs",
     "pallets/governance/src/tests.rs"
   ],
-  "timestamp": "2026-04-30T16:06:37.589673415Z",
+  "timestamp": "2026-05-02T01:56:12.673203204Z",
   "result": {
     "claim_id": "x3.governance.proof_gated_upgrade",
     "claim": "Governance flash-loan takeover resistance",
@@ -32,13 +32,13 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
+      "expected_attack_tests": "1",
       "passed_attack_tests": "1",
-      "failed_attack_tests": "0",
-      "expected_attack_tests": "1"
+      "failed_attack_tests": "0"
     },
-    "timestamp": "2026-04-30T16:06:37.579089065Z",
-    "duration_ms": 55181
+    "timestamp": "2026-05-02T01:56:12.663459279Z",
+    "duration_ms": 100978
   },
   "limitations": [],
-  "binding_hash": "bc92ce8e4855f6c2f84729e12b8e8724905de804c4945c2003de3c1331c3c486"
+  "binding_hash": "29d5423b40df3a9180734f692612b5ba53327a5f30c84af2051b1eba7522df87"
 }

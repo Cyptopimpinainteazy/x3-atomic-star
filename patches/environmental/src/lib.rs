@@ -55,12 +55,13 @@ pub use local_key::LocalKey;
 
 #[doc(hidden)]
 #[cfg(feature = "std")]
-pub use std::thread::LocalKey as StdLocalKey;
+pub use local_key::LocalKey as StdLocalKey;
 
-// Ensure std::thread::LocalKey is always available as GlobalLocalKey for consistency
+// Keep a single key type across std/no_std so macro expansion and helper
+// fns agree on the same static key ABI.
 #[doc(hidden)]
 #[cfg(feature = "std")]
-pub type GlobalLocalKey<T> = std::thread::LocalKey<T>;
+pub type GlobalLocalKey<T> = LocalKey<T>;
 
 #[doc(hidden)]
 #[cfg(not(feature = "std"))]
@@ -70,13 +71,6 @@ pub type GlobalLocalKey<T> = LocalKey<T>;
 #[macro_export]
 macro_rules! thread_local_impl {
 	($(#[$attr:meta])* static $name:ident: $t:ty = $init:expr) => (
-		#[cfg(feature = "std")]
-		std::thread_local! {
-			$(#[$attr])*
-			static $name: $t = $init;
-		}
-
-		#[cfg(not(feature = "std"))]
 		$(#[$attr])*
 		static $name: $crate::LocalKey<$t> = {
 			fn __init() -> $t { $init }

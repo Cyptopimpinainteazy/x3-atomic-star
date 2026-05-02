@@ -126,7 +126,6 @@ where
 // ── Atomic Kernel Config ──────────────────────────────────────────────────
 
 impl pallet_x3_atomic_kernel::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type WeightInfo = ();
     type MinBond = MinBond;

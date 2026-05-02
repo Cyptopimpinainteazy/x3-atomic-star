@@ -124,6 +124,19 @@ impl Receipt {
     pub fn is_stale(&self) -> Result<bool> {
         // Check if any relevant files have been modified since receipt timestamp
         for file in &self.relevant_files {
+            // Ignore claim-receipt files as freshness inputs to avoid cyclical
+            // staleness (one claim refresh updating another claim's evidence).
+            if file
+                .to_string_lossy()
+                .contains("proof/receipts/claims/")
+                && file
+                    .extension()
+                    .map(|ext| ext == "json")
+                    .unwrap_or(false)
+            {
+                continue;
+            }
+
             if !file.exists() {
                 // File deleted since receipt - definitely stale
                 return Ok(true);

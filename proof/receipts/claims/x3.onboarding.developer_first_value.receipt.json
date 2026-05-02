@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2443da713d70fa19205e3fe44709884bb429cd03",
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
   "command_run": "x3-proof verify x3.onboarding.developer_first_value",
-  "artifact_hash": "91d0199973c4aa48275a768f2681c5c1ea9dd2d3f0f87f03d006ca7e8e46807d",
+  "artifact_hash": "4ef50ee4d21b43dcdf980e8693c72655dfcef08fabc3d5140e9f38d9d4b6e447",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "MAINNET_QUICK_START.md",
@@ -12,7 +12,7 @@
     "Cargo.toml",
     "proof/onboarding/ttfv_benchmark.json"
   ],
-  "timestamp": "2026-04-30T16:09:40.639913922Z",
+  "timestamp": "2026-05-02T01:56:14.582201117Z",
   "result": {
     "claim_id": "x3.onboarding.developer_first_value",
     "claim": "A fresh developer can deploy and test a first X3 app with measured time-to-first-value",
@@ -45,15 +45,15 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "quickstart_doc": "MAINNET_QUICK_START.md",
       "ttfv_budget_seconds": "600",
-      "makefile": "present",
       "ttfv_measured_at": "2026-04-28T21:10:08Z",
-      "ttfv_total_seconds": "24.252"
+      "ttfv_total_seconds": "24.252",
+      "quickstart_doc": "MAINNET_QUICK_START.md",
+      "makefile": "present"
     },
-    "timestamp": "2026-04-30T16:09:40.629299841Z",
+    "timestamp": "2026-05-02T01:56:14.574489254Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "f80bb22d68f2dff3a1f1e1e7391adc9b17b287367000923f29d6e4d7e60f1c44"
+  "binding_hash": "a859c4c6419bfa265b8ec7e5d15b36a7087089db4d2fd371d33036303fa73187"
 }

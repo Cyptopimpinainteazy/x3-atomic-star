@@ -8,7 +8,7 @@
 //! - X3 AMM - Native cross-VM AMM
 
 use crate::types::{AmmProtocol, VmType};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;

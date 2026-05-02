@@ -220,8 +220,7 @@ impl LpLockRegistry {
 
         // Lock duration (20% weight) - longer locks = higher score
         let duration_score = if lock_duration > 0 {
-            ((lock_duration as f64).ln() * 20.0
-                / (30.0_f64 * 24.0 * 3600.0).ln()) as u32
+            ((lock_duration as f64).ln() * 20.0 / (30.0_f64 * 24.0 * 3600.0).ln()) as u32
         // 30 days max
         } else {
             0

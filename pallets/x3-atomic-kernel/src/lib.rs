@@ -86,7 +86,7 @@ pub mod pallet {
         pallet_prelude::*,
         traits::{Currency, ReservableCurrency},
     };
-    use frame_system::offchain::{CreateBare, SubmitTransaction};
+    use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_io::hashing::sha2_256;
@@ -106,12 +106,10 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-        frame_system::Config
+        frame_system::Config<RuntimeEvent: From<Event<Self>>>
         + frame_system::offchain::CreateTransactionBase<Call<Self>>
         + frame_system::offchain::CreateBare<Call<Self>>
     {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// The currency used for executor bonds.
         /// Must implement `ReservableCurrency` so bonds are properly locked at submission
         /// and released (or slashed) at finalization/rollback.
@@ -811,6 +809,9 @@ pub mod pallet {
                     "Bundle {:?} rolled back",
                     bundle_id
                 );
+
+                // S1-1: Commit storage layer to make changes visible across threads
+                sp_io::storage::commit_layer();
 
                 Ok(())
             })

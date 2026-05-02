@@ -36,7 +36,8 @@ This documentation covers:
 - ✅ **Tri-VM system** - EVM, SVM, and native execution
 - ✅ **Development tools** - CLI, SDK, testing frameworks
 - ✅ **Deployment** - Local testnet, multi-server, production
-- ⚠️ **Security** - 9 critical blockers under remediation (see mainnet readiness docs)
+- ✅ **Security** - All ProofForge gates PASSED (16/16 S0 verified, 0 blockers)  
+  See: [MAINNET STATUS](../docs/CURRENT_MAINNET_STATUS.md)
 
 ---
 

@@ -1,4 +1,11 @@
-//! Shared building blocks for the X3 compiler pipeline.
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::string::String;
+use core::{fmt, ops::Add, str::FromStr};
+
+// Shared building blocks for the X3 compiler pipeline.
 
 /// A byte index span that locates tokens and AST nodes inside source text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -25,7 +32,7 @@ impl Span {
     }
 }
 
-impl std::ops::Add for Span {
+impl Add for Span {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -105,15 +112,15 @@ impl Keyword {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KeywordParseError;
 
-impl std::fmt::Display for KeywordParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for KeywordParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("invalid keyword")
     }
 }
 
-impl std::error::Error for KeywordParseError {}
+impl core::error::Error for KeywordParseError {}
 
-impl std::str::FromStr for Keyword {
+impl FromStr for Keyword {
     type Err = KeywordParseError;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {

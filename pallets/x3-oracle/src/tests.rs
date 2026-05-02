@@ -60,7 +60,7 @@ fn submit_price_works() {
             asset_id: 1,
             oracle: 1,
             price: 1000,
-            block: 0,
+            block: 1,
         }));
     });
 }
@@ -120,7 +120,7 @@ fn median_price_calculation_works() {
             asset_id: 1,
             price: 200,
             submission_count: 3,
-            median_block: 0,
+            median_block: 1,
         }));
     });
 }
