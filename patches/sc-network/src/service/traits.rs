@@ -809,15 +809,6 @@ pub enum Direction {
 	Outbound,
 }
 
-impl From<libp2p::protocol::notification::Direction> for Direction {
-	fn from(direction: libp2p::protocol::notification::Direction) -> Self {
-		match direction {
-			libp2p::protocol::notification::Direction::Inbound => Direction::Inbound,
-			libp2p::protocol::notification::Direction::Outbound => Direction::Outbound,
-		}
-	}
-}
-
 /// Events received by the protocol from `Notifications`.
 #[derive(Debug)]
 pub enum NotificationEvent {
@@ -877,4 +868,3 @@ pub trait MessageSink: Send + Sync {
 	/// Returns an error if the peer does not exist.
 	fn send_async_notification(&self, notification: Vec<u8>) -> Pin<Box<dyn Future<Output = Result<(), error::Error>> + Send>>;
 }
-

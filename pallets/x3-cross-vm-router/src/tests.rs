@@ -9,12 +9,12 @@
 // The **one** test that matters: `test_x3_native_evm_svm_roundtrip_preserves_supply`.
 
 use crate as pallet_x3_cross_vm_router;
+use codec::Encode;
 use frame_support::{
     assert_ok, construct_runtime, derive_impl, parameter_types,
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
-use parity_scale_codec::Encode;
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
@@ -138,7 +138,7 @@ fn new_test_ext() -> sp_io::TestExternalities {
 
 /// Alice on X3Native.
 fn alice_native() -> AccountBytes {
-    AccountBytes::X3Native([1u8; 32])
+    native_sender(1)
 }
 /// Alice's EVM-side address.
 fn alice_evm() -> AccountBytes {
@@ -331,7 +331,7 @@ fn do_xvm_vm(
 fn native_sender(account: u64) -> AccountBytes {
     let encoded = account.encode();
     let mut bytes = [0u8; 32];
-    bytes.copy_from_slice(&encoded[..32]);
+    bytes[..encoded.len()].copy_from_slice(&encoded);
     AccountBytes::X3Native(bytes)
 }
 
@@ -449,6 +449,24 @@ fn test_x3_native_evm_svm_roundtrip_preserves_supply() {
 
         // Native → EVM 250
         do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 250);
+
+        // EVM → SVM 100, then SVM → Native 50 via verified VM adapter origin.
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Svm,
+            alice_svm(),
+            100,
+        );
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Svm,
+            alice_svm(),
+            DomainId::X3Native,
+            alice_native(),
+            50,
+        );
 
         // Test that EVM/SVM transfers require VM adapter origin (not signed)
         assert!(Router::xvm_transfer_from_vm(

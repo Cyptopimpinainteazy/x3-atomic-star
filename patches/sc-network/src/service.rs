@@ -724,8 +724,8 @@ where
 	B: sp_runtime::traits::Block,
 	H: ExHashT,
 {
-	fn sign_with_local_identity(&self, msg: impl AsRef<[u8]>) -> Result<Signature, SigningError> {
-		Signature::sign_message(msg.as_ref(), &self.local_identity)
+	fn sign_with_local_identity(&self, msg: &[u8]) -> Result<Signature, SigningError> {
+		Signature::sign_message(msg, &self.local_identity)
 	}
 }
 

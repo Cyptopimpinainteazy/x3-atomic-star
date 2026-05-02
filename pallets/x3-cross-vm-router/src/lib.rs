@@ -455,7 +455,8 @@ pub mod pallet {
             // Construct sender from signed origin (prevents forgery)
             let encoded = who.encode();
             let mut account_bytes = [0u8; 32];
-            account_bytes.copy_from_slice(&encoded[..32]);
+            let len = encoded.len().min(account_bytes.len());
+            account_bytes[..len].copy_from_slice(&encoded[..len]);
             let sender = AccountBytes::X3Native(account_bytes);
 
             Self::do_initiate_transfer(
