@@ -83,7 +83,10 @@ fn run_atomic_swap_demo(from: &str, to: &str, amount: u128) -> Result<()> {
         proof_bytes: vec![9, 9, 9],
     };
 
-    println!("{}", format!("→ Atomic swap demo {from} ⇒ {to} (amount {amount})").bold());
+    println!(
+        "{}",
+        format!("→ Atomic swap demo {from} ⇒ {to} (amount {amount})").bold()
+    );
     println!("  message id: {}", message_id);
 
     let routed = router

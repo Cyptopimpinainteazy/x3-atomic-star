@@ -214,10 +214,10 @@ where
         }
         // -----------------------------------------------------------------------
 
-        // Verify signature against wallet
-        // In production: validate against stored public key
-        // Simplified: assume valid if non-empty
-        Ok(true)
+        // Do not accept approvals without cryptographic verification.
+        Err(Error::invalid_params(
+            "Approval signature verification backend is not implemented",
+        ))
     }
 
     fn get_balance(&self, account: String, _token_id: [u8; 32]) -> Result<u128> {
@@ -234,9 +234,10 @@ where
         }
         // -----------------------------------------------------------------------
 
-        // In production: query wallet pallet storage
-        // For now: return mock balance
-        Ok(1_000_000_000_000) // 1M tokens
+        // Do not return synthetic balances on RPC failures/unwired backends.
+        Err(Error::invalid_params(
+            "Wallet balance backend is not implemented",
+        ))
     }
 
     fn get_approval_status(&self, _approval_id: [u8; 32]) -> Result<(String, u32)> {

@@ -8,12 +8,12 @@
 
 pub use pallet::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 pub mod weights;
 pub use weights::WeightInfo;
@@ -22,16 +22,16 @@ pub use weights::WeightInfo;
 pub mod pallet {
     use super::WeightInfo;
     use frame_support::{
-        pallet_prelude::*,
-        traits::{Get, Currency},
-        sp_runtime::{Saturating, SaturatedConversion},
         ensure,
-        BoundedVec
+        pallet_prelude::*,
+        sp_runtime::{SaturatedConversion, Saturating},
+        traits::{Currency, Get},
+        BoundedVec,
     };
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::Encode;
-    use sp_core::{H256, Get as SpGet};
-    use x3_automation::{Action, Condition, Task, TaskId, TaskStatus, ExecutionResult};
+    use sp_core::{Get as SpGet, H256};
+    use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
     // Note: Would integrate with oracle pallet for price data
 
     /// Balance type alias
@@ -45,7 +45,8 @@ pub mod pallet {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Currency type for fees
-        type Currency: Currency<Self::AccountId> + frame_support::traits::ReservableCurrency<Self::AccountId>;
+        type Currency: Currency<Self::AccountId>
+            + frame_support::traits::ReservableCurrency<Self::AccountId>;
 
         /// Maximum tasks per account
         #[pallet::constant]
@@ -73,13 +74,8 @@ pub mod pallet {
     /// Active automated tasks
     #[pallet::storage]
     #[pallet::getter(fn tasks)]
-    pub type Tasks<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        TaskId,
-        Task<T::AccountId, BalanceOf<T>>,
-        OptionQuery,
-    >;
+    pub type Tasks<T: Config> =
+        StorageMap<_, Blake2_128Concat, TaskId, Task<T::AccountId, BalanceOf<T>>, OptionQuery>;
 
     /// Task IDs per account
     #[pallet::storage]
@@ -116,9 +112,7 @@ pub mod pallet {
             owner: T::AccountId,
         },
         /// A task expired
-        TaskExpired {
-            task_id: TaskId,
-        },
+        TaskExpired { task_id: TaskId },
     }
 
     #[pallet::error]
@@ -173,7 +167,10 @@ pub mod pallet {
                 Condition::BlockNumber(block) => block.min(max_expiry.saturated_into::<u64>()),
                 _ => max_expiry.saturated_into::<u64>(),
             };
-            ensure!(expiry_block > current_block.saturated_into::<u64>(), Error::<T>::ExpiryTooFar);
+            ensure!(
+                expiry_block > current_block.saturated_into::<u64>(),
+                Error::<T>::ExpiryTooFar
+            );
 
             // Check balance for registration fee
             let registration_fee = T::BaseRegistrationFee::get();
@@ -238,7 +235,10 @@ pub mod pallet {
             let registration_fee = T::BaseRegistrationFee::get();
             T::Currency::unreserve(&who, registration_fee);
 
-            Self::deposit_event(Event::TaskCancelled { task_id, owner: who });
+            Self::deposit_event(Event::TaskCancelled {
+                task_id,
+                owner: who,
+            });
 
             Ok(())
         }
@@ -284,7 +284,12 @@ pub mod pallet {
 
             // Pay execution fee to keeper
             let execution_fee = T::ExecutionFee::get().min(task.max_fee);
-            T::Currency::transfer(&task.owner, &execution_result.keeper, execution_fee, frame_support::traits::ExistenceRequirement::KeepAlive)?;
+            T::Currency::transfer(
+                &task.owner,
+                &execution_result.keeper,
+                execution_fee,
+                frame_support::traits::ExistenceRequirement::KeepAlive,
+            )?;
 
             // Unreserve registration fee
             let registration_fee = T::BaseRegistrationFee::get();
@@ -302,97 +307,112 @@ pub mod pallet {
 }
 
 impl<T: Config> Pallet<T> {
-        /// Generate a unique task ID
-        fn generate_task_id(counter: u64, account: &T::AccountId) -> TaskId {
-            let mut data = Vec::new();
-            data.extend_from_slice(&counter.to_le_bytes());
-            data.extend_from_slice(&account.encode());
-            H256::from(sp_io::hashing::blake2_256(&data))
-        }
+    /// Generate a unique task ID
+    fn generate_task_id(counter: u64, account: &T::AccountId) -> TaskId {
+        let mut data = Vec::new();
+        data.extend_from_slice(&counter.to_le_bytes());
+        data.extend_from_slice(&account.encode());
+        H256::from(sp_io::hashing::blake2_256(&data))
+    }
 
-        /// Validate task parameters
-        fn validate_task_parameters(condition: &Condition, action: &Action) -> DispatchResult {
-            match condition {
-                Condition::BlockNumber(block) => {
-                    let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
-                    ensure!(*block > current_block, Error::<T>::InvalidTask);
-                }
-                Condition::PriceThreshold { asset_id, .. } => {
-                    // Validate that asset exists (simplified check)
-                    ensure!(*asset_id > 0, Error::<T>::InvalidTask);
-                }
-                Condition::Custom(data) => {
-                    ensure!(!data.is_empty(), Error::<T>::InvalidTask);
-                }
+    /// Validate task parameters
+    fn validate_task_parameters(condition: &Condition, action: &Action) -> DispatchResult {
+        match condition {
+            Condition::BlockNumber(block) => {
+                let current_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+                ensure!(*block > current_block, Error::<T>::InvalidTask);
             }
-
-            match action {
-                Action::Extrinsic { pallet_index, call_index, .. } => {
-                    // Basic validation - in production would validate pallet/call exists
-                    ensure!(*pallet_index > 0 || *call_index > 0, Error::<T>::InvalidTask);
-                }
-                Action::Custom(data) => {
-                    ensure!(!data.is_empty(), Error::<T>::InvalidTask);
-                }
+            Condition::PriceThreshold { asset_id, .. } => {
+                // Validate that asset exists (simplified check)
+                ensure!(*asset_id > 0, Error::<T>::InvalidTask);
             }
-
-            Ok(())
-        }
-
-        /// Check if task condition is met
-        fn check_condition(task: &Task<T::AccountId, BalanceOf<T>>) -> bool {
-            match &task.condition {
-                Condition::BlockNumber(target_block) => {
-                    let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
-                    current_block >= *target_block
-                }
-                Condition::PriceThreshold { asset_id: _, threshold: _, above: _ } => {
-                    // TODO: Integrate with oracle pallet for price conditions
-                    false
-                }
-                Condition::Custom(_) => {
-                    // Custom conditions would need custom logic
-                    false
-                }
+            Condition::Custom(data) => {
+                ensure!(!data.is_empty(), Error::<T>::InvalidTask);
             }
         }
 
-        /// Execute task action
-        fn execute_action(task: &Task<T::AccountId, BalanceOf<T>>) -> Result<ExecutionResult, DispatchError> {
-            // Simplified execution - in production would dispatch to actual pallets
-            match &task.action {
-                Action::Extrinsic { .. } => {
-                    // Would dispatch the extrinsic here
-                    Ok(ExecutionResult {
-                        task_id: task.id,
-                        success: true,
-                        gas_used: 21000,
-                        fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
-                        output: vec![],
-                        keeper: task.owner.clone(), // Simplified - would be actual keeper
-                    })
-                }
-                Action::Custom(_) => {
-                    // Custom action execution
-                    Ok(ExecutionResult {
-                        task_id: task.id,
-                        success: true,
-                        gas_used: 10000,
-                        fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
-                        output: vec![],
-                        keeper: task.owner.clone(),
-                    })
-                }
+        match action {
+            Action::Extrinsic {
+                pallet_index,
+                call_index,
+                ..
+            } => {
+                // Basic validation - in production would validate pallet/call exists
+                ensure!(
+                    *pallet_index > 0 || *call_index > 0,
+                    Error::<T>::InvalidTask
+                );
+            }
+            Action::Custom(data) => {
+                ensure!(!data.is_empty(), Error::<T>::InvalidTask);
             }
         }
 
-        /// Clean up expired tasks (called by off-chain worker or governance)
-        pub fn cleanup_expired_tasks() -> u32 {
-            let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
-            let mut cleaned = 0u32;
+        Ok(())
+    }
 
-            // Simplified cleanup - in production would iterate all tasks
-            // This is just a placeholder implementation
-            cleaned
+    /// Check if task condition is met
+    fn check_condition(task: &Task<T::AccountId, BalanceOf<T>>) -> bool {
+        match &task.condition {
+            Condition::BlockNumber(target_block) => {
+                let current_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+                current_block >= *target_block
+            }
+            Condition::PriceThreshold {
+                asset_id: _,
+                threshold: _,
+                above: _,
+            } => {
+                // TODO: Integrate with oracle pallet for price conditions
+                false
+            }
+            Condition::Custom(_) => {
+                // Custom conditions would need custom logic
+                false
+            }
         }
     }
+
+    /// Execute task action
+    fn execute_action(
+        task: &Task<T::AccountId, BalanceOf<T>>,
+    ) -> Result<ExecutionResult, DispatchError> {
+        // Simplified execution - in production would dispatch to actual pallets
+        match &task.action {
+            Action::Extrinsic { .. } => {
+                // Would dispatch the extrinsic here
+                Ok(ExecutionResult {
+                    task_id: task.id,
+                    success: true,
+                    gas_used: 21000,
+                    fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
+                    output: vec![],
+                    keeper: task.owner.clone(), // Simplified - would be actual keeper
+                })
+            }
+            Action::Custom(_) => {
+                // Custom action execution
+                Ok(ExecutionResult {
+                    task_id: task.id,
+                    success: true,
+                    gas_used: 10000,
+                    fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
+                    output: vec![],
+                    keeper: task.owner.clone(),
+                })
+            }
+        }
+    }
+
+    /// Clean up expired tasks (called by off-chain worker or governance)
+    pub fn cleanup_expired_tasks() -> u32 {
+        let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+        let mut cleaned = 0u32;
+
+        // Simplified cleanup - in production would iterate all tasks
+        // This is just a placeholder implementation
+        cleaned
+    }
+}

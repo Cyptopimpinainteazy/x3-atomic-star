@@ -8,12 +8,12 @@
 
 pub use pallet::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 pub mod weights;
 pub use weights::WeightInfo;
@@ -21,10 +21,17 @@ pub use weights::WeightInfo;
 #[frame_support::pallet]
 pub mod pallet {
     use super::WeightInfo;
-    use frame_support::{pallet_prelude::*, traits::{Currency, Get, ReservableCurrency}, BoundedVec};
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{Currency, Get, ReservableCurrency},
+        BoundedVec,
+    };
     use frame_system::pallet_prelude::*;
     use sp_core::{H256, U256};
-    use sp_runtime::{traits::{AtLeast32BitUnsigned, CheckedAdd, SaturatedConversion}, Saturating};
+    use sp_runtime::{
+        traits::{AtLeast32BitUnsigned, CheckedAdd, SaturatedConversion},
+        Saturating,
+    };
     use x3_vrf::{RandomnessRequest, RandomnessResult};
 
     /// Maximum number of pending randomness requests per account
@@ -179,10 +186,8 @@ pub mod pallet {
             );
 
             // Calculate fee
-            let seed_fee = T::FeePerByte::get()
-                .saturating_mul((seed.len() as u32).into());
-            let total_fee = T::BaseFee::get()
-                .saturating_add(seed_fee);
+            let seed_fee = T::FeePerByte::get().saturating_mul((seed.len() as u32).into());
+            let total_fee = T::BaseFee::get().saturating_add(seed_fee);
             ensure!(total_fee <= max_fee, Error::<T>::FeeOverflow);
 
             // Check balance
@@ -232,15 +237,12 @@ pub mod pallet {
         /// In production, this would be restricted to authorized fulfillers
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::fulfill_randomness())]
-        pub fn fulfill_randomness(
-            origin: OriginFor<T>,
-            request_id: H256,
-        ) -> DispatchResult {
+        pub fn fulfill_randomness(origin: OriginFor<T>, request_id: H256) -> DispatchResult {
             let _ = ensure_signed(origin)?; // In production, check if authorized fulfiller
 
             // Get pending request
-            let request = PendingRequests::<T>::get(request_id)
-                .ok_or(Error::<T>::RequestNotFound)?;
+            let request =
+                PendingRequests::<T>::get(request_id).ok_or(Error::<T>::RequestNotFound)?;
 
             // Check not already fulfilled
             ensure!(
@@ -250,7 +252,8 @@ pub mod pallet {
 
             // Generate VRF randomness
             let vrf_provider = x3_vrf::get_vrf_provider();
-            let proof = vrf_provider.prove(&request.seed.0)
+            let proof = vrf_provider
+                .prove(&request.seed.0)
                 .map_err(|_| Error::<T>::VrfGenerationFailed)?;
 
             // Create result
@@ -291,18 +294,18 @@ pub mod pallet {
         /// Cancel a pending randomness request and refund the fee
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::cancel_randomness())]
-        pub fn cancel_randomness(
-            origin: OriginFor<T>,
-            request_id: H256,
-        ) -> DispatchResult {
+        pub fn cancel_randomness(origin: OriginFor<T>, request_id: H256) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // Get pending request
-            let request = PendingRequests::<T>::get(request_id)
-                .ok_or(Error::<T>::RequestNotFound)?;
+            let request =
+                PendingRequests::<T>::get(request_id).ok_or(Error::<T>::RequestNotFound)?;
 
             // Check ownership
-            ensure!(Self::is_request_owner(&who, request_id), Error::<T>::NotRequestOwner);
+            ensure!(
+                Self::is_request_owner(&who, request_id),
+                Error::<T>::NotRequestOwner
+            );
 
             // Check not already fulfilled
             ensure!(

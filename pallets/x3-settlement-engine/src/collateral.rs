@@ -12,7 +12,9 @@ use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 /// Bond types used for different policies
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo,
+)]
 pub enum BondType {
     InitialMargin,
     MaintenanceMargin,
@@ -20,7 +22,9 @@ pub enum BondType {
 }
 
 /// Bond state
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo,
+)]
 pub enum BondState {
     Locked,
     Withdrawable,

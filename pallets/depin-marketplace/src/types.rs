@@ -156,7 +156,18 @@ pub enum DePinJobType {
 }
 
 /// Provider status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum ProviderStatus {
     /// Actively accepting jobs
     Active,
@@ -197,7 +208,18 @@ pub enum JobFailureReason {
 }
 
 /// Job status within the marketplace.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum JobStatus {
     /// Waiting in order book for a provider
     Pending,
@@ -214,7 +236,17 @@ pub enum JobStatus {
 }
 
 /// Information about a registered provider.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 #[scale_info(skip_type_params(T))]
 pub struct ProviderInfo<T: frame_system::Config> {
     /// Provider account
@@ -238,7 +270,17 @@ pub struct ProviderInfo<T: frame_system::Config> {
 }
 
 /// A pending order in the order book.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 #[scale_info(skip_type_params(T))]
 pub struct Order<T: frame_system::Config> {
     /// Unique job ID
@@ -258,7 +300,17 @@ pub struct Order<T: frame_system::Config> {
 }
 
 /// An active marketplace job.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 #[scale_info(skip_type_params(T))]
 pub struct MarketplaceJob<T: frame_system::Config> {
     /// Unique ID

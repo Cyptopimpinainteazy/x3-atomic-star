@@ -1,6 +1,6 @@
 /// L2 Bridge — Base/Optimism settlement bridge enabling Ethereum L2 ↔ X3 token transfers
 /// Implements canonical bridge with sequencer messaging and exit proofs
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

@@ -18,6 +18,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
     BuildStorage, MultiSignature, Perbill,
 };
+use x3_asset_kernel_types::traits::NoEconomicHalt;
 
 pub type AccountId = u64;
 pub type BlockNumber = u64;
@@ -131,6 +132,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MinBond = MinBond;
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
+    type EconomicHalt = NoEconomicHalt;
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────

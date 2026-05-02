@@ -96,6 +96,7 @@ pub mod pallet {
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
     };
+    use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
     // ── Config ────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,9 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-        frame_system::Config + frame_system::offchain::CreateTransactionBase<Call<Self>> + frame_system::offchain::CreateBare<Call<Self>>
+        frame_system::Config
+        + frame_system::offchain::CreateTransactionBase<Call<Self>>
+        + frame_system::offchain::CreateBare<Call<Self>>
     {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -130,6 +133,9 @@ pub mod pallet {
         /// Maximum time (in blocks) a Pending bundle may wait before auto-rollback.
         #[pallet::constant]
         type BundleDeadlineBlocks: Get<BlockNumberFor<Self>>;
+
+        /// Read-only economic halt gate.
+        type EconomicHalt: EconomicHaltInspect;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -179,7 +185,9 @@ pub mod pallet {
     // ── Types ─────────────────────────────────────────────────────────────────
 
     /// Bundle execution status.
-    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    )]
     pub enum BundleStatus {
         /// Submitted, waiting for executor assignment.
         Pending,
@@ -255,7 +263,9 @@ pub mod pallet {
     }
 
     /// Reason a bundle was rolled back.
-    #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    )]
     pub enum BundleRollbackReason {
         /// One or more legs failed execution.
         ExecutionFailed,
@@ -296,6 +306,8 @@ pub mod pallet {
         /// Bundle data is invalid or malformed (S0-005 consistency check).
         /// Examples: zero legs_hash, invalid leg count.
         InvalidBundleData,
+        /// New bundle submissions halted by economic safety policy.
+        EconomicHaltActive,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -386,7 +398,9 @@ pub mod pallet {
                     committed_at_ns,
                 };
 
-                match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(call.into())) {
+                match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(
+                    call.into(),
+                )) {
                     Ok(()) => {
                         // Clear the entry so we don't resubmit next block.
                         sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &key);
@@ -490,6 +504,11 @@ pub mod pallet {
             deadline_blocks: BlockNumberFor<T>,
         ) -> DispatchResult {
             let submitter = ensure_signed(origin)?;
+
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
 
             ensure!(!legs.is_empty(), Error::<T>::TooManyLegs);
             ensure!(

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sp_core::{
     ed25519::{Public as Ed25519Public, Signature as Ed25519Signature},
+    ByteArray,
     Pair as PairTrait,
 };
 use std::collections::HashSet;
@@ -93,13 +94,8 @@ impl ProofVerifier {
             return Err("Invalid finality proof");
         }
 
-        // 2. Process payload logic
-        match proof.proof_type {
-            ProofType::StateCommitment => Ok(true),
-            ProofType::ReceiptInclusion => Ok(true),
-            ProofType::IntentLock => Ok(true),
-            ProofType::SlashEvent => Ok(true),
-        }
+        // 2. Validate payload/type consistency and basic structure.
+        Self::verify_payload(proof)
     }
 
     /// Verify HotStuff QC with Ed25519 signatures
@@ -151,7 +147,7 @@ impl ProofVerifier {
             // Parse Ed25519 signature (next 64 bytes)
             let sig_slice = &sig_bytes[4..68];
             let signature = Ed25519Signature::from_slice(sig_slice)
-                .ok_or("Invalid Ed25519 signature format")?;
+                .map_err(|_| "Invalid Ed25519 signature format")?;
 
             // Verify Ed25519 signature against validator's public key
             if sp_core::ed25519::Pair::verify(&signature, &message_hash, &validator.grandpa_key) {
@@ -208,7 +204,7 @@ impl ProofVerifier {
 
             let sig_slice = &precommit_bytes[4..68];
             let signature = Ed25519Signature::from_slice(sig_slice)
-                .ok_or("Invalid Ed25519 signature format")?;
+                .map_err(|_| "Invalid Ed25519 signature format")?;
 
             if sp_core::ed25519::Pair::verify(&signature, &message_hash, &validator.grandpa_key) {
                 valid_count += 1;
@@ -255,6 +251,57 @@ impl ProofVerifier {
         message.extend_from_slice(&proof.block_height.to_le_bytes());
 
         blake2_256(&message)
+    }
+
+    fn verify_payload(proof: &CrossChainProof) -> Result<bool, &'static str> {
+        match (&proof.proof_type, &proof.payload) {
+            (ProofType::StateCommitment, ProofPayload::StateCommitment(root)) => {
+                if *root == [0u8; 32] {
+                    return Err("Invalid state commitment root");
+                }
+                Ok(true)
+            }
+            (
+                ProofType::ReceiptInclusion,
+                ProofPayload::ReceiptInclusion {
+                    receipt_hash,
+                    merkle_proof,
+                },
+            ) => {
+                if *receipt_hash == [0u8; 32] {
+                    return Err("Invalid receipt hash");
+                }
+                if merkle_proof.is_empty() {
+                    return Err("Missing receipt inclusion proof nodes");
+                }
+                Ok(true)
+            }
+            (
+                ProofType::IntentLock,
+                ProofPayload::IntentLock {
+                    intent_hash,
+                    resources,
+                },
+            ) => {
+                if *intent_hash == [0u8; 32] {
+                    return Err("Invalid intent hash");
+                }
+                if *resources == [0u8; 32] {
+                    return Err("Invalid intent lock resources");
+                }
+                Ok(true)
+            }
+            (ProofType::SlashEvent, ProofPayload::SlashEvent { offender, amount }) => {
+                if *offender == [0u8; 32] {
+                    return Err("Invalid slash offender");
+                }
+                if *amount == 0 {
+                    return Err("Invalid slash amount");
+                }
+                Ok(true)
+            }
+            _ => Err("Proof type and payload mismatch"),
+        }
     }
 }
 

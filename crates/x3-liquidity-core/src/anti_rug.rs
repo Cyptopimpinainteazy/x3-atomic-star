@@ -170,7 +170,9 @@ impl LpLockRegistry {
         }
 
         // Calculate lock percentage
-        let locked_lp: u128 = self.locks.values()
+        let locked_lp: u128 = self
+            .locks
+            .values()
             .filter(|lock| lock.pool_id == pool_id)
             .map(|lock| lock.lp_amount)
             .sum();
@@ -183,7 +185,9 @@ impl LpLockRegistry {
         let lock_percentage = lock_percentage.min(10000);
 
         // Estimate lock duration (use the longest lock for this pool)
-        let lock_duration = self.locks.values()
+        let lock_duration = self
+            .locks
+            .values()
             .filter(|lock| lock.pool_id == pool_id)
             .map(|lock| lock.unlock_at_block.saturating_sub(0)) // Would need current block
             .max()
@@ -197,7 +201,8 @@ impl LpLockRegistry {
         };
 
         // Days since launch (simplified)
-        let days_since_launch = ((current_timestamp.saturating_sub(launch_timestamp)) / 86400) as u32;
+        let days_since_launch =
+            ((current_timestamp.saturating_sub(launch_timestamp)) / 86400) as u32;
 
         let factors = AntiRugScore {
             lock_percentage,
@@ -215,7 +220,9 @@ impl LpLockRegistry {
 
         // Lock duration (20% weight) - longer locks = higher score
         let duration_score = if lock_duration > 0 {
-            ((lock_duration as f64).ln() * 20.0 / (30.0 * 24.0 * 3600.0).ln()) as u32 // 30 days max
+            ((lock_duration as f64).ln() * 20.0
+                / (30.0_f64 * 24.0 * 3600.0).ln()) as u32
+        // 30 days max
         } else {
             0
         };

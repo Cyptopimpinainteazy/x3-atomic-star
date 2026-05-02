@@ -1,6 +1,4 @@
-use crate::{
-    AssetId, BorrowPurpose, BorrowRequest, ChainKind, FlashloanId, FlashloanPool,
-};
+use crate::{AssetId, BorrowPurpose, BorrowRequest, ChainKind, FlashloanId, FlashloanPool};
 
 #[test]
 fn flash_loan_reentrancy_rejected() {
@@ -26,7 +24,9 @@ fn flash_loan_reentrancy_rejected() {
         purpose: BorrowPurpose::ArbExecution,
     };
 
-    let receipt_1 = pool.borrow(&request_1).expect("first borrow should succeed");
+    let receipt_1 = pool
+        .borrow(&request_1)
+        .expect("first borrow should succeed");
     let second = pool.borrow(&request_2);
 
     assert!(

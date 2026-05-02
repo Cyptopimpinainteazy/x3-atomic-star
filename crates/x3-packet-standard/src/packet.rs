@@ -100,7 +100,18 @@ impl Packet {
 
 /// Quad-tuple identifying a unidirectional packet stream.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 pub struct StreamKey {
     pub src_chain: ChainId,
@@ -110,7 +121,18 @@ pub struct StreamKey {
 }
 
 /// A packet commitment is just the hash; we wrap it for type safety.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+)]
 pub struct PacketCommitment(pub H256);
 
 impl PacketCommitment {

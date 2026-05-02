@@ -3,7 +3,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::string::String;
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 
 /// Result type for X3 integration operations

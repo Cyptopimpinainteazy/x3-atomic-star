@@ -171,13 +171,13 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PROOF 9: Atlas kernel tests pass
+# PROOF 9: Supply ledger asset-kernel tests pass
 # ═══════════════════════════════════════════════════════════════════════════════
-echo -e "${YELLOW}[9/12] Atlas kernel (asset) tests${NC}"
-if cargo test -p x3-atlas-kernel --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-09-atlas-tests.log"; then
-  echo -e "${GREEN}✅ PROOF 9 PASSED: Atlas kernel tests pass${NC}"
+echo -e "${YELLOW}[9/12] Supply ledger asset-kernel tests${NC}"
+if cargo test -p pallet-x3-supply-ledger --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-09-atlas-tests.log"; then
+  echo -e "${GREEN}✅ PROOF 9 PASSED: Supply ledger tests pass${NC}"
 else
-  echo -e "${RED}❌ PROOF 9 FAILED: Atlas kernel tests failed${NC}"
+  echo -e "${RED}❌ PROOF 9 FAILED: Supply ledger tests failed${NC}"
   echo "proof_09_atlas=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
 fi
 echo ""

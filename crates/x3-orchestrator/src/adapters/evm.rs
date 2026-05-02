@@ -26,7 +26,9 @@ impl ChainAdapter for EvmAdapter {
         if proof.proof_bytes.is_empty() {
             return Err(OrchestratorError::InvalidProof);
         }
-        Ok(true)
+        Err(OrchestratorError::ExecutionFailed(
+            "EVM proof verification backend is not wired".into(),
+        ))
     }
 
     fn execute(&self, _msg: &CrossVmMessage) -> Result<()> {

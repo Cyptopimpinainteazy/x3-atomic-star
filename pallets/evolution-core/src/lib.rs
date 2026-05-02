@@ -76,7 +76,9 @@ pub mod pallet {
     // ============================================================================
 
     /// Metric identifier
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     pub enum MetricId {
         /// Gas used in block
         BlockGasUsed,
@@ -103,7 +105,9 @@ pub mod pallet {
     }
 
     /// Mutation type
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     pub enum MutationType {
         /// Adjust gas parameters
         GasParameter { opcode: u8, new_cost: u64 },
@@ -123,7 +127,9 @@ pub mod pallet {
     }
 
     /// Mutation proposal
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct MutationProposal<T: Config> {
         /// Unique proposal ID
@@ -147,7 +153,18 @@ pub mod pallet {
     }
 
     /// Proposal status
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Eq,
+        Default,
+    )]
     pub enum ProposalStatus {
         #[default]
         Pending,
@@ -158,7 +175,18 @@ pub mod pallet {
     }
 
     /// Block metrics snapshot
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default, PartialEq, Eq)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        Default,
+        PartialEq,
+        Eq,
+    )]
     pub struct BlockMetrics {
         pub gas_used: u128,
         pub evm_calls: u32,

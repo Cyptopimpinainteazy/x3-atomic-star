@@ -84,11 +84,11 @@ features:
     weight: 15
     criticality: P0
     required_files:
-      - pallets/x3-atlas-kernel/src/lib.rs
-      - pallets/x3-atlas-kernel/src/tests.rs
+      - pallets/x3-supply-ledger/src/lib.rs
+      - pallets/x3-supply-ledger/src/tests_s0_1.rs
     required_commands:
-      - cargo check -p x3-atlas-kernel
-      - cargo test -p x3-atlas-kernel
+      - cargo check -p pallet-x3-supply-ledger
+      - cargo test -p pallet-x3-supply-ledger
     required_proofs:
       - wired
       - unit_tested
@@ -98,13 +98,13 @@ features:
       - canonical_supply_tested
     proof_evidence:
       - claim: "Asset kernel wired into construct_runtime!"
-        command: "grep -A5 'x3_atlas_kernel' runtime/src/lib.rs"
-        file: "evidence/wiring-atlas.log"
+        command: "grep -A5 'X3SupplyLedger' runtime/src/lib.rs"
+        file: "evidence/wiring-supply-ledger.log"
       - claim: "Canonical supply invariant tested"
-        command: "cargo test -p x3-atlas-kernel canonical_supply"
+        command: "cargo test -p pallet-x3-supply-ledger canonical_supply"
         file: "evidence/test-canonical-supply.log"
       - claim: "Asset minting/burning conserves supply"
-        command: "cargo test -p x3-atlas-kernel test_mint_burn_conservation"
+        command: "cargo test -p pallet-x3-supply-ledger preserves_invariant"
         file: "evidence/test-mint-burn.log"
 
   - id: canonical_supply_conservation
@@ -113,14 +113,14 @@ features:
     weight: 3
     criticality: P0
     required_files:
-      - pallets/x3-atlas-kernel/src/invariants.rs
+      - pallets/x3-supply-ledger/src/supply_verification.rs
     required_proofs:
       - invariant_tested
     hard_fail_if_missing:
       - invariant_tested
     proof_evidence:
       - claim: "Canonical supply equals sum of all ledgers"
-        command: "cargo test -p x3-atlas-kernel test_canonical_supply_invariant"
+        command: "cargo test -p pallet-x3-supply-ledger canonical_supply"
         file: "evidence/test-invariant-canonical-supply.log"
       - claim: "Supply conserved across VM boundaries"
         command: "cargo test -p x3-bridge test_supply_conservation_cross_vm"

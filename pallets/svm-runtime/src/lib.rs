@@ -90,7 +90,9 @@ pub mod pallet {
     }
 
     /// SVM Account Info - metadata for an SVM account
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct SvmAccountInfo<T: Config> {
         /// Balance in lamports
@@ -108,7 +110,9 @@ pub mod pallet {
     }
 
     /// Program Info - metadata for deployed programs
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct ProgramInfo<T: Config> {
         /// Authority that can upgrade this program (None = immutable)
@@ -122,7 +126,9 @@ pub mod pallet {
     }
 
     /// Account metadata for instruction execution
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    )]
     pub struct AccountMeta {
         /// Account pubkey
         pub pubkey: [u8; 32],
@@ -144,7 +150,9 @@ pub mod pallet {
     }
 
     /// Result of program execution
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq, Default)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq, Default,
+    )]
     pub struct ExecutionResult {
         /// Whether execution succeeded
         pub success: bool,

@@ -420,9 +420,12 @@ fn cannot_finalize_during_voting() {
 fn proposal_snapshot_cleared_on_finalize() {
     new_test_ext().execute_with(|| {
         let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
-        let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Finalize".to_vec().try_into().unwrap();
-        let description: BoundedVec<u8, ConstU32<4096>> =
-            b"Snapshot cleanup check on finalize".to_vec().try_into().unwrap();
+        let title: BoundedVec<u8, ConstU32<256>> =
+            b"Snapshot Finalize".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> = b"Snapshot cleanup check on finalize"
+            .to_vec()
+            .try_into()
+            .unwrap();
 
         assert_ok!(Governance::submit_proposal(
             RuntimeOrigin::signed(account(1)),
@@ -457,8 +460,10 @@ fn flash_loan_governance_takeover_fails() {
         // Proposal is created at block N, while attacker has no voting balance.
         let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
         let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Attack".to_vec().try_into().unwrap();
-        let description: BoundedVec<u8, ConstU32<4096>> =
-            b"Flash-loan governance takeover attempt".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> = b"Flash-loan governance takeover attempt"
+            .to_vec()
+            .try_into()
+            .unwrap();
 
         assert_ok!(Governance::submit_proposal(
             RuntimeOrigin::signed(account(1)),
@@ -556,8 +561,10 @@ fn proposal_snapshot_cleared_on_cancel() {
     new_test_ext().execute_with(|| {
         let call = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
         let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Cancel".to_vec().try_into().unwrap();
-        let description: BoundedVec<u8, ConstU32<4096>> =
-            b"Snapshot cleanup check on cancel".to_vec().try_into().unwrap();
+        let description: BoundedVec<u8, ConstU32<4096>> = b"Snapshot cleanup check on cancel"
+            .to_vec()
+            .try_into()
+            .unwrap();
 
         assert_ok!(Governance::submit_proposal(
             RuntimeOrigin::signed(account(1)),

@@ -20,7 +20,19 @@ pub type TaskId = H256;
 pub type SessionId = H256;
 
 /// Contributor status on-chain.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub enum ContributorStatus {
     /// Active and accepting tasks.
     #[default]
@@ -147,7 +159,19 @@ pub enum WorkloadType {
 }
 
 /// On-chain task status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub enum TaskStatus {
     /// Waiting for a contributor to claim.
     #[default]
@@ -270,7 +294,19 @@ pub struct JurySession<BlockNumber> {
 }
 
 /// Phase of a jury session.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub enum JuryPhase {
     /// Accepting vote commitments.
     #[default]

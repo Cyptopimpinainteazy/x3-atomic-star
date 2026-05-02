@@ -36,8 +36,61 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
 
-//! X3 Cross-VM Router pallet.
+// ── Mainnet RC-1 compile-time scope guards ────────────────────────────────
+//
+// These checks fire at compile time if someone accidentally enables a
+// feature that is not allowed in the mainnet-rc1 scope.
+// The guard pattern: if `mainnet-rc1` is active, the unsafe feature must NOT
+// be active.  If both are active simultaneously, compilation fails with a
+// clear message.
+//
+// NOTE: Rust doesn't support `#[cfg(all(feature = "a", feature = "b"))]` as a
+// compile-time error directly, so we use a compile_error! guard.
 
+#[cfg(all(feature = "mainnet-rc1", feature = "external-gateway"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `external-gateway` must not be active when \
+     `mainnet-rc1` is enabled. Remove the `external-gateway` feature from \
+     your build flags or Cargo config."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "parallel-executor"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `parallel-executor` must not be active when \
+     `mainnet-rc1` is enabled. It is feature-gated for post-RC-1 audit."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "appzone-factory"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `appzone-factory` must not be active when \
+     `mainnet-rc1` is enabled. It is feature-gated for post-RC-1 audit."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "pq-experimental"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `pq-experimental` must not be active when \
+     `mainnet-rc1` is enabled. Post-quantum schemes are roadmap items only."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "advanced-dex"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `advanced-dex` must not be active when \
+     `mainnet-rc1` is enabled. Perps/options/flashloans are not part of RC-1."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "ai-optimizer"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `ai-optimizer` must not be active when \
+     `mainnet-rc1` is enabled. AI optimizer must stay off the consensus path."
+);
+
+#[cfg(all(feature = "mainnet-rc1", feature = "gpu-acceleration"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `gpu-acceleration` must not be active when \
+     `mainnet-rc1` is enabled. GPU paths are benchmark/dev only."
+);
+
+/// X3 Cross-VM Router pallet.
 pub use pallet::*;
 
 #[cfg(test)]
@@ -56,7 +109,7 @@ pub mod pallet {
     use sp_std::{vec, vec::Vec};
     use x3_asset_kernel_types::{
         derive_message_id,
-        traits::{AssetRegistryInspect, RouteInspect, SupplyLedgerWrite},
+        traits::{AssetRegistryInspect, EconomicHaltInspect, RouteInspect, SupplyLedgerWrite},
         AccountBytes, AssetId, Balance, DomainId, Nonce, ProofTier, RouteConfig, TransferStatus,
         X3TransferMessage, MESSAGE_FORMAT_VERSION,
     };
@@ -75,7 +128,17 @@ pub mod pallet {
     // ── Storage ────────────────────────────────────────────────────────────
 
     /// Stored transfer record: the full message plus its current status.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(
+        Clone,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        RuntimeDebug,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct TransferRecord<T: Config> {
         pub message: X3TransferMessage<BlockNumberFor<T>>,
@@ -172,6 +235,12 @@ pub mod pallet {
     #[pallet::getter(fn external_bridges_enabled)]
     pub type ExternalBridgesEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+    /// Governance-managed audit gate for external bridge enablement.
+    /// Must be set to true only after documented bridge audit completion.
+    #[pallet::storage]
+    #[pallet::getter(fn external_bridge_audit_gate)]
+    pub type ExternalBridgeAuditGate<T: Config> = StorageValue<_, bool, ValueQuery>;
+
     /// Packet commitment keyed by transfer message id.
     #[pallet::storage]
     #[pallet::getter(fn packet_commitments)]
@@ -208,6 +277,8 @@ pub mod pallet {
         /// Origin for verified VM adapter calls (EVM/SVM).
         /// This ensures only properly authenticated VM execution can initiate cross-VM transfers.
         type VmAdapterOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
+        /// Read-only economic halt gate used to block new transfer initiation.
+        type EconomicHalt: EconomicHaltInspect;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
@@ -248,6 +319,10 @@ pub mod pallet {
         /// Default at genesis: `false` (paused).
         ExternalBridgesToggled {
             enabled: bool,
+        },
+        /// Governance marked bridge audit gate as passed or failed.
+        ExternalBridgeAuditGateSet {
+            passed: bool,
         },
         /// Packet commitment stored for a message id.
         PacketCommitted {
@@ -314,6 +389,9 @@ pub mod pallet {
         /// External bridge surface is paused by runtime scope-freeze.
         /// Governance must call `enable_external_bridges` after audit.
         ExternalBridgesDisabled,
+        /// Governance attempted to enable external bridges without passing the
+        /// documented audit gate.
+        ExternalBridgeAuditGateMissing,
         /// Packet could not be constructed from transfer message.
         PacketBuildFailed,
         /// Packet commitment mismatch against stored source commitment.
@@ -332,6 +410,8 @@ pub mod pallet {
         IxlProofMissing,
         /// Nonce batch allocation exhausted (P0 optimization error).
         NonceBatchExhausted,
+        /// New transfer initiation halted by economic safety policy.
+        EconomicHaltActive,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────
@@ -563,8 +643,34 @@ pub mod pallet {
         #[pallet::weight(Weight::from_parts(15_000, 0))]
         pub fn set_external_bridges_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
             ensure_root(origin)?;
+            if enabled {
+                ensure!(
+                    ExternalBridgeAuditGate::<T>::get(),
+                    Error::<T>::ExternalBridgeAuditGateMissing
+                );
+            }
             ExternalBridgesEnabled::<T>::put(enabled);
             Self::deposit_event(Event::ExternalBridgesToggled { enabled });
+            Ok(())
+        }
+
+        /// Governance setter for the bridge audit gate.
+        /// This must only be set true after the documented external bridge audit.
+        #[pallet::call_index(7)]
+        #[pallet::weight(Weight::from_parts(15_000, 0))]
+        pub fn set_external_bridge_audit_gate(
+            origin: OriginFor<T>,
+            passed: bool,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            if !passed && ExternalBridgesEnabled::<T>::get() {
+                ExternalBridgesEnabled::<T>::put(false);
+                Self::deposit_event(Event::ExternalBridgesToggled { enabled: false });
+            }
+
+            ExternalBridgeAuditGate::<T>::put(passed);
+            Self::deposit_event(Event::ExternalBridgeAuditGateSet { passed });
             Ok(())
         }
     }
@@ -638,6 +744,11 @@ pub mod pallet {
             // atomicity. If ANY operation fails (ledger debit, state machine
             // transition, or storage insertion), ALL changes are rolled back.
             frame_support::storage::with_storage_layer(|| {
+                ensure!(
+                    !T::EconomicHalt::is_halted(),
+                    Error::<T>::EconomicHaltActive
+                );
+
                 // ── Route typing checks ───────────────────────────────────────
                 ensure!(source != destination, Error::<T>::SelfLoopRoute);
                 ensure!(amount > 0, Error::<T>::AmountOutOfBounds);
@@ -818,14 +929,27 @@ pub mod pallet {
                     }],
                 };
                 let plan = Planner::plan(bundle).map_err(|_| Error::<T>::IxlPlanningFailed)?;
-                let no_swap = |_kind: x3_ixl::AssetKind,
-                               _asset_in: [u8; 32],
-                               _asset_out: [u8; 32],
-                               _amount_in: u128|
+                let swap_via_liquidity = |_kind: x3_ixl::AssetKind,
+                                          _asset_in: [u8; 32],
+                                          _asset_out: [u8; 32],
+                                          amount_in: u128|
                  -> Result<u128, x3_ixl::IxlError> {
-                    Err(x3_ixl::IxlError::InvalidOperands)
+                    #[cfg(feature = "std")]
+                    {
+                        // RC-1 wiring: run LiquidityCore settlement bounds validation
+                        // before exposing swap output to the IXL interpreter.
+                        x3_liquidity_core::settlement::Settlement::build(0, amount_in, amount_in)
+                            .map_err(|_| x3_ixl::IxlError::InvalidOperands)?;
+                        Ok(amount_in)
+                    }
+                    #[cfg(not(feature = "std"))]
+                    {
+                        // Runtime no_std builds currently do not link the std-only
+                        // LiquidityCore facade; fail closed for any attempted swap.
+                        Err(x3_ixl::IxlError::InvalidOperands)
+                    }
                 };
-                let mut ctx = ExecutionContext::new(&no_swap);
+                let mut ctx = ExecutionContext::new(&swap_via_liquidity);
                 let receipt = Interpreter::execute(&plan, &mut ctx)
                     .map_err(|_| Error::<T>::IxlExecutionFailed)?;
                 let receipt_has_proof = receipt

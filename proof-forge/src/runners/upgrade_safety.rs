@@ -18,7 +18,10 @@ fn assess_upgrade_safety(workspace: &Path, claim_id: &str) -> ProofResult {
             "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json",
             "Proof-gated upgrade receipt exists",
         ),
-        ("pallets/governance/src/lib.rs", "Governance pallet implementation exists"),
+        (
+            "pallets/governance/src/lib.rs",
+            "Governance pallet implementation exists",
+        ),
         ("runtime/Cargo.toml", "Runtime crate manifest exists"),
     ];
 
@@ -78,5 +81,8 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, _verbose: bool) -> R
 }
 
 pub async fn run_proofs(workspace: &Path, _verbose: bool) -> Result<ProofResult> {
-    Ok(assess_upgrade_safety(workspace, "x3.upgrade_safety.full_proof"))
+    Ok(assess_upgrade_safety(
+        workspace,
+        "x3.upgrade_safety.full_proof",
+    ))
 }

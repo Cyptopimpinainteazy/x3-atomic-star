@@ -13,7 +13,12 @@ fn register_task_works() {
         let action = Action::Custom(vec![1, 2, 3]);
         let max_fee = 1000;
 
-        assert_ok!(Automation::register_task(RuntimeOrigin::signed(1), condition, action, max_fee));
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            condition,
+            action,
+            max_fee
+        ));
 
         let tasks = Automation::account_tasks(1);
         assert_eq!(tasks.len(), 1);
@@ -52,7 +57,12 @@ fn cancel_task_works() {
         // Register a task
         let condition = Condition::BlockNumber(100);
         let action = Action::Custom(vec![1, 2, 3]);
-        assert_ok!(Automation::register_task(RuntimeOrigin::signed(1), condition, action, 1000));
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            condition,
+            action,
+            1000
+        ));
 
         let task_id = Automation::account_tasks(1)[0];
 
@@ -71,7 +81,12 @@ fn cancel_task_not_owner() {
         // Register a task with account 1
         let condition = Condition::BlockNumber(100);
         let action = Action::Custom(vec![1, 2, 3]);
-        assert_ok!(Automation::register_task(RuntimeOrigin::signed(1), condition, action, 1000));
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            condition,
+            action,
+            1000
+        ));
 
         let task_id = Automation::account_tasks(1)[0];
 
@@ -89,7 +104,12 @@ fn execute_task_condition_not_met() {
         // Register a task for block 100
         let condition = Condition::BlockNumber(100);
         let action = Action::Custom(vec![1, 2, 3]);
-        assert_ok!(Automation::register_task(RuntimeOrigin::signed(1), condition, action, 1000));
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            condition,
+            action,
+            1000
+        ));
 
         let task_id = Automation::account_tasks(1)[0];
 

@@ -30,7 +30,9 @@ fn deauthorize_oracle_works() {
         assert_ok!(Oracle::authorize_oracle(RuntimeOrigin::root(), 1));
         assert_ok!(Oracle::deauthorize_oracle(RuntimeOrigin::root(), 1));
         assert!(!Oracle::is_authorized_oracle(1));
-        System::assert_has_event(RuntimeEvent::Oracle(Event::OracleDeauthorized { account: 1 }));
+        System::assert_has_event(RuntimeEvent::Oracle(Event::OracleDeauthorized {
+            account: 1,
+        }));
     });
 }
 
@@ -81,7 +83,11 @@ fn submit_price_rate_limit_works() {
 
         // Submit maximum allowed per block
         for i in 0..MaxSubmissionsPerBlock::get() {
-            assert_ok!(Oracle::submit_price(RuntimeOrigin::signed(1), i as u32, 1000 + i as u64));
+            assert_ok!(Oracle::submit_price(
+                RuntimeOrigin::signed(1),
+                i as u32,
+                1000 + i as u64
+            ));
         }
 
         // Next submission should be rate limited

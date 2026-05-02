@@ -84,7 +84,9 @@ impl ParallelExecutor {
                 }
             }
 
-            batches.push(ExecutionBatch { transactions: batch });
+            batches.push(ExecutionBatch {
+                transactions: batch,
+            });
             processed.insert(i);
         }
 
@@ -99,9 +101,9 @@ impl ParallelExecutor {
         conflicts: &[Conflict],
     ) -> bool {
         batch.iter().any(|batch_tx| {
-            conflicts.iter().any(|conflict| {
-                conflict.involves(tx.id, batch_tx.id)
-            })
+            conflicts
+                .iter()
+                .any(|conflict| conflict.involves(tx.id, batch_tx.id))
         })
     }
 
@@ -135,7 +137,8 @@ impl ParallelExecutor {
     ) -> Result<Vec<TransactionResult>, ExecutionError> {
         // In parallel execution, we'd spawn tasks here
         // For now, simulate parallel execution
-        batch.transactions
+        batch
+            .transactions
             .into_iter()
             .map(|tx| self.execute_transaction(tx))
             .collect()
@@ -190,12 +193,17 @@ impl ConflictDetector {
     }
 
     /// Detect conflicts between access lists
-    pub fn detect_conflicts(&self, access_lists: &[AccessList]) -> Result<Vec<Conflict>, ExecutionError> {
+    pub fn detect_conflicts(
+        &self,
+        access_lists: &[AccessList],
+    ) -> Result<Vec<Conflict>, ExecutionError> {
         let mut conflicts = Vec::new();
 
         for i in 0..access_lists.len() {
             for j in (i + 1)..access_lists.len() {
-                if let Some(conflict) = self.check_conflict(&access_lists[i], &access_lists[j], i, j) {
+                if let Some(conflict) =
+                    self.check_conflict(&access_lists[i], &access_lists[j], i, j)
+                {
                     conflicts.push(conflict);
                 }
             }
@@ -398,8 +406,14 @@ mod tests {
         let tx = Transaction {
             id: 1,
             instructions: vec![
-                Instruction { opcode: 1, operands: vec![1, 2, 3] },
-                Instruction { opcode: 2, operands: vec![4, 5, 6] },
+                Instruction {
+                    opcode: 1,
+                    operands: vec![1, 2, 3],
+                },
+                Instruction {
+                    opcode: 2,
+                    operands: vec![4, 5, 6],
+                },
             ],
         };
 
@@ -420,11 +434,19 @@ mod tests {
     #[test]
     fn test_execution_batch_creation() {
         let transactions = vec![
-            Transaction { id: 1, instructions: vec![] },
-            Transaction { id: 2, instructions: vec![] },
+            Transaction {
+                id: 1,
+                instructions: vec![],
+            },
+            Transaction {
+                id: 2,
+                instructions: vec![],
+            },
         ];
 
-        let batch = ExecutionBatch { transactions: transactions.clone() };
+        let batch = ExecutionBatch {
+            transactions: transactions.clone(),
+        };
         assert_eq!(batch.transactions.len(), 2);
         assert_eq!(batch.transactions[0].id, 1);
         assert_eq!(batch.transactions[1].id, 2);
@@ -432,20 +454,16 @@ mod tests {
 
     #[test]
     fn test_transaction_result_creation() {
-        let state_changes = vec![
-            StateChange {
-                key: [1; 32],
-                old_value: vec![0],
-                new_value: vec![1],
-            }
-        ];
+        let state_changes = vec![StateChange {
+            key: [1; 32],
+            old_value: vec![0],
+            new_value: vec![1],
+        }];
 
-        let events = vec![
-            Event {
-                topic: vec![1, 2, 3],
-                data: vec![4, 5, 6],
-            }
-        ];
+        let events = vec![Event {
+            topic: vec![1, 2, 3],
+            data: vec![4, 5, 6],
+        }];
 
         let result = TransactionResult {
             tx_id: 42,
@@ -607,11 +625,17 @@ mod tests {
         let transactions = vec![
             Transaction {
                 id: 1,
-                instructions: vec![Instruction { opcode: 1, operands: vec![1] }],
+                instructions: vec![Instruction {
+                    opcode: 1,
+                    operands: vec![1],
+                }],
             },
             Transaction {
                 id: 2,
-                instructions: vec![Instruction { opcode: 2, operands: vec![2] }],
+                instructions: vec![Instruction {
+                    opcode: 2,
+                    operands: vec![2],
+                }],
             },
         ];
 
@@ -628,12 +652,18 @@ mod tests {
         // Create transactions that would conflict
         let tx1 = Transaction {
             id: 1,
-            instructions: vec![Instruction { opcode: 1, operands: vec![1] }],
+            instructions: vec![Instruction {
+                opcode: 1,
+                operands: vec![1],
+            }],
         };
 
         let tx2 = Transaction {
             id: 2,
-            instructions: vec![Instruction { opcode: 1, operands: vec![1] }], // Same operation
+            instructions: vec![Instruction {
+                opcode: 1,
+                operands: vec![1],
+            }], // Same operation
         };
 
         let transactions = vec![tx1, tx2];
@@ -644,7 +674,9 @@ mod tests {
 
     #[test]
     fn test_execution_batch_empty() {
-        let batch = ExecutionBatch { transactions: vec![] };
+        let batch = ExecutionBatch {
+            transactions: vec![],
+        };
         assert_eq!(batch.transactions.len(), 0);
     }
 

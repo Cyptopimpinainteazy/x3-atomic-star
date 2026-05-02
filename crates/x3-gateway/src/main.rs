@@ -2,16 +2,16 @@
 
 //! X3 Gateway - REST and GraphQL API for indexed blockchain data.
 
-mod config;
 mod cache;
+mod config;
 mod db;
 mod error;
 mod graphql;
 mod orchestra;
 mod rest;
 
-use crate::config::GatewayConfig;
 use crate::cache::RedisCache;
+use crate::config::GatewayConfig;
 use crate::db::Database;
 use crate::error::{GatewayError, Result};
 use crate::graphql::create_schema;

@@ -27,7 +27,7 @@
 //! record_mint_token(origin, nonce, hash)
 //! ```
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::{DispatchError, RuntimeDebug};

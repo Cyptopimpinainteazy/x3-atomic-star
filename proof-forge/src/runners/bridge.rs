@@ -5,7 +5,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
 
-pub async fn verify_claim(_workspace: &Path, claim_id: &str, _verbose: bool) -> Result<ProofResult> {
+pub async fn verify_claim(
+    _workspace: &Path,
+    claim_id: &str,
+    _verbose: bool,
+) -> Result<ProofResult> {
     let start = Instant::now();
 
     Ok(ProofResult {

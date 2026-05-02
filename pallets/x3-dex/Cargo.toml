@@ -19,6 +19,7 @@ sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 x3-dex = { version = "0.1.0", default-features = false, path = "../../crates/x3-dex" }
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 
 [features]
 default = ["std"]

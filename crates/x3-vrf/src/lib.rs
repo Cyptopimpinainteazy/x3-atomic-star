@@ -11,7 +11,9 @@ use sp_core::{H256, U256};
 use sp_std::vec::Vec;
 
 /// VRF proof for verifying randomness generation
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct VrfProof {
     /// The generated random output
     pub output: [u8; 32],
@@ -20,15 +22,21 @@ pub struct VrfProof {
 }
 
 /// VRF public key
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct VrfPublicKey(pub [u8; 32]);
 
 /// VRF secret key
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct VrfSecretKey(pub [u8; 64]);
 
 /// Randomness request data
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct RandomnessRequest {
     /// Request ID
     pub request_id: H256,
@@ -41,7 +49,9 @@ pub struct RandomnessRequest {
 }
 
 /// Fulfilled randomness data
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct RandomnessResult {
     /// Request ID
     pub request_id: H256,
@@ -95,10 +105,7 @@ impl VrfProvider for MockVrfProvider {
 
         let mut proof = [0u8; 64];
         proof[..32].copy_from_slice(seed);
-        Ok(VrfProof {
-            output,
-            proof,
-        })
+        Ok(VrfProof { output, proof })
     }
 
     fn verify(&self, proof: &VrfProof, seed: &[u8; 32], _public_key: &VrfPublicKey) -> bool {

@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use codec::{self, Encode, EncodeLike, Input, Output};
+use codec::{self, DecodeWithMemTracking, Encode, EncodeLike, Input, Output};
 
 /// Role that the peer sent to us during the handshake, with the addition of what our local node
 /// knows about that peer.
@@ -119,3 +119,5 @@ impl codec::Decode for Roles {
 		Self::from_bits(input.read_byte()?).ok_or_else(|| codec::Error::from("Invalid bytes"))
 	}
 }
+
+impl DecodeWithMemTracking for Roles {}

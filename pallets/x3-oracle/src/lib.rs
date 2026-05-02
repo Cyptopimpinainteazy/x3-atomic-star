@@ -9,12 +9,12 @@
 
 pub use pallet::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 pub mod weights;
 pub use weights::WeightInfo;
@@ -22,43 +22,47 @@ pub use weights::WeightInfo;
 #[frame_support::pallet]
 pub mod pallet {
     use super::WeightInfo;
-use frame_support::{pallet_prelude::*, traits::Get};
-use frame_system::pallet_prelude::*;
-use parity_scale_codec::DecodeWithMemTracking;
-use sp_runtime::traits::SaturatedConversion;
+    use frame_support::{pallet_prelude::*, traits::Get};
+    use frame_system::pallet_prelude::*;
+    use parity_scale_codec::DecodeWithMemTracking;
+    use sp_runtime::traits::SaturatedConversion;
 
-/// Asset identifier type for price feeds
-pub type AssetId = u32;
+    /// Asset identifier type for price feeds
+    pub type AssetId = u32;
 
-/// Price represented as fixed-point with 6 decimals (e.g., 123456 = $1.23456)
-pub type Price = u64;
+    /// Price represented as fixed-point with 6 decimals (e.g., 123456 = $1.23456)
+    pub type Price = u64;
 
-/// Timestamp in seconds since Unix epoch
-pub type Timestamp = u64;
+    /// Timestamp in seconds since Unix epoch
+    pub type Timestamp = u64;
 
-/// Price submission data
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
-pub struct PriceSubmission<BlockNumber> {
-    /// Submitted price
-    pub price: Price,
-    /// Block number when submitted
-    pub block: BlockNumber,
-    /// Timestamp when submitted
-    pub timestamp: Timestamp,
-}
+    /// Price submission data
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq,
+    )]
+    pub struct PriceSubmission<BlockNumber> {
+        /// Submitted price
+        pub price: Price,
+        /// Block number when submitted
+        pub block: BlockNumber,
+        /// Timestamp when submitted
+        pub timestamp: Timestamp,
+    }
 
-/// Computed price data with metadata
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq)]
-pub struct PriceData<BlockNumber> {
-    /// Median price across submissions
-    pub price: Price,
-    /// Number of submissions used in median calculation
-    pub submission_count: u32,
-    /// Block when price was last updated
-    pub last_updated: BlockNumber,
-    /// Timestamp when price was last updated
-    pub timestamp: Timestamp,
-}
+    /// Computed price data with metadata
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq,
+    )]
+    pub struct PriceData<BlockNumber> {
+        /// Median price across submissions
+        pub price: Price,
+        /// Number of submissions used in median calculation
+        pub submission_count: u32,
+        /// Block when price was last updated
+        pub last_updated: BlockNumber,
+        /// Timestamp when price was last updated
+        pub timestamp: Timestamp,
+    }
 
     /// Maximum number of authorized oracle accounts
     #[pallet::config]
@@ -118,7 +122,8 @@ pub struct PriceData<BlockNumber> {
     /// Computed median prices for each asset
     #[pallet::storage]
     #[pallet::getter(fn get_price)]
-    pub type AssetPrices<T: Config> = StorageMap<_, Blake2_128Concat, AssetId, PriceData<BlockNumberFor<T>>, OptionQuery>;
+    pub type AssetPrices<T: Config> =
+        StorageMap<_, Blake2_128Concat, AssetId, PriceData<BlockNumberFor<T>>, OptionQuery>;
 
     /// Track submission counts per block per oracle to prevent spam
     #[pallet::storage]
@@ -131,8 +136,6 @@ pub struct PriceData<BlockNumber> {
         u32,
         ValueQuery,
     >;
-
-
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -183,14 +186,7 @@ pub struct PriceData<BlockNumber> {
 
     /// Reasons why a price submission was rejected
     #[derive(
-        Clone,
-        Encode,
-        Decode,
-        DecodeWithMemTracking,
-        MaxEncodedLen,
-        TypeInfo,
-        Debug,
-        PartialEq,
+        Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq,
     )]
     pub enum SubmissionRejectionReason {
         /// Oracle not authorized
@@ -288,7 +284,8 @@ pub struct PriceData<BlockNumber> {
         fn current_timestamp() -> Timestamp {
             // TODO: Use pallet_timestamp::Pallet::<T>::now() when available
             // For now, use block number as proxy
-            frame_system::Pallet::<T>::block_number().saturated_into::<u64>() * 12 // ~12 second blocks
+            frame_system::Pallet::<T>::block_number().saturated_into::<u64>() * 12
+            // ~12 second blocks
         }
 
         /// Update the median price for an asset based on current submissions

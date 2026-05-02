@@ -3,7 +3,9 @@
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use sp_runtime::scale_info::TypeInfo;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+#[derive(
+    Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq,
+)]
 pub struct LiquidityPool {
     pub pool_id: u64,
     pub token_a: TokenId,
@@ -16,22 +18,16 @@ pub struct LiquidityPool {
 }
 
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    MaxEncodedLen,
-    TypeInfo,
-    Debug,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq,
 )]
 pub struct TokenId {
     pub chain_id: u32,
     pub asset_id: u128,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+#[derive(
+    Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq,
+)]
 pub struct LPPosition {
     pub position_id: u64,
     pub pool_id: u64,
@@ -225,8 +221,10 @@ impl AMMPool {
         }
 
         // Calculate optimal amounts based on current ratio
-        let amount_b_optimal = (amount_a_desired as f64) * (pool.reserve_b as f64) / (pool.reserve_a as f64);
-        let amount_a_optimal = (amount_b_desired as f64) * (pool.reserve_a as f64) / (pool.reserve_b as f64);
+        let amount_b_optimal =
+            (amount_a_desired as f64) * (pool.reserve_b as f64) / (pool.reserve_a as f64);
+        let amount_a_optimal =
+            (amount_b_desired as f64) * (pool.reserve_a as f64) / (pool.reserve_b as f64);
 
         let (amount_a, amount_b) = if amount_b_optimal <= amount_b_desired as f64 {
             (amount_a_desired, amount_b_optimal as u128)
@@ -243,8 +241,10 @@ impl AMMPool {
         let lp_tokens = if pool.total_lp_supply == 0 {
             Self::sqrt(amount_a.saturating_mul(amount_b))
         } else {
-            let lp_from_a = (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
-            let lp_from_b = (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
+            let lp_from_a =
+                (amount_a as f64) * (pool.total_lp_supply as f64) / (pool.reserve_a as f64);
+            let lp_from_b =
+                (amount_b as f64) * (pool.total_lp_supply as f64) / (pool.reserve_b as f64);
             lp_from_a.min(lp_from_b) as u128
         };
 

@@ -3,7 +3,7 @@
 //! These APIs allow off-chain consumers (node RPC, DNS server) to query the
 //! canonical on-chain `.x3` zone data without submitting transactions.
 
-use codec::{Codec, Decode, Encode};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 

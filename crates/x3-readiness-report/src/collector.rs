@@ -43,7 +43,12 @@ impl Collector {
         report.supply_invariant = ReadinessCheck::unknown(reason.clone());
         report.halt_functional = ReadinessCheck::unknown(reason.clone());
         report.permissions_enforced = ReadinessCheck::unknown(reason.clone());
-        report.balance_reconciliation = ReadinessCheck::unknown(reason);
+        report.balance_reconciliation = ReadinessCheck::unknown(reason.clone());
+        report.ixl_bundle_gate = ReadinessCheck::unknown(reason.clone());
+        report.packet_lifecycle_gate = ReadinessCheck::unknown(reason.clone());
+        report.liquidity_core_gate = ReadinessCheck::unknown(reason.clone());
+        report.external_bridges_disabled = ReadinessCheck::unknown(reason.clone());
+        report.kernel_invariant_gate = ReadinessCheck::unknown(reason);
         report.recompute_overall();
         report
     }
@@ -91,6 +96,90 @@ impl Collector {
             "balance reconciliation requires runtime API \
              `canonical_ledger_reconcile`; not yet wired",
         );
+
+        // ── RC-1 specific gates ──────────────────────────────────────────────
+        // IXL bundle gate: verify the router's IXL integration endpoint is live.
+        report.ixl_bundle_gate = match Self::rpc_call(endpoint, "x3_router_ixlStatus", &[]) {
+            Ok(v) if v.get("wired").and_then(|b| b.as_bool()) == Some(true) => {
+                ReadinessCheck::pass("IXL bundle execution wired and reported live by node")
+            }
+            Ok(_) => ReadinessCheck::fail(
+                "x3_router_ixlStatus returned but `wired` field is false — \
+                 IXL not properly initialised in runtime",
+            ),
+            Err(_) => ReadinessCheck::fail(
+                "LAUNCH BLOCKER: x3_router_ixlStatus RPC not available; \
+                 RC-1 requires explicit IXL wiring evidence from a live node",
+            ),
+        };
+
+        // Packet lifecycle gate: verify replay guard and commitment storage.
+        report.packet_lifecycle_gate =
+            match Self::rpc_call(endpoint, "x3_router_packetLifecycleStatus", &[]) {
+                Ok(v) if v.get("replay_guard").and_then(|b| b.as_bool()) == Some(true) => {
+                    ReadinessCheck::pass("packet lifecycle wired: replay guard + commitments live")
+                }
+                Ok(_) => ReadinessCheck::fail(
+                    "x3_router_packetLifecycleStatus returned but replay_guard is false",
+                ),
+                Err(_) => ReadinessCheck::fail(
+                    "LAUNCH BLOCKER: x3_router_packetLifecycleStatus RPC not available; \
+                     RC-1 requires live replay/commitment status evidence",
+                ),
+            };
+
+        // LiquidityCore gate: spot AMM + LP lock must be callable.
+        report.liquidity_core_gate =
+            match Self::rpc_call(endpoint, "x3_liquidityCore_spotAmmStatus", &[]) {
+                Ok(v) if v.get("spot_amm_active").and_then(|b| b.as_bool()) == Some(true) => {
+                    ReadinessCheck::pass("LiquidityCore spot AMM active and LP locks enforced")
+                }
+                Ok(_) => ReadinessCheck::fail(
+                    "x3_liquidityCore_spotAmmStatus returned but spot_amm_active is false",
+                ),
+                Err(_) => ReadinessCheck::fail(
+                    "LAUNCH BLOCKER: x3_liquidityCore_spotAmmStatus RPC not available; \
+                     LiquidityCore settlement is not provably wired on the live path",
+                ),
+            };
+
+        // External bridges disabled gate: MUST be false at genesis.
+        report.external_bridges_disabled =
+            match Self::rpc_call(endpoint, "x3_router_externalBridgesEnabled", &[]) {
+                Ok(v) if v.as_bool() == Some(false) => ReadinessCheck::pass(
+                    "external bridges are DISABLED — scope-freeze rule satisfied",
+                ),
+                Ok(v) if v.as_bool() == Some(true) => ReadinessCheck::fail(
+                    "LAUNCH BLOCKER: external bridges are ENABLED — they must be \
+                     disabled at genesis for RC-1 scope compliance",
+                ),
+                Ok(_) => ReadinessCheck::unknown(
+                    "x3_router_externalBridgesEnabled returned unexpected type",
+                ),
+                Err(_) => ReadinessCheck::fail(
+                    "LAUNCH BLOCKER: x3_router_externalBridgesEnabled RPC not available; \
+                     cannot prove scope-freeze (external bridges disabled)",
+                ),
+            };
+
+        // Kernel invariant gate: supply ledger invariant enforcement.
+        report.kernel_invariant_gate = match (
+            report.kernel_status.supply,
+            report.kernel_status.total_locked,
+        ) {
+            (Some(supply), Some(locked)) if supply > 0 && locked <= supply => ReadinessCheck::pass(
+                format!("kernel invariant holds: supply={supply}, locked={locked}, locked≤supply"),
+            ),
+            (Some(_supply), Some(locked)) if locked == 0 => ReadinessCheck::pass(
+                "kernel invariant holds: no assets locked (genesis/idle state)",
+            ),
+            (Some(supply), Some(locked)) if locked > supply => ReadinessCheck::fail(format!(
+                "INVARIANT VIOLATION: locked={locked} > supply={supply} — state corruption"
+            )),
+            _ => ReadinessCheck::unknown(
+                "kernel invariant cannot be checked: supply/locked unavailable from RPC",
+            ),
+        };
 
         report.recompute_overall();
         report

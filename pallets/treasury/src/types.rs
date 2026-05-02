@@ -170,7 +170,9 @@ pub struct EmergencyPause<AccountId, BlockNumber> {
 }
 
 /// Treasury statistics.
-#[derive(Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug,
+)]
 pub struct TreasuryStats<Balance: Default> {
     /// Total deposited to treasury.
     pub total_deposited: Balance,

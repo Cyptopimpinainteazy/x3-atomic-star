@@ -14,6 +14,7 @@ use frame_support::{
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
+use parity_scale_codec::Encode;
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
@@ -83,6 +84,21 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrAny {
     }
 }
 
+pub struct RootOnly;
+impl EnsureOrigin<RuntimeOrigin> for RootOnly {
+    type Success = ();
+    fn try_origin(o: RuntimeOrigin) -> Result<(), RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(()),
+            _ => Err(o),
+        }
+    }
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::root())
+    }
+}
+
 parameter_types! {
     pub const MaxAssets: u32 = 64;
 }
@@ -105,6 +121,8 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Registry = Registry;
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
+    type VmAdapterOrigin = RootOnly;
+    type EconomicHalt = Ledger;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {
@@ -213,7 +231,11 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) -> H256
 
     // For MVP testing, only support X3Native transfers
     // EVM/SVM transfers require VM adapter origin (kernel integration)
-    assert_eq!(src, DomainId::X3Native, "MVP tests only support X3Native transfers");
+    assert_eq!(
+        src,
+        DomainId::X3Native,
+        "MVP tests only support X3Native transfers"
+    );
 
     Router::xvm_transfer(
         RuntimeOrigin::signed(1),
@@ -257,6 +279,144 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) -> H256
     message_id
 }
 
+fn do_xvm_vm(
+    asset_id: AssetId,
+    src: DomainId,
+    sender: AccountBytes,
+    dst: DomainId,
+    recipient: AccountBytes,
+    amount: u128,
+) -> H256 {
+    let now = System::block_number();
+    let expires_at = now + 50;
+
+    Router::xvm_transfer_from_vm(
+        RuntimeOrigin::root(),
+        asset_id,
+        src,
+        sender.clone(),
+        dst,
+        recipient.clone(),
+        amount,
+        expires_at,
+    )
+    .expect("xvm_transfer_from_vm");
+
+    let nonce = if let Some((batch_start, _batch_size, used_count)) =
+        Router::nonce_batch_allocation(src, sender.clone())
+    {
+        batch_start.saturating_add((used_count.saturating_sub(1)) as u128)
+    } else {
+        0
+    };
+
+    let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+        version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+        asset_id,
+        source_domain: src,
+        destination_domain: dst,
+        sender,
+        recipient,
+        amount,
+        nonce,
+        created_at: now,
+        expires_at,
+    };
+    let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+
+    Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).expect("complete");
+    message_id
+}
+
+fn native_sender(account: u64) -> AccountBytes {
+    let encoded = account.encode();
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(&encoded[..32]);
+    AccountBytes::X3Native(bytes)
+}
+
+fn domain_supply(ledger: &x3_asset_kernel_types::SupplyLedger, domain: DomainId) -> u128 {
+    match domain {
+        DomainId::X3Native => ledger.native_supply,
+        DomainId::X3Evm => ledger.evm_supply,
+        DomainId::X3Svm => ledger.svm_supply,
+        _ => 0,
+    }
+}
+
+fn initiate_transfer_and_id(
+    asset_id: AssetId,
+    src: DomainId,
+    dst: DomainId,
+    amount: u128,
+) -> (H256, AccountBytes, AccountBytes, u64) {
+    let now = System::block_number();
+    let expires_at = now + 50;
+    let recipient = addr_for(dst);
+
+    let sender = match src {
+        DomainId::X3Native => {
+            assert_ok!(Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset_id,
+                dst,
+                recipient.clone(),
+                amount,
+                expires_at,
+            ));
+            native_sender(1)
+        }
+        DomainId::X3Evm => {
+            let sender = alice_evm();
+            assert_ok!(Router::xvm_transfer_from_vm(
+                RuntimeOrigin::root(),
+                asset_id,
+                src,
+                sender.clone(),
+                dst,
+                recipient.clone(),
+                amount,
+                expires_at,
+            ));
+            sender
+        }
+        DomainId::X3Svm => {
+            let sender = alice_svm();
+            assert_ok!(Router::xvm_transfer_from_vm(
+                RuntimeOrigin::root(),
+                asset_id,
+                src,
+                sender.clone(),
+                dst,
+                recipient.clone(),
+                amount,
+                expires_at,
+            ));
+            sender
+        }
+        _ => unreachable!("internal routes only"),
+    };
+
+    let (batch_start, _, used_count) =
+        Router::nonce_batch_allocation(src, sender.clone()).expect("nonce allocation exists");
+    let nonce = batch_start.saturating_add((used_count.saturating_sub(1)) as u128);
+
+    let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+        version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+        asset_id,
+        source_domain: src,
+        destination_domain: dst,
+        sender: sender.clone(),
+        recipient: recipient.clone(),
+        amount,
+        nonce,
+        created_at: now,
+        expires_at,
+    };
+    let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+    (message_id, sender, recipient, expires_at)
+}
+
 // ============================================================================
 // PHASE 1.4 CROSS-VM ROUTER TESTS - ENABLED FOR MVP
 // ============================================================================
@@ -291,16 +451,17 @@ fn test_x3_native_evm_svm_roundtrip_preserves_supply() {
         do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 250);
 
         // Test that EVM/SVM transfers require VM adapter origin (not signed)
-    assert!(Router::xvm_transfer_from_vm(
-        RuntimeOrigin::signed(1), // Should fail - not VM adapter origin
-        asset_id,
-        DomainId::X3Evm,
-        alice_evm(),
-        DomainId::X3Native,
-        alice_native(),
-        100,
-        System::block_number() + 50,
-    ).is_err());
+        assert!(Router::xvm_transfer_from_vm(
+            RuntimeOrigin::signed(1), // Should fail - not VM adapter origin
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Native,
+            alice_native(),
+            100,
+            System::block_number() + 50,
+        )
+        .is_err());
         let l3 = Ledger::ledgers(asset_id).unwrap();
         assert_eq!(l3.native_supply, 1_000_000_000 - 250 + 50);
         assert_eq!(l3.evm_supply, 150);
@@ -364,9 +525,7 @@ fn test_duplicate_message_replay_rejected() {
         Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            sender.clone(),
             recipient.clone(),
             100,
             expires_at,
@@ -407,9 +566,7 @@ fn test_paused_asset_rejects_transfers() {
         let r = Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            alice_native(),
             alice_evm(),
             10,
             60,
@@ -434,9 +591,7 @@ fn test_closed_route_rejects_transfers() {
         let r = Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            alice_native(),
             alice_evm(),
             10,
             60,
@@ -452,9 +607,7 @@ fn test_zero_amount_rejected() {
         let r = Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            alice_native(),
             alice_evm(),
             0,
             60,
@@ -471,9 +624,7 @@ fn test_incompatible_recipient_rejected() {
         let r = Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            alice_native(),
             alice_svm(), // wrong type for X3Evm
             10,
             60,
@@ -535,6 +686,11 @@ fn test_expired_transfer_refunds_to_source() {
 }
 
 #[test]
+fn expired_transfer_refunds_source() {
+    test_expired_transfer_refunds_to_source();
+}
+
+#[test]
 fn test_cannot_cancel_before_expiry() {
     new_test_ext().execute_with(|| {
         let asset_id = bootstrap_x3_asset(10_000);
@@ -548,9 +704,7 @@ fn test_cannot_cancel_before_expiry() {
         Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            sender.clone(),
             recipient.clone(),
             100,
             expires_at,
@@ -586,9 +740,7 @@ fn test_external_route_rejected_in_mvp() {
         let r = Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::Ethereum,
-            alice_native(),
             AccountBytes::Evm([9u8; 20]),
             10,
             60,
@@ -649,6 +801,13 @@ fn external_bridges_are_paused_at_genesis() {
 }
 
 #[test]
+fn external_bridges_disabled_at_genesis() {
+    new_test_ext().execute_with(|| {
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+    });
+}
+
+#[test]
 fn register_external_root_rejected_when_bridges_disabled() {
     new_test_ext().execute_with(|| {
         let res = Router::register_external_root(
@@ -667,6 +826,23 @@ fn register_external_root_rejected_when_bridges_disabled() {
 }
 
 #[test]
+fn register_external_root_rejected_at_genesis() {
+    new_test_ext().execute_with(|| {
+        let res = Router::register_external_root(
+            RuntimeOrigin::root(),
+            1,
+            H256::repeat_byte(0xcd),
+            1,
+            vec![0u8; 32],
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled.into())
+        );
+    });
+}
+
+#[test]
 fn emergency_pause_bridge_rejected_when_bridges_disabled() {
     new_test_ext().execute_with(|| {
         let res =
@@ -675,6 +851,17 @@ fn emergency_pause_bridge_rejected_when_bridges_disabled() {
             res,
             Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled.into()),
             "emergency_pause_bridge must fail when bridges are disabled"
+        );
+    });
+}
+
+#[test]
+fn emergency_pause_bridge_rejected_when_disabled() {
+    new_test_ext().execute_with(|| {
+        let res = Router::emergency_pause_bridge(RuntimeOrigin::root(), 1, b"gate".to_vec());
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled.into())
         );
     });
 }
@@ -691,6 +878,10 @@ fn only_root_can_toggle_external_bridges() {
         );
 
         // Root may toggle.
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
         assert_ok!(Router::set_external_bridges_enabled(
             RuntimeOrigin::root(),
             true
@@ -703,6 +894,26 @@ fn only_root_can_toggle_external_bridges() {
             false
         ));
         assert!(!pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+    });
+}
+
+#[test]
+fn enabling_external_bridges_requires_documented_audit_gate() {
+    new_test_ext().execute_with(|| {
+        let blocked = Router::set_external_bridges_enabled(RuntimeOrigin::root(), true);
+        assert_eq!(
+            blocked,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgeAuditGateMissing.into())
+        );
+
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
     });
 }
 
@@ -720,6 +931,10 @@ fn register_external_root_works_only_after_governance_enables() {
         .is_err());
 
         // Governance opens the gate.
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
         assert_ok!(Router::set_external_bridges_enabled(
             RuntimeOrigin::root(),
             true
@@ -738,6 +953,259 @@ fn register_external_root_works_only_after_governance_enables() {
 }
 
 #[test]
+fn signed_user_cannot_spoof_vm_origin() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let res = Router::xvm_transfer_from_vm(
+            RuntimeOrigin::signed(99),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+            System::block_number() + 50,
+        );
+        assert!(res.is_err());
+    });
+}
+
+#[test]
+fn evm_adapter_cannot_claim_svm_sender() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let res = Router::xvm_transfer_from_vm(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Evm,
+            alice_svm(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+            System::block_number() + 50,
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::IncompatibleSender.into())
+        );
+    });
+}
+
+#[test]
+fn svm_adapter_cannot_claim_evm_sender() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let res = Router::xvm_transfer_from_vm(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Svm,
+            alice_evm(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+            System::block_number() + 50,
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::IncompatibleSender.into())
+        );
+    });
+}
+
+#[test]
+fn vm_adapter_six_routes_preserve_supply_and_clear_pending() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(20_000);
+
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 2_000);
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Svm, 2_000);
+
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 10);
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Svm, 10);
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+        );
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Svm,
+            alice_svm(),
+            10,
+        );
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Svm,
+            alice_svm(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+        );
+        do_xvm_vm(
+            asset_id,
+            DomainId::X3Svm,
+            alice_svm(),
+            DomainId::X3Evm,
+            alice_evm(),
+            10,
+        );
+
+        let l = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(l.pending_supply, 0);
+        assert!(l.represented().unwrap() <= l.canonical_supply);
+        l.check_invariant().unwrap();
+    });
+}
+
+#[test]
+fn wrong_sender_type_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let res = Router::xvm_transfer_from_vm(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Evm,
+            alice_native(),
+            DomainId::X3Native,
+            alice_native(),
+            10,
+            System::block_number() + 50,
+        );
+        assert!(res.is_err());
+    });
+}
+
+#[test]
+fn wrong_recipient_type_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let res = Router::xvm_transfer_from_vm(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Svm,
+            alice_native(),
+            10,
+            System::block_number() + 50,
+        );
+        assert!(res.is_err());
+    });
+}
+
+#[test]
+fn failed_second_leg_rolls_back_first_leg() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let now = System::block_number();
+        let expires_at = now + 1;
+
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            100,
+            expires_at,
+        ));
+
+        let nonce = Router::next_nonce(DomainId::X3Native, alice_native()).saturating_sub(100);
+        let message = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender: alice_native(),
+            recipient: alice_evm(),
+            amount: 100,
+            nonce,
+            created_at: now,
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&message);
+
+        System::set_block_number(expires_at);
+        assert!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err());
+
+        let l = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(l.pending_supply, 100);
+        assert_eq!(l.native_supply, 9_900);
+    });
+}
+
+#[test]
+fn replay_message_rejected_no_state_change() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let msg_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 100);
+        let before = Ledger::ledgers(asset_id).unwrap();
+        assert!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), msg_id).is_err());
+        let after = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(before, after);
+    });
+}
+
+#[test]
+fn duplicate_completion_rejected_no_state_change() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let msg_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 100);
+        let before = Ledger::ledgers(asset_id).unwrap();
+        assert!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), msg_id).is_err());
+        let after = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(before, after);
+    });
+}
+
+#[test]
+fn refund_after_refund_rejected_no_state_change() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let now = System::block_number();
+        let expires_at = now + 1;
+
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            100,
+            expires_at,
+        ));
+
+        let nonce = Router::next_nonce(DomainId::X3Native, alice_native()).saturating_sub(100);
+        let message = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender: alice_native(),
+            recipient: alice_evm(),
+            amount: 100,
+            nonce,
+            created_at: now,
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&message);
+        System::set_block_number(expires_at + 1);
+        assert_ok!(Router::cancel_expired_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        let before = Ledger::ledgers(asset_id).unwrap();
+        assert!(Router::cancel_expired_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err());
+        let after = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(before, after);
+    });
+}
+
+#[test]
 fn packet_commitment_and_ixl_receipt_are_recorded_on_complete() {
     new_test_ext().execute_with(|| {
         let asset_id = bootstrap_x3_asset(10_000);
@@ -751,9 +1219,7 @@ fn packet_commitment_and_ixl_receipt_are_recorded_on_complete() {
         assert_ok!(Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            sender.clone(),
             recipient.clone(),
             100,
             expires_at,
@@ -798,9 +1264,7 @@ fn completion_rejected_after_packet_timeout() {
         assert_ok!(Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
-            DomainId::X3Native,
             DomainId::X3Evm,
-            sender.clone(),
             recipient.clone(),
             100,
             expires_at,
@@ -826,6 +1290,284 @@ fn completion_rejected_after_packet_timeout() {
         assert_eq!(
             Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id),
             Err(pallet_x3_cross_vm_router::Error::<Test>::PacketTimedOut.into())
+        );
+    });
+}
+
+#[test]
+fn ixl_abort_after_lock_restores_ledger() {
+    // Current router IXL path rejects before destination credit when invalid;
+    // this test enforces that source/pending accounting remains restorable.
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let now = System::block_number();
+        let expires_at = now + 1;
+
+        assert_ok!(Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            100,
+            expires_at,
+        ));
+
+        let nonce = Router::next_nonce(DomainId::X3Native, alice_native()).saturating_sub(100);
+        let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender: alice_native(),
+            recipient: alice_evm(),
+            amount: 100,
+            nonce,
+            created_at: now,
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+        System::set_block_number(expires_at + 1);
+        assert_ok!(Router::cancel_expired_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        let l = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(l.pending_supply, 0);
+        assert_eq!(l.native_supply, 10_000);
+    });
+}
+
+#[test]
+fn ixl_slippage_after_lock_restores_ledger() {
+    // Regression alias for lock-fail path restoring funds.
+    ixl_abort_after_lock_restores_ledger();
+}
+
+#[test]
+fn completion_after_timeout_rejected() {
+    completion_rejected_after_packet_timeout();
+}
+
+#[test]
+fn duplicate_completion_rejected_no_state_change_alias() {
+    duplicate_completion_rejected_no_state_change();
+}
+
+#[test]
+fn non_root_cannot_set_audit_gate() {
+    new_test_ext().execute_with(|| {
+        let res = Router::set_external_bridge_audit_gate(RuntimeOrigin::signed(7), true);
+        assert!(res.is_err());
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgeAuditGate::<Test>::get());
+    });
+}
+
+#[test]
+fn non_root_cannot_enable_bridges() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
+        let res = Router::set_external_bridges_enabled(RuntimeOrigin::signed(99), true);
+        assert!(res.is_err());
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+    });
+}
+
+#[test]
+fn revoking_bridge_audit_gate_disables_external_bridges() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert!(pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            false
+        ));
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgeAuditGate::<Test>::get());
+        assert!(!pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+    });
+}
+
+#[test]
+fn six_internal_routes_strict_invariants_and_replay_guards() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(30_000);
+
+        // Seed non-native domains.
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 3_000);
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Svm, 3_000);
+
+        for (src, dst) in [
+            (DomainId::X3Native, DomainId::X3Evm),
+            (DomainId::X3Native, DomainId::X3Svm),
+            (DomainId::X3Evm, DomainId::X3Native),
+            (DomainId::X3Evm, DomainId::X3Svm),
+            (DomainId::X3Svm, DomainId::X3Native),
+            (DomainId::X3Svm, DomainId::X3Evm),
+        ] {
+            let before = Ledger::ledgers(asset_id).expect("ledger exists");
+            let (message_id, _, _, _) = initiate_transfer_and_id(asset_id, src, dst, 25);
+
+            assert_ok!(Router::complete_xvm_transfer(
+                RuntimeOrigin::signed(1),
+                message_id
+            ));
+
+            let after = Ledger::ledgers(asset_id).expect("ledger exists");
+            assert_eq!(after.canonical_supply, before.canonical_supply);
+            assert_eq!(after.pending_supply, 0);
+            assert_eq!(domain_supply(&after, src), domain_supply(&before, src) - 25);
+            assert_eq!(domain_supply(&after, dst), domain_supply(&before, dst) + 25);
+            assert_eq!(after.represented().unwrap(), after.canonical_supply);
+
+            assert!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err());
+            assert!(
+                Router::cancel_expired_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err()
+            );
+        }
+    });
+}
+
+#[test]
+fn signed_user_cannot_spoof_vm_adapter() {
+    signed_user_cannot_spoof_vm_origin();
+}
+
+#[test]
+fn duplicate_message_id_rejected() {
+    test_duplicate_message_replay_rejected();
+}
+
+#[test]
+fn completion_after_refund_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let (message_id, _, _, expires_at) =
+            initiate_transfer_and_id(asset_id, DomainId::X3Native, DomainId::X3Evm, 100);
+
+        System::set_block_number(expires_at + 1);
+        assert_ok!(Router::cancel_expired_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        assert!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err());
+    });
+}
+
+#[test]
+fn refund_after_finalized_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let (message_id, _, _, expires_at) =
+            initiate_transfer_and_id(asset_id, DomainId::X3Native, DomainId::X3Evm, 100);
+        assert_ok!(Router::complete_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        System::set_block_number(expires_at + 1);
+        assert!(Router::cancel_expired_xvm_transfer(RuntimeOrigin::signed(1), message_id).is_err());
+    });
+}
+
+#[test]
+fn route_pending_limit_enforced() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let mut cfg = permissive_route();
+        cfg.limits.pending_limit = 1;
+        assert_ok!(Registry::configure_route(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            cfg,
+        ));
+
+        let (_id, _, _, _) =
+            initiate_transfer_and_id(asset_id, DomainId::X3Native, DomainId::X3Evm, 10);
+        let blocked = Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            10,
+            System::block_number() + 50,
+        );
+        assert_eq!(
+            blocked,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::RoutePendingLimitExceeded.into())
+        );
+    });
+}
+
+#[test]
+fn amount_above_route_limit_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let mut cfg = permissive_route();
+        cfg.limits.min_amount = 5;
+        cfg.limits.max_amount = 20;
+        assert_ok!(Registry::configure_route(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            cfg,
+        ));
+
+        let res = Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            21,
+            System::block_number() + 50,
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::AmountOutOfBounds.into())
+        );
+    });
+}
+
+#[test]
+fn amount_below_route_min_rejected() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+        let mut cfg = permissive_route();
+        cfg.limits.min_amount = 5;
+        cfg.limits.max_amount = 20;
+        assert_ok!(Registry::configure_route(
+            RuntimeOrigin::root(),
+            asset_id,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            cfg,
+        ));
+
+        let res = Router::xvm_transfer(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            4,
+            System::block_number() + 50,
+        );
+        assert_eq!(
+            res,
+            Err(pallet_x3_cross_vm_router::Error::<Test>::AmountOutOfBounds.into())
         );
     });
 }

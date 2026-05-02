@@ -56,7 +56,9 @@ pub struct GraphNode {
 }
 
 /// Trade graph for path finding
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
+)]
 pub struct TradeGraph {
     /// Nodes indexed by token ID
     pub nodes: BTreeMap<H256, GraphNode>,

@@ -25,9 +25,39 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 x3-packet-standard = { path = "../../crates/x3-packet-standard", default-features = false }
 x3-ixl = { path = "../../crates/x3-ixl", default-features = false }
+x3-liquidity-core = { path = "../../crates/x3-liquidity-core", optional = true }
 
 [features]
-default = ["std"]
+default = ["std", "mainnet-rc1"]
+
+# ── Mainnet RC-1 scope lock ────────────────────────────────────────────────
+# Only the features listed here are active on the RC-1 network.
+# Anything NOT in this list MUST remain disabled until explicitly audited and
+# enabled by a separate governance vote + migration.
+mainnet-rc1 = [
+    "internal-ixl",
+    "packet-standard",
+    "liquidity-core",
+    "kernel-invariants",
+]
+
+# Internal modules that form the RC-1 critical path.
+internal-ixl    = []   # x3-ixl bundle execution (always on in mainnet-rc1)
+packet-standard = []   # x3-packet-standard lifecycle (always on in mainnet-rc1)
+liquidity-core  = []   # spot AMM + LP locks (always on in mainnet-rc1)
+kernel-invariants = [] # supply-ledger invariant enforcement
+
+# ── Gated — NOT active in mainnet-rc1 ─────────────────────────────────────
+# These features MUST NOT be enabled by the mainnet-rc1 feature set.
+# Each one requires a separate audit pass before activation.
+external-gateway   = []  # External cross-chain bridge surface
+parallel-executor  = []  # Non-deterministic parallel execution
+appzone-factory    = []  # AppZone contract deployment
+pq-experimental    = []  # Post-quantum crypto schemes
+advanced-dex       = []  # Perps / options / flash loans
+ai-optimizer       = []  # AI route optimizer (consensus path)
+gpu-acceleration   = []  # GPU validator acceleration
+
 std = [
     "frame-support/std",
     "frame-system/std",
@@ -43,6 +73,7 @@ std = [
     "x3-asset-kernel-types/std",
     "x3-packet-standard/std",
     "x3-ixl/std",
+    "x3-liquidity-core",
 ]
 try-runtime = [
     "frame-support/try-runtime",

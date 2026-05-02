@@ -51,7 +51,12 @@ impl PQManager {
     }
 
     /// Verify post-quantum signature
-    pub fn verify(&self, message: &[u8], signature: &PQSignature, public_key: &PQPublicKey) -> Result<bool, PQError> {
+    pub fn verify(
+        &self,
+        message: &[u8],
+        signature: &PQSignature,
+        public_key: &PQPublicKey,
+    ) -> Result<bool, PQError> {
         match self.scheme {
             PQScheme::Dilithium3 => self.verify_dilithium(message, signature, public_key),
             PQScheme::Falcon512 => self.verify_falcon(message, signature, public_key),
@@ -89,7 +94,10 @@ impl PQManager {
         let public_key = PQPublicKey(vec![0u8; 1952]); // Dilithium-3 public key size
         let private_key = PQPrivateKey(vec![0u8; 4016]); // Dilithium-3 private key size
 
-        Ok(PQKeyPair { public_key, private_key })
+        Ok(PQKeyPair {
+            public_key,
+            private_key,
+        })
     }
 
     fn sign_dilithium(&self, message: &[u8]) -> Result<PQSignature, PQError> {
@@ -107,7 +115,12 @@ impl PQManager {
         Ok(PQSignature(signature))
     }
 
-    fn verify_dilithium(&self, message: &[u8], signature: &PQSignature, public_key: &PQPublicKey) -> Result<bool, PQError> {
+    fn verify_dilithium(
+        &self,
+        message: &[u8],
+        signature: &PQSignature,
+        public_key: &PQPublicKey,
+    ) -> Result<bool, PQError> {
         // Dilithium verification
         // In practice: use pqclean_dilithium::verify
         // For now, simulate verification
@@ -121,7 +134,10 @@ impl PQManager {
         let public_key = PQPublicKey(vec![0u8; 897]); // Falcon-512 public key size
         let private_key = PQPrivateKey(vec![0u8; 1281]); // Falcon-512 private key size
 
-        Ok(PQKeyPair { public_key, private_key })
+        Ok(PQKeyPair {
+            public_key,
+            private_key,
+        })
     }
 
     fn sign_falcon(&self, message: &[u8]) -> Result<PQSignature, PQError> {
@@ -133,7 +149,12 @@ impl PQManager {
         Ok(PQSignature(signature))
     }
 
-    fn verify_falcon(&self, message: &[u8], signature: &PQSignature, public_key: &PQPublicKey) -> Result<bool, PQError> {
+    fn verify_falcon(
+        &self,
+        message: &[u8],
+        signature: &PQSignature,
+        public_key: &PQPublicKey,
+    ) -> Result<bool, PQError> {
         // Falcon verification
         let message_hash = sp_io::hashing::blake2_256(message);
         Ok(signature.0.len() == 666 && signature.0[0..32] == message_hash)
@@ -145,7 +166,10 @@ impl PQManager {
         let public_key = PQPublicKey(vec![0u8; 64]); // Sphincs+ public key size
         let private_key = PQPrivateKey(vec![0u8; 128]); // Sphincs+ private key size
 
-        Ok(PQKeyPair { public_key, private_key })
+        Ok(PQKeyPair {
+            public_key,
+            private_key,
+        })
     }
 
     fn sign_sphincs(&self, message: &[u8]) -> Result<PQSignature, PQError> {
@@ -157,7 +181,12 @@ impl PQManager {
         Ok(PQSignature(signature))
     }
 
-    fn verify_sphincs(&self, message: &[u8], signature: &PQSignature, public_key: &PQPublicKey) -> Result<bool, PQError> {
+    fn verify_sphincs(
+        &self,
+        message: &[u8],
+        signature: &PQSignature,
+        public_key: &PQPublicKey,
+    ) -> Result<bool, PQError> {
         // Sphincs+ verification
         let message_hash = sp_io::hashing::blake2_256(message);
         Ok(signature.0.len() == 29792 && signature.0[0..32] == message_hash)
@@ -187,7 +216,8 @@ impl HybridSigner {
 
     /// Sign with both classical and PQ algorithms
     pub fn sign_hybrid(&self, message: &[u8]) -> Result<HybridSignature, PQError> {
-        let classical_sig = <sp_core::sr25519::Pair as PairCrypto>::sign(&self.classical_key, message);
+        let classical_sig =
+            <sp_core::sr25519::Pair as PairCrypto>::sign(&self.classical_key, message);
         let pq_sig = self.pq_manager.sign(message)?;
 
         Ok(HybridSignature {
@@ -205,10 +235,16 @@ impl HybridSigner {
         pq_pk: &PQPublicKey,
     ) -> Result<bool, PQError> {
         // Verify classical signature
-        let classical_valid = <sp_core::sr25519::Pair as PairCrypto>::verify(&signature.classical, message, classical_pk);
+        let classical_valid = <sp_core::sr25519::Pair as PairCrypto>::verify(
+            &signature.classical,
+            message,
+            classical_pk,
+        );
 
         // Verify PQ signature
-        let pq_valid = self.pq_manager.verify(message, &signature.post_quantum, pq_pk)?;
+        let pq_valid = self
+            .pq_manager
+            .verify(message, &signature.post_quantum, pq_pk)?;
 
         Ok(classical_valid && pq_valid)
     }
@@ -518,7 +554,9 @@ mod tests {
         let signature = manager1.sign(message).unwrap();
         let wrong_public_key = manager2.public_key();
 
-        let verified = manager1.verify(message, &signature, wrong_public_key).unwrap();
+        let verified = manager1
+            .verify(message, &signature, wrong_public_key)
+            .unwrap();
         assert!(!verified);
     }
 
@@ -544,7 +582,9 @@ mod tests {
         let classical_pk = hybrid.classical_key.public();
         let pq_pk = hybrid.pq_manager.public_key();
 
-        let verified = hybrid.verify_hybrid(message, &hybrid_sig, classical_pk, pq_pk).unwrap();
+        let verified = hybrid
+            .verify_hybrid(message, &hybrid_sig, classical_pk, pq_pk)
+            .unwrap();
         assert!(verified);
     }
 
@@ -559,7 +599,9 @@ mod tests {
         let wrong_classical_pk = hybrid2.classical_key.public();
         let pq_pk = hybrid1.pq_manager.public_key();
 
-        let verified = hybrid1.verify_hybrid(message, &hybrid_sig, &wrong_classical_pk, pq_pk).unwrap();
+        let verified = hybrid1
+            .verify_hybrid(message, &hybrid_sig, &wrong_classical_pk, pq_pk)
+            .unwrap();
         assert!(!verified);
     }
 
@@ -574,7 +616,9 @@ mod tests {
         let classical_pk = hybrid1.classical_key.public();
         let wrong_pq_pk = hybrid2.pq_manager.public_key();
 
-        let verified = hybrid1.verify_hybrid(message, &hybrid_sig, classical_pk, wrong_pq_pk).unwrap();
+        let verified = hybrid1
+            .verify_hybrid(message, &hybrid_sig, classical_pk, wrong_pq_pk)
+            .unwrap();
         assert!(!verified);
     }
 
@@ -686,11 +730,17 @@ mod tests {
         manager.enable_pq(PQScheme::Dilithium3).unwrap();
         assert!(manager.pq_manager.is_some());
         assert!(manager.hybrid_enabled);
-        assert_eq!(manager.pq_manager.as_ref().unwrap().scheme, PQScheme::Dilithium3);
+        assert_eq!(
+            manager.pq_manager.as_ref().unwrap().scheme,
+            PQScheme::Dilithium3
+        );
 
         // Test changing scheme
         manager.enable_pq(PQScheme::Falcon512).unwrap();
-        assert_eq!(manager.pq_manager.as_ref().unwrap().scheme, PQScheme::Falcon512);
+        assert_eq!(
+            manager.pq_manager.as_ref().unwrap().scheme,
+            PQScheme::Falcon512
+        );
     }
 
     #[test]
@@ -726,7 +776,9 @@ mod tests {
         let signature = manager.sign_transaction(tx).unwrap().unwrap();
         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
 
-        let verified = manager.verify_transaction_signature(tx, &signature, &public_key).unwrap();
+        let verified = manager
+            .verify_transaction_signature(tx, &signature, &public_key)
+            .unwrap();
         assert!(verified);
     }
 
@@ -744,7 +796,9 @@ mod tests {
         let wrong_sig = PQSignature(vec![0; 3293]); // Zero signature
         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
 
-        let verified = manager.verify_transaction_signature(tx, &wrong_sig, &public_key).unwrap();
+        let verified = manager
+            .verify_transaction_signature(tx, &wrong_sig, &public_key)
+            .unwrap();
         assert!(!verified);
     }
 
@@ -777,7 +831,10 @@ mod tests {
         let public_key = PQPublicKey(vec![1, 2, 3, 4]);
         let private_key = PQPrivateKey(vec![5, 6, 7, 8]);
 
-        let keypair = PQKeyPair { public_key, private_key };
+        let keypair = PQKeyPair {
+            public_key,
+            private_key,
+        };
 
         assert_eq!(keypair.public_key.0, vec![1, 2, 3, 4]);
         assert_eq!(keypair.private_key.0, vec![5, 6, 7, 8]);
@@ -796,7 +853,10 @@ mod tests {
         let classical = sp_core::sr25519::Signature::from_raw([42; 64]);
         let post_quantum = PQSignature(vec![1, 2, 3]);
 
-        let hybrid = HybridSignature { classical, post_quantum };
+        let hybrid = HybridSignature {
+            classical,
+            post_quantum,
+        };
 
         assert_eq!(hybrid.classical.0, [42; 64]);
         assert_eq!(hybrid.post_quantum.0, vec![1, 2, 3]);
@@ -869,7 +929,7 @@ mod tests {
 
         // Check signature sizes match expected
         assert_eq!(dilithium_sig.0.len(), 3293); // Dilithium-3
-        assert_eq!(falcon_sig.0.len(), 666);    // Falcon-512
+        assert_eq!(falcon_sig.0.len(), 666); // Falcon-512
         assert_eq!(sphincs_sig.0.len(), 29792); // Sphincs+-256
     }
 }

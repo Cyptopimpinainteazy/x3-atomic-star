@@ -3,7 +3,7 @@
 //! These APIs allow external callers (RPC, off-chain workers) to query
 //! evolution state without submitting transactions.
 
-use codec::{Codec, Decode, Encode};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 

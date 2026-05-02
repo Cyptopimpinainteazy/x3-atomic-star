@@ -334,7 +334,7 @@ impl GasEstimationRPC {
     ///
     /// Kept private so it is not exposed as a public production-facing API.
     fn gas_price(&self) -> u64 {
-        100_000_000_000u64 // 100 Wei base fee (mock)
+        100_000_000_000u64 // 100 Wei simulation baseline
     }
 }
 

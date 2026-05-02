@@ -29,10 +29,10 @@ invariants:
       - failed_swap_conserves_supply
       - token_transfer_conserves_supply
     test_files:
-      - pallets/x3-atlas-kernel/tests/test_supply_invariant.rs
+      - pallets/x3-supply-ledger/src/tests_s0_1.rs
       - crates/x3-bridge/tests/test_supply_conservation.rs
     commands:
-      - cargo test -p x3-atlas-kernel canonical_supply
+      - cargo test -p pallet-x3-supply-ledger canonical_supply
       - cargo test -p x3-bridge test_supply_conservation
     blocker_if_missing: "Canonical supply not tested = cannot launch"
 

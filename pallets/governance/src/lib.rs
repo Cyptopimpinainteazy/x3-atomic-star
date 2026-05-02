@@ -753,8 +753,8 @@ pub mod pallet {
             );
 
             // Check proposal snapshot balance to block post-submission flash-loaned power.
-            let snapshot_balance = ProposalBalanceSnapshot::<T>::get(proposal_id, &voter)
-                .unwrap_or_else(Zero::zero);
+            let snapshot_balance =
+                ProposalBalanceSnapshot::<T>::get(proposal_id, &voter).unwrap_or_else(Zero::zero);
             ensure!(balance <= snapshot_balance, Error::<T>::InsufficientBalance);
 
             // Calculate voting power with conviction

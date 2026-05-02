@@ -73,5 +73,9 @@ mod benchmarks {
         execute_task(RawOrigin::Signed(keeper), task_id);
     }
 
-    impl_benchmark_test_suite!(AutomationPallet, crate::mock::new_test_ext(), crate::mock::Test);
+    impl_benchmark_test_suite!(
+        AutomationPallet,
+        crate::mock::new_test_ext(),
+        crate::mock::Test
+    );
 }

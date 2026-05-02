@@ -18,7 +18,9 @@ pub const PROOF_TYPE_SCHED_MISMATCH_V1: ProofTypeTag = 0x01;
 
 // ── Block reference ───────────────────────────────────────────────────────────
 
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub struct HeaderRef {
     pub block_number: u32,
     pub block_hash: H256,

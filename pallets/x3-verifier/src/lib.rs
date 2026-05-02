@@ -180,7 +180,18 @@ pub mod pallet {
     impl<T: Config> Eq for ExecutionReceipt<T> {}
 
     /// Job status
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq, Default)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Eq,
+        Default,
+    )]
     pub enum JobStatus {
         #[default]
         Pending,

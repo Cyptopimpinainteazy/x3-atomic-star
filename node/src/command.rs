@@ -325,18 +325,16 @@ pub fn run() -> CliResult<()> {
                             }
                         }
                         Err(e) => {
-                            warn!("RPC call failed: {}. Showing mock data.", e);
-                            println!("--- Simulation Result (Mock - RPC unavailable) ---");
-                            println!("Success:           true");
-                            println!(
-                                "Estimated Output:  {} (mock)",
-                                amount.saturating_mul(98) / 100
-                            );
-                            println!("Price Impact:      50 bps");
-                            println!("EVM Gas:           150,000");
-                            println!("SVM Compute:       0");
-                            println!();
-                            println!("Note: Start a node to get live simulation results.");
+                            warn!("RPC call failed: {}", e);
+                            println!("--- Simulation Failed ---");
+                            println!("RPC endpoint unavailable or returned an error.");
+                            println!("No mock output is emitted in shipping builds.");
+                            println!("Start a node and retry to get live simulation results.");
+                            return Err(format!(
+                                "atomicTrade_simulate failed against {}: {}",
+                                rpc_url, e
+                            )
+                            .into());
                         }
                     }
 
@@ -394,14 +392,16 @@ pub fn run() -> CliResult<()> {
                             }
                         }
                         Err(e) => {
-                            warn!("RPC call failed: {}. Showing mock data.", e);
-                            println!("--- Price Data (Mock - RPC unavailable) ---");
-                            println!("TWAP Price:        0 (no observations)");
-                            println!("Latest Price:      0 (no observations)");
-                            println!("Observations:      0");
-                            println!("Last Updated:      N/A");
-                            println!();
-                            println!("Note: Start a node and submit price observations first.");
+                            warn!("RPC call failed: {}", e);
+                            println!("--- Price Data Query Failed ---");
+                            println!("RPC endpoint unavailable or returned an error.");
+                            println!("No mock output is emitted in shipping builds.");
+                            println!("Start a node and submit observations before retrying.");
+                            return Err(format!(
+                                "atomicTrade_getPriceData failed against {}: {}",
+                                rpc_url, e
+                            )
+                            .into());
                         }
                     }
 

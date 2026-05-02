@@ -30,8 +30,8 @@ fn custom_error(message: impl Into<String>) -> JsonRpseeError {
 /// Decode hex string with "0x" prefix to 32-byte array.
 fn decode_hex_32(value: &str, label: &str) -> Result<[u8; 32], JsonRpseeError> {
     let stripped = value.strip_prefix("0x").unwrap_or(value);
-    let bytes = hex::decode(stripped)
-        .map_err(|e| custom_error(format!("{label} decode failed: {e}")))?;
+    let bytes =
+        hex::decode(stripped).map_err(|e| custom_error(format!("{label} decode failed: {e}")))?;
     if bytes.len() != 32 {
         return Err(custom_error(format!(
             "{label} must be 32 bytes, got {}",

@@ -7,11 +7,22 @@ use x3_dex::amm_pools::TokenId;
 #[test]
 fn test_swap_execution() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
             0,
@@ -40,11 +51,22 @@ fn test_swap_execution() {
 #[test]
 fn test_invariant_preservation() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
             0,
@@ -75,11 +97,22 @@ fn test_invariant_preservation() {
 #[test]
 fn test_slippage_protection() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
             0,

@@ -1,6 +1,17 @@
-> ⚠️ **STATUS BANNER (April 27, 2026):** This document predates the Apr 27 evidence-based reconciliation. **5 of 9 ProofForge critical blockers are now RESOLVED** (S0-1..5). Outstanding: S0-6 + S1-1/2/3. See **[STATUS_AUDIT_2026_04_27.md](./STATUS_AUDIT_2026_04_27.md)** for the authoritative current state.
+# X3_ATOMIC_STAR
 
-# 🚀 X3_ATOMIC_STAR - Unified Blockchain **TESTNET ONLY** Platform
+## Mainnet Status Source Of Truth
+
+- The authoritative status for launch decisions is: [docs/CURRENT_MAINNET_STATUS.md](docs/CURRENT_MAINNET_STATUS.md)
+- Target scope is v0.4 Internal-Only Mainnet RC.
+- External bridges are disabled by default and are not part of current launch readiness claims.
+
+## Current Position
+
+- Internal-only X3Native, X3Evm, X3Svm path is the release scope.
+- Public external bridge readiness is not claimed in this repository state.
+
+# 🚀 X3_ATOMIC_STAR - Unified Blockchain TESTNET Platform
 
 🚨 **CRITICAL - READ FIRST**: This blockchain is **NOT READY FOR MAINNET DEPLOYMENT**.  
 📖 See [⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md](./⚠️_CRITICAL_PROOFFORGE_DISCREPANCY.md) for details (2 min read)  

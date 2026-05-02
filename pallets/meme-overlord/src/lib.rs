@@ -169,7 +169,9 @@ pub mod pallet {
     pub type MemeId = u64;
 
     /// Meme template structure
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct MemeTemplate<T: Config> {
         /// Template ID
@@ -191,7 +193,9 @@ pub mod pallet {
     }
 
     /// Generated meme
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct Meme<T: Config> {
         /// Meme ID
@@ -215,7 +219,17 @@ pub mod pallet {
     }
 
     /// Meme categories
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Copy)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Copy,
+    )]
     pub enum MemeCategory {
         /// Small profit memes (1-10%)
         SmallGain,
@@ -236,7 +250,17 @@ pub mod pallet {
     }
 
     /// Text positions for meme overlay
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Default)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Default,
+    )]
     pub struct TextPositions {
         pub top_x: u16,
         pub top_y: u16,
@@ -245,7 +269,17 @@ pub mod pallet {
     }
 
     /// Achievement types
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Copy)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Copy,
+    )]
     pub enum AchievementType {
         /// First trade
         FirstTrade,
@@ -280,7 +314,9 @@ pub mod pallet {
     }
 
     /// Achievement record
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq)]
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq,
+    )]
     pub struct Achievement {
         pub achievement_type: AchievementType,
         pub unlocked_at: u64,
@@ -288,7 +324,17 @@ pub mod pallet {
     }
 
     /// Trade statistics
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Default)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Default,
+    )]
     pub struct TradeStats {
         pub total_trades: u64,
         pub profitable_trades: u64,
@@ -301,7 +347,17 @@ pub mod pallet {
     }
 
     /// Social engagement for a meme
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Default)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        Debug,
+        PartialEq,
+        Default,
+    )]
     pub struct Engagement {
         pub likes: u32,
         pub shares: u32,

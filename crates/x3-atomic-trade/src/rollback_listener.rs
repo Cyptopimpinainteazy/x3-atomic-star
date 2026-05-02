@@ -1,6 +1,6 @@
 /// Cross-VM Atomic Rollback Event Listener — Tracks failed trade batches and handles compensation/refunds
 /// Monitors TradeBatchFailed events across VM boundaries and triggers rollback mechanisms
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

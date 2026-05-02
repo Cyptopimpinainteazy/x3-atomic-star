@@ -4,7 +4,8 @@
 //! and EVM-specific payload construction.
 
 use crate::error::{AtlasError, Result};
-use crate::utils::{blake2b_256, from_hex, to_hex};
+use crate::utils::{from_hex, to_hex};
+use sp_core::hashing::keccak_256;
 use sp_core::H256;
 
 // ============================================================================
@@ -27,13 +28,9 @@ pub fn function_selector(signature: &str) -> [u8; 4] {
     selector
 }
 
-/// Simple Keccak-256 implementation using Blake2b as fallback.
-///
-/// Note: For production, use a proper Keccak implementation.
-/// This uses Blake2b for portability.
+/// Keccak-256 implementation used for EVM selector hashing.
 pub fn keccak256(data: &[u8]) -> [u8; 32] {
-    // Using Blake2b as a placeholder - in production use actual Keccak
-    blake2b_256(data).0
+    keccak_256(data)
 }
 
 /// ABI-encode a uint256.

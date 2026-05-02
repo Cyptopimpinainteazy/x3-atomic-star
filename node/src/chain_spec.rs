@@ -10,8 +10,8 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, TreasuryConfig, X3CoinConfig,
-    WASM_BINARY,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, TreasuryConfig,
+    X3CoinConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -80,12 +80,8 @@ fn parse_authorities_from_env(var: &str) -> Result<Vec<(AuraId, GrandpaId)>, Str
 }
 
 fn parse_endowed_accounts_from_env(var: &str) -> Result<Vec<AccountId>, String> {
-    let raw = std::env::var(var).map_err(|_| {
-        format!(
-            "Missing {}. Expected JSON array of SS58 account IDs",
-            var
-        )
-    })?;
+    let raw = std::env::var(var)
+        .map_err(|_| format!("Missing {}. Expected JSON array of SS58 account IDs", var))?;
 
     let decoded: Vec<String> =
         serde_json::from_str(&raw).map_err(|e| format!("Invalid {} JSON: {}", var, e))?;
@@ -150,10 +146,23 @@ fn assert_no_forbidden_live_seed() -> Result<(), String> {
 
 fn assert_no_seed_accounts(endowed_accounts: &[AccountId]) -> Result<(), String> {
     const FORBIDDEN_SEEDS: &[&str] = &[
-        "Alice", "Bob", "Charlie", "Dave", "Eve", "Ferdie",
-        "AtlasFoundation", "AtlasEcosystem", "AtlasCommunity",
-        "TestnetFaucet", "TestnetAlice", "TestnetBob", "TestnetCharlie", "TestnetDave",
-        "TreasuryFoundation", "CommunityFund", "DevelopmentAllocation",
+        "Alice",
+        "Bob",
+        "Charlie",
+        "Dave",
+        "Eve",
+        "Ferdie",
+        "AtlasFoundation",
+        "AtlasEcosystem",
+        "AtlasCommunity",
+        "TestnetFaucet",
+        "TestnetAlice",
+        "TestnetBob",
+        "TestnetCharlie",
+        "TestnetDave",
+        "TreasuryFoundation",
+        "CommunityFund",
+        "DevelopmentAllocation",
     ];
 
     for account in endowed_accounts {

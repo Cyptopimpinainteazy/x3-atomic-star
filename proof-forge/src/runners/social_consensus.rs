@@ -10,8 +10,14 @@ use std::time::Instant;
 fn assess_social_consensus(workspace: &Path, claim_id: &str) -> ProofResult {
     let started = Instant::now();
     let checks: [(&str, &str); 4] = [
-        ("pallets/governance/Cargo.toml", "Governance pallet manifest exists"),
-        ("pallets/governance/src/lib.rs", "Governance pallet implementation exists"),
+        (
+            "pallets/governance/Cargo.toml",
+            "Governance pallet manifest exists",
+        ),
+        (
+            "pallets/governance/src/lib.rs",
+            "Governance pallet implementation exists",
+        ),
         (
             "pallets/governance/src/runtime_api.rs",
             "Governance runtime API surface exists",
@@ -78,5 +84,8 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, _verbose: bool) -> R
 }
 
 pub async fn run_proofs(workspace: &Path, _verbose: bool) -> Result<ProofResult> {
-    Ok(assess_social_consensus(workspace, "x3.social_consensus.full_proof"))
+    Ok(assess_social_consensus(
+        workspace,
+        "x3.social_consensus.full_proof",
+    ))
 }

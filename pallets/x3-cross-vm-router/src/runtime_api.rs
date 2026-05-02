@@ -3,7 +3,7 @@
 //! These APIs allow external callers (RPC, off-chain workers, relayers) to query
 //! bridge routing state and external chain verification status without submitting transactions.
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_std::vec::Vec;

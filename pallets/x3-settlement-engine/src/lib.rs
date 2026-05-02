@@ -279,7 +279,17 @@ pub mod pallet {
     pub type BondCounter<T: Config> = StorageValue<_, u64, ValueQuery, DefaultBondCounter>;
 
     // Bond record stored on-chain
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+        PartialEq,
+        Eq,
+    )]
     #[scale_info(skip_type_params(AccountId, Balance))]
     pub struct BondRecord<AccountId, Balance> {
         pub id: H256,

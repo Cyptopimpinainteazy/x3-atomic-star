@@ -3,7 +3,7 @@
 //! Provides optimized implementations of common operations for X3-Lang contracts.
 //! Includes SHA-256, Blake2, math (sqrt, pow, log), and ABI encoding/decoding.
 
-use sp_core::hashing::{blake2_256, sha256};
+use sp_core::hashing::{blake2_256, keccak_256, sha256};
 
 /// Cryptographic primitives
 pub mod crypto {
@@ -20,10 +20,8 @@ pub mod crypto {
     }
 
     /// Keccak256 (Ethereum style)
-    /// Note: In production, use proper Keccak implementation
     pub fn keccak256(data: &[u8]) -> [u8; 32] {
-        // Placeholder: in real implementation, use sha3_crate or similar
-        blake2_256(data) // Fallback
+        keccak_256(data)
     }
 
     /// Simple signature verification structure
@@ -34,11 +32,14 @@ pub mod crypto {
     }
 
     impl Signature {
-        /// Verify ECDSA signature (mock)
+        /// Verify ECDSA signature.
+        ///
+        /// Fail-closed until a full secp256k1 verifier is wired.
         pub fn verify_ecdsa(&self, message_hash: &[u8; 32], public_key: &[u8; 65]) -> bool {
-            // In production: use libsecp256k1 or similar
-            // Mock: always accept for now
-            !message_hash.is_empty() && !public_key.is_empty()
+            let _ = self;
+            let _ = message_hash;
+            let _ = public_key;
+            false
         }
     }
 }

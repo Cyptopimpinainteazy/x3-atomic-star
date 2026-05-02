@@ -11,7 +11,11 @@ fn request_randomness_works() {
         let seed = vec![1, 2, 3, 4];
         let max_fee = 1000;
 
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), seed, max_fee));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            seed,
+            max_fee
+        ));
 
         // Check that request was created
         let requests = Vrf::account_requests(1);
@@ -54,7 +58,11 @@ fn request_randomness_too_many_pending() {
     new_test_ext().execute_with(|| {
         // Create maximum pending requests
         for i in 0..MaxPendingRequests::get() {
-            assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![i as u8], 1000));
+            assert_ok!(Vrf::request_randomness(
+                RuntimeOrigin::signed(1),
+                vec![i as u8],
+                1000
+            ));
         }
 
         // Next request should fail
@@ -80,11 +88,18 @@ fn request_randomness_seed_too_long() {
 fn fulfill_randomness_works() {
     new_test_ext().execute_with(|| {
         // Create a request
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
 
         // Fulfill it
-        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::signed(2), request_id));
+        assert_ok!(Vrf::fulfill_randomness(
+            RuntimeOrigin::signed(2),
+            request_id
+        ));
 
         // Check that it's fulfilled
         let result = Vrf::fulfilled_requests(request_id).unwrap();
@@ -113,9 +128,16 @@ fn fulfill_randomness_not_found() {
 fn fulfill_randomness_already_fulfilled() {
     new_test_ext().execute_with(|| {
         // Create and fulfill a request
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::signed(2), request_id));
+        assert_ok!(Vrf::fulfill_randomness(
+            RuntimeOrigin::signed(2),
+            request_id
+        ));
 
         // Try to fulfill again
         assert_noop!(
@@ -129,7 +151,11 @@ fn fulfill_randomness_already_fulfilled() {
 fn cancel_randomness_works() {
     new_test_ext().execute_with(|| {
         // Create a request
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
 
         // Cancel it
@@ -150,7 +176,11 @@ fn cancel_randomness_works() {
 fn cancel_randomness_not_owner() {
     new_test_ext().execute_with(|| {
         // Create a request with account 1
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
 
         // Try to cancel with account 2
@@ -165,9 +195,16 @@ fn cancel_randomness_not_owner() {
 fn cancel_randomness_already_fulfilled() {
     new_test_ext().execute_with(|| {
         // Create and fulfill a request
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::signed(2), request_id));
+        assert_ok!(Vrf::fulfill_randomness(
+            RuntimeOrigin::signed(2),
+            request_id
+        ));
 
         // Try to cancel
         assert_noop!(
@@ -185,9 +222,16 @@ fn get_randomness_public_function() {
         assert!(Vrf::get_randomness(fake_id).is_none());
 
         // Create and fulfill
-        assert_ok!(Vrf::request_randomness(RuntimeOrigin::signed(1), vec![42], 1000));
+        assert_ok!(Vrf::request_randomness(
+            RuntimeOrigin::signed(1),
+            vec![42],
+            1000
+        ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::signed(2), request_id));
+        assert_ok!(Vrf::fulfill_randomness(
+            RuntimeOrigin::signed(2),
+            request_id
+        ));
 
         // Now should be available
         assert!(Vrf::get_randomness(request_id).is_some());

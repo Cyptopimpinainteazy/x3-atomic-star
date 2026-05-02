@@ -110,6 +110,8 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Registry = Registry;
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
+    type VmAdapterOrigin = RootOrAny;
+    type EconomicHalt = Ledger;
 }
 
 impl pallet_x3_token_factory::Config for Test {
@@ -117,6 +119,7 @@ impl pallet_x3_token_factory::Config for Test {
     type CreateTokenOrigin = EnsureSigned<u64>;
     type Registry = Registry;
     type Ledger = Ledger;
+    type EconomicHalt = Ledger;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {

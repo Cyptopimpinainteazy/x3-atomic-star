@@ -1,6 +1,6 @@
 /// Cosmos IBC Light Client — Enables native IBC connections between X3 and any Cosmos chain
 /// Implements light client verification, header validation, and consensus state management
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

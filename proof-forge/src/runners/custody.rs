@@ -11,9 +11,18 @@ fn assess_custody(workspace: &Path, claim_id: &str) -> ProofResult {
     let started = Instant::now();
 
     let checks: [(&str, &str); 4] = [
-        ("crates/custody-service/Cargo.toml", "Custody service crate manifest exists"),
-        ("crates/custody-service/src/lib.rs", "Custody service library entry exists"),
-        ("crates/custody-service/src/hsm.rs", "HSM abstraction module exists"),
+        (
+            "crates/custody-service/Cargo.toml",
+            "Custody service crate manifest exists",
+        ),
+        (
+            "crates/custody-service/src/lib.rs",
+            "Custody service library entry exists",
+        ),
+        (
+            "crates/custody-service/src/hsm.rs",
+            "HSM abstraction module exists",
+        ),
         (
             "crates/x3-relayer/src/submitter.rs",
             "Relayer submitter path exists for custody signing integration",

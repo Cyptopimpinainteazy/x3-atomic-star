@@ -37,7 +37,9 @@ pub mod pallet {
     // -----------------------------------------------------------------------
 
     /// Full lifecycle record for one reservation.
-    #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+    #[derive(
+        Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    )]
     pub struct ReservationState<Balance, BlockNumber> {
         /// Opaque route identifier supplied by the caller.
         pub route_id: RouteId,

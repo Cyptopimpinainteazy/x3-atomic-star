@@ -6,8 +6,6 @@ use crate::proof::{Claim, ProofResult, ProofStatus};
 use std::collections::HashMap;
 
 pub mod claims;
-
-
 /// Claim registry with verification tracking
 #[derive(Debug, Clone)]
 pub struct Registry {

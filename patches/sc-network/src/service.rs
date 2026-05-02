@@ -93,6 +93,7 @@ use std::{
 
 pub use behaviour::{InboundFailure, OutboundFailure, ResponseFailure};
 pub use libp2p::identity::{DecodingError, Keypair, PublicKey};
+pub use metrics::NotificationMetrics;
 pub use protocol::NotificationsSink;
 
 mod metrics;

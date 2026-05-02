@@ -73,14 +73,20 @@ async fn assess_consensus(workspace: &Path, claim_id: &str) -> Result<ProofResul
                         .find(|l| !l.trim().is_empty())
                         .unwrap_or("unknown error")
                 ));
-                evidence.insert("consensus_governance_check".to_string(), "false".to_string());
+                evidence.insert(
+                    "consensus_governance_check".to_string(),
+                    "false".to_string(),
+                );
             }
             Err(e) => {
                 failed_checks.push(format!(
                     "Consensus executable governance check could not run: {}",
                     e
                 ));
-                evidence.insert("consensus_governance_check".to_string(), "false".to_string());
+                evidence.insert(
+                    "consensus_governance_check".to_string(),
+                    "false".to_string(),
+                );
             }
         }
     }

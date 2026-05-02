@@ -7,20 +7,31 @@ use x3_dex::amm_pools::TokenId;
 #[test]
 fn test_liquidity_addition() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
 
         // Add liquidity
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0, // pool_id
+            0,    // pool_id
             1000, // amount_a_desired
             1000, // amount_b_desired
-            900, // amount_a_min
-            900, // amount_b_min
+            900,  // amount_a_min
+            900,  // amount_b_min
         ));
 
         // Verify pool state updated
@@ -36,11 +47,22 @@ fn test_liquidity_addition() {
 #[test]
 fn test_lp_token_minting() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
             0,
@@ -59,11 +81,22 @@ fn test_lp_token_minting() {
 #[test]
 fn test_proportional_calculations() {
     new_test_ext().execute_with(|| {
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool with initial liquidity
-        assert_ok!(DEX::create_pool(RuntimeOrigin::signed(1), token_a.clone(), token_b.clone(), 30));
+        assert_ok!(DEX::create_pool(
+            RuntimeOrigin::signed(1),
+            token_a.clone(),
+            token_b.clone(),
+            30
+        ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
             0,

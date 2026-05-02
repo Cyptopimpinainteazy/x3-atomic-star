@@ -65,7 +65,9 @@ pub enum WitnessError {
 
 /// Domain tag for an access key.
 /// Values 0-3 are stable; 4 (`Custom`) is reserved for v1+.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, DecodeWithMemTracking,
+)]
 #[repr(u8)]
 pub enum AccessDomain {
     StorageKey = 0,

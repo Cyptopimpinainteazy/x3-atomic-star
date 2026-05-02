@@ -66,12 +66,17 @@ pub fn execute_evm(
 
     let gas_price_evm: EvmU256 = EvmU256::from_big_endian(&evm_config.gas_price.to_big_endian());
     let origin = to_evm_h160(caller);
-    let block_number_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.block_number).to_big_endian());
+    let block_number_evm: EvmU256 =
+        EvmU256::from_big_endian(&SpU256::from(evm_config.block_number).to_big_endian());
     let block_coinbase = to_evm_h160(evm_config.coinbase);
-    let block_timestamp_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.block_timestamp).to_big_endian());
-    let block_gas_limit_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(gas_limit).to_big_endian());
-    let chain_id_evm: EvmU256 = EvmU256::from_big_endian(&SpU256::from(evm_config.chain_id).to_big_endian());
-    let block_base_fee_per_gas_evm: EvmU256 = EvmU256::from_big_endian(&evm_config.base_fee.to_big_endian());
+    let block_timestamp_evm: EvmU256 =
+        EvmU256::from_big_endian(&SpU256::from(evm_config.block_timestamp).to_big_endian());
+    let block_gas_limit_evm: EvmU256 =
+        EvmU256::from_big_endian(&SpU256::from(gas_limit).to_big_endian());
+    let chain_id_evm: EvmU256 =
+        EvmU256::from_big_endian(&SpU256::from(evm_config.chain_id).to_big_endian());
+    let block_base_fee_per_gas_evm: EvmU256 =
+        EvmU256::from_big_endian(&evm_config.base_fee.to_big_endian());
 
     let vicinity = MemoryVicinity {
         gas_price: gas_price_evm,

@@ -228,7 +228,10 @@ async fn status(State(state): State<AppState>) -> Result<Json<StatusResponse>, G
         latest_block: stats.latest_block,
         total_blocks: stats.total_blocks,
         total_comits: stats.total_comits,
-        cache: state.redis_cache.as_ref().map(|_| state.cache_metrics.snapshot()),
+        cache: state
+            .redis_cache
+            .as_ref()
+            .map(|_| state.cache_metrics.snapshot()),
     }))
 }
 
@@ -526,7 +529,10 @@ async fn load_chain_stats(state: &AppState) -> Result<ChainStats, GatewayError> 
                 state.cache_metrics.misses.fetch_add(1, Ordering::Relaxed);
             }
             Err(err) => {
-                state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+                state
+                    .cache_metrics
+                    .fallbacks
+                    .fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(error = %err, "redis cache read failed, falling back to database");
             }
         }
@@ -543,9 +549,7 @@ async fn load_chain_stats(state: &AppState) -> Result<ChainStats, GatewayError> 
     Ok(stats)
 }
 
-async fn load_latest_block(
-    state: &AppState,
-) -> Result<Option<crate::db::Block>, GatewayError> {
+async fn load_latest_block(state: &AppState) -> Result<Option<crate::db::Block>, GatewayError> {
     const KEY: &str = "x3-gateway:latest-block";
     const TTL_SECS: u64 = 3;
 
@@ -559,7 +563,10 @@ async fn load_latest_block(
                 state.cache_metrics.misses.fetch_add(1, Ordering::Relaxed);
             }
             Err(err) => {
-                state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+                state
+                    .cache_metrics
+                    .fallbacks
+                    .fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(error = %err, "redis latest-block cache read failed");
             }
         }
@@ -857,7 +864,10 @@ async fn load_benchmark_reports_from_cache(
             Ok(None)
         }
         Err(err) => {
-            state.cache_metrics.fallbacks.fetch_add(1, Ordering::Relaxed);
+            state
+                .cache_metrics
+                .fallbacks
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(error = %err, "redis benchmark report cache read failed");
             Ok(None)
         }

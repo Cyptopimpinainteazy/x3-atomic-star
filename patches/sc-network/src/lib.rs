@@ -243,11 +243,11 @@
 //! More precise usage details are still being worked on and will likely change in the future.
 
 mod behaviour;
-mod peer_store;
+pub mod peer_store;
 mod peerset;
 mod protocol;
 mod protocol_controller;
-mod service;
+pub mod service;
 
 pub mod config;
 pub mod discovery;
@@ -273,15 +273,17 @@ pub use sc_network_common::{
 	types::ReputationChange,
 };
 pub use service::{
+	NotificationMetrics,
 	signature::Signature,
 	traits::{
-		KademliaKey, NetworkBlock, NetworkDHTProvider, NetworkEventStream, NetworkNotification,
-		NetworkPeers, NetworkRequest, NetworkSigner, NetworkStateInfo, NetworkStatus,
-		NetworkStatusProvider, NetworkSyncForkRequest, NotificationSender as NotificationSenderT,
+		KademliaKey, NetworkBackend, NetworkBlock, NetworkDHTProvider, NetworkEventStream,
+		NetworkNotification, NetworkPeers, NetworkRequest, NetworkSigner,
+		NetworkStateInfo, NetworkStatus, NetworkStatusProvider, NetworkSyncForkRequest,
+		NotificationConfig, NotificationService, NotificationSender as NotificationSenderT,
 		NotificationSenderError, NotificationSenderReady,
 	},
-	DecodingError, Keypair, NetworkService, NetworkWorker, NotificationSender, NotificationsSink,
-	OutboundFailure, PublicKey,
+	DecodingError, Keypair, NetworkService, NetworkWorker,
+	NotificationSender, NotificationsSink, OutboundFailure, PublicKey,
 };
 pub use types::ProtocolName;
 

@@ -74,7 +74,10 @@ impl AppZoneFactory {
         template: &str,
         target_dir: &str,
     ) -> Result<(), AppZoneError> {
-        println!("Creating new app zone '{}' using template '{}'...", name, template);
+        println!(
+            "Creating new app zone '{}' using template '{}'...",
+            name, template
+        );
 
         // Validate template exists
         let template_path = Path::new(&self.templates_dir).join(template);
@@ -96,17 +99,16 @@ impl AppZoneFactory {
 
         println!("✅ App zone '{}' created successfully!", name);
         println!("📁 Location: {}", app_dir.display());
-        println!("🚀 Run 'cd {} && x3-appzone-factory deploy .' to deploy", app_dir.display());
+        println!(
+            "🚀 Run 'cd {} && x3-appzone-factory deploy .' to deploy",
+            app_dir.display()
+        );
 
         Ok(())
     }
 
     /// Deploy app zone to network
-    pub fn deploy_app_zone(
-        &self,
-        path: &str,
-        network: &str,
-    ) -> Result<(), AppZoneError> {
+    pub fn deploy_app_zone(&self, path: &str, network: &str) -> Result<(), AppZoneError> {
         println!("Deploying app zone from '{}' to {}...", path, network);
 
         let app_dir = Path::new(path);
@@ -221,7 +223,11 @@ impl AppZoneFactory {
     }
 
     // Private helper methods
-    fn copy_template_files(&self, template_path: &Path, target_path: &Path) -> Result<(), AppZoneError> {
+    fn copy_template_files(
+        &self,
+        template_path: &Path,
+        target_path: &Path,
+    ) -> Result<(), AppZoneError> {
         // Recursively copy template directory
         fs::create_dir_all(target_path)?;
 
@@ -290,7 +296,11 @@ impl AppZoneFactory {
         Ok(())
     }
 
-    fn generate_deploy_config(&self, app_dir: &Path, network: &str) -> Result<DeployConfig, AppZoneError> {
+    fn generate_deploy_config(
+        &self,
+        app_dir: &Path,
+        network: &str,
+    ) -> Result<DeployConfig, AppZoneError> {
         // Read app config
         let config_path = app_dir.join("app-config.toml");
         let config_content = fs::read_to_string(&config_path)?;
@@ -463,7 +473,11 @@ pub fn main() -> Result<(), AppZoneError> {
     let factory = AppZoneFactory::new();
 
     match cli.command {
-        Commands::New { name, template, dir } => {
+        Commands::New {
+            name,
+            template,
+            dir,
+        } => {
             factory.create_app_zone(&name, &template, &dir)?;
         }
         Commands::Deploy { path, network } => {
@@ -508,7 +522,9 @@ mod tests {
     fn test_network_endpoints() {
         let factory = AppZoneFactory::new();
 
-        assert!(factory.get_network_endpoints("local").contains(&"http://127.0.0.1:9944".to_string()));
+        assert!(factory
+            .get_network_endpoints("local")
+            .contains(&"http://127.0.0.1:9944".to_string()));
         assert!(factory.get_network_endpoints("testnet").len() > 1);
         assert!(factory.get_network_endpoints("mainnet").len() > 1);
     }
@@ -526,9 +542,13 @@ mod tests {
         let factory = AppZoneFactory::new();
         let temp_dir = TempDir::new().unwrap();
 
-        let result = factory.create_app_zone("test", "nonexistent", temp_dir.path().to_str().unwrap());
+        let result =
+            factory.create_app_zone("test", "nonexistent", temp_dir.path().to_str().unwrap());
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AppZoneError::TemplateNotFound(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AppZoneError::TemplateNotFound(_)
+        ));
     }
 
     #[test]
@@ -540,9 +560,13 @@ mod tests {
         let app_dir = temp_dir.path().join("existing");
         fs::create_dir(&app_dir).unwrap();
 
-        let result = factory.create_app_zone("existing", "basic", temp_dir.path().to_str().unwrap());
+        let result =
+            factory.create_app_zone("existing", "basic", temp_dir.path().to_str().unwrap());
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AppZoneError::DirectoryExists(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AppZoneError::DirectoryExists(_)
+        ));
     }
 
     #[test]
@@ -551,9 +575,17 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create valid app zone structure
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
-        fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("app-config.toml"),
+            "[app]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
 
         let result = factory.validate_app_zone(temp_dir.path());
@@ -566,7 +598,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
-        fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("app-config.toml"),
+            "[app]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
 
         let result = factory.validate_app_zone(temp_dir.path());
@@ -581,12 +617,19 @@ mod tests {
 
         fs::write(temp_dir.path().join("Cargo.toml"), "invalid toml").unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
-        fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("app-config.toml"),
+            "[app]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
 
         let result = factory.validate_app_zone(temp_dir.path());
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AppZoneError::InvalidCargoToml));
+        assert!(matches!(
+            result.unwrap_err(),
+            AppZoneError::InvalidCargoToml
+        ));
     }
 
     #[test]
@@ -594,7 +637,11 @@ mod tests {
         let factory = AppZoneFactory::new();
         let temp_dir = TempDir::new().unwrap();
 
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
         fs::write(temp_dir.path().join("app-config.toml"), "invalid toml").unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
@@ -610,7 +657,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create invalid app zone
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"",
+        )
+        .unwrap();
 
         let result = factory.deploy_app_zone(temp_dir.path().to_str().unwrap(), "local");
         assert!(result.is_err());
@@ -621,7 +672,9 @@ mod tests {
         let factory = AppZoneFactory::new();
         let temp_dir = TempDir::new().unwrap();
 
-        let config = factory.generate_deploy_config(temp_dir.path(), "testnet").unwrap();
+        let config = factory
+            .generate_deploy_config(temp_dir.path(), "testnet")
+            .unwrap();
         assert_eq!(config.network, "testnet");
         assert!(config.rpc_endpoints.len() > 1);
         assert_eq!(config.gas_limit, 10_000_000);
@@ -648,9 +701,17 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create valid app zone
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
-        fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+        fs::write(
+            temp_dir.path().join("app-config.toml"),
+            "[app]\nname = \"test\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
 
         let result = factory.update_app_zone(temp_dir.path().to_str().unwrap());
@@ -672,7 +733,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create minimal Cargo.toml
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
 
         // This test might fail if cargo is not available, so we'll mock it
@@ -688,7 +753,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create minimal Cargo.toml
-        fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"").unwrap();
+        fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+        )
+        .unwrap();
         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
 
         let result = factory.build_app_zone(temp_dir.path());
@@ -712,7 +781,10 @@ mod tests {
 
         assert_eq!(deserialized.network, "testnet");
         assert_eq!(deserialized.app_name, "myapp");
-        assert_eq!(deserialized.pallets, vec!["balances".to_string(), "system".to_string()]);
+        assert_eq!(
+            deserialized.pallets,
+            vec!["balances".to_string(), "system".to_string()]
+        );
         assert_eq!(deserialized.gas_limit, 5_000_000);
         assert_eq!(deserialized.confirmations, 6);
     }
@@ -722,7 +794,10 @@ mod tests {
         let receipt = DeployReceipt {
             network: "mainnet".to_string(),
             app_name: "myapp".to_string(),
-            transaction_hash: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
+            transaction_hash: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                24, 25, 26, 27, 28, 29, 30, 31, 32,
+            ],
             block_number: 12345678,
             deployed_at: 1640995200,
         };
@@ -775,7 +850,13 @@ mod tests {
 
     #[test]
     fn test_clap_deploy_parsing() {
-        let args = vec!["x3-appzone-factory", "deploy", "/path/to/app", "--network", "testnet"];
+        let args = vec![
+            "x3-appzone-factory",
+            "deploy",
+            "/path/to/app",
+            "--network",
+            "testnet",
+        ];
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {

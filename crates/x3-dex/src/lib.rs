@@ -72,9 +72,7 @@ pub use pool_analytics::{
 pub use real_slippage::{
     PoolReserves, PriceImpact, RealSlippageCalculator, SlippageProtection, SlippageQuote,
 };
-pub use settlement_bridge::{
-    LimitOrderSettlementBridge, OrderSettlementIntent, SettlementStatus,
-};
+pub use settlement_bridge::{LimitOrderSettlementBridge, OrderSettlementIntent, SettlementStatus};
 pub use stop_loss_trigger::{
     GridTradingConfig, StopLossTakeProfitEngine, StopLossTrigger, TakeProfitTrigger,
     TrailingStopTrigger,

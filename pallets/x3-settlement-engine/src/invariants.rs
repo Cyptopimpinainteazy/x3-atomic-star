@@ -251,7 +251,9 @@ impl InvariantEnforcer {
 }
 
 /// VM execution event for reentrancy detection
-#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+)]
 pub enum VmExecutionEvent {
     /// Entered VM execution
     Enter(VmType),
@@ -260,7 +262,9 @@ pub enum VmExecutionEvent {
 }
 
 /// VM type identifier
-#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+)]
 pub enum VmType {
     Evm,
     Svm,

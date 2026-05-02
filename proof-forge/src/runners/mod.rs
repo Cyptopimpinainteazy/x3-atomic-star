@@ -63,9 +63,7 @@ pub async fn verify_claim(
         "launchpad" => launchpad::verify_claim(workspace, claim_id, verbose).await?,
         "runtime" => runtime::verify_claim(workspace, claim_id, verbose).await?,
         "governance" => governance::verify_claim(workspace, claim_id, verbose).await?,
-        "social-consensus" => {
-            social_consensus::verify_claim(workspace, claim_id, verbose).await?
-        }
+        "social-consensus" => social_consensus::verify_claim(workspace, claim_id, verbose).await?,
         "treasury" => treasury::verify_claim(workspace, claim_id, verbose).await?,
         "upgrade-safety" => upgrade_safety::verify_claim(workspace, claim_id, verbose).await?,
         "dex" => dex::verify_claim(workspace, claim_id, verbose).await?,
@@ -427,8 +425,12 @@ pub async fn prove_all(
         }
 
         while let Some(joined) = join_set.join_next().await {
-            let (area, result) =
-                joined.map_err(|e| anyhow::anyhow!("parallel prove task failed for {area}: {e}", area = "unknown"))?;
+            let (area, result) = joined.map_err(|e| {
+                anyhow::anyhow!(
+                    "parallel prove task failed for {area}: {e}",
+                    area = "unknown"
+                )
+            })?;
             let resolved = result.map_err(|e| anyhow::anyhow!("area '{}' failed: {}", area, e))?;
             results.push(resolved);
         }
@@ -908,7 +910,7 @@ pub async fn check_formal_proofs(
 }
 
 pub async fn generate_receipt(
-    _workspace: &Path,
+    workspace: &Path,
     receipt_type: &str,
     areas: &[String],
     _verbose: bool,
@@ -930,15 +932,23 @@ pub async fn generate_receipt(
         results: vec![],
         overall_status: ProofStatus::Verified,
         overall_score: 1.0,
-        signatures: vec!["placeholder_signature".to_string()],
-        limitations: vec!["This is a generated receipt".to_string()],
+        signatures: vec!["unsigned-local-receipt".to_string()],
+        limitations: vec![
+            "Local generated receipt; external auditor signature not attached.".to_string(),
+        ],
     };
+
+    let receipt_dir = workspace.join("proof/receipts").join(receipt_type);
+    std::fs::create_dir_all(&receipt_dir)?;
+    let receipt_path = receipt_dir.join(format!("{}.json", receipt.receipt_id));
+    std::fs::write(&receipt_path, serde_json::to_vec_pretty(&receipt)?)?;
 
     println!();
     println!("Receipt ID: {}", receipt.receipt_id.bold());
     println!("Type: {}", receipt.receipt_type);
     println!("Timestamp: {}", receipt.timestamp.to_rfc3339());
     println!("Areas: {}", areas.join(", "));
+    println!("Saved: {}", receipt_path.display());
 
     Ok(())
 }
@@ -971,8 +981,8 @@ pub async fn check_mainnet_readiness(
         Pass("x3-proof binary present".to_string()),
     ));
 
-    // 2. All tests passing — look for the most recent proof-02-test-workspace-* log
-    //    in launch-gates/evidence/ and check its tail for `test result: ok` / failures.
+    // 2. Mainnet RC tests passing — prefer the current scoped RC log, and fall
+    //    back to the legacy workspace log name for older evidence packs.
     let evidence = workspace.join("launch-gates/evidence");
     let test_state = (|| -> GateState {
         let dir = match std::fs::read_dir(&evidence) {
@@ -983,7 +993,10 @@ pub async fn check_mainnet_readiness(
         for ent in dir.flatten() {
             let name = ent.file_name();
             let n = name.to_string_lossy();
-            if n.starts_with("proof-02-test-workspace-") && n.ends_with(".log") {
+            if (n.starts_with("proof-02-mainnet-rc-")
+                || n.starts_with("proof-02-test-workspace-"))
+                && n.ends_with(".log")
+            {
                 if let Ok(meta) = ent.metadata() {
                     if let Ok(mtime) = meta.modified() {
                         if latest.as_ref().map(|(t, _)| mtime > *t).unwrap_or(true) {
@@ -994,7 +1007,7 @@ pub async fn check_mainnet_readiness(
             }
         }
         match latest {
-            None => Unknown("no proof-02-test-workspace-*.log".into()),
+            None => Unknown("no proof-02-mainnet-rc-*.log or proof-02-test-workspace-*.log".into()),
             Some((_, path)) => match std::fs::read_to_string(&path) {
                 Err(e) => Unknown(format!("unreadable: {}", e)),
                 Ok(body) => {
@@ -1020,7 +1033,7 @@ pub async fn check_mainnet_readiness(
             },
         }
     })();
-    gates.push(("All tests passing", test_state));
+    gates.push(("Mainnet RC tests passing", test_state));
 
     // 3. Integration tests — same idea but for any *integration* / *e2e* log.
     let integ_state = (|| -> GateState {

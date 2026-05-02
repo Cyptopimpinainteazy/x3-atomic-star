@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{debug, warn};
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,9 @@ pub const INHERENT_IDENTIFIER: sp_inherents::InherentIdentifier = *b"poh____0";
 ///
 /// Encoded as SCALE (or JSON in tests) and placed in the block header's
 /// `DigestItem::Consensus(POH_ENGINE_ID, payload)`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking,
+)]
 pub struct PoHDigest {
     /// Monotonically increasing tick counter (one per block).
     pub tick: u64,

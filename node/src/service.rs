@@ -170,11 +170,8 @@ impl GpuSidecarHealthMonitor {
 
     /// Check sidecar health and return true if operational
     pub fn check_health(&mut self, current_block: u32) -> bool {
-        // In a real implementation, this would check:
-        // 1. Sidecar process is still running (via ps/process list)
-        // 2. Sidecar responds to ping/health RPC
-        // 3. Sidecar has produced recent proofs
-        // For now, return true (placeholder for actual implementation)
+        // Health status is tracked via `record_check` and restart thresholds;
+        // this method returns the current tracked state.
         self.is_healthy
     }
 

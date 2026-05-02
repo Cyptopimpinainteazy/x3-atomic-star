@@ -2927,13 +2927,10 @@ fn test_fee_accounting_on_successful_comit() {
         ));
 
         let final_balance = crate::mock::Balances::free_balance(&ALICE);
-        
+
         // Verify fee was charged (actual fee based on execution, not max_fee)
         let actual_fee_charged = initial_balance - final_balance;
-        assert!(
-            actual_fee_charged > 0,
-            "Some fee should be charged"
-        );
+        assert!(actual_fee_charged > 0, "Some fee should be charged");
         assert!(
             actual_fee_charged <= max_fee,
             "Actual fee should not exceed max_fee"
@@ -2997,7 +2994,7 @@ fn test_fee_not_charged_on_execution_failure() {
         assert!(result.is_err());
 
         let final_balance = crate::mock::Balances::free_balance(&ALICE);
-        
+
         // Verify no fee was charged (atomic rollback)
         assert_eq!(
             initial_balance, final_balance,
@@ -3006,7 +3003,9 @@ fn test_fee_not_charged_on_execution_failure() {
 
         // No FeeDeducted event should be present
         let events = x3_events();
-        assert!(!events.iter().any(|e| matches!(e, AtlasEvent::FeeDeducted { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, AtlasEvent::FeeDeducted { .. })));
 
         println!("✅ TICKET-4.5-004: Fee correctly not charged on execution failure");
     });
@@ -3070,9 +3069,9 @@ fn test_cumulative_fee_accounting() {
                 _ => None,
             })
             .collect();
-        
+
         assert_eq!(fee_events.len(), num_comits as usize, "Should have fee event for each comit");
-        
+
         // Sum of individual fee events should equal total charged
         let sum_of_fees: Balance = fee_events.iter().sum();
         assert_eq!(sum_of_fees, total_fees_charged, "Sum of fees should match total charged");
@@ -3120,9 +3119,12 @@ fn test_nonce_prevents_fee_double_charge() {
 
         let balance_after_first = crate::mock::Balances::free_balance(&ALICE);
         let first_fee_charged = initial_balance - balance_after_first;
-        
+
         assert!(first_fee_charged > 0, "Some fee should be charged");
-        assert!(first_fee_charged <= max_fee, "Fee should not exceed max_fee");
+        assert!(
+            first_fee_charged <= max_fee,
+            "Fee should not exceed max_fee"
+        );
 
         // Second submission with same nonce should fail (nonce check)
         let result = AtlasKernel::submit_comit_v2(
@@ -3139,7 +3141,7 @@ fn test_nonce_prevents_fee_double_charge() {
         assert!(result.is_err());
 
         let final_balance = crate::mock::Balances::free_balance(&ALICE);
-        
+
         // Verify fee was NOT charged twice
         assert_eq!(
             final_balance, balance_after_first,
@@ -3161,14 +3163,14 @@ fn test_defensive_accounting_checks_exist() {
 
         // This test documents that defensive_assert! checks exist in lib.rs
         // at unreserve call sites (lines 2137, 2159, 2201, 2209, 2239, 2243)
-        // 
+        //
         // The defensive checks validate:
         // 1. Full unreserve on prepare error (defensive_assert! line 2137)
         // 2. Full unreserve on queue push failure (defensive_assert! line 2159)
         // 3. Full unreserve on execution failure (defensive_assert! lines 2201, 2209)
         // 4. Full unreserve on fee exceeded (defensive_assert! line 2239)
         // 5. Full unreserve on success path (defensive_assert! line 2243)
-        
+
         println!("✅ TICKET-4.5-004: Defensive checks documented");
         println!("   - Line 2137: Prepare error unreserve validation");
         println!("   - Line 2159: Queue full unreserve validation");
@@ -3182,4 +3184,3 @@ fn test_defensive_accounting_checks_exist() {
 // Property-based tests module (TICKET-4.5-004 Feature 2 Step 4)
 #[cfg(test)]
 mod property_tests;
-

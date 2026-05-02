@@ -11,7 +11,10 @@ fn assess_x3language(workspace: &Path, claim_id: &str) -> ProofResult {
     let started = Instant::now();
     let checks: [(&str, &str); 5] = [
         ("x3-lang/Cargo.toml", "x3-lang workspace manifest exists"),
-        ("x3-lang/compiler/Cargo.toml", "x3-lang compiler crate exists"),
+        (
+            "x3-lang/compiler/Cargo.toml",
+            "x3-lang compiler crate exists",
+        ),
         ("x3-lang/vm/Cargo.toml", "x3-lang VM crate exists"),
         (
             "x3-lang/tests/verify_bytecode.rs",

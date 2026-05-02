@@ -65,7 +65,18 @@ pub mod pallet {
     // ─────────────────────────────────────────────────────────────────────────
 
     /// Classification of an account.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
     pub enum AccountKind {
         /// Externally-owned account (default).
@@ -83,7 +94,9 @@ pub mod pallet {
     }
 
     /// Per-account information stored in the registry.
-    #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct AccountInfo<T: Config> {
         /// Account classification.

@@ -27,7 +27,7 @@
 //! - Never advancing the canonical finalized head from Flash in shadow mode.
 //! - Logging every round timeout as a potential liveness event.
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
@@ -83,8 +83,8 @@ impl Proposal {
         // Use sp_core for actual sr25519 verification
         use sp_core::sr25519;
         use sp_runtime::traits::Verify;
-        let public = sr25519::Public(self.leader_id);
-        let signature = sr25519::Signature(self.leader_sig);
+        let public = sr25519::Public::from_raw(self.leader_id);
+        let signature = sr25519::Signature::from_raw(self.leader_sig);
         let message = self.message_hash();
 
         signature.verify(&message[..], &public)
@@ -117,8 +117,8 @@ impl Vote {
         // Use sp_core for actual sr25519 verification
         use sp_core::sr25519;
         use sp_runtime::traits::Verify;
-        let public = sr25519::Public(self.voter_id);
-        let signature = sr25519::Signature(self.voter_sig);
+        let public = sr25519::Public::from_raw(self.voter_id);
+        let signature = sr25519::Signature::from_raw(self.voter_sig);
         let message = self.message_hash();
 
         signature.verify(&message[..], &public)
@@ -128,7 +128,9 @@ impl Vote {
 /// Flash Finality certificate.
 /// Produced when ≥ 2/3 + 1 validators vote for the same block in the same round.
 /// This is the artifact that becomes a PoAE proof anchor.
-#[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Encode, Decode, DecodeWithMemTracking, serde::Serialize, serde::Deserialize,
+)]
 pub struct FinalityCertificate {
     pub block_hash: BlockHash,
     pub block_number: BlockNumber,

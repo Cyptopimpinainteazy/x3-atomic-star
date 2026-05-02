@@ -43,7 +43,9 @@ use tracing::{debug, info};
 // ─── Core Types ───────────────────────────────────────────────────────────────
 
 /// VM type for a bundle leg.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking,
+)]
 pub enum VmType {
     Evm,
     Svm,

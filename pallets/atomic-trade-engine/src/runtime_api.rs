@@ -13,7 +13,9 @@ use sp_std::vec::Vec;
 use crate::types::{RouteStep, TradeRoute};
 
 /// Trade simulation result returned by the runtime API.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct SimulationResult {
     /// Whether the trade would succeed
@@ -33,7 +35,9 @@ pub struct SimulationResult {
 }
 
 /// Batch status for query.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BatchStatusResponse {
     /// Batch exists
@@ -51,7 +55,9 @@ pub struct BatchStatusResponse {
 }
 
 /// Price oracle data response.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct PriceDataResponse {
     /// Token pair exists in oracle

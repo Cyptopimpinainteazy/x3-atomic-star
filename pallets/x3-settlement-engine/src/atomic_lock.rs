@@ -43,7 +43,9 @@ impl EscrowAccount {
 }
 
 /// 2PC Atomic lock state
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+)]
 pub enum LockPhase {
     /// Funds locked during Prepare → ready for Commit
     LockedForCommit {
@@ -68,7 +70,9 @@ pub enum LockPhase {
 }
 
 /// Reason for lock release
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+)]
 pub enum ReleaseReason {
     CommitSucceeded,
     CommitFailed,

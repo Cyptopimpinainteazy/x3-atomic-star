@@ -14,7 +14,9 @@ use sp_std::vec::Vec;
 pub type TaskId = H256;
 
 /// Task condition types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub enum Condition {
     /// Time-based: execute at specific block number
     BlockNumber(u64),
@@ -29,7 +31,9 @@ pub enum Condition {
 }
 
 /// Task action types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub enum Action {
     /// Call a pallet extrinsic
     Extrinsic {
@@ -42,7 +46,9 @@ pub enum Action {
 }
 
 /// Automated task definition
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct Task<AccountId, Balance> {
     /// Unique task identifier
     pub id: TaskId,
@@ -61,7 +67,9 @@ pub struct Task<AccountId, Balance> {
 }
 
 /// Task execution status
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub enum TaskStatus {
     /// Task is active and waiting for condition
     Active,
@@ -134,7 +142,9 @@ pub enum AutomationError {
 }
 
 /// Keeper network participant
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct Keeper<AccountId> {
     /// Keeper account
     pub account: AccountId,
@@ -189,7 +199,9 @@ pub mod execution {
     }
 
     /// Validate task parameters (simplified for demo)
-    pub fn validate_task<AccountId, Balance: Default + PartialEq>(_task: &Task<AccountId, Balance>) -> Result<(), crate::AutomationError> {
+    pub fn validate_task<AccountId, Balance: Default + PartialEq>(
+        _task: &Task<AccountId, Balance>,
+    ) -> Result<(), crate::AutomationError> {
         // Simplified validation for demo
         Ok(())
     }

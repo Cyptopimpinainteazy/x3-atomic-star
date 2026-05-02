@@ -129,7 +129,9 @@ impl MediaApi for MediaRpc {
 
     async fn get_network_stats(&self) -> Result<NetworkStats, String> { Ok(NetworkStats { total_nodes: 4, online_nodes: 3, stale_nodes: 1, offline_nodes: 0, total_vram_gb: 184, available_vram_gb: 140, total_jobs_completed: 2048 }) }
     async fn get_pending_jobs(&self) -> Result<Vec<MediaJobStatus>, String> { Ok(vec![]) }
-    async fn cancel_job(&self, _job_id: String) -> Result<bool, String> { Ok(true) }
+    async fn cancel_job(&self, _job_id: String) -> Result<bool, String> {
+        Err("cancel_job is not implemented".into())
+    }
     async fn estimate_job(&self, _request: MediaJobRequest) -> Result<serde_json::Value, String> { Ok(json!({})) }
     async fn get_swarm_capacity(&self) -> Result<serde_json::Value, String> { Ok(json!({})) }
 }

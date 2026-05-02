@@ -84,6 +84,17 @@ pub struct ReadinessReport {
     pub halt_functional: ReadinessCheck,
     pub permissions_enforced: ReadinessCheck,
     pub balance_reconciliation: ReadinessCheck,
+    // ── RC-1 specific gates ──────────────────────────────────────────────
+    /// IXL bundle execution path: planner + interpreter + rollback wired.
+    pub ixl_bundle_gate: ReadinessCheck,
+    /// Packet lifecycle: replay guard, commitment, timeout wired in router.
+    pub packet_lifecycle_gate: ReadinessCheck,
+    /// LiquidityCore settlement: spot AMM swap callback wired to IXL.
+    pub liquidity_core_gate: ReadinessCheck,
+    /// External bridges: must be DISABLED at genesis (scope-freeze rule).
+    pub external_bridges_disabled: ReadinessCheck,
+    /// Kernel invariant: supply ledger invariant check wired after every bundle.
+    pub kernel_invariant_gate: ReadinessCheck,
     /// Computed; only `true` when every check is `Pass`.
     pub overall_ready: bool,
 }
@@ -104,6 +115,11 @@ impl ReadinessReport {
             halt_functional: ReadinessCheck::default(),
             permissions_enforced: ReadinessCheck::default(),
             balance_reconciliation: ReadinessCheck::default(),
+            ixl_bundle_gate: ReadinessCheck::default(),
+            packet_lifecycle_gate: ReadinessCheck::default(),
+            liquidity_core_gate: ReadinessCheck::default(),
+            external_bridges_disabled: ReadinessCheck::default(),
+            kernel_invariant_gate: ReadinessCheck::default(),
             overall_ready: false,
         }
     }
@@ -113,7 +129,12 @@ impl ReadinessReport {
         self.overall_ready = self.supply_invariant.is_pass()
             && self.halt_functional.is_pass()
             && self.permissions_enforced.is_pass()
-            && self.balance_reconciliation.is_pass();
+            && self.balance_reconciliation.is_pass()
+            && self.ixl_bundle_gate.is_pass()
+            && self.packet_lifecycle_gate.is_pass()
+            && self.liquidity_core_gate.is_pass()
+            && self.external_bridges_disabled.is_pass()
+            && self.kernel_invariant_gate.is_pass();
     }
 
     pub fn is_ready(&self) -> bool {
@@ -126,6 +147,11 @@ impl ReadinessReport {
             self.halt_functional.is_pass(),
             self.permissions_enforced.is_pass(),
             self.balance_reconciliation.is_pass(),
+            self.ixl_bundle_gate.is_pass(),
+            self.packet_lifecycle_gate.is_pass(),
+            self.liquidity_core_gate.is_pass(),
+            self.external_bridges_disabled.is_pass(),
+            self.kernel_invariant_gate.is_pass(),
         ];
         let passed = checks.iter().filter(|&&x| x).count() as u32;
         (passed * 100) / checks.len() as u32

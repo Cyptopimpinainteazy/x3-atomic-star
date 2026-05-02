@@ -13,19 +13,36 @@ mod benchmarks {
     #[benchmark]
     fn create_pool() {
         let caller: T::AccountId = whitelisted_caller();
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
         let fee_basis_points = 30;
 
         #[extrinsic_call]
-        create_pool(RawOrigin::Signed(caller), token_a, token_b, fee_basis_points);
+        create_pool(
+            RawOrigin::Signed(caller),
+            token_a,
+            token_b,
+            fee_basis_points,
+        );
     }
 
     #[benchmark]
     fn add_liquidity() {
         let caller: T::AccountId = whitelisted_caller();
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool first
         assert_ok!(DEXPallet::<T>::create_pool(
@@ -42,8 +59,14 @@ mod benchmarks {
     #[benchmark]
     fn remove_liquidity() {
         let caller: T::AccountId = whitelisted_caller();
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity first
         assert_ok!(DEXPallet::<T>::create_pool(
@@ -71,8 +94,14 @@ mod benchmarks {
     #[benchmark]
     fn swap() {
         let caller: T::AccountId = whitelisted_caller();
-        let token_a = TokenId { chain_id: 1, asset_id: 0 };
-        let token_b = TokenId { chain_id: 1, asset_id: 1 };
+        let token_a = TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        };
+        let token_b = TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        };
 
         // Create pool and add liquidity first
         assert_ok!(DEXPallet::<T>::create_pool(

@@ -11,8 +11,7 @@ use sp_core::{H160, H256};
 use sp_io::TestExternalities;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
-    BuildStorage,
-    DispatchError,
+    BuildStorage, DispatchError,
 };
 
 pub type AccountId = u64;
@@ -123,10 +122,7 @@ impl pallet_balances::Config for Test {
 pub struct TestEvmAdapter;
 
 impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
-    fn execute(
-        _payload: &[u8],
-        _gas_limit: u64,
-    ) -> Result<crate::ExecutionReceipt, DispatchError> {
+    fn execute(_payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Use a fixed asset/balance so tests can assert on canonical ledger.
         let account: AccountId = ALICE;
         let asset_id: AssetId = 0;
@@ -211,15 +207,10 @@ impl pallet_x3_kernel::SvmExecutorAdapter for TestSvmAdapter {
 pub struct TestX3Adapter;
 
 impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
-    fn execute(
-        payload: &[u8],
-        _gas_limit: u64,
-    ) -> Result<crate::ExecutionReceipt, DispatchError> {
+    fn execute(payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Simulate an execution failure when payload starts with 0xFF.
         if payload.first() == Some(&0xFF) {
-            return Err(DispatchError::Other(
-                "X3 execution failed",
-            ));
+            return Err(DispatchError::Other("X3 execution failed"));
         }
 
         let account: AccountId = ALICE;
@@ -452,11 +443,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
     }
 
     /// Check authorization - in mock, always allow ALICE, deny others for non-empty ops
-    fn auth_check(
-        &self,
-        caller: &Self::AccountId,
-        operation: &[u8],
-    ) -> Result<(), DispatchError> {
+    fn auth_check(&self, caller: &Self::AccountId, operation: &[u8]) -> Result<(), DispatchError> {
         if *caller == ALICE {
             Ok(())
         } else if operation.is_empty() {
@@ -488,9 +475,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         // Verify all state changes have valid addresses
         for change in state_changes {
             if change.address.is_empty() {
-                return Err(DispatchError::Other(
-                    "Invalid state change address",
-                ));
+                return Err(DispatchError::Other("Invalid state change address"));
             }
         }
         Ok(())

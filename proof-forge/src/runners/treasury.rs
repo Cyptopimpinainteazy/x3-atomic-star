@@ -9,8 +9,14 @@ use tokio::process::Command;
 async fn assess_treasury(workspace: &Path, claim_id: &str) -> Result<ProofResult> {
     let started = Instant::now();
     let checks: [(&str, &str); 4] = [
-        ("pallets/treasury/Cargo.toml", "Treasury pallet manifest exists"),
-        ("pallets/treasury/src/lib.rs", "Treasury pallet implementation exists"),
+        (
+            "pallets/treasury/Cargo.toml",
+            "Treasury pallet manifest exists",
+        ),
+        (
+            "pallets/treasury/src/lib.rs",
+            "Treasury pallet implementation exists",
+        ),
         (
             "proof/funding/milestone-receipt-map.yml",
             "Funding milestone-to-receipt map exists",

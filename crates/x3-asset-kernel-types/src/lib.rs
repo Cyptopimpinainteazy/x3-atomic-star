@@ -169,7 +169,17 @@ pub const MAX_ACCOUNT_BYTES: u32 = 128;
 
 /// Typed recipient address. Domain and address type are always carried together
 /// so a `0x123...` hex blob is never ambiguous across VMs.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum AccountBytes {
     /// X3 native runtime account (32-byte sp_core::AccountId32-style).
@@ -445,7 +455,17 @@ pub enum ProofTier {
 /// The `message_id` is derived from the other fields plus the creation block,
 /// so no caller can forge or reuse one. Replay protection is enforced at both
 /// the message-id level (hash) and the per-(domain, sender, nonce) level.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct X3TransferMessage<BlockNumber: MaxEncodedLen> {
     /// Wire-format version. Must equal [`MESSAGE_FORMAT_VERSION`].
@@ -473,7 +493,7 @@ pub struct X3TransferMessage<BlockNumber: MaxEncodedLen> {
 /// State of a pending transfer. Only transitions listed in [`TransferStatus::can_transition_to`]
 /// are allowed. All others are rejected by the router.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
+    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug, Default,
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum TransferStatus {
@@ -723,6 +743,25 @@ pub mod traits {
         fn ledger(asset_id: &AssetId) -> Option<SupplyLedger>;
     }
 
+    /// Read-only economic halt gate used by execution-facing pallets.
+    ///
+    /// When this returns `true`, new economic entrypoints (new transfers,
+    /// swaps, launches, bundle submissions) must reject immediately, while
+    /// recovery/refund flows remain available.
+    pub trait EconomicHaltInspect {
+        /// Returns `true` when new economic operations must be blocked.
+        fn is_halted() -> bool;
+    }
+
+    /// Default open gate for pallets/tests that do not wire a halt provider.
+    pub struct NoEconomicHalt;
+
+    impl EconomicHaltInspect for NoEconomicHalt {
+        fn is_halted() -> bool {
+            false
+        }
+    }
+
     /// Privileged, origin-free registry mutations used by the token factory.
     ///
     /// These bypass the signed-origin checks performed by the registry's
@@ -839,7 +878,17 @@ impl TokenClass {
 ///
 /// Carries the derived `AssetId`, the creator, and the initial supply. Indexers
 /// can treat this as the "token exists" event.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    RuntimeDebug,
+)]
 pub struct TokenLaunchReceipt<AccountId, BlockNumber>
 where
     AccountId: MaxEncodedLen,

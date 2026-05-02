@@ -235,6 +235,8 @@ impl Metrics {
 	}
 }
 
+pub type NotificationMetrics = Metrics;
+
 /// The bandwidth counter metric.
 #[derive(Clone)]
 pub struct BandwidthCounters(Arc<BandwidthSinks>);

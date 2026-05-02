@@ -199,7 +199,9 @@ impl FinalityOracle {
 }
 
 /// Settlement urgency level
-#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+)]
 pub enum Urgency {
     /// Accept minimal confirmations (risky)
     Immediate,

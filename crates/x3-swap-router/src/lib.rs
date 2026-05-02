@@ -11,7 +11,9 @@ use sp_std::vec::Vec;
 // Note: Would integrate with oracle pallet for price data
 
 /// Swap route segment
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct RouteSegment {
     /// Input asset ID
     pub from_asset: u32,
@@ -128,7 +130,7 @@ impl AiRouteOptimizer {
         // In real implementation, this would query the oracle pallet
         // For demo, return mock prices
         match asset_id {
-            0 => Some(1000000), // Native token ~$1
+            0 => Some(1000000),  // Native token ~$1
             1 => Some(60000000), // Some other asset
             _ => None,
         }

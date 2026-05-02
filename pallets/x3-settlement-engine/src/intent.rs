@@ -53,7 +53,9 @@ pub struct SettlementLeg {
 }
 
 /// Settlement risk level
-#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+)]
 pub enum RiskLevel {
     /// Low risk (X3-internal swaps)
     Low,

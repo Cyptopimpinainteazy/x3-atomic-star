@@ -157,15 +157,7 @@ pub struct DeltaEntry<BlockNumber> {
 }
 
 /// A single field change in a delta.
-#[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    TypeInfo,
-    MaxEncodedLen,
-    Debug,
-)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
 pub struct FieldChange {
     /// Field path (e.g., "state.balance").
     pub path: BoundedVec<u8, ConstU32<64>>,

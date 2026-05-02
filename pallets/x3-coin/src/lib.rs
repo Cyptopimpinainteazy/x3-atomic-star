@@ -89,7 +89,17 @@ pub const BONUS_CLAIM_PERIOD: u64 = 3_942_000; // 3,942,000 blocks ≈ 3 months
 pub const MAX_BONUS_CLAIMS: u32 = 10;
 
 /// Vesting schedule for team allocation
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+)]
 pub struct VestingSchedule {
     /// Total amount to be vested
     pub total_amount: u128,
@@ -104,7 +114,17 @@ pub struct VestingSchedule {
 }
 
 /// Bonus pool claim record
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+)]
 pub struct BonusClaim {
     /// Amount claimed
     pub amount: u128,

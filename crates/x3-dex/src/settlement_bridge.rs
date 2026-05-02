@@ -166,29 +166,31 @@ impl LimitOrderSettlementBridge {
         if buy_order.token_out != sell_order.token_in {
             return Err("Token mismatch: buy_order.token_out != sell_order.token_in");
         }
-        
+
         if buy_order.token_in != sell_order.token_out {
             return Err("Token mismatch: buy_order.token_in != sell_order.token_out");
         }
-        
+
         // Buy order must be willing to pay execution_price or more
         if buy_order.limit_price < execution_price {
             return Err("Buy order limit price below execution price");
         }
-        
+
         // Sell order must accept execution_price or less
         if sell_order.limit_price > execution_price {
             return Err("Sell order limit price above execution price");
         }
-        
+
         // Amount must not exceed remaining capacity
         let buy_remaining = buy_order.amount_in.saturating_sub(buy_order.filled_amount);
-        let sell_remaining = sell_order.amount_in.saturating_sub(sell_order.filled_amount);
-        
+        let sell_remaining = sell_order
+            .amount_in
+            .saturating_sub(sell_order.filled_amount);
+
         if execution_amount > buy_remaining || execution_amount > sell_remaining {
             return Err("Execution amount exceeds remaining order capacity");
         }
-        
+
         // Generate intent ID from order IDs + execution price + block
         let intent_id = Self::derive_intent_id(
             buy_order.id,
@@ -197,10 +199,10 @@ impl LimitOrderSettlementBridge {
             execution_amount,
             current_block,
         );
-        
+
         // Settlement deadline: 100 blocks (~10 minutes at 6s/block)
         const SETTLEMENT_TIMEOUT_BLOCKS: u64 = 100;
-        
+
         Ok(OrderSettlementIntent {
             intent_id,
             buy_order_id: buy_order.id,
@@ -216,7 +218,7 @@ impl LimitOrderSettlementBridge {
             deadline: current_block + SETTLEMENT_TIMEOUT_BLOCKS,
         })
     }
-    
+
     /// Derive deterministic intent ID from order parameters
     fn derive_intent_id(
         buy_order_id: [u8; 32],
@@ -253,7 +255,7 @@ impl LimitOrderSettlementBridge {
 
         H256::from(hash)
     }
-    
+
     /// Check if settlement intent can be finalized
     ///
     /// Called by settlement engine to verify all conditions met:
@@ -268,7 +270,7 @@ impl LimitOrderSettlementBridge {
         if current_block > intent.deadline {
             return Ok(false);
         }
-        
+
         // Check status progression
         match intent.status {
             SettlementStatus::Locked | SettlementStatus::Executing => Ok(true),
@@ -277,7 +279,7 @@ impl LimitOrderSettlementBridge {
             SettlementStatus::Pending => Err("Assets not yet locked"),
         }
     }
-    
+
     /// Create order execution record from finalized intent
     pub fn create_execution_record(
         intent: &OrderSettlementIntent,
@@ -291,7 +293,7 @@ impl LimitOrderSettlementBridge {
             matched_against: Some(intent.sell_order_id),
             timestamp,
         };
-        
+
         let sell_execution = OrderExecution {
             order_id: intent.sell_order_id,
             executed_at_price: intent.execution_price,
@@ -300,17 +302,17 @@ impl LimitOrderSettlementBridge {
             matched_against: Some(intent.buy_order_id),
             timestamp,
         };
-        
+
         (buy_execution, sell_execution)
     }
-    
+
     /// Calculate taker fee (0.25%)
     const TAKER_FEE_BPS: u64 = 25;
-    
+
     fn calculate_taker_fee(amount: u64) -> u64 {
         amount.saturating_mul(Self::TAKER_FEE_BPS) / 10_000
     }
-    
+
     /// Create settlement intent from matched order execution
     ///
     /// This is the bridge function to be called after limit_order_book::match_orders succeeds.
@@ -342,20 +344,20 @@ impl LimitOrderSettlementBridge {
         if buy_execution.matched_against != Some(sell_execution.order_id) {
             return Err("Buy execution not matched to sell execution");
         }
-        
+
         if sell_execution.matched_against != Some(buy_execution.order_id) {
             return Err("Sell execution not matched to buy execution");
         }
-        
+
         // Use execution price and amount from matched orders
         let execution_price = buy_execution.executed_at_price;
         let execution_amount = buy_execution.execution_amount;
-        
+
         // Validate amounts match
         if execution_amount != sell_execution.execution_amount {
             return Err("Execution amounts do not match");
         }
-        
+
         // Generate deterministic intent ID
         let intent_id = Self::derive_intent_id(
             buy_execution.order_id,
@@ -364,10 +366,10 @@ impl LimitOrderSettlementBridge {
             execution_amount,
             current_block,
         );
-        
+
         // Settlement deadline: 100 blocks (~10 minutes at 6s/block)
         const SETTLEMENT_TIMEOUT_BLOCKS: u64 = 100;
-        
+
         Ok(OrderSettlementIntent {
             intent_id,
             buy_order_id: buy_execution.order_id,
@@ -383,7 +385,7 @@ impl LimitOrderSettlementBridge {
             deadline: current_block + SETTLEMENT_TIMEOUT_BLOCKS,
         })
     }
-    
+
     /// Convert OrderSettlementIntent to on-chain SettlementIntent format
     ///
     /// Maps off-chain DEX settlement intent to pallet-x3-settlement-engine format.
@@ -417,7 +419,7 @@ impl LimitOrderSettlementBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn create_test_buy_order() -> LimitOrder {
         LimitOrder {
             id: [1u8; 32],
@@ -433,7 +435,7 @@ mod tests {
             expires_at: 2000,
         }
     }
-    
+
     fn create_test_sell_order() -> LimitOrder {
         LimitOrder {
             id: [2u8; 32],
@@ -449,20 +451,20 @@ mod tests {
             expires_at: 2000,
         }
     }
-    
+
     #[test]
     fn test_create_settlement_intent_valid() {
         let buy_order = create_test_buy_order();
         let sell_order = create_test_sell_order();
-        
+
         let result = LimitOrderSettlementBridge::create_settlement_intent(
             &buy_order,
             &sell_order,
-            10_000, // 1.0x price (between buy limit 1.05x and sell limit 0.95x)
+            10_000,  // 1.0x price (between buy limit 1.05x and sell limit 0.95x)
             500_000, // Half the order size
             1500,
         );
-        
+
         assert!(result.is_ok());
         let intent = result.unwrap();
         assert_eq!(intent.buyer, buy_order.user);
@@ -470,12 +472,12 @@ mod tests {
         assert_eq!(intent.settlement_amount, 500_000);
         assert_eq!(intent.status, SettlementStatus::Pending);
     }
-    
+
     #[test]
     fn test_create_settlement_intent_price_mismatch() {
         let buy_order = create_test_buy_order();
         let sell_order = create_test_sell_order();
-        
+
         // Execution price too high for buy order
         let result = LimitOrderSettlementBridge::create_settlement_intent(
             &buy_order,
@@ -484,11 +486,14 @@ mod tests {
             500_000,
             1500,
         );
-        
+
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Buy order limit price below execution price");
+        assert_eq!(
+            result.unwrap_err(),
+            "Buy order limit price below execution price"
+        );
     }
-    
+
     #[test]
     fn test_can_finalize_intent_timeout() {
         let mut intent = OrderSettlementIntent {
@@ -505,14 +510,20 @@ mod tests {
             created_at: 1000,
             deadline: 1100,
         };
-        
+
         // Before deadline: can finalize
-        assert_eq!(LimitOrderSettlementBridge::can_finalize_intent(&intent, 1050), Ok(true));
-        
+        assert_eq!(
+            LimitOrderSettlementBridge::can_finalize_intent(&intent, 1050),
+            Ok(true)
+        );
+
         // After deadline: cannot finalize
-        assert_eq!(LimitOrderSettlementBridge::can_finalize_intent(&intent, 1150), Ok(false));
+        assert_eq!(
+            LimitOrderSettlementBridge::can_finalize_intent(&intent, 1150),
+            Ok(false)
+        );
     }
-    
+
     #[test]
     fn test_create_execution_record() {
         let intent = OrderSettlementIntent {
@@ -529,22 +540,23 @@ mod tests {
             created_at: 1000,
             deadline: 1100,
         };
-        
-        let (buy_exec, sell_exec) = LimitOrderSettlementBridge::create_execution_record(&intent, 1050);
-        
+
+        let (buy_exec, sell_exec) =
+            LimitOrderSettlementBridge::create_execution_record(&intent, 1050);
+
         assert_eq!(buy_exec.order_id, intent.buy_order_id);
         assert_eq!(buy_exec.execution_amount, 1_000_000);
         assert_eq!(buy_exec.execution_fee, 2_500); // 0.25% of 1M = 2500
-        
+
         assert_eq!(sell_exec.order_id, intent.sell_order_id);
         assert_eq!(sell_exec.execution_fee, 0); // Maker rebate
     }
-    
+
     #[test]
     fn test_create_settlement_intent_from_execution() {
         let buy_order = create_test_buy_order();
         let sell_order = create_test_sell_order();
-        
+
         // Create matched executions (simulating match_orders output)
         let buy_execution = OrderExecution {
             order_id: buy_order.id,
@@ -554,7 +566,7 @@ mod tests {
             matched_against: Some(sell_order.id),
             timestamp: 1500,
         };
-        
+
         let sell_execution = OrderExecution {
             order_id: sell_order.id,
             executed_at_price: 10_000,
@@ -563,7 +575,7 @@ mod tests {
             matched_against: Some(buy_order.id),
             timestamp: 1500,
         };
-        
+
         let result = LimitOrderSettlementBridge::create_settlement_intent_from_execution(
             &buy_execution,
             &sell_execution,
@@ -571,7 +583,7 @@ mod tests {
             &sell_order,
             1500,
         );
-        
+
         assert!(result.is_ok());
         let intent = result.unwrap();
         assert_eq!(intent.buyer, buy_order.user);
@@ -581,12 +593,12 @@ mod tests {
         assert_eq!(intent.status, SettlementStatus::Pending);
         assert_eq!(intent.deadline, 1500 + 100); // SETTLEMENT_TIMEOUT_BLOCKS
     }
-    
+
     #[test]
     fn test_create_settlement_intent_from_execution_mismatch() {
         let buy_order = create_test_buy_order();
         let sell_order = create_test_sell_order();
-        
+
         // Create unmatched executions
         let buy_execution = OrderExecution {
             order_id: buy_order.id,
@@ -596,7 +608,7 @@ mod tests {
             matched_against: None, // NOT MATCHED
             timestamp: 1500,
         };
-        
+
         let sell_execution = OrderExecution {
             order_id: sell_order.id,
             executed_at_price: 10_000,
@@ -605,7 +617,7 @@ mod tests {
             matched_against: Some(buy_order.id),
             timestamp: 1500,
         };
-        
+
         let result = LimitOrderSettlementBridge::create_settlement_intent_from_execution(
             &buy_execution,
             &sell_execution,
@@ -613,8 +625,11 @@ mod tests {
             &sell_order,
             1500,
         );
-        
+
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Buy execution not matched to sell execution");
+        assert_eq!(
+            result.unwrap_err(),
+            "Buy execution not matched to sell execution"
+        );
     }
 }

@@ -8,6 +8,8 @@
 
 pub use pallet::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -18,8 +20,6 @@ mod tests_amm_math;
 mod tests_liquidity_provision;
 #[cfg(test)]
 mod tests_swapping;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 pub mod weights;
 pub use weights::WeightInfo;
@@ -29,22 +29,21 @@ pub mod pallet {
     use super::WeightInfo;
     use frame_support::{pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
-    use sp_core::H256;
-    use x3_dex::amm_pools::{LiquidityPool, LPPosition, TokenId, AMMPool};
-    use x3_dex::limit_order_book::{LimitOrder, LimitOrderBookEngine};
+    use x3_asset_kernel_types::traits::EconomicHaltInspect;
+    use x3_dex::amm_pools::{AMMPool, LPPosition, LiquidityPool, TokenId};
 
     /// Maximum number of pools that can be tracked
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Maximum number of pools
         #[pallet::constant]
         type MaxPools: Get<u32>;
 
         /// Weight information for extrinsics
         type WeightInfo: WeightInfo;
+
+        /// Read-only economic halt gate.
+        type EconomicHalt: EconomicHaltInspect;
     }
 
     #[pallet::pallet]
@@ -72,13 +71,32 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// A new liquidity pool was created
-        PoolCreated { pool_id: u64, token_a: TokenId, token_b: TokenId },
+        PoolCreated {
+            pool_id: u64,
+            token_a: TokenId,
+            token_b: TokenId,
+        },
         /// Liquidity was added to a pool
-        LiquidityAdded { pool_id: u64, amount_a: u128, amount_b: u128, lp_tokens: u128 },
+        LiquidityAdded {
+            pool_id: u64,
+            amount_a: u128,
+            amount_b: u128,
+            lp_tokens: u128,
+        },
         /// Liquidity was removed from a pool
-        LiquidityRemoved { pool_id: u64, amount_a: u128, amount_b: u128, lp_tokens: u128 },
+        LiquidityRemoved {
+            pool_id: u64,
+            amount_a: u128,
+            amount_b: u128,
+            lp_tokens: u128,
+        },
         /// A swap was executed
-        SwapExecuted { pool_id: u64, amount_in: u128, amount_out: u128, user: T::AccountId },
+        SwapExecuted {
+            pool_id: u64,
+            amount_in: u128,
+            amount_out: u128,
+            user: T::AccountId,
+        },
     }
 
     #[pallet::error]
@@ -93,6 +111,8 @@ pub mod pallet {
         SlippageExceeded,
         /// Pool already exists
         PoolAlreadyExists,
+        /// New swaps are halted by economic safety policy.
+        EconomicHaltActive,
     }
 
     #[pallet::call]
@@ -117,12 +137,19 @@ pub mod pallet {
 
             // Check if pool already exists
             let pool_id = pool.pool_id;
-            ensure!(!Pools::<T>::contains_key(pool_id), Error::<T>::PoolAlreadyExists);
+            ensure!(
+                !Pools::<T>::contains_key(pool_id),
+                Error::<T>::PoolAlreadyExists
+            );
 
             // Store pool
             Pools::<T>::insert(pool_id, pool);
 
-            Self::deposit_event(Event::PoolCreated { pool_id, token_a, token_b });
+            Self::deposit_event(Event::PoolCreated {
+                pool_id,
+                token_a,
+                token_b,
+            });
             Ok(())
         }
 
@@ -137,7 +164,7 @@ pub mod pallet {
             amount_a_min: u128,
             amount_b_min: u128,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+            ensure_signed(origin)?;
 
             // Get pool
             let mut pool = Pools::<T>::get(pool_id).ok_or(Error::<T>::PoolNotFound)?;
@@ -149,7 +176,8 @@ pub mod pallet {
                 amount_b_desired,
                 amount_a_min,
                 amount_b_min,
-            ).map_err(|_| Error::<T>::InsufficientLiquidity)?;
+            )
+            .map_err(|_| Error::<T>::InsufficientLiquidity)?;
 
             // Update pool reserves
             pool.reserve_a = pool.reserve_a.saturating_add(amount_a);
@@ -169,7 +197,12 @@ pub mod pallet {
             LPPositions::<T>::insert(position_id, position);
             NextPositionId::<T>::mutate(|id| *id = id.saturating_add(1));
 
-            Self::deposit_event(Event::LiquidityAdded { pool_id, amount_a, amount_b, lp_tokens });
+            Self::deposit_event(Event::LiquidityAdded {
+                pool_id,
+                amount_a,
+                amount_b,
+                lp_tokens,
+            });
             Ok(())
         }
 
@@ -183,7 +216,7 @@ pub mod pallet {
             amount_a_min: u128,
             amount_b_min: u128,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+            ensure_signed(origin)?;
 
             // Get position
             let position = LPPositions::<T>::get(position_id).ok_or(Error::<T>::PoolNotFound)?;
@@ -193,12 +226,9 @@ pub mod pallet {
             let mut pool = Pools::<T>::get(pool_id).ok_or(Error::<T>::PoolNotFound)?;
 
             // Remove liquidity using DEX logic
-            let (amount_a, amount_b) = AMMPool::remove_liquidity_calculate(
-                &pool,
-                lp_amount,
-                amount_a_min,
-                amount_b_min,
-            ).map_err(|_| Error::<T>::InsufficientLiquidity)?;
+            let (amount_a, amount_b) =
+                AMMPool::remove_liquidity_calculate(&pool, lp_amount, amount_a_min, amount_b_min)
+                    .map_err(|_| Error::<T>::InsufficientLiquidity)?;
 
             // Update pool reserves
             pool.reserve_a = pool.reserve_a.saturating_sub(amount_a);
@@ -213,7 +243,12 @@ pub mod pallet {
             Pools::<T>::insert(pool_id, pool);
             LPPositions::<T>::insert(position_id, updated_position);
 
-            Self::deposit_event(Event::LiquidityRemoved { pool_id, amount_a, amount_b, lp_tokens: lp_amount });
+            Self::deposit_event(Event::LiquidityRemoved {
+                pool_id,
+                amount_a,
+                amount_b,
+                lp_tokens: lp_amount,
+            });
             Ok(())
         }
 
@@ -228,6 +263,11 @@ pub mod pallet {
             min_out: u128,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
+
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
 
             // Get pool
             let mut pool = Pools::<T>::get(pool_id).ok_or(Error::<T>::PoolNotFound)?;
@@ -248,7 +288,12 @@ pub mod pallet {
             // Store updated pool
             Pools::<T>::insert(pool_id, pool);
 
-            Self::deposit_event(Event::SwapExecuted { pool_id, amount_in, amount_out, user: who });
+            Self::deposit_event(Event::SwapExecuted {
+                pool_id,
+                amount_in,
+                amount_out,
+                user: who,
+            });
             Ok(())
         }
     }

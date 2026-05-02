@@ -9,7 +9,19 @@ use sp_std::prelude::*;
 pub type AgentId = u32;
 
 /// Agent status.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub enum AgentStatus {
     /// Agent is active and can operate.
     #[default]
@@ -46,7 +58,18 @@ pub struct Agent<AccountId, Balance, BlockNumber> {
 }
 
 /// Agent quota limits.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
+)]
 pub struct AgentQuota<BlockNumber: Default> {
     /// Maximum gas per block.
     pub gas_per_block: u128,
@@ -61,7 +84,9 @@ pub struct AgentQuota<BlockNumber: Default> {
 }
 
 /// Agent permissions.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug,
+)]
 pub struct AgentPermissions {
     /// Can deploy contracts.
     pub can_deploy: bool,
@@ -91,7 +116,18 @@ impl Default for AgentPermissions {
 }
 
 /// Permission type for checking.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+)]
 pub enum PermissionType {
     Deploy,
     Stake,
@@ -117,7 +153,18 @@ pub struct AgentActivity {
 }
 
 /// Action types for event streaming.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+)]
 pub enum ActionType {
     /// Agent executed a trade.
     Trade,

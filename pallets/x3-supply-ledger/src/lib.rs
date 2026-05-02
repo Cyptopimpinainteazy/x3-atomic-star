@@ -26,6 +26,8 @@ pub use pallet::*;
 pub mod mint_idempotency;
 pub mod supply_verification;
 #[cfg(test)]
+mod tests_halt;
+#[cfg(test)]
 mod tests_s0_1;
 
 #[frame_support::pallet]
@@ -37,12 +39,34 @@ pub mod pallet {
     use sp_core::H256;
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
-        traits::{AssetRegistryInspect, SupplyLedgerGovern, SupplyLedgerWrite},
+        traits::{
+            AssetRegistryInspect, EconomicHaltInspect, SupplyLedgerGovern, SupplyLedgerWrite,
+        },
         AssetId, Balance, DomainId, SupplyLedger,
     };
 
     /// Keep only the latest N block proofs to prevent unbounded storage growth.
     const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
+
+    /// Runtime response policy when a supply invariant violation is detected
+    /// during block finalization.
+    #[derive(
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        RuntimeDebug,
+    )]
+    pub enum InvariantViolationPolicy {
+        LogOnly,
+        EventAndPause,
+        RejectNewTransfers,
+    }
 
     /// AssetId → per-asset supply ledger.
     #[pallet::storage]
@@ -92,6 +116,24 @@ pub mod pallet {
         MintIdempotencyToken,
     >;
 
+    /// Active invariant violation policy.
+    #[pallet::storage]
+    #[pallet::getter(fn invariant_violation_policy)]
+    pub type InvariantPolicy<T: Config> =
+        StorageValue<_, InvariantViolationPolicy, ValueQuery, DefaultInvariantPolicy>;
+
+    /// Halt flag for new transfer legs.
+    /// When true, debit and destination credit operations are rejected.
+    /// Refund operations remain allowed to avoid stranding funds.
+    #[pallet::storage]
+    #[pallet::getter(fn transfer_halted)]
+    pub type TransferHalted<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+    #[pallet::type_value]
+    pub fn DefaultInvariantPolicy() -> InvariantViolationPolicy {
+        InvariantViolationPolicy::EventAndPause
+    }
+
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
@@ -128,8 +170,7 @@ pub mod pallet {
                         asset_id,
                         block_number
                     );
-                    // In production: this should HALT the chain
-                    // For now, we log and continue to collect all violations
+                    // Collect all violations first, then apply configured policy.
                 }
 
                 // Build proof for this asset
@@ -167,13 +208,22 @@ pub mod pallet {
                     violated_assets: violations.clone(),
                 });
 
-                // CRITICAL: In production deployment, this should HALT the chain
-                // using frame_system::Pallet::<T>::deposit_log() or panic!()
-                log::error!(
-                    "🚨 CRITICAL: {} supply invariant violations at block {:?}. Chain should HALT.",
-                    violations.len(),
-                    block_number
-                );
+                match InvariantPolicy::<T>::get() {
+                    InvariantViolationPolicy::LogOnly => {
+                        log::error!(
+                            "Supply invariant violation(s) detected at block {:?}, policy=LogOnly",
+                            block_number
+                        );
+                    }
+                    InvariantViolationPolicy::EventAndPause
+                    | InvariantViolationPolicy::RejectNewTransfers => {
+                        TransferHalted::<T>::put(true);
+                        Self::deposit_event(Event::TransfersHalted {
+                            block_number: Self::block_number_to_u32(block_number),
+                            violated_assets: violations,
+                        });
+                    }
+                }
             }
 
             // Generate merkle tree and complete proofs
@@ -267,6 +317,15 @@ pub mod pallet {
         },
         /// S0-2: Duplicate mint attempt detected and rejected.
         DuplicateMintRejected { origin: T::AccountId, nonce: u64 },
+        /// Governance updated invariant violation policy.
+        InvariantPolicyUpdated { policy: InvariantViolationPolicy },
+        /// New transfer legs halted due to invariant failure.
+        TransfersHalted {
+            block_number: u32,
+            violated_assets: Vec<AssetId>,
+        },
+        /// Governance resumed transfers after remediation.
+        TransfersResumed,
     }
 
     #[pallet::error]
@@ -283,6 +342,8 @@ pub mod pallet {
         DuplicateMint,
         /// S0-2: Mint hash verification failed (tampering detected).
         MintHashMismatch,
+        /// New transfers are halted until governance resumes.
+        TransfersHalted,
     }
 
     #[pallet::call]
@@ -334,6 +395,29 @@ pub mod pallet {
         ) -> DispatchResult {
             T::SupplyGovernance::ensure_origin(origin)?;
             Self::do_burn_canonical(&asset_id, domain, amount)
+        }
+
+        /// Governance setter for invariant violation response policy.
+        #[pallet::call_index(2)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn set_invariant_violation_policy(
+            origin: OriginFor<T>,
+            policy: InvariantViolationPolicy,
+        ) -> DispatchResult {
+            T::SupplyGovernance::ensure_origin(origin)?;
+            InvariantPolicy::<T>::put(policy);
+            Self::deposit_event(Event::InvariantPolicyUpdated { policy });
+            Ok(())
+        }
+
+        /// Governance resume switch for transfer flow after remediation.
+        #[pallet::call_index(3)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn resume_transfers(origin: OriginFor<T>) -> DispatchResult {
+            T::SupplyGovernance::ensure_origin(origin)?;
+            TransferHalted::<T>::put(false);
+            Self::deposit_event(Event::TransfersResumed);
+            Ok(())
         }
     }
 
@@ -518,6 +602,7 @@ pub mod pallet {
             source_domain: DomainId,
             amount: Balance,
         ) -> Result<(), DispatchError> {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             ensure!(T::Registry::is_active(asset_id), Error::<T>::AssetNotActive);
             Ledgers::<T>::try_mutate(asset_id, |maybe| -> DispatchResult {
                 let ledger = maybe.as_mut().ok_or(Error::<T>::UnknownAsset)?;
@@ -544,6 +629,7 @@ pub mod pallet {
             destination_domain: DomainId,
             amount: Balance,
         ) -> Result<(), DispatchError> {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             ensure!(T::Registry::is_active(asset_id), Error::<T>::AssetNotActive);
             Ledgers::<T>::try_mutate(asset_id, |maybe| -> DispatchResult {
                 let ledger = maybe.as_mut().ok_or(Error::<T>::UnknownAsset)?;
@@ -612,6 +698,12 @@ pub mod pallet {
             amount: Balance,
         ) -> Result<(), DispatchError> {
             Pallet::<T>::do_burn_canonical(asset_id, domain, amount)
+        }
+    }
+
+    impl<T: Config> EconomicHaltInspect for Pallet<T> {
+        fn is_halted() -> bool {
+            TransferHalted::<T>::get()
         }
     }
 }

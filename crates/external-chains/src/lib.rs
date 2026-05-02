@@ -76,7 +76,9 @@ pub mod chain_ids {
 }
 
 /// Chain type enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Encode, Decode, DecodeWithMemTracking, TypeInfo,
+)]
 pub enum ChainType {
     Base,
     Arbitrum,

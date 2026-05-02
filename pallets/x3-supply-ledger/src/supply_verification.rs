@@ -25,7 +25,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
@@ -247,11 +247,11 @@ impl SupplyMerkleTree {
         let mut level_start = 0;
 
         while level_size > 1 {
-                    let sibling_index = if index.is_multiple_of(2) {
-                        index + 1
-                    } else {
-                        index - 1
-                    };
+            let sibling_index = if index.is_multiple_of(2) {
+                index + 1
+            } else {
+                index - 1
+            };
 
             let sibling = if sibling_index < level_size {
                 tree[level_start + sibling_index]

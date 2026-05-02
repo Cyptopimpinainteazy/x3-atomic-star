@@ -15,6 +15,7 @@ sp-runtime    = { default-features = false, git = "https://github.com/paritytech
 sp-std        = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 sp-io         = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
 sp-api        = { workspace = true, default-features = false }
+x3-asset-kernel-types = { package = "x3-asset-kernel-types", path = "../../crates/x3-asset-kernel-types", default-features = false }
 frame-benchmarking = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", optional = true }
 # Codec
 parity-scale-codec = { version = "3", default-features = false, features = ["derive"] }

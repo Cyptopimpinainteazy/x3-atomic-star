@@ -99,7 +99,9 @@ pub mod pallet {
         pub parent_slot_hashes: Vec<H256>,
     }
 
-    #[derive(Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo, Default)]
+    #[derive(
+        Debug, Clone, Encode, Decode, DecodeWithMemTracking, PartialEq, Eq, TypeInfo, Default,
+    )]
     pub struct ValidationStatistics {
         pub evm_headers_validated: u64,
         pub svm_headers_validated: u64,

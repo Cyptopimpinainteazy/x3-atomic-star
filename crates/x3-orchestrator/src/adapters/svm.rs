@@ -25,7 +25,9 @@ impl ChainAdapter for SvmAdapter {
         if proof.proof_bytes.is_empty() {
             return Err(OrchestratorError::InvalidProof);
         }
-        Ok(true)
+        Err(OrchestratorError::ExecutionFailed(
+            "SVM proof verification backend is not wired".into(),
+        ))
     }
 
     fn execute(&self, _msg: &CrossVmMessage) -> Result<()> {

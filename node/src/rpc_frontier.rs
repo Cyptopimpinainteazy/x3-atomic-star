@@ -184,12 +184,16 @@ where
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
-        let result: Result<Vec<u8>, Vec<u8>> = api.call_evm(at, caller, target_bytes, input_data, gas_limit)
+        let result: Result<Vec<u8>, Vec<u8>> = api
+            .call_evm(at, caller, target_bytes, input_data, gas_limit)
             .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
 
         match result {
             Ok(output) => Ok(format!("0x{}", hex::encode(output))),
-            Err(err) => Err(jsonrpsee::core::Error::Custom(format!("EVM call failed: {}", String::from_utf8_lossy(&err)))),
+            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+                "EVM call failed: {}",
+                String::from_utf8_lossy(&err)
+            ))),
         }
     })?;
 
@@ -219,12 +223,16 @@ where
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
-        let result: Result<u64, Vec<u8>> = api.estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit)
+        let result: Result<u64, Vec<u8>> = api
+            .estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit)
             .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
 
         match result {
             Ok(gas) => Ok(format!("0x{:x}", gas)),
-            Err(err) => Err(jsonrpsee::core::Error::Custom(format!("Gas estimation failed: {}", String::from_utf8_lossy(&err)))),
+            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+                "Gas estimation failed: {}",
+                String::from_utf8_lossy(&err)
+            ))),
         }
     })?;
 

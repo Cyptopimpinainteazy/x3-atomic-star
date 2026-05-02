@@ -119,6 +119,13 @@ jobs:
             live_collector_against_unreachable_endpoint_is_unknown_not_pass \
             unknown_blocks_ready
 
+      # Mainnet RC-1 E2E suite — in-process tests that exercise the full
+      # critical path without a live node.  All 15 scenarios must pass.
+      # This step is a LAUNCH BLOCKER: failures here block merge to main.
+      - name: cargo test (mainnet_rc1 E2E — launch blocker)
+        run: |
+          cargo test -p e2e_tests --test mainnet_rc1
+
       # Suppressions must be explicit and narrow, not broad ignores.
       - name: validate embarrassment suppressions
         run: |

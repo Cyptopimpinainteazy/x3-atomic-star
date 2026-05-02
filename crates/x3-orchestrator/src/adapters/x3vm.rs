@@ -26,7 +26,9 @@ impl ChainAdapter for X3VmAdapter {
         if proof.proof_bytes.is_empty() {
             return Err(OrchestratorError::InvalidProof);
         }
-        Ok(true)
+        Err(OrchestratorError::ExecutionFailed(
+            "X3VM proof verification backend is not wired".into(),
+        ))
     }
 
     fn execute(&self, _msg: &CrossVmMessage) -> Result<()> {

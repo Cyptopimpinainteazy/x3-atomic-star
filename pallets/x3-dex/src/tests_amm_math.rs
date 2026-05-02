@@ -9,8 +9,14 @@ fn test_amm_calculations() {
     // Test basic AMM calculations are mathematically correct
     let mut pool = LiquidityPool {
         pool_id: 0,
-        token_a: TokenId { chain_id: 1, asset_id: 0 },
-        token_b: TokenId { chain_id: 1, asset_id: 1 },
+        token_a: TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        },
+        token_b: TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        },
         reserve_a: 1000,
         reserve_b: 1000,
         total_lp_supply: 1000,
@@ -20,11 +26,10 @@ fn test_amm_calculations() {
 
     // Test adding liquidity calculations
     let result = AMMPool::add_liquidity_calculate(
-        &pool,
-        100,  // amount_a_desired
-        100,  // amount_b_desired
-        90,   // amount_a_min
-        90,   // amount_b_min
+        &pool, 100, // amount_a_desired
+        100, // amount_b_desired
+        90,  // amount_a_min
+        90,  // amount_b_min
     );
 
     assert!(result.is_ok());
@@ -38,8 +43,14 @@ fn test_overflow_protection() {
     // Test that calculations handle overflow safely
     let pool = LiquidityPool {
         pool_id: 0,
-        token_a: TokenId { chain_id: 1, asset_id: 0 },
-        token_b: TokenId { chain_id: 1, asset_id: 1 },
+        token_a: TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        },
+        token_b: TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        },
         reserve_a: u128::MAX / 2,
         reserve_b: u128::MAX / 2,
         total_lp_supply: 1000,
@@ -48,13 +59,7 @@ fn test_overflow_protection() {
     };
 
     // Test with large amounts that could cause overflow
-    let result = AMMPool::add_liquidity_calculate(
-        &pool,
-        u128::MAX / 4,
-        u128::MAX / 4,
-        1,
-        1,
-    );
+    let result = AMMPool::add_liquidity_calculate(&pool, u128::MAX / 4, u128::MAX / 4, 1, 1);
 
     // Should not panic, should handle gracefully
     assert!(result.is_ok() || result.is_err()); // Either succeeds safely or fails safely
@@ -64,8 +69,14 @@ fn test_overflow_protection() {
 fn test_slippage_calculation() {
     let pool = LiquidityPool {
         pool_id: 0,
-        token_a: TokenId { chain_id: 1, asset_id: 0 },
-        token_b: TokenId { chain_id: 1, asset_id: 1 },
+        token_a: TokenId {
+            chain_id: 1,
+            asset_id: 0,
+        },
+        token_b: TokenId {
+            chain_id: 1,
+            asset_id: 1,
+        },
         reserve_a: 1000,
         reserve_b: 1000,
         total_lp_supply: 1000,
@@ -77,8 +88,8 @@ fn test_slippage_calculation() {
     let result = AMMPool::swap_calculate(
         &pool,
         &pool.token_a,
-        100,  // amount_in
-        90,   // min_out (reasonable expectation)
+        100, // amount_in
+        90,  // min_out (reasonable expectation)
     );
 
     assert!(result.is_ok());

@@ -78,13 +78,13 @@ pub mod migrations;
 pub use weights::WeightInfo;
 
 use frame_support::pallet_prelude::*;
-use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned, CheckedAdd, SaturatedConversion};
 use frame_support::sp_runtime::DispatchError;
 use frame_support::traits::BuildGenesisConfig;
 use frame_support::traits::{Currency, DefensiveResult, UnixTime};
 use frame_system::pallet_prelude::*;
 use parity_scale_codec::Codec;
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::{H160, H256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::traits::MaybeSerializeDeserialize;
@@ -189,7 +189,9 @@ pub struct StateChange {
 }
 
 /// Unified state representation for the X3 Chain.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
+)]
 pub struct SphereState {
     /// State root hash representing the entire sphere state.
     pub state_root: H256,
@@ -528,7 +530,9 @@ pub mod pallet {
     >;
 
     /// Prepared cross-VM operation held during 2PC timeout window.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+    #[derive(
+        Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo,
+    )]
     pub struct PreparedCrossVmOp<AccountId, Balance, BlockNumber> {
         /// Origin account that prepared the operation.
         pub origin: AccountId,
@@ -2251,10 +2255,11 @@ pub mod pallet {
             };
 
             // TICKET-4.5-004: Calculate actual fee with overflow protection
-            let required_fee: T::Balance = Self::calculate_execution_fee(evm_gas, svm_compute, T::Balance::default())
-                .defensive_ok()
-                .ok_or(Error::<T>::FeeOverflow)?;
-            
+            let required_fee: T::Balance =
+                Self::calculate_execution_fee(evm_gas, svm_compute, T::Balance::default())
+                    .defensive_ok()
+                    .ok_or(Error::<T>::FeeOverflow)?;
+
             if required_fee > prepared.reserved_fee {
                 // TICKET-4.5-004: Defensive unreserve on fee exceeded
                 let unreserved = T::Currency::unreserve(who, prepared.reserved_fee.into());
@@ -2271,7 +2276,7 @@ pub mod pallet {
                 unreserved == prepared.reserved_fee.into(),
                 "Failed to unreserve full reserved fee on success path"
             );
-            
+
             let refund = prepared.reserved_fee.saturating_sub(required_fee);
 
             if !refund.is_zero() {
@@ -3284,7 +3289,17 @@ pub mod pallet {
     }
 
     /// Asset metadata stored alongside each asset id.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(Symbol))]
     pub struct AssetMetadata<Symbol: MaxEncodedLen> {
         pub symbol: Symbol,

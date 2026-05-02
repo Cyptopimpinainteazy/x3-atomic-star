@@ -84,7 +84,8 @@ async fn assess_launchpad(workspace: &Path, claim_id: &str) -> Result<ProofResul
         }
     } else {
         missing_proofs.push(
-            "Launch validator manifest missing; cannot run executable launch gate check".to_string(),
+            "Launch validator manifest missing; cannot run executable launch gate check"
+                .to_string(),
         );
     }
 

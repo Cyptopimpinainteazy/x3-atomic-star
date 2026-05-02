@@ -153,7 +153,7 @@ impl TransactionSigner {
         if !signature.is_valid {
             return Err("Signature marked invalid");
         }
-        Ok(true)
+        Err("Cryptographic signature verification not implemented")
     }
 
     /// Check if transaction has enough signatures

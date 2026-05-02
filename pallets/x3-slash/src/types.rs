@@ -6,7 +6,17 @@ use scale_info::TypeInfo;
 use sp_core::H256;
 
 /// Bond state stored on-chain.
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+)]
 #[scale_info(skip_type_params(AccountId, Balance))]
 pub struct BondState<AccountId, Balance> {
     /// Unique bond identifier.
@@ -26,7 +36,18 @@ pub struct BondState<AccountId, Balance> {
 }
 
 /// Bond lifecycle status.
-#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+)]
 pub enum BondStatus {
     /// Bond is active and locked.
     Active,
@@ -39,7 +60,17 @@ pub enum BondStatus {
 }
 
 /// Slash record stored on-chain (immutable history).
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+)]
 #[scale_info(skip_type_params(AccountId))]
 pub struct SlashRecord<AccountId> {
     /// Unique slash identifier.

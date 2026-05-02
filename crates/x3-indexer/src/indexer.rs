@@ -470,10 +470,7 @@ fn decode_event_data(event: &subxt::events::Event<'_, PolkadotConfig>) -> serde_
 
     // Add basic event info
     data.insert("pallet".to_string(), serde_json::json!(event.pallet_name()));
-    data.insert(
-        "variant".to_string(),
-        serde_json::json!(event.event_name()),
-    );
+    data.insert("variant".to_string(), serde_json::json!(event.event_name()));
 
     // Try to decode field bytes as hex
     let bytes = event.field_bytes();

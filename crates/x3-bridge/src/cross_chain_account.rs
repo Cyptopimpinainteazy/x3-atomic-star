@@ -1,6 +1,6 @@
 /// Cross-Chain Account Abstraction — Unified account control across EVM, SVM, IBC-compatible chains
 /// Implements unified key standard with threshold multisig support across multiple blockchains
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::{ed25519, sr25519};
 use sp_std::vec::Vec;
 

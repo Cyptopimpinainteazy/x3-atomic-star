@@ -1,6 +1,6 @@
 /// Gas Relayer — Multi-token fee payment abstraction enabling users to pay transaction fees in any token
 /// Implements relayer netting, fee routing, and sponsor mechanisms
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

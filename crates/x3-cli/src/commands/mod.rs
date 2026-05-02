@@ -6,9 +6,9 @@ use clap::{Parser, Subcommand};
 pub mod account;
 pub mod build;
 pub mod compile;
+pub mod demo;
 #[cfg(feature = "sdk")]
 pub mod deploy;
-pub mod demo;
 pub mod docgen;
 pub mod init;
 #[cfg(feature = "sdk")]

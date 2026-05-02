@@ -35,13 +35,13 @@ use pallet_aura;
 use pallet_balances;
 use pallet_collective;
 use pallet_cross_chain_validator;
-use pallet_offences;
-use pallet_session;
 use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
+use pallet_offences;
 use pallet_preimage;
 use pallet_scheduler;
+use pallet_session;
 #[cfg(feature = "dev")]
 use pallet_sudo;
 use pallet_swarm;
@@ -50,8 +50,8 @@ use pallet_transaction_payment::CurrencyAdapter;
 use pallet_treasury;
 use pallet_x3_asset_registry;
 use pallet_x3_cross_vm_router;
-use pallet_x3_kernel;
 use pallet_x3_invariants;
+use pallet_x3_kernel;
 use pallet_x3_settlement_engine;
 use pallet_x3_supply_ledger;
 use pallet_x3_token_factory;
@@ -438,6 +438,7 @@ impl pallet_x3_dex::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxPools = MaxPools;
     type WeightInfo = ();
+    type EconomicHalt = X3SupplyLedger;
 }
 
 parameter_types! {
@@ -924,8 +925,6 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
 }
-
-
 
 impl pallet_x3_kernel::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
@@ -1726,6 +1725,7 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     // TODO: Implement proper VM adapter origin that can only be created by verified kernel execution
     // For now, restrict to root to prevent unauthorized VM adapter calls
     type VmAdapterOrigin = frame_system::EnsureRoot<AccountId>;
+    type EconomicHalt = X3SupplyLedger;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {
@@ -1733,6 +1733,7 @@ impl pallet_x3_token_factory::Config for Runtime {
     type CreateTokenOrigin = frame_system::EnsureSigned<AccountId>;
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
+    type EconomicHalt = X3SupplyLedger;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -2345,18 +2346,16 @@ impl_runtime_apis! {
                 };
             }
 
-            // Fallback simulation when no pools are available.
-            let estimated_output =
-                amount_in.saturating_mul(10000 - slippage_bps as u128) / 10000;
-
+            // Fail closed when no pool route exists. Do not synthesize a
+            // successful quote from heuristics.
             SimulationResult {
-                success: true,
-                estimated_output,
-                price_impact_bps: slippage_bps,
-                evm_gas: 150_000,
+                success: false,
+                estimated_output: 0,
+                price_impact_bps: 0,
+                evm_gas: 0,
                 svm_compute: 0,
                 route: vec![],
-                error: None,
+                error: Some("No route available for token pair".to_string()),
             }
         }
 

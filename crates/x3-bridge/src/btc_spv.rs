@@ -7,7 +7,7 @@
 //! - Block header chain validation
 //! - UTXO state tracking
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_io::hashing;
 use sp_std::vec::Vec;
 
@@ -260,19 +260,16 @@ fn bits_to_target(bits: u32) -> SpvResult<[u8; 32]> {
     let exponent = (bits >> 24) as u8;
     let mantissa = bits & 0x00ffffff;
 
-    if exponent < 3 {
+    if exponent < 3 || exponent > 32 {
         return Err(SpvError::InvalidDifficultyRetarget);
     }
 
     let mut target = [0u8; 32];
     let mantissa_bytes = mantissa.to_be_bytes();
 
-    // Place mantissa at appropriate position based on exponent
-    let shift = exponent as usize - 3;
-    if shift > 29 {
-        return Err(SpvError::InvalidDifficultyRetarget);
-    }
-
+    // Place mantissa in big-endian target representation.
+    // For exponent = 3, the mantissa occupies the least-significant 3 bytes.
+    let shift = 32 - exponent as usize;
     target[shift..shift + 3].copy_from_slice(&mantissa_bytes[1..4]);
 
     Ok(target)
@@ -327,7 +324,9 @@ mod tests {
     fn test_blockchain_add_header() {
         let mut blockchain = BtcBlockchain::new();
 
-        let header = BitcoinBlockHeader {
+        // Easy difficulty; brute-force a valid nonce to ensure deterministic acceptance.
+        let mut valid = false;
+        let mut header = BitcoinBlockHeader {
             version: 1,
             prev_block_hash: [0u8; 32],
             merkle_root: [1u8; 32],
@@ -336,8 +335,15 @@ mod tests {
             nonce: 0,
         };
 
-        // This should work with easy difficulty
-        assert!(blockchain.add_header(header, 0).is_ok());
+        for nonce in 0..1_000_000 {
+            header.nonce = nonce;
+            if blockchain.add_header(header.clone(), 0).is_ok() {
+                valid = true;
+                break;
+            }
+        }
+
+        assert!(valid, "Failed to find a valid nonce for easy difficulty header");
         assert_eq!(blockchain.current_height, 0);
     }
 
@@ -368,9 +374,9 @@ mod tests {
 
     #[test]
     fn test_bits_to_target() {
-        // Max target (easy difficulty)
+        // Example target for bits 0x207fffff
         let max_target = bits_to_target(0x207fffff).unwrap();
-        assert_eq!(max_target[0..2], [0xff, 0xff]);
+        assert_eq!(&max_target[0..3], &[0x7f, 0xff, 0xff]);
 
         // Invalid exponent
         let invalid = bits_to_target(0x01000000);

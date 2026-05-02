@@ -22,7 +22,7 @@
 use crate::role::Roles;
 
 use bitflags::bitflags;
-use codec::{Decode, Encode, Error, Input, Output};
+use codec::{Decode, DecodeWithMemTracking, Encode, Error, Input, Output};
 pub use generic::{BlockAnnounce, FromBlock};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, NumberFor};
 
@@ -131,7 +131,7 @@ pub mod generic {
 	use sp_runtime::{EncodedJustification, Justifications};
 
 	/// Block data sent in the response.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
 	pub struct BlockData<Header, Hash, Extrinsic> {
 		/// Block header hash.
 		pub hash: Hash,
@@ -152,7 +152,7 @@ pub mod generic {
 	}
 
 	/// Request block data from a peer.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
 	pub struct BlockRequest<Hash, Number> {
 		/// Unique request id.
 		pub id: RequestId,
@@ -168,7 +168,7 @@ pub mod generic {
 	}
 
 	/// Identifies starting point of a block sequence.
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
 	pub enum FromBlock<Hash, Number> {
 		/// Start with given hash.
 		Hash(Hash),
@@ -177,7 +177,7 @@ pub mod generic {
 	}
 
 	/// Response to `BlockRequest`
-	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking)]
+	#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode)]
 	pub struct BlockResponse<Header, Hash, Extrinsic> {
 		/// Id of a request this response was made for.
 		pub id: RequestId,

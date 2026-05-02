@@ -30,7 +30,9 @@ pub type RouteId = [u8; 32];
 pub type VaultId = [u8; 32];
 
 /// Purpose class of a vault.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum VaultType {
     /// Chain gas tokens and operational fee assets.
@@ -44,7 +46,9 @@ pub enum VaultType {
 }
 
 /// Ownership class of a vault.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum OwnerType {
     Protocol,
@@ -53,7 +57,9 @@ pub enum OwnerType {
 }
 
 /// Operational health of a vault.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum VaultStatus {
     /// Normal operation; all bands satisfied.
@@ -72,7 +78,9 @@ pub enum VaultStatus {
 pub type LaneId = [u8; 32];
 
 /// Risk / execution class of a lane.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum LaneClass {
     /// Public liquidity only; no protocol backstop.
@@ -84,7 +92,9 @@ pub enum LaneClass {
 }
 
 /// Operational health of a lane.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum LaneStatus {
     Active,
@@ -100,7 +110,9 @@ pub enum LaneStatus {
 pub type ReservationId = [u8; 32];
 
 /// Lifecycle state of a reservation.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum ReservationStatus {
     /// Inventory is held; route may proceed.
@@ -121,7 +133,9 @@ pub enum ReservationStatus {
 pub type PartnerId = [u8; 32];
 
 /// Lifecycle state of a partner.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum PartnerStatus {
     Active,
@@ -136,7 +150,9 @@ pub enum PartnerStatus {
 // ---------------------------------------------------------------------------
 
 /// Which liquidity bucket a route consumes.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum LiquiditySourceType {
     /// Offsetting internal user demand; no external movement.
@@ -154,7 +170,9 @@ pub enum LiquiditySourceType {
 // ---------------------------------------------------------------------------
 
 /// Why a lane was frozen.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum FreezeReason {
     BalanceBelowCriticalMin,
@@ -167,7 +185,9 @@ pub enum FreezeReason {
 }
 
 /// Evidence bundle submitted when unfreezing a lane.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct OperatorEvidence {
     /// Free-form UTF-8 description (bounded to 256 bytes).
@@ -183,7 +203,9 @@ pub struct OperatorEvidence {
 // ---------------------------------------------------------------------------
 
 /// A single dimension that the solvency engine evaluates.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum SolvencyCheck {
     SourceChainHealth,
@@ -229,7 +251,9 @@ pub struct SolvencyResult {
 pub type VenueId = [u8; 32];
 
 /// What triggered a rebalance.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum RebalanceTrigger {
     BelowMinBand { vault_id: VaultId },
@@ -242,7 +266,9 @@ pub enum RebalanceTrigger {
 }
 
 /// Which rebalance step successfully resolved the shortage.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum RebalanceMethod {
     InternalNetting,
@@ -257,7 +283,9 @@ pub enum RebalanceMethod {
 // ---------------------------------------------------------------------------
 
 /// Observed health state of an external chain.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum ChainHealthStatus {
     Healthy,
@@ -270,7 +298,9 @@ pub enum ChainHealthStatus {
 // ---------------------------------------------------------------------------
 
 /// Full state record for a single vault.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct VaultState<
     Balance: Encode + Decode + MaxEncodedLen + TypeInfo + Clone + core::fmt::Debug + PartialEq + Eq,
@@ -293,7 +323,9 @@ pub struct VaultState<
 
 /// Full state record for a single lane.
 /// `MaxSources` is a const-generic bound for the `BoundedVec`.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[scale_info(skip_type_params(MaxSources))]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct LaneState<

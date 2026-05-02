@@ -46,7 +46,8 @@ pub mod pallet {
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
         traits::{
-            AssetRegistryInspect, AssetRegistryMutate, SupplyLedgerGovern, SupplyLedgerWrite,
+            AssetRegistryInspect, AssetRegistryMutate, EconomicHaltInspect, SupplyLedgerGovern,
+            SupplyLedgerWrite,
         },
         AssetId, Balance, DomainId, RouteConfig, RouteLimits, SupplyPolicy, TokenClass,
     };
@@ -92,7 +93,17 @@ pub mod pallet {
 
     /// Stored per-token record tying a factory-launched asset to its launch
     /// metadata and authority.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+    #[derive(
+        Clone,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
+        MaxEncodedLen,
+        RuntimeDebug,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct TokenRecord<T: Config> {
         /// Creator account.
@@ -130,6 +141,8 @@ pub mod pallet {
         /// (mint/burn) and inspection (`ledger`) sides so it can enforce
         /// per-asset caps.
         type Ledger: SupplyLedgerGovern + SupplyLedgerWrite;
+        /// Read-only economic halt gate.
+        type EconomicHalt: EconomicHaltInspect;
     }
 
     // ── Storage ────────────────────────────────────────────────────────────
@@ -220,6 +233,8 @@ pub mod pallet {
         UnknownToken,
         /// Nonce overflow — effectively unreachable.
         NonceOverflow,
+        /// New launch/mint operations halted by economic safety policy.
+        EconomicHaltActive,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────
@@ -232,6 +247,11 @@ pub mod pallet {
         #[pallet::weight(Weight::from_parts(60_000, 0))]
         pub fn create_token(origin: OriginFor<T>, config: TokenFactoryConfig) -> DispatchResult {
             let creator = T::CreateTokenOrigin::ensure_origin(origin)?;
+
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
 
             // Basic config validation.
             ensure!(
@@ -330,6 +350,10 @@ pub mod pallet {
             amount: Balance,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
             let record = Tokens::<T>::get(asset_id).ok_or(Error::<T>::UnknownToken)?;
             ensure!(who == record.mint_authority, Error::<T>::NotMintAuthority);
             ensure!(

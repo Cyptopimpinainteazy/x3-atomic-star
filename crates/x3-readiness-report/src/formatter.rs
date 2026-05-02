@@ -49,11 +49,18 @@ Kernel snapshot
   halted:         {halted}
   total_locked:   {locked}
 
-Checks
+Core checks
   [{m_si}] supply_invariant         — {r_si}
   [{m_hf}] halt_functional          — {r_hf}
   [{m_pe}] permissions_enforced     — {r_pe}
   [{m_br}] balance_reconciliation   — {r_br}
+
+RC-1 launch gates
+  [{m_ixl}] ixl_bundle_gate          — {r_ixl}
+  [{m_pl}] packet_lifecycle_gate    — {r_pl}
+  [{m_lc}] liquidity_core_gate      — {r_lc}
+  [{m_eb}] external_bridges_disabled— {r_eb}
+  [{m_ki}] kernel_invariant_gate    — {r_ki}
 ",
             ts = report.timestamp,
             ver = report.version,
@@ -71,6 +78,16 @@ Checks
             r_pe = report.permissions_enforced.reason,
             m_br = Self::mark(&report.balance_reconciliation),
             r_br = report.balance_reconciliation.reason,
+            m_ixl = Self::mark(&report.ixl_bundle_gate),
+            r_ixl = report.ixl_bundle_gate.reason,
+            m_pl = Self::mark(&report.packet_lifecycle_gate),
+            r_pl = report.packet_lifecycle_gate.reason,
+            m_lc = Self::mark(&report.liquidity_core_gate),
+            r_lc = report.liquidity_core_gate.reason,
+            m_eb = Self::mark(&report.external_bridges_disabled),
+            r_eb = report.external_bridges_disabled.reason,
+            m_ki = Self::mark(&report.kernel_invariant_gate),
+            r_ki = report.kernel_invariant_gate.reason,
         )
     }
 

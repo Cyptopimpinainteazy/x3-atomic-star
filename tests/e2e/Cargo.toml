@@ -17,6 +17,11 @@ bench = false
 name = "cross_vm_real_chain_test"
 path = "cross_vm_real_chain_test.rs"
 
+[[test]]
+name = "mainnet_rc1"
+path = "mainnet_rc1.rs"
+required-features = []
+
 [features]
 default = []
 full_e2e = []
@@ -33,7 +38,9 @@ hex = "0.4"
 x3-universal-contracts = { path = "../../crates/x3-universal-contracts" }
 x3-ixl = { path = "../../crates/x3-ixl" }
 x3-packet-standard = { path = "../../crates/x3-packet-standard" }
+x3-liquidity-core = { path = "../../crates/x3-liquidity-core" }
 x3-proof = { path = "../../crates/x3-proof" }
+sp-core = { workspace = true }
 x3-fees = { path = "../../crates/x3-fees" }
 x3-slash = { path = "../../crates/x3-slash" }
 

@@ -9,6 +9,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
+use x3_asset_kernel_types::traits::NoEconomicHalt;
 use x3_dex::amm_pools::TokenId;
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -61,9 +62,13 @@ impl Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type MaxPools = MaxPools;
     type WeightInfo = ();
+    type EconomicHalt = NoEconomicHalt;
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+    frame_system::GenesisConfig::<Test>::default()
+        .build_storage()
+        .unwrap()
+        .into()
 }

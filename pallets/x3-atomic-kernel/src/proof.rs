@@ -14,7 +14,9 @@ use sp_core::H256;
 /// Per the audit: "Every extrinsic submitted through the parallel path must
 /// include a DeclaredAccess: reads/writes lists. The proposer validates that
 /// shards are conflict-free on writes."
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct DeclaredAccess {
     /// Storage keys / account identifiers this leg will read.  
     pub reads: frame_support::BoundedVec<H256, sp_runtime::traits::ConstU32<64>>,
@@ -23,7 +25,9 @@ pub struct DeclaredAccess {
 }
 
 /// VM type for a bundle leg.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub enum VmType {
     /// Ethereum Virtual Machine leg.
     Evm,
@@ -36,7 +40,9 @@ pub enum VmType {
 }
 
 /// A single atomic trade leg within a bundle.
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct BundleLeg {
     /// Target VM for this leg.
     pub vm_type: VmType,
@@ -76,7 +82,9 @@ pub struct BundleLeg {
 ///           → external verifier reads proof via RPC or state proof
 ///             → settles cross-chain payment
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub struct PoaeProof {
     /// Unique bundle identifier (derived deterministically from submitter+block+legs).
     pub bundle_id: H256,

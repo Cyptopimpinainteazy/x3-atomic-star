@@ -4749,12 +4749,14 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "sp-core 38.1.0",
  "tokio",
  "tokio-tungstenite 0.20.1",
  "tracing",
  "tracing-subscriber",
  "x3-fees",
  "x3-ixl",
+ "x3-liquidity-core",
  "x3-packet-standard",
  "x3-proof",
  "x3-slash",
@@ -13129,6 +13131,7 @@ dependencies = [
  "sp-io 45.0.0",
  "sp-runtime 46.0.0",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603)",
+ "x3-asset-kernel-types",
 ]
 
 [[package]]
@@ -13185,6 +13188,7 @@ dependencies = [
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2509-7)",
  "x3-asset-kernel-types",
  "x3-ixl",
+ "x3-liquidity-core",
  "x3-packet-standard",
 ]
 
@@ -13218,6 +13222,7 @@ dependencies = [
  "sp-io 43.0.0",
  "sp-runtime 44.0.0",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2509-7)",
+ "x3-asset-kernel-types",
  "x3-dex",
 ]
 
@@ -29208,6 +29213,7 @@ dependencies = [
 name = "x3-proof"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "hex",
  "serde",
  "serde_json",
@@ -29532,15 +29538,15 @@ name = "x3-x3-integration"
 version = "0.1.0"
 dependencies = [
  "env_logger 0.10.2",
- "frame-support 46.0.0",
+ "frame-support 43.0.2",
  "log",
  "parity-scale-codec",
  "scale-info",
  "serde",
- "sp-core 40.0.0",
- "sp-io 45.0.0",
- "sp-runtime 46.0.0",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603)",
+ "sp-core 38.1.0",
+ "sp-io 43.0.0",
+ "sp-runtime 44.0.0",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2509-7)",
  "thiserror 1.0.69",
  "x3-backend",
  "x3-common",

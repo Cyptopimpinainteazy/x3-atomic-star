@@ -14,7 +14,18 @@ use sp_core::H256;
 /// This is a closed enum on purpose: external chains are explicitly out of
 /// scope for v0.4 internal-only mainnet.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Encode, Decode, TypeInfo, MaxEncodedLen,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 pub enum AssetKind {
     X3Native,

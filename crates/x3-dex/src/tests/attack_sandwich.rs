@@ -26,9 +26,13 @@ fn sandwich_attack_profit_bounded_by_slippage() {
         .expect("baseline quote must be computable");
 
     // Front-run: attacker buys token B with token A.
-    let (attacker_bought_b, front_fee) =
-        RealSlippageCalculator::calculate_output_amount(front_run_in, reserve_a, reserve_b, fee_bps)
-            .expect("front-run quote must succeed");
+    let (attacker_bought_b, front_fee) = RealSlippageCalculator::calculate_output_amount(
+        front_run_in,
+        reserve_a,
+        reserve_b,
+        fee_bps,
+    )
+    .expect("front-run quote must succeed");
     let front_in_after_fee = front_run_in.saturating_sub(front_fee);
     reserve_a = reserve_a.saturating_add(front_in_after_fee);
     reserve_b = reserve_b.saturating_sub(attacker_bought_b);
