@@ -12,15 +12,15 @@
 //! All BTC operations are controlled by X3 proofs.
 
 use crate::types::{BtcBlockHeader, BtcUtxoState};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use ripemd::{Digest, Ripemd160};
 use scale_info::TypeInfo;
 use sp_core::{H256, U256};
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// BTC HTLC parameters
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BtcHtlcParams {
     /// Secret hash (SHA256)
     pub secret_hash: H256,
@@ -134,7 +134,7 @@ impl BtcHtlcParams {
 }
 
 /// BTC SPV proof data
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BtcSpvProof {
     /// Transaction (raw bytes)
     pub tx_bytes: Vec<u8>,
@@ -195,7 +195,7 @@ impl BtcSpvProof {
 /// 1. Maker creates adaptor signature with secret point
 /// 2. Taker can extract secret from completed signature
 /// 3. Secret revelation is atomic with BTC spend
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BtcAdaptorSignature {
     /// Pre-signature (incomplete until adapted)
     pub pre_signature: [u8; 64],
@@ -283,15 +283,12 @@ impl BtcAdaptorSignature {
             secp256k1_n - (s_pre_u256 - s_complete_u256)
         };
 
-        let mut secret = [0u8; 32];
-        secret_u256.to_big_endian(&mut secret);
-
-        Some(secret)
+        Some(secret_u256.to_big_endian())
     }
 }
 
 /// Track BTC reorg risk for a block
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BtcReorgRisk {
     /// Block hash
     pub block_hash: H256,

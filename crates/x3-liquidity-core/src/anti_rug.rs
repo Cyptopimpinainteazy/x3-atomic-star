@@ -8,7 +8,7 @@
 //! This is an in-memory registry used by the CLI and devnet harness.  The
 //! production on-chain variant lives in a pallet `StorageMap`.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 /// Key: (owner, pool_id).
 type LockKey = ([u8; 32], u64);

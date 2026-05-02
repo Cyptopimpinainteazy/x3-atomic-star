@@ -4,14 +4,14 @@
 //! Because X3 hosts all three VMs, internal swaps are atomic within a single block.
 
 use crate::types::{EscrowLeg, EscrowLegState, ExternalChainId};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::{vec, vec::Vec};
 
 /// Escrow operation to be executed atomically
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub enum EscrowOp<AccountId, Balance> {
     /// Lock assets into escrow
     Lock {
@@ -33,7 +33,7 @@ pub enum EscrowOp<AccountId, Balance> {
 }
 
 /// Batch of escrow operations (for atomic execution)
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct EscrowBatch<AccountId, Balance> {
     /// Intent ID this batch belongs to
     pub intent_id: H256,
@@ -139,7 +139,7 @@ impl CrossVmEscrow {
 }
 
 /// EVM HTLC contract interface
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct EvmHtlcParams {
     /// Secret hash (32 bytes)
     pub secret_hash: H256,
@@ -212,7 +212,7 @@ impl EvmHtlcParams {
 }
 
 /// Solana escrow program interface
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct SvmEscrowParams {
     /// Secret hash
     pub secret_hash: H256,

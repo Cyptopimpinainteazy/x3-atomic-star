@@ -25,7 +25,7 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 x3-packet-standard = { path = "../../crates/x3-packet-standard", default-features = false }
 x3-ixl = { path = "../../crates/x3-ixl", default-features = false }
-x3-liquidity-core = { path = "../../crates/x3-liquidity-core", optional = true }
+x3-liquidity-core = { path = "../../crates/x3-liquidity-core", optional = true, default-features = false }
 
 [features]
 default = ["std", "mainnet-rc1"]
@@ -73,7 +73,7 @@ std = [
     "x3-asset-kernel-types/std",
     "x3-packet-standard/std",
     "x3-ixl/std",
-    "x3-liquidity-core",
+    "x3-liquidity-core/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",

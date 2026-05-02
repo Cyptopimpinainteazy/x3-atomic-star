@@ -21,6 +21,7 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 codec = { workspace = true, default-features = false, features = ["derive"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
+log = { workspace = true, default-features = false }
 
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
@@ -33,18 +34,20 @@ pallet-offences = { workspace = true, default-features = false }
 pallet-timestamp = { workspace = true, default-features = false }
 pallet-balances = { workspace = true, default-features = false }
 pallet-transaction-payment = { workspace = true, default-features = false }
-pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
 pallet-sudo = { workspace = true, default-features = false, optional = true }
 pallet-collective = { workspace = true, default-features = false }
 pallet-scheduler = { workspace = true, default-features = false }
 pallet-preimage = { workspace = true, default-features = false }
 pallet-evm = { workspace = true, default-features = false }
+pallet-ethereum = { workspace = true, default-features = false }
 pallet-evm-precompile-simple = { workspace = true, default-features = false }
 pallet-evm-precompile-modexp = { workspace = true, default-features = false }
 pallet-evm-precompile-sha3fips = { workspace = true, default-features = false }
 fp-evm = { workspace = true, default-features = false }
 
 pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
+pallet-x3-consensus = { path = "../pallets/x3-consensus", default-features = false }
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false }
 pallet-x3-account-registry = { path = "../pallets/x3-account-registry", default-features = false }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge", default-features = false }
@@ -136,6 +139,7 @@ std = [
 	"pallet-scheduler/std",
 	"pallet-preimage/std",
 	"pallet-evm/std",
+	"pallet-ethereum/std",
 	"pallet-evm-precompile-simple/std",
 	"pallet-evm-precompile-modexp/std",
 	"pallet-evm-precompile-sha3fips/std",

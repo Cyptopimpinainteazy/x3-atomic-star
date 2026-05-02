@@ -810,7 +810,7 @@ pub mod pallet {
                     bundle_id
                 );
 
-                // S1-1: Commit storage layer to make changes visible across threads
+                // S1-1: Ensure storage changes are visible across threads
                 sp_io::storage::commit_layer();
 
                 Ok(())

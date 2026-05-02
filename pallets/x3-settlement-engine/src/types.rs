@@ -1,10 +1,10 @@
 //! Core types for the X3 Settlement Engine
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Maximum size for escrow address data
@@ -24,7 +24,7 @@ pub const MAX_RECEIPT_DATA_SIZE: u32 = 1024;
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -62,7 +62,7 @@ pub struct SettlementIntent<AccountId> {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -83,7 +83,7 @@ pub struct AssetSpec {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -106,7 +106,17 @@ impl Default for TokenId {
 
 /// Intent state machine states
 #[derive(
-    Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq, Default,
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Default,
 )]
 pub enum IntentState {
     /// Intent created, waiting for escrows
@@ -134,7 +144,7 @@ pub enum IntentState {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -172,7 +182,7 @@ pub struct SettlementTransfer<AccountId, Balance> {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -202,7 +212,17 @@ pub struct EscrowLeg<AccountId> {
 
 /// Escrow leg state
 #[derive(
-    Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq, Default,
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Default,
 )]
 pub enum EscrowLegState {
     /// Waiting for deposit
@@ -221,7 +241,7 @@ pub enum EscrowLegState {
 // ============================================================================
 
 /// BTC UTXO state tracked by X3
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen)]
 pub struct BtcUtxoState {
     /// Transaction ID
     pub txid: H256,
@@ -245,7 +265,7 @@ pub struct BtcUtxoState {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -278,7 +298,7 @@ pub struct BtcBlockHeader {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -301,7 +321,17 @@ pub struct SettlementProof {
 
 /// Proof type used for verification
 #[derive(
-    Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq, Default,
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Default,
 )]
 pub enum ProofType {
     /// Merkle Patricia Trie proof (EVM)
@@ -325,7 +355,18 @@ pub enum ProofType {
 
 /// External chain identifier
 #[derive(
-    Clone, Copy, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, PartialEq, Eq, Hash, Default,
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
 )]
 pub enum ExternalChainId {
     /// Native X3 chain (EVM/SVM/X3VM internal)
@@ -363,7 +404,7 @@ pub enum ExternalChainId {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -395,7 +436,7 @@ pub struct FinalityConfig {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -423,7 +464,7 @@ pub enum RefundReason {
     Encode,
     Decode,
     DecodeWithMemTracking,
-    RuntimeDebug,
+    Debug,
     TypeInfo,
     MaxEncodedLen,
     PartialEq,
@@ -445,7 +486,7 @@ pub enum InvariantViolationType {
 // ============================================================================
 
 /// Canonical event: Trade matched
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct TradeMatchedEvent<AccountId> {
     pub match_id: H256,
     pub maker: AccountId,
@@ -456,7 +497,7 @@ pub struct TradeMatchedEvent<AccountId> {
 }
 
 /// Canonical event: Settlement intent created on X3
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct X3IntentCreatedEvent<AccountId> {
     pub intent_id: H256,
     pub maker: AccountId,
@@ -468,7 +509,7 @@ pub struct X3IntentCreatedEvent<AccountId> {
 }
 
 /// Canonical event: Assets locked in X3 escrow
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct X3AssetsLockedEvent {
     pub intent_id: H256,
     pub leg_index: u32,
@@ -478,7 +519,7 @@ pub struct X3AssetsLockedEvent {
 }
 
 /// Canonical event: External proof submitted
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct ExternalProofSubmittedEvent {
     pub intent_id: H256,
     pub chain: ExternalChainId,
@@ -488,7 +529,7 @@ pub struct ExternalProofSubmittedEvent {
 }
 
 /// Canonical event: Settlement finalized on X3
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct X3FinalizedEvent {
     pub intent_id: H256,
     pub maker_received: u128,
@@ -497,7 +538,7 @@ pub struct X3FinalizedEvent {
 }
 
 /// Canonical event: Settlement refunded
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct X3RefundedEvent {
     pub intent_id: H256,
     pub reason: RefundReason,

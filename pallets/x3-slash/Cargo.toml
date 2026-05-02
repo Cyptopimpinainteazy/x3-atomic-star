@@ -20,7 +20,7 @@ x3-slash = { path = "../../crates/x3-slash", default-features = false }
 x3-proof = { path = "../../crates/x3-proof", default-features = false }
 
 # Staking integration
-pallet-staking = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+pallet-staking = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
 
 # Benchmarking
 frame-benchmarking = { workspace = true, optional = true }

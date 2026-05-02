@@ -11,13 +11,14 @@
 //! - Abort: Release from escrow, refund to original owner
 //! - Timeout: Slash escrow, validator loses bond
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{
     pallet_prelude::*,
     traits::{Currency, ReservableCurrency},
 };
 use scale_info::TypeInfo;
 use sp_runtime::traits::AtLeast32BitUnsigned;
+use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Account that holds locked funds during 2PC phases
@@ -81,7 +82,7 @@ pub enum ReleaseReason {
 }
 
 /// Per-intent atomic lock record
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen)]
 pub struct AtomicLock<Balance, AccountId> {
     /// Intent being settled
     pub intent_id: [u8; 32],

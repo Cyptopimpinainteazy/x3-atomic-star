@@ -14,7 +14,7 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::PalletId;
 pub use frame_support::{
     construct_runtime, parameter_types,
@@ -48,6 +48,7 @@ use pallet_swarm;
 use pallet_timestamp;
 use pallet_transaction_payment::CurrencyAdapter;
 use pallet_treasury;
+use pallet_x3_account_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_cross_vm_router;
 use pallet_x3_invariants;
@@ -290,6 +291,7 @@ construct_runtime!(
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
         X3TokenFactory: pallet_x3_token_factory,
+        X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         X3SettlementEngine: pallet_x3_settlement_engine,
         Swarm: pallet_swarm,
@@ -336,6 +338,7 @@ construct_runtime!(
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
         X3TokenFactory: pallet_x3_token_factory,
+        X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         X3SettlementEngine: pallet_x3_settlement_engine,
         Swarm: pallet_swarm,
@@ -1754,6 +1757,17 @@ impl pallet_x3_domain_registry::Config for Runtime {
     type MaxTxtLen = MaxX3TxtLen;
 }
 
+// ===== X3 Account Registry Pallet Configuration =====
+parameter_types! {
+    pub const MaxAccountNameLength: u32 = 64;
+}
+
+impl pallet_x3_account_registry::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AtlasId = AtlasId;
+    type MaxNameLength = MaxAccountNameLength;
+}
+
 // ===== X3SettlementEngine Configuration =====
 
 parameter_types! {
@@ -2128,7 +2142,7 @@ impl_runtime_apis! {
             }
             let data = raw_tx[60..60 + data_len].to_vec();
 
-            frame_support::log::info!(
+            log::info!(
                 target: "runtime::evm",
                 "submit_evm_transaction caller=0x{:?} to=0x{:?} value={} data_len={}",
                 caller,

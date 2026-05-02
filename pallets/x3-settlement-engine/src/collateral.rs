@@ -5,15 +5,15 @@
 //! slashing flows. This is a lightweight, safe starting point and should be
 //! expanded into a full FRAME pallet storage design as part of the ADR work.
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Bond types used for different policies
 #[derive(
-    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo,
+    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo,
 )]
 pub enum BondType {
     InitialMargin,
@@ -23,7 +23,7 @@ pub enum BondType {
 
 /// Bond state
 #[derive(
-    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo,
+    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo,
 )]
 pub enum BondState {
     Locked,
@@ -32,7 +32,7 @@ pub enum BondState {
 }
 
 /// Simple bond record
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct Bond<AccountId, Balance> {
     pub id: H256,
     pub owner: AccountId,

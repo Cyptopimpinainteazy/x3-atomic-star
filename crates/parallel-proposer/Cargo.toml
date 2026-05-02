@@ -15,7 +15,7 @@ contention-predictor = { path = "../contention-predictor" }
 futures = "0.3"
 log = "0.4"
 prometheus-endpoint = { package = "substrate-prometheus-endpoint", path = "../../patches/substrate-prometheus-endpoint" }
-sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
 sc-client-api = { workspace = true }
 sc-telemetry = { workspace = true }
 sc-transaction-pool-api = { workspace = true }

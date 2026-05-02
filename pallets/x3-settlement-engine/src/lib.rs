@@ -105,6 +105,7 @@ pub mod pallet {
     use super::*;
     use crate::atomic_lock;
     use crate::bridge_integration::CrossChainValidatorProvider;
+    use codec::Encode;
     use frame_support::{
         pallet_prelude::*,
         traits::{Currency, ReservableCurrency, StorageVersion, UnixTime},
@@ -122,8 +123,9 @@ pub mod pallet {
     // Types
     // ============================================================================
 
+    type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
     type BalanceOf<T> =
-        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+        <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
 
     // ============================================================================
     // Pallet Definition
@@ -142,7 +144,9 @@ pub mod pallet {
         type SettlementWeightInfo: crate::weights::WeightInfo;
 
         /// Currency for deposits and fees.
-        type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+        type Currency:
+            Currency<<Self as frame_system::Config>::AccountId>
+            + ReservableCurrency<<Self as frame_system::Config>::AccountId>;
 
         /// Cross-chain validator provider for proof verification
         type CrossChainValidator: bridge_integration::CrossChainValidatorProvider;
@@ -185,7 +189,7 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn settlement_intents)]
     pub type SettlementIntents<T: Config> =
-        StorageMap<_, Blake2_128Concat, H256, SettlementIntent<T::AccountId>, OptionQuery>;
+        StorageMap<_, Blake2_128Concat, H256, SettlementIntent<AccountIdOf<T>>, OptionQuery>;
 
     /// Settlement creation block tracker: Maps intent_id → block_number
     /// Used to enforce the SettlementTimeoutBlocks deadline. After SettlementTimeoutBlocks
@@ -211,7 +215,7 @@ pub mod pallet {
         H256, // intent_id
         Blake2_128Concat,
         u32, // leg_index
-        EscrowLeg<T::AccountId>,
+        EscrowLeg<AccountIdOf<T>>,
         OptionQuery,
     >;
 
@@ -260,13 +264,13 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn bonds)]
     pub type Bonds<T: Config> =
-        StorageMap<_, Blake2_128Concat, H256, BondRecord<T::AccountId, BalanceOf<T>>, OptionQuery>;
+        StorageMap<_, Blake2_128Concat, H256, BondRecord<AccountIdOf<T>, BalanceOf<T>>, OptionQuery>;
 
     /// Mapping from owner -> vector of bond ids (bounded for simplicity)
     #[pallet::storage]
     #[pallet::getter(fn bonds_by_owner)]
     pub type BondsByOwner<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, BoundedVec<H256, ConstU32<100>>, ValueQuery>;
+        StorageMap<_, Blake2_128Concat, AccountIdOf<T>, BoundedVec<H256, ConstU32<100>>, ValueQuery>;
 
     #[pallet::type_value]
     pub fn DefaultBondCounter() -> u64 {
@@ -284,7 +288,7 @@ pub mod pallet {
         Encode,
         Decode,
         DecodeWithMemTracking,
-        RuntimeDebug,
+        Debug,
         TypeInfo,
         MaxEncodedLen,
         PartialEq,
@@ -310,7 +314,7 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn pending_intents)]
     pub type PendingIntents<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+        StorageMap<_, Blake2_128Concat, AccountIdOf<T>, u32, ValueQuery>;
 
     /// Global intent counter (for statistics)
     #[pallet::storage]
@@ -336,7 +340,7 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         H256, // intent_id
-        atomic_lock::AtomicLock<BalanceOf<T>, T::AccountId>,
+        atomic_lock::AtomicLock<BalanceOf<T>, AccountIdOf<T>>,
         OptionQuery,
     >;
 
@@ -373,7 +377,7 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         H256, // transfer_id
-        SettlementTransfer<T::AccountId, BalanceOf<T>>,
+        SettlementTransfer<AccountIdOf<T>, BalanceOf<T>>,
         OptionQuery,
     >;
 
@@ -400,8 +404,8 @@ pub mod pallet {
         /// [intent_id, maker, taker, asset_a, asset_b]
         X3IntentCreated {
             intent_id: H256,
-            maker: T::AccountId,
-            taker: T::AccountId,
+            maker: AccountIdOf<T>,
+            taker: AccountIdOf<T>,
             asset_a: AssetSpec,
             asset_b: AssetSpec,
             secret_hash: H256,
@@ -429,14 +433,14 @@ pub mod pallet {
         /// Bond deposited on-chain
         BondDeposited {
             bond_id: H256,
-            owner: T::AccountId,
+            owner: AccountIdOf<T>,
             amount: BalanceOf<T>,
         },
 
         /// Bond withdrawn/finalized
         BondWithdrawn {
             bond_id: H256,
-            owner: T::AccountId,
+            owner: AccountIdOf<T>,
             amount: BalanceOf<T>,
         },
 
@@ -510,7 +514,7 @@ pub mod pallet {
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         SettlementExecuted {
             transfer_id: H256,
-            receiver: T::AccountId,
+            receiver: AccountIdOf<T>,
             amount: BalanceOf<T>,
         },
 
@@ -689,7 +693,7 @@ pub mod pallet {
             // take() removes the index entry and returns the bounded vec: O(1) lookup.
             // Then we fetch only the specific locks registered for this block.
             let expiring_ids = AtomicLockExpiryIndex::<T>::take(current_block);
-            let expired_locks: Vec<(H256, atomic_lock::AtomicLock<BalanceOf<T>, T::AccountId>)> =
+            let expired_locks: Vec<(H256, atomic_lock::AtomicLock<BalanceOf<T>, AccountIdOf<T>>)> =
                 expiring_ids
                     .iter()
                     .filter_map(|id| AtomicLocks::<T>::get(id).map(|lock| (*id, lock)))
@@ -864,7 +868,7 @@ pub mod pallet {
         #[pallet::weight(T::SettlementWeightInfo::create_intent())]
         pub fn create_intent(
             origin: OriginFor<T>,
-            taker: T::AccountId,
+            taker: AccountIdOf<T>,
             asset_a: AssetSpec,
             asset_b: AssetSpec,
             secret_hash: H256,
@@ -1545,7 +1549,7 @@ pub mod pallet {
         pub fn settle_transfer(
             origin: OriginFor<T>,
             transfer_id: H256,
-            receiver: T::AccountId,
+            receiver: AccountIdOf<T>,
             amount: BalanceOf<T>,
         ) -> DispatchResult {
             let executor = ensure_signed(origin)?;
@@ -1558,8 +1562,11 @@ pub mod pallet {
             // AuthorizedAccounts is secure-by-default: an empty registry rejects all callers.
             // Accounts are added via x3-kernel::authorize_account (governance-gated).
             #[cfg(not(feature = "dev-bypass"))]
+            let executor_encoded = executor.encode();
+            #[cfg(not(feature = "dev-bypass"))]
             ensure!(
-                pallet_x3_kernel::AuthorizedAccounts::<T>::contains_key(&executor),
+                pallet_x3_kernel::AuthorizedAccounts::<T>::iter_keys()
+                    .any(|account| account.encode() == executor_encoded),
                 Error::<T>::ExecutorNotAuthorized
             );
 
@@ -1657,7 +1664,7 @@ pub mod pallet {
 
     impl<T: Config> Pallet<T> {
         /// Generate unique intent ID
-        pub fn generate_intent_id(maker: &T::AccountId, taker: &T::AccountId, nonce: u64) -> H256 {
+        pub fn generate_intent_id(maker: &AccountIdOf<T>, taker: &AccountIdOf<T>, nonce: u64) -> H256 {
             let mut data = maker.encode();
             data.extend(taker.encode());
             data.extend(nonce.to_le_bytes());
@@ -2073,8 +2080,8 @@ pub mod pallet {
         /// Finalize settlement (ALL legs complete)
         fn finalize_settlement(
             intent_id: H256,
-            intent: &SettlementIntent<T::AccountId>,
-            _claimer: &T::AccountId,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+            _claimer: &AccountIdOf<T>,
         ) -> Result<(), DispatchError> {
             // Update all escrow legs to Released
             for leg_idx in 0..intent.legs_total {
@@ -2126,7 +2133,7 @@ pub mod pallet {
         /// Process refund for failed/timeout settlement
         fn process_refund(
             intent_id: H256,
-            intent: &SettlementIntent<T::AccountId>,
+            intent: &SettlementIntent<AccountIdOf<T>>,
             reason: RefundReason,
         ) -> Result<(), DispatchError> {
             // Refund all escrow legs
@@ -2175,8 +2182,8 @@ pub mod pallet {
         /// replayed claims that previously only incremented an aggregate counter.
         fn mark_claimed_leg(
             intent_id: H256,
-            intent: &SettlementIntent<T::AccountId>,
-            claimer: &T::AccountId,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+            claimer: &AccountIdOf<T>,
         ) -> Result<(), DispatchError> {
             for leg_idx in 0..intent.legs_total {
                 let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
@@ -2373,7 +2380,7 @@ pub mod pallet {
 
         /// Internal helper: create a bond record (storage-backed)
         pub fn create_bond_internal(
-            who: &T::AccountId,
+            who: &AccountIdOf<T>,
             asset: Vec<u8>,
             amount: BalanceOf<T>,
             bond_type: u8,

@@ -371,6 +371,9 @@ pub mod pallet {
             for (account, amount) in &self.liquidity_allocations {
                 Pallet::<T>::increase_canonical_balance(account, (*amount).saturated_into());
             }
+
+            // 🔒 SECURITY: Verify supply conservation invariant after genesis allocations
+            Pallet::<T>::verify_supply_invariant().expect("Genesis supply invariant violation");
         }
     }
 

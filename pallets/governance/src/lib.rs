@@ -900,6 +900,12 @@ pub mod pallet {
         pub fn undelegate(origin: OriginFor<T>) -> DispatchResult {
             let delegator = ensure_signed(origin)?;
 
+            // S1-2: Ensure caller is authorized for governance participation
+            ensure!(
+                AuthorizedGovernanceAccounts::<T>::contains_key(&delegator),
+                Error::<T>::UnauthorizedGovernance
+            );
+
             Self::remove_delegation(&delegator)?;
 
             Self::deposit_event(Event::Undelegated { delegator });
@@ -965,7 +971,13 @@ pub mod pallet {
         #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::finalize_proposal())]
         pub fn finalize_proposal(origin: OriginFor<T>, proposal_id: u32) -> DispatchResult {
-            ensure_signed(origin)?;
+            let finalizer = ensure_signed(origin)?;
+
+            // S1-2: Ensure caller is authorized for governance participation
+            ensure!(
+                AuthorizedGovernanceAccounts::<T>::contains_key(&finalizer),
+                Error::<T>::UnauthorizedGovernance
+            );
 
             let mut proposal =
                 Proposals::<T>::get(proposal_id).ok_or(Error::<T>::ProposalNotFound)?;
@@ -1047,7 +1059,10 @@ pub mod pallet {
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::unlock())]
         pub fn unlock(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
-            ensure_signed(origin)?;
+            let unlocker = ensure_signed(origin)?;
+
+            // S1-2: Only account holder can unlock their own tokens
+            ensure!(unlocker == account, Error::<T>::UnauthorizedGovernance);
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let mut unlocked_amount = BalanceOf::<T>::zero();

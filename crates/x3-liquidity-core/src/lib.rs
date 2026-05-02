@@ -25,6 +25,10 @@
 //! * Anti-rug LP lock: **wired, tested**
 //! * Advanced features: **gated behind `advanced` feature, not active in v0.4**
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 pub mod anti_rug;
 pub mod launchpad;
 pub mod settlement;

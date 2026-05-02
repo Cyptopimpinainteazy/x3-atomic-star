@@ -14,14 +14,14 @@
 //! - Block governance upgrades (if invariant checks fail)
 
 use crate::types::{IntentState, InvariantViolationType, RefundReason};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::{vec, vec::Vec};
 
 /// Invariant check result
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq)]
 pub enum InvariantCheckResult {
     /// All invariants satisfied
     Pass,
@@ -32,7 +32,7 @@ pub enum InvariantCheckResult {
 }
 
 /// Invariant checker configuration
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct InvariantConfig {
     /// Enable strict mode (halt on any violation)
     pub strict_mode: bool,
@@ -252,7 +252,7 @@ impl InvariantEnforcer {
 
 /// VM execution event for reentrancy detection
 #[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
 )]
 pub enum VmExecutionEvent {
     /// Entered VM execution
@@ -263,7 +263,7 @@ pub enum VmExecutionEvent {
 
 /// VM type identifier
 #[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
 )]
 pub enum VmType {
     Evm,
@@ -272,7 +272,7 @@ pub enum VmType {
 }
 
 /// Slashing parameters for invariant violations
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct SlashingParams {
     /// Base slash amount (in native tokens)
     pub base_slash: u128,
@@ -283,7 +283,7 @@ pub struct SlashingParams {
 }
 
 /// Report of invariant violation
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct ViolationReport {
     /// Intent ID
     pub intent_id: H256,
@@ -304,7 +304,7 @@ pub struct ViolationReport {
 /// Before any governance proposal can execute, it must pass:
 /// 1. Invariant simulation (no invariants broken by change)
 /// 2. Settlement test suite (existing settlements not affected)
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct GovernanceInvariantCheck {
     /// Proposal ID
     pub proposal_id: H256,
@@ -317,7 +317,7 @@ pub struct GovernanceInvariantCheck {
 }
 
 /// Governance simulation result
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub enum SimulationResult {
     /// Simulation passed
     Passed,

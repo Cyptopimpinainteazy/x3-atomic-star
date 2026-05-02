@@ -11,7 +11,7 @@
 
 #![allow(dead_code)]
 
-use codec::{Compact, Decode, Encode};
+use codec::{Compact, Decode, DecodeWithMemTracking, Encode};
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
 use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};

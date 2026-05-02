@@ -2,34 +2,8 @@
 //!
 //! Universal account registry for the X3 chain.
 //!
-//! ## Responsibilities
-//!
-//! * **Account registration** — any account holder can register an explicit
-//!   on-chain identity anchored to their `AccountId`.
-//! * **Nonce tracking** — canonical per-account operation counter used by
-//!   cross-VM dispatchers to prevent replay across EVM / SVM / X3-VM.
-//! * **Account metadata** — optional `AccountKind` tag so pallets can
-//!   distinguish EOA, contract, system, and validator accounts without
-//!   coupling to the EVM or SVM runtimes.
-//! * **Deregistration** — accounts can be deregistered (metadata cleared)
-//!   but the nonce is preserved to prevent replay.
-//!
-//! ## Design Constraints (v0.4)
-//!
-//! * Does NOT store balances — that remains in `pallet-balances`.
-//! * Does NOT replace `frame-system` account tracking.
-//! * Nonce in this pallet is independent of the `frame-system` nonce.
-//!   It is the cross-VM replay counter only.
-//! * Storage is bounded: `AccountKind` and `DisplayName` are small fixed-size
-//!   or length-bounded types that implement `MaxEncodedLen`.
-//!
-//! ## Storage
-//!
-//! | Storage item | Key | Value |
-//! |---|---|---|
-//! | `Accounts` | `T::AccountId` | `AccountInfo<T>` |
-//! | `CrossVmNonces` | `T::AccountId` | `u64` |
-//! | `AccountCount` | — | `u64` |
+//! This pallet tracks a canonical Atlas ID, optional account kind, and a
+//! cross-VM nonce for replay prevention across EVM / SVM / X3-VM flows.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -43,111 +17,172 @@ pub mod pallet {
     use scale_info::TypeInfo;
     #[cfg(feature = "std")]
     use serde::{Deserialize, Serialize};
-    use sp_runtime::traits::Zero;
-    use sp_std::marker::PhantomData;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Config
-    // ─────────────────────────────────────────────────────────────────────────
+    use sp_std::vec::Vec;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-        /// Maximum byte length of an account display name.
+        type AtlasId: Parameter + Member + Default + Copy + MaxEncodedLen;
+
         #[pallet::constant]
         type MaxNameLength: Get<u32>;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Types
-    // ─────────────────────────────────────────────────────────────────────────
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
 
     /// Classification of an account.
     #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Encode,
-        Decode,
-        DecodeWithMemTracking,
-        TypeInfo,
+        Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo,
         MaxEncodedLen,
     )]
     #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
     pub enum AccountKind {
-        /// Externally-owned account (default).
         Eoa,
-        /// EVM contract address.
         EvmContract,
-        /// SVM program address.
         SvmProgram,
-        /// X3-VM application zone.
         X3AppZone,
-        /// Validator node operator.
         Validator,
-        /// System-reserved account (genesis, treasury, …).
         System,
     }
 
-    /// Per-account information stored in the registry.
-    #[derive(
-        Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
-    )]
-    #[scale_info(skip_type_params(T))]
-    pub struct AccountInfo<T: Config> {
-        /// Account classification.
-        egistered {
+    #[pallet::type_value]
+    pub fn DefaultForAccountCount() -> u64 {
+        0
+    }
+
+    #[pallet::storage]
+    #[pallet::getter(fn account_registry)]
+    pub type AccountRegistry<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, T::AtlasId, OptionQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn atlas_registry)]
+    pub type AtlasRegistry<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AtlasId, T::AccountId, OptionQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn account_kind)]
+    pub type AccountKinds<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, AccountKind, OptionQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn cross_vm_nonce)]
+    pub type CrossVmNonces<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn account_count)]
+    pub type AccountCount<T> = StorageValue<_, u64, ValueQuery, DefaultForAccountCount>;
+
+    #[pallet::event]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    pub enum Event<T: Config> {
+        AccountRegistered {
+            account: T::AccountId,
+            atlas_id: T::AtlasId,
+        },
+        AccountDeregistered {
+            account: T::AccountId,
+            atlas_id: T::AtlasId,
+        },
+        NonceAnchored {
+            account: T::AccountId,
+            nonce: u64,
+        },
+    }
+
+    #[pallet::error]
+    pub enum Error<T> {
+        AlreadyRegistered,
+        NotRegistered,
+        AtlasIdInUse,
+        NameTooLong,
+    }
+
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        #[pallet::call_index(0)]
+        #[pallet::weight(10_000)]
+        pub fn register_account(
+            origin: OriginFor<T>,
+            atlas_id: T::AtlasId,
+            kind: AccountKind,
+            display_name: Vec<u8>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                !AccountRegistry::<T>::contains_key(&who),
+                Error::<T>::AlreadyRegistered
+            );
+            ensure!(
+                !AtlasRegistry::<T>::contains_key(&atlas_id),
+                Error::<T>::AtlasIdInUse
+            );
+
+            ensure!(
+                display_name.len() <= T::MaxNameLength::get() as usize,
+                Error::<T>::NameTooLong
+            );
+
+            AccountRegistry::<T>::insert(&who, atlas_id);
+            AtlasRegistry::<T>::insert(&atlas_id, &who);
+            AccountKinds::<T>::insert(&who, kind);
+            AccountCount::<T>::mutate(|count| *count = count.saturating_add(1));
+
+            Self::deposit_event(Event::AccountRegistered {
                 account: who,
                 atlas_id,
             });
-
             Ok(())
         }
 
-        /// Anchor the current nonce for cross-VM operations.
         #[pallet::call_index(1)]
+        #[pallet::weight(10_000)]
+        pub fn deregister_account(origin: OriginFor<T>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let atlas_id = AccountRegistry::<T>::take(&who).ok_or(Error::<T>::NotRegistered)?;
+
+            AtlasRegistry::<T>::remove(&atlas_id);
+            AccountKinds::<T>::remove(&who);
+            AccountCount::<T>::mutate(|count| *count = count.saturating_sub(1));
+
+            Self::deposit_event(Event::AccountDeregistered {
+                account: who,
+                atlas_id,
+            });
+            Ok(())
+        }
+
+        #[pallet::call_index(2)]
         #[pallet::weight(10_000)]
         pub fn anchor_nonce(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
-
-            // Ensure account is registered
             ensure!(
                 AccountRegistry::<T>::contains_key(&who),
                 Error::<T>::NotRegistered
             );
 
             let nonce = CrossVmNonces::<T>::get(&who);
-
-            Self::deposit_event(Event::NonceAnchored {
-                account: who,
-                nonce,
-            });
-
+            Self::deposit_event(Event::NonceAnchored { account: who, nonce });
             Ok(())
         }
     }
 
     impl<T: Config> Pallet<T> {
-        /// Get the Atlas ID for an account.
         pub fn get_atlas_id(account: &T::AccountId) -> Option<T::AtlasId> {
             AccountRegistry::<T>::get(account)
         }
 
-        /// Get the account for an Atlas ID.
         pub fn get_account(atlas_id: T::AtlasId) -> Option<T::AccountId> {
             AtlasRegistry::<T>::get(atlas_id)
         }
 
-        /// Get the next cross-VM nonce for an account.
         pub fn get_next_cross_vm_nonce(account: &T::AccountId) -> u64 {
             CrossVmNonces::<T>::get(account)
         }
 
-        /// Increment the cross-VM nonce for an account.
         pub fn increment_cross_vm_nonce(account: &T::AccountId) {
             CrossVmNonces::<T>::mutate(account, |nonce| *nonce = nonce.saturating_add(1));
         }

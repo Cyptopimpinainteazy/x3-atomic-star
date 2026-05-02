@@ -3,14 +3,14 @@
 //! Handles atomic intent lifecycle from creation to finalization/refund.
 
 use crate::types::{AssetSpec, ExternalChainId, IntentState, SettlementIntent};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::{vec, vec::Vec};
 
 /// Intent creation parameters
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct CreateIntentParams<AccountId> {
     /// Maker (initiator)
     pub maker: AccountId,
@@ -27,7 +27,7 @@ pub struct CreateIntentParams<AccountId> {
 }
 
 /// Intent settlement plan
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct SettlementPlan {
     /// Ordered list of legs to execute
     pub legs: Vec<SettlementLeg>,
@@ -38,7 +38,7 @@ pub struct SettlementPlan {
 }
 
 /// Individual settlement leg
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct SettlementLeg {
     /// Leg index
     pub index: u32,
@@ -54,7 +54,7 @@ pub struct SettlementLeg {
 
 /// Settlement risk level
 #[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
 )]
 pub enum RiskLevel {
     /// Low risk (X3-internal swaps)

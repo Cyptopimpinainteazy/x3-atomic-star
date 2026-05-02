@@ -4,14 +4,14 @@
 //! X3 uses this to determine when proofs are trustworthy.
 
 use crate::types::{ExternalChainId, FinalityConfig, ProofType};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Chain finality status
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct ChainStatus {
     /// Chain identifier
     pub chain: ExternalChainId,
@@ -200,7 +200,7 @@ impl FinalityOracle {
 
 /// Settlement urgency level
 #[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PartialEq, Eq,
+    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
 )]
 pub enum Urgency {
     /// Accept minimal confirmations (risky)
@@ -212,7 +212,7 @@ pub enum Urgency {
 }
 
 /// Light client header for X3 verification
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct LightClientHeader {
     /// Chain this header is from
     pub chain: ExternalChainId,
@@ -231,7 +231,7 @@ pub struct LightClientHeader {
 }
 
 /// Reorg detector
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct ReorgDetector {
     /// Chain being monitored
     pub chain: ExternalChainId,

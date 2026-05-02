@@ -172,6 +172,55 @@ pub mod pallet {
     #[pallet::storage_version(STORAGE_VERSION)]
     pub struct Pallet<T>(_);
 
+    /// SVM executor for BPF program execution
+    /// Uses the x3-svm-integration crate for real eBPF execution
+    pub struct SvmBpffExecutor<T: Config>(core::marker::PhantomData<T>);
+
+    impl<T: Config> SvmBpffExecutor<T> {
+        /// Execute BPF bytecode with the interpreter
+        pub fn execute_bpf(
+            &self,
+            program: &[u8],
+            input: &[u8],
+            config: &x3_svm_integration::SvmConfig,
+        ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
+            x3_svm_integration::interp_execute_bpf(program, input, config)
+        }
+
+        /// Validate BPF program bytecode
+        pub fn validate_program(&self, program: &[u8]) -> x3_svm_integration::SvmResult<()> {
+            x3_svm_integration::interp_validate_program(program)
+        }
+    }
+
+    impl<T: Config> x3_svm_integration::SvmExecutor for SvmBpffExecutor<T> {
+        fn execute(
+            &self,
+            instruction: &x3_svm_integration::SvmInstruction,
+            _payer: [u8; 32],
+            _accounts: &[(x3_svm_integration::SvmAccountMeta, x3_svm_integration::AccountUpdate)],
+            config: &x3_svm_integration::SvmConfig,
+        ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
+            // For execution, we need the program bytecode - delegate to execute_bpf
+            // The program_id is used to look up the bytecode in the calling context
+            // Here we execute raw bytecode passed via accounts
+            self.execute_bpf(&[], &instruction.data, config)
+        }
+
+        fn execute_bpf(
+            &self,
+            program: &[u8],
+            input: &[u8],
+            config: &x3_svm_integration::SvmConfig,
+        ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
+            x3_svm_integration::interp_execute_bpf(program, input, config)
+        }
+
+        fn validate_program(&self, program: &[u8]) -> x3_svm_integration::SvmResult<()> {
+            x3_svm_integration::interp_validate_program(program)
+        }
+    }
+
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type
@@ -548,6 +597,19 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Execute a BPF program instruction with real eBPF execution
+        #[pallet::call_index(5)]
+        #[pallet::weight(T::WeightInfo::execute_instruction(accounts.len() as u32))]
+        pub fn execute_instruction(
+            origin: OriginFor<T>,
+            program_id: [u8; 32],
+            accounts: Vec<([u8; 32], bool, bool)>, // (pubkey, is_signer, is_writable)
+            instruction_data: Vec<u8>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_signed(origin)?;
+            Self::execute_bpf_instruction(program_id, accounts, instruction_data)
+        }
+
         /// Fund an SVM account by burning native tokens
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::fund_account())]
@@ -629,6 +691,122 @@ pub mod pallet {
         pub fn get_program_bytecode(program_id: &[u8; 32]) -> Option<Vec<u8>> {
             ProgramData::<T>::get(program_id).map(|d| d.into_inner())
         }
+
+        /// Execute a BPF program instruction with real eBPF execution
+        pub fn execute_bpf_instruction(
+            program_id: [u8; 32],
+            accounts: Vec<([u8; 32], bool, bool)>, // (pubkey, is_signer, is_writable)
+            instruction_data: Vec<u8>,
+        ) -> DispatchResultWithPostInfo {
+            // Input validation
+            ensure!(
+                instruction_data.len() as u32 <= MAX_INSTRUCTION_DATA_SIZE,
+                Error::<T>::InstructionDataTooLarge
+            );
+            ensure!(
+                accounts.len() as u32 <= MAX_ACCOUNTS_PER_INSTRUCTION,
+                Error::<T>::TooManyAccounts
+            );
+
+            // Check program exists and is executable
+            let _program = Programs::<T>::get(&program_id)
+                .ok_or(Error::<T>::ProgramNotFound)?;
+            
+            let program_account = Accounts::<T>::get(&program_id)
+                .ok_or(Error::<T>::ProgramNotFound)?;
+            
+            ensure!(program_account.executable, Error::<T>::ProgramNotExecutable);
+
+            // Get program bytecode
+            let bytecode = ProgramData::<T>::get(&program_id)
+                .ok_or(Error::<T>::ProgramNotFound)?
+                .into_inner();
+
+            // Track writable accounts and their original lamports for supply invariant
+            // Also cache account info to avoid double storage reads in persistence loop
+            // Only include accounts that exist in storage (filter out non-existent accounts)
+            let mut original_accounts: sp_std::vec::Vec<(
+                [u8; 32],  // pubkey
+                u64,       // original lamports
+            )> = sp_std::vec::Vec::new();
+            
+            for (pubkey, _, is_writable) in &accounts {
+                if *is_writable {
+                    // Only add accounts that exist in storage - filter out non-existent
+                    if let Some(info) = Accounts::<T>::get(pubkey) {
+                        original_accounts.push((*pubkey, info.lamports));
+                    }
+                }
+            }
+
+            // Create SVM config
+            let svm_config = x3_svm_integration::SvmConfig::new(
+                T::MaxComputeUnits::get(),
+                0, // compute unit price (not used in on-chain context)
+                CurrentSlot::<T>::get(),
+                0, // block timestamp
+            );
+
+            // Execute BPF program using the interpreter
+            let executor = SvmBpffExecutor::<T>(core::marker::PhantomData);
+            let result = executor.execute_bpf(&bytecode, &instruction_data, &svm_config);
+
+            match result {
+                Ok(exec_result) => {
+                    // Calculate lamport changes for supply invariant verification
+                    let mut lamport_delta: i64 = 0;
+
+                    // Persist state changes for writable accounts using cached original values
+                    for upd in &exec_result.account_updates {
+                        // Check if this account was in our writable list (exists in storage)
+                        if let Some((_, original_lamports)) = original_accounts.iter()
+                            .find(|(pk, _)| pk[..] == upd.pubkey[..])
+                        {
+                            // Calculate delta using cached original value (no double read)
+                            lamport_delta = lamport_delta.saturating_add(
+                                upd.lamports as i64 - (*original_lamports as i64)
+                            );
+
+                            // Update lamports using try_mutate
+                            Accounts::<T>::try_mutate(&upd.pubkey, |maybe_info| -> DispatchResult {
+                                if let Some(info) = maybe_info.as_mut() {
+                                    info.lamports = upd.lamports;
+                                }
+                                Ok(())
+                            })?;
+
+                            // Update data (even if empty - BPF program may clear data intentionally)
+                            let bounded_data = BoundedVec::try_from(upd.data.clone())
+                                .map_err(|_| Error::<T>::AccountDataTooLarge)?;
+                            AccountData::<T>::insert(&upd.pubkey, bounded_data);
+                        }
+                    }
+
+                    // Update total lamports to maintain supply invariant
+                    if lamport_delta != 0 {
+                        TotalLamports::<T>::mutate(|total| {
+                            if lamport_delta > 0 {
+                                *total = total.saturating_add(lamport_delta as u64);
+                            } else {
+                                *total = total.saturating_sub((-lamport_delta) as u64);
+                            }
+                        });
+                    }
+
+                    Self::deposit_event(Event::InstructionExecuted {
+                        program_id,
+                        success: exec_result.success,
+                        compute_units: exec_result.compute_units_used,
+                    });
+
+                    Ok(().into())
+                }
+                Err(e) => {
+                    log::error!("SVM BPF execution failed: {:?}", e);
+                    Err(Error::<T>::ExecutionFailed.into())
+                }
+            }
+        }
     }
 }
 
@@ -637,15 +815,18 @@ mod tests {
     use super::*;
     use frame_support::{
         assert_noop, assert_ok, parameter_types,
-        traits::{ConstU32, ConstU64},
+        traits::{ConstU32, ConstU64, Nothing},
     };
     use sp_core::H256;
     use sp_runtime::{
+        generic,
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage,
     };
 
-    type Block = frame_system::mocking::MockBlock<Test>;
+    type Block = generic::Block<generic::Header<u32, BlakeTwo256>, UncheckedExtrinsic>;
+
+    pub type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 
     frame_support::construct_runtime!(
         pub enum Test {
@@ -672,7 +853,7 @@ mod tests {
         type AccountId = u64;
         type Lookup = IdentityLookup<Self::AccountId>;
         type RuntimeEvent = RuntimeEvent;
-        type BlockHashCount = ConstU64<250>;
+        type BlockHashCount = ConstU32<250>;
         type Version = ();
         type PalletInfo = PalletInfo;
         type AccountData = pallet_balances::AccountData<u128>;
@@ -683,6 +864,13 @@ mod tests {
         type OnSetCode = ();
         type MaxConsumers = ConstU32<16>;
         type Nonce = u32;
+        type RuntimeTask = ();
+        type SingleBlockMigrations = ();
+        type MultiBlockMigrator = ();
+        type ExtensionsWeightInfo = ();
+        type PreInherents = ();
+        type PostInherents = ();
+        type PostTransactions = ();
     }
 
     impl pallet_balances::Config for Test {
@@ -693,12 +881,13 @@ mod tests {
         type AccountStore = System;
         type MaxLocks = ();
         type MaxReserves = ();
-        type MaxHolds = ConstU32<0>;
-        type MaxFreezes = ConstU32<0>;
         type ReserveIdentifier = [u8; 8];
-        type FreezeIdentifier = ();
         type WeightInfo = ();
         type RuntimeHoldReason = ();
+        type RuntimeFreezeReason = ();
+        type FreezeIdentifier = ();
+        type MaxFreezes = ConstU32<0>;
+        type DoneSlashHandler = ();
     }
 
     impl pallet::Config for Test {

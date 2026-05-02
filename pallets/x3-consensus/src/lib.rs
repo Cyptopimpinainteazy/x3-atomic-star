@@ -18,9 +18,8 @@ pub mod pallet {
 	use super::*;
 	use frame_support::{pallet_prelude::*, traits::Get};
 	use frame_system::pallet_prelude::*;
-	use sp_consensus_aura::AURA_ENGINE_ID;
-	use sp_consensus_grandpa::GRANDPA_ENGINE_ID;
-	use sp_core::H256;
+	use sp_consensus_aura::sr25519::AuthorityId as AuraAuthorityId;
+	use sp_std::vec::Vec;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -38,7 +37,7 @@ pub mod pallet {
 		type MaxValidators: Get<u32>;
 
 		/// Weight information for extrinsics
-		type WeightInfo: WeightInfo;
+		type WeightInfo: crate::weights::WeightInfo;
 	}
 
 	#[pallet::pallet]
@@ -56,12 +55,12 @@ pub mod pallet {
 
 	/// Block number when next validator set should be activated
 	#[pallet::storage]
-	pub type ValidatorSetActivationBlock<T: Config> = StorageValue<_, T::BlockNumber, OptionQuery>;
+	pub type ValidatorSetActivationBlock<T: Config> = StorageValue<_, BlockNumberFor<T>, OptionQuery>;
 
 	/// Consensus state tracking
 	#[pallet::storage]
 	#[pallet::getter(fn consensus_state)]
-	pub type ConsensusState<T: Config> = StorageValue<_, ConsensusInfo<T::BlockNumber>, ValueQuery>;
+	pub type ConsensusState<T: Config> = StorageValue<_, ConsensusInfo<BlockNumberFor<T>>, ValueQuery>;
 
 	/// Events
 	#[pallet::event]
@@ -70,7 +69,7 @@ pub mod pallet {
 		/// New validator set activated
 		ValidatorSetChanged { validators: Vec<T::AccountId> },
 		/// Consensus state updated
-		ConsensusStateUpdated { block_number: T::BlockNumber },
+		ConsensusStateUpdated { block_number: BlockNumberFor<T> },
 		/// Validator slashed for misbehavior
 		ValidatorSlashed { validator: T::AccountId, reason: SlashReason },
 	}
@@ -87,12 +86,12 @@ pub mod pallet {
 	}
 
 	/// Consensus information
-	#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Debug, PartialEq, Eq)]
+	#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 	pub struct ConsensusInfo<BlockNumber> {
 		/// Current block number
 		pub block_number: BlockNumber,
 		/// Aura authorities
-		pub aura_authorities: Vec<sp_consensus_aura::AuthorityId>,
+		pub aura_authorities: Vec<AuraAuthorityId>,
 		/// Grandpa authorities
 		pub grandpa_authorities: Vec<(sp_consensus_grandpa::AuthorityId, u64)>,
 		/// Last finalized block
@@ -134,7 +133,7 @@ pub mod pallet {
 		pub fn set_validators(
 			origin: OriginFor<T>,
 			validators: Vec<T::AccountId>,
-			activation_delay: T::BlockNumber,
+			activation_delay: BlockNumberFor<T>,
 		) -> DispatchResult {
 			// Only governance can change validators
 			ensure_root(origin)?;
@@ -207,7 +206,7 @@ pub mod pallet {
 		}
 
 		/// Update the current consensus state
-		fn update_consensus_state(current_block: T::BlockNumber) {
+		fn update_consensus_state(current_block: BlockNumberFor<T>) {
 			let aura_authorities = pallet_aura::Pallet::<T>::authorities();
 			let grandpa_authorities = pallet_grandpa::Pallet::<T>::grandpa_authorities();
 

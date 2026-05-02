@@ -82,7 +82,7 @@ sp-timestamp = { workspace = true }
 sp-keystore = { workspace = true }
 
 substrate-frame-rpc-system = { workspace = true }
-pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
 
 frame-benchmarking-cli = { workspace = true, optional = true, default-features = false }
 
@@ -106,7 +106,7 @@ runtime-benchmarks = [
 ]
 
 # try-runtime feature enables runtime-level testing support
-# Note: try-runtime-cli tool has been removed in polkadot-stable2603
+# Note: try-runtime-cli tool has been removed in polkadot-stable2512
 # Use runtime benchmarks or tests for try-runtime functionality
 try-runtime = [
     "x3-chain-runtime/try-runtime",
