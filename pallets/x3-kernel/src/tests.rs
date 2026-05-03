@@ -3,7 +3,10 @@ use parity_scale_codec::Encode;
 use sp_core::{hashing::blake2_256, H256};
 use sp_runtime::DispatchError;
 
-use crate::{AccountRegistry, AssetRegistry, CanonicalLedger, ComitFailureReason, Nonces};
+use crate::{
+    AccountRegistry, AssetRegistry, CanonicalLedger, ComitFailureReason, EvmTransactionData,
+    EvmTransactionReceipts, EvmTransactions, Nonces, SubmittedComits,
+};
 
 use crate::mock::{
     self, new_test_ext, AssetId, AtlasId, AtlasKernel, Balance, ExtBuilder, RuntimeEvent,
@@ -50,6 +53,33 @@ fn compute_prepare_root_v2(
     fee: Balance,
 ) -> H256 {
     AtlasKernel::compute_prepare_root_v2(comit_id, evm_payload, svm_payload, x3_payload, nonce, fee)
+}
+
+fn legacy_evm_tx(
+    to: [u8; 20],
+    value: &[u8],
+    gas_price: &[u8],
+    gas_limit: &[u8],
+    input: Option<&[u8]>,
+) -> Vec<u8> {
+    let mut tx = Vec::new();
+    tx.push(0x80);
+    tx.push(0x80 + gas_price.len() as u8);
+    tx.extend_from_slice(gas_price);
+    tx.push(0x80 + gas_limit.len() as u8);
+    tx.extend_from_slice(gas_limit);
+    tx.push(0x94);
+    tx.extend_from_slice(&to);
+    tx.push(0x80 + value.len() as u8);
+    tx.extend_from_slice(value);
+    match input {
+        Some(bytes) => {
+            tx.push(0x80 + bytes.len() as u8);
+            tx.extend_from_slice(bytes);
+        }
+        None => tx.push(0x80),
+    }
+    tx
 }
 
 #[test]
@@ -265,6 +295,68 @@ fn submit_comit_rejects_payloads_exceeding_limit() {
         // No events emitted on error (they get rolled back)
         let events = x3_events();
         assert_eq!(events.len(), 0);
+    });
+}
+
+#[test]
+fn submit_evm_transaction_persists_receipt_and_transaction_metadata() {
+    new_test_ext().execute_with(|| {
+        let to = [0x11; 20];
+        let input = [0xab; 56];
+        let raw_tx = legacy_evm_tx(to, &[0x01, 0x02], &[0x13, 0x88], &[0x52, 0x08], Some(&input));
+        let tx_hash = H256::from(sp_io::hashing::keccak256(&raw_tx));
+
+        let returned_hash =
+            AtlasKernel::submit_evm_transaction(raw_tx.clone()).expect("transaction should store");
+
+        assert_eq!(returned_hash, tx_hash.as_bytes().to_vec());
+
+        let receipt =
+            EvmTransactionReceipts::<Test>::get(tx_hash).expect("receipt should be persisted");
+        assert!(receipt.success);
+        assert_eq!(receipt.gas_used, 21_000);
+        assert_eq!(receipt.to, to.to_vec());
+        assert_eq!(receipt.value, 0x0102);
+
+        let tx_data = EvmTransactions::<Test>::get(tx_hash)
+            .expect("transaction metadata should be persisted");
+        assert_eq!(
+            tx_data,
+            EvmTransactionData {
+                raw: raw_tx,
+                from: Vec::new(),
+                to: to.to_vec(),
+                value: 0x0102,
+                gas: 21_000,
+                input: input.to_vec(),
+                nonce: 0,
+                gas_price: 5_000,
+            }
+        );
+
+        assert_eq!(SubmittedComits::<Test>::get(tx_hash), Some(System::block_number()));
+    });
+}
+
+#[test]
+fn submit_evm_transaction_rejects_replay_without_overwriting_stored_records() {
+    new_test_ext().execute_with(|| {
+        let to = [0x22; 20];
+        let raw_tx = legacy_evm_tx(to, &[0x2a], &[0x01], &[0x52, 0x08], None);
+        let tx_hash = H256::from(sp_io::hashing::keccak256(&raw_tx));
+
+        assert_ok!(AtlasKernel::submit_evm_transaction(raw_tx.clone()));
+        let original_receipt =
+            EvmTransactionReceipts::<Test>::get(tx_hash).expect("receipt should exist");
+        let original_tx = EvmTransactions::<Test>::get(tx_hash).expect("tx data should exist");
+
+        let replay_err =
+            AtlasKernel::submit_evm_transaction(raw_tx).expect_err("replay must be rejected");
+        assert_eq!(replay_err, b"replay".to_vec());
+
+        assert_eq!(EvmTransactionReceipts::<Test>::get(tx_hash), Some(original_receipt));
+        assert_eq!(EvmTransactions::<Test>::get(tx_hash), Some(original_tx));
+        assert_eq!(SubmittedComits::<Test>::get(tx_hash), Some(System::block_number()));
     });
 }
 

@@ -20,6 +20,17 @@ sha2 = { version = "0.10", default-features = false }
 blake3 = { version = "1.5", default-features = false }
 log = { version = "0.4", default-features = false }
 
+# For BLS signature verification
+blst = { version = "0.3", features = ["parallel"], default-features = false }
+
+# For ed25519 signature verification
+ed25519-dalek = { version = "1.0", default-features = false, features = ["u64_backend"] }
+
+# For LiveNodeDispatcher (std-only)
+jsonrpsee = { version = "0.22", features = ["http-client"], optional = true }
+hex = { version = "0.4", optional = true }
+reqwest = { version = "0.11", features = ["blocking"], optional = true }
+
 [features]
 default = ["std"]
 std = [
@@ -31,6 +42,11 @@ std = [
     "sp-io/std",
     "sp-runtime/std",
     "sp-std/std",
+    "blst/std",
+    "jsonrpsee/std",
+    "jsonrpsee/http-client",
+    "hex",
+    "reqwest",
 ]
 
 [lib]

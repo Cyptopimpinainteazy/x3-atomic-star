@@ -160,6 +160,11 @@ export class SubstrateAdapter extends BaseChainAdapter {
     } as any;
   }
 
+  async getSystemHealth(): Promise<any> {
+    if (!this.api) throw new Error("Not connected");
+    return await this.api.rpc.system.health();
+  }
+
   /** Subscribe to new blocks and call handler with a canonical Block payload */
   async subscribe(events: string[], filter: any, handler: (event: any) => void): Promise<{ unsubscribe: () => void }> {
     if (!this.api) throw new Error("Not connected");

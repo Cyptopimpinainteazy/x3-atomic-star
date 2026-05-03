@@ -161,6 +161,9 @@ impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -206,6 +209,9 @@ impl pallet_x3_kernel::SvmExecutorAdapter for TestSvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -249,6 +255,9 @@ impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -398,6 +407,9 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -415,6 +427,9 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 

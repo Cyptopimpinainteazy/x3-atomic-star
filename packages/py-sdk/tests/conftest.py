@@ -77,3 +77,18 @@ def mock_client(mock_substrate):
     client.is_authorized.return_value = True
     
     return client
+
+
+@pytest.fixture
+def live_client():
+    """Create a live AtlasClient connected to the X3 testnet node.
+    
+    Skips if X3_RPC_ENDPOINT environment variable is not set.
+    """
+    import os
+    endpoint = os.environ.get("X3_RPC_ENDPOINT")
+    if not endpoint:
+        pytest.skip("X3_RPC_ENDPOINT environment variable not set - skipping live integration test")
+    
+    from atlas_sphere_sdk import AtlasClient
+    return AtlasClient(endpoint=endpoint)

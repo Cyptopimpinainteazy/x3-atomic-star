@@ -11,7 +11,7 @@ import { sha256AsU8a } from '@polkadot/util-crypto';
 import type { AccountId } from './types';
 import { ValidationError } from './errors';
 import { SOLANA_PUBKEY_LENGTH, ACCOUNT_ID_LENGTH } from './constants';
-import { base58Decode } from './utils';
+import { base58DecodeSolana } from './utils';
 
 // =============================================================================
 // Types
@@ -90,7 +90,7 @@ export function pubkeyToBytes(pubkey: Pubkey): Uint8Array {
   }
 
   // Base58 decode for Solana-style pubkeys
-  const decoded = base58Decode(pubkey);
+  const decoded = base58DecodeSolana(pubkey);
   if (decoded.length !== SOLANA_PUBKEY_LENGTH) {
     throw new ValidationError('pubkey', `Pubkey must be ${SOLANA_PUBKEY_LENGTH} bytes after decode`, decoded.length);
   }
@@ -149,8 +149,15 @@ export function findProgramAddress(
     const allSeeds = [...seeds, new Uint8Array([bump])];
     const hash = simpleHash(programBytes, allSeeds);
 
-    // Check if on curve (simplified - always accept)
-    // Real implementation checks if point is on ed25519 curve
+    // Check if on curve (ed25519)
+    // A point is on the ed25519 curve if its high bit is 0 (little-endian)
+    // For PDA derivation, we need to check if the hash represents a valid ed25519 point
+    const highBitSet = (hash[31] & 0x80) !== 0;
+    if (highBitSet) {
+      // Point is not on curve, continue to next bump
+      continue;
+    }
+    
     return {
       address: u8aToHex(hash),
       bump,

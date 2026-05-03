@@ -291,5 +291,25 @@
         ]
       }
     ]
+  },
+  "substrate": {
+    "mainnet": [
+      {
+        "id": "x3chain",
+        "name": "X3 Chain Mainnet",
+        "rpcs": [
+          "wss://rpc.atlassphere.io"
+        ]
+      }
+    ],
+    "testnet": [
+      {
+        "id": "x3chain",
+        "name": "X3 Chain Testnet",
+        "rpcs": [
+          "wss://testnet.x3chain.io:9944"
+        ]
+      }
+    ]
   }
 }

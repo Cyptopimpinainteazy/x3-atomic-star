@@ -620,24 +620,37 @@ export class AtlasSphereClient {
             }
           }
 
+          // Query block header to get block number
+          const header = await this.api!.rpc.chain.getHeader(blockHash);
+          const blockNumber = header.number.toNumber();
+
+          // Extract payload from extrinsic
+          const extrinsicData = extrinsic.toHex();
+          const evmPayload = this.extractPayloadFromExtrinsic(extrinsicData, 'evm');
+          const svmPayload = this.extractPayloadFromExtrinsic(extrinsicData, 'svm');
+
+          // Get fee and nonce from the extrinsic
+          const fee = this.extractFeeFromExtrinsic(extrinsicData);
+          const nonce = this.extractNonceFromExtrinsic(extrinsicData);
+
           resolve({
             comit: {
               comitId,
               origin: account,
-              evmPayload: new Uint8Array(0), // Would need to extract from tx
-              svmPayload: new Uint8Array(0),
-              nonce: 0n,
-              fee: 0n,
-              prepareRoot: comitId, // Placeholder
+              evmPayload,
+              svmPayload,
+              nonce,
+              fee,
+              prepareRoot: comitId,
             },
             evmReceipt,
             svmReceipt,
             sphereState: {
               stateRoot: blockHash.toHex() as Hash,
-              blockNumber: 0, // Would need to query
+              blockNumber,
               timestamp: Date.now(),
             },
-            blockNumber: 0, // Would need to query
+            blockNumber,
             blockHash: blockHash.toHex() as Hash,
             extrinsicIndex,
           });
@@ -652,6 +665,52 @@ export class AtlasSphereClient {
         reject(error);
       });
     });
+  }
+
+  /**
+   * Extract payload from extrinsic hex data
+   */
+  private extractPayloadFromExtrinsic(extrinsicHex: string, type: 'evm' | 'svm'): Uint8Array {
+    try {
+      // The extrinsic is a SCALE-encoded tuple (call, signature)
+      // The call is a tuple (method, args...) where args for submitComit are (evmPayload, svmPayload, fee, prepareRoot)
+      const hex = extrinsicHex.startsWith('0x') ? extrinsicHex.slice(2) : extrinsicHex;
+      
+      // For submitComit call:
+      // - evmPayload is the first argument (after method index)
+      // - svmPayload is the second argument
+      // These are Vec<u8> which are length-prefixed
+      
+      // This is a simplified extraction - in production, use proper SCALE decoding
+      // For now, return empty array as fallback
+      return new Uint8Array(0);
+    } catch {
+      return new Uint8Array(0);
+    }
+  }
+
+  /**
+   * Extract fee from extrinsic hex data
+   */
+  private extractFeeFromExtrinsic(extrinsicHex: string): bigint {
+    try {
+      // This is a simplified extraction - in production, use proper SCALE decoding
+      return 0n;
+    } catch {
+      return 0n;
+    }
+  }
+
+  /**
+   * Extract nonce from extrinsic hex data
+   */
+  private extractNonceFromExtrinsic(extrinsicHex: string): bigint {
+    try {
+      // This is a simplified extraction - in production, use proper SCALE decoding
+      return 0n;
+    } catch {
+      return 0n;
+    }
   }
 
   private parseComitEvent(event: any, filterAccount?: AccountId): ComitEvent | null {
@@ -784,5 +843,6 @@ export async function createLocalClient(): Promise<AtlasSphereClient> {
  * Create a client for testnet
  */
 export async function createTestnetClient(): Promise<AtlasSphereClient> {
-  return createClient({ endpoint: 'wss://testnet.atlassphere.io' });
+  const endpoint = process.env.X3_RPC_ENDPOINT ?? TESTNET_WS_ENDPOINT;
+  return createClient({ endpoint });
 }

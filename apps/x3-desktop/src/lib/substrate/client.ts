@@ -270,3 +270,15 @@ export async function setAppNetwork(network: 'local' | 'testnet' | 'mainnet'): P
 }
 
 export type { ApiPromise, Header, SignedBlock };
+
+// Treasury Pallet ID for account derivation
+export const TREASURY_PALLET_ID: Uint8Array = new Uint8Array([112, 121, 47, 116, 114, 115, 114, 121]); // "py/trsry"
+
+export function getTreasuryAccountId(): string {
+  const apiPromise = apiInstance;
+  if (!apiPromise) {
+    console.warn('[Substrate] API not connected, using default treasury account');
+    return '5G9VtN6VXgG9F2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7'; // Placeholder
+  }
+  return apiPromise.createType('AccountId', TREASURY_PALLET_ID).toString();
+}

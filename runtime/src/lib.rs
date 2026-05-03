@@ -27,12 +27,13 @@ pub use frame_support::{
     },
 };
 use frame_support::{traits::Currency, weights::Weight};
-use frame_system::limits;
+use frame_system::{limits, Pallet as SystemPallet};
 use pallet_agent_accounts;
 use pallet_agent_memory;
 use pallet_atomic_trade_engine;
 use pallet_aura;
 use pallet_balances;
+use pallet_ethereum;
 use pallet_collective;
 use pallet_cross_chain_validator;
 use pallet_evolution_core;
@@ -131,15 +132,21 @@ pub const X3: Balance = 1_000 * MILLI_ATLAS;
 pub const DOLLARS: Balance = X3; // 1 X3 = 1 USD equivalent
 pub const NATIVE_GAS_PRICE: u64 = 1_000_000_000;
 
+fn decode_evm_tx_hash(tx_hash: &[u8]) -> Option<H256> {
+    if tx_hash.len() != 32 {
+        return None;
+    }
+
+    Some(H256::from_slice(tx_hash))
+}
+
 #[sp_version::runtime_version]
 pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     spec_name: create_runtime_str!("x3-chain"),
     impl_name: create_runtime_str!("x3-chain"),
     authoring_version: 1,
-    // v5: 200ms slot duration migration. Nodes MUST check spec_version to select
-    // the correct slot duration for pre/post-upgrade blocks to prevent Aura
-    // slot monotonicity failures. See node/src/service.rs slot_duration_for_spec().
-    spec_version: 5,
+    // v7: added EvmTransactionReceipts storage, get_evm_transaction/receipt/logs runtime API methods, chain_id() method, and 5 ETH RPC client-side methods
+    spec_version: 7,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -634,6 +641,20 @@ impl pallet_evm::Config for Runtime {
 impl pallet_ethereum::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type StateRoot = pallet_ethereum::IntermediateStateRoot<Self>;
+}
+
+/// Mapping from Ethereum block hash to Substrate block number.
+/// This is required for eth_getBlockByHash to work correctly.
+pub struct EthereumBlockHashMapping;
+
+impl fp_ethereum::BlockHashMapping<Runtime> for EthereumBlockHashMapping {
+    fn block_hash(block_number: u32) -> H256 {
+        use sp_runtime::traits::Hash;
+        
+        // Get the block at the given number
+        let header = frame_system::Pallet::<Runtime>::block_hash(block_number);
+        H256::from_slice(header.as_ref())
+    }
 }
 
 // Helper types for pallet_x3_kernel::Config bridge escrow bindings
@@ -1733,9 +1754,7 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
-    // TODO: Implement proper VM adapter origin that can only be created by verified kernel execution
-    // For now, restrict to root to prevent unauthorized VM adapter calls
-    type VmAdapterOrigin = frame_system::EnsureRoot<AccountId>;
+    type VmAdapterOrigin = EnsureRootOrHalfCouncil;
     type EconomicHalt = X3SupplyLedger;
 }
 
@@ -2119,7 +2138,16 @@ impl_runtime_apis! {
             use sp_io::hashing::keccak_256;
             use fp_evm::ExitReason;
             use pallet_evm::Runner;
-            use sp_core::{H160, U256};
+            use sp_core::{H160, H256, U256};
+            use codec::Encode;
+
+            // Compute tx_hash once at the start for replay prevention check
+            let tx_hash = keccak_256(&raw_tx);
+
+            // Check for replay - reject if this transaction was already submitted
+            if pallet_x3_kernel::SubmittedComits::<Runtime>::contains_key(H256::from_slice(tx_hash.as_ref())) {
+                return Err(b"transaction already submitted (replay detected)".to_vec());
+            }
 
             if raw_tx.len() < (20 + 20 + 16 + 4) {
                 return Err(b"invalid payload: too short".to_vec());
@@ -2142,6 +2170,11 @@ impl_runtime_apis! {
             }
             let data = raw_tx[60..60 + data_len].to_vec();
 
+            use sp_runtime::traits::BlakeTwo256;
+            let caller_account: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256>
+                as pallet_evm::AddressMapping<AccountId>>::into_account_id(caller);
+            let tx_nonce = frame_system::Pallet::<Runtime>::account_nonce(&caller_account) as u64;
+
             log::info!(
                 target: "runtime::evm",
                 "submit_evm_transaction caller=0x{:?} to=0x{:?} value={} data_len={}",
@@ -2152,6 +2185,22 @@ impl_runtime_apis! {
             );
 
             let evm_config = fp_evm::Config::shanghai();
+
+            // Persist full tx metadata for eth_getTransactionByHash compatibility.
+            let tx_data = pallet_x3_kernel::pallet::EvmTransactionData {
+                raw: raw_tx.clone(),
+                from: caller.as_bytes().to_vec(),
+                to: to.as_bytes().to_vec(),
+                value: value.as_u128(),
+                gas: 10_000_000u64,
+                input: data.clone(),
+                nonce: tx_nonce,
+                gas_price: NATIVE_GAS_PRICE as u128,
+            };
+            pallet_x3_kernel::EvmTransactions::<Runtime>::insert(
+                H256::from_slice(tx_hash.as_ref()),
+                tx_data,
+            );
             let result = <Runtime as pallet_evm::Config>::Runner::call(
                 caller,
                 to,
@@ -2172,15 +2221,133 @@ impl_runtime_apis! {
             match result {
                 Ok(info) => match info.exit_reason {
                     ExitReason::Succeed(_) => {
-                    let tx_hash = keccak_256(&raw_tx).to_vec();
-                    Ok(tx_hash)
-                }
-                    ExitReason::Revert(_) => Err(info.value),
+                        // Build execution receipt
+                        let receipt = pallet_x3_kernel::ExecutionReceipt {
+                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+                            success: true,
+                            gas_used: info.used_gas.standard,
+                            return_data: info.value.to_vec(),
+                            logs: info
+                                .logs
+                                .into_iter()
+                                .map(|log| pallet_x3_kernel::ExecutionLog {
+                                    address: log.address.as_bytes().to_vec(),
+                                    topics: log.topics,
+                                    data: log.data,
+                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
+                                })
+                                .collect(),
+                            state_changes: Vec::new(),
+                            protocol_version: 1,
+                            migration_history: Vec::new(),
+                            compatibility_flags: 0,
+                            from: caller.as_bytes().to_vec(),
+                            to: to.as_bytes().to_vec(),
+                            value: value.as_u128(),
+                        };
+                        // Store receipt keyed by transaction hash
+                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
+                            H256::from_slice(tx_hash.as_ref()),
+                            receipt,
+                        );
+                        // Record transaction as submitted for replay prevention
+                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
+                        Ok(tx_hash.to_vec())
+                    }
+                    ExitReason::Revert(_) => {
+                        // Build execution receipt for reverted transaction
+                        let receipt = pallet_x3_kernel::ExecutionReceipt {
+                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+                            success: false,
+                            gas_used: info.used_gas.standard,
+                            return_data: info.value.to_vec(),
+                            logs: info
+                                .logs
+                                .into_iter()
+                                .map(|log| pallet_x3_kernel::ExecutionLog {
+                                    address: log.address.as_bytes().to_vec(),
+                                    topics: log.topics,
+                                    data: log.data,
+                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
+                                })
+                                .collect(),
+                            state_changes: Vec::new(),
+                            protocol_version: 1,
+                            migration_history: Vec::new(),
+                            compatibility_flags: 0,
+                            from: caller.as_bytes().to_vec(),
+                            to: to.as_bytes().to_vec(),
+                            value: value.as_u128(),
+                        };
+                        // Store receipt keyed by transaction hash
+                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
+                            H256::from_slice(tx_hash.as_ref()),
+                            receipt,
+                        );
+                        // Record transaction as submitted for replay prevention
+                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
+                        Err(info.value)
+                    }
                     ExitReason::Error(_) | ExitReason::Fatal(_) => {
-                        Err(b"EVM execution failed".to_vec())
+                        // Build execution receipt for failed transaction
+                        let receipt = pallet_x3_kernel::ExecutionReceipt {
+                            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+                            success: false,
+                            gas_used: info.used_gas.standard,
+                            return_data: info.value.to_vec(),
+                            logs: info
+                                .logs
+                                .into_iter()
+                                .map(|log| pallet_x3_kernel::ExecutionLog {
+                                    address: log.address.as_bytes().to_vec(),
+                                    topics: log.topics,
+                                    data: log.data,
+                                    block_number: SystemPallet::<Runtime>::block_number() as u64,
+                                })
+                                .collect(),
+                            state_changes: Vec::new(),
+                            protocol_version: 1,
+                            migration_history: Vec::new(),
+                            compatibility_flags: 0,
+                            from: caller.as_bytes().to_vec(),
+                            to: to.as_bytes().to_vec(),
+                            value: value.as_u128(),
+                        };
+                        // Store receipt keyed by transaction hash
+                        pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
+                            H256::from_slice(tx_hash.as_ref()),
+                            receipt,
+                        );
+                        // Record transaction as submitted for replay prevention
+                        pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
+                        Err(info.value)
                     }
                 },
-                Err(_) => Err(b"EVM runner call failed".to_vec()),
+                Err(_) => {
+                    // Build execution receipt for runner failure
+                    let receipt = pallet_x3_kernel::ExecutionReceipt {
+                        version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
+                        success: false,
+                        gas_used: 0,
+                        return_data: b"EVM runner call failed".to_vec(),
+                        logs: Vec::new(),
+                        state_changes: Vec::new(),
+                        protocol_version: 1,
+                        migration_history: Vec::new(),
+                        compatibility_flags: 0,
+                        from: caller.as_bytes().to_vec(),
+                        to: to.as_bytes().to_vec(),
+                        value: value.as_u128(),
+                    };
+                    // Store receipt keyed by transaction hash
+                    pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::insert(
+                        H256::from_slice(tx_hash.as_ref()),
+                        receipt,
+                    );
+                    // Record transaction as submitted for replay prevention
+                    pallet_x3_kernel::SubmittedComits::<Runtime>::insert(H256::from_slice(tx_hash.as_ref()), SystemPallet::<Runtime>::block_number());
+                    Err(b"EVM runner call failed".to_vec())
+                }
             }
         }
 
@@ -2307,13 +2474,82 @@ impl_runtime_apis! {
                 Err(_) => Err(b"EVM runner estimate failed".to_vec()),
             }
         }
+    
+        fn get_evm_transaction(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+            let hash = decode_evm_tx_hash(&tx_hash)?;
+            pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::get(&hash)
+                .map(|receipt| receipt.encode())
+        }
 
+        fn get_evm_receipt(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+            let hash = decode_evm_tx_hash(&tx_hash)?;
+            pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::get(&hash)
+                .map(|receipt| receipt.encode())
+        }
+        
+        fn get_evm_transaction_by_hash(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+            let hash = decode_evm_tx_hash(&tx_hash)?;
+            pallet_x3_kernel::EvmTransactions::<Runtime>::get(&hash)
+                .map(|tx| tx.encode())
+        }
+    
+        fn get_evm_logs(filter: Vec<u8>) -> Vec<Vec<u8>> {
+            use codec::{Decode, Encode};
+            use sp_core::H160;
+            
+            // Try to decode as SCALE-encoded tuple (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
+            // If that fails, try the old concatenated format for backward compatibility
+            let (from_block, to_block, address_filter) = match <(u64, u64, Option<[u8; 20]>)>::decode(&mut &filter[..]) {
+                Ok(d) => d,
+                Err(_) => {
+                    // Fallback to old concatenated format: [from_block(8 LE)] [to_block(8 LE)] [address(20, optional)]
+                    if filter.len() < 16 {
+                        return vec![];
+                    }
+                    let from_block = u64::from_le_bytes(filter[0..8].try_into().unwrap_or([0u8; 8]));
+                    let to_block = u64::from_le_bytes(filter[8..16].try_into().unwrap_or([0u8; 8]));
+                    let address_filter = if filter.len() >= 36 {
+                        let mut addr = [0u8; 20];
+                        addr.copy_from_slice(&filter[16..36]);
+                        Some(addr)
+                    } else {
+                        None
+                    };
+                    (from_block, to_block, address_filter)
+                }
+            };
+    
+            let mut logs = Vec::new();
+            for (_, receipt) in pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::iter() {
+                // Apply block range filter and address filter
+                for log in &receipt.logs {
+                    // Check if log's block_number is within range
+                    if log.block_number >= from_block && log.block_number <= to_block {
+                        // Apply address filter if provided
+                        if let Some(addr_bytes) = &address_filter {
+                            if log.address == *addr_bytes {
+                                logs.push(log.encode());
+                            }
+                        } else {
+                            logs.push(log.encode());
+                        }
+                    }
+                }
+            }
+            logs
+        }
+    
         fn validate_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
             // Stateless validation: check payload length without mutating state.
             if raw_tx.len() < (20 + 20 + 16 + 4) {
                 return Err(b"invalid payload: too short".to_vec());
             }
             Ok(vec![])
+        }
+        
+        fn chain_id() -> u64 {
+            // Return the chain ID from the runtime configuration
+            650_000u64
         }
     }
 

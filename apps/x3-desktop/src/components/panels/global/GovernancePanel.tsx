@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { Vote, TrendingUp, Users, Zap, Plus, CheckCircle } from "lucide-react";
 import clsx from "clsx";
+import { useProposalList } from "../../../hooks/useSubstrate";
+import { useGovernanceSnapshot } from "../../../hooks/useSubstrate";
+import { useWalletStore } from "../../../stores/walletStore";
+import { x3ChainService } from "../../../services/x3ChainService";
+import { GovernanceProposal as ChainProposal } from "../../../lib/substrate/queries";
 
 interface Proposal {
   id: string;
@@ -16,75 +21,37 @@ interface Proposal {
   proposer: string;
 }
 
-const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: "1",
-    title: "Increase Fee Distribution to Stakers",
-    description: "Redirect 10% of protocol fees to staking rewards, improving APR from 8% to 12%",
-    type: "parameter",
-    status: "active",
-    votesFor: 7500000,
-    votesAgainst: 500000,
-    totalVotes: 8000000,
-    quorumRequired: 4000000,
-    endsIn: "3 days",
-    proposer: "0x1234...5678",
-  },
-  {
-    id: "2",
-    title: "Fund Marketing Initiative Q2 2025",
-    description: "Allocate 500k X3 tokens to marketing campaigns, partnerships, and community building",
-    type: "treasury",
-    status: "passed",
-    votesFor: 6800000,
-    votesAgainst: 1200000,
-    totalVotes: 8000000,
-    quorumRequired: 4000000,
-    endsIn: "Closed",
-    proposer: "0x8765...4321",
-  },
-  {
-    id: "3",
-    title: "Upgrade to V2 Smart Contracts",
-    description: "Deploy optimized smart contracts with lower gas costs and new DeFi features",
-    type: "upgrade",
-    status: "active",
-    votesFor: 4200000,
-    votesAgainst: 3800000,
-    totalVotes: 8000000,
-    quorumRequired: 4000000,
-    endsIn: "5 days",
-    proposer: "0xabcd...efgh",
-  },
-];
-
 export default function GovernancePanel() {
-  const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(MOCK_PROPOSALS[0]);
+  const { data: proposals, isLoading, error } = useProposalList();
+  const { data: snapshot } = useGovernanceSnapshot();
+  const { activeAccountIndex, accounts } = useWalletStore();
+  const activeAccount = accounts[activeAccountIndex];
+
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [userVotingPower, setUserVotingPower] = useState(250000);
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [userVote, setUserVote] = useState<{ [key: string]: "for" | "against" | null }>({});
 
-  const totalStaked = 50000000;
+  const totalStaked = snapshot?.totalStaked || 50000000;
   const currentVotingPower = userVotingPower;
   const delegatedVotingPower = 0;
 
-  const handleVote = (proposalId: string, direction: "for" | "against") => {
-    setUserVote({ ...userVote, [proposalId]: direction });
-
-    setProposals(
-      proposals.map((p) => {
-        if (p.id === proposalId && p.status === "active") {
-          return {
-            ...p,
-            votesFor: direction === "for" ? p.votesFor + currentVotingPower : p.votesFor,
-            votesAgainst: direction === "against" ? p.votesAgainst + currentVotingPower : p.votesAgainst,
-            totalVotes: p.totalVotes + currentVotingPower,
-          };
-        }
-        return p;
-      })
-    );
+  const handleVote = async (proposalId: string, direction: "for" | "against") => {
+    if (!activeAccount) {
+      console.error("No active account found");
+      return;
+    }
+    try {
+      const signer = await x3ChainService.getApi();
+      const result = await x3ChainService.castVote(signer, parseInt(proposalId), direction === "for" ? "Aye" : "Nay", "1000000000000", "None");
+      if (result.success) {
+        console.log(`Vote cast successfully: ${result.txHash}`);
+        setUserVote({ ...userVote, [proposalId]: direction });
+        window.dispatchEvent(new CustomEvent("proposal-updated"));
+      }
+    } catch (err) {
+      console.error("Error casting vote:", err);
+    }
   };
 
   const getProposalColor = (type: string) => {
@@ -200,54 +167,81 @@ export default function GovernancePanel() {
         {/* Proposals List */}
         <div>
           <h3 className="font-semibold mb-3 text-sm">Active & Recent Proposals</h3>
-          <div className="space-y-2">
-            {proposals.map((proposal) => (
-              <button
-                key={proposal.id}
-                onClick={() => setSelectedProposal(proposal)}
-                className={clsx(
-                  "w-full text-left p-3 rounded-lg border-2 transition",
-                  selectedProposal?.id === proposal.id
-                    ? "border-blue-600 bg-blue-600/10"
-                    : "border-[#2a2a35] bg-[#15151b] hover:border-[#3a3a45]"
-                )}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold mb-1">{proposal.title}</div>
-                    <span className={clsx("text-xs px-2 py-1 rounded border-2", getProposalColor(proposal.type))}>
-                      {proposal.type}
-                    </span>
-                  </div>
-                  <span className={clsx("text-xs px-2 py-1 rounded border", getStatusColor(proposal.status))}>
-                    {proposal.status}
-                  </span>
-                </div>
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-400">Loading proposals...</div>
+          ) : error ? (
+            <div className="text-center py-4 text-red-400 bg-red-900/20 rounded-lg border border-red-900/50">
+              Error loading proposals: {error.message}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {proposals && proposals.length > 0 ? (
+                proposals.map((proposal: ChainProposal) => {
+                  const chainProposal: Proposal = {
+                    id: proposal.id.toString(),
+                    title: proposal.title,
+                    description: proposal.description,
+                    type: "parameter",
+                    status: proposal.status === "Active" ? "active" : proposal.status === "Passed" ? "passed" : proposal.status === "Rejected" ? "failed" : "executed",
+                    votesFor: proposal.ayes,
+                    votesAgainst: proposal.nays,
+                    totalVotes: proposal.ayes + proposal.nays,
+                    quorumRequired: proposal.threshold,
+                    endsIn: proposal.votingEnd > Date.now() / 1000 ? `${Math.ceil((proposal.votingEnd - Date.now() / 1000) / 86400)} days` : "Closed",
+                    proposer: proposal.proposer,
+                  };
+                  return (
+                    <button
+                      key={chainProposal.id}
+                      onClick={() => setSelectedProposal(chainProposal)}
+                      className={clsx(
+                        "w-full text-left p-3 rounded-lg border-2 transition",
+                        selectedProposal?.id === chainProposal.id
+                          ? "border-blue-600 bg-blue-600/10"
+                          : "border-[#2a2a35] bg-[#15151b] hover:border-[#3a3a45]"
+                      )}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold mb-1">{chainProposal.title}</div>
+                          <span className={clsx("text-xs px-2 py-1 rounded border-2", getProposalColor(chainProposal.type))}>
+                            {chainProposal.type}
+                          </span>
+                        </div>
+                        <span className={clsx("text-xs px-2 py-1 rounded border", getStatusColor(chainProposal.status))}>
+                          {chainProposal.status}
+                        </span>
+                      </div>
 
-                <div className="mt-2 mb-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="text-xs text-gray-400">Support</div>
-                    <div className="flex-1 bg-[#2a2a35] rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-green-600 to-blue-600"
-                        style={{
-                          width: `${(proposal.votesFor / proposal.totalVotes) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-400">
-                      {((proposal.votesFor / proposal.totalVotes) * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
+                      <div className="mt-2 mb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="text-xs text-gray-400">Support</div>
+                          <div className="flex-1 bg-[#2a2a35] rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-green-600 to-blue-600"
+                              style={{
+                                width: `${(chainProposal.votesFor / chainProposal.totalVotes) * 100}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            {((chainProposal.votesFor / chainProposal.totalVotes) * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
 
-                <div className="text-xs text-gray-400">
-                  {(proposal.votesFor / 1000000).toFixed(1)}M for • {(proposal.votesAgainst / 1000000).toFixed(1)}M against •{" "}
-                  {proposal.endsIn}
-                </div>
-              </button>
-            ))}
-          </div>
+                      <div className="text-xs text-gray-400">
+                        {(chainProposal.votesFor / 1000000).toFixed(1)}M for • {(chainProposal.votesAgainst / 1000000).toFixed(1)}M against •{" "}
+                        {chainProposal.endsIn}
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-400">No proposals found</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Selected Proposal Details */}

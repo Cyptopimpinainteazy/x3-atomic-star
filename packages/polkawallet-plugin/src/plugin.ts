@@ -204,11 +204,13 @@ export function createLocalPlugin(): AtlasX3Plugin {
   return new AtlasX3Plugin({ endpoint: 'ws://127.0.0.1:9944', network: 'x3-local' });
 }
 
+import { getCurrentEndpoint } from './config/env';
+
 /**
  * Create a plugin connected to the X3 testnet
  */
 export function createTestnetPlugin(): AtlasX3Plugin {
-  return new AtlasX3Plugin({ endpoint: 'wss://testnet.x3-chain.io', network: 'x3-testnet' });
+  return new AtlasX3Plugin({ endpoint: getCurrentEndpoint(), network: 'x3-testnet' });
 }
 
 /**

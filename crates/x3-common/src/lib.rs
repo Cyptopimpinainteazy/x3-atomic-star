@@ -194,3 +194,18 @@ impl Token {
         Self { kind, span }
     }
 }
+
+// Re-export signing module for external use
+pub mod signing;
+pub use signing::{
+    Signer, Ed25519Signer, Secp256k1Signer, Sr25519Signer,
+    Signature, PublicKey, KeyType,
+    verify_signature, verify_signature_hash,
+};
+
+// Re-export weight metering module for external use
+pub mod weight_metering;
+pub use weight_metering::{
+    ComputeMeter, GasMeter, WeightMeter, WeightConfig, OperationCosts,
+    WeightResult, WeightError, HashAlgorithm, Operation,
+};

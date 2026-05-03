@@ -7,6 +7,7 @@
 
 import type { HTLC, HTLCCreateParams, HTLCClaimParams, HTLCRefundParams, ChainId } from "../types";
 import { type IHTLCAdapter, sha256FromHex, bytesToHex, hexToBytes } from "./base";
+import * as web3 from "@solana/web3.js";
 
 /** Anchor instruction discriminators (first 8 bytes of SHA-256 hash of instruction name) */
 const IX_INITIALIZE = [175, 175, 109, 31, 13, 152, 155, 237]; // sha256("global:initialize")[..8]
@@ -179,12 +180,11 @@ export class SolanaHTLCAdapter implements IHTLCAdapter {
 
   private deriveHTLCPda(hashLockBytes: Uint8Array): string {
     // PDA = findProgramAddress([b"htlc", hashLock], programId)
-    // Simplified: use sha256 as a deterministic derivation
-    const seed = new Uint8Array([
-      ...new TextEncoder().encode("htlc"),
-      ...hashLockBytes,
-    ]);
-    return sha256FromHex(bytesToHex(seed));
+    const [pda] = web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("htlc"), ...hashLockBytes],
+      new web3.PublicKey(this.programId)
+    );
+    return pda.toBase58();
   }
 
   private encodeLittleEndianU64(value: number): Uint8Array {
@@ -280,4 +280,16 @@ export class SolanaHTLCAdapter implements IHTLCAdapter {
     );
     return signature;
   }
+}
+
+/**
+ * Factory function to create a Solana HTLC adapter with env var configuration.
+ * Reads X3_SOLANA_HTLC_PROGRAM_ID from environment.
+ */
+export function createSolanaHTLCAdapter(chainId: ChainId, rpcEndpoint: string): SolanaHTLCAdapter {
+  const programId = process.env.X3_SOLANA_HTLC_PROGRAM_ID;
+  if (!programId) {
+    throw new Error("X3_SOLANA_HTLC_PROGRAM_ID environment variable is required");
+  }
+  return new SolanaHTLCAdapter(chainId, rpcEndpoint, programId);
 }

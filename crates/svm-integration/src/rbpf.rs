@@ -4,8 +4,8 @@
 //! the solana-rbpf virtual machine.
 
 use crate::{
-    AccountUpdate, SvmAccountMeta, SvmConfig, SvmError, SvmExecutionResult, SvmExecutor,
-    SvmInstruction, SvmResult,
+    serialize_accounts, AccountUpdate, SvmAccountMeta, SvmConfig, SvmError,
+    SvmExecutionResult, SvmExecutor, SvmInstruction, SvmResult,
 };
 use solana_rbpf::{
     elf::Executable,
@@ -59,51 +59,6 @@ impl Default for RbpfSvmExecutor {
     }
 }
 
-impl RbpfSvmExecutor {
-    /// Serialize accounts into a buffer for BPF program access (M-7 fix).
-    ///
-    /// Format per account:
-    /// - 32 bytes: pubkey
-    /// - 8 bytes: lamports (little-endian u64)
-    /// - 1 byte: is_signer flag
-    /// - 1 byte: is_writable flag
-    /// - 4 bytes: data length
-    /// - Variable: data from AccountUpdate
-    fn serialize_accounts(accounts: &[(SvmAccountMeta, AccountUpdate)]) -> Vec<u8> {
-        let mut buffer = Vec::new();
-
-        // Write account count as u32 LE
-        buffer.extend_from_slice(&(accounts.len() as u32).to_le_bytes());
-
-        for (meta, update) in accounts {
-            // Pubkey (32 bytes)
-            buffer.extend_from_slice(&meta.pubkey);
-
-            // Lamports from update (8 bytes)
-            buffer.extend_from_slice(&update.lamports.to_le_bytes());
-
-            // Flags (2 bytes)
-            buffer.push(if meta.is_signer { 1 } else { 0 });
-            buffer.push(if meta.is_writable { 1 } else { 0 });
-
-            // Data length and data
-            buffer.extend_from_slice(&(update.data.len() as u32).to_le_bytes());
-            buffer.extend_from_slice(&update.data);
-        }
-
-        buffer
-    }
-
-    /// Create a simple test program that returns success
-    #[allow(dead_code)]
-    fn create_test_program() -> Vec<u8> {
-        // Minimal BPF program: mov r0, 0; exit
-        vec![
-            0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov r0, 0
-            0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
-        ]
-    }
-}
 
 /// Context for X3 syscall execution
 /// Tracks compute units, logs, and return data during BPF execution
@@ -114,9 +69,6 @@ struct AtlasSyscallContext {
     compute_units_used: u64,
     /// Logs emitted during execution
     logs: Vec<Vec<u8>>,
-    /// Return data from the program (reserved for future use)
-    #[allow(dead_code)]
-    return_data: Vec<u8>,
 }
 
 impl AtlasSyscallContext {
@@ -125,7 +77,6 @@ impl AtlasSyscallContext {
             compute_units_remaining: compute_limit,
             compute_units_used: 0,
             logs: Vec::new(),
-            return_data: Vec::new(),
         }
     }
 }
@@ -301,8 +252,8 @@ impl SvmExecutor for RbpfSvmExecutor {
             return Err(SvmError::InvalidProgramId);
         }
 
-        // Serialize accounts into input buffer for BPF program access (M-7 fix)
-        let account_input = Self::serialize_accounts(accounts);
+        // Use shared serialize_accounts from lib.rs
+        let account_input = serialize_accounts(accounts);
 
         // Execute the BPF program with instruction data + serialized accounts as input
         let mut result = self.execute_bpf(&instruction.data, &account_input, config)?;

@@ -147,3 +147,122 @@ export function useRpcStats(config?: SWRConfiguration) {
     ...config,
   });
 }
+
+// ── Governance Hooks ───────────────────────────────────────────────────────────
+
+import {
+  getGovernanceSnapshot,
+  getProposalList,
+  getProposalTally,
+  getDelegation,
+  getAIProposals,
+  getTopDelegates,
+  type GovernanceSnapshot,
+  type GovernanceProposal,
+  type Delegation,
+} from '@/lib/substrate';
+
+export function useGovernanceSnapshot(config?: SWRConfiguration) {
+  return useSWR<GovernanceSnapshot | null, Error>('governance-snapshot', () => getGovernanceSnapshot(), {
+    ...defaultConfig,
+    refreshInterval: 12000,
+    ...config,
+  });
+}
+
+export function useProposalList(config?: SWRConfiguration) {
+  return useSWR<GovernanceProposal[], Error>('proposal-list', () => getProposalList(), {
+    ...defaultConfig,
+    refreshInterval: 6000,
+    ...config,
+  });
+}
+
+export function useProposalTally(proposalId: number | null, config?: SWRConfiguration) {
+  return useSWR<{ ayes: number; nays: number; total: number } | null, Error>(
+    proposalId ? ['proposal-tally', proposalId] : null,
+    () => (proposalId ? getProposalTally(proposalId) : null),
+    { ...defaultConfig, refreshInterval: 6000, ...config },
+  );
+}
+
+export function useDelegation(address: string | null, config?: SWRConfiguration) {
+  return useSWR<Delegation | null, Error>(
+    address ? ['delegation', address] : null,
+    () => (address ? getDelegation(address) : null),
+    { ...defaultConfig, refreshInterval: 30000, ...config },
+  );
+}
+
+export function useAIProposals(config?: SWRConfiguration) {
+  return useSWR<GovernanceProposal[], Error>('ai-proposals', () => getAIProposals(), {
+    ...defaultConfig,
+    refreshInterval: 12000,
+    ...config,
+  });
+}
+
+export function useTopDelegates(count = 10, config?: SWRConfiguration) {
+  return useSWR<{ address: string; power: string }[], Error>(
+    ['top-delegates', count],
+    () => getTopDelegates(count),
+    { ...defaultConfig, refreshInterval: 60000, ...config },
+  );
+}
+
+// ── Treasury Hooks ─────────────────────────────────────────────────────────────
+
+import {
+  getTreasurySnapshot,
+  getTreasuryBalance,
+  getTreasuryWallets,
+  type TreasurySnapshot,
+  type TreasuryWallet,
+} from '@/lib/substrate';
+
+export function useTreasurySnapshot(config?: SWRConfiguration) {
+  return useSWR<TreasurySnapshot | null, Error>('treasury-snapshot', () => getTreasurySnapshot(), {
+    ...defaultConfig,
+    refreshInterval: 12000,
+    ...config,
+  });
+}
+
+export function useTreasuryBalance(config?: SWRConfiguration) {
+  return useSWR<string, Error>('treasury-balance', () => getTreasuryBalance(), {
+    ...defaultConfig,
+    refreshInterval: 12000,
+    ...config,
+  });
+}
+
+export function useTreasuryWallets(config?: SWRConfiguration) {
+  return useSWR<TreasuryWallet[], Error>('treasury-wallets', () => getTreasuryWallets(), {
+    ...defaultConfig,
+    refreshInterval: 12000,
+    ...config,
+  });
+}
+
+// ── My Votes Hook ──────────────────────────────────────────────────────────────
+
+export function useMyVotes(address: string | null, config?: SWRConfiguration) {
+  return useSWR<any[], Error>(
+    address ? ['my-votes', address] : null,
+    async () => {
+      if (!address) return [];
+      const api = await (await import('@/lib/substrate')).getApi();
+      try {
+        const entries = await api.query.governance.votes.entries(address);
+        return entries.map(([key, value]: any) => ({
+          proposalId: key.args[0].toNumber(),
+          vote: value,
+        }));
+      } catch (e) {
+        console.error('Error fetching my votes:', e);
+        return [];
+      }
+    },
+    { ...defaultConfig, refreshInterval: 12000, ...config },
+  );
+}

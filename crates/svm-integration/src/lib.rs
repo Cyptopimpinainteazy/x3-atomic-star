@@ -243,57 +243,52 @@ pub trait SvmExecutor {
     fn validate_program(&self, program: &[u8]) -> SvmResult<()>;
 }
 
-/// Mock SVM executor for testing (always succeeds)
-pub struct MockSvmExecutor;
+/// Real SVM executor using solana-rbpf (replaces mock for testing)
+#[cfg(any(test, feature = "test-utils"))]
+pub struct MockSvmExecutor {
+    inner: RbpfSvmExecutor,
+}
 
+#[cfg(any(test, feature = "test-utils"))]
+impl MockSvmExecutor {
+    /// Create a new mock executor that delegates to real RbpfSvmExecutor
+    pub fn new() -> Self {
+        Self {
+            inner: RbpfSvmExecutor::new(),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+impl Default for MockSvmExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(test, feature = "test-utils"))]
 impl SvmExecutor for MockSvmExecutor {
     fn execute(
         &self,
         instruction: &SvmInstruction,
-        _payer: [u8; 32],
-        _accounts: &[(SvmAccountMeta, AccountUpdate)],
+        payer: [u8; 32],
+        accounts: &[(SvmAccountMeta, AccountUpdate)],
         config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        if instruction.data.is_empty() && instruction.program_id == [0u8; 32] {
-            return Err(SvmError::InvalidPayload);
-        }
-
-        Ok(SvmExecutionResult {
-            success: true,
-            output: vec![0x01],
-            compute_units_used: config.compute_unit_limit / 2,
-            account_updates: vec![],
-            logs: vec![],
-            state_root: [0u8; 32],
-        })
+        self.inner.execute(instruction, payer, accounts, config)
     }
 
     fn execute_bpf(
         &self,
         program: &[u8],
-        _input: &[u8],
+        input: &[u8],
         config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        if program.is_empty() {
-            return Err(SvmError::InvalidPayload);
-        }
-
-        Ok(SvmExecutionResult {
-            success: true,
-            output: vec![0x01],
-            compute_units_used: config.compute_unit_limit / 2,
-            account_updates: vec![],
-            logs: vec![],
-            state_root: [0u8; 32],
-        })
+        self.inner.execute_bpf(program, input, config)
     }
 
     fn validate_program(&self, program: &[u8]) -> SvmResult<()> {
-        if program.is_empty() {
-            Err(SvmError::InvalidPayload)
-        } else {
-            Ok(())
-        }
+        self.inner.validate_program(program)
     }
 }
 
@@ -628,6 +623,44 @@ mod tests {
 }
 
 // ---------------------------------------------------------------------------
+// Account serialization (used by both InterpSvmExecutor and RbpfSvmExecutor)
+// ---------------------------------------------------------------------------
+
+/// Serialize accounts into a buffer for BPF program access.
+///
+/// Format per account:
+/// - 32 bytes: pubkey
+/// - 8 bytes: lamports (little-endian u64)
+/// - 1 byte: is_signer flag
+/// - 1 byte: is_writable flag
+/// - 4 bytes: data length (little-endian u32)
+/// - Variable: data from AccountUpdate
+pub fn serialize_accounts(accounts: &[(SvmAccountMeta, AccountUpdate)]) -> Vec<u8> {
+    let mut buffer = Vec::new();
+
+    // Write account count as u32 LE
+    buffer.extend_from_slice(&(accounts.len() as u32).to_le_bytes());
+
+    for (meta, update) in accounts {
+        // Pubkey (32 bytes)
+        buffer.extend_from_slice(&meta.pubkey);
+
+        // Lamports from update (8 bytes)
+        buffer.extend_from_slice(&update.lamports.to_le_bytes());
+
+        // Flags (2 bytes)
+        buffer.push(if meta.is_signer { 1 } else { 0 });
+        buffer.push(if meta.is_writable { 1 } else { 0 });
+
+        // Data length and data
+        buffer.extend_from_slice(&(update.data.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(&update.data);
+    }
+
+    buffer
+}
+
+// ---------------------------------------------------------------------------
 // InterpSvmExecutor – real no-std executor using the built-in eBPF interpreter
 // ---------------------------------------------------------------------------
 
@@ -636,11 +669,36 @@ impl SvmExecutor for InterpSvmExecutor {
         &self,
         instruction: &SvmInstruction,
         _payer: [u8; 32],
-        _accounts: &[(SvmAccountMeta, AccountUpdate)],
+        accounts: &[(SvmAccountMeta, AccountUpdate)],
         config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        // Execute the program's bytecode with the instruction data as input
-        self.execute_bpf(&instruction.program_id, &instruction.data, config)
+        // Check for invalid program_id
+        if instruction.program_id == [0u8; 32] {
+            return Err(SvmError::InvalidProgramId);
+        }
+
+        // Serialize accounts into input buffer for BPF program access
+        let account_input = serialize_accounts(accounts);
+
+        // Execute the BPF program with instruction.data as program and account_input as input
+        let mut result = self.execute_bpf(&instruction.data, &account_input, config)?;
+
+        // Surface writable account balances to upper layers so canonical ledgers can
+        // persist account-level views even when the BPF program does not emit deltas.
+        if result.account_updates.is_empty() {
+            result.account_updates = accounts
+                .iter()
+                .filter_map(|(meta, update)| {
+                    if meta.is_writable {
+                        Some(update.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+        }
+
+        Ok(result)
     }
 
     fn execute_bpf(

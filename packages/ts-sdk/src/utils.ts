@@ -4,7 +4,7 @@
  * Provides encoding, hashing, and conversion utilities.
  */
 
-import { blake2AsHex, blake2AsU8a } from '@polkadot/util-crypto';
+import { blake2AsHex, blake2AsU8a, decodeAddress, encodeAddress } from '@polkadot/util-crypto';
 import { hexToU8a, u8aToHex, stringToU8a, isHex } from '@polkadot/util';
 import type { HexString } from '@polkadot/util/types';
 import type { Hash, AccountId, Balance, Nonce } from './types';
@@ -186,13 +186,17 @@ export function decodeU64(bytes: Uint8Array): bigint {
 // Address Utilities
 // =============================================================================
 
+// =============================================================================
+// Base58 Utilities (for Solana-style pubkeys, not SS58)
+// =============================================================================
+
 // Base58 alphabet (Bitcoin-style)
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 /**
- * Decode Base58-encoded string to bytes
+ * Decode Base58-encoded string to bytes (for Solana-style pubkeys)
  */
-export function base58Decode(input: string): Uint8Array {
+export function base58DecodeSolana(input: string): Uint8Array {
   // Base58 decoding algorithm
   let result: number[] = [0];
   
@@ -223,16 +227,23 @@ export function base58Decode(input: string): Uint8Array {
   return new Uint8Array(result.reverse());
 }
 
-// SS58 alphabet (modified base58)
-const SS58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+/**
+ * @deprecated Use base58DecodeSolana instead. This function is kept for backward compatibility.
+ */
+export function base58Decode(input: string): Uint8Array {
+  return base58DecodeSolana(input);
+}
 
 /**
  * Decode SS58-encoded account ID to bytes
+ * Uses @polkadot/util-crypto's decodeAddress which handles all prefix widths
+ * and validates the 2-byte checksum.
  */
 export function decodeAccountId(accountId: AccountId): Uint8Array {
-  // Simple hex decoding - in production use @polkadot/keyring
-  if (isHex(accountId)) {
-    const bytes = hexToU8a(accountId);
+  // decodeAddress from @polkadot/util-crypto handles both hex and SS58 formats
+  // and validates the checksum automatically
+  try {
+    const bytes = decodeAddress(accountId);
     if (bytes.length !== ACCOUNT_ID_LENGTH) {
       throw new ValidationError(
         'accountId',
@@ -241,39 +252,15 @@ export function decodeAccountId(accountId: AccountId): Uint8Array {
       );
     }
     return bytes;
-  }
-
-  // SS58 decoding implementation
-  try {
-    // SS58 format: <prefix><payload><checksum>
-    // Prefix is 1 byte for short addresses, 2 bytes for longer
-    const prefix = SS58_ALPHABET.indexOf(accountId[0]);
-    let addressData: string;
-    
-    if (prefix < 1) {
-      // Invalid prefix
-      throw new ValidationError('accountId', 'Invalid SS58 prefix', prefix);
-    } else if (prefix <= 46) {
-      // 1 byte prefix
-      addressData = accountId.slice(1);
-    } else if (prefix <= 16383) {
-      // 2 byte prefix (not supported in basic implementation)
-      throw new ValidationError('accountId', '2-byte SS58 prefix not supported', prefix);
-    } else {
-      throw new ValidationError('accountId', 'Invalid SS58 prefix', prefix);
-    }
-    
-    // Base58 decode
-    const bytes = base58Decode(addressData);
-    return bytes;
   } catch (error) {
     if (error instanceof ValidationError) throw error;
-    throw new ValidationError('accountId', 'SS58 decoding failed', accountId);
+    throw new ValidationError('accountId', 'Failed to decode account ID', accountId);
   }
 }
 
 /**
  * Encode bytes to SS58 account ID
+ * Uses @polkadot/util-crypto's encodeAddress for consistent round-trip encoding.
  */
 export function encodeAccountId(bytes: Uint8Array): AccountId {
   if (bytes.length !== ACCOUNT_ID_LENGTH) {
@@ -283,8 +270,8 @@ export function encodeAccountId(bytes: Uint8Array): AccountId {
       bytes.length
     );
   }
-  // Simple hex encoding - in production use @polkadot/keyring
-  return u8aToHex(bytes);
+  // encodeAddress returns the SS58 format by default
+  return encodeAddress(bytes);
 }
 
 /**

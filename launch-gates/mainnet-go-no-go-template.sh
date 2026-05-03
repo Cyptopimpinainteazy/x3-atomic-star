@@ -113,6 +113,63 @@ receipt_shape_valid() {
   ' "$file" >/dev/null 2>&1
 }
 
+# Extract binding_hash from receipt
+receipt_binding_hash() {
+  local file="$1"
+  jq -r '.binding_hash // empty' "$file"
+}
+
+# Extract receipt timestamp
+receipt_timestamp() {
+  local file="$1"
+  jq -r '.timestamp // empty' "$file"
+}
+
+# Verify receipt integrity by recomputing binding hash and comparing
+# This replicates the Rust Receipt::compute_binding_hash() logic from proof-forge/src/receipt.rs
+receipt_integrity_valid() {
+  local file="$1"
+  local stored_hash
+  stored_hash="$(receipt_binding_hash "$file")"
+
+  # Check binding_hash exists and is non-empty
+  if [[ -z "${stored_hash}" || "${stored_hash}" == "null" ]]; then
+    return 1
+  fi
+
+  # Recompute binding hash from receipt fields
+  local repo_commit command_run artifact_hash policy_hash timestamp
+  local relevant_files result_json limitations
+
+  repo_commit="$(jq -r '.repo_commit_hash // empty' "$file")"
+  command_run="$(jq -r '.command_run // empty' "$file")"
+  artifact_hash="$(jq -r '.artifact_hash // empty' "$file")"
+  policy_hash="$(jq -r '.policy_hash // empty' "$file")"
+  timestamp="$(jq -r '.timestamp // empty' "$file")"
+
+  # Compute SHA256 of relevant_files list (in order)
+  local files_hash=""
+  files_hash="$(jq -r '.relevant_files[]? // empty' "$file" | while IFS= read -r f; do
+    echo -n "$f"
+  done | sha256sum | cut -d' ' -f1)"
+
+  # Compute canonical result JSON (sorted keys, matching Rust canonicalize_json_value)
+  result_json="$(jq -S '.result' "$file" | sha256sum | cut -d' ' -f1)"
+
+  # Compute limitations hash
+  local limit_hash=""
+  limit_hash="$(jq -r '.limitations[]? // empty' "$file" | while IFS= read -r l; do
+    echo -n "$l"
+  done | sha256sum | cut -d' ' -f1)"
+
+  # Recompute full binding hash
+  local computed_hash
+  computed_hash="$(echo -n "${repo_commit}${command_run}${artifact_hash}${policy_hash}${files_hash}$(echo -n "$timestamp" | sha256sum | cut -d' ' -f1)${result_json}${limit_hash}" | sha256sum | cut -d' ' -f1)"
+
+  # Compare
+  [[ "${computed_hash}" == "${stored_hash}" ]]
+}
+
 min_score() {
   local a="$1"
   local b="$2"
@@ -127,6 +184,7 @@ BLOCKERS_P0=()
 BLOCKERS_P1=()
 BLOCKERS_P2=()
 CLAIM_ROWS=""
+RECEIPT_BINDINGS=""
 
 TOTAL_CLAIMS=0
 S0_CLAIMS=0
@@ -156,27 +214,39 @@ while IFS='|' read -r claim criticality registry_status; do
 
   if [[ -f "${receipt_file}" ]]; then
     if receipt_shape_valid "${receipt_file}"; then
-      RECEIPT_OK=$((RECEIPT_OK + 1))
-      raw_receipt_status="$(jq -r '.result.status // .status // "unknown"' "${receipt_file}")"
-      receipt_status="${raw_receipt_status^^}"
-      receipt_score="$(status_to_score "${raw_receipt_status}")"
-      receipt_state="ok"
+      # Verify receipt integrity (binding_hash must exist and be non-empty)
+      if receipt_integrity_valid "${receipt_file}"; then
+        RECEIPT_OK=$((RECEIPT_OK + 1))
+        raw_receipt_status="$(jq -r '.result.status // .status // "unknown"' "${receipt_file}")"
+        receipt_status="${raw_receipt_status^^}"
+        receipt_score="$(status_to_score "${raw_receipt_status}")"
+        receipt_state="ok"
 
-      receipt_ts="$(jq -r '.timestamp // empty' "${receipt_file}")"
-      if [[ -n "${receipt_ts}" ]]; then
-        now_epoch="$(date +%s)"
-        receipt_epoch="$(date -d "${receipt_ts}" +%s 2>/dev/null || echo "")"
-        if [[ -n "${receipt_epoch}" ]]; then
-          age_hours="$(( (now_epoch - receipt_epoch) / 3600 ))"
-          if (( age_hours > FRESH_HOURS )); then
-            receipt_state="stale"
-            RECEIPT_STALE=$((RECEIPT_STALE + 1))
-            if (( receipt_score > 70 )); then
-              receipt_score=70
+        # Collect receipt metadata for immutability
+        receipt_binding="$(receipt_binding_hash "${receipt_file}")"
+        receipt_ts="$(receipt_timestamp "${receipt_file}")"
+        RECEIPT_BINDINGS+="${claim}|${receipt_binding}|${receipt_ts}"$'\n'
+
+        if [[ -n "${receipt_ts}" ]]; then
+          now_epoch="$(date +%s)"
+          receipt_epoch="$(date -d "${receipt_ts}" +%s 2>/dev/null || echo "")"
+          if [[ -n "${receipt_epoch}" ]]; then
+            age_hours="$(( (now_epoch - receipt_epoch) / 3600 ))"
+            if (( age_hours > FRESH_HOURS )); then
+              receipt_state="stale"
+              RECEIPT_STALE=$((RECEIPT_STALE + 1))
+              if (( receipt_score > 70 )); then
+                receipt_score=70
+              fi
+              receipt_status="${receipt_status} (STALE)"
             fi
-            receipt_status="${receipt_status} (STALE)"
           fi
         fi
+      else
+        RECEIPT_INVALID=$((RECEIPT_INVALID + 1))
+        receipt_state="invalid"
+        receipt_status="INTEGRITY_FAILED"
+        receipt_score=0
       fi
     else
       RECEIPT_INVALID=$((RECEIPT_INVALID + 1))
@@ -349,7 +419,20 @@ REPORT_FILE="${REPORTS_DIR}/X3-MAINNET-GO-NO-GO-${TIMESTAMP}.md"
   echo "- Registry source: proof/claims/registry.yml"
   echo "- Receipt source: proof/receipts/claims/*.receipt.json"
   echo
+  echo "## Receipt Bindings (for evidence immutability)"
+  echo
+  echo "| Claim | Binding Hash | Receipt Timestamp |"
+  echo "|---|---|---|"
+  if [[ -n "${RECEIPT_BINDINGS}" ]]; then
+    echo -n "${RECEIPT_BINDINGS}" | while IFS='|' read -r claim binding timestamp; do
+      if [[ -n "${claim}" && -n "${binding}" ]]; then
+        echo "| ${claim} | ${binding} | ${timestamp} |"
+      fi
+    done
+  fi
+  echo
   echo "This report is machine-computed from current claim status + receipt integrity/freshness state."
+  echo "Receipt binding hashes and timestamps are captured at report generation time for evidence traceability."
 } > "${REPORT_FILE}"
 
 echo "✅ Report generated: ${REPORT_FILE}"

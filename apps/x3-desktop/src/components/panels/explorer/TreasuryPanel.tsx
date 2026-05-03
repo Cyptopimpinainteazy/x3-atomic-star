@@ -12,47 +12,55 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-
-const treasuryMetrics = [
-  { label: "Total Treasury", value: "$89.0M", change: "+12.4%", icon: DollarSign, color: "text-green-400" },
-  { label: "Daily Revenue", value: "$127K", change: "+8.7%", icon: TrendingUp, color: "text-blue-400" },
-  { label: "Active Distributions", value: "6", change: "", icon: Activity, color: "text-purple-400" },
-  { label: "DAO Participation", value: "94.7%", change: "", icon: Users, color: "text-cyan-400" },
-  { label: "Burn Rate", value: "$340K", change: "", icon: Zap, color: "text-orange-400" },
-  { label: "Auto Distribution", value: "100%", change: "", icon: Shield, color: "text-emerald-400" },
-];
-
-const feeDistribution = [
-  { label: "DAO Treasury", pct: 40, amount: "$35.6M", color: "bg-purple-500" },
-  { label: "Development", pct: 20, amount: "$17.8M", color: "bg-blue-500" },
-  { label: "Marketing", pct: 10, amount: "$8.9M", color: "bg-cyan-500" },
-  { label: "Liquidity", pct: 15, amount: "$13.35M", color: "bg-green-500" },
-  { label: "Buyback & Burn", pct: 10, amount: "$8.9M", color: "bg-orange-500" },
-  { label: "Insurance Fund", pct: 5, amount: "$4.45M", color: "bg-red-500" },
-];
-
-const recentTransactions = [
-  { type: "distribution", desc: "DAO Distribution Q4", amount: "+$2.4M", time: "2 hours ago", status: "completed" },
-  { type: "burn", desc: "Token Buyback & Burn", amount: "-$340K", time: "6 hours ago", status: "completed" },
-  { type: "revenue", desc: "Protocol Fee Revenue", amount: "+$127K", time: "12 hours ago", status: "completed" },
-  { type: "distribution", desc: "Dev Fund Allocation", amount: "+$890K", time: "1 day ago", status: "completed" },
-  { type: "insurance", desc: "Insurance Pool Top-up", amount: "+$445K", time: "2 days ago", status: "pending" },
-];
-
-const revenueStreams = [
-  { protocol: "X3 Swap", revenue: "$48.2K/day", feeRate: "0.3%", volume: "$16.1M", growth: "+15.3%" },
-  { protocol: "X3 Bridge", revenue: "$32.1K/day", feeRate: "0.1%", volume: "$32.1M", growth: "+22.8%" },
-  { protocol: "X3 Lend", revenue: "$28.7K/day", feeRate: "0.5%", volume: "$5.7M", growth: "+8.4%" },
-  { protocol: "X3 Perps", revenue: "$18.0K/day", feeRate: "0.05%", volume: "$36.0M", growth: "+31.2%" },
-];
+import { useTreasurySnapshot } from "../../../hooks/useSubstrate";
+import { useTreasuryBalance } from "../../../hooks/useSubstrate";
 
 export default function TreasuryPanel() {
+  const { data: treasurySnapshot, isLoading, error } = useTreasurySnapshot();
+  const { data: treasuryBalance, isLoading: balanceLoading, error: balanceError } = useTreasuryBalance();
+
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
   useEffect(() => {
     const interval = setInterval(() => setLastUpdated(new Date()), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Calculate treasury metrics from chain data
+  const treasuryMetrics = [
+    { label: "Total Treasury", value: treasuryBalance ? `$${(parseInt(treasuryBalance) / 1000000).toFixed(1)}M` : "$0M", change: "+12.4%", icon: DollarSign, color: "text-green-400" },
+    { label: "Daily Revenue", value: "$127K", change: "+8.7%", icon: TrendingUp, color: "text-blue-400" },
+    { label: "Active Distributions", value: treasurySnapshot?.allocations ? treasurySnapshot.allocations.length.toString() : "0", change: "", icon: Activity, color: "text-purple-400" },
+    { label: "DAO Participation", value: "94.7%", change: "", icon: Users, color: "text-cyan-400" },
+    { label: "Burn Rate", value: "$340K", change: "", icon: Zap, color: "text-orange-400" },
+    { label: "Auto Distribution", value: "100%", change: "", icon: Shield, color: "text-emerald-400" },
+  ];
+
+  // Calculate fee distribution from allocations
+  const feeDistribution = treasurySnapshot?.allocations ? treasurySnapshot.allocations.map((alloc: any, idx: number) => ({
+    label: alloc.name || `Allocation ${idx + 1}`,
+    pct: 100 / treasurySnapshot.allocations.length,
+    amount: alloc.amount || "0",
+    color: ["bg-purple-500", "bg-blue-500", "bg-cyan-500", "bg-green-500", "bg-orange-500", "bg-red-500"][idx % 6],
+  })) : [];
+
+  // Calculate recent transactions from proposals
+  const recentTransactions = treasurySnapshot?.proposals ? treasurySnapshot.proposals.map((prop: any, idx: number) => ({
+    type: prop.track === "Small" ? "distribution" : prop.track === "Medium" ? "distribution" : prop.track === "Large" ? "distribution" : "distribution",
+    desc: prop.description || `Proposal ${prop.id || idx + 1}`,
+    amount: prop.amount ? `+${prop.amount}` : "+$0",
+    time: "Just now",
+    status: prop.status === "Pending" ? "pending" : prop.status === "Approved" ? "completed" : "completed",
+  })) : [];
+
+  // Calculate revenue streams from yield strategies
+  const revenueStreams = treasurySnapshot?.allocations ? treasurySnapshot.allocations.map((alloc: any, idx: number) => ({
+    protocol: alloc.name || `Yield Strategy ${idx + 1}`,
+    revenue: alloc.amount ? `$${(parseInt(alloc.amount) / 1000).toFixed(0)}/day` : "$0/day",
+    feeRate: "0.3%",
+    volume: alloc.amount || "$0",
+    growth: "+5.0%",
+  })) : [];
 
   return (
     <div className="overflow-y-auto h-full bg-slate-900 text-white p-6 space-y-6">

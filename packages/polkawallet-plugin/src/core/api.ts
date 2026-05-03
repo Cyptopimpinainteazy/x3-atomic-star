@@ -1,39 +1,55 @@
 /**
- * X3Chain API Connection Manager
+ * X3Chain API Connection Manager with Retry Logic
  *
  * Handles WebSocket lifecycle, type registration, and API initialization
- * for the X3 Chain x3chain runtime.
+ * for the X3 Chain x3chain runtime. Includes automatic reconnection with
+ * exponential backoff and environment variable configuration.
  */
 
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { EventEmitter } from 'eventemitter3';
 import { X3ChainCustomTypes, X3ChainRpc } from '../types/runtime-types';
 import type { X3ChainConfig, ConnectionState, X3Network } from '../types/interfaces';
+import { getSdkConfig, getCurrentEndpoint, getCurrentNetwork } from '../config/env';
 
-const DEFAULT_ENDPOINTS: Record<X3Network, string> = {
-  'x3-mainnet': 'wss://rpc.x3-chain.io',
-  'x3-testnet': 'wss://testnet.x3-chain.io',
-  'x3-local': 'ws://127.0.0.1:9944',
-};
+// Re-export network types for convenience
+export { X3Network };
 
 export interface ApiEvents {
   connected: (state: ConnectionState) => void;
   disconnected: () => void;
   error: (error: Error) => void;
   ready: (api: ApiPromise) => void;
+  reconnecting: (attempt: number, delay: number) => void;
+  reconnected: (state: ConnectionState) => void;
 }
 
+/**
+ * Enhanced X3Chain API with automatic reconnection and retry logic
+ */
 export class X3ChainApi extends EventEmitter<ApiEvents> {
   private _api: ApiPromise | null = null;
   private _provider: WsProvider | null = null;
   private _config: X3ChainConfig;
   private _connectionState: ConnectionState | null = null;
+  private _reconnectAttempts: number = 0;
+  private _reconnectTimer: NodeJS.Timeout | null = null;
+  private _isDisconnecting: boolean = false;
 
-  constructor(config: X3ChainConfig) {
+  constructor(config: X3ChainConfig = {}) {
     super();
+    
+    // Load environment configuration
+    const envConfig = getSdkConfig();
+    
     this._config = {
       autoConnect: true,
       timeout: 30_000,
+      network: envConfig.network,
+      endpoint: envConfig.endpoint,
+      autoReconnect: envConfig.autoReconnect,
+      reconnectMaxAttempts: envConfig.reconnectMaxAttempts,
+      reconnectDelay: envConfig.reconnectDelay,
       ...config,
     };
   }
@@ -56,58 +72,128 @@ export class X3ChainApi extends EventEmitter<ApiEvents> {
     return this._api?.isConnected ?? false;
   }
 
+  /** Get current network */
+  get network(): X3Network {
+    return this._config.network || 'local';
+  }
+
   /**
    * Connect to the x3chain node
    */
   async connect(): Promise<ApiPromise> {
-    const endpoint =
-      this._config.endpoint ||
-      DEFAULT_ENDPOINTS[this._config.network || 'x3-local'];
+    const endpoint = this._config.endpoint || getCurrentEndpoint();
+    
+    this._isDisconnecting = false;
+    this._reconnectAttempts = 0;
 
-    this._provider = new WsProvider(endpoint, this._config.autoConnect ? 1000 : false);
+    this._provider = new WsProvider(endpoint, this._config.autoReconnect ? 1000 : false);
 
     this._provider.on('disconnected', () => {
-      this._connectionState = null;
-      this.emit('disconnected');
+      if (!this._isDisconnecting) {
+        this._handleDisconnect();
+      } else {
+        this._connectionState = null;
+        this.emit('disconnected');
+      }
     });
 
     this._provider.on('error', (err: Error) => {
       this.emit('error', err);
     });
 
-    this._api = await ApiPromise.create({
-      provider: this._provider,
-      types: X3ChainCustomTypes,
-      rpc: X3ChainRpc,
-      signer: this._config.signer,
-    });
+    try {
+      this._api = await ApiPromise.create({
+        provider: this._provider,
+        types: X3ChainCustomTypes,
+        rpc: X3ChainRpc,
+        signer: this._config.signer,
+      });
 
-    await this._api.isReady;
+      await this._api.isReady;
 
-    const [chain, header] = await Promise.all([
-      this._api.rpc.system.chain(),
-      this._api.rpc.chain.getHeader(),
-    ]);
+      const [chain, header] = await Promise.all([
+        this._api.rpc.system.chain(),
+        this._api.rpc.chain.getHeader(),
+      ]);
 
-    this._connectionState = {
-      connected: true,
-      endpoint,
-      chainName: chain.toString(),
-      genesisHash: this._api.genesisHash.toHex(),
-      runtimeVersion: this._api.runtimeVersion.specVersion.toNumber(),
-      latestBlock: header.number.toNumber(),
-    };
+      this._connectionState = {
+        connected: true,
+        endpoint,
+        chainName: chain.toString(),
+        genesisHash: this._api.genesisHash.toHex(),
+        runtimeVersion: this._api.runtimeVersion.specVersion.toNumber(),
+        latestBlock: header.number.toNumber(),
+      };
 
-    this.emit('connected', this._connectionState);
-    this.emit('ready', this._api);
+      this.emit('connected', this._connectionState);
+      this.emit('ready', this._api);
 
-    return this._api;
+      return this._api;
+    } catch (err) {
+      this.emit('error', err as Error);
+      throw err;
+    }
+  }
+
+  /**
+   * Handle disconnection with automatic reconnection
+   */
+  private _handleDisconnect(): void {
+    if (this._isDisconnecting) return;
+
+    const maxAttempts = this._config.reconnectMaxAttempts || 5;
+    const baseDelay = this._config.reconnectDelay || 1000;
+
+    if (this._reconnectAttempts < maxAttempts) {
+      this._reconnectAttempts++;
+      const delay = baseDelay * Math.pow(2, this._reconnectAttempts - 1); // Exponential backoff
+
+      this.emit('reconnecting', this._reconnectAttempts, delay);
+
+      this._reconnectTimer = setTimeout(() => {
+        this._reconnect();
+      }, delay);
+    } else {
+      this._connectionState = null;
+      this.emit('disconnected');
+    }
+  }
+
+  /**
+   * Attempt to reconnect to the node
+   */
+  private async _reconnect(): Promise<void> {
+    if (this._api) {
+      await this._api.disconnect();
+      this._api = null;
+    }
+    if (this._provider) {
+      await this._provider.disconnect();
+      this._provider = null;
+    }
+
+    try {
+      await this.connect();
+      if (this._connectionState) {
+        this.emit('reconnected', this._connectionState);
+      }
+    } catch (err) {
+      this.emit('error', err as Error);
+      this._handleDisconnect();
+    }
   }
 
   /**
    * Disconnect from the node
    */
   async disconnect(): Promise<void> {
+    this._isDisconnecting = true;
+    
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+
     if (this._api) {
       await this._api.disconnect();
       this._api = null;
@@ -145,13 +231,62 @@ export class X3ChainApi extends EventEmitter<ApiEvents> {
       return [];
     }
   }
+
+  /**
+   * Execute a query with retry logic
+   */
+  async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    delay: number = 1000
+  ): Promise<T> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err as Error;
+        
+        if (attempt < maxRetries) {
+          this.emit('error', new Error(`Attempt ${attempt}/${maxRetries} failed: ${lastError.message}`));
+          await new Promise(resolve => setTimeout(resolve, delay * attempt));
+        }
+      }
+    }
+
+    throw new Error(`All ${maxRetries} attempts failed: ${lastError?.message}`);
+  }
+
+  /**
+   * Check if the API is connected and ready
+   */
+  async ensureConnected(): Promise<void> {
+    if (!this._api || !this.isConnected) {
+      await this.connect();
+    }
+  }
 }
 
 /**
  * Convenience factory to create and connect an API instance
  */
-export async function createX3Api(config: X3ChainConfig): Promise<X3ChainApi> {
+export async function createX3Api(config: X3ChainConfig = {}): Promise<X3ChainApi> {
   const x3 = new X3ChainApi(config);
   await x3.connect();
   return x3;
+}
+
+/**
+ * Create API instance from environment configuration
+ */
+export async function createX3ApiFromEnv(): Promise<X3ChainApi> {
+  const config = getSdkConfig();
+  return createX3Api({
+    network: config.network,
+    endpoint: config.endpoint,
+    autoReconnect: config.autoReconnect,
+    reconnectMaxAttempts: config.reconnectMaxAttempts,
+    reconnectDelay: config.reconnectDelay,
+  });
 }

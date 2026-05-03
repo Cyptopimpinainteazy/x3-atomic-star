@@ -131,7 +131,7 @@ export {
   createTestnetPlugin,
   createMainnetPlugin,
 } from './plugin';
-export { createX3Api } from './core/api';
+export { createX3Api, createX3ApiFromEnv } from './core/api';
 export { KernelService } from './services/kernel';
 export { SettlementService } from './services/settlement';
 export { AtomicTradeService } from './services/trades';

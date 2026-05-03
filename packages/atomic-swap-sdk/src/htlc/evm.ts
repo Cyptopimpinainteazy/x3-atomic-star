@@ -306,3 +306,15 @@ export class EvmHTLCAdapter implements IHTLCAdapter {
     return (json as any).result || "0x0";
   }
 }
+
+/**
+ * Factory function to create an EVM HTLC adapter with env var configuration.
+ * Reads X3_EVM_HTLC_CONTRACT from environment.
+ */
+export function createEvmHTLCAdapter(chainId: ChainId, rpcEndpoint: string): EvmHTLCAdapter {
+  const contractAddress = process.env.X3_EVM_HTLC_CONTRACT;
+  if (!contractAddress) {
+    throw new Error("X3_EVM_HTLC_CONTRACT environment variable is required");
+  }
+  return new EvmHTLCAdapter(chainId, rpcEndpoint, contractAddress);
+}

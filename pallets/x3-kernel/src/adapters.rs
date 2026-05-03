@@ -73,6 +73,9 @@ impl EvmExecutorAdapter for MockEvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -101,6 +104,9 @@ impl EvmExecutorAdapter for () {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -139,6 +145,9 @@ impl SvmExecutorAdapter for MockSvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -172,6 +181,9 @@ impl EvmExecutorAdapter for FailingMockEvmAdapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             });
         }
         // Otherwise delegate to normal mock
@@ -209,6 +221,9 @@ impl SvmExecutorAdapter for FailingMockSvmAdapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             });
         }
         // Otherwise delegate to normal mock
@@ -233,6 +248,9 @@ impl SvmExecutorAdapter for () {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -267,6 +285,9 @@ impl X3ExecutorAdapter for MockX3Adapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -312,6 +333,9 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             });
         }
 
@@ -340,6 +364,9 @@ impl X3ExecutorAdapter for () {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -407,6 +434,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             })
         }
 
@@ -473,6 +503,7 @@ pub mod real_adapters {
                         address: vec![0u8; 32], // SVM doesn't have per-log addresses
                         topics: Vec::new(),
                         data: log,
+                        block_number: 0,
                     })
                     .collect(),
                 state_changes: result
@@ -487,6 +518,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             })
         }
 
@@ -538,6 +572,7 @@ pub mod real_adapters {
                         address: vec![0u8; 32], // X3 uses module-level logging
                         topics: vec![log.topic],
                         data: log.data,
+                        block_number: 0,
                     })
                     .collect(),
                 state_changes: receipt
@@ -552,6 +587,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
             })
         }
 

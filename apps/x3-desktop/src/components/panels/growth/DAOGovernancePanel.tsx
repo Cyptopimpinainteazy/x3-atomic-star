@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import { Zap, Users, TrendingUp, DollarSign, CheckCircle2, Clock } from 'lucide-react';
+import { useProposalList } from '../../../hooks/useSubstrate';
+import { useTreasurySnapshot } from '../../../hooks/useSubstrate';
+import { useTreasuryBalance } from '../../../hooks/useSubstrate';
+import { useTopDelegates } from '../../../hooks/useSubstrate';
+import { GovernanceProposal as ChainProposal } from '../../../lib/substrate/queries';
 
 interface Proposal {
   id: string;
@@ -25,83 +30,49 @@ interface DaoMetric {
 export const DAOGovernancePanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'proposals' | 'treasury' | 'voting-power'>('proposals');
 
-  const proposals: Proposal[] = [
-    {
-      id: '1',
-      title: 'Allocate $2M to Ecosystem Grants Program',
-      type: 'budget',
-      status: 'voting',
-      votesFor: 8500000,
-      votesAgainst: 1200000,
-      votesAbstain: 300000,
-      quorumRequired: 5000000,
-      endDate: '2026-03-07',
-      createdBy: 'GrantsCommittee',
-      impact: 'Fund 50+ projects, increase TVL 3-5x',
-    },
-    {
-      id: '2',
-      title: 'Emergency: Pause unstable AMM pool #42',
-      type: 'emergency',
-      status: 'passed',
-      votesFor: 6200000,
-      votesAgainst: 280000,
-      votesAbstain: 120000,
-      quorumRequired: 5000000,
-      endDate: '2026-02-28',
-      createdBy: 'RiskCouncil',
-      impact: 'Prevent potential ~$50K loss from exploit',
-    },
-    {
-      id: '3',
-      title: 'Increase validator commission cap to 25%',
-      type: 'governance',
-      status: 'voting',
-      votesFor: 3200000,
-      votesAgainst: 4100000,
-      votesAbstain: 700000,
-      quorumRequired: 5000000,
-      endDate: '2026-03-10',
-      createdBy: 'ValidatorCouncil',
-      impact: 'Allow validators to adjust economics',
-    },
-    {
-      id: '4',
-      title: 'Partner with Chainlink for Oracle Integration',
-      type: 'strategic',
-      status: 'executed',
-      votesFor: 7850000,
-      votesAgainst: 450000,
-      votesAbstain: 200000,
-      quorumRequired: 5000000,
-      endDate: '2026-02-21',
-      createdBy: 'PartnershipTeam',
-      impact: 'Reduce oracle latency 60%, increase adoption',
-    },
-  ];
+  const { data: proposals, isLoading: proposalsLoading, error: proposalsError } = useProposalList();
+  const { data: treasurySnapshot, isLoading: treasuryLoading, error: treasuryError } = useTreasurySnapshot();
+  const { data: treasuryBalance, isLoading: balanceLoading, error: balanceError } = useTreasuryBalance();
+  const { data: topDelegates, isLoading: delegatesLoading, error: delegatesError } = useTopDelegates(5);
 
+  // Convert chain proposals to local format
+  const chainProposals: Proposal[] = proposals ? proposals.map((p: ChainProposal) => ({
+    id: p.id.toString(),
+    title: p.title,
+    type: 'budget',
+    status: p.status === 'Active' ? 'voting' : p.status === 'Passed' ? 'passed' : p.status === 'Rejected' ? 'rejected' : 'executed',
+    votesFor: p.ayes,
+    votesAgainst: p.nays,
+    votesAbstain: 0,
+    quorumRequired: p.threshold,
+    endDate: new Date().toISOString().split('T')[0],
+    createdBy: p.proposer,
+    impact: p.description,
+  })) : [];
+
+  // Calculate treasury data from chain
   const treasuryData = {
-    totalAssets: 285000000,
-    x3Tokens: 125000000,
-    stablecoins: 95000000,
-    otherAssets: 65000000,
-    lastUpdated: '2 hours ago',
+    totalAssets: parseInt(treasuryBalance || '0') + (treasurySnapshot?.allocations?.reduce((sum, a) => sum + parseInt(a.amount || '0'), 0) || 0),
+    x3Tokens: parseInt(treasuryBalance || '0'),
+    stablecoins: 0,
+    otherAssets: treasurySnapshot?.allocations?.reduce((sum, a) => sum + parseInt(a.amount || '0'), 0) || 0,
+    lastUpdated: 'Just now',
   };
 
+  // Calculate DAO metrics from chain data
   const daoMetrics: DaoMetric[] = [
-    { label: 'Voting Power (Delegated)', value: '125.4M X3', change: '+8.2%', status: 'up' },
-    { label: 'Treasury Balance', value: '$285M USD', change: '+5.1%', status: 'up' },
-    { label: 'Active Proposals', value: '4', change: 'No change', status: 'neutral' },
-    { label: 'DAO Members', value: '12,450', change: '+2.3%', status: 'up' },
+    { label: 'Voting Power (Delegated)', value: topDelegates ? `${(topDelegates.reduce((sum, d) => sum + parseInt(d.power || '0'), 0) / 1000000).toFixed(1)}M X3` : '0M X3', change: '+8.2%', status: 'up' },
+    { label: 'Treasury Balance', value: treasuryBalance ? `$${(parseInt(treasuryBalance) / 1000000).toFixed(0)}M` : '$0M', change: '+5.1%', status: 'up' },
+    { label: 'Active Proposals', value: proposals ? proposals.filter(p => p.status === 'Active').length.toString() : '0', change: 'No change', status: 'neutral' },
+    { label: 'DAO Members', value: topDelegates ? topDelegates.length.toString() : '0', change: '+2.3%', status: 'up' },
   ];
 
-  const votingPowerTop = [
-    { address: 'Protocol Grants Council', power: 24500000, percentage: 19.5 },
-    { address: 'Validator Fellowship', power: 18750000, percentage: 14.9 },
-    { address: 'Community Treasury', power: 16200000, percentage: 12.9 },
-    { address: 'Development Fund', power: 14600000, percentage: 11.6 },
-    { address: 'Individual Holders (Top 10)', power: 51350000, percentage: 40.9 },
-  ];
+  // Calculate voting power from top delegates
+  const votingPowerTop = topDelegates ? topDelegates.map((d, idx) => ({
+    address: d.address,
+    power: parseInt(d.power || '0'),
+    percentage: topDelegates.reduce((sum, total) => sum + parseInt(total.power || '0'), 0) > 0 ? (parseInt(d.power || '0') / topDelegates.reduce((sum, total) => sum + parseInt(total.power || '0'), 0)) * 100 : 0,
+  })) : [];
 
   interface VotingData {
     votesFor: number;
@@ -181,62 +152,66 @@ export const DAOGovernancePanel: React.FC = () => {
 
             {/* Proposals List */}
             <div className="space-y-3">
-              {proposals.map((proposal) => (
-                <div key={proposal.id} className={`p-4 border rounded-lg hover:border-cyan-500/30 transition ${getStatusColor(proposal.status)}`}>
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-white">{proposal.title}</h3>
-                      <p className="text-xs text-gray-500 mt-1">By {proposal.createdBy}</p>
+              {chainProposals && chainProposals.length > 0 ? (
+                chainProposals.map((proposal) => (
+                  <div key={proposal.id} className={`p-4 border rounded-lg hover:border-cyan-500/30 transition ${getStatusColor(proposal.status)}`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-white">{proposal.title}</h3>
+                        <p className="text-xs text-gray-500 mt-1">By {proposal.createdBy}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs rounded font-semibold ${
+                          proposal.type === 'budget' ? 'bg-purple-600' :
+                          proposal.type === 'emergency' ? 'bg-red-600' : 'bg-blue-600'
+                        }`}>
+                          {proposal.type.toUpperCase()}
+                        </span>
+                        <span className="text-xs font-bold">{proposal.status}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs rounded font-semibold ${
-                        proposal.type === 'budget' ? 'bg-purple-600' :
-                        proposal.type === 'emergency' ? 'bg-red-600' : 'bg-blue-600'
-                      }`}>
-                        {proposal.type.toUpperCase()}
-                      </span>
-                      <span className="text-xs font-bold">{proposal.status}</span>
+
+                    <p className="text-sm text-gray-300 mb-3">{proposal.impact}</p>
+
+                    {/* Voting Progress */}
+                    <div className="space-y-2 mb-3">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">Quorum: {calculateQuorumPercentage(proposal).toFixed(0)}% / 100%</span>
+                        <span className="text-cyan-400 font-semibold">{((proposal.votesFor + proposal.votesAgainst + proposal.votesAbstain) / 1000000).toFixed(1)}M / {(proposal.quorumRequired / 1000000).toFixed(0)}M votes</span>
+                      </div>
+                      <div className="w-full bg-[#2a2a35] rounded-full h-1.5">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                          style={{ width: `${Math.min(calculateQuorumPercentage(proposal), 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Vote Breakdown */}
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <div className="text-center p-2 bg-black/20 rounded">
+                        <p className="text-emerald-400 font-bold text-sm">{(proposal.votesFor / 1000000).toFixed(1)}M</p>
+                        <p className="text-xs text-gray-600">For ({calculatePassPercentage(proposal).toFixed(0)}%)</p>
+                      </div>
+                      <div className="text-center p-2 bg-black/20 rounded">
+                        <p className="text-red-400 font-bold text-sm">{(proposal.votesAgainst / 1000000).toFixed(1)}M</p>
+                        <p className="text-xs text-gray-600">Against</p>
+                      </div>
+                      <div className="text-center p-2 bg-black/20 rounded">
+                        <p className="text-gray-400 font-bold text-sm">{(proposal.votesAbstain / 1000000).toFixed(1)}M</p>
+                        <p className="text-xs text-gray-600">Abstain</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-gray-600">
+                      {proposal.status === 'voting' && <span>Voting ends: {proposal.endDate}</span>}
+                      {proposal.status !== 'voting' && <span>Ended: {proposal.endDate}</span>}
                     </div>
                   </div>
-
-                  <p className="text-sm text-gray-300 mb-3">{proposal.impact}</p>
-
-                  {/* Voting Progress */}
-                  <div className="space-y-2 mb-3">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">Quorum: {calculateQuorumPercentage(proposal).toFixed(0)}% / 100%</span>
-                      <span className="text-cyan-400 font-semibold">{((proposal.votesFor + proposal.votesAgainst + proposal.votesAbstain) / 1000000).toFixed(1)}M / {(proposal.quorumRequired / 1000000).toFixed(0)}M votes</span>
-                    </div>
-                    <div className="w-full bg-[#2a2a35] rounded-full h-1.5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
-                        style={{ width: `${Math.min(calculateQuorumPercentage(proposal), 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Vote Breakdown */}
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    <div className="text-center p-2 bg-black/20 rounded">
-                      <p className="text-emerald-400 font-bold text-sm">{(proposal.votesFor / 1000000).toFixed(1)}M</p>
-                      <p className="text-xs text-gray-600">For ({calculatePassPercentage(proposal).toFixed(0)}%)</p>
-                    </div>
-                    <div className="text-center p-2 bg-black/20 rounded">
-                      <p className="text-red-400 font-bold text-sm">{(proposal.votesAgainst / 1000000).toFixed(1)}M</p>
-                      <p className="text-xs text-gray-600">Against</p>
-                    </div>
-                    <div className="text-center p-2 bg-black/20 rounded">
-                      <p className="text-gray-400 font-bold text-sm">{(proposal.votesAbstain / 1000000).toFixed(1)}M</p>
-                      <p className="text-xs text-gray-600">Abstain</p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between text-xs text-gray-600">
-                    {proposal.status === 'voting' && <span>Voting ends: {proposal.endDate}</span>}
-                    {proposal.status !== 'voting' && <span>Ended: {proposal.endDate}</span>}
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-400">No proposals found</div>
+              )}
             </div>
           </div>
         )}

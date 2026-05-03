@@ -307,3 +307,730 @@ function extractAuthor(header: Header): string | null {
   }
   return null;
 }
+
+/* ── Governance ───────────────────────────────────────────── */
+
+export interface GovernanceProposal {
+  id: number;
+  title: string;
+  description: string;
+  proposer: string;
+  status: 'Active' | 'Passed' | 'Rejected' | 'Cancelled' | 'Enacted';
+  votingStart: number;
+  votingEnd: number;
+  threshold: number;
+  ayes: number;
+  nays: number;
+  weight: string;
+  touchesInvariants: boolean;
+  proofCommitment?: string;
+  constitutionHash?: string;
+}
+
+export interface GovernanceSnapshot {
+  proposalCount: number;
+  activeProposals: number;
+  totalVoters: number;
+  totalDelegations: number;
+  config: {
+    quorum: number;
+    threshold: number;
+    votingPeriod: number;
+    enactmentPeriod: number;
+  };
+}
+
+export interface Delegation {
+  target: string;
+  conviction: 'None' | 'Locked1x' | 'Locked2x' | 'Locked3x' | 'Locked4x' | 'Locked5x' | 'Locked6x';
+  balance: string;
+}
+
+export interface TreasuryProposal {
+  id: number;
+  proposer: string;
+  beneficiary: string;
+  amount: string;
+  description: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Executed' | 'Cancelled';
+  track: 'Small' | 'Medium' | 'Large' | 'Critical';
+  bond: string;
+  signers: string[];
+  approvals: number;
+  createdAt: number;
+}
+
+export interface TreasurySnapshot {
+  proposalCount: number;
+  pendingProposals: TreasuryProposal[];
+  signers: string[];
+  totalBalance: string;
+  isPaused: boolean;
+  stats: {
+    totalSpent: string;
+    recurringTotal: string;
+  };
+}
+
+export interface TreasuryWallet {
+  address: string;
+  balance: string;
+  name: string;
+}
+
+export async function getGovernanceSnapshot(): Promise<GovernanceSnapshot | null> {
+  const api = await getApi();
+  try {
+    const [proposalCount, proposals, config] = await Promise.all([
+      api.query.governance.proposalCount(),
+      api.query.governance.proposals.entries(),
+      api.query.governance.config(),
+    ]);
+
+    const activeProposals = proposals.filter(([, p]: any) => {
+      const proposal = p.unwrap();
+      return proposal.status === 'Active' || proposal.status === 'Voting';
+    }).length;
+
+    // Count unique voters from all proposals
+    const voters = new Set<string>();
+    for (const [key, value] of proposals) {
+      const votes = await api.query.governance.proposalVotes(key.args[0].toNumber());
+      if (votes.ayes) {
+        votes.ayes.forEach((v: any) => voters.add(v.toString()));
+      }
+      if (votes.nays) {
+        votes.nays.forEach((v: any) => voters.add(v.toString()));
+      }
+    }
+
+    const delegations = await api.query.governance.delegations.entries();
+    const configData = config.unwrap();
+
+    return {
+      proposalCount: proposalCount.toNumber(),
+      activeProposals: activeProposals.length,
+      totalVoters: voters.size,
+      totalDelegations: delegations.length,
+      config: {
+        quorum: Number(configData.quorum.toString()) / 100,
+        threshold: Number(configData.threshold.toString()) / 100,
+        votingPeriod: Number(configData.votingPeriod.toString()),
+        enactmentPeriod: Number(configData.enactmentPeriod.toString()),
+      },
+    };
+  } catch (e) {
+    console.error('Error fetching governance snapshot:', e);
+    return null;
+  }
+}
+
+export async function getProposalList(): Promise<GovernanceProposal[]> {
+  const api = await getApi();
+  try {
+    const entries = await api.query.governance.proposals.entries();
+    const proposals: GovernanceProposal[] = [];
+
+    for (const [key, value] of entries) {
+      const proposalId = key.args[0].toNumber();
+      const proposal = value.unwrap();
+      const votes = await api.query.governance.proposalVotes(proposalId);
+
+      proposals.push({
+        id: proposalId,
+        title: proposal.title.toString(),
+        description: proposal.description.toString(),
+        proposer: proposal.proposer.toString(),
+        status: proposal.status.toString() as GovernanceProposal['status'],
+        votingStart: Number(proposal.voting_start.toString()),
+        votingEnd: Number(proposal.voting_end.toString()),
+        threshold: Number(proposal.threshold.toString()),
+        ayes: Number(votes.ayes?.length || 0),
+        nays: Number(votes.nays?.length || 0),
+        weight: proposal.weight.toString(),
+        touchesInvariants: proposal.touches_invariants,
+        proofCommitment: proposal.proof_commitment?.toString(),
+        constitutionHash: proposal.constitution_hash?.toString(),
+      });
+    }
+
+    return proposals;
+  } catch (e) {
+    console.error('Error fetching proposal list:', e);
+    return [];
+  }
+}
+
+export async function getProposalTally(proposalId: number): Promise<{ ayes: number; nays: number; total: number } | null> {
+  const api = await getApi();
+  try {
+    const votes = await api.query.governance.proposalVotes(proposalId);
+    const ayes = Number(votes.ayes?.length || 0);
+    const nays = Number(votes.nays?.length || 0);
+    return { ayes, nays, total: ayes + nays };
+  } catch (e) {
+    console.error(`Error fetching proposal ${proposalId} tally:`, e);
+    return null;
+  }
+}
+
+export async function getDelegation(address: string): Promise<Delegation | null> {
+  const api = await getApi();
+  try {
+    const delegation = await api.query.governance.delegations(address);
+    if (!delegation.isSome) return null;
+
+    const del = delegation.unwrap();
+    return {
+      target: del.target.toString(),
+      conviction: del.conviction.toString() as Delegation['conviction'],
+      balance: del.balance.toString(),
+    };
+  } catch (e) {
+    console.error(`Error fetching delegation for ${address}:`, e);
+    return null;
+  }
+}
+
+export async function getTreasurySnapshot(): Promise<TreasurySnapshot | null> {
+  const api = await getApi();
+  try {
+    const [proposals, signers, isPaused] = await Promise.all([
+      api.query.treasury.proposals.entries(),
+      api.query.treasury.signers(),
+      api.query.treasury.isPaused(),
+    ]);
+
+    const treasuryAccount = (await import('./client')).getTreasuryAccountId();
+
+    const treasuryProposals: TreasuryProposal[] = [];
+    for (const [key, value] of proposals) {
+      const proposalId = key.args[0].toNumber();
+      const proposal = value.unwrap();
+
+      treasuryProposals.push({
+        id: proposalId,
+        proposer: proposal.proposer.toString(),
+        beneficiary: proposal.beneficiary.toString(),
+        amount: proposal.amount.toString(),
+        description: proposal.description.toString(),
+        status: proposal.status.toString() as TreasuryProposal['status'],
+        track: proposal.track.toString() as TreasuryProposal['track'],
+        bond: proposal.bond.toString(),
+        signers: proposal.signers.map((s: any) => s.toString()),
+        approvals: proposal.approvals.toNumber(),
+        createdAt: Number(proposal.created_at.toString()),
+      });
+    }
+
+    return {
+      proposalCount: proposals.length,
+      pendingProposals: treasuryProposals.filter(p => p.status === 'Pending' || p.status === 'Approved'),
+      signers: signers.map((s: any) => s.toString()),
+      totalBalance: '0', // Will be fetched separately
+      isPaused: isPaused.isTrue,
+      stats: {
+        totalSpent: '0',
+        recurringTotal: '0',
+      },
+    };
+  } catch (e) {
+    console.error('Error fetching treasury snapshot:', e);
+    return null;
+  }
+}
+
+export async function getTreasuryBalance(): Promise<string> {
+  const api = await getApi();
+  try {
+    const treasuryAccountId = (await import('./client')).getTreasuryAccountId();
+    const accountData = await api.query.system.account(treasuryAccountId);
+    return accountData.data.free.toString();
+  } catch (e) {
+    console.error('Error fetching treasury balance:', e);
+    return '0';
+  }
+}
+
+export async function getTreasuryWallets(): Promise<TreasuryWallet[]> {
+  const api = await getApi();
+  try {
+    const treasuryAccountId = (await import('./client')).getTreasuryAccountId();
+    const accountData = await api.query.system.account(treasuryAccountId);
+    return [{
+      address: treasuryAccountId,
+      balance: accountData.data.free.toString(),
+      name: 'Treasury Account',
+    }];
+  } catch (e) {
+    console.error('Error fetching treasury wallets:', e);
+    return [];
+  }
+}
+
+export async function getAIProposals(): Promise<GovernanceProposal[]> {
+  const api = await getApi();
+  try {
+    const entries = await api.query.governance.aiProposals.entries();
+    const proposals: GovernanceProposal[] = [];
+
+    for (const [key, value] of entries) {
+      const proposalId = key.args[0].toNumber();
+      const proposal = value.unwrap();
+
+      proposals.push({
+        id: proposalId,
+        title: proposal.title.toString(),
+        description: proposal.description.toString(),
+        proposer: proposal.proposer.toString(),
+        status: proposal.status.toString() as GovernanceProposal['status'],
+        votingStart: Number(proposal.voting_start.toString()),
+        votingEnd: Number(proposal.voting_end.toString()),
+        threshold: Number(proposal.threshold.toString()),
+        ayes: 0,
+        nays: 0,
+        weight: proposal.weight.toString(),
+        touchesInvariants: proposal.touches_invariants,
+        proofCommitment: proposal.proof_commitment?.toString(),
+        constitutionHash: proposal.constitution_hash?.toString(),
+      });
+    }
+
+    return proposals;
+  } catch (e) {
+    console.error('Error fetching AI proposals:', e);
+    return [];
+  }
+}
+
+export async function getTopDelegates(count = 10): Promise<{ address: string; power: string }[]> {
+  const api = await getApi();
+  try {
+    const delegations = await api.query.governance.delegations.entries();
+    const powers: { [address: string]: string } = {};
+
+    for (const [key, value] of delegations) {
+      const delegator = key.args[0].toString();
+      const del = value.unwrap();
+      const power = del.balance.toString();
+
+      if (!powers[del.target.toString()]) {
+        powers[del.target.toString()] = '0';
+      }
+      powers[del.target.toString()] = (BigInt(powers[del.target.toString()]) + BigInt(power)).toString();
+    }
+
+    return Object.entries(powers)
+      .sort((a, b) => BigInt(b[1]) - BigInt(a[1]))
+      .slice(0, count)
+      .map(([address, power]) => ({ address, power }));
+  } catch (e) {
+    console.error('Error fetching top delegates:', e);
+    return [];
+  }
+}
+
+/* ── Governance Extrinsics ─────────────────────────────────── */
+
+export async function submitGovernanceProposal(
+  signer: any,
+  call: any,
+  title: string,
+  description: string,
+  touchesInvariants: boolean = false,
+  proofCommitment?: string,
+  constitutionHash?: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const titleBytes = new TextEncoder().encode(title);
+    const descriptionBytes = new TextEncoder().encode(description);
+
+    const tx = api.tx.governance.submitProposal(
+      call,
+      titleBytes,
+      descriptionBytes,
+      touchesInvariants,
+      proofCommitment ? Uint8Array.from(proofCommitment.replace('0x', ''), 'hex') : null,
+      constitutionHash ? Uint8Array.from(constitutionHash.replace('0x', ''), 'hex') : null,
+    );
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error submitting governance proposal:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function castVote(
+  signer: any,
+  proposalId: number,
+  direction: 'Aye' | 'Nay',
+  balance: string,
+  conviction: 'None' | 'Locked1x' | 'Locked2x' | 'Locked3x' | 'Locked4x' | 'Locked5x' | 'Locked6x',
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.vote(
+      proposalId,
+      direction === 'Aye' ? { aye: balance } : { nay: balance },
+      conviction,
+    );
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error casting vote on proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function delegateVote(
+  signer: any,
+  target: string,
+  conviction: 'None' | 'Locked1x' | 'Locked2x' | 'Locked3x' | 'Locked4x' | 'Locked5x' | 'Locked6x',
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.delegate(target, conviction);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error delegating vote:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function undelegateVote(signer: any): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.undelegate();
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error undelegating vote:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function fastTrackProposal(
+  signer: any,
+  proposalId: number,
+  delay: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.fastTrack(proposalId, delay);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error fast-tracking proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function cancelProposal(
+  signer: any,
+  proposalId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.cancelProposal(proposalId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error cancelling proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function finalizeProposal(
+  signer: any,
+  proposalId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.finalizeProposal(proposalId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error finalizing proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function unlockVotes(signer: any, account: string): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.governance.unlock(account);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error unlocking votes for ${account}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+/* ── Treasury Extrinsics ───────────────────────────────────── */
+
+export async function submitTreasuryProposal(
+  signer: any,
+  beneficiary: string,
+  amount: string,
+  description: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const descriptionBytes = new TextEncoder().encode(description);
+
+    const tx = api.tx.treasury.submitProposal(
+      beneficiary,
+      amount,
+      descriptionBytes,
+    );
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error submitting treasury proposal:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function approveTreasuryProposal(
+  signer: any,
+  proposalId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.approveProposal(proposalId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error approving treasury proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function rejectTreasuryProposal(
+  signer: any,
+  proposalId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.rejectProposal(proposalId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error rejecting treasury proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function executeTreasuryProposal(
+  signer: any,
+  proposalId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.executeProposal(proposalId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error executing treasury proposal ${proposalId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function createRecurringPayment(
+  signer: any,
+  beneficiary: string,
+  amount: string,
+  interval: number,
+  count?: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.createRecurringPayment(
+      beneficiary,
+      amount,
+      interval,
+      count || null,
+    );
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error creating recurring payment:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function cancelRecurringPayment(
+  signer: any,
+  paymentId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.cancelRecurringPayment(paymentId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error cancelling recurring payment ${paymentId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function registerYieldStrategy(
+  signer: any,
+  agent: string,
+  maxAllocation: string,
+  profitShare: number,
+  riskLevel: 'Low' | 'Medium' | 'High',
+  description: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const descriptionBytes = new TextEncoder().encode(description);
+
+    const tx = api.tx.treasury.registerYieldStrategy(
+      agent,
+      maxAllocation,
+      profitShare,
+      riskLevel,
+      descriptionBytes,
+    );
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error registering yield strategy:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function executeYieldStrategy(
+  signer: any,
+  strategyId: number,
+  amount: string,
+  maxIterations: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.executeYieldStrategy(strategyId, amount, maxIterations);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error executing yield strategy ${strategyId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function reportYieldReturn(
+  signer: any,
+  strategyId: number,
+  totalReturn: string,
+  principal: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.reportYieldReturn(strategyId, totalReturn, principal);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error reporting yield return for strategy ${strategyId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function deactivateYieldStrategy(
+  signer: any,
+  strategyId: number,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.deactivateYieldStrategy(strategyId);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error(`Error deactivating yield strategy ${strategyId}:`, e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function pauseTreasury(
+  signer: any,
+  reason: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const reasonBytes = new TextEncoder().encode(reason);
+
+    const tx = api.tx.treasury.pause(reasonBytes);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error pausing treasury:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function unpauseTreasury(signer: any): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.unpause();
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error unpausing treasury:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function updateTreasurySigners(
+  signer: any,
+  signers: string[],
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.updateSigners(signers);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error updating treasury signers:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}
+
+export async function depositToTreasury(
+  signer: any,
+  amount: string,
+): Promise<{ success: boolean; txHash: string; error?: string }> {
+  const api = await getApi();
+  try {
+    const tx = api.tx.treasury.deposit(amount);
+
+    const result = await tx.signAndSend(signer, { nonce: -1 });
+    return { success: true, txHash: result.txHash.toString() };
+  } catch (e: any) {
+    console.error('Error depositing to treasury:', e);
+    return { success: false, txHash: '', error: e.message };
+  }
+}

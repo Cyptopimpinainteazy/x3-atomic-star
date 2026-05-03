@@ -102,6 +102,11 @@ export class EvmAdapter extends BaseChainAdapter {
     return { txHash: hash };
   }
 
+  async getBalance(address: string): Promise<string> {
+    const balanceHex = await this.rpcCall<string>("eth_getBalance", [address, "latest"]);
+    return BigInt(balanceHex).toString();
+  }
+
   private parseBlock(raw: EvmBlockRaw): Block {
     return {
       hash: raw.hash,

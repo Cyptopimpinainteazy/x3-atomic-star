@@ -1,661 +1,205 @@
-# 🚀 X3_ATOMIC_STAR Testnet Deployment Guide
+# X3 Chain Testnet Deployment Guide
 
-**Version:** 1.0  
-**Date:** April 24, 2026  
-**Status:** Ready for Testnet Launch  
-**Rust:** 1.90.0 ✅  
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)  
-**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0  
+This guide covers the deployment and key management procedures for X3 Chain testnet.
 
----
+## Table of Contents
 
-## 📌 Quick Start (TL;DR)
+- [Overview](#overview)
+- [Node Key Generation](#node-key-generation)
+- [Key Management](#key-management)
+- [Chain Specification](#chain-specification)
+- [Deployment Checklist](#deployment-checklist)
 
-```bash
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
+## Overview
 
-# Build
-cargo build --release -p x3-chain-node
+X3 Chain testnet requires a minimum of 3 validator nodes for proper consensus. Each node needs:
 
-# Run testnet
-./target/release/x3-chain-node --chain dev --tmp
+1. A unique ed25519 node key for P2P networking
+2. Aura (sr25519) keys for block production
+3. Grandpa (ed25519) keys for finality
 
-# In another terminal, run tests
-cargo test --lib tests_phase4
-```
+## Node Key Generation
 
----
+### Generating Node Keys
 
-## 🎯 What is X3_ATOMIC_STAR?
-
-**X3_ATOMIC_STAR** is a unified, production-ready Substrate blockchain featuring:
-
-- **31 Core Pallets** - All blockchain capabilities (settlement, routing, governance, etc.)
-- **101 Custom Crates** - Advanced modules for cross-chain integration
-- **64/64 Settlement Tests** - Phase 4 validated settlement engine
-- **GPU Acceleration** - Optional 10-100x faster validation
-- **Advanced Consensus** - ChronosFlash, Flash-Finality, Quantum-Swarm
-- **Cross-VM Support** - EVM, Solana, Native chain integration
-
----
-
-## 📦 Directory Structure
-
-```
-/home/lojak/Desktop/X3_ATOMIC_STAR/
-├── node/                          # Node implementation
-├── runtime/                        # Substrate runtime
-├── pallets/                        # 31 blockchain pallets
-├── crates/                         # 101 custom crates
-├── tests_phase4/                   # Phase 4 test suite (65 tests)
-├── deployment/                     # 31 deployment scripts
-├── x3-security-swarm/              # Security testing
-├── x3-swarm-orchestra/             # Multi-node orchestration
-├── Cargo.toml                      # Workspace manifest
-├── rust-toolchain.toml             # Rust 1.89.0 ✅
-├── target/release/                 # Compiled binaries
-└── logs/                           # Testnet logs
-```
-
----
-
-## 🔨 Build Status: COMPLETE
-
-### Build Artifacts
-✅ **Core Node** (`x3-chain-node`) - BUILD COMPLETE  
-✅ **Release Binary** - Available at `target/release/x3-chain-node`  
-✅ **Compilation** - Zero errors, warnings only
-
-### Build Artifacts
-
-Once complete, you'll have:
-
-```
-target/release/
-├── x3-chain-node                 # Main testnet binary (core)
-└── (tests compiled in memory)
-```
-
----
-
-## 🧪 Phase 4 Test Suite
-
-### Settlement Engine Tests (64 tests)
-```
-✅ intent_creation
-✅ escrow_locking
-✅ proof_submission
-✅ settlement_finalization
-✅ refund_handling
-✅ replay_protection
-✅ (+ 58 more)
-```
-
-### Cross-VM Router Tests (1 test)
-```
-✅ cross_chain_routing
-```
-
-**Expected Result:** 65/65 PASS ✅
-
----
-
-## 🚀 Deployment Scenarios
-
-### Scenario 1: Development Testnet (Quick Start)
+Run the key generation script:
 
 ```bash
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
-cargo build --release -p x3-chain-node
-
-# Run single node with development chain
-./target/release/x3-chain-node --chain dev --tmp
+python3 scripts/generate-node-keys/generate_keys.py
 ```
 
-**What you get:**
-- Single validator (instant finality)
-- Pre-funded test accounts
-- 1 second block time
-- Zero network latency
-- Perfect for local testing
+This will:
+- Generate 3 ed25519 keypairs
+- Output multiaddrs to `deployment/keys/bootnode-info.txt`
+- Output key data to `deployment/keys/bootnode-keys.json`
 
----
+### Manual Key Generation
 
-### Scenario 2: Multi-Node Testnet
+If you need to generate keys manually:
 
 ```bash
-# Terminal 1: Validator 1
-./target/release/x3-chain-node \
-  --chain testnet/chain-spec.json \
-  --node-key 0x1111... \
-  --validator
-
-# Terminal 2: Validator 2
-./target/release/x3-chain-node \
-  --chain testnet/chain-spec.json \
-  --node-key 0x2222... \
-  --validator \
-  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/...
+# Using Rust with sp-core
+cargo run --release --bin generate-node-keys
 ```
 
-**What you get:**
-- Multiple validators with consensus
-- Realistic network delays
-- Settlement across validators
-- Proof of cross-chain settlement
-- 2-5 second block time (with GRANDPA finality)
+Or using Python:
 
----
+```python
+from nacl.signing import SigningKey
+import hashlib
+import base58
 
-### Scenario 3: GPU-Accelerated Testnet
+# Generate ed25519 keypair
+signing_key = SigningKey.generate()
+public_key = signing_key.verify_key.encode()
+secret_key = signing_key.encode()
 
-```bash
-# Build with GPU feature
-cargo build --release -p x3-chain-node --features gpu-validator
+# Compute peer ID (base58(sha256(public_key)))
+peer_id_hash = hashlib.sha256(public_key).digest()
+peer_id = base58.b58encode(peer_id_hash).decode()
 
-# Run with GPU acceleration
-./target/release/x3-chain-node \
-  --chain testnet/chain-spec.json \
-  --validator \
-  --features gpu-validator
+print(f"Peer ID: {peer_id}")
+print(f"Multiaddr: /ip4/127.0.0.1/tcp/30333/p2p/{peer_id}")
 ```
 
-**What you get:**
-- GPU-accelerated signature verification
-- 10-100x faster validation
-- Improved settlement throughput
-- Lower latency for complex proofs
+## Key Management
 
----
+### Storage
 
-## 🔌 RPC Endpoints
+- **Node keys**: Store in `deployment/keys/` (gitignored)
+- **Validator keys**: Store in a secure HSM or encrypted vault
+- **Backup keys**: Store in a secure offline location
 
-Once running, connect via:
+### Security Best Practices
 
-### JSON-RPC
+1. **Never commit keys to version control**
+   - The `deployment/keys/` directory is gitignored
+   - Use `.gitignore` to exclude sensitive files
+
+2. **Use environment variables for sensitive data**
+   ```bash
+   export X3_NODE_KEY="base64-encoded-secret-key"
+   export X3_AURA_KEY="base64-encoded-secret-key"
+   export X3_GRANDPA_KEY="base64-encoded-secret-key"
+   ```
+
+3. **Rotate keys periodically**
+   - Generate new keys every 90 days
+   - Update chain specification with new keys
+   - Perform a scheduled upgrade
+
+4. **Backup keys securely**
+   - Encrypt backups with AES-256-GCM
+   - Store backups in multiple locations
+   - Test key recovery procedures
+
+### Key File Structure
+
 ```
-http://localhost:9933
-```
-
-### WebSocket
-```
-ws://localhost:9944
-```
-
-### Test Connection
-```bash
-curl -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
-  http://localhost:9933
-```
-
----
-
-## 🤖 AgentMemory Offchain Indexing
-
-The X3 AgentMemory pallet provides append-only on-chain memory for AI agents with LLM-friendly serialization. To effectively utilize AgentMemory during testnet, offchain indexing is **required**.
-
-### What is AgentMemory?
-
-**Location:** `pallets/agent-memory/src/lib.rs`
-
-AgentMemory stores:
-- Append-only memory logs per agent (immutable history)
-- Delta-compressed chunks for efficient storage
-- JSONL-like format for LLM consumption
-- Read/write permissions per agent
-- Chunk-based pagination for large memories
-- TTL-based pruning (default: configurable blocks)
-
-### Offchain Indexing Requirements
-
-The pallet **requires** an external indexing service to:
-
-1. **Index memory entries** from storage events
-2. **Build queryable indexes** by agent, timestamp, and content type
-3. **Enable fast LLM access** to agent history
-4. **Monitor health** and alert on indexing lag
-
-### Indexer Service Configuration
-
-#### Location
-```
-tools/x3-indexer/
-├── src/
-│   ├── main.rs              # Service entry point
-│   ├── storage.rs           # Direct storage reader
-│   ├── index_builder.rs     # Index construction
-│   └── rpc_server.rs        # Query API
-└── config.toml              # Connection strings
+deployment/keys/
+├── bootnode-info.txt      # Multiaddrs for bootnodes (public)
+├── bootnode-keys.json     # Full key data (secret, gitignored)
+├── validator-keys/        # Validator key storage
+│   ├── node1/
+│   │   ├── node_key       # ed25519 node key
+│   │   ├── aura_key       # sr25519 aura key
+│   │   └── grandpa_key    # ed25519 grandpa key
+│   └── node2/
+│       └── ...
+└── backups/               # Encrypted key backups
+    ├── node1-backup.enc
+    └── node2-backup.enc
 ```
 
-#### Environment Variables
-```bash
-# RPC endpoint to index
-export X3_INDEXER_RPC_URL="ws://localhost:9944"
+## Chain Specification
 
-# Output database (indexed memory)
-export X3_INDEXER_DB_PATH="/var/lib/x3-indexer/db"
+### Updating Bootnodes
 
-# Polling interval (ms)
-export X3_INDEXER_POLL_INTERVAL="1000"
+After generating keys, update the chain specification:
 
-# Health check port
-export X3_INDEXER_HEALTH_PORT="8080"
-```
-
-#### Deployment
-```bash
-# Start indexer
-./target/release/x3-indexer --config tools/x3-indexer/config.toml
-
-# Expected output:
-# [INFO] Indexer started on 127.0.0.1:3030
-# [INFO] Connected to ws://localhost:9944
-# [INFO] Indexing AgentMemory events...
-# [INFO] Agent 1: 1,234 entries indexed (lag: 2 blocks)
-```
-
-#### Health Checks
-```bash
-# Check indexer status
-curl http://localhost:8080/health
-
-# Expected response:
-# {
-#   "status": "healthy",
-#   "last_indexed_block": 12345,
-#   "lag_blocks": 2,
-#   "agents_indexed": 5
-# }
-```
-
-#### Troubleshooting
-- **High lag:** Increase `X3_INDEXER_POLL_INTERVAL` or scale indexer replicas
-- **Memory growth:** Check TTL pruning is enabled in AgentMemory config
-- **RPC connection errors:** Verify node is running on `ws://localhost:9944`
-- **Database disk full:** Rotate old indexes (>30 days) to cold storage
-
----
-
-## 📊 Monitoring
-
-### View Logs
-```bash
-# Real-time logs
-./target/release/x3-chain-node --chain dev 2>&1 | grep -E "finalized|settlement"
-
-# With timestamps
-./target/release/x3-chain-node --chain dev 2>&1 | while IFS= read -r line; do 
-  echo "$(date '+%H:%M:%S') $line"; 
-done
-```
-
-### Check Sync Status
-```bash
-curl http://localhost:9933 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"system_syncState","params":[],"id":1}'
-```
-
-### Monitor Settlement
-```bash
-# Watch for settlement events
-curl http://localhost:9933 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"author_submitExtrinsic","params":["0x..."],"id":1}'
-```
-
----
-
-## 🧪 Running Tests
-
-### Phase 4 Settlement Tests
-```bash
-cargo test --lib tests_phase4 -- --nocapture
-
-# Output should show:
-# test result: ok. 65 passed; 0 failed
-```
-
-### Specific Component Tests
-```bash
-# Settlement engine only
-cargo test --lib x3_settlement_engine
-
-# Cross-VM router only
-cargo test --lib x3_cross_vm_router
-
-# All integration tests
-cargo test --lib --lib integration_tests
-```
-
-### With Debug Output
-```bash
-RUST_LOG=debug cargo test --lib tests_phase4 -- --nocapture --test-threads=1
-```
-
----
-
-## 🔐 Security Considerations
-
-### For Testnet Only
-```bash
-# These settings are for development - NOT production safe!
---rpc-methods Unsafe        # Exposes all RPC methods
---rpc-external              # Accepts external connections
---ws-external               # WebSocket externally accessible
-```
-
-### For Production
-```bash
-# Use restricted RPC methods
---rpc-methods Safe
-
-# Firewall RPC endpoints
-# Use reverse proxy
-# Enable authentication
-# Run on private network
-```
-
----
-
-## ✅ Wiring Verification (Critical Integration Checks)
-
-**Status:** ✅ ALL 7 WIRING ISSUES FIXED  
-**Date:** April 25, 2026  
-**Compilation:** ✅ PASSED (Zero errors, warnings only)  
-**Reference:** `01-wiring-audit.md`
-
-All critical runtime wiring issues identified in the comprehensive audit have been systematically resolved and verified.
-
-### Issue 1: ✅ FraudProofs ↔ X3Sequencer Ordering
-**Status:** FIXED  
-**Location:** `runtime/src/lib.rs` construct_runtime!  
-**Fix:** Reordered FraudProofs to come AFTER X3Sequencer to prevent forward reference failures  
-```rust
-// Fixed order in construct_runtime!:
-X3Sequencer: pallet_x3_sequencer,  // BEFORE
-FraudProofs: crate::fraud_proofs::pallet::pallet,  // AFTER
-```
-**Verification:** `cargo check` passes ✅
-
----
-
-### Issue 2: ✅ EVM Precompile Registration Complete
-**Status:** FIXED  
-**Location:** `runtime/src/precompiles.rs`  
-**Fix:** Registered all 4 custom X3 precompiles with proper error handling  
-```
-✅ 0xf001 (61441) — X3Verifier (proof verification dispatcher)
-✅ 0xf002 (61442) — X3Bridge (cross-VM asset bridging)
-✅ 0xf003 (61443) — X3Governance (governance proposals)
-✅ 0xf004 (61444) — X3AssetRegistry (asset metadata management)
-```
-**Verification:** All precompiles register in FrontierPrecompiles::used_addresses() ✅
-
----
-
-### Issue 3: ✅ GPU Sidecar Integrated in Service Lifecycle
-**Status:** FIXED  
-**Location:** `node/src/service.rs`  
-**Fix:** Implemented GpuSidecarHealthMonitor for managed lifecycle  
-**Features:**
-- Health check every 5 blocks
-- Auto-restart after 3 consecutive failures
-- Prevents node degradation if sidecar crashes
-- Integrated into task_manager
-
-**Usage:**
-```bash
-# Enable GPU validator sidecar (automatic with --enable-gpu-validator)
-./target/release/x3-chain-node --chain dev --enable-gpu-validator
-```
-**Verification:** Health monitor lifecycle integrated ✅
-
----
-
-### Issue 4: ✅ Settlement Finality Timeout Implemented
-**Status:** FIXED  
-**Location:** `pallets/x3-settlement-engine/src/lib.rs`  
-**Fix:** Added SettlementTimeoutBlocks parameter for auto-refund on stalled settlements  
-**Configuration:**
-```rust
-type SettlementTimeoutBlocks: Get<BlockNumberFor<Self>>;
-// Default: 28,800 blocks (~24 hours at 3-second blocks)
-```
-**Behavior:**
-- If validator attestations don't reach quorum within timeout
-- Settlement automatically refunds to user (funds favored)
-- Event: `Event::SettlementTimeout { settlement_id }`
-
-**Verification:** Timeout mechanism verified in settlement tests ✅
-
----
-
-### Issue 5: ✅ AgentMemory Offchain Indexing Documented
-**Status:** FIXED  
-**Location:** `TESTNET_DEPLOYMENT_GUIDE.md` (this file)  
-**Fix:** Complete integration guide for x3-indexer service  
-**Requirements:**
-- Run `./target/release/x3-indexer` alongside node
-- Listens to AgentMemory storage events
-- Builds queryable indexes by agent/timestamp
-- Provides RPC API for fast LLM access
-- Health check available at `:8080/health`
-
-**Deployment:**
-```bash
-# Start indexer service
-./target/release/x3-indexer --config tools/x3-indexer/config.toml
-
-# Monitor health
-curl http://localhost:8080/health
-```
-**See:** "AgentMemory Offchain Indexing" section above for full details ✅
-
----
-
-### Issue 6: ✅ TX Pool Sizing Dynamic Configuration
-**Status:** FIXED  
-**Location:** `node/src/service.rs`  
-**Fix:** Implemented NetworkSpeed enum with adaptive pool sizing  
-**Network Speed Detection:**
-```bash
-export X3_NETWORK_SPEED=slow    # 50k TX, 128 MiB (1 Mbps validators)
-export X3_NETWORK_SPEED=normal  # 100k TX, 256 MiB (default)
-export X3_NETWORK_SPEED=fast    # 200k TX, 512 MiB (gigabit networks)
-```
-**Auto-detection:**
-- Ping bootstrap nodes
-- Measure network latency
-- Auto-select appropriate pool size
-- Prevents bandwidth exhaustion
-
-**Verification:** Network speed detection implemented and tested ✅
-
----
-
-### Issue 7: ✅ Cross-Chain Header Validation Integrated
-**Status:** FIXED  
-**Location:** `runtime/src/lib.rs` + `pallets/cross-chain-validator/`  
-**Fix:** Implemented pallet_cross_chain_validator with full header validation  
-**Features:**
-- EVM header validation (Merkle proof verification)
-- SVM header validation (Solana validator set checks)
-- Finality oracle integration
-- RPC methods for validation status
-
-**Wiring:**
-```rust
-// In runtime construct_runtime!:
-CrossChainValidator: pallet_cross_chain_validator,
-
-// Configuration impl:
-impl pallet_cross_chain_validator::Config for Runtime {
-    type WeightInfo = pallet_cross_chain_validator::weights::SubstrateWeight<Self>;
+```json
+{
+  "bootNodes": [
+    "/ip4/127.0.0.1/tcp/30333/p2p/81SQketjqCBnnCb8rQw1dThQS1AJnqMjYZ2RAr2cN8Sc",
+    "/ip4/127.0.0.1/tcp/30333/p2p/F31BGgebnyLRvMTerSxnMFSmWtNJFpVS3E34qiKkjNo2",
+    "/ip4/127.0.0.1/tcp/30333/p2p/8wwRqSDhQAw44KbFH4x8CJ1cJPZZs9y2U9m3xCHe4rRP"
+  ]
 }
 ```
-**Verification:** CrossChainValidator pallet wired in runtime ✅
 
----
+### Building Chain Specification
 
-### Compilation Verification
 ```bash
-$ cargo check --workspace
-   Compiling x3-chain-node v0.1.0
-   Finished `dev` profile [unoptimized + debuginfo] target(s) in 9m 16s
-   ✅ ZERO ERRORS (warnings only)
+# Build raw chain spec
+./target/release/x3-chain-node build-spec \
+    --chain=dev \
+    --raw \
+    --disable-default-bootnode \
+    > deployment/chain-specs/x3-testnet-raw.json
+
+# Update bootnodes in the chain spec
+# (edit deployment/chain-specs/x3-testnet-raw.json)
 ```
 
-### Pre-Deployment Validation Checklist
-- [x] Issue 1: Runtime pallet ordering correct
-- [x] Issue 2: All 4 EVM precompiles registered
-- [x] Issue 3: GPU sidecar health monitoring active
-- [x] Issue 4: Settlement finality timeout configured
-- [x] Issue 5: AgentMemory indexing documented
-- [x] Issue 6: TX pool adaptive sizing enabled
-- [x] Issue 7: CrossChain validation fully wired
-- [x] Compilation: PASSED with zero errors
+### Loading Bootnodes from Environment
 
-**System Ready for Testnet Launch! 🚀**
+The node can load bootnodes from environment variables:
 
----
-
-## 🐛 Troubleshooting
-
-### Build Fails: "rustc 1.89.0 is not supported"
 ```bash
-# Solution: Update Rust
-rustup update
-# Verify
-rustc --version  # Should show 1.89.0 or higher
+# Single bootnode
+export TESTNET_BOOTNODES="/ip4/127.0.0.1/tcp/30333/p2p/81SQketjqCBnnCb8rQw1dThQS1AJnqMjYZ2RAr2cN8Sc"
+
+# Multiple bootnodes (comma-separated)
+export TESTNET_BOOTNODES="/ip4/127.0.0.1/tcp/30333/p2p/81SQketjqCBnnCb8rQw1dThQS1AJnqMjYZ2RAr2cN8Sc,/ip4/127.0.0.1/tcp/30333/p2p/F31BGgebnyLRvMTerSxnMFSmWtNJFpVS3E34qiKkjNo2"
 ```
 
-### Node Won't Start: "Port 9933 already in use"
-```bash
-# Solution: Use different port
-./target/release/x3-chain-node --chain dev --rpc-port 9934 --ws-port 9945
-```
+## Deployment Checklist
 
-### Tests Fail: "file not found"
-```bash
-# Solution: Run from project root
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
-cargo test --lib tests_phase4
-```
+### Pre-Deployment
 
-### Settlement Not Finalizing
-```bash
-# Check settlement pallet:
-cargo test --lib x3_settlement_engine -- --nocapture
+- [ ] Generate node keys for all validators
+- [ ] Store keys securely (encrypted, backed up)
+- [ ] Update chain specification with real peer IDs
+- [ ] Configure environment variables
+- [ ] Verify network connectivity between nodes
 
-# Verify proof oracle:
-cargo test --lib x3_verifier -- --nocapture
-```
+### Deployment
 
----
+- [ ] Start validator nodes with correct keys
+- [ ] Verify nodes are syncing
+- [ ] Check P2P connections
+- [ ] Verify block production
+- [ ] Verify finality
 
-## 📈 Performance Baseline
+### Post-Deployment
 
-Expected metrics on modern hardware:
+- [ ] Monitor node health
+- [ ] Check block production rate
+- [ ] Verify finality gadget progress
+- [ ] Set up monitoring and alerting
 
-| Metric | Expected | Notes |
-|--------|----------|-------|
-| **Block Time** | 6 seconds | With GRANDPA finality |
-| **Finality** | 2 minutes | Conservative (240 blocks) |
-| **TPS** | 100-500 | Depends on extrinsic complexity |
-| **Settlement Latency** | 10-30 seconds | For atomic cross-chain |
-| **GPU Speedup** | 10-100x | For complex proofs (if enabled) |
+## Troubleshooting
 
----
+### Node Not Connecting
 
-## 🚀 Next Steps After Launch
+- Check firewall rules
+- Verify bootnode multiaddrs are correct
+- Check network connectivity
 
-1. **Verify Sync**
-   ```bash
-   # Wait for node to sync (1-2 minutes for dev chain)
-   curl http://localhost:9933 -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"system_syncState","params":[],"id":1}' | jq
-   ```
+### Block Production Stalled
 
-2. **Run Settlement Test**
-   ```bash
-   # Create intent → lock escrow → submit proof → claim settlement
-   cargo test --lib test_settlement_lifecycle -- --nocapture
-   ```
+- Verify Aura keys are loaded
+- Check clock synchronization
+- Verify validator set
 
-3. **Load Test**
-   ```bash
-   # Submit multiple settlements concurrently
-   cargo test --lib bench_settlement_throughput -- --nocapture
-   ```
+### Finality Not Progressing
 
-4. **Monitor GPU (if enabled)**
-   ```bash
-   nvidia-smi
-   # Should show consistent GPU utilization during validation
-   ```
+- Verify Grandpa keys are loaded
+- Check validator participation
+- Verify network connectivity
 
----
+## References
 
-## 📚 Additional Resources
-
-### Documentation Files
-- `RUST_UPGRADE_VERIFICATION.md` - Rust 1.89.0 upgrade details
-- `TESTNET_PRE_DEPLOYMENT_CHECKLIST.md` - Pre-launch checklist
-- `COOL_FEATURES_DISCOVERED.md` - Advanced features guide
-- `FEATURES_AND_ADDITIONS.md` - Complete feature inventory
-
-### Deployment Scripts
-```
-deployment/
-├── DEPLOYMENT_READY.sh          # Pre-flight checks
-├── deploy-testnet.sh            # Launch testnet
-├── key-gen-testnet.sh          # Generate keys
-├── validator-setup.sh           # Configure validators
-└── (27+ more scripts)
-```
-
-### Configuration Files
-```
-testnet/
-├── chain-spec.json             # Network parameters
-├── genesis.json                # Initial state
-└── bootstrap-nodes.txt         # Boot node list
-```
-
----
-
-## ✅ Deployment Checklist
-
-- [x] Rust 1.90.0 installed
-- [x] Solana packages compatible
-- [x] Workspace validated (111 members)
-- [x] Dependencies updated
-- [x] Core node build complete
-- [x] Compilation verified (zero errors)
-- [x] ProofForge gates PASSED (16/16 S0 verified)
-- [x] RC-1 scope LOCKED
-- [ ] Validator keys created
-- [ ] Testnet launched
-- [ ] Sync verified
-
----
-
-## 🎉 You're Ready!
-
-X3_ATOMIC_STAR is **production-ready** for testnet deployment. All core components are verified, tested, and optimized. 
-
-**Launch your testnet now:**
-```bash
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
-./target/release/x3-chain-node --chain dev --tmp
-```
-
----
-
-**Status:** ✅ GO FOR MAINNET RC-1  
-**Last Updated:** 2026-05-02  
-**Commit:** `2e0c3bdac9de8b60`  
-**Next Step:** Ready to deploy RC-1 — see [QUICK_COMMAND_REFERENCE.md](QUICK_COMMAND_REFERENCE.md)
+- [Substrate Node Keys](https://docs.substrate.io/reference/command-line-tools/subkey/)
+- [Chain Specification](https://docs.substrate.io/how-to-guides/v3/advanced/chainspec/)
+- [P2P Networking](https://docs.substrate.io/reference/architecture/networking/)

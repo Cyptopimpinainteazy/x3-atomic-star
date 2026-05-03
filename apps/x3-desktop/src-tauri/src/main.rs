@@ -7,7 +7,7 @@ mod wallet;
 mod wallet_core;
 
 use chrono::Utc;
-use rand::Rng;
+use rand::RngCore;
 use serde::{Serialize, Deserialize};
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -16,6 +16,8 @@ use tauri::{AppHandle, Builder, Emitter, Manager, State, generate_handler};
 use tokio::time::sleep;
 use sysinfo::System;
 use uuid::Uuid;
+
+use wallet_core::substrate_hook::SubstrateHookManager;
 
 const TELEMETRY_EVENT: &str = "telemetry_update";
 const IPFS_LOCAL: &str = "http://127.0.0.1:5001";
@@ -178,6 +180,19 @@ struct TelemetryState {
   /// Reusable sysinfo handle — creating System::new_all() is very expensive;
   /// we keep one instance and call refresh_*() on it each tick instead.
   sys_handle: Arc<std::sync::Mutex<System>>,
+}
+
+#[derive(Clone)]
+struct SubstrateState {
+  manager: Arc<RwLock<Option<SubstrateHookManager>>>,
+}
+
+impl SubstrateState {
+  fn new() -> Self {
+    Self {
+      manager: Arc::new(RwLock::new(None)),
+    }
+  }
 }
 
 impl TelemetryState {
@@ -1210,6 +1225,7 @@ fn main() {
 
   Builder::default()
     .manage(telemetry_state.clone())
+    .manage(SubstrateState::new())
     .invoke_handler(generate_handler![
       get_app_registry,
       launch_swarm_health,
@@ -1343,7 +1359,25 @@ fn main() {
       wallet::submit_cross_swap,
       wallet::execute_x3_script,
       wallet::run_cross_chain_intent,
-    ])
+      // ── Phase 2: Substrate Hooks ──
+      wallet::subscribe_substrate_events,
+      wallet::get_substrate_hook_state,
+      wallet::register_substrate_hook,
+      wallet::unregister_substrate_hook,
+      // ── Phase 2: Wallet Store ──
+      wallet::store_wallet_encrypted,
+      wallet::retrieve_wallet_encrypted,
+      wallet::delete_wallet,
+      wallet::export_wallet_backup,
+      wallet::import_wallet_backup,
+      // ── Phase 2: x3ChainService ──
+      wallet::query_block,
+      wallet::query_account,
+      wallet::query_balance,
+      wallet::submit_extrinsic,
+      wallet::get_connection_status,
+      wallet::clear_chain_cache,
+      ])
     .setup(move |app| {
       // Initialize social database
       let app_dir = app.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));

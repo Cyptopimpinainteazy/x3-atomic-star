@@ -24,6 +24,9 @@ pub mod merkle_proof_validator;
 // Gap #3: Merkle settlement integration for bridge commit phase
 pub mod merkle_settlement_bridge;
 
+// Live Node RPC connector for cross-VM operations
+pub mod connector;
+
 #[cfg(test)]
 #[path = "tests/attack_arbitrage.rs"]
 mod attack_arbitrage;
@@ -34,6 +37,9 @@ mod attack_arbitrage;
 /// See `canonical.rs` for invariants. Legacy `VmType` / `CrossVmOperation`
 /// types in this file remain valid and will be migrated in a later patch.
 pub mod canonical;
+
+// Cross-VM Bridge Finality Verifier for EVM and SVM
+pub mod bridge;
 
 pub use canonical::{
     CrossVmCall, CrossVmPayload, CrossVmReceipt, CrossVmStatus, VmId, CALL_HASH_DOMAIN,

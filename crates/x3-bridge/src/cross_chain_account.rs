@@ -3,6 +3,7 @@
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::{ed25519, sr25519};
 use sp_std::vec::Vec;
+use x3_common::signing::{verify_signature, KeyType};
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct CrossChainAccount {
@@ -162,6 +163,15 @@ impl CrossChainAccountManager {
     /// - **Solana / Cosmos**: Ed25519 verification; `signature.signer` used as the 32-byte public key
     /// - **X3**: sr25519 verification; `signature.signer` used as the 32-byte public key
     /// - **Bitcoin**: secp256k1 recovery; recovered key hash matched against `signature.signer[12..]`
+    /// Convert ChainType to KeyType for signature verification
+    fn chain_type_to_key_type(chain_type: ChainType) -> KeyType {
+        match chain_type {
+            ChainType::Ethereum | ChainType::Bitcoin => KeyType::Secp256k1,
+            ChainType::Solana | ChainType::Cosmos => KeyType::Ed25519,
+            ChainType::X3 => KeyType::Sr25519,
+        }
+    }
+
     pub fn verify_signature(
         account: &CrossChainAccount,
         signature: &MultiChainSignature,
@@ -176,84 +186,44 @@ impl CrossChainAccountManager {
             return Err("Signature nonce is stale");
         }
 
-        // Per-chain cryptographic verification
+        // Convert chain type to key type
+        let key_type = Self::chain_type_to_key_type(signature.chain_type);
+
+        // Verify signature using the unified signing module
+        let signature_valid = x3_common::signing::verify_signature_hash(
+            &signature.signature,
+            &signature.message_hash,
+            &signature.signer,
+            key_type,
+        );
+
+        if !signature_valid {
+            return Err("Signature verification failed");
+        }
+
+        // For Ethereum and Bitcoin, also verify the recovered address matches
         match signature.chain_type {
-            ChainType::Ethereum => {
-                // secp256k1 ECDSA recovery: signature must be 65 bytes (r + s + v)
-                if signature.signature.len() != 65 {
-                    return Err("Ethereum signature must be 65 bytes");
-                }
-                let mut sig65 = [0u8; 65];
-                sig65.copy_from_slice(&signature.signature);
-
-                let recovered =
-                    sp_io::crypto::secp256k1_ecdsa_recover(&sig65, &signature.message_hash)
-                        .map_err(|_| "secp256k1 recovery failed")?;
-
-                // Ethereum address = keccak256(uncompressed_pubkey)[12..]
-                let pubkey_hash = sp_io::hashing::keccak_256(&recovered);
-                let mut eth_addr = [0u8; 20];
-                eth_addr.copy_from_slice(&pubkey_hash[12..]);
-
+            ChainType::Ethereum | ChainType::Bitcoin => {
+                // Verify recovered address matches stored EVM address
                 match account.evm_address {
-                    Some(stored_addr) if stored_addr == eth_addr => Ok(true),
-                    Some(_) => Err("Recovered Ethereum address does not match account"),
+                    Some(stored_addr) => {
+                        // Use the signing module's to_evm_address function
+                        let recovered_addr = x3_common::signing::PublicKey::Secp256k1({
+                            let mut pk = [0u8; 65];
+                            pk.copy_from_slice(&signature.signer);
+                            pk
+                        }).to_evm_address();
+
+                        if recovered_addr == stored_addr {
+                            Ok(true)
+                        } else {
+                            Err("Recovered address does not match account")
+                        }
+                    }
                     None => Err("Account has no EVM address to verify against"),
                 }
             }
-            ChainType::Solana | ChainType::Cosmos => {
-                // Ed25519: signature must be exactly 64 bytes; signer is the 32-byte public key
-                if signature.signature.len() != 64 {
-                    return Err("Ed25519 signature must be 64 bytes");
-                }
-                let mut sig_bytes = [0u8; 64];
-                sig_bytes.copy_from_slice(&signature.signature);
-
-                let ed_sig = ed25519::Signature::from_raw(sig_bytes);
-                let ed_pubkey = ed25519::Public::from_raw(signature.signer);
-
-                if sp_io::crypto::ed25519_verify(&ed_sig, &signature.message_hash, &ed_pubkey) {
-                    Ok(true)
-                } else {
-                    Err("Ed25519 signature verification failed")
-                }
-            }
-            ChainType::X3 => {
-                // sr25519: signature must be exactly 64 bytes; signer is the 32-byte public key
-                if signature.signature.len() != 64 {
-                    return Err("sr25519 signature must be 64 bytes");
-                }
-                let mut sig_bytes = [0u8; 64];
-                sig_bytes.copy_from_slice(&signature.signature);
-
-                let sr_sig = sr25519::Signature::from_raw(sig_bytes);
-                let sr_pubkey = sr25519::Public::from_raw(signature.signer);
-
-                if sp_io::crypto::sr25519_verify(&sr_sig, &signature.message_hash, &sr_pubkey) {
-                    Ok(true)
-                } else {
-                    Err("sr25519 signature verification failed")
-                }
-            }
-            ChainType::Bitcoin => {
-                // Bitcoin secp256k1: signature must be exactly 65 bytes
-                if signature.signature.len() != 65 {
-                    return Err("Bitcoin signature must be 65 bytes");
-                }
-                let mut sig65 = [0u8; 65];
-                sig65.copy_from_slice(&signature.signature);
-
-                let recovered =
-                    sp_io::crypto::secp256k1_ecdsa_recover(&sig65, &signature.message_hash)
-                        .map_err(|_| "secp256k1 recovery failed (Bitcoin)")?;
-
-                // Compare keccak256(pubkey)[12..] against signer[12..]
-                let pubkey_hash = sp_io::hashing::keccak_256(&recovered);
-                if pubkey_hash[12..] != signature.signer[12..] {
-                    return Err("Recovered Bitcoin key does not match signer");
-                }
-                Ok(true)
-            }
+            _ => Ok(true),
         }
     }
 

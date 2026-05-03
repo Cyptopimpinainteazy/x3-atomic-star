@@ -310,3 +310,18 @@ export class SubstrateHTLCAdapter implements IHTLCAdapter {
     return bytesToHex(data);
   }
 }
+
+/**
+ * Factory function to create a Substrate HTLC adapter with env var configuration.
+ * Reads X3_RPC_ENDPOINT for HTTP endpoint and X3_WS_ENDPOINT for WebSocket endpoint.
+ */
+export function createSubstrateHTLCAdapter(chainId: ChainId): SubstrateHTLCAdapter {
+  const rpcEndpoint = process.env.X3_RPC_ENDPOINT;
+  const wsEndpoint = process.env.X3_WS_ENDPOINT;
+  
+  if (!rpcEndpoint) {
+    throw new Error("X3_RPC_ENDPOINT environment variable is required");
+  }
+  
+  return new SubstrateHTLCAdapter(chainId, rpcEndpoint, wsEndpoint);
+}

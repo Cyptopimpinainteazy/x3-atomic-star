@@ -28,17 +28,13 @@ class CollateralManagerClient:
             "params": {"account": account, "asset": asset, "amount": str(amount)},
             "id": 1
         }
-        try:
-            response = self.client.post(f"{self.endpoint}/rpc", json=payload)
-            response.raise_for_status()
-            result = response.json().get("result", {})
-            return DepositReceipt(
-                bond_id=result.get("bondId", f"bond-{int(time.time())}"),
-                tx_hash=result.get("txHash")
-            )
-        except Exception:
-            # Fallback for demo/testing - remove in production
-            return DepositReceipt(bond_id=f"bond-{int(time.time())}")
+        response = self.client.post(f"{self.endpoint}/rpc", json=payload)
+        response.raise_for_status()
+        result = response.json().get("result", {})
+        return DepositReceipt(
+            bond_id=result.get("bondId", f"bond-{int(time.time())}"),
+            tx_hash=result.get("txHash")
+        )
 
     def request_withdraw_bond(self, account: str, bond_id: str) -> WithdrawRequest:
         """Request withdrawal of bonded collateral"""
@@ -48,17 +44,14 @@ class CollateralManagerClient:
             "params": {"account": account, "bondId": bond_id},
             "id": 1
         }
-        try:
-            response = self.client.post(f"{self.endpoint}/rpc", json=payload)
-            response.raise_for_status()
-            result = response.json().get("result", {})
-            return WithdrawRequest(
-                request_id=result.get("requestId", f"req-{int(time.time())}"),
-                bond_id=bond_id,
-                status=result.get("status", "Pending")
-            )
-        except Exception:
-            return WithdrawRequest(request_id=f"req-{int(time.time())}", bond_id=bond_id, status="Pending")
+        response = self.client.post(f"{self.endpoint}/rpc", json=payload)
+        response.raise_for_status()
+        result = response.json().get("result", {})
+        return WithdrawRequest(
+            request_id=result.get("requestId", f"req-{int(time.time())}"),
+            bond_id=bond_id,
+            status=result.get("status", "Pending")
+        )
 
     # ------------------------------------------------------------------
     # GAP-6 plan-named API surface
