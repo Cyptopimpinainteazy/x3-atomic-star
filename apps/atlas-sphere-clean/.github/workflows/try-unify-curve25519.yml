@@ -1,0 +1,25 @@
+name: Try unify curve25519-dalek (investigation)
+
+on:
+  pull_request:
+    branches: [ "chore/unify-curve25519" ]
+  push:
+    branches: [ "chore/unify-curve25519" ]
+
+jobs:
+  try-unify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Run svm-integration counter test (workspace)
+        run: cargo test --manifest-path crates/svm-integration/Cargo.toml --test counter_integration -- --nocapture

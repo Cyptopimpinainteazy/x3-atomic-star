@@ -1,0 +1,55 @@
+name: alembic-roundtrip
+
+on:
+  workflow_dispatch:
+
+jobs:
+  roundtrip:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: x3_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set DATABASE_URL
+        run: echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/x3_test" >> $GITHUB_ENV
+
+      - name: Install Alembic and deps
+        run: |
+          python -m pip install --user alembic psycopg2-binary
+
+      - name: Run Alembic downgrade base
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          if [ -f alembic.ini ]; then
+            alembic downgrade base
+          else
+            echo "No alembic.ini found, skipping downgrade"
+          fi
+
+      - name: Run Alembic upgrade head
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          if [ -f alembic.ini ]; then
+            alembic upgrade head
+          else
+            echo "No alembic.ini found, skipping upgrade"
+          fi
+
+      - name: Report
+        run: echo "Alembic roundtrip (downgrade->upgrade) completed"

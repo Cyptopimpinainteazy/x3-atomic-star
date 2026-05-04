@@ -1,0 +1,28 @@
+# Generated docs validation ignore list
+# Exclude vendored/third-party trees and heavy generated artifacts.
+**/node_modules/**
+**/target/**
+patches/**
+forge-std/**
+tests/security/lib/**
+botchain-tri-vm-genesis/**
+Plan_v1___Boost_Blockchain_Speed/**
+Plan_v2___Boost_Blockchain_Speed/**
+Plan_v3___Boost_Blockchain_Speed/**
+Plan_v4___Boost_Blockchain_Speed/**
+Plan_v5___Boost_Blockchain_Speed/**
+tools/get-shit-done/**
+idea-IU-*/**
+x3fronend/PRPs/templates/**
+scripts/p4_utils/**
+implementation_plan.md
+masterchecklist.md
+docs/runbooks/getting-started/100GUIDE.md
+docs/runbooks/deployment/TIER5_*.md
+docs/testnet-config/**
+docs/reports/**
+docs/openspec/**
+docs/planning-artifacts/**
+docs/master/releases/**
+docs/master/implementation/**
+docs/runbooks/deployment/**

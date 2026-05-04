@@ -1,0 +1,173 @@
+---
+# Shot Blaster Configuration for x3_md_supervisor Full Build
+# This configuration orchestrates the four-agent swarm for autonomous code governance
+
+mode: yolo
+manifest_version: "0.1"
+project: "x3-md-supervisor"
+
+fail_on:
+  - TODO
+  - placeholder
+  - stub
+  - missing_file
+  - unwired_ui
+  - fake_logic
+  - syntax_error
+  - linker_error
+
+# Chunk strategy for huge chats
+chunking:
+  strategy: semantic
+  max_tokens: 1200
+  overlap: 120
+  hash_dedupe: true
+
+# State management
+memory:
+  persistent: true
+  store:
+    - ast_diffs
+    - pnl_impacts
+    - agent_votes
+    - rollbacks
+    - audit_logs
+  eviction_policy: pnl_weighted_lru
+  ttl_hours: 24
+
+# Execution environment
+execution:
+  retries: 2
+  retry_on:
+    - syntax_error
+    - import_error
+    - test_failure
+  hard_fail_on:
+    - silent_error
+    - skipped_feature
+  timeout_seconds: 300
+  allow_partial: false
+
+# Model configuration - local + free OpenRouter
+models:
+  planner:
+    provider: ollama
+    model: x3-planner
+    fallback: openrouter
+    fallback_model: deepseek/deepseek-r1:free
+    timeout: 60
+
+  builder:
+    provider: ollama
+    model: x3-builder
+    fallback: openrouter
+    fallback_model: qwen/qwen-2.5-coder-32b-instruct:free
+    timeout: 120
+
+  fixer:
+    provider: ollama
+    model: x3-fixer
+    timeout: 60
+
+  auditor:
+    provider: ollama
+    model: x3-auditor
+    fallback: openrouter
+    fallback_model: mistralai/mistral-7b-instruct:free
+    timeout: 60
+
+  closer:
+    provider: ollama
+    model: x3-closer
+    timeout: 60
+
+# Agent configuration
+agents:
+  planner:
+    role: propose
+    strict: true
+    parallelizable: true
+    retry_on_failure: true
+
+  builder:
+    role: implement
+    strict: true
+    parallelizable: false
+    must_succeed: true
+
+  fixer:
+    role: repair
+    strict: false
+    parallelizable: true
+    optional: false
+
+  auditor:
+    role: validate
+    strict: true
+    parallelizable: false
+    blocking: true
+
+  closer:
+    role: finalize
+    strict: true
+    parallelizable: false
+    blocking: true
+
+# Quality gates
+gates:
+  - lint_python:
+      tool: flake8
+      blocking: true
+  - lint_typescript:
+      tool: eslint
+      blocking: false
+  - test_python:
+      tool: pytest
+      blocking: true
+      coverage_min: 95
+  - test_typescript:
+      tool: jest
+      blocking: false
+  - security:
+      tool: semgrep
+      blocking: true
+
+# Output requirements
+output_rules:
+  - full_files_only
+  - no_partial_code
+  - deterministic_order
+  - deterministic_hashing
+  - audit_logging_mandatory
+  - error_explanations_required
+
+# Performance constraints
+performance:
+  max_cycle_seconds: 300
+  max_memory_mb: 2048
+  parallelism: 4
+  warn_slow_lints: 10
+
+# VCS configuration
+vcs:
+  provider: git
+  branch: md-supervisor
+  atomic_commits: true
+  auto_rollback_negative_pnl: true
+  sign_commits: false
+
+# Trader integration
+trader_bridge:
+  enabled: true
+  pnl_feedback_timeout: 300
+  auto_rollback_threshold: -100.0
+  window_hours: 1
+
+# Logging
+logging:
+  level: info
+  format: json
+  outputs:
+    - ".md_supervisor/audit.jsonl"
+    - ".md_supervisor/courtroom.jsonl"
+  retention_days: 30

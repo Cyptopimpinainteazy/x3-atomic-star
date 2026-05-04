@@ -1,0 +1,194 @@
+# Combined CI workflow
+on:
+  push:
+    branches: [ main, feat/** ]
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/swarm-dashboard/**'
+      - 'tools/**'
+      - 'alembic/**'
+      - '.github/workflows/ci-swarm.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: test_swarm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found, skipping Python dependencies"
+          fi
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/test_swarm
+        run: |
+          if [ -f alembic.ini ]; then
+            alembic upgrade head
+          else
+            echo "No alembic.ini found, skipping migrations"
+          fi
+
+      - name: Run Python tests
+        env:
+          DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/test_swarm
+        run: |
+          if [ -d tests ]; then
+            pytest tests/
+          else
+            echo "No tests directory found, skipping Python tests"
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'apps/swarm-dashboard/package-lock.json'
+
+      - name: Install Node dependencies
+        working-directory: ./swarm-dashboard
+        run: npm ci || npm install --no-audit --no-fund
+
+      - name: Run Node unit tests
+        working-directory: ./swarm-dashboard
+        run: npm test --silent || true
+
+      - name: Build swarm-dashboard
+        working-directory: ./swarm-dashboard
+        run: npm run build --silent || true
+
+      - name: Run browserless tests (Lighthouse)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            http://localhost:3000/x3/swarm/contributors
+            http://localhost:3000/x3/swarm/
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+  evm-diagnostics:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event.pull_request != null
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y strace gdb
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run x3-evm-integration tests with tracing (capture diagnostics)
+        env:
+          CARGO_TERM_VERBOSE: 1
+          CARGO_NET_OFFLINE: 1
+          RUST_BACKTRACE: 1
+        shell: bash
+        run: |
+          set -eo pipefail
+          ulimit -c unlimited || true
+          mkdir -p artifacts
+
+          echo "Starting diagnostic run: strace + cargo test"
+
+          STRACE_PREFIX=strace.out
+          strace -ff -o ${STRACE_PREFIX} -s 200 -tt -f bash -lc 'cargo test -p x3-evm-integration --features frontier-executor -- --nocapture' || TEST_EXIT=$?
+          TEST_EXIT=${TEST_EXIT:-0}
+
+          if ls ${STRACE_PREFIX}* 1>/dev/null 2>&1; then
+            mv ${STRACE_PREFIX}* artifacts/ 2>/dev/null || true
+          fi
+
+          if ls core* 1>/dev/null 2>&1; then
+            mv core* artifacts/ 2>/dev/null || true
+          fi
+
+          dmesg | tail -n 200 > artifacts/dmesg.tail || true
+          tar -czf artifacts.tgz -C artifacts . || true
+          echo "TEST_EXIT=${TEST_EXIT}" > artifact-meta.txt
+          exit $TEST_EXIT
+
+      - name: Detect SIGILL and auto-open issue
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = 'artifacts';
+            const patterns = [/SIGILL/, /ILL_ILLOPN/];
+            const matches = [];
+
+            function walk(dir) {
+              const files = [];
+              if (!fs.existsSync(dir)) return files;
+              for (const f of fs.readdirSync(dir)) {
+                const p = `${dir}/${f}`;
+                const st = fs.statSync(p);
+                if (st.isDirectory()) files.push(...walk(p));
+                else files.push(p);
+              }
+              return files;
+            }
+
+            for (const f of walk(path)) {
+              try {
+                const content = fs.readFileSync(f, 'utf8');
+                for (const re of patterns) {
+                  if (re.test(content)) {
+                    matches.push(f);
+                    break;
+                  }
+                }
+              } catch (e) {
+                // binary files may throw; ignore
+              }
+            }
+
+            if (matches.length === 0) {
+              console.log('No SIGILL patterns found in artifacts.');
+            } else {
+              const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+              const prNumber = context.payload.pull_request && context.payload.pull_request.number ? context.payload.pull_request.number : null;
+              const title = `SIGILL observed in CI (run ${process.env.GITHUB_RUN_ID}${prNumber ? `, PR #${prNumber}` : ''})`;
+              let body = '';
+              const templatePath = '.github/ISSUE_TEMPLATE/sigill-crash-report.md';
+              if (fs.existsSync(templatePath)) {
+                body = fs.readFileSync(templatePath, 'utf8') + '\n\n';
+              }
+              body += `**Workflow run:** ${runUrl}\n`;
+              if (prNumber) body += `**Pull request:** #${prNumber}\n`;
+              body += `**Found in files:**\n${matches.map(f => `- ${f}`).join('\n')}\n\n`;
+              body += 'Artifacts: attached to workflow run (evm-sigill-diagnostics).\n';
+
+              const { data: issues } = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
+              if (!issues.some(i => i.title === title)) {
+                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['bug','diagnostics'] });
+                console.log(`Opened issue: ${title}`);
+              } else {
+                console.log('An open issue with the same title already exists; skipping creation.');
+              }
+            }

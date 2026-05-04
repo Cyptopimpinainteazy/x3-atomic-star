@@ -1,0 +1,38 @@
+name: X3 Phase 4 Audit Gate
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+concurrency:
+  group: x3-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phase-4-gate:
+    name: Phase 4 Rust Build + Launch Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (nightly for WASM)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-12-01
+          components: rustfmt, clippy, rust-src
+          targets: wasm32-unknown-unknown
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install wasm-opt (binaryen)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
+      - name: Run Phase 4 audit
+        run: |
+          chmod +x scripts/x3_audit.sh
+          bash scripts/x3_audit.sh --ci

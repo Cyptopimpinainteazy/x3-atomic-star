@@ -1,0 +1,39 @@
+name: Run SIGILL aggregator (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Lookback window in days'
+        required: false
+        default: '7'
+      min_runs:
+        description: 'Minimum runs for alerting'
+        required: false
+        default: '1'
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: sudo apt-get update -y && sudo apt-get install -y jq unzip curl || true
+
+      - name: Run aggregator script
+        run: |
+          chmod +x .github/scripts/aggregate-sigill-telemetry.sh
+          .github/scripts/aggregate-sigill-telemetry.sh --days ${{ github.event.inputs.days || '7' }} --min-runs ${{ github.event.inputs.min_runs || '1' }}
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigill-fallback-summary
+          path: artifacts/sigill-fallback-summary.json

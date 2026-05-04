@@ -1,0 +1,33 @@
+#!/bin/bash
+# ------------------------------------------------------------------
+#  THE BATON
+#  Convenience script for conducting the Orchestra.
+# ------------------------------------------------------------------
+
+CMD=$1
+
+case "$CMD" in
+    "start")
+        echo ">>> Lowering the Baton (Starting Concert)..."
+        python3 -m orchestra.concert
+        ;;
+    "status")
+        echo ">>> Inspecting the Pit (CLI View)..."
+        python3 -m orchestra.views.cli
+        ;;
+    "verify")
+        echo ">>> Checking Tuning (Compliance/Tests)..."
+        python3 -m orchestra.audit.compliance
+        python3 -m orchestra.tests.test_eligibility
+        ;;
+    "clear")
+        echo ">>> Resetting the Stage (Archive Queue)..."
+        mkdir -p .taskmaster/archive
+        mv .taskmaster/queue/* .taskmaster/archive/ 2>/dev/null
+        echo "Stage cleared."
+        ;;
+    *)
+        echo "Usage: ./baton {start|status|verify|clear}"
+        exit 1
+        ;;
+esac

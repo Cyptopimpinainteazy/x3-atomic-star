@@ -1,0 +1,27 @@
+name: Desktop Security Guardrails
+
+on:
+  pull_request:
+    paths:
+      - "apps/x3-desktop/**"
+      - "scripts/ci/check_desktop_security.sh"
+      - ".github/workflows/desktop-security-guardrails.yml"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "apps/x3-desktop/**"
+      - "scripts/ci/check_desktop_security.sh"
+      - ".github/workflows/desktop-security-guardrails.yml"
+
+jobs:
+  desktop-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce CSP and capability policy
+        run: scripts/ci/check_desktop_security.sh

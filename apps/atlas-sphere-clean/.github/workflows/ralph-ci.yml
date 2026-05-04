@@ -1,0 +1,43 @@
+name: Ralph CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  ralph-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install dependencies
+      run: |
+        cargo install cargo-tarpaulin || true
+        cargo install cargo-audit || true
+
+    - name: Run Ralph Auto (strict mode)
+      run: ./scripts/ralph/ralph-auto.sh --strict "" 1
+
+    - name: Run Coverage Check
+      run: |
+        ./scripts/ralph/ralph-check-coverage.sh
+
+    - name: Mark for Manual Review
+      if: always()
+      run: |
+        echo "Ralph CI completed. Manual review required for diff output."
+        echo "Check scripts/ralph/ralph-last.out for structured output."

@@ -1,0 +1,26 @@
+name: BMAD Integration
+
+on:
+  pull_request:
+    branches: [ main, feature/** ]
+  push:
+    branches: [ main ]
+
+jobs:
+  bmad-install:
+    name: Install BMAD Method
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install BMAD Method (alpha)
+        working-directory: ./crates/vibe-bmad
+        run: npm run install-bmad
+      - name: Verify BMAD CLI
+        run: npx bmad-method --version || npx bmad-method@alpha --version
+      - name: Run BMAD workflow init (CI-friendly)
+        working-directory: ./crates/vibe-bmad
+        run: npm run ci-init

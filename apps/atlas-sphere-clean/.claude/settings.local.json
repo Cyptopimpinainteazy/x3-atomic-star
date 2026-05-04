@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(git:*)",
+      "Bash(ollama:*)",
+      "Bash(claude mcp:*)",
+      "Bash(npx:*)",
+      "Bash(cargo:*)",
+      "Bash(make:*)",
+      "Bash(pytest:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)"
+    ],
+    "deny": []
+		},
+		"hooks": {
+			"SessionStart": [
+				{
+					"matcher": "",
+					"hooks": [
+						{
+							"type": "command",
+							"command": ""
+						}
+					]
+				}
+			]
+		}
+}

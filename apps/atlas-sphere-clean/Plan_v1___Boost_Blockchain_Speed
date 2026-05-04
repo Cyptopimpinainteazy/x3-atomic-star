@@ -1,0 +1,278 @@
+I have created the following plan after thorough exploration and analysis of the codebase. Follow the below plan verbatim. Trust the files and references. Do not re-verify what's written in the plan. Explore only when absolutely necessary. First implement all the proposed file changes and then I'll review all the changes together at the end.
+
+## Observations
+
+X3 Chain currently achieves **~581 TPS** (finalized, single validator) vs Solana's **~1,279 non-vote TPS** — roughly 2.2x behind. The architecture is Substrate-based: **Aura** (400ms slots) + **GRANDPA** (multi-round finality), sequential `BasicPool` transaction execution, and a custom tri-VM (EVM/SVM/X3). Critically, the multiprocess load test shows a **98.6% transaction rejection rate** (128,610 failed of 130,448 sent), which is the most urgent bottleneck. Crucially, the codebase already has `crates/contention-predictor` (ML-based parallel shard planner with graph coloring), `crates/x3-vm/src/gpu_hostcalls.rs` (GPU batch sig verification, PoH chain), and CUDA kernels — none of which are wired into the live block production path.
+
+## Approach
+
+The plan attacks bottlenecks in descending order of TPS impact: (1) fix the catastrophic pool rejection rate, (2) wire the existing `ContentionPredictor` into a parallel block proposer, (3) GPU-batch all signature verification, (4) halve block time, (5) replace GRANDPA with single-round BFT finality, (6) add PoH for leader-time ordering, and (7) implement Turbine-style block propagation. Each step builds on existing infrastructure rather than introducing new dependencies.
+
+---
+
+## Performance Gap & Target
+
+| Metric | Current X3 | Solana (non-vote) | Target X3 |
+|---|---|---|---|
+| Finalized TPS | 581 | 1,279 | >2,000 |
+| Block time | 400ms | ~400ms | 200ms |
+| Finality rounds | Multi (GRANDPA) | Single (Tower BFT) | Single |
+| Parallel execution | None | Sealevel (Rayon) | Shard-parallel |
+| Sig verification | Sequential | GPU batch | GPU batch |
+| Tx rejection rate | 98.6% (load) | <1% | <5% |
+
+---
+
+## Step 1 — Fix Transaction Pool Rejection Rate (Immediate, Highest Impact)
+
+**Problem**: The `BasicPool` in `node/src/service.rs` is rejecting 98.6% of transactions under load due to default capacity limits and nonce collision from concurrent senders.
+
+In `node/src/service.rs`, configure `sc_transaction_pool::BasicPool::new_full` with a custom `sc_transaction_pool::Options` struct:
+- Set `ready.count` to at least **100,000** (from the default ~8,192)
+- Set `future.count` to at least **50,000**
+- Set `ready.total_bytes` and `future.total_bytes` to match the 20MB block size
+- Set `ban_time` to a shorter duration to allow retry of temporarily rejected transactions
+
+In `node/src/service.rs`, pass a `PoolOptions` (or equivalent `sc_transaction_pool::Options`) to `BasicPool::new_full` before the `PartialComponents` are assembled. The pool options struct is the second argument to `BasicPool::new_full` — currently it uses `config.transaction_pool.clone()`. Override this by constructing a custom `sc_transaction_pool::Options` with the above limits and passing it instead.
+
+Additionally, in `node/src/chain_spec.rs` (or wherever the `ChainSpec` is built), ensure the `transaction_pool` config in the `Configuration` struct has `max_transactions_in_ready_queue` and `max_transactions_in_future_queue` set to large values via CLI defaults or chain spec overrides.
+
+---
+
+## Step 2 — Wire ContentionPredictor into a Parallel Block Proposer
+
+**Problem**: `sc_basic_authorship::ProposerFactory` executes transactions sequentially. The `ContentionPredictor` in `crates/contention-predictor` already implements graph-coloring shard planning but is not connected to block production.
+
+### 2a — Create `crates/parallel-proposer`
+
+Create a new crate `crates/parallel-proposer` that implements `sp_consensus::Proposer`. This crate:
+
+1. Wraps `sc_basic_authorship::ProposerFactory` for the base block-building scaffolding
+2. Before sealing a block, pulls the pending transaction batch from the pool
+3. Calls `ContentionPredictor::predict_and_shard()` on the batch's `TxMetadata` (sender, target, selector, gas_limit, nonce — all available from the extrinsic)
+4. For each `ShardGroup` returned, executes the group's transactions in parallel using `rayon::scope` or `tokio::task::spawn_blocking`
+5. Merges the resulting state diffs deterministically (writes from each shard are non-overlapping by construction of the graph coloring)
+6. Falls back to serial execution when `ContentionPredictor` returns a single shard (low-confidence path — already handled by `fallback::serial_execution`)
+
+The `TxMetadata` extraction from a Substrate extrinsic: decode the `Call` variant to extract the target pallet/function (maps to `selector`), the `AccountId` (maps to `sender`), and the `nonce` from the signed extension.
+
+### 2b — Replace ProposerFactory in `node/src/service.rs`
+
+In `new_full()`, replace:
+```
+sc_basic_authorship::ProposerFactory::new(...)
+```
+with `parallel_proposer::ParallelProposerFactory::new(...)`, passing the same `task_manager`, `client`, `transaction_pool`, `prometheus_registry`, and `telemetry` arguments, plus a `ContentionPredictor` instance with `PredictorConfig::default()`.
+
+Wire `update_heatmap()` into the finality notification stream (the `block-watcher` task already exists in `service.rs`) so the predictor learns from each finalized block's actual access patterns.
+
+```mermaid
+sequenceDiagram
+    participant Aura as Aura Slot Timer
+    participant PP as ParallelProposer
+    participant CP as ContentionPredictor
+    participant Rayon as Rayon Thread Pool
+    participant State as Runtime State
+
+    Aura->>PP: propose_block(slot)
+    PP->>PP: fetch pending TXs from pool
+    PP->>CP: predict_and_shard(tx_metadata[])
+    CP-->>PP: ShardGroup[] (conflict-free groups)
+    PP->>Rayon: spawn shard_0, shard_1, ..., shard_N in parallel
+    Rayon->>State: execute shard_0 TXs
+    Rayon->>State: execute shard_1 TXs (no overlap)
+    Rayon-->>PP: state diffs per shard
+    PP->>PP: merge diffs deterministically
+    PP-->>Aura: sealed block
+```
+
+---
+
+## Step 3 — GPU Batch Signature Verification
+
+**Problem**: Transaction signatures are verified one-by-one in the import queue. The CUDA kernels `cross-chain-gpu-validator/kernels/secp256k1_batch.cu` and `keccak256_batch.cu` already exist, and `crates/x3-vm/src/gpu_hostcalls.rs` exposes `handle_secp256k1_verify()` and `handle_keccak256_batch()`.
+
+### 3a — Create `crates/gpu-sig-verifier`
+
+Create a new crate `crates/gpu-sig-verifier` that exposes a `BatchSigVerifier` struct:
+- Accumulates `(pubkey, message_hash, signature)` tuples from incoming transactions
+- When the batch reaches a configurable threshold (e.g., 256 signatures) or a time deadline (e.g., 5ms), flushes the batch to the GPU via `GpuHostcalls::handle_secp256k1_verify()` (already implemented in `crates/x3-vm/src/gpu_hostcalls.rs`)
+- Returns a `Vec<bool>` of verification results in the same order
+
+### 3b — Integrate into the Aura Import Queue
+
+In `node/src/service.rs`, the Aura import queue is created via `sc_consensus_aura::import_queue`. The `create_inherent_data_providers` closure runs per block. Wrap the block import with a custom `BlockImportWrapper` that:
+1. Extracts all extrinsics from the incoming block
+2. Sends their signatures to `BatchSigVerifier`
+3. Only proceeds with import if all signatures verify
+4. Falls back to CPU verification if GPU is unavailable (the `GpuHostcalls::is_available()` check already exists)
+
+---
+
+## Step 4 — Halve Block Time to 200ms
+
+In `runtime/src/lib.rs`, change:
+```
+pub const MILLISECS_PER_BLOCK: u64 = 400;
+```
+to:
+```
+pub const MILLISECS_PER_BLOCK: u64 = 200;
+```
+
+This requires bumping `spec_version` from `2` to `3` in the `VERSION` constant. `SLOT_DURATION` and `MinimumPeriod` derive from this constant automatically.
+
+Also increase `BlockWeights` proportionally — the current `60 * WEIGHT_REF_TIME_PER_SECOND` was sized for 400ms blocks. With 200ms blocks, reduce to `30 * WEIGHT_REF_TIME_PER_SECOND` to keep per-block work proportional, or keep it at 60s to allow larger blocks (more TPS per block at the cost of higher hardware requirements — recommended for a high-performance chain).
+
+---
+
+## Step 5 — Replace GRANDPA with Single-Round Flash Finality
+
+**Problem**: GRANDPA requires two voting rounds (prevote + precommit) with network round-trips between each, adding 1-3 seconds of finality latency. Solana's Tower BFT finalizes in a single round.
+
+### 5a — Create `crates/flash-finality`
+
+Implement a HotStuff-inspired single-round BFT finality gadget:
+
+- **Leader** (current Aura slot author) broadcasts a `Proposal(block_hash, slot, leader_sig)`
+- **Validators** respond with `Vote(block_hash, slot, validator_sig)` within a 100ms window
+- Once the leader collects 2/3+ votes, it broadcasts a `Certificate(block_hash, aggregated_sigs)`
+- Any node receiving a valid `Certificate` marks the block as finalized immediately
+
+The `Certificate` is a threshold signature aggregate (use the existing `crates/quantum-crypto` if it contains BLS or Schnorr aggregation, otherwise use `ed25519` multi-sig with the existing `GpuHostcalls::handle_ed25519_verify()` for batch verification of the vote set).
+
+### 5b — Integrate into `node/src/service.rs`
+
+In `new_full()`:
+- Remove the `sc_consensus_grandpa::run_grandpa_voter` task
+- Remove `grandpa_block_import` wrapper (or keep it as a no-op for compatibility)
+- Spawn `flash_finality::run_flash_finality_voter(FlashFinalityParams { ... })` instead
+- The `FlashFinalityParams` takes the same `network`, `client`, `keystore`, `sync_service` as GRANDPA
+
+The `grandpa_protocol_name` and `grandpa_peers_set_config` in `net_config` should be replaced with a `flash_finality_protocol_name` and corresponding peers set config.
+
+```mermaid
+sequenceDiagram
+    participant Leader as Aura Leader
+    participant V1 as Validator 1
+    participant V2 as Validator 2
+    participant V3 as Validator 3
+
+    Leader->>V1: Proposal(block_hash, slot)
+    Leader->>V2: Proposal(block_hash, slot)
+    Leader->>V3: Proposal(block_hash, slot)
+    V1-->>Leader: Vote(block_hash, sig_1)
+    V2-->>Leader: Vote(block_hash, sig_2)
+    V3-->>Leader: Vote(block_hash, sig_3)
+    Leader->>Leader: aggregate 2/3+ votes → Certificate
+    Leader->>V1: Certificate(block_hash, agg_sig)
+    Leader->>V2: Certificate(block_hash, agg_sig)
+    Leader->>V3: Certificate(block_hash, agg_sig)
+    Note over V1,V3: Block finalized in 1 round (~100ms)
+```
+
+---
+
+## Step 6 — Proof of History Integration
+
+**Problem**: Validators must communicate to agree on time ordering. PoH eliminates this by providing a verifiable sequential hash chain that proves time has passed.
+
+The GPU `PohChain` hostcall already exists in `crates/x3-vm/src/gpu_hostcalls.rs` (hostcall ID `0xD2` based on the header). The CUDA SHA-256 batch kernel in `cross-chain-gpu-validator/kernels/keccak256_batch.cu` can be adapted for PoH.
+
+### 6a — Create `crates/poh-generator`
+
+Implement a `PohGenerator` that:
+- Runs a continuous SHA-256 hash chain: `hash[n+1] = SHA256(hash[n])`
+- Uses `GpuHostcalls::handle_sha256_poh()` (the streamed PoH hostcall) for GPU acceleration
+- Inserts transaction hashes into the chain at the moment they are received: `hash[n+1] = SHA256(hash[n] || tx_hash)`
+- Exposes `current_tick()` and `mix_transaction(tx_hash)` APIs
+- Produces a `PohEntry { num_hashes, hash, transaction }` sequence
+
+### 6b — Embed PoH into Block Headers
+
+Add a `poh_hash: [u8; 32]` field to the block header (via a custom `DigestItem` in the runtime) that contains the PoH hash at the time of block production. This allows any validator to verify the time ordering of transactions within the block without additional communication.
+
+In `pallets/x3-kernel` or a new `pallets/poh` pallet, add an inherent that the block author must include: the current PoH sequence covering all transactions in the block.
+
+### 6c — Use PoH in Flash Finality
+
+In `crates/flash-finality`, validators verify the PoH sequence in the block before voting. This replaces the need for validators to communicate about time — the PoH proves the leader spent real time producing the block.
+
+---
+
+## Step 7 — Turbine Block Propagation
+
+**Problem**: Standard libp2p gossip requires each validator to receive the full block from the leader, creating O(N) bandwidth on the leader. Solana's Turbine uses erasure-coded tree propagation.
+
+### 7a — Create `crates/turbine`
+
+Implement erasure-coded block propagation:
+
+1. **Shredding**: The block author splits the block into fixed-size **shreds** (e.g., 1232 bytes each, matching Solana's MTU-optimized size). Add Reed-Solomon erasure coding so any 2/3 of shreds can reconstruct the full block.
+
+2. **Tree propagation**: Organize validators into a propagation tree (depth ~log₂(N)). The leader sends different shreds to each root-level validator; each root-level validator forwards to its subtree. Each validator only needs to receive and forward a fraction of the total block data.
+
+3. **Integration**: In `node/src/network.rs` (or `node/src/service.rs`), replace the standard block announcement with a `TurbineBlockPropagator` that:
+   - On block production: shreds the block and distributes shreds to the tree
+   - On block receipt: collects shreds, reconstructs the block, forwards remaining shreds to subtree peers
+
+Use the existing `sc_network` notification protocol infrastructure (already used for GRANDPA) to add a `turbine` notification protocol.
+
+---
+
+## Step 8 — Gulf Stream Transaction Forwarding
+
+**Problem**: All transactions go to the current node's mempool, creating a bottleneck. Solana's Gulf Stream forwards transactions directly to the next leader.
+
+### 8a — Implement Leader Schedule in `node/src/authority.rs`
+
+The Aura slot schedule is deterministic — given the current slot and the authority set, the next N leaders are known. Expose a `next_leader(slot_offset: u32) -> AuthorityId` function.
+
+### 8b — Create `crates/gulf-stream`
+
+Implement a `TransactionForwarder` that:
+- Intercepts incoming transactions at the RPC layer (in `node/src/rpc.rs` or the RPC middleware)
+- Looks up the next 4 leaders using `next_leader()`
+- Forwards the transaction directly to those leaders' RPC endpoints via HTTP/WebSocket
+- The receiving leader adds the transaction to its local pool with elevated priority
+
+This reduces the time between transaction submission and inclusion from up to 1 full slot to near-zero.
+
+---
+
+## Step 9 — Runtime Weight & Block Capacity Tuning
+
+In `runtime/src/lib.rs`, after the block time reduction:
+
+- Increase `MaxAuthorities` from 100 to 200 to support a larger validator set for better decentralization without sacrificing speed
+- Tune `BlockWeights` to allow more transactions per block: the current `60 * WEIGHT_REF_TIME_PER_SECOND` with 200ms blocks means each block can hold 12 seconds of sequential work — with parallel execution (Step 2), this effectively multiplies by the number of parallel shards
+- Increase `DefaultEvmGasLimit` proportionally if EVM transactions are a significant workload
+
+---
+
+## Summary of Expected TPS Gains
+
+```mermaid
+graph TD
+    A[Current: 581 TPS] --> B[Step 1: Fix Pool Rejection\n+300% under load]
+    B --> C[Step 2: Parallel Execution\n×4-8x on non-conflicting TXs]
+    C --> D[Step 3: GPU Batch Sig Verify\n-40% validation overhead]
+    D --> E[Step 4: 200ms Block Time\n×2x block rate]
+    E --> F[Step 5: Flash Finality\n-80% finality latency]
+    F --> G[Step 6: PoH\nEliminate time-ordering comms]
+    G --> H[Step 7: Turbine Propagation\nScale to 200+ validators]
+    H --> I[Target: >2,000 TPS finalized]
+```
+
+| Step | Change | Files | Expected Gain |
+|---|---|---|---|
+| 1 | Pool capacity limits | `node/src/service.rs` | Fix 98.6% rejection |
+| 2 | Parallel proposer + ContentionPredictor | `crates/parallel-proposer` (new), `node/src/service.rs` | 4-8× TPS |
+| 3 | GPU batch sig verify | `crates/gpu-sig-verifier` (new), `node/src/service.rs` | -40% overhead |
+| 4 | Block time 400ms→200ms | `runtime/src/lib.rs` | 2× block rate |
+| 5 | Flash Finality (single-round BFT) | `crates/flash-finality` (new), `node/src/service.rs` | -80% finality latency |
+| 6 | PoH integration | `crates/poh-generator` (new), `pallets/poh` (new) | Eliminate time-ordering overhead |
+| 7 | Turbine propagation | `crates/turbine` (new), `node/src/network.rs` | Scale validator set |
+| 8 | Gulf Stream forwarding | `crates/gulf-stream` (new), RPC layer | Reduce submission latency |
+
+**Implementation order**: Steps 1 → 4 → 2 → 3 → 5 → 6 → 7 → 8. Steps 1 and 4 are configuration changes with immediate measurable impact. Step 2 is the highest-complexity, highest-reward change and should be the primary engineering focus.

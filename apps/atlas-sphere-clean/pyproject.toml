@@ -1,0 +1,71 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+include = [
+    "tests/**/*.py",
+    "scripts/**/*.py",
+    "deployment/**/*.py",
+    "tools/**/*.py",
+]
+extend-exclude = [
+    "tests/security/lib/**",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (undefined names, unused imports)
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # bugbear (likely bugs, performance issues)
+    "C4",  # comprehension improvements
+    "SIM", # simplify
+    "RUF", # ruff-specific rules
+    "S",   # bandit security rules
+    "T20", # flake8-print (flag print statements in non-scripts)
+    "ERA", # eradicate obvious commented-out code
+]
+ignore = [
+    "S101",    # Use of `assert` — fine in tests
+    "T201",    # `print` found — intentional in CLI scripts
+    "ERA001",  # Commented-out code — warn only, no hard fail
+    "S110",    # try-except-pass — deliberate in resilient chain orchestration
+    "S603",    # subprocess without shell=True — audited by semgrep separately
+    "S607",    # partial path in subprocess — project-controlled scripts only
+    "S310",    # urllib open — tests/scripts use requests
+    "RUF001",  # ambiguous unicode in strings — international endpoint names
+    "RUF002",  # ambiguous unicode in docstrings
+    "RUF003",  # ambiguous unicode in comments — documentation convention
+    "E501",    # line-length — 120 set above; residual long lines tolerated
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "T20"]
+"**/test_*.py" = ["S", "T20"]
+"**/*_test.py" = ["S", "T20"]
+"scripts/testnet/**" = ["S", "T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tests"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+reportMissingImports = true
+reportMissingTypeStubs = false   # many chain deps lack stubs
+reportUnusedImport = true
+reportUnusedVariable = true
+reportUntypedFunctionDecorator = false
+include = ["tests", "scripts", "deployment"]
+exclude = [
+    ".venv-p4",
+    ".venv",
+    "node_modules",
+    "**/__pycache__",
+]

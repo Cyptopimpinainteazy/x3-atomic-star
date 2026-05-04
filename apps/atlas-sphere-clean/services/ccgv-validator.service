@@ -1,0 +1,31 @@
+[Unit]
+Description=Cross-Chain GPU Validator
+Documentation=https://github.com/Cyptopimpinainteazy/x3-chain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lojak
+WorkingDirectory=/home/lojak/Desktop/x3-chain-master/cross-chain-gpu-validator
+
+# Activate virtual environment and start service
+ExecStart=/bin/bash -c 'source .venv/bin/activate && python -m cross_chain_gpu_validator.cli serve --host 0.0.0.0 --port 8000'
+
+# Environment
+Environment="CCGV_USE_MOCK_RPC=true"
+Environment="CCGV_REQUIRE_GPU=false"
+Environment="CCGV_LOG_LEVEL=INFO"
+
+# Restart policy
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryLimit=2G
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target

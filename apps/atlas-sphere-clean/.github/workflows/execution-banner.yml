@@ -1,0 +1,28 @@
+name: Execution Banner / Test-change policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: ["**"]
+
+jobs:
+  enforce-banner:
+    name: Enforce execution banner and test-change policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Print execution banner
+        run: scripts/print_execution_banner.sh
+
+      - name: Run test-change policy check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          # fall back to origin/main inside the script if BASE_SHA is empty
+          scripts/check_test_changes.sh "$BASE_SHA" "$HEAD_SHA"

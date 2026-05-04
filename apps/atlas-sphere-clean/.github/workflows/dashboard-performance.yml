@@ -1,0 +1,189 @@
+name: Dashboard Performance Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/swarm-dashboard/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/swarm-dashboard/**'
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+
+jobs:
+  lighthouse:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: 'apps/swarm-dashboard/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: apps/swarm-dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/swarm-dashboard
+        run: npm run build
+
+      - name: Start preview server
+        working-directory: apps/swarm-dashboard
+        run: npm run preview &
+        timeout-minutes: 1
+
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:4173; then
+              echo "✅ Server ready"
+              exit 0
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
+          echo "❌ Server failed to start"
+          exit 1
+
+      - name: Run Lighthouse
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          configPath: './apps/swarm-dashboard/.lighthouserc.json'
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |-
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('./apps/swarm-dashboard/.lighthouse/desktop.json', 'utf8'));
+            const scores = results.categories;
+            const perf = Math.round(scores.performance.score * 100);
+            const a11y = Math.round(scores.accessibility.score * 100);
+            const bp = Math.round(scores["best-practices"].score * 100);
+            const seo = Math.round(scores.seo.score * 100);
+            const comment = [
+              "## Lighthouse Audit Results",
+              "",
+              "| Category | Score |",
+              "| --- | --- |",
+              "| Performance | " + perf + " |",
+              "| Accessibility | " + a11y + " |",
+              "| Best Practices | " + bp + " |",
+              "| SEO | " + seo + " |",
+              "",
+              "[View full report](" + results.finalUrl + ")"
+            ].join("\n");
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+        continue-on-error: true
+
+  bundle-analysis:
+    name: Bundle Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: 'apps/swarm-dashboard/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: apps/swarm-dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/swarm-dashboard
+        run: npm run build
+
+      - name: Analyze bundle
+        working-directory: apps/swarm-dashboard
+        run: |
+          npm install -D esbuild-visualizer
+          npx esbuild-visualizer --bundle dist/assets/*.js --open false || true
+
+      - name: Generate report
+        working-directory: apps/swarm-dashboard
+        run: |
+          find dist -name "*.js" -exec sh -c 'echo "{}:"; wc -c "{}"; echo' \; | sort -k3 -rn | head -20
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: apps/swarm-dashboard/dist
+        continue-on-error: true
+
+  performance-regression:
+    name: Performance Regression Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: 'apps/swarm-dashboard/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: apps/swarm-dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/swarm-dashboard
+        run: npm run build
+
+      - name: Measure build time
+        id: measure
+        working-directory: apps/swarm-dashboard
+        run: |
+          # Clear cache
+          rm -rf node_modules/.vite
+          
+          # Measure build time
+          START=$(date +%s%N)
+          npm run build > /dev/null 2>&1
+          END=$(date +%s%N)
+          
+          BUILD_TIME=$(( (END - START) / 1000000 ))
+          echo "build-time=$BUILD_TIME" >> $GITHUB_OUTPUT
+          echo "⏱️ Build time: ${BUILD_TIME}ms"
+
+      - name: Check size
+        working-directory: apps/swarm-dashboard
+        run: |
+          GZIP_SIZE=$(du -sb dist | awk '{print $1}')
+          echo "📦 Dist size: $(($GZIP_SIZE / 1024))KB"
+          
+          # Fail if size exceeds threshold
+          if [ $GZIP_SIZE -gt 2097152 ]; then
+            echo "❌ Bundle size exceeds 2MB"
+            exit 1
+          fi

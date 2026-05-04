@@ -1,0 +1,174 @@
+I have the following comments after thorough review of file. Implement the comments by following the instructions verbatim.
+
+---
+## Comment 1: RuntimeCrossVmDispatcher::execute_svm_tx always returns a failure result for every cross-VM SVM call.
+
+In `crates/x3-bridge-adapters/src/lib.rs`, implement `execute_svm_tx` to route through the runtime API. Add a `submit_svm_instruction` method to `AtlasKernelRuntimeApi` in `pallets/x3-kernel/src/lib.rs` that accepts a 32-byte program_id and instruction data, invokes the `RbpfSvmAdapter` or the `svm-runtime` pallet's execute path, and returns a receipt. Implement this in `runtime/src/lib.rs` analogously to `submit_evm_transaction`. Then update `execute_svm_tx` in `x3-bridge-adapters` to call this new API endpoint instead of returning a hardcoded failure.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge-adapters/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-kernel/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+---
+## Comment 2: submit_evm_transaction runtime API ignores caller identity and accepts arbitrary raw bytes as EVM payload without proper RLP decoding.
+
+1. In `runtime/src/lib.rs`, update `submit_evm_transaction` to call `pallet_evm::Runner::call` (already done for `call_evm`) rather than the X3 kernel adapter, passing the decoded `to`, `value`, `data`, and caller fields. 2. Define a proper encoding contract for the RPC-to-runtime payload or implement full RLP decoding using the `rlp` crate. 3. In `RuntimeCrossVmDispatcher::execute_evm_tx`, either send a properly RLP-encoded transaction or use the separate `call_evm` runtime API that already uses the Frontier runner correctly. 4. Enforce caller authentication by requiring a signed origin or at minimum logging the caller address in the EVM context.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge-adapters/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-kernel/src/adapters.rs
+---
+## Comment 3: Testnet and production chain specs use mnemonic-derived seeds instead of real validator keys, creating a critical key-management gap.
+
+1. For `testnet_config()` and `production_config()` in `node/src/chain_spec.rs`, replace the mnemonic-derived authorities with keys loaded from external sources: either a JSON key file, environment variables, or an on-chain key registration flow. 2. Add a compile-time or startup assertion that rejects loading if any well-known development seed (`Alice`, `Bob`, `TestnetAlpha`, `ValidatorAlpha`, etc.) is detected in `ChainType::Live` specs. 3. Document a key ceremony procedure in `X3_DEPLOYMENT_SOP.md` that generates fresh sr25519/ed25519 key pairs using `subkey` and injects them via `--keystore-path`.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/chain_spec.rs
+- /home/lojak/Desktop/x3-chain-master/X3_DEPLOYMENT_SOP.md
+---
+## Comment 4: HTLC adapter stores signer private keys as plain in-memory byte arrays with no HSM or keystore protection.
+
+1. Replace `pub signer_key: [u8; 32]` and `pub signer: [u8; 64]` in `EvmHtlcAdapter` and `SvmHtlcAdapter` with a trait object like `Arc<dyn Signer>` that abstracts signing without exposing the raw key bytes. 2. Implement a `FileSigner` that loads keys from an encrypted keystore (e.g., using the existing `sc-keystore` or an external KMS adapter) and zeroes memory on drop using `zeroize`. 3. Remove the `pub` visibility from the signer fields as an immediate stopgap to prevent accidental exposure via debug printing.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/cross-vm-coordinator/src/htlc.rs
+- /home/lojak/Desktop/x3-chain-master/crates/cross-vm-coordinator/src/relayer.rs
+---
+## Comment 5: GRANDPA key-ownership and equivocation proof methods always return None, disabling slashing and finality safety.
+
+Implement `generate_key_ownership_proof` in `runtime/src/lib.rs` by adding `pallet_grandpa::historical` support. Specifically: 1. Add `pallet-session` with the `historical` feature and configure `pallet_grandpa::Config::KeyOwnerProofSystem` to use `pallet_session::historical::Proof`. 2. Implement `generate_key_ownership_proof` to call `Historical::prove((sp_consensus_grandpa::KEY_TYPE, authority_id))`. 3. Implement `submit_report_equivocation_unsigned_extrinsic` to call `Grandpa::submit_unsigned_equivocation_report(...)`. This is standard Substrate boilerplate and is required before any cross-chain verifier can validate GRANDPA-anchored finality proofs.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-atomic-kernel/src/lib.rs
+---
+## Comment 6: Ethereum bridge lock_on_ethereum uses u64 subtraction for block-number confirmations with potential underflow.
+
+In `crates/x3-bridge/src/ethereum_bridge.rs`, change the confirmation calculation to use `current_block.saturating_sub(deposit.eth_block)` and add an explicit check: if `current_block < deposit.eth_block { return Err("block number regression detected"); }`. Add a similar guard to `L2Bridge::confirm_deposit` in `l2_bridge.rs` which has the same pattern.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge/src/ethereum_bridge.rs
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge/src/l2_bridge.rs
+---
+## Comment 7: AtomicSwap escrow address in dispatch_operation is the zero address, conflating the bridge escrow with the null account.
+
+1. Define a proper bridge escrow contract address and program ID in the runtime configuration (e.g., as `type BridgeEvmEscrow: Get<H160>` and `type BridgeSvmEscrow: Get<[u8; 32]>` in the pallet `Config`). 2. In `dispatch_operation` for `AtomicSwap`, use these configured addresses instead of hardcoded zeros. 3. Deploy an actual AtlasHTLC escrow contract at the configured EVM address for testnet. 4. Update the integration tests to validate that the escrow address is non-zero and callable.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/cross-vm-bridge/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-kernel/src/lib.rs
+---
+## Comment 8: BtcHtlcParams::ripemd160 uses SHA-256 instead of RIPEMD-160, generating incorrect P2SH addresses.
+
+In `pallets/x3-settlement-engine/src/btc_gateway.rs`, replace the `ripemd160` helper with a correct RIPEMD-160 implementation. Add `ripemd` crate (e.g., `ripemd = { version = "0.1", default-features = false }`) to the settlement engine's `Cargo.toml`, and implement `ripemd160` using `ripemd::Ripemd160::digest(data)`. Update `to_p2sh_address` to call `ripemd160(&sha256_hash)` with the proper ordering. Add a test vector from the Bitcoin test suite to guard against regressions.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/btc_gateway.rs
+---
+## Comment 9: The duplicate enable_grandpa computation in new_full creates a subtle shadow that can diverge from compute_enable_grandpa.
+
+In `node/src/service.rs`, remove the re-declaration at line 396 (`let mut enable_grandpa = !config.disable_grandpa;`). Instead, replace with `let mut enable_grandpa = enable_grandpa;` (converting the earlier immutable binding to mutable) or restructure the code to use only the result of `compute_enable_grandpa` throughout `new_full`. Ensure the subsequent `if feature_flags.enable_flash_finality { enable_grandpa = false; }` block is also removed if it duplicates what `compute_enable_grandpa` already handles.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/service.rs
+---
+## Comment 10: EVM call and gas estimate APIs use H160::zero() as the caller, bypassing authorization and fee deduction.
+
+In `runtime/src/lib.rs`, update `call_evm` and `estimate_evm_gas` to accept a caller address parameter (or an optional one defaulting to zero only for pure read-only simulation). Map the RPC-level caller hex address through `AtlasKernelRuntimeApi::map_evm_address` and pass it as `source` to `Runner::call`. For `eth_estimateGas`, passing zero is acceptable if gas cost is computed without state mutation, but document this explicitly in the API comment.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/node/src/rpc_frontier.rs
+---
+## Comment 11: x3_submitCrossVmTransaction RPC ignores the svm_payload field entirely, silently dropping half of every cross-VM request.
+
+In `node/src/rpc.rs`, implement the full `x3_submitCrossVmTransaction` handler to: (1) decode both `evm_payload` and `svm_payload`, (2) construct a `CrossVmOperation::AtomicSwap` or `submit_cross_vm_operation` extrinsic depending on the `atomic` flag, and (3) route through the kernel's 2PC pipeline via `x3_kernel::submit_cross_vm_operation`. If a full implementation is not ready for testnet, change the handler to return an explicit `not implemented` error instead of silently ignoring the SVM leg.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/rpc.rs
+---
+## Comment 12: Flash Finality key falls back to a hardcoded mock `[0xAA; 32]` if no keystore key exists, creating a predictable signer identity.
+
+In `node/src/service.rs`, replace the `unwrap_or([0xAA; 32])` fallback with an explicit error or warning that disables Flash Finality entirely when the key is missing. Specifically, if no `flsh` key is found, log a `log::warn!` and set `flash_finality_gadget = None` to disable the feature. Add documentation to `NODE_REQUIREMENTS.md` and `X3_DEPLOYMENT_SOP.md` explaining how to insert a Flash Finality key via `subkey` or the RPC method.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/service.rs
+- /home/lojak/Desktop/x3-chain-master/NODE_REQUIREMENTS.md
+---
+## Comment 13: is_svm_program uses canonical balance > 0 as a proxy for program existence, which is semantically incorrect.
+
+In `runtime/src/lib.rs`, update `is_svm_program` to check the `pallet_svm_runtime::Programs` storage map rather than the canonical balance. Specifically, use `pallet_svm_runtime::Programs::<Runtime>::contains_key(&program_id_as_pubkey)` where `program_id_as_pubkey` is derived from the 32-byte SVM pubkey. This accurately reflects the on-chain deployed program registry.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/svm-runtime/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge-adapters/src/lib.rs
+---
+## Comment 14: L2 Merkle proof hash function uses XOR instead of cryptographic hashing, making proofs trivially forgeable.
+
+In `crates/x3-bridge/src/l2_bridge.rs`, replace the `hash_pair` method with a proper double-SHA256 (Bitcoin-style) or Keccak256 (Ethereum/Optimism-style) hash. Use `sp_io::hashing::sha2_256` to hash the concatenation of both 32-byte inputs, then hash again for double-SHA256, or use `sp_io::hashing::keccak_256` for compatibility with the Optimism output root format. Ensure the `verify_output_root` chain also uses this real hash function.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge/src/l2_bridge.rs
+---
+## Comment 15: EthereumBridge validator signature verification is a no-op: all signatures are accepted regardless of content.
+
+In `crates/x3-bridge/src/ethereum_bridge.rs`, implement proper ECDSA signature verification in `execute_mint`. For each `ValidatorSignature`, use `sp_io::crypto::secp256k1_ecdsa_recover_compressed` to verify that the signature over `message.message_hash` was produced by one of the registered `self.validators[validator_id]` addresses. If any signature fails verification, reject the entire mint. Move validator storage from `Vec<String>` (addresses) to `Vec<[u8; 20]>` (H160) to enable proper address recovery comparison.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge/src/ethereum_bridge.rs
+---
+## Comment 16: EvmHtlcAdapter::claim_htlc calls eth_send_raw_tx with calldata hex but the relayer has no actual transaction signing implementation.
+
+In `crates/cross-vm-coordinator/src/htlc.rs`, implement proper EIP-1559 transaction construction and signing in `claim_htlc`: (1) fetch the current nonce for the signer address, (2) construct an EIP-1559 transaction with `to = self.htlc_contract`, `data = calldata`, and appropriate gas fields, (3) sign with `self.signer_key` using secp256k1 ECDSA, (4) RLP-encode the signed transaction, and (5) submit via `eth_sendRawTransaction`. Remove the fallback hash generation that masks failures. Add the `ethers` or `alloy` crate as a dependency for transaction construction.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/cross-vm-coordinator/src/htlc.rs
+---
+## Comment 17: BtcAdaptorSignature::extract_secret uses wrapping_sub for scalar arithmetic, not secp256k1 modular subtraction.
+
+In `pallets/x3-settlement-engine/src/btc_gateway.rs`, replace the byte-by-byte wrapping subtraction in `extract_secret` with proper 256-bit integer arithmetic. Parse `s_complete` and `s_pre` as big-endian `u256` scalars, compute their difference modulo the secp256k1 order `n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141`, and encode the result back as 32 big-endian bytes. Use the `k256` or `secp256k1` crate (already likely available in the workspace for sr25519 support).
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/btc_gateway.rs
+---
+## Comment 18: cross-vm-bridge on_initialize expiry scans Executing bundles in an unbounded full-storage iteration per block.
+
+Add a secondary storage index for `Executing` bundles in `pallet-x3-atomic-kernel`, analogous to `DeadlineIndex`. Maintain an `ExecutingBundles: StorageMap<_, Blake2_128Concat, BlockNumberFor<T>, BoundedVec<H256, MaxLegsPerBundle>, ValueQuery>` keyed by the block when they transitioned to `Executing`. In the OCW, only iterate over bundles indexed at the current block rather than scanning all bundles. Alternatively, maintain a `BoundedVec` of currently executing bundle IDs in a `StorageValue`.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-atomic-kernel/src/lib.rs
+---
+## Comment 19: Cross-VM escrow lock transfers to the empty address `[]` which is semantically wrong and causes the overlay to track a phantom account.
+
+In `crates/x3-bridge-adapters/src/lib.rs`, redesign `lock_internal` to not use `transfer` for the lock step. Instead: (1) load the `from` balance into the overlay via `ensure_loaded`, (2) check that the balance is sufficient, (3) directly mutate the overlay to debit `from` without crediting any escrow address, and (4) record the locked amount only in the `tickets` map. The release step credits `to` directly. This avoids the empty-slice phantom account entirely.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/crates/x3-bridge-adapters/src/lib.rs
+---
+## Comment 20: Testnet bootnodes list is empty in all chain specs, requiring manual out-of-band peer discovery for every testnet peer.
+
+In `node/src/chain_spec.rs`, populate the bootnodes field in `testnet_config()` and `staging_config()` with the actual testnet bootnode multiaddrs. Read them from a static array or environment variable (e.g., `TESTNET_BOOTNODES`). The multiaddr format is `/ip4/<ip>/tcp/<port>/p2p/<peer_id>`. Load the peer ID from the `deployment/keys/bootnode-info.txt` file during chain spec build or embed the known testnet bootnode peers directly. Update `X3_DEPLOYMENT_SOP.md` with bootnode registration steps.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/chain_spec.rs
+- /home/lojak/Desktop/x3-chain-master/deployment/keys/bootnode-info.txt
+- /home/lojak/Desktop/x3-chain-master/X3_DEPLOYMENT_SOP.md
+---
+## Comment 21: Cross-VM integration test cross-vm-atomic-test.rs only uses simulated (in-memory) execution, not the real pallet runtime.
+
+Extend `integration-tests/cross-vm-atomic-test.rs` to use real pallet `TestExternalities` with the mock runtime (analogous to `integration-tests/cross-vm-pallet-test.rs`). Replace the simulated `execute_evm_payload`/`execute_svm_payload` with calls to `AtomicKernel::submit_atomic_bundle`, `AtomicKernel::assign_bundle_executor`, and `AtomicKernel::finalize_atomic_bundle` using the test-mock adapters. Add at least one test that exercises the OCW finalization path with a non-zero receipt root and a Flash Finality cert anchor.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/integration-tests/cross-vm-atomic-test.rs
+- /home/lojak/Desktop/x3-chain-master/integration-tests/cross-vm-pallet-test.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-atomic-kernel/src/lib.rs
+---
+## Comment 22: Transaction pool config is tuned in two places in new_partial with conflicting values, with the manual override silently replacing tune_transaction_pool_config.
+
+In `node/src/service.rs`, remove the manual `txpool_config` override block (lines 242–253) from `new_partial` and instead pass the already-tuned `config.transaction_pool` directly to `BasicPool::new_full`. Ensure `tune_transaction_pool_config` is the single source of truth for pool sizing. If `new_partial` needs different limits than `new_full`, expose a dedicated `PoolConfig` parameter rather than duplicating the tuning inline.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/service.rs
+---

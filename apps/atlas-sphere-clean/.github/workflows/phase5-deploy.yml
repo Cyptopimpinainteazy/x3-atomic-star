@@ -1,0 +1,323 @@
+name: Phase 5 Jury Anchoring - Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pallets/x3-jury-anchor/**'
+      - 'swarm/jury/anchorer.py'
+      - 'packages/blockchain-adapter/src/jury-anchoring.ts'
+      - 'tests/test_jury_anchoring.py'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/phase5-deploy.yml'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  test:
+    name: Test Phase 5 Components
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - rust
+          - python
+          - typescript
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        if: matrix.component == 'rust'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Test Rust Pallet
+        if: matrix.component == 'rust'
+        run: |
+          cd pallets/x3-jury-anchor
+          cargo test --lib 2>&1 | tee test-results.log
+          if grep -q "test result: FAILED\|error\[" test-results.log; then
+            echo "❌ Rust tests failed"
+            exit 1
+          fi
+          echo "✓ Rust pallet tests passed"
+
+      - name: Setup Python
+        if: matrix.component == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Test Python Anchorer
+        if: matrix.component == 'python'
+        run: |
+          pip install -q pytest aiohttp pydantic pydantic-settings
+          pytest tests/test_jury_anchoring.py -v --tb=short
+          if [ $? -ne 0 ]; then
+            echo "❌ Python tests failed"
+            exit 1
+          fi
+          echo "✓ Python tests passed"
+
+      - name: Setup Node
+        if: matrix.component == 'typescript'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Test TypeScript
+        if: matrix.component == 'typescript'
+        run: |
+          cd packages/blockchain-adapter
+          npm install --silent
+          npm run build 2>&1 | tee build.log
+          if grep -q "error" build.log; then
+            echo "❌ TypeScript build failed"
+            exit 1
+          fi
+          echo "✓ TypeScript build succeeded"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'pallets/x3-jury-anchor'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Rust pallet image
+        uses: docker/build-push-action@v4
+        with:
+          context: pallets/x3-jury-anchor
+          file: pallets/x3-jury-anchor/Dockerfile
+          push: false
+          tags: |
+            x3-jury-anchor:latest
+            x3-jury-anchor:${{ github.sha }}
+
+      - name: Build and push Python anchorer image
+        uses: docker/build-push-action@v4
+        with:
+          context: swarm/jury
+          file: swarm/jury/Dockerfile
+          push: false
+          tags: |
+            x3-jury-anchorer:latest
+            x3-jury-anchorer:${{ github.sha }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to staging
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh staging
+
+      - name: Run health checks
+        run: |
+          chmod +x scripts/health-check.sh
+          for i in {1..30}; do
+            if ./scripts/health-check.sh; then
+              echo "✓ Staging health checks passed"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "✗ Staging health checks failed"
+          exit 1
+
+      - name: Run integration tests
+        run: |
+          pip install -q pytest aiohttp
+          pytest tests/test_jury_anchoring.py::TestJuryAnchoringEndToEnd -v
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ Phase 5 deployed to staging successfully",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ Phase 5 Jury Anchoring\nDeployed to Staging\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "❌ Phase 5 staging deployment failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ Phase 5 Jury Anchoring\nStaging deployment FAILED\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Backup database before deployment
+        run: |
+          aws rds create-db-snapshot \
+            --db-instance-identifier x3-jury-prod \
+            --db-snapshot-identifier "pre-phase5-$(date +%s)"
+
+      - name: Deploy to production
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh production
+
+      - name: Health checks (critical)
+        run: |
+          chmod +x scripts/health-check.sh
+          for i in {1..60}; do
+            if ./scripts/health-check.sh; then
+              echo "✓ Production health checks passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "✗ Production health checks failed - ROLLBACK"
+          exit 1
+
+      - name: Run production tests
+        run: |
+          pip install -q pytest aiohttp
+          pytest tests/test_jury_anchoring.py -v --tb=short
+          if [ $? -ne 0 ]; then
+            echo "✗ Production tests failed - ROLLBACK"
+            exit 1
+          fi
+
+      - name: Notify all teams on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "🚀 Phase 5 deployed to production successfully",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🚀 Phase 5 Jury Blockchain Anchoring\n*LIVE IN PRODUCTION*\n\n✓ Staging: Passed\n✓ Production: Passed\n✓ All health checks: Green\n\nCommit: ${{ github.sha }}"
+                  }
+                }
+              ]
+            }
+
+      - name: Trigger monitoring
+        if: success()
+        run: |
+          curl -X POST http://monitoring.x3.io/api/status \
+            -H "Content-Type: application/json" \
+            -d '{"status":"phase5_deployed","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          chmod +x scripts/rollback.sh
+          ./scripts/rollback.sh
+          echo "⚠️ Production deployment failed - ROLLBACK EXECUTED"
+
+      - name: Notify team on rollback
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "🔴 Phase 5 production deployment FAILED - ROLLBACK EXECUTED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🔴 Phase 5 Jury Anchoring\n*DEPLOYMENT FAILED*\n*ROLLBACK EXECUTED*\n\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}\n\n📋 Check GitHub Actions logs for details"
+                  }
+                }
+              ]
+            }

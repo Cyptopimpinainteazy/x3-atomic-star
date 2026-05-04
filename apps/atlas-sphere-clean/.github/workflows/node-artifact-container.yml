@@ -1,0 +1,39 @@
+name: Node Artifact (Container)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - node/**
+      - runtime/**
+      - pallets/**
+      - crates/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - scripts/build-node-artifact-container.sh
+      - .github/workflows/node-artifact-container.yml
+
+jobs:
+  build-node-artifact:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts/node
+
+      - name: Build artifact in container
+        run: bash scripts/build-node-artifact-container.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-chain-node-linux-amd64
+          path: |
+            artifacts/node/x3-chain-node
+            artifacts/node/x3-chain-node.sha256
+          if-no-files-found: error

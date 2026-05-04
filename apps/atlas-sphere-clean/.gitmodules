@@ -1,0 +1,49 @@
+[submodule "BMAD-METHOD"]
+	path = BMAD-METHOD
+	url = https://github.com/bmad-code-org/BMAD-METHOD.git
+
+[submodule "ralph-repo"]
+	path = ralph-repo
+	url = https://github.com/aymenfurter/ralph.git
+
+[submodule "TPS TESTING"]
+	path = TPS TESTING
+	url = https://github.com/Diorzz/Blockchain-TPS-Test-GO.git
+
+[submodule "third_party/zombienet"]
+	path = third_party/zombienet
+	url = https://github.com/paritytech/zombienet.git
+
+[submodule "cross-chain-gpu-validator/third_party/secp256k1-cuda-ecc"]
+	path = cross-chain-gpu-validator/third_party/secp256k1-cuda-ecc
+	url = https://github.com/atjbok/Secp256k1-CUDA-ecc
+
+[submodule "scagent"]
+	path = scagent
+	url = https://github.com/miounet11/scagent.git
+
+[submodule "third_party/Diffsplat"]
+	path = third_party/Diffsplat
+	url = https://github.com/Cyptopimpinainteazy/x3-chain
+
+[submodule "third_party/Hunyuan3D-2.1"]
+	path = third_party/Hunyuan3D-2.1
+	url = https://github.com/Cyptopimpinainteazy/x3-chain
+
+[submodule "third_party/open-notebook"]
+	path = third_party/open-notebook
+	url = https://github.com/lfnovo/open-notebook
+
+[submodule "third_party/threejs-avatar-demo"]
+	path = third_party/threejs-avatar-demo
+	url = https://github.com/Cyptopimpinainteazy/x3-chain
+
+[submodule "tools/openspec"]
+	path = tools/openspec
+	url = https://github.com/Fission-AI/OpenSpec
+[submodule "ralph-o-matic"]
+	path = ralph-o-matic
+	url = https://github.com/dbinky/ralph-o-matic.git
+[submodule "forge-std"]
+	path = tests/security/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std.git

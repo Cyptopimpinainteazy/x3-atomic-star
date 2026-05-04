@@ -1,0 +1,99 @@
+[package]
+name = "x3-chain-node"
+version = "0.1.0"
+edition = "2021"
+publish = false
+authors = ["X3 Chain Core Engineering <engineering@x3-chain.io>"]
+license = "Apache-2.0"
+description = "X3 Chain L1 Substrate node binary with dual-VM readiness."
+repository = "https://github.com/x3-chain/core"
+default-run = "x3-chain-node"
+
+[[bin]]
+name = "x3-chain-node"
+path = "src/main.rs"
+
+[dependencies]
+x3-chain-runtime = { path = "../runtime", features = ["std", "frontier", "native-real-vm-adapters"] }
+pallet-x3-kernel = { path = "../pallets/x3-kernel", features = ["std"] }
+pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", features = ["std"] }
+pallet-evolution-core = { path = "../pallets/evolution-core", features = ["std"] }
+pallet-x3-verifier = { path = "../pallets/x3-verifier", features = ["std"] }
+pallet-x3-domain-registry = { path = "../pallets/x3-domain-registry", features = ["std"] }
+flash-finality = { package = "x3-flash-finality", path = "../crates/flash-finality" }
+poh-generator = { package = "x3-poh-generator", path = "../crates/poh-generator" }
+x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
+x3-rpc = { path = "../crates/x3-rpc" }
+x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
+
+clap = { version = "4.4", features = ["derive"] }
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false }
+hex = "0.4"
+bs58 = "0.5"
+log = "0.4"
+env_logger = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+parity-scale-codec = { version = "3.6", default-features = false, features = ["derive"] }
+jsonrpsee = { version = "0.16.3", features = ["macros", "server", "client"] }
+tokio = { version = "1.37", default-features = false }
+
+
+
+sc-basic-authorship = { workspace = true }
+sc-cli = { workspace = true }
+sc-client-api = { workspace = true }
+sc-consensus = { workspace = true }
+sc-consensus-aura = { workspace = true }
+sc-consensus-grandpa = { workspace = true }
+sc-executor = { workspace = true }
+sc-network = { workspace = true }
+sc-network-gossip = { workspace = true }
+sc-rpc = { workspace = true }
+sc-rpc-api = { workspace = true }
+sc-service = { workspace = true, features = ["rocksdb"] }
+sc-telemetry = { workspace = true }
+sc-transaction-pool = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
+substrate-prometheus-endpoint = { path = "../patches/substrate-prometheus-endpoint" }
+
+sp-api = { workspace = true }
+sp-block-builder = { workspace = true }
+sp-blockchain = { workspace = true }
+sp-consensus-aura = { workspace = true }
+sp-consensus-grandpa = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-io = { workspace = true }
+sp-timestamp = { workspace = true }
+sp-keystore = { workspace = true }
+
+substrate-frame-rpc-system = { workspace = true }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", default-features = false }
+
+frame-benchmarking-cli = { workspace = true, optional = true, default-features = false }
+# try-runtime-cli = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603", optional = true }
+# FIXME: try-runtime-cli doesn't exist in polkadot-stable2603 - needs investigation
+
+[features]
+default = ["cli"]
+cli = []
+
+# Optional flags to enable Frontier JSON-RPC and EVM runtime features.  
+# Enabling `frontier` will opt-in to Frontier crates and runtime adapters.
+frontier = []
+
+native = ["x3-chain-runtime/native"]
+
+runtime-benchmarks = [
+    "x3-chain-runtime/runtime-benchmarks",
+    "frame-benchmarking-cli/runtime-benchmarks",
+]
+
+try-runtime = [
+    "x3-chain-runtime/try-runtime",
+    # "try-runtime-cli/try-runtime",  # FIXME: try-runtime-cli doesn't exist in polkadot-stable2603
+]
+
+# Optional Frontier (EVM) JSON-RPC wiring

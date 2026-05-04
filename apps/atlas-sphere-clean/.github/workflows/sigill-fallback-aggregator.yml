@@ -1,0 +1,107 @@
+name: SIGILL fallback aggregator
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly (Mon) at 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    env:
+      SIGILL_FALLBACK_WINDOW_DAYS: '7'
+      SIGILL_FALLBACK_ALERT_THRESHOLD: '0.05' # default 5% threshold
+      SIGILL_FALLBACK_MIN_RUNS: '5' # minimum runs with telemetry to consider (raised to avoid small-sample alerts)
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y jq unzip curl || true
+
+      - name: Gather telemetry artifacts (last ${SIGILL_FALLBACK_WINDOW_DAYS} days)
+        id: gather
+        run: |
+          set -eo pipefail
+          mkdir -p telemetry artifacts
+          since=$(date -d "${SIGILL_FALLBACK_WINDOW_DAYS} days ago" --utc +%Y-%m-%dT%H:%M:%SZ)
+          echo "Looking for workflow runs since: $since"
+          gh api -H "Accept: application/vnd.github+json" /repos/${GITHUB_REPOSITORY}/actions/workflows/sigill-triage-integration.yml/runs?per_page=100 > runs.json
+          jq -r --arg since "$since" '.workflow_runs[] | select(.created_at > $since) | .id' runs.json | while read -r run_id; do
+            echo "Checking run $run_id"
+            gh api /repos/${GITHUB_REPOSITORY}/actions/runs/$run_id/artifacts > art_${run_id}.json
+            artifact_id=$(jq -r '.artifacts[] | select(.name=="sigill-fallback-telemetry") | .id' art_${run_id}.json)
+            archive_url=$(jq -r '.artifacts[] | select(.name=="sigill-fallback-telemetry") | .archive_download_url' art_${run_id}.json)
+            if [ -n "$artifact_id" ] && [ "$artifact_id" != "null" ]; then
+              echo "Found artifact $artifact_id for run $run_id"
+              curl -L -H "Authorization: token $GITHUB_TOKEN" -o artifact_${artifact_id}.zip "$archive_url"
+              # Try extracting the fallback-telemetry.json inside the zip
+              if unzip -Z1 artifact_${artifact_id}.zip | grep -iq "fallback-telemetry.json"; then
+                unzip -p artifact_${artifact_id}.zip "fallback-telemetry.json" > telemetry/run_${run_id}.json || true
+              else
+                # Try any JSON file inside the zip
+                file=$(unzip -Z1 artifact_${artifact_id}.zip | grep -i '\.json$' | head -n1)
+                if [ -n "$file" ]; then
+                  unzip -p artifact_${artifact_id}.zip "$file" > telemetry/run_${run_id}.json || true
+                fi
+              fi
+              echo "Saved telemetry for run $run_id"
+            fi
+          done
+          ls -la telemetry || true
+
+      - name: Summarize telemetry
+        id: summarize
+        run: |
+          set -eo pipefail
+          if [ -z "$(ls telemetry/*.json 2>/dev/null || true)" ]; then
+            echo "No telemetry files found; writing empty summary"
+            jq -n --arg wd "${SIGILL_FALLBACK_WINDOW_DAYS}" --arg gen "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" '{total_runs_with_telemetry:0, fallback_count:0, fallback_rate:0.0, avg_attempts:0.0, window_days:($wd|tonumber), generated_at:$gen}' > sigill-fallback-summary.json
+            jq -c . sigill-fallback-summary.json | tee /tmp/summary.json
+            exit 0
+          fi
+
+          jq -s --arg wd "${SIGILL_FALLBACK_WINDOW_DAYS}" --arg gen "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" '{
+            total_runs_with_telemetry: length,
+            fallback_count: (map(select(.fallback_used=="true")) | length),
+            fallback_rate: (if length == 0 then 0 else ((map(select(.fallback_used=="true")) | length) / length) end),
+            avg_attempts: ( (map(.fallback_attempts | tonumber) | if length==0 then 0 else (add/length) end) ),
+            window_days: ($wd|tonumber),
+            generated_at: $gen,
+          jq -c . sigill-fallback-summary.json | tee /tmp/summary.json
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigill-fallback-summary
+          path: sigill-fallback-summary.json
+
+      - name: Open alert if threshold exceeded
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('sigill-fallback-summary.json', 'utf8'));
+            const total = summary.total_runs_with_telemetry || 0;
+            const fallbackRate = Number(summary.fallback_rate || 0);
+            const threshold = Number(process.env.SIGILL_FALLBACK_ALERT_THRESHOLD || 0.05);
+            const minRuns = Number(process.env.SIGILL_FALLBACK_MIN_RUNS || 1);
+            console.log(`Found ${total} runs with telemetry; fallback_rate=${fallbackRate}; threshold=${threshold}; minRuns=${minRuns}`);
+            if (total >= minRuns && fallbackRate > threshold) {
+              const title = `[ALERT] SIGILL fallback rate high: ${(fallbackRate*100).toFixed(2)}% over last ${process.env.SIGILL_FALLBACK_WINDOW_DAYS} days`;
+              const body = `Automated summary report (attached as artifact):\n\n- Runs with telemetry: ${total}\n- Fallback count: ${summary.fallback_count}\n- Fallback rate: ${(fallbackRate*100).toFixed(2)}%\n- Average attempts: ${summary.avg_attempts}\n\nSee the attached artifact 'sigill-fallback-summary' for run-level details.`;
+              // Create an issue
+              const issue = await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['infra', 'sigill', 'automation'] });
+              console.log(`Opened alert issue #${issue.data.number}`);
+            } else {
+              console.log('Threshold not exceeded; no alert issue will be created.');
+            }

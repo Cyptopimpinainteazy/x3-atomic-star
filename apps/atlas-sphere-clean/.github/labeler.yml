@@ -1,0 +1,15 @@
+risk:consensus:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/blockchain-adapter/src/index.ts'
+          - 'apps/blockchain-adapter/src/worker.ts'
+          - 'apps/blockchain-adapter/scripts/deploy_provenance.ts'
+
+risk:tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/test/**'
+          - '**/tests/**'
+          - '**/__tests__/**'
+          - '**/*.test.*'
+          - '**/*.spec.*'

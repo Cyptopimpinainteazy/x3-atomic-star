@@ -1,0 +1,25 @@
+{
+  "version": "v1.1.1",
+  "bundle": "release-v1.1",
+  "tarball": "x3-chain-v1.1.1.tar.gz",
+  "git_commit": "55d09edb6",
+  "git_tag": "untagged",
+  "rust_version": "rustc 1.88.0 (6b00bc388 2025-06-23)",
+  "build_date": "2026-04-11T23:17:13Z",
+  "source_date_epoch": 1775929085,
+  "signed": true,
+  "artifacts": {
+    "binary": {
+      "path": "bin/x3-chain-node",
+      "sha256": "dbb39f11619ea58692e5944c2712d4e2f82c2792d89e91d1eefd2e9bf65ed48a"
+    },
+    "wasm": {
+      "path": "runtime/x3_chain_runtime.compact.compressed.wasm",
+      "sha256": "6d13a8e7f26bc67c9d4d9d2738fbee79a63c12b16c63726acf168539dfd813d5"
+    },
+    "tarball": {
+      "path": "x3-chain-v1.1.1.tar.gz",
+      "sha256": "08963239d56c0524d97c67c9b779d8bb42b169bfc3317fe6c5d3fe7f2aa31709"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+name: Ollama Triage Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_repo:
+        description: 'Test repo in owner/repo format (requires a PAT with write access)'
+        required: true
+      test_assignee:
+        description: 'An example assignee to validate assignment (optional)'
+        required: false
+
+jobs:
+  triage-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create test issue in test repo
+        id: create_test_issue
+        env:
+          TEST_REPO: ${{ github.event.inputs.test_repo }}
+          TEST_TOKEN: ${{ secrets.TRIAGE_TEST_TOKEN }}
+        run: |
+          if [ -z "$TEST_TOKEN" ]; then echo "Set secret TRIAGE_TEST_TOKEN (PAT with access to test repo)"; exit 1; fi
+          TITLE="[triage-test] Ollama triage test - $(date -u +%s)"
+          BODY="This is a test issue created by the triage-test workflow. Labels: ollama-integration-failure, tests-failed"
+          OWNER=$(echo "$TEST_REPO" | cut -d'/' -f1)
+          REPO=$(echo "$TEST_REPO" | cut -d'/' -f2)
+          RESP=$(curl -sS -X POST -H "Authorization: token $TEST_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$OWNER/$REPO/issues" -d "{\"title\": \"$TITLE\", \"body\": \"$BODY\", \"labels\": [\"ollama-integration-failure\", \"tests-failed\"]}")
+          echo "$RESP" > /tmp/test_issue.json
+          ISSUE_NUM=$(jq -r .number /tmp/test_issue.json)
+          if [ "$ISSUE_NUM" = "null" ]; then echo "Failed to create issue: $(cat /tmp/test_issue.json)"; exit 1; fi
+          echo "issue_number=$ISSUE_NUM" >> $GITHUB_OUTPUT
+          echo "created issue $OWNER/$REPO#$ISSUE_NUM"
+
+      - name: Run triage logic against test issue
+        env:
+          TEST_REPO: ${{ github.event.inputs.test_repo }}
+          TEST_TOKEN: ${{ secrets.TRIAGE_TEST_TOKEN }}
+          LABEL_ASSIGN_MAP: ${{ secrets.OLLAMA_LABEL_ASSIGN_MAP || '' }}
+          DEFAULT_ASSIGNEE: ${{ github.event.inputs.test_assignee || '' }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const repo = process.env.TEST_REPO
+            const [owner, repoName] = repo.split('/')
+            const issue_number = parseInt('${{ steps.create_test_issue.outputs.issue_number }}')
+            const labels = ['needs-investigation','priority:medium']
+            // assign based on map or default
+            const mapStr = process.env.LABEL_ASSIGN_MAP || ''
+            const map = {}
+            mapStr.split(',').map(s=>s.trim()).filter(Boolean).forEach(pair=>{ const [k,v]=pair.split('='); if(k&&v) map[k.trim()]=v.trim() })
+            const assignee = map['tests-failed'] || (process.env.DEFAULT_ASSIGNEE||'')
+            if (assignee) {
+              await github.rest.issues.addAssignees({owner, repo: repoName, issue_number, assignees:[assignee]})
+            }
+            await github.rest.issues.addLabels({owner, repo: repoName, issue_number, labels})
+
+      - name: Validate triage result
+        env:
+          TEST_REPO: ${{ github.event.inputs.test_repo }}
+          TEST_TOKEN: ${{ secrets.TRIAGE_TEST_TOKEN }}
+          EXPECTED_ASSIGNEE: ${{ github.event.inputs.test_assignee || '' }}
+        run: |
+          OWNER=$(echo "$TEST_REPO" | cut -d'/' -f1)
+          REPO=$(echo "$TEST_REPO" | cut -d'/' -f2)
+          ISSUE_NUM=${{ steps.create_test_issue.outputs.issue_number }}
+          echo "Checking issue $OWNER/$REPO#$ISSUE_NUM"
+          RESP=$(curl -sS -H "Authorization: token $TEST_TOKEN" "https://api.github.com/repos/$OWNER/$REPO/issues/$ISSUE_NUM")
+          echo "$RESP" > /tmp/triage_result.json
+          grep -q "needs-investigation" /tmp/triage_result.json || (echo "Label missing"; exit 1)
+          if [ -n "$EXPECTED_ASSIGNEE" ]; then
+            jq -r '.assignees[].login' /tmp/triage_result.json | grep -q "$EXPECTED_ASSIGNEE" || (echo "Assignee not set as expected"; exit 1)
+          fi
+
+      - name: Cleanup test issue
+        if: always()
+        env:
+          TEST_REPO: ${{ github.event.inputs.test_repo }}
+          TEST_TOKEN: ${{ secrets.TRIAGE_TEST_TOKEN }}
+        run: |
+          OWNER=$(echo "$TEST_REPO" | cut -d'/' -f1)
+          REPO=$(echo "$TEST_REPO" | cut -d'/' -f2)
+          ISSUE_NUM=${{ steps.create_test_issue.outputs.issue_number }}
+          curl -sS -X PATCH -H "Authorization: token $TEST_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$OWNER/$REPO/issues/$ISSUE_NUM" -d '{"state":"closed"}'
+          echo "Closed test issue $OWNER/$REPO#$ISSUE_NUM"

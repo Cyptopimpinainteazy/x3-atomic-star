@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+# Custom rules can be added here if needed
+# For example:
+# [[rules]]
+#   description = "Infura Project ID"
+#   regex = '''(?i)infura.*[a-f0-9]{32}'''
+#   tags = ["key", "infura"]
+
+# [[rules]]
+#   description = "Dune API Key"
+#   regex = '''(?i)dune.*[a-zA-Z0-9]{32}'''
+#   tags = ["key", "dune"]

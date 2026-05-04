@@ -1,0 +1,115 @@
+I have the following comments after thorough review of file. Implement the comments by following the instructions verbatim.
+
+---
+## Comment 1: C-001 RPC dry-run bug was made WORSE: the fix reverted from submit_evm_transaction (which commits) to validate_evm_transaction (dry-run).
+
+In `node/src/rpc.rs` inside `x3_submitCrossVmTransaction`:
+1. Change `.validate_evm_transaction(at, evm_payload)` back to `.submit_evm_transaction(at, evm_payload)`.
+2. Remove the `// READ-ONLY` comment that was added — it belongs only on the actual dry-run helper.
+3. After a successful `submit_evm_transaction`, construct and submit a `pallet_x3_atomic_kernel::submit_atomic_bundle` extrinsic (or use an RPC helper that wraps it) so the PoAE proof lifecycle begins. The cross-VM bridge in-memory queue is not a substitute for on-chain state.
+4. Keep `validate_evm_transaction` as a separate RPC endpoint (`x3_estimateGas` path is already correct) — never use it on the state-committing path.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/rpc.rs
+---
+## Comment 2: C-002 unresolved: SwapCoordinator, HTLC adapters, and AtomicSwapOrchestrator are still never spawned in node/src/service.rs.
+
+In `node/src/service.rs` inside `new_full()`:
+1. Instantiate `SwapCoordinator` with `OffchainPersistence` backed by `backend.offchain_storage()` (pattern already used for the escrow adapter).
+2. Instantiate `EvmHtlcAdapter`, `SvmHtlcAdapter`, `X3VmHtlcAdapter` with RPC URLs from CLI flags or config.
+3. Spawn a background task that drives the HTLC monitoring loop.
+4. Instantiate `AtomicSwapOrchestrator` via `task_manager.spawn_essential_handle().spawn()`.
+5. Replace the sleep-loop retainer with a real coordination task.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/node/src/service.rs
+---
+## Comment 3: C-003 unresolved: settlement engine benchmarking.rs has zero diff — all six compile errors remain.
+
+In `pallets/x3-settlement-engine/src/benchmarking.rs`:
+1. Replace `whitemp` with `whitelisted_caller`.
+2. Fix `AssetSpec` to `{ chain, token: TokenId::Native, amount: 1_000_000u128 }`.
+3. Fix `claim_settlement` to `(origin, intent_id, secret)` — three parameters.
+4. Fix verify block to `IntentState::Finalized`.
+5. Fix `BtcBlockHeader` fields to `prev_block_hash`, `timestamp`.
+6. Rename bond benchmarks to `deposit_bond`, `finalize_bond_withdraw`.
+7. Run `cargo build --features runtime-benchmarks -p pallet_x3_settlement_engine` and fix all remaining errors.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/benchmarking.rs
+---
+## Comment 4: C-004 unresolved: AtomicLock is still created with zero amount in create_intent — timeout slashing remains a no-op.
+
+In `pallets/x3-settlement-engine/src/lib.rs`:
+1. Remove the `AtomicLock::new_prepare` call from `create_intent` entirely — do not create a lock with placeholder values.
+2. In `lock_escrow`, after `T::Currency::reserve(&who, amount.saturated_into())` succeeds, create the `AtomicLock` with the actual `amount`, `escrow_account = who.clone()`, and `lockee = who.clone()`.
+3. Update `on_finalize` to skip locks with `lock.amount == BalanceOf::<T>::zero()` (i.e., the old placeholder entries).
+4. Add a test verifying that after a timeout, the escrow account loses the expected reserved amount.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/lib.rs
+---
+## Comment 5: C-005 unresolved: any signed account can still slash any bundle submitter by calling rollback_atomic_bundle with ExecutionFailed.
+
+In `pallets/x3-atomic-kernel/src/lib.rs` inside `rollback_atomic_bundle`:
+1. For `ExecutionFailed` and `AccessSetViolation`: add `ensure!(record.executor == Some(caller.clone()), Error::<T>::NotBundleSubmitter)` — only the assigned executor may report these.
+2. For `DeadlineExceeded`: remove it from the signed extrinsic call path or restrict to root/governance origin. Auto-expiry is already handled by `on_initialize`; a signed extrinsic for this reason is redundant and dangerous.
+3. Add a test that verifies a random third-party account cannot call `rollback_atomic_bundle` with `ExecutionFailed`.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-atomic-kernel/src/lib.rs
+---
+## Comment 6: C-006 unresolved: settlement engine on_initialize automatic refund is still a TODO stub — user funds can be stuck indefinitely.
+
+In `pallets/x3-settlement-engine/src/lib.rs`:
+1. Add `IntentDeadlineIndex<T> = StorageMap<_, Twox64Concat, BlockNumberFor<T>, BoundedVec<H256, MaxDeadlinePerBlock>, ValueQuery>` storage.
+2. In `create_intent`, insert the intent's timeout block into the deadline index.
+3. In `on_initialize`, read the current block's deadline index, call `Self::process_refund()` for each unresolved intent, clean up the index, and return a proper `Weight`.
+4. Cap processing per block (e.g. `MAX_REFUNDS_PER_BLOCK = 20`) with an appropriate constant.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/lib.rs
+---
+## Comment 7: C-007 unresolved: workspace lint suppressions for dead_code, deprecated, and unused_* still present in Cargo.toml.
+
+In `Cargo.toml`:
+1. Remove `dead_code = "allow"`, `unused_imports = "allow"`, `unused_variables = "allow"`, `unused_mut = "allow"`, and `deprecated = "allow"` from `[workspace.lints.rust]`.
+2. Fix the dead-code and deprecation warnings that surface — they identify the dead paths.
+3. Add per-module `#[allow(...)]` with explanatory comments only where third-party code genuinely requires it.
+4. Add a CI step that fails on new `dead_code` or `deprecated` warnings.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/Cargo.toml
+---
+## Comment 8: C-008 unresolved: e2e and bridge integration tests are still pure formatting changes — no real VM execution was added.
+
+1. In `crates/cross-vm-bridge/tests/integration.rs`, replace `bridge.execute_pending()` with `bridge.execute_pending_with_dispatcher(&RuntimeCrossVmDispatcher::new(client))` using a real dev node client.
+2. Add an integration test covering the complete `submit_atomic_bundle` → `assign_bundle_executor` → `finalize_atomic_bundle` lifecycle using `TestExternalities`, pre-populating `FinalityCertAnchors` with a non-zero cert, and asserting `PoaeProof::validate_structure()` returns `true`.
+3. Remove the silent-skip pattern from `cross_vm_real_chain_test.rs` — in CI, substitute a panic with an explanatory message when the node is unavailable, controlled by an env var.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/tests/e2e/cross_vm_real_chain_test.rs
+- /home/lojak/Desktop/x3-chain-master/crates/cross-vm-bridge/tests/integration.rs
+---
+## Comment 9: C-009 unresolved: BTC SPV merkle proof byte-order issue was not addressed.
+
+In `pallets/x3-settlement-engine/src/lib.rs` in `verify_btc_merkle_proof` and in `pallets/x3-settlement-engine/src/btc_gateway.rs` in `BtcSpvProof::verify()`:
+1. Establish and document in code comments that all txids and block hashes are stored in internal hash order (not display-reversed).
+2. At the submission boundary, reverse txid bytes from display order to internal order.
+3. Add a test vector from a known Bitcoin mainnet block verifying the implementation produces the correct root.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-settlement-engine/src/btc_gateway.rs
+---
+## Comment 10: C-011 partial: X3vmReplayStore added to x3-kernel, but no runtime API for PoAE proof queries was implemented.
+
+1. The `X3vmReplayStore` and associated helper methods in `pallet_x3_kernel` are correctly implemented — retain them.
+2. Additionally, define a `X3AtomicKernelApi` runtime API trait in `pallets/x3-atomic-kernel/src/lib.rs` with methods: `get_poae_proof(bundle_id: H256) -> Option<PoaeProof>`, `get_bundle_status(bundle_id: H256) -> Option<BundleStatus>`, `get_finality_cert_anchor(block_num: u64) -> Option<H256>`.
+3. Implement this in `runtime/src/lib.rs` inside `impl_runtime_apis!` delegating to `pallet_x3_atomic_kernel::PoaeProofs::<Runtime>::get(bundle_id)` etc.
+4. Expose as RPC methods `x3_getPoaeProof` and `x3_getBundleStatus` in `node/src/rpc.rs`.
+
+### Relevant Files
+- /home/lojak/Desktop/x3-chain-master/pallets/x3-kernel/src/lib.rs
+- /home/lojak/Desktop/x3-chain-master/runtime/src/lib.rs
+---

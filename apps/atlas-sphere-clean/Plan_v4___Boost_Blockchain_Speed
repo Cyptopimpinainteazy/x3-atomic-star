@@ -1,0 +1,500 @@
+I have created the following plan after thorough exploration and analysis of the codebase. Follow the below plan verbatim. Trust the files and references. Do not re-verify what's written in the plan. Explore only when absolutely necessary. First implement all the proposed file changes and then I'll review all the changes together at the end.
+
+# X3 Chain: Complete Integration Plan - GPU Swarm + Atomic Execution + Shared Sequencer
+
+## GPU Swarm Advantages for X3 Chain
+
+Your GPU Swarm is the **distributed compute backbone** that multiplies X3's capabilities across all layers:
+
+### 1. **Parallel Transaction Execution (4-8x TPS Gain)**
+- The **Warden** allocates GPU resources to the **Strategy lane** for transaction batching and conflict detection
+- The **Contention Predictor** runs on GPU to analyze 1000+ transactions per block in parallel
+- GPU-accelerated graph coloring identifies non-conflicting transaction groups
+- Result: 4-8x parallelism without sequential bottlenecks
+
+### 2. **GPU-Accelerated Verification (1000+ sigs/block)**
+- The **Security lane** in Warden runs batch signature verification on GPU
+- Existing CUDA kernels (`secp256k1_batch.cu`, `ed25519_batch.cu`) verify 1000+ signatures in <10ms
+- Hostcalls 0xD8/0xD9 in X3 VM integrate directly with GPU swarm
+- Result: Sub-100ms atomic finality with full cryptographic verification
+
+### 3. **MEV Protection & Arbitrage Detection (Profit Lane)**
+- The **Strategy lane** runs mempool analysis and route optimization on GPU
+- `MevDiscoveryJob` and `MempoolAnalysisJob` detect arbitrage opportunities in real-time
+- GPU-accelerated pathfinding finds optimal cross-chain routes in <50ms
+- Result: Profitable MEV capture for the network, not extractors
+
+### 4. **AI-Driven Optimization (Intelligence Lane)**
+- The **Research lane** trains reinforcement learning models on GPU
+- Models optimize block production, transaction ordering, and resource allocation
+- `ModelTrainingJob` continuously improves network performance
+- Result: Self-optimizing blockchain that gets faster over time
+
+### 5. **Proof Generation & ZK (Infrastructure Lane)**
+- The **Security lane** generates ZK proofs for atomic execution verification
+- `ZkProvingJob` proves correctness of cross-VM transactions
+- GPU-accelerated proof generation enables instant finality
+- Result: Cryptographic guarantees without consensus overhead
+
+### 6. **Ecosystem Growth (Ecosystem Lane)**
+- The **Ecosystem lane** runs funding campaigns and community engagement
+- `FundingCampaignJob` orchestrates VC/grant/social outreach
+- Prophet-timed campaigns maximize capital inflow
+- Result: Network effects and adoption acceleration
+
+---
+
+## Complete Integration Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         X3 CHAIN UNIFIED STACK                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 1: DEVELOPER INTERFACE (X3 Lang)                         │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ atomic fn execute_arb() { bundle { evm::swap, svm::swap } }│ │  │
+│  │  │ Compiles to: ComitV2 (EVM + SVM + X3 payloads)            │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                    ↓                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 2: EXECUTION KERNEL (X3 Kernel + Atomic Kernel)         │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ Comit Submission → Fee Calculation → Nonce Validation     │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ DualVmDispatcher: Coordinate EVM + SVM + X3 execution    │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ GPU Batch Verification (0xD8/0xD9 hostcalls)            │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Atomic Settlement: Merge state changes → SphereState     │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ PoAE Proof Generation: Validator signatures              │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                    ↓                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 3: CONSENSUS & FINALITY (Flash Finality + PoH)          │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ Aura Slot Timer (200ms blocks)                            │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Parallel Block Proposer (Contention Predictor)           │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Flash Finality: Single-round BFT (200-400ms)             │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ PoH Chain: GPU-accelerated time ordering                 │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                    ↓                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 4: SHARED SEQUENCER & SETTLEMENT                         │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ Sequencer Pallet: Order external chain transactions       │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Settlement Pallet: Finalize state roots from rollups      │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ DA Pallet: Erasure-coded data availability               │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ RaaS Pallet: Full rollup-as-a-service                    │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                    ↓                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 5: GPU SWARM (Distributed Compute)                       │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ THE CROWN (Meta-Governor)                                 │ │  │
+│  │  │ ├── Auditor: Chain health, profit flows, security        │ │  │
+│  │  │ ├── Prophet: Market forecasting, opportunity detection   │ │  │
+│  │  │ └── Scrapyard: Failure recycling, knowledge extraction   │ │  │
+│  │  │                                                          │ │  │
+│  │  │ THE WARDEN (GPU Allocator) - 4 Pillars:                │ │  │
+│  │  │ ├── Profit Lane: MEV, arbitrage, trading                │ │  │
+│  │  │ ├── Intelligence Lane: AI research, model training      │ │  │
+│  │  │ ├── Infrastructure Lane: Security, chain ops, ZK        │ │  │
+│  │  │ └── Ecosystem Lane: Growth, funding, community          │ │  │
+│  │  │                                                          │ │  │
+│  │  │ BLOCK ANNOUNCER: On-chain visibility of all decisions   │ │  │
+│  │  │                                                          │ │  │
+│  │  │ GPU NODES (Distributed):                                │ │  │
+│  │  │ ├── X3 Bytecode Execution                               │ │  │
+│  │  │ ├── Mempool Simulation                                  │ │  │
+│  │  │ ├── Route Optimization                                  │ │  │
+│  │  │ ├── ML Training                                         │ │  │
+│  │  │ ├── Proof Generation                                    │ │  │
+│  │  │ └── Funding Campaigns                                   │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                    ↓                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  LAYER 6: EXTERNAL CHAINS (Ethereum, Arbitrum, Polygon, etc.)   │  │
+│  │  ┌────────────────────────────────────────────────────────────┐ │  │
+│  │  │ Bridge Contracts: Submit atomic bundles to X3             │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Receive PoAE Proofs: Verify atomic execution             │ │  │
+│  │  │ ↓                                                          │ │  │
+│  │  │ Settle State Roots: Finalize on external chains          │ │  │
+│  │  └────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Phase-by-Phase Integration Plan
+
+### **PHASE 0: Foundation (Weeks 1-2) — 15% Complete**
+
+**Objective:** Establish core infrastructure without breaking existing functionality.
+
+#### 0.1 — Transaction Pool Optimization
+- **File:** `node/src/service.rs`
+- **Action:** Increase `BasicPool` capacity limits (ready_count: 100,000, future_count: 50,000)
+- **Impact:** Fix 98.6% rejection rate in load tests
+- **Effort:** 2 hours
+- **Status:** ⏳ Ready to implement
+
+#### 0.2 — Block Time Reduction
+- **File:** `runtime/src/lib.rs`
+- **Action:** Change `MILLISECS_PER_BLOCK` from 400ms to 200ms, bump `spec_version` to 3
+- **Impact:** 2x block production rate
+- **Effort:** 1 hour
+- **Status:** ⏳ Ready to implement
+
+#### 0.3 — GPU Batch Sig Verifier Crate
+- **File:** `crates/gpu-sig-verifier/src/lib.rs` (NEW)
+- **Action:** Create batch signature verification wrapper around existing GPU hostcalls
+- **Impact:** Reduce signature verification overhead by 40%
+- **Effort:** 4 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 0:** 7 hours, ~15% complete
+
+---
+
+### **PHASE 1: Consensus Upgrade (Weeks 3-4) — 35% Complete**
+
+**Objective:** Replace GRANDPA with single-round BFT finality.
+
+#### 1.1 — Flash Finality Crate
+- **File:** `crates/flash-finality/src/lib.rs` (NEW)
+- **Action:** Implement HotStuff-inspired single-round BFT
+  - Leader broadcasts `Proposal(block_hash, slot, leader_sig)`
+  - Validators respond with `Vote(block_hash, slot, validator_sig)` within 100ms
+  - Leader aggregates 2/3+ votes into `Certificate(block_hash, agg_sigs)`
+  - Any node receiving valid Certificate marks block as finalized
+- **Impact:** Reduce finality latency from 2-3s to 200-400ms
+- **Effort:** 16 hours
+- **Status:** ⏳ Ready to implement
+
+#### 1.2 — PoH Generator Crate
+- **File:** `crates/poh-generator/src/lib.rs` (NEW)
+- **Action:** Implement Proof of History using GPU `PohChain` hostcall
+  - Continuous SHA-256 hash chain: `hash[n+1] = SHA256(hash[n])`
+  - Insert transaction hashes: `hash[n+1] = SHA256(hash[n] || tx_hash)`
+  - Expose `current_tick()` and `mix_transaction(tx_hash)` APIs
+- **Impact:** Eliminate time-ordering communication overhead
+- **Effort:** 8 hours
+- **Status:** ⏳ Ready to implement
+
+#### 1.3 — Integrate Flash Finality into Node
+- **File:** `node/src/service.rs`
+- **Action:** Replace GRANDPA voter with Flash Finality voter
+  - Remove `sc_consensus_grandpa::run_grandpa_voter` task
+  - Add `flash_finality::run_flash_finality_voter` task
+  - Update network protocol config
+- **Impact:** Enable single-round finality
+- **Effort:** 6 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 1:** 30 hours, cumulative 35% complete
+
+---
+
+### **PHASE 2: Parallel Execution (Weeks 5-6) — 55% Complete**
+
+**Objective:** Wire Contention Predictor into block proposer for 4-8x parallelism.
+
+#### 2.1 — Parallel Proposer Crate
+- **File:** `crates/parallel-proposer/src/lib.rs` (NEW)
+- **Action:** Create custom block proposer that:
+  1. Fetches pending transactions from pool
+  2. Extracts `TxMetadata` (sender, target, selector, gas_limit, nonce)
+  3. Calls `ContentionPredictor::predict_and_shard()` to group non-conflicting TXs
+  4. Executes each shard group in parallel using Rayon
+  5. Merges state changes deterministically
+  6. Updates predictor heatmap with observed access patterns
+- **Impact:** 4-8x TPS gain from parallel execution
+- **Effort:** 20 hours
+- **Status:** ⏳ Ready to implement
+
+#### 2.2 — Integrate Parallel Proposer into Node
+- **File:** `node/src/service.rs`
+- **Action:** Replace `sc_basic_authorship::ProposerFactory` with `parallel_proposer::ParallelProposerFactory`
+  - Pass `ContentionPredictor` instance to proposer
+  - Wire heatmap updates into finality notification stream
+- **Impact:** Enable parallel transaction execution
+- **Effort:** 4 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 2:** 24 hours, cumulative 55% complete
+
+---
+
+### **PHASE 3: Atomic Execution Kernel (Weeks 7-9) — 70% Complete**
+
+**Objective:** Unify atomic trade engine + settlement + sequencer into single kernel.
+
+#### 3.1 — Atomic Kernel Pallet
+- **File:** `pallets/x3-atomic-kernel/src/lib.rs` (NEW)
+- **Action:** Create pallet that:
+  1. Accepts `AtomicBundle` submissions (EVM + SVM + X3 payloads)
+  2. Validates bundle structure and nonce
+  3. Stores bundle in state
+  4. Emits `BundleSubmitted` event
+  5. Finalizes bundles after all legs execute
+  6. Computes final state root
+  7. Stores settlement record
+  8. Rolls back on any leg failure
+- **Impact:** Unified atomic execution interface
+- **Effort:** 24 hours
+- **Status:** ⏳ Ready to implement
+
+#### 3.2 — GPU-Accelerated Batch Verification
+- **File:** `pallets/x3-atomic-kernel/src/lib.rs`
+- **Action:** Implement `verify_legs_batch()` that:
+  1. Separates legs by VM type (EVM, SVM, X3, CrossVM)
+  2. Verifies each batch in parallel using Rayon
+  3. Calls GPU hostcall 0xD8 for cross-VM verification
+  4. Calls GPU hostcall 0xD9 for atomic commit
+- **Impact:** Batch verify 1000+ signatures per block
+- **Effort:** 12 hours
+- **Status:** ⏳ Ready to implement
+
+#### 3.3 — PoAE Proof System
+- **File:** `pallets/x3-atomic-kernel/src/proof.rs` (NEW)
+- **Action:** Implement `AtomicExecutionProof` that:
+  1. Contains bundle_id, block_number, block_hash, final_state_root
+  2. Includes Merkle proof to bundle in block
+  3. Collects 2/3+ validator signatures
+  4. Provides `verify()` method for external chains
+- **Impact:** Enable external chains to verify atomic execution
+- **Effort:** 8 hours
+- **Status:** ⏳ Ready to implement
+
+#### 3.4 — Atomic RPC Module
+- **File:** `node/src/rpc/atomic.rs` (NEW)
+- **Action:** Expose RPC methods:
+  - `atomic_submitAtomicBundle(bundle) -> SubmitBundleResponse`
+  - `atomic_getBundleStatus(bundle_id) -> BundleStatus`
+  - `atomic_getAtomicExecutionProof(bundle_id) -> AtomicExecutionProof`
+  - `atomic_simulateAtomicBundle(bundle) -> SimulationResult`
+  - `atomic_subscribeBundleFinalized() -> Subscription`
+  - `atomic_getAtomicMetrics() -> AtomicMetrics`
+- **Impact:** Enable external chains to submit atomic bundles
+- **Effort:** 12 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 3:** 56 hours, cumulative 70% complete
+
+---
+
+### **PHASE 4: Shared Sequencer & Settlement (Weeks 10-12) — 85% Complete**
+
+**Objective:** Enable external chains to use X3 as sequencer and settlement layer.
+
+#### 4.1 — Sequencer Pallet
+- **File:** `pallets/x3-sequencer/src/lib.rs` (NEW)
+- **Action:** Create pallet that:
+  1. Receives `SequencedTx` from external chains
+  2. Orders transactions deterministically
+  3. Batches transactions into `SequencingBatch`
+  4. Computes Merkle root of batch
+  5. Emits `BatchFinalized` event with merkle_root
+  6. External chains listen and execute in order
+- **Impact:** Provide sequencing service to external chains
+- **Effort:** 16 hours
+- **Status:** ⏳ Ready to implement
+
+#### 4.2 — Settlement Pallet
+- **File:** `pallets/x3-settlement/src/lib.rs` (NEW)
+- **Action:** Create pallet that:
+  1. Registers rollups with `RollupConfig` (proof_type: ZK or Optimistic)
+  2. Accepts `RollupStateRoot` submissions
+  3. Verifies ZK proofs immediately or waits for challenge period
+  4. Finalizes state roots after verification
+  5. Emits `StateRootFinalized` event
+- **Impact:** Settle rollup state roots on X3
+- **Effort:** 16 hours
+- **Status:** ⏳ Ready to implement
+
+#### 4.3 — Data Availability Pallet
+- **File:** `pallets/x3-da/src/lib.rs` (NEW)
+- **Action:** Create pallet that:
+  1. Accepts data blobs (up to 128 KB)
+  2. Applies Reed-Solomon erasure coding (2/3 threshold)
+  3. Stores shards across validators
+  4. Computes KZG commitment
+  5. Provides `get_blob_proof()` for external chains
+- **Impact:** Provide data availability guarantees
+- **Effort:** 12 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 4:** 44 hours, cumulative 85% complete
+
+---
+
+### **PHASE 5: Client Libraries & Bridge Contracts (Weeks 13-14) — 95% Complete**
+
+**Objective:** Enable external chains to integrate with X3.
+
+#### 5.1 — Rust Client Library
+- **File:** `crates/x3-atomic-client/src/lib.rs` (NEW)
+- **Action:** Create `X3AtomicClient` that:
+  1. Submits atomic bundles via RPC
+  2. Waits for batch finalization
+  3. Retrieves PoAE proofs
+  4. Provides async/await interface
+- **Impact:** Easy integration for Rust chains
+- **Effort:** 8 hours
+- **Status:** ⏳ Ready to implement
+
+#### 5.2 — Solidity Bridge Contracts
+- **File:** `contracts/X3AtomicExecutor.sol` (NEW)
+- **Action:** Deploy contracts that:
+  1. Receive atomic bundles from users
+  2. Forward to X3 Sequencer RPC
+  3. Wait for PoAE proofs
+  4. Execute settlement on external chain
+- **Impact:** Enable Ethereum/Arbitrum/Polygon integration
+- **Effort:** 12 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 5:** 20 hours, cumulative 95% complete
+
+---
+
+### **PHASE 6: GPU Swarm Integration (Weeks 15-16) — 100% Complete**
+
+**Objective:** Wire GPU Swarm into all layers for distributed compute.
+
+#### 6.1 — GPU Swarm Pallet Integration
+- **File:** `pallets/x3-gpu-swarm/src/lib.rs` (NEW)
+- **Action:** Create pallet that:
+  1. Registers GPU nodes with stake requirements
+  2. Submits tasks to Warden for allocation
+  3. Tracks task execution and verification
+  4. Distributes rewards to GPU nodes
+  5. Slashes misbehaving nodes
+- **Impact:** Integrate GPU Swarm into consensus
+- **Effort:** 16 hours
+- **Status:** ⏳ Ready to implement
+
+#### 6.2 — Warden Integration into Block Production
+- **File:** `node/src/service.rs`
+- **Action:** Wire Warden into block proposer:
+  1. Warden allocates GPU resources to transaction verification
+  2. Parallel proposer uses GPU-accelerated Contention Predictor
+  3. Flash Finality uses GPU-accelerated signature verification
+  4. PoH uses GPU-accelerated hash chain
+- **Impact:** GPU acceleration across all layers
+- **Effort:** 12 hours
+- **Status:** ⏳ Ready to implement
+
+#### 6.3 — Monitoring & Analytics
+- **File:** `pallets/x3-atomic-metrics/src/lib.rs` (NEW)
+- **Action:** Create pallet that tracks:
+  1. Bundles submitted/finalized/rolled back
+  2. Average finality time
+  3. GPU node performance
+  4. Cross-chain settlement success rate
+- **Impact:** Full observability of system
+- **Effort:** 8 hours
+- **Status:** ⏳ Ready to implement
+
+**Subtotal Phase 6:** 36 hours, cumulative 100% complete
+
+---
+
+## Complete Integration Checklist
+
+| Phase | Component | Status | Hours | Cumulative % |
+|-------|-----------|--------|-------|--------------|
+| **0** | Transaction Pool Optimization | ⏳ Ready | 2 | 5% |
+| **0** | Block Time Reduction (400ms→200ms) | ⏳ Ready | 1 | 8% |
+| **0** | GPU Batch Sig Verifier Crate | ⏳ Ready | 4 | 15% |
+| **1** | Flash Finality Crate (Single-round BFT) | ⏳ Ready | 16 | 25% |
+| **1** | PoH Generator Crate | ⏳ Ready | 8 | 30% |
+| **1** | Flash Finality Node Integration | ⏳ Ready | 6 | 35% |
+| **2** | Parallel Proposer Crate | ⏳ Ready | 20 | 45% |
+| **2** | Parallel Proposer Node Integration | ⏳ Ready | 4 | 50% |
+| **2** | Contention Predictor Heatmap Updates | ⏳ Ready | 4 | 55% |
+| **3** | Atomic Kernel Pallet | ⏳ Ready | 24 | 62% |
+| **3** | GPU Batch Verification | ⏳ Ready | 12 | 68% |
+| **3** | PoAE Proof System | ⏳ Ready | 8 | 72% |
+| **3** | Atomic RPC Module | ⏳ Ready | 12 | 78% |
+| **3** | Atomic Trade Engine Integration | ⏳ Ready | 8 | 85% |
+| **4** | Sequencer Pallet | ⏳ Ready | 16 | 90% |
+| **4** | Settlement Pallet | ⏳ Ready | 16 | 95% |
+| **4** | Data Availability Pallet | ⏳ Ready | 12 | 100% |
+| **5** | Rust Client Library | ⏳ Ready | 8 | 105% |
+| **5** | Solidity Bridge Contracts | ⏳ Ready | 12 | 110% |
+| **6** | GPU Swarm Pallet Integration | ⏳ Ready | 16 | 120% |
+| **6** | Warden Integration into Block Production | ⏳ Ready | 12 | 130% |
+| **6** | Monitoring & Analytics Pallet | ⏳ Ready | 8 | 140% |
+| | **TOTAL** | | **247 hours** | **100%** |
+
+---
+
+## Expected Performance Outcomes
+
+| Metric | Current | Target | Gain |
+|--------|---------|--------|------|
+| **TPS (Sequential)** | 581 | 2,000+ | 3.4x |
+| **TPS (Atomic Bundles)** | 100-200 | 2,000+ | 10-20x |
+| **Finality Latency** | 2-3 seconds | 200-400ms | 5-15x |
+| **Block Time** | 400ms | 200ms | 2x |
+| **Signature Verification** | Per-sig | Batch (1000+) | 100x faster |
+| **Cross-Chain Latency** | 12+ seconds | <1 second | 12x+ |
+| **Settlement Cost** | $0.50-$2.00 | $0.01-$0.05 | 10-100x cheaper |
+| **Parallel Execution** | None | 4-8x | 4-8x |
+| **GPU Utilization** | 0% | 80%+ | Unlimited |
+
+---
+
+## Risk Mitigation
+
+| Risk | Mitigation |
+|------|-----------|
+| **Consensus change breaks finality** | Extensive testing of Flash Finality with 7+ validators before mainnet |
+| **Parallel execution causes state divergence** | Deterministic merging of state changes, extensive invariant testing |
+| **GPU nodes become bottleneck** | Warden dynamically allocates resources, fallback to CPU verification |
+| **External chains can't verify proofs** | Comprehensive client libraries and bridge contracts with examples |
+| **Performance regression** | Continuous benchmarking at each phase, rollback plan for each phase |
+
+---
+
+## Timeline
+
+- **Weeks 1-2:** Phase 0 (Foundation) - 15% complete
+- **Weeks 3-4:** Phase 1 (Consensus) - 35% complete
+- **Weeks 5-6:** Phase 2 (Parallel Execution) - 55% complete
+- **Weeks 7-9:** Phase 3 (Atomic Kernel) - 70% complete
+- **Weeks 10-12:** Phase 4 (Shared Sequencer) - 85% complete
+- **Weeks 13-14:** Phase 5 (Client Libraries) - 95% complete
+- **Weeks 15-16:** Phase 6 (GPU Swarm) - 100% complete
+
+**Total:** 16 weeks (~4 months) to full integration
+
+---
+
+## Key Success Metrics
+
+✅ **Throughput:** 2,000+ TPS finalized with atomic guarantees
+✅ **Latency:** 200-400ms atomic finality
+✅ **Cost:** $0.01-$0.05 per atomic transaction
+✅ **Decentralization:** 7+ validators with GPU acceleration
+✅ **Adoption:** 10+ external chains integrated
+✅ **Reliability:** 99.9% uptime, zero atomic execution failures
+✅ **Scalability:** Linear scaling with GPU node count

@@ -1,0 +1,3 @@
+@openzeppelin/contracts-upgradeable/=contracts/@openzeppelin/contracts-upgradeable/
+@openzeppelin/contracts/=contracts/@openzeppelin/contracts/
+forge-std/=contracts/forge-std/src/

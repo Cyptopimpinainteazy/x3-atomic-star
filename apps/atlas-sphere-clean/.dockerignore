@@ -1,0 +1,16 @@
+.git
+.github
+target
+node_modules
+dist
+*.swp
+*.swo
+*~
+.DS_Store
+.env.local
+.env.*.local
+docs
+*.md
+!Dockerfile
+.vscode
+.idea

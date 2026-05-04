@@ -1,0 +1,1706 @@
+└─ x3-chain-master
+   ├─ docs
+   │  ├─ crates
+   │  │  └─ README.md
+   │  │     ├─ line 214: [x] Core task and node types
+   │  │     ├─ line 215: [x] Scheduler with multiple strategies
+   │  │     ├─ line 216: [x] Verification pipeline
+   │  │     ├─ line 217: [x] Coordinator architecture
+   │  │     ├─ line 218: [x] Full libp2p P2P networking
+   │  │     ├─ line 219: [x] X3-VM integration for bytecode execution
+   │  │     ├─ line 220: [x] CUDA backend implementation
+   │  │     ├─ line 221: [x] Vulkan compute shaders
+   │  │     ├─ line 222: [x] WebGPU support for browsers
+   │  │     ├─ line 223: [x] Economic incentive model
+   │  │     ├─ line 224: [x] Slashing conditions
+   │  │     └─ line 225: [x] Blockchain integration for rewards
+   │  ├─ cross-chain-gpu-validator
+   │  │  ├─ docs
+   │  │  │  └─ INFERSTRUCTOR_300X_TEST_PLAN.md
+   │  │  │     ├─ line 659: [ ] All 5 test phases completed successfully
+   │  │  │     ├─ line 660: [ ] ≥19.5M TPS sustained for 10+ minutes
+   │  │  │     ├─ line 661: [ ] 100% hash correctness across all lanes
+   │  │  │     ├─ line 662: [ ] <3ms failover recovery time demonstrated
+   │  │  │     ├─ line 663: [ ] Real-world testnet integration validated
+   │  │  │     ├─ line 664: [ ] Metrics exported and reproducible
+   │  │  │     ├─ line 665: [ ] External validator fallback tested
+   │  │  │     ├─ line 666: [ ] No state divergence in any scenario
+   │  │  │     ├─ line 667: [ ] PDF report generated
+   │  │  │     └─ line 668: [ ] Code + configs committed to repo
+   │  │  └─ tests
+   │  │     ├─ INTEGRATION_GUIDE.md
+   │  │     │  ├─ line 580: [x] Multi-lane GPU acceleration (Primary/Shadow/Tertiary)
+   │  │     │  ├─ line 581: [x] <3ms deterministic failover
+   │  │     │  ├─ line 582: [x] JWT authentication & API keys
+   │  │     │  ├─ line 583: [x] SLA tier enforcement
+   │  │     │  ├─ line 584: [x] Real-time monitoring dashboard
+   │  │     │  ├─ line 585: [ ] Multi-region deployment (US, EU, APAC)
+   │  │     │  ├─ line 586: [ ] Custom lane slicing for Enterprise
+   │  │     │  ├─ line 587: [ ] 24/7 NOC support
+   │  │     │  ├─ line 588: [ ] Smart contract integration
+   │  │     │  └─ line 589: [ ] Cross-chain atomic swaps via acceleration
+   │  │     ├─ ONBOARDING_COMPLETE.md
+   │  │     │  ├─ line 345: [ ] Test registration flow
+   │  │     │  ├─ line 346: [ ] Verify API key authentication works
+   │  │     │  ├─ line 347: [ ] Run 10-minute load test
+   │  │     │  ├─ line 348: [ ] Implement native fallback in your code
+   │  │     │  ├─ line 349: [ ] Set up monitoring alerts
+   │  │     │  ├─ line 350: [ ] Document credentials securely
+   │  │     │  ├─ line 351: [ ] Test failover (kill Primary lane, verify Shadow takes over)
+   │  │     │  ├─ line 352: [ ] Verify result hash validation
+   │  │     │  ├─ line 353: [ ] Load test at your expected TPS
+   │  │     │  ├─ line 354: [ ] Contact support for production endpoint
+   │  │     │  ├─ line 358: [ ] Use HTTPS endpoint: `https://inferstructor.x3.network`
+   │  │     │  ├─ line 359: [ ] Store credentials in secrets manager (not .env files)
+   │  │     │  ├─ line 360: [ ] Set up log aggregation
+   │  │     │  ├─ line 361: [ ] Configure rate limit alerts
+   │  │     │  ├─ line 362: [ ] Enable request tracing
+   │  │     │  ├─ line 363: [ ] Set up cost monitoring
+   │  │     │  ├─ line 364: [ ] Document runbooks for ops team
+   │  │     │  └─ line 365: [ ] Test disaster recovery plan
+   │  │     ├─ PRODUCTION_DEPLOYMENT_GUIDE.md
+   │  │     │  ├─ line 446: [ ] GPU nodes provisioned with NVIDIA drivers
+   │  │     │  ├─ line 447: [ ] CUDA 12.x installed on all nodes
+   │  │     │  ├─ line 448: [ ] All lane configs updated with real IPs
+   │  │     │  ├─ line 449: [ ] GPU lane services running on each node
+   │  │     │  ├─ line 450: [ ] Toll booth service running
+   │  │     │  ├─ line 451: [ ] Lane orchestrator monitoring all lanes
+   │  │     │  ├─ line 452: [ ] End-to-end test completed
+   │  │     │  ├─ line 453: [ ] Monitoring dashboard accessible
+   │  │     │  └─ line 454: [ ] Failover tested (kill primary, verify shadow takes over)
+   │  │     └─ QUICKREF.md
+   │  │        ├─ line 162: [ ] All 3 lanes deployed
+   │  │        ├─ line 163: [ ] GPU kernels precompiled
+   │  │        ├─ line 164: [ ] Toll booth configured
+   │  │        ├─ line 165: [ ] SLA tiers defined
+   │  │        ├─ line 166: [ ] Monitoring enabled
+   │  │        ├─ line 167: [ ] Backup lanes tested
+   │  │        ├─ line 168: [ ] Split-brain prevention verified
+   │  │        ├─ line 169: [ ] External fallback tested
+   │  │        ├─ line 170: [ ] 300× speed proven
+   │  │        └─ line 171: [ ] Proof document exported
+   │  ├─ implementation
+   │  │  └─ IMPLEMENTATION_PLAN.md
+   │  │     ├─ line 19: [x] EVM executor trait defined
+   │  │     ├─ line 20: [x] Mock executor implemented
+   │  │     ├─ line 21: [ ] Connect EVM execution results to `CanonicalLedger` storage
+   │  │     ├─ line 22: [ ] Implement state changes → canonical ledger persistence
+   │  │     ├─ line 23: [ ] Add EVM account balance tracking
+   │  │     ├─ line 24: [ ] Wire through `DualVmDispatcher::execute_evm_tx`
+   │  │     ├─ line 43: [x] SVM executor trait defined
+   │  │     ├─ line 44: [x] Mock executor implemented
+   │  │     ├─ line 45: [ ] Connect SVM execution results to `CanonicalLedger` storage
+   │  │     ├─ line 46: [ ] Implement account updates → canonical ledger persistence
+   │  │     ├─ line 47: [ ] Add SVM account balance tracking
+   │  │     ├─ line 48: [ ] Wire through `DualVmDispatcher::execute_svm_tx`
+   │  │     ├─ line 54: [x] Operation types defined
+   │  │     ├─ line 55: [x] Validation logic complete
+   │  │     ├─ line 56: [x] Execution logic with state change output
+   │  │     ├─ line 57: [x] Atomic semantics documented
+   │  │     ├─ line 58: [ ] Wire to runtime for extrinsic submission
+   │  │     ├─ line 68: [x] X3 Kernel RPC methods exposed (5 methods)
+   │  │     ├─ line 69: [x] HTTP JSON-RPC server on 127.0.0.1:9944
+   │  │     ├─ line 70: [ ] Add WebSocket support
+   │  │     ├─ line 71: [ ] Add Frontier EVM RPC methods (future)
+   │  │     ├─ line 72: [ ] Add SVM RPC methods (future)
+   │  │     ├─ line 86: [x] Prometheus metrics defined (20+ metrics)
+   │  │     ├─ line 87: [x] Metric types specified
+   │  │     ├─ line 88: [ ] Wire to actual node events
+   │  │     ├─ line 89: [ ] Export endpoint configuration
+   │  │     ├─ line 90: [ ] Grafana dashboard templates
+   │  │     ├─ line 96: [x] Aura + GRANDPA consensus
+   │  │     ├─ line 97: [x] libp2p networking with peer discovery
+   │  │     ├─ line 98: [x] Block sync operational
+   │  │     ├─ line 108: [x] Basic chain spec commands
+   │  │     ├─ line 109: [ ] Add `x3-chain-node comit` subcommand
+   │  │     ├─ line 110: [ ] Add `x3-chain-node keys` subcommand enhancements
+   │  │     ├─ line 111: [ ] Add `x3-chain-node inspect` for canonical ledger queries
+   │  │     ├─ line 125: [ ] Create `src/client.ts` - Main AtlasSphereClient class
+   │  │     ├─ line 126: [ ] Create `src/comit.ts` - Comit builder and submission
+   │  │     ├─ line 127: [ ] Create `src/query.ts` - Canonical ledger queries
+   │  │     ├─ line 128: [ ] Create `src/evm.ts` - EVM-specific utilities
+   │  │     ├─ line 129: [ ] Create `src/svm.ts` - SVM-specific utilities
+   │  │     ├─ line 130: [ ] Create `src/types.ts` - TypeScript type definitions
+   │  │     ├─ line 131: [ ] Write comprehensive tests
+   │  │     ├─ line 132: [ ] Build and publish to npm
+   │  │     ├─ line 138: [ ] Create `client.py` - Main AtlasSphereClient class
+   │  │     ├─ line 139: [ ] Create `comit.py` - Comit builder and submission
+   │  │     ├─ line 140: [ ] Create `query.py` - Canonical ledger queries
+   │  │     ├─ line 141: [ ] Create `evm.py` - EVM-specific utilities
+   │  │     ├─ line 142: [ ] Create `svm.py` - SVM-specific utilities
+   │  │     ├─ line 143: [ ] Create `cli.py` - CLI entrypoint (already configured)
+   │  │     ├─ line 144: [ ] Write comprehensive tests
+   │  │     ├─ line 145: [ ] Build and publish to PyPI
+   │  │     ├─ line 192: [ ] EVM execution persists to canonical ledger
+   │  │     ├─ line 193: [ ] SVM execution persists to canonical ledger
+   │  │     ├─ line 194: [ ] Cross-VM operations execute atomically
+   │  │     ├─ line 195: [ ] State changes visible via RPC queries
+   │  │     ├─ line 196: [ ] All tests passing
+   │  │     ├─ line 199: [ ] HTTP + WebSocket RPC operational
+   │  │     ├─ line 200: [ ] Telemetry metrics exported to Prometheus
+   │  │     ├─ line 201: [ ] Networking stable with >10 peers
+   │  │     ├─ line 202: [ ] Block production and finalization consistent
+   │  │     ├─ line 203: [ ] RPC queries return correct canonical ledger state
+   │  │     ├─ line 206: [ ] CLI can create and submit Comits
+   │  │     ├─ line 207: [ ] CLI can query canonical ledger
+   │  │     ├─ line 208: [ ] TypeScript SDK published to npm
+   │  │     ├─ line 209: [ ] Python SDK published to PyPI
+   │  │     ├─ line 210: [ ] Comprehensive documentation and examples
+   │  │     └─ line 211: [ ] Developer tutorials complete
+   │  ├─ infra
+   │  │  ├─ API_KEYS_REQUIRED.md
+   │  │  │  ├─ line 93: [x] Infura Project ID ✅ **COMPLETED**
+   │  │  │  ├─ line 94: [x] CoinGecko API Key ✅ **WORKING** (demo key)
+   │  │  │  ├─ line 95: [x] Dune Analytics API Key ✅ **COMPLETED**
+   │  │  │  ├─ line 96: [x] GoPlus Security API Key ✅ **WORKING**
+   │  │  │  ├─ line 97: [ ] Generate wallet keystore
+   │  │  │  ├─ line 98: [ ] PostgreSQL password
+   │  │  │  ├─ line 99: [ ] Git SSH key + token
+   │  │  │  ├─ line 102: [ ] All development keys
+   │  │  │  ├─ line 103: [ ] Production RPC endpoints
+   │  │  │  ├─ line 104: [ ] Multi-signature wallet setup
+   │  │  │  ├─ line 105: [ ] HSM for sensitive operations
+   │  │  │  ├─ line 106: [ ] Governance approval process
+   │  │  │  └─ line 107: [ ] Monitoring and alerting setup
+   │  │  └─ README-RPC-ENDPOINTS.md
+   │  │     ├─ line 122: [ ] Add Ethereum mainnet endpoints (Infura/Alchemy)
+   │  │     ├─ line 123: [ ] Configure fallback Solana endpoints
+   │  │     ├─ line 124: [ ] Implement automatic failover logic
+   │  │     ├─ line 125: [ ] Add metrics dashboard for RPC monitoring
+   │  │     └─ line 126: [ ] Set up alerting for endpoint downtime
+   │  ├─ infra-structure
+   │  │  ├─ docs
+   │  │  │  └─ INFERSTRUCTOR_300X_TEST_PLAN.md
+   │  │  │     ├─ line 659: [ ] All 5 test phases completed successfully
+   │  │  │     ├─ line 660: [ ] ≥19.5M TPS sustained for 10+ minutes
+   │  │  │     ├─ line 661: [ ] 100% hash correctness across all lanes
+   │  │  │     ├─ line 662: [ ] <3ms failover recovery time demonstrated
+   │  │  │     ├─ line 663: [ ] Real-world testnet integration validated
+   │  │  │     ├─ line 664: [ ] Metrics exported and reproducible
+   │  │  │     ├─ line 665: [ ] External validator fallback tested
+   │  │  │     ├─ line 666: [ ] No state divergence in any scenario
+   │  │  │     ├─ line 667: [ ] PDF report generated
+   │  │  │     └─ line 668: [ ] Code + configs committed to repo
+   │  │  └─ tests
+   │  │     ├─ INTEGRATION_GUIDE.md
+   │  │     │  ├─ line 580: [x] Multi-lane GPU acceleration (Primary/Shadow/Tertiary)
+   │  │     │  ├─ line 581: [x] <3ms deterministic failover
+   │  │     │  ├─ line 582: [x] JWT authentication & API keys
+   │  │     │  ├─ line 583: [x] SLA tier enforcement
+   │  │     │  ├─ line 584: [x] Real-time monitoring dashboard
+   │  │     │  ├─ line 585: [ ] Multi-region deployment (US, EU, APAC)
+   │  │     │  ├─ line 586: [ ] Custom lane slicing for Enterprise
+   │  │     │  ├─ line 587: [ ] 24/7 NOC support
+   │  │     │  ├─ line 588: [ ] Smart contract integration
+   │  │     │  └─ line 589: [ ] Cross-chain atomic swaps via acceleration
+   │  │     ├─ ONBOARDING_COMPLETE.md
+   │  │     │  ├─ line 345: [ ] Test registration flow
+   │  │     │  ├─ line 346: [ ] Verify API key authentication works
+   │  │     │  ├─ line 347: [ ] Run 10-minute load test
+   │  │     │  ├─ line 348: [ ] Implement native fallback in your code
+   │  │     │  ├─ line 349: [ ] Set up monitoring alerts
+   │  │     │  ├─ line 350: [ ] Document credentials securely
+   │  │     │  ├─ line 351: [ ] Test failover (kill Primary lane, verify Shadow takes over)
+   │  │     │  ├─ line 352: [ ] Verify result hash validation
+   │  │     │  ├─ line 353: [ ] Load test at your expected TPS
+   │  │     │  ├─ line 354: [ ] Contact support for production endpoint
+   │  │     │  ├─ line 358: [ ] Use HTTPS endpoint: `https://inferstructor.x3.network`
+   │  │     │  ├─ line 359: [ ] Store credentials in secrets manager (not .env files)
+   │  │     │  ├─ line 360: [ ] Set up log aggregation
+   │  │     │  ├─ line 361: [ ] Configure rate limit alerts
+   │  │     │  ├─ line 362: [ ] Enable request tracing
+   │  │     │  ├─ line 363: [ ] Set up cost monitoring
+   │  │     │  ├─ line 364: [ ] Document runbooks for ops team
+   │  │     │  └─ line 365: [ ] Test disaster recovery plan
+   │  │     ├─ PRODUCTION_DEPLOYMENT_GUIDE.md
+   │  │     │  ├─ line 446: [ ] GPU nodes provisioned with NVIDIA drivers
+   │  │     │  ├─ line 447: [ ] CUDA 12.x installed on all nodes
+   │  │     │  ├─ line 448: [ ] All lane configs updated with real IPs
+   │  │     │  ├─ line 449: [ ] GPU lane services running on each node
+   │  │     │  ├─ line 450: [ ] Toll booth service running
+   │  │     │  ├─ line 451: [ ] Lane orchestrator monitoring all lanes
+   │  │     │  ├─ line 452: [ ] End-to-end test completed
+   │  │     │  ├─ line 453: [ ] Monitoring dashboard accessible
+   │  │     │  └─ line 454: [ ] Failover tested (kill primary, verify shadow takes over)
+   │  │     └─ QUICKREF.md
+   │  │        ├─ line 162: [ ] All 3 lanes deployed
+   │  │        ├─ line 163: [ ] GPU kernels precompiled
+   │  │        ├─ line 164: [ ] Toll booth configured
+   │  │        ├─ line 165: [ ] SLA tiers defined
+   │  │        ├─ line 166: [ ] Monitoring enabled
+   │  │        ├─ line 167: [ ] Backup lanes tested
+   │  │        ├─ line 168: [ ] Split-brain prevention verified
+   │  │        ├─ line 169: [ ] External fallback tested
+   │  │        ├─ line 170: [ ] 300× speed proven
+   │  │        └─ line 171: [ ] Proof document exported
+   │  ├─ openspec
+   │  │  ├─ changes
+   │  │  │  ├─ add-cross-chain-gpu-validator
+   │  │  │  │  └─ tasks.md
+   │  │  │  │     ├─ line 2: [ ] 1.1 Create package layout: `cross-chain-gpu-validator/{src,kernels,dashboard,deployment,docs}`.
+   │  │  │  │     ├─ line 3: [ ] 1.2 Implement secp256k1 GPU batch verifier with CPU parity tests.
+   │  │  │  │     ├─ line 4: [ ] 1.3 Implement keccak256 GPU batch hasher with CPU parity tests.
+   │  │  │  │     ├─ line 5: [ ] 1.4 Implement EVM state root validation pipeline (GPU batched).
+   │  │  │  │     ├─ line 6: [ ] 1.5 Implement SVM validation pipeline (GPU-assisted where applicable).
+   │  │  │  │     ├─ line 7: [ ] 1.6 Implement atomic swap orchestrator with Redis registry and timeout rollback.
+   │  │  │  │     ├─ line 8: [ ] 1.7 Implement GPU->CPU failover logic (failover only).
+   │  │  │  │     ├─ line 9: [ ] 1.8 Implement operator dashboard (TPS, success rate, rollback counts, GPU health, RPC latency).
+   │  │  │  │     ├─ line 10: [ ] 1.9 Implement testnet deployment scripts for Solana + Ethereum.
+   │  │  │  │     ├─ line 11: [ ] 1.10 Implement stress benchmark runner (2-4M TPS target, report outputs).
+   │  │  │  │     ├─ line 12: [ ] 1.11 Add security checks and anomaly detection hooks for atomic violations.
+   │  │  │  │     ├─ line 15: [ ] 2.1 Add kernel parity tests (GPU vs CPU).
+   │  │  │  │     ├─ line 16: [ ] 2.2 Add atomic invariant tests (commit/rollback/timeout).
+   │  │  │  │     ├─ line 17: [ ] 2.3 Add integration tests for dual-chain orchestration.
+   │  │  │  │     ├─ line 18: [ ] 2.4 Add benchmark test harness and validation reports.
+   │  │  │  │     ├─ line 19: [ ] 2.5 Register new invariants in `tests/invariants/registry.toml` and reference IDs in tests.
+   │  │  │  │     ├─ line 22: [ ] 3.1 Architecture overview for cross-chain validator stack.
+   │  │  │  │     ├─ line 23: [ ] 3.2 Deployment guide for testnet.
+   │  │  │  │     ├─ line 24: [ ] 3.3 Monitoring and dashboard guide.
+   │  │  │  │     └─ line 25: [ ] 3.4 Security and rollback procedures.
+   │  │  │  ├─ add-social-agent-swarm
+   │  │  │  │  └─ tasks.md
+   │  │  │  │     ├─ line 2: [x] 1.1 Vendor Open Notebook into repo and add a minimal adapter for querying approved content.
+   │  │  │  │     ├─ line 3: [x] 1.2 Add social-agent pipeline (planner, researcher, drafter, reviewer) wired to swarm task queue.
+   │  │  │  │     ├─ line 4: [x] 1.3 Add network + keyword configuration with draft-only enforcement and ToS guardrails.
+   │  │  │  │     ├─ line 5: [x] 1.4 Persist drafts and audit logs; expose read APIs in swarm server.
+   │  │  │  │     └─ line 6: [x] 1.5 Add tests for draft generation pipeline and guardrail enforcement.
+   │  │  │  ├─ jury-blockchain-anchoring
+   │  │  │  │  ├─ COMPLETE_DELIVERY.md
+   │  │  │  │  │  ├─ line 341: [x] **Specification** - proposal.md + design.md complete
+   │  │  │  │  │  ├─ line 342: [x] **Implementation** - All 4 options coded end-to-end
+   │  │  │  │  │  ├─ line 343: [x] **Testing** - 13/13 tests passing
+   │  │  │  │  │  ├─ line 344: [x] **Documentation** - 20+ pages with examples
+   │  │  │  │  │  ├─ line 345: [x] **Security** - Threat model reviewed, mitigations in place
+   │  │  │  │  │  ├─ line 346: [x] **Performance** - Benchmarks show 2-5sec anchor, <200ms verify
+   │  │  │  │  │  ├─ line 347: [x] **Integration** - Works with existing jury system (Phase 1-4)
+   │  │  │  │  │  ├─ line 348: [x] **Monitoring** - Health checks + observability implemented
+   │  │  │  │  │  ├─ line 349: [x] **Troubleshooting** - Common issues documented with fixes
+   │  │  │  │  │  └─ line 350: [x] **Rollback** - Feature flag allows disabling if needed
+   │  │  │  │  ├─ DEPLOYMENT_GUIDE.md
+   │  │  │  │  │  ├─ line 13: [x] **Rust Pallet Compiles**
+   │  │  │  │  │  ├─ line 19: [x] **Python Code Type-Checks**
+   │  │  │  │  │  ├─ line 24: [x] **TypeScript Compiles**
+   │  │  │  │  │  ├─ line 30: [x] **All Tests Pass**
+   │  │  │  │  │  ├─ line 38: [x] proposal.md - Problem + solution specified
+   │  │  │  │  │  ├─ line 39: [x] design.md - Architecture + code samples complete
+   │  │  │  │  │  ├─ line 40: [x] GUIDE.md - 10 sections, 2,500+ lines
+   │  │  │  │  │  ├─ line 41: [x] API reference - 3 RPC methods documented
+   │  │  │  │  │  ├─ line 42: [x] Examples - 3 working scenarios
+   │  │  │  │  │  ├─ line 43: [x] Troubleshooting - 6+ common issues with fixes
+   │  │  │  │  │  ├─ line 47: [x] Rust code reviewed for memory safety
+   │  │  │  │  │  ├─ line 48: [x] Python RPC calls use secure hashing (SHA256)
+   │  │  │  │  │  ├─ line 49: [x] TypeScript doesn't trust unverified data
+   │  │  │  │  │  ├─ line 50: [x] Authority checks are enforced
+   │  │  │  │  │  ├─ line 51: [x] Duplicate prevention is implemented
+   │  │  │  │  │  ├─ line 52: [x] Error paths don't leak sensitive data
+   │  │  │  │  │  ├─ line 53: [x] Audit logging captures all actions
+   │  │  │  │  │  ├─ line 57: [x] Anchor operation: <5 seconds (measured)
+   │  │  │  │  │  ├─ line 58: [x] Verify operation: <200 milliseconds (measured)
+   │  │  │  │  │  ├─ line 59: [x] React polling: 2s interval (efficient)
+   │  │  │  │  │  ├─ line 60: [x] Memory usage: <100MB per service instance (validated)
+   │  │  │  │  │  ├─ line 61: [x] RPC throughput: >100 calls/sec (tested)
+   │  │  │  │  │  ├─ line 65: [x] Works with jury-service (Phase 2)
+   │  │  │  │  │  ├─ line 66: [x] Works with REST API (Phase 2)
+   │  │  │  │  │  ├─ line 67: [x] Works with audit logging (Phase 2)
+   │  │  │  │  │  ├─ line 68: [x] Compatible with existing storage schema
+   │  │  │  │  │  ├─ line 69: [x] No breaking changes to Phase 1-4
+   │  │  │  │  │  ├─ line 552: [x] Code complete
+   │  │  │  │  │  ├─ line 553: [x] Tests passing
+   │  │  │  │  │  ├─ line 554: [x] Documentation comprehensive
+   │  │  │  │  │  ├─ line 555: [x] Security reviewed
+   │  │  │  │  │  ├─ line 556: [x] Performance validated
+   │  │  │  │  │  └─ line 557: [x] Rollback plan ready
+   │  │  │  │  ├─ FILE_MANIFEST.md
+   │  │  │  │  │  ├─ line 337: [x] Authority verification on anchor_decision
+   │  │  │  │  │  ├─ line 338: [x] Signature validation in pallet
+   │  │  │  │  │  ├─ line 339: [x] Duplicate decision prevention
+   │  │  │  │  │  ├─ line 340: [x] Audit trail for all operations
+   │  │  │  │  │  ├─ line 341: [x] No sensitive data on-chain
+   │  │  │  │  │  ├─ line 342: [x] Hash-only verification approach
+   │  │  │  │  │  ├─ line 343: [x] Error messages don't leak info
+   │  │  │  │  │  ├─ line 344: [x] Rate limiting on RPC
+   │  │  │  │  │  ├─ line 345: [x] Input validation on all entries
+   │  │  │  │  │  ├─ line 346: [x] Timeout protection on polling
+   │  │  │  │  │  ├─ line 349: [x] No memory safety issues (Rust)
+   │  │  │  │  │  ├─ line 350: [x] No type confusion attacks (TypeScript)
+   │  │  │  │  │  ├─ line 351: [x] No SQL injection (parameterized queries)
+   │  │  │  │  │  ├─ line 352: [x] No XSS vectors (React sanitization)
+   │  │  │  │  │  ├─ line 353: [x] No timing attacks (constant-time hash)
+   │  │  │  │  │  ├─ line 354: [x] No integer overflow (checked arithmetic)
+   │  │  │  │  │  ├─ line 361: [x] **Option 1:** New OpenSpec change proposal ✅
+   │  │  │  │  │  ├─ line 362: [x] **Option 2:** Runtime pallet implementation ✅
+   │  │  │  │  │  ├─ line 363: [x] **Option 3:** Python off-chain integration ✅
+   │  │  │  │  │  ├─ line 364: [x] **Option 4:** Documentation & examples ✅
+   │  │  │  │  │  ├─ line 367: [x] Jury decisions → blockchain hash anchor
+   │  │  │  │  │  ├─ line 368: [x] Off-chain votes remain private
+   │  │  │  │  │  ├─ line 369: [x] On-chain immutability guarantee
+   │  │  │  │  │  ├─ line 370: [x] RPC verification methods
+   │  │  │  │  │  ├─ line 371: [x] Frontend display components
+   │  │  │  │  │  ├─ line 372: [x] Audit logging integration
+   │  │  │  │  │  ├─ line 373: [x] Error handling & recovery
+   │  │  │  │  │  ├─ line 374: [x] Performance optimization
+   │  │  │  │  │  ├─ line 377: [x] Health checks
+   │  │  │  │  │  ├─ line 378: [x] Monitoring metrics
+   │  │  │  │  │  ├─ line 379: [x] Troubleshooting guide
+   │  │  │  │  │  ├─ line 380: [x] Deployment procedures
+   │  │  │  │  │  ├─ line 381: [x] Rollback plans
+   │  │  │  │  │  ├─ line 382: [x] Disaster recovery
+   │  │  │  │  │  ├─ line 383: [x] SLA definitions
+   │  │  │  │  │  ├─ line 384: [x] Example scripts
+   │  │  │  │  │  ├─ line 391: [x] All code compiles without errors
+   │  │  │  │  │  ├─ line 392: [x] All tests pass (22+)
+   │  │  │  │  │  ├─ line 393: [x] No security vulnerabilities found
+   │  │  │  │  │  ├─ line 394: [x] Performance benchmarks met
+   │  │  │  │  │  ├─ line 395: [x] Documentation complete
+   │  │  │  │  │  ├─ line 396: [x] Examples working
+   │  │  │  │  │  ├─ line 397: [x] Integration verified
+   │  │  │  │  │  ├─ line 398: [x] Rollback plan created
+   │  │  │  │  │  ├─ line 401: [x] Staging deployment guide
+   │  │  │  │  │  ├─ line 402: [x] Production deployment guide
+   │  │  │  │  │  ├─ line 403: [x] Health check automation
+   │  │  │  │  │  ├─ line 404: [x] Monitoring setup
+   │  │  │  │  │  ├─ line 405: [x] Alert configuration
+   │  │  │  │  │  ├─ line 406: [x] Incident response procedures
+   │  │  │  │  │  ├─ line 407: [x] Communication templates
+   │  │  │  │  │  ├─ line 408: [x] Rollback procedures
+   │  │  │  │  │  ├─ line 411: [x] 24-hour monitoring plan
+   │  │  │  │  │  ├─ line 412: [x] Success criteria defined
+   │  │  │  │  │  ├─ line 413: [x] Metrics dashboard ready
+   │  │  │  │  │  ├─ line 414: [x] On-call procedures
+   │  │  │  │  │  ├─ line 415: [x] Escalation paths
+   │  │  │  │  │  └─ line 416: [x] Status page updates
+   │  │  │  │  ├─ PRE_FLIGHT_CHECKLIST.md
+   │  │  │  │  │  ├─ line 11: [ ] **Rust Pallet Tests**
+   │  │  │  │  │  ├─ line 18: [ ] **Python Integration Tests**
+   │  │  │  │  │  ├─ line 25: [ ] **TypeScript Compilation**
+   │  │  │  │  │  ├─ line 32: [ ] **Code Quality Checks**
+   │  │  │  │  │  ├─ line 41: [ ] **Security Scan**
+   │  │  │  │  │  ├─ line 52: [ ] **Docker Images Built**
+   │  │  │  │  │  ├─ line 59: [ ] **Environment Files Created**
+   │  │  │  │  │  ├─ line 67: [ ] **Database Migrations Ready**
+   │  │  │  │  │  ├─ line 74: [ ] **Monitoring Configured**
+   │  │  │  │  │  ├─ line 75: [ ] Prometheus config updated
+   │  │  │  │  │  ├─ line 76: [ ] Grafana dashboards exported
+   │  │  │  │  │  ├─ line 77: [ ] Alert rules configured
+   │  │  │  │  │  ├─ line 82: [ ] **Deployment Guide Current**
+   │  │  │  │  │  ├─ line 83: [ ] Steps match actual scripts
+   │  │  │  │  │  ├─ line 84: [ ] Timings are accurate
+   │  │  │  │  │  ├─ line 85: [ ] Emergency contacts listed
+   │  │  │  │  │  ├─ line 88: [ ] **Operations Runbook Complete**
+   │  │  │  │  │  ├─ line 89: [ ] Common issues documented
+   │  │  │  │  │  ├─ line 90: [ ] Troubleshooting procedures tested
+   │  │  │  │  │  ├─ line 91: [ ] Rollback procedure verified
+   │  │  │  │  │  ├─ line 94: [ ] **Team Communications Ready**
+   │  │  │  │  │  ├─ line 95: [ ] Announcement drafted
+   │  │  │  │  │  ├─ line 96: [ ] Status update templates prepared
+   │  │  │  │  │  ├─ line 97: [ ] Escalation contacts verified
+   │  │  │  │  │  ├─ line 102: [ ] **Engineering Review Complete**
+   │  │  │  │  │  ├─ line 103: [ ] Code reviewed by 2+ engineers
+   │  │  │  │  │  ├─ line 104: [ ] Architecture approved
+   │  │  │  │  │  ├─ line 105: [ ] Test coverage acceptable
+   │  │  │  │  │  ├─ line 108: [ ] **Security Review Complete**
+   │  │  │  │  │  ├─ line 109: [ ] Threat model reviewed
+   │  │  │  │  │  ├─ line 110: [ ] No critical vulnerabilities
+   │  │  │  │  │  ├─ line 111: [ ] Data handling approved
+   │  │  │  │  │  ├─ line 114: [ ] **Operations Review Complete**
+   │  │  │  │  │  ├─ line 115: [ ] Runbook tested
+   │  │  │  │  │  ├─ line 116: [ ] Monitoring ready
+   │  │  │  │  │  ├─ line 117: [ ] Capacity sufficient
+   │  │  │  │  │  ├─ line 120: [ ] **Product Approval**
+   │  │  │  │  │  ├─ line 121: [ ] Feature meets spec
+   │  │  │  │  │  ├─ line 122: [ ] User impact communicated
+   │  │  │  │  │  ├─ line 123: [ ] Go-live approved
+   │  │  │  │  │  ├─ line 134: [ ] Send pre-deployment announcement
+   │  │  │  │  │  ├─ line 140: [ ] Notify on-call team
+   │  │  │  │  │  ├─ line 141: [ ] Slack message sent
+   │  │  │  │  │  ├─ line 142: [ ] On-call engineer confirmed ready
+   │  │  │  │  │  ├─ line 145: [ ] Verify runbook accessible to team
+   │  │  │  │  │  ├─ line 152: [ ] Create database backup
+   │  │  │  │  │  ├─ line 158: [ ] Stop accepting new jury decisions
+   │  │  │  │  │  ├─ line 164: [ ] Wait 5 minutes for in-flight decisions to complete
+   │  │  │  │  │  ├─ line 167: [ ] Verify no active transactions
+   │  │  │  │  │  ├─ line 173: [ ] Check disk space
+   │  │  │  │  │  ├─ line 179: [ ] Verify backup location accessible
+   │  │  │  │  │  ├─ line 186: [ ] Review deployment script
+   │  │  │  │  │  ├─ line 192: [ ] Verify all environment variables set
+   │  │  │  │  │  ├─ line 198: [ ] Test health check script works
+   │  │  │  │  │  ├─ line 204: [ ] Verify rollback script available
+   │  │  │  │  │  ├─ line 210: [ ] Announce final 30-minute warning
+   │  │  │  │  │  ├─ line 217: [ ] **START TIME: __________ UTC**
+   │  │  │  │  │  ├─ line 219: [ ] Execute deployment script
+   │  │  │  │  │  ├─ line 225: [ ] **T+5 min:** Update: Services launching
+   │  │  │  │  │  ├─ line 228: [ ] **T+10 min:** Update: Services online
+   │  │  │  │  │  ├─ line 231: [ ] **T+15 min:** RPC Node Health Check
+   │  │  │  │  │  ├─ line 240: [ ] **T+20 min:** Run Health Checks
+   │  │  │  │  │  ├─ line 247: [ ] **T+25 min:** Run Integration Tests
+   │  │  │  │  │  ├─ line 254: [ ] **T+30 min:** Announce: Phase 5 Online
+   │  │  │  │  │  ├─ line 261: [ ] **Deploy Successful Announced** (T+30 min)
+   │  │  │  │  │  ├─ line 264: [ ] **Monitor Every 15 Minutes:**
+   │  │  │  │  │  └─ line 290: [ ] **Mon
+   │  │  │  │  ├─ TEAM_COMMUNICATIONS.md
+   │  │  │  │  │  ├─ line 56: [ ] Read: `docs/runbooks/getting-started/QUICK_REFERENCE.md`
+   │  │  │  │  │  ├─ line 57: [ ] Review: `design.md` architecture
+   │  │  │  │  │  ├─ line 58: [ ] Update: Any custom integrations
+   │  │  │  │  │  ├─ line 59: [ ] Test: Run examples in your environment
+   │  │  │  │  │  ├─ line 60: [ ] Prepare: Monitoring dashboards
+   │  │  │  │  │  ├─ line 301: [ ] Review connection pool sizing (done)
+   │  │  │  │  │  ├─ line 302: [ ] Update monitoring thresholds (in progress)
+   │  │  │  │  │  └─ line 303: [ ] Capacity planning for Q2 (scheduled)
+   │  │  │  │  └─ proposal.md
+   │  │  │  │     ├─ line 104: [ ] Jury decisions anchor to blockchain deterministically
+   │  │  │  │     ├─ line 105: [ ] RPC method returns correct decision hash and block number
+   │  │  │  │     ├─ line 106: [ ] Off-chain audit logs match on-chain hash
+   │  │  │  │     ├─ line 107: [ ] Multiple sessions per block supported
+   │  │  │  │     ├─ line 110: [ ] No jury perf degradation (latency < 100ms)
+   │  │  │  │     ├─ line 111: [ ] On-chain storage < 100KB per session
+   │  │  │  │     ├─ line 112: [ ] Transaction finality < 6s
+   │  │  │  │     ├─ line 113: [ ] RPC latency < 200ms
+   │  │  │  │     ├─ line 116: [ ] 16+ unit tests for pallet logic
+   │  │  │  │     ├─ line 117: [ ] E2E test: create session → vote → anchor → verify
+   │  │  │  │     ├─ line 118: [ ] Cross-chain verification test
+   │  │  │  │     ├─ line 119: [ ] Scale test: 100 sessions/sec
+   │  │  │  │     ├─ line 122: [ ] Technical design (design.md)
+   │  │  │  │     ├─ line 123: [ ] API reference (RPC methods)
+   │  │  │  │     ├─ line 124: [ ] Deployment guide
+   │  │  │  │     ├─ line 125: [ ] Developer examples
+   │  │  │  │     └─ line 126: [ ] Troubleshooting guide
+   │  │  │  └─ refactor-swarm-legacy
+   │  │  │     └─ tasks.md
+   │  │  │        ├─ line 2: [ ] 1.1 Identify production paths that reference `swarm/` or `crates/gpu-swarm/`.
+   │  │  │        ├─ line 3: [ ] 1.2 Add deprecation markers and disable default build/run usage (keep code for reference).
+   │  │  │        ├─ line 4: [ ] 1.3 Gate reusable components behind explicit feature flags.
+   │  │  │        ├─ line 7: [ ] 2.1 Update docs to clarify swarm is deprecated for production launch.
+   │  │  │        ├─ line 8: [ ] 2.2 Document approved reuse points for Inferstructor.
+   │  │  │        └─ line 11: [ ] 3.1 Add CI guard to prevent new dependencies on deprecated modules.
+   │  │  └─ AGENTS.md
+   │  │     ├─ line 69: [ ] Read relevant specs in `specs/[capability]/spec.md`
+   │  │     ├─ line 70: [ ] Check pending changes in `changes/` for conflicts
+   │  │     ├─ line 71: [ ] Read `openspec/project.md` for conventions
+   │  │     ├─ line 72: [ ] Run `openspec list` to see active changes
+   │  │     ├─ line 73: [ ] Run `openspec list --specs` to see existing capabilities
+   │  │     ├─ line 201: [ ] 1.1 Create database schema
+   │  │     ├─ line 202: [ ] 1.2 Implement API endpoint
+   │  │     ├─ line 203: [ ] 1.3 Add frontend component
+   │  │     └─ line 204: [ ] 1.4 Write tests
+   │  ├─ proposals
+   │  │  └─ P4_SOLANA_TPS_ACCELERATION.md
+   │  │     ├─ line 360: [ ] Signature verification latency: < 1ms for 1000 sigs (vs 100ms on CPU)
+   │  │     ├─ line 361: [ ] Accuracy: 100% match with CPU baseline
+   │  │     ├─ line 362: [ ] Speedup: 50x
+   │  │     ├─ line 365: [ ] Solana testnet throughput: **2,000+ TPS** (vs 600 mainnet)
+   │  │     ├─ line 366: [ ] Latency p99: < 2 seconds block confirmation
+   │  │     ├─ line 367: [ ] Validator participation: No performance regression
+   │  │     ├─ line 370: [ ] Solana mainnet throughput: **4,000+ TPS**
+   │  │     ├─ line 371: [ ] Economic efficiency: Positive ROI for validators + GPU operators
+   │  │     ├─ line 372: [ ] Node participation: 50%+ of validators adopted
+   │  │     ├─ line 379: [ ] Benchmark current Solana validator bottleneck
+   │  │     ├─ line 380: [ ] Set up GPU development environment
+   │  │     ├─ line 381: [ ] Create GPU Swarm integration harness
+   │  │     ├─ line 382: [ ] Document current performance baseline
+   │  │     ├─ line 385: [ ] Implement ED25519 GPU verification (CUDA)
+   │  │     ├─ line 386: [ ] PoC with 100 test signatures
+   │  │     ├─ line 387: [ ] Benchmark against CPU: Target 50x
+   │  │     ├─ line 388: [ ] Create test harness for Solana validator
+   │  │     ├─ line 391: [ ] Integrate GPU verifier into Solana fork
+   │  │     ├─ line 392: [ ] Load test: 100 TPS → 1000 TPS
+   │  │     ├─ line 393: [ ] Validate consensus doesn't break
+   │  │     ├─ line 394: [ ] Benchmark mainnet equivalence
+   │  │     ├─ line 397: [ ] Implement GPU merkle tree
+   │  │     ├─ line 398: [ ] Batch state updates
+   │  │     ├─ line 399: [ ] Integrate into validator
+   │  │     ├─ line 402: [ ] TX simulation GPU acceleration
+   │  │     ├─ line 403: [ ] End-to-end integration testing
+   │  │     ├─ line 404: [ ] Deploy to testnet
+   │  │     └─ line 405: [ ] Documentation & runbooks
+   │  ├─ runbooks
+   │  │  ├─ deployment
+   │  │  │  ├─ DEPLOYMENT_CHECKLIST.md
+   │  │  │  │  ├─ line 8: [ ] Install systemd services: `sudo bash deployment/scripts/install-services.sh`
+   │  │  │  │  ├─ line 9: [ ] Verify services are enabled: `sudo systemctl list-unit-files | grep x3`
+   │  │  │  │  ├─ line 10: [ ] Check all 3 services are active: `sudo systemctl status redis ccgv-validator x3-intelligence`
+   │  │  │  │  ├─ line 11: [ ] Verify ports are listening: 5173 (dashboard), 8000 (validator), 6379 (redis)
+   │  │  │  │  ├─ line 12: [ ] Create `.env` file from template
+   │  │  │  │  ├─ line 13: [ ] Set all required environment variables in `.env`
+   │  │  │  │  ├─ line 16: [ ] Change default admin password in `auth.ts`
+   │  │  │  │  ├─ line 17: [ ] Generate random AUTH_SALT (min 32 chars): `openssl rand -base64 32`
+   │  │  │  │  ├─ line 18: [ ] Generate random JWT_SECRET (min 32 chars): `openssl rand -base64 32`
+   │  │  │  │  ├─ line 19: [ ] Update CCGV_RPC_* endpoints with production API keys
+   │  │  │  │  ├─ line 20: [ ] Review and update REDIS_HOST if using external Redis
+   │  │  │  │  ├─ line 21: [ ] Set ENVIRONMENT=production in `.env`
+   │  │  │  │  ├─ line 24: [ ] Update app title/branding in `AppBar.tsx` if needed
+   │  │  │  │  ├─ line 25: [ ] Update default email in `auth.ts`
+   │  │  │  │  ├─ line 26: [ ] Configure log paths in service files (currently `/var/log/x3`)
+   │  │  │  │  ├─ line 27: [ ] Set NODE_ENV=production in `x3-intelligence.service`
+   │  │  │  │  ├─ line 28: [ ] Set RUST_LOG level for `ccgv-validator.service`
+   │  │  │  │  ├─ line 31: [ ] Redis is configured for persistence (appendonly=yes)
+   │  │  │  │  ├─ line 32: [ ] Redis password protection enabled (requirepass)
+   │  │  │  │  ├─ line 33: [ ] Backup strategy defined for Redis data
+   │  │  │  │  ├─ line 34: [ ] Check disk space for Redis and logs (min 10GB recommended)
+   │  │  │  │  ├─ line 35: [ ] Set up Redis replication if high-availability required
+   │  │  │  │  ├─ line 38: [ ] Set up log rotation for `/var/log/x3/*.log`
+   │  │  │  │  ├─ line 39: [ ] Configure centralized logging (CloudWatch, Datadog, etc.) if needed
+   │  │  │  │  ├─ line 40: [ ] Set up service health monitoring (systemd notify)
+   │  │  │  │  ├─ line 41: [ ] Configure alerts for service crashes
+   │  │  │  │  ├─ line 42: [ ] Test log viewing: `sudo journalctl -u x3-intelligence.service -n 50`
+   │  │  │  │  ├─ line 45: [ ] Configure firewall rules (whitelist ports: 5173, 8000, 6379)
+   │  │  │  │  ├─ line 46: [ ] Set up reverse proxy (nginx/Apache) for HTTPS termination
+   │  │  │  │  ├─ line 47: [ ] Configure SSL certificate (self-signed for dev, Let's Encrypt for prod)
+   │  │  │  │  ├─ line 48: [ ] Update API_BASE_URL if behind reverse proxy
+   │  │  │  │  ├─ line 49: [ ] Test HTTPS endpoint and certificate validity
+   │  │  │  │  ├─ line 50: [ ] Configure CORS headers if needed
+   │  │  │  │  ├─ line 53: [ ] Run load tests on dashboard endpoints
+   │  │  │  │  ├─ line 54: [ ] Optimize database queries if needed
+   │  │  │  │  ├─ line 55: [ ] Set up caching headers for static assets
+   │  │  │  │  ├─ line 56: [ ] Configure gzip compression for responses
+   │  │  │  │  ├─ line 57: [ ] Test with expected user load
+   │  │  │  │  ├─ line 63: [ ] Reboot system
+   │  │  │  │  ├─ line 64: [ ] Verify all services start automatically
+   │  │  │  │  ├─ line 65: [ ] Services are ready within 30 seconds
+   │  │  │  │  ├─ line 66: [ ] Dashboard accessible at https://localhost:5173
+   │  │  │  │  ├─ line 69: [ ] Login with new credentials works
+   │  │  │  │  ├─ line 70: [ ] Invalid credentials rejected
+   │  │  │  │  ├─ line 71: [ ] Session persists across page reload
+   │  │  │  │  ├─ line 72: [ ] Logout clears session
+   │  │  │  │  ├─ line 73: [ ] Expired tokens refreshed automatically
+   │  │  │  │  ├─ line 76: [ ] All metrics display correctly
+   │  │  │  │  ├─ line 77: [ ] Real-time updates working
+   │  │  │  │  ├─ line 78: [ ] No console errors or warnings
+   │  │  │  │  ├─ line 79: [ ] Response times acceptable (<500ms)
+   │  │  │  │  ├─ line 82: [ ] XSS payloads blocked on input fields
+   │  │  │  │  ├─ line 83: [ ] CSRF token validation working
+   │  │  │  │  ├─ line 84: [ ] Password hashing verified (never plaintext)
+   │  │  │  │  ├─ line 85: [ ] Tokens don't contain sensitive data
+   │  │  │  │  ├─ line 86: [ ] Authorization enforced on all endpoints
+   │  │  │  │  ├─ line 87: [ ] API responses don't leak sensitive info
+   │  │  │  │  ├─ line 88: [ ] CORS properly restricted
+   │  │  │  │  ├─ line 91: [ ] Service crash recovery (systemd restart)
+   │  │  │  │  ├─ line 92: [ ] Database connection resilience
+   │  │  │  │  ├─ line 93: [ ] RPC endpoint failover (if multiple endpoints)
+   │  │  │  │  ├─ line 94: [ ] Memory usage stable over 24 hours
+   │  │  │  │  ├─ line 95: [ ] No log file size explosion
+   │  │  │  │  ├─ line 96: [ ] Graceful shutdown/startup
+   │  │  │  │  ├─ line 99: [ ] Cross-chain message processing works
+   │  │  │  │  ├─ line 100: [ ] GPU validator receives correct transactions
+   │  │  │  │  ├─ line 101: [ ] Dashboard metrics match validator state
+   │  │  │  │  ├─ line 102: [ ] RPC calls complete successfully
+   │  │  │  │  ├─ line 103: [ ] Error handling for rate limits
+   │  │  │  │  ├─ line 108: [ ] Update README with production notes
+   │  │  │  │  ├─ line 109: [ ] Document admin password reset procedure
+   │  │  │  │  ├─ line 110: [ ] Create user guide for dashboard features
+   │  │  │  │  ├─ line 111: [ ] Document how to add new users (if applicable)
+   │  │  │  │  ├─ line 112: [ ] Create troubleshooting guide
+   │  │  │  │  ├─ line 115: [ ] Document service dependencies (redis → validator → dashboard)
+   │  │  │  │  ├─ line 116: [ ] Create service restart procedure
+   │  │  │  │  ├─ line 117: [ ] Document log locations and retention
+   │  │  │  │  ├─ line 118: [ ] Create backup/restore procedures
+   │  │  │  │  ├─ line 119: [ ] Document emergency fallback (startup.sh)
+   │  │  │  │  ├─ line 122: [ ] Document password policy requirements
+   │  │  │  │  ├─ line 123: [ ] Create incident response procedure
+   │  │  │  │  ├─ line 124: [ ] Document data retention policies
+   │  │  │  │  ├─ line 125: [ ] List of sensitive configuration variables
+   │  │  │  │  ├─ line 126: [ ] Access control documentation
+   │  │  │  │  ├─ line 131: [ ] All changes committed and merged to main
+   │  │  │  │  ├─ line 132: [ ] Version tags created for release
+   │  │  │  │  ├─ line 133: [ ] Release notes prepared
+   │  │  │  │  ├─ line 134: [ ] Rollback plan documented
+   │  │  │  │  ├─ line 135: [ ] Data backup taken before deployment
+   │  │  │  │  ├─ line 138: [ ] Pull latest code: `git pull origin main`
+   │  │  │  │  ├─ line 139: [ ] Run install script: `sudo bash deployment/scripts/install-services.sh`
+   │  │  │  │  ├─ line 140: [ ] Verify `.env` file is in place with correct values
+   │  │  │  │  ├─ line 141: [ ] Start services: `sudo systemctl start redis ccgv-validator x3-intelligence`
+   │  │  │  │  ├─ line 142: [ ] Monitor startup logs: `sudo journalctl -f`
+   │  │  │  │  ├─ line 143: [ ] Wait 30 seconds for full startup
+   │  │  │  │  ├─ line 144: [ ] Test dashboard: curl https://localhost:5173/api/health
+   │  │  │  │  ├─ line 145: [ ] Test login: credentials from `.env` AUTH_USER
+   │  │  │  │  ├─ line 148: [ ] All services running: `sudo systemctl status *`
+   │  │  │  │  ├─ line 149: [ ] Dashboard responsive: http://localhost:5173
+   │  │  │  │  ├─ line 150: [ ] Login functional with current credentials
+   │  │  │  │  ├─ line 151: [ ] Metrics updating in real-time
+   │  │  │  │  ├─ line 152: [ ] No error messages in logs
+   │  │  │  │  ├─ line 153: [ ] System memory usage normal (<50%)
+   │  │  │  │  ├─ line 154: [ ] Disk usage normal (<80% full)
+   │  │  │  │  ├─ line 159: [ ] Redis configured for replication (master/slave)
+   │  │  │  │  ├─ line 160: [ ] Validator can handle multiple instances
+   │  │  │  │  ├─ line 161: [ ] Load balancing configuration for multiple dashboards
+   │  │  │  │  ├─ line 162: [ ] Session state externalized to Redis
+   │  │  │  │  ├─ line 165: [ ] Application tested with increased load
+   │  │  │  │  ├─ line 166: [ ] Database query optimization completed
+   │  │  │  │  ├─ line 167: [ ] Caching strategy implemented
+   │  │  │  │  ├─ line 168: [ ] Memory limits set appropriately
+   │  │  │  │  ├─ line 173: [ ] Weekly: Check logs for errors
+   │  │  │  │  ├─ line 174: [ ] Biweekly: Review resource usage
+   │  │  │  │  ├─ line 175: [ ] Monthly: Security updates and patches
+   │  │  │  │  ├─ line 176: [ ] Quarterly: Full system audit
+   │  │  │  │  ├─ line 177: [ ] Annually: Disaster recovery drill
+   │  │  │  │  ├─ line 180: [ ] Daily backups of critical data
+   │  │  │  │  ├─ line 181: [ ] Weekly full system snapshots
+   │  │  │  │  ├─ line 182: [ ] Recovery time objective (RTO) defined: _____ minutes
+   │  │  │  │  ├─ line 183: [ ] Recovery point objective (RPO) defined: _____ minutes
+   │  │  │  │  ├─ line 184: [ ] Backup verification tested monthly
+   │  │  │  │  ├─ line 187: [ ] Alert on service down condition
+   │  │  │  │  ├─ line 188: [ ] Alert on high memory usage (>80%)
+   │  │  │  │  ├─ line 189: [ ] Alert on disk full condition (>95%)
+   │  │  │  │  ├─ line 190: [ ] Alert on slow API responses (>1000ms)
+   │  │  │  │  └─ line 191: [ ] Alert on authentication failures (>10/5min)
+   │  │  │  ├─ DEPLOYMENT_GUIDE.md
+   │  │  │  │  ├─ line 7: [ ] Node.js 18+ installed
+   │  │  │  │  ├─ line 8: [ ] Ollama installed (optional but recommended)
+   │  │  │  │  ├─ line 9: [ ] OpenRouter API key obtained (optional)
+   │  │  │  │  ├─ line 10: [ ] Docker installed (for containerized deployment)
+   │  │  │  │  ├─ line 11: [ ] Kubernetes cluster available (for K8s deployment)
+   │  │  │  │  ├─ line 12: [ ] Configuration files created
+   │  │  │  │  ├─ line 13: [ ] Dependencies installed
+   │  │  │  │  ├─ line 14: [ ] Tests passing
+   │  │  │  │  └─ line 15: [ ] Performance benchmarks accepted
+   │  │  │  ├─ PRODUCTION_DEPLOYMENT_STATUS.md
+   │  │  │  │  ├─ line 200: [ ] Send docs/runbooks/deployment/TIER5_DEPLOYMENT_APPROVALS.md to stakeholders
+   │  │  │  │  ├─ line 201: [ ] Collect 5 required signatures
+   │  │  │  │  ├─ line 202: [ ] Schedule deployment window
+   │  │  │  │  ├─ line 206: [ ] Add SendGrid API key to .env
+   │  │  │  │  ├─ line 207: [ ] Test email sending with `crm_send_email` command
+   │  │  │  │  ├─ line 208: [ ] Verify CSV import/export with sample data
+   │  │  │  │  ├─ line 209: [ ] Run bulk contact operations test
+   │  │  │  │  ├─ line 213: [ ] Start local IPFS node: `ipfs daemon`
+   │  │  │  │  ├─ line 214: [ ] Test media upload via `crm_social_ipfs`
+   │  │  │  │  ├─ line 215: [ ] Setup WebSocket server (already implemented)
+   │  │  │  │  ├─ line 216: [ ] Verify ActivityPub federation with test instance
+   │  │  │  │  ├─ line 220: [ ] Wire CRM forms to Tauri commands
+   │  │  │  │  ├─ line 221: [ ] Add WebSocket client to social feed
+   │  │  │  │  ├─ line 222: [ ] Implement notification UI
+   │  │  │  │  ├─ line 223: [ ] Add IPFS media upload progress
+   │  │  │  │  ├─ line 227: [ ] Test full email campaign flow
+   │  │  │  │  ├─ line 228: [ ] Test real-time messaging
+   │  │  │  │  ├─ line 229: [ ] Test ActivityPub federation
+   │  │  │  │  ├─ line 230: [ ] Stress test database with 10k+ contacts
+   │  │  │  │  ├─ line 231: [ ] Load test WebSocket broadcasting
+   │  │  │  │  ├─ line 235: [ ] Build release binary
+   │  │  │  │  ├─ line 236: [ ] Deploy to staging (test run)
+   │  │  │  │  ├─ line 237: [ ] Deploy to production
+   │  │  │  │  ├─ line 238: [ ] Monitor metrics
+   │  │  │  │  ├─ line 239: [ ] On-call ready
+   │  │  │  │  ├─ line 274: [x] All code compiles (zero errors)
+   │  │  │  │  ├─ line 275: [x] Type-safe Rust entire codebase
+   │  │  │  │  ├─ line 276: [x] Error handling on all endpoints
+   │  │  │  │  ├─ line 277: [x] Unit tests for critical paths
+   │  │  │  │  ├─ line 278: [x] No unsafe code in new features
+   │  │  │  │  ├─ line 281: [x] Schema created + tested
+   │  │  │  │  ├─ line 282: [x] Indexes for performance
+   │  │  │  │  ├─ line 283: [x] Foreign key constraints enabled
+   │  │  │  │  ├─ line 284: [x] WAL mode for concurrency
+   │  │  │  │  ├─ line 285: [x] Migrations automatically applied
+   │  │  │  │  ├─ line 288: [x] 35+ CRM commands registered
+   │  │  │  │  ├─ line 289: [x] 40+ Social commands registered
+   │  │  │  │  ├─ line 290: [x] Request/response types defined
+   │  │  │  │  ├─ line 291: [x] Error handling consistent
+   │  │  │  │  ├─ line 292: [x] Authentication integrated
+   │  │  │  │  ├─ line 295: [x] Docker Compose ready
+   │  │  │  │  ├─ line 296: [x] Kubernetes manifests ready
+   │  │  │  │  ├─ line 297: [x] Monitoring (Prometheus + Grafana)
+   │  │  │  │  ├─ line 298: [x] RPC endpoints configured
+   │  │  │  │  ├─ line 299: [x] Database backups documented
+   │  │  │  │  ├─ line 302: [ ] SendGrid/Mailgun credentials
+   │  │  │  │  ├─ line 303: [ ] IPFS node running
+   │  │  │  │  ├─ line 304: [ ] WebSocket client in frontend
+   │  │  │  │  ├─ line 305: [ ] Frontend form integration
+   │  │  │  │  └─ line 308: [ ] 5 Stakeholder signatures on docs/runbooks/deployment/TIER5_DEPLOYMENT_APPROVALS.md
+   │  │  │  ├─ TIER5_DEPLOYMENT_APPROVALS.md
+   │  │  │  │  ├─ line 461: [x] Code compiles without errors
+   │  │  │  │  ├─ line 462: [x] All tests execute successfully
+   │  │  │  │  ├─ line 463: [x] Security audit completed
+   │  │  │  │  ├─ line 464: [x] Dependency audit completed
+   │  │  │  │  ├─ line 465: [x] Documentation reviewed and complete
+   │  │  │  │  ├─ line 466: [x] Infrastructure validated
+   │  │  │  │  ├─ line 467: [x] Backup procedures tested
+   │  │  │  │  ├─ line 468: [x] Disaster recovery procedures tested
+   │  │  │  │  ├─ line 469: [x] Performance benchmarks met
+   │  │  │  │  ├─ line 470: [x] Team trained and ready
+   │  │  │  │  ├─ line 471: [x] Incident response procedures documented
+   │  │  │  │  ├─ line 472: [x] Monitoring configured and tested
+   │  │  │  │  ├─ line 473: [x] Runbooks created and reviewed
+   │  │  │  │  ├─ line 474: [x] Change management process followed
+   │  │  │  │  └─ line 475: [x] Stakeholder reviews scheduled
+   │  │  │  ├─ TIER5_DEPLOYMENT_APPROVED_SELF_SIGNED.md
+   │  │  │  │  ├─ line 171: [x] Code review completed
+   │  │  │  │  ├─ line 172: [x] All tests passing (96%)
+   │  │  │  │  ├─ line 173: [x] Security audit passed
+   │  │  │  │  ├─ line 174: [x] Infrastructure verified
+   │  │  │  │  ├─ line 175: [x] Monitoring configured
+   │  │  │  │  ├─ line 176: [x] Runbooks prepared
+   │  │  │  │  ├─ line 177: [x] Team trained
+   │  │  │  │  ├─ line 178: [x] Rollback plan documented
+   │  │  │  │  ├─ line 179: [x] 5 stakeholder approvals obtained
+   │  │  │  │  ├─ line 182: [ ] Run smoke tests (5 min)
+   │  │  │  │  ├─ line 183: [ ] Deploy to staging (5 min)
+   │  │  │  │  ├─ line 184: [ ] Verify in staging (10 min)
+   │  │  │  │  ├─ line 185: [ ] Deploy to production (5 min)
+   │  │  │  │  ├─ line 186: [ ] Monitor metrics (30 min)
+   │  │  │  │  ├─ line 189: [ ] User communication (Day 0)
+   │  │  │  │  ├─ line 190: [ ] Performance monitoring (Day 1-7)
+   │  │  │  │  ├─ line 191: [ ] Bug fix process established (ongoing)
+   │  │  │  │  └─ line 192: [ ] Team support ready (on-call)
+   │  │  │  ├─ TIER5_DEPLOYMENT_READINESS_FINAL.md
+   │  │  │  │  ├─ line 184: [x] Code compiles without errors
+   │  │  │  │  ├─ line 185: [x] Style enforcement passed (clippy)
+   │  │  │  │  ├─ line 186: [x] Security audit completed
+   │  │  │  │  ├─ line 187: [x] Code formatting applied
+   │  │  │  │  ├─ line 188: [x] Git repository clean
+   │  │  │  │  ├─ line 189: [x] Documentation updated
+   │  │  │  │  ├─ line 190: [x] Deployment guide ready
+   │  │  │  │  ├─ line 191: [ ] Full test suite passing (blocked by environment)
+   │  │  │  │  ├─ line 192: [ ] Node integration layer ready (Phase 5)
+   │  │  │  │  └─ line 193: [ ] Stakeholder approvals obtained (pending)
+   │  │  │  ├─ TIER5_DEPLOYMENT_READY.md
+   │  │  │  │  ├─ line 194: [x] **Section 1.1**: Source Code Quality - VERIFIED
+   │  │  │  │  ├─ line 195: [x] **Section 1.2**: Build Artifacts (TIER 5) - VERIFIED
+   │  │  │  │  ├─ line 196: [x] **Section 2.1**: Unit Tests - VERIFIED (96% pass rate)
+   │  │  │  │  ├─ line 200: [ ] Infrastructure Readiness (Kubernetes, DB, blockchain)
+   │  │  │  │  ├─ line 201: [ ] Security & Compliance (Access control, encryption)
+   │  │  │  │  ├─ line 202: [ ] Operational Readiness (Monitoring, documentation)
+   │  │  │  │  ├─ line 203: [ ] Team & Process (Staffing, incident response)
+   │  │  │  │  ├─ line 207: [ ] Stakeholder Approvals (5 required)
+   │  │  │  │  ├─ line 208: [ ] Project Lead
+   │  │  │  │  ├─ line 209: [ ] QA Manager
+   │  │  │  │  ├─ line 210: [ ] Security Officer
+   │  │  │  │  ├─ line 211: [ ] Operations Manager
+   │  │  │  │  └─ line 212: [ ] CTO / VP Engineering
+   │  │  │  └─ TIER5_PRE_DEPLOYMENT_CHECKLIST.md
+   │  │  │     ├─ line 27: [x] **All commits are on main branch** - Verify no feature branches are being deployed
+   │  │  │     ├─ line 32: [x] **Code compiles without errors** - Final build validation
+   │  │  │     ├─ line 37: [ ] **Clippy lints are clean** - Rust best practices verification
+   │  │  │     ├─ line 43: [x] **Code formatting is correct** - Consistent style enforcement
+   │  │  │     ├─ line 48: [ ] **All documentation builds** - No broken doc links or syntax errors
+   │  │  │     ├─ line 52: [x] **Git status is clean** - No uncommitted changes
+   │  │  │     ├─ line 59: [ ] **Release binary exists** - Built artifact is present
+   │  │  │     ├─ line 66: [ ] **Binary runs** - Smoke test of executable
+   │  │  │     ├─ line 70: [ ] **Docker images build successfully** - Container CI passes
+   │  │  │     ├─ line 74: [ ] **Docker images are scanned** - No high/critical vulnerabilities
+   │  │  │     ├─ line 84: [x] **All unit tests pass** - Complete test suite execution
+   │  │  │     ├─ line 97: [ ] **All integration tests pass** - Full E2E validation suite
+   │  │  │     ├─ line 102: [ ] **Code coverage is meeting targets** - Test coverage validation
+   │  │  │     ├─ line 106: [ ] **Test timing is acceptable** - Performance baseline for each test
+   │  │  │     ├─ line 110: [ ] **Flaky tests have been identified and resolved** - Zero intermittent failures
+   │  │  │     ├─ line 114: [ ] **Performance tests show no regression** - Benchmarks match or exceed targets
+   │  │  │     ├─ line 122: [ ] **Staging deployment is successful** - All services up and running
+   │  │  │     ├─ line 126: [ ] **Staging health checks pass** - Liveness and readiness probes succeeding
+   │  │  │     ├─ line 130: [ ] **Staging smoke tests pass** - Quick functional validation
+   │  │  │     ├─ line 134: [ ] **Staging metrics are healthy** - No performance degradation
+   │  │  │     ├─ line 138: [ ] **Staging logs show no errors** - Systemwide error monitoring
+   │  │  │     ├─ line 142: [ ] **Staging database backed up** - Point-in-time recovery available
+   │  │  │     ├─ line 152: [ ] **Production cluster is healthy** - Kubernetes node status
+   │  │  │     ├─ line 156: [ ] **Production storage is ready** - PersistentVolumes allocated
+   │  │  │     ├─ line 160: [ ] **Production DNS is configured** - Domain names resolve correctly
+   │  │  │     ├─ line 164: [ ] **Production TLS certificates are valid** - SSL/TLS chain verification
+   │  │  │     ├─ line 168: [ ] **Load balancer is configured** - Traffic routing rules in place
+   │  │  │     ├─ line 173: [ ] **Firewall rules are correct** - Ingress/egress configured
+   │  │  │     ├─ line 177: [ ] **Monitoring infrastructure online** - Prometheus/Grafana operational
+   │  │  │     ├─ line 184: [ ] **Production database is running** - DB cluster healthy
+   │  │  │     ├─ line 188: [ ] **Database backups automated** - Regular snapshots configured
+   │  │  │     ├─ line 192: [ ] **Database replication working** - Standby replicas synced
+   │  │  │     ├─ line 196: [ ] **Database connections limited** - Resource constraints in place
+   │  │  │     ├─ line 200: [ ] **Database indexes are optimized** - Query plans verified
+   │  │  │     ├─ line 206: [ ] **Blockchain node is synced** - Full sync to current block
+   │  │  │     ├─ line 210: [ ] **Blockchain node is producing blocks** - New blocks being created
+   │  │  │     ├─ line 214: [ ] **Validator is bonded** - Validator set includes this node
+   │  │  │     ├─ line 218: [ ] **RPC endpoints are responding** - All critical methods tested
+   │  │  │     ├─ line 222: [ ] **Blockchain backups automated** - Snapshots of state
+   │  │  │     ├─ line 232: [ ] **Production secrets are configured** - All sensitive values injected
+   │  │  │     ├─ line 237: [ ] **RBAC is configured** - Role-based access control working
+   │  │  │     ├─ line 241: [ ] **SSH access is restricted** - Bastion host or no direct SSH
+   │  │  │     ├─ line 245: [ ] **API authentication is enforced** - All endpoints require auth
+   │  │  │     ├─ line 249: [ ] **Network policies are active** - Pod-to-pod communication restricted
+   │  │  │     ├─ line 255: [ ] **Encryption in transit is enforced** - TLS 1.3+ everywhere
+   │  │  │     ├─ line 260: [ ] **Encryption at rest is enabled** - Data encrypted on disk
+   │  │  │     ├─ line 265: [ ] **Audit logging is active** - All critical operations logged
+   │  │  │     ├─ line 270: [ ] **PII data is protected** - No unnecessary personal data storage
+   │  │  │     ├─ line 274: [ ] **Secrets are not logged** - No passwords/keys in logs
+   │  │  │     ├─ line 280: [x] **Dependency vulnerabilities scanned** - All deps checked for CVEs
+   │  │  │     ├─ line 288: [ ] **SAST results reviewed** - Code scanning completed
+   │  │  │     ├─ line 292: [ ] **Container images are scanned** - Image layer scanning completed
+   │  │  │     ├─ line 297: [ ] **OWASP Top 10 reviewed** - Common vulnerabilities checked
+   │  │  │     ├─ line 303: [ ] **Penetration test results** (if applicable) - External security review
+   │  │  │     ├─ line 313: [ ] **Deployment guide is complete** - Procedures documented
+   │  │  │     ├─ line 317: [ ] **Incident runbooks are written** - Response procedures documented
+   │  │  │     ├─ line 323: [ ] **Architecture documentation is current** - System design documented
+   │  │  │     ├─ line 327: [ ] **API documentation is complete** - All endpoints documented
+   │  │  │     ├─ line 331: [ ] **Configuration documentation is accurate** - All config options explained
+   │  │  │     ├─ line 338: [ ] **All dashboards are configured** - Prometheus + Grafana setup
+   │  │  │     ├─ line 344: [ ] **Alert rules are configured** - Automatic incident detection
+   │  │  │     ├─ line 350: [ ] **On-call routing is active** - Alerts reach on-call engineer
+   │  │  │     ├─ line 356: [ ] **Metrics retention is configured** - Long-term metric storage
+   │  │  │     ├─ line 360: [ ] **Log aggregation is working** - Centralized logging configured
+   │  │  │     ├─ line 367: [ ] **CI/CD pipeline is tested** - GitHub Actions or similar working
+   │  │  │     ├─ line 373: [ ] **Automated rollback is configured** - Error detection + rollback
+   │  │  │     ├─ line 378: [ ] **Health checks are configured** - Liveness and readiness probes
+   │  │  │     ├─ line 383: [ ] **Canary detection is active** - Early error detection in canary stage
+   │  │  │     ├─ line 393: [ ] **On-call rotation is defined** - 24/7 coverage available
+   │  │  │     ├─ line 398: [ ] **Incident response plan is documented** - Team knows procedures
+   │  │  │     ├─ line 403: [ ] **Communication channels are ready** - Team can reach each other
+   │  │  │     ├─ line 408: [ ] **Team training is complete** - All engineers know new systems
+   │  │  │     ├─ line 413: [ ] **Manager notification process defined** - Escalation clear
+   │  │  │     ├─ line 420: [ ] **Go-live announcement is prepared** - Communications ready
+   │  │  │     ├─ line 426: [ ] **Customer support is prepared** - Support team briefed
+   │  │  │     ├─ line 432: [ ] **Stakeholder approval obtained** - Executive buy-in secured
+   │  │  │     ├─ line 434: [ ] Project Lead
+   │  │  │     ├─ line 435: [ ] QA Manager
+   │  │  │     ├─ line 436: [ ] Security Officer
+   │  │  │     ├─ line 437: [ ] Operations Manager
+   │  │  │     ├─ line 438: [ ] CTO or VP Engineering
+   │  │  │     ├─ line 441: [ ] **Business metrics baseline established** - Pre-launch measurements taken
+   │  │  │     ├─ line 464: [ ] **All checklist items verified** - Every checkbox above is ticked
+   │  │  │     ├─ line 465: [ ] **No blocking issues remain** - All known issues have mitigation plans
+   │  │  │     ├─ line 466: [ ] **Stakeholder approvals obtained** - All 5 sign-offs secured (section 7.1)
+   │  │  │     ├─ line 467: [ ] **Team is confident in deployment** - Unanimous readiness expressed
+   │  │  │     └─ line 468: [ ] **Rollback plan is clear** - Team knows how to undo if needed
+   │  │  ├─ getting-started
+   │  │  │  ├─ 100GUIDE.md
+   │  │  │  │  ├─ line 9: [x] **Flash Finality: wire certificate broadcast to real P2P gossip** — currently the cert is generated, not actually gossiped to peers. Hook into `sc-network` broadcast. *Implemented in `crates/flash-finality/src/gossip_bridge.rs` with broadcast/receive, message encoding, and network stats tracking.*
+   │  │  │  │  ├─ line 10: [x] **Parallel Proposer: real multi-shard block assembly** — wire the scheduler to actually assign tx batches to CPU cores based on access-set analysis, not just round-robin. *Implemented in `crates/x3-consensus/src/parallel_proposer.rs` with work-stealing scheduler and conflict-free tx sharding.*
+   │  │  │  │  ├─ line 11: [x] **Proof of History integration** — add a PoH tick generator that gets embedded in block headers so verifiers can confirm time ordering without trusting the proposer. *Implemented in `crates/x3-consensus/src/proof_of_history.rs` with SHA-256 hash chain, tick sequential verification, and ordering proofs.*
+   │  │  │  │  ├─ line 12: [x] **Finality proof API** — expose a public RPC `x3_finalityProof(block_hash)` that returns the Flash Finality certificate for external chains to verify. *Implemented in `crates/x3-consensus/src/finality_proof_api.rs` with RPC endpoints, quorum verification, and recent block index.*
+   │  │  │  │  ├─ line 13: [x] **Network partition recovery** — implement a view-change protocol so the chain can resume if 1/3 validators go offline. *Implemented in `crates/x3-consensus/src/network_partition_recovery.rs` with PartitionDetector, ViewChangeRequest, and ViewChangeOrchestrator using 2/3 quorum voting.*
+   │  │  │  │  ├─ line 14: [x] **Fork choice rule** — currently longest-chain, upgrade to GHOST (Greediest Heaviest Observed SubTree) for better fork resolution under high TPS. *Implemented in `crates/x3-consensus/src/ghost_fork_choice.rs` with BlockWeight tracking, recursive subtree weight updates, and greedy heaviest-child selection.*
+   │  │  │  │  ├─ line 17: [x] **GPU memory pooling** — pre-allocate GPU memory slabs at validator startup instead of `cudaMalloc` per batch. Eliminates the biggest GPU latency spike. *Implemented in `crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs` with slab allocator, async allocation/deallocation, and pool statistics.*
+   │  │  │  │  ├─ line 18: [x] **Multi-GPU round-robin dispatch** — the current FFI targets GPU 0. Add device enumeration so all 3 GTX 1070s are used in parallel. *Implemented in `crates/x3-gpu-validator-swarm/src/multi_gpu_dispatcher.rs` with round-robin and load-balanced scheduling.*
+   │  │  │  │  ├─ line 19: [x] **GPU fallback chain** — if X3 kernel fails, fall back to OpenCL, then CPU — log the degradation event as a validator warning. *Implemented in `crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs` with cascading strategy, CPU fallback engine, and FallbackEvent tracking.*
+   │  │  │  │  ├─ line 20: [x] **X3 kernel versioning** — ship kernel version tags so validators can update GPU kernels without a full node restart. *Implemented in `crates/x3-gpu-validator-swarm/src/x3_kernel_versioning.rs` with X3KernelRegistry, X3KernelRuntime, hot-reload capability, and approval governance.*
+   │  │  │  │  ├─ line 21: [ ] **GPU validator bonding requirement** — require validators to prove GPU capacity via a staked GPU manifest at registration time (prevents fake validator claims).
+   │  │  │  │  ├─ line 22: [ ] **GPU benchmark on-chain attestation** — validators submit a signed GPU benchmark result every epoch. Low-performing validators get reduced commission.
+   │  │  │  │  ├─ line 25: [x] **JIT compilation** — the VM currently interprets bytecode. Add a simple JIT tier using Cranelift or LLVM to compile hot functions to native code. *Implemented in `crates/x3-vm/src/jit_compiler.rs` with hot-path detection, adaptive compilation threshold, and 3-5× speedup estimates.*
+   │  │  │  │  ├─ line 26: [x] **Gas metering audit** — run a full gas audit against all opcodes. Many GPU opcodes have placeholder costs. Calibrate against real CUDA execution times. *Implemented in `crates/x3-vm/src/gas_metering_audit.rs` with opcode audits, GTX 1070 benchmark suite, and cost table calibration.*
+   │  │  │  │  ├─ line 27: [x] **Standard Library** — ship a native `x3_stdlib` with: math ops, string ops, cryptographic primitives, ABI encoding, cross-VM call helpers. *Implemented in `crates/x3-stdlib/src/lib.rs` with crypto (SHA-256, Blake2), math (sqrt, pow, log, mod_exp), and ABI (uint256, address, bool, bytes) encoding.*
+   │  │  │  │  ├─ line 28: [x] **Contract upgrade pattern** — add `#[upgradeable]` attribute to X3-Lang that deploys a proxy + logic separation automatically. *Implemented in `crates/x3-vm/src/contract_upgrade_pattern.rs` with ProxyContract, StorageLayout validation, and UpgradeSafetyChecker.*
+   │  │  │  │  ├─ line 29: [x] **Debugging protocol** — implement a DAP (Debug Adapter Protocol) server in the VM so devs can step-debug X3 contracts in VS Code. *Implemented in `crates/x3-vm/src/dap_debugging.rs` with DAPServer, breakpoint management, stack frame traversal, variable inspection, and step-in/step-over controls.*
+   │  │  │  │  ├─ line 30: [x] **Gas estimation RPC** — `x3_estimateGas(tx)` that runs the transaction in a forked state and returns the exact gas cost before submission. *Implemented in `crates/x3-rpc/src/gas_estimation.rs` with GasEstimator, forked execution context, intrinsic gas calculation, and 25% safety margin.*
+   │  │  │  │  ├─ line 31: [ ] **Formal verification hooks** — add annotations that can be extracted by a tool like Certora or Halmos for property checking.
+   │  │  │  │  ├─ line 34: [x] **Dynamic fee market (EIP-1559 equivalent)** — replace the fixed MIN_FEE with a base fee that adjusts per block based on fullness. Burns 70%, rewards validators 30%. *Implemented in `crates/x3-fees/src/lib.rs` with `Eip1559FeeMarket` struct, dynamic adjustment, and 70/30 split logic.*
+   │  │  │  │  ├─ line 35: [x] **MEV protection** — implement a commit-reveal scheme for transaction ordering so block proposers can't front-run user swaps on the DEX. *Implemented in `crates/x3-fees/src/lib.rs` with `CommitRevealProof` struct and SHA-256 verification.*
+   │  │  │  │  ├─ line 36: [x] **Slashing insurance fund** — 5% of all slashed stake goes into a DAO-controlled insurance pool that users can claim from if a validator equivocates. *Implemented in `crates/x3-fees/src/lib.rs` with `SlashingInsuranceFund` struct, claim filing, and processing logic.*
+   │  │  │  │  ├─ line 37: [x] **Validator commission capping** — governance parameter to cap max validator commission at 20% to prevent extractive validators. *Implemented in `crates/x3-economics/src/validator_commission.rs` with cap enforcement, history tracking, and per-validator commission management.*
+   │  │  │  │  ├─ line 38: [x] **Stake delegation with compounding** — auto-compound staking rewards every epoch without requiring an explicit re-stake transaction. *Implemented in `crates/x3-economics/src/stake_compounding.rs` with per-nominator delegations, proportional reward distribution, and automatic compounding.*
+   │  │  │  │  ├─ line 39: [x] **Inflation schedule** — define a parametric inflation curve (e.g., 8% year 1 → 1.5% terminal) with on-chain governance to adjust it. *Implemented in `crates/x3-economics/src/inflation_schedule.rs` with linear/stepwise/exponential/custom curves, governance updates, and supply projections.*
+   │  │  │  │  ├─ line 46: [x] **Wire Swap button to on-chain RPC** — [DexPanel.tsx](file:///home/lojak/Desktop/x3-chain-master/apps/x3-desktop/src/components/panels/dex/DexPanel.tsx) has the UI. Connect [create_trade_batch](file:///home/lojak/Desktop/x3-chain-master/pallets/atomic-trade-engine/src/lib.rs#409-522) + [execute_trade_batch](file:///home/lojak/Desktop/x3-chain-master/pallets/atomic-trade-engine/src/lib.rs#523-629) extrinsics via Polkadot.js API or custom RPC.
+   │  │  │  │  ├─ line 47: [x] **Real AMM liquidity pools** — ✅ Implemented via [amm_pools.rs](../../../crates/x3-dex/src/amm_pools.rs) (420 lines, 12 tests). ConstantProduct pool contracts with reserve tracking, LP token minting/burning, constant-product swap formula, fee tiers, slippage protection.
+   │  │  │  │  ├─ line 48: [x] **Cross-VM price oracle** — ✅ Implemented via [pyth_oracle.rs](../../../crates/x3-oracle/src/pyth_oracle.rs) (450 lines, 12 tests). Provides real-time feeds with TWAP calculation, staleness detection, anomaly detection via Pyth guardian network.
+   │  │  │  │  ├─ line 49: [x] **Intent-based routing** — ✅ Implemented via [route_finder.rs](../../../crates/x3-dex/src/route_finder.rs) (480 lines, 10 tests). BFS-based pathfinding with cycle avoidance, supports N-hop routes, simulates execution with gas cost estimation, enables solvers to find optimal routes.
+   │  │  │  │  ├─ line 50: [x] **Arbitrage bot integration** — ✅ Implemented via [arb_bot_events.rs](../../../crates/x3-dex/src/arb_bot_events.rs) (480 lines, 11 tests). WebSocket MEV opportunity detection with spread calculation, bot subscriptions, execution tracking, and performance metrics. Ready for Bot Marketplace in TIER 3.
+   │  │  │  │  ├─ line 51: [x] **Cross-VM atomic rollback UI** — ✅ Implemented via [rollback_listener.rs](../../../crates/x3-atomic-trade/src/rollback_listener.rs) (420 lines, 11 tests). TradeBatchFailed event monitoring, auto-recovery on slippage, compensation issuance with tiered multipliers, failure notifications with severity levels.
+   │  │  │  │  ├─ line 52: [x] **Multi-hop pathfinding UI** — ✅ Backend routing engine ready. [route_finder.rs](../../../crates/x3-dex/src/route_finder.rs) exposes best-path queries with multihop support. Ready for RPC wrapping and DEX frontend integration.
+   │  │  │  │  ├─ line 53: [x] **Gas abstraction** — ✅ Implemented via [gas_relayer.rs](../../../crates/x3-bridge/src/gas_relayer.rs) (420 lines, 13 tests). Relayer network with multi-token fee payment, sponsor pools, batch settlement, exchange rate feeds, slippage tolerance, and fee sharing (uses relayer pattern).
+   │  │  │  │  ├─ line 56: [x] **Ethereum bridge (canonical)** — ✅ Implemented via [ethereum_bridge.rs](../../../crates/x3-bridge/src/ethereum_bridge.rs) (420 lines, 10 tests). Lock/Mint flow with 5-of-7 multisig validator consensus, 12 ETH block confirmations, token registration, wrapped minting, burning & refunds.
+   │  │  │  │  ├─ line 57: [x] **Solana wormhole adapter** — ✅ Implemented via [wormhole_adapter.rs](../../../crates/x3-bridge/src/wormhole_adapter.rs) (390 lines, 10 tests). Full VAA verification (19-guardian 2/3+1 threshold), SPL token wrapping, transfer payload parsing, balance tracking, cross-chain settlement.
+   │  │  │  │  ├─ line 58: [x] **Cosmos IBC module** — ✅ Implemented via [ibc_light_client.rs](../../../crates/x3-bridge/src/ibc_light_client.rs) (480 lines, 12 tests). IBC light client pallet with Tendermint consensus verification (2/3+1 BFT), header validation, Merkle proof verification, FT transfers, packet acknowledgement, and misbehavior detection.
+   │  │  │  │  ├─ line 59: [x] **Base/Optimism bridge** — ✅ Implemented via [l2_bridge.rs](../../../crates/x3-bridge/src/l2_bridge.rs) (470 lines, 14 tests). Canonical L2 bridge with deposit/withdrawal flows, output root state commitments, Merkle proofs, 7-day finalization period (OP-Stack standard), token pair registry, refund mechanisms.
+   │  │  │  │  ├─ line 60: [x] **Bitcoin HTLC bridge** — ✅ Implemented via [bitcoin_htlc.rs](../../../crates/x3-bridge/src/bitcoin_htlc.rs) (480 lines, 16 tests). HTLC atomic swaps with preimage validation, timelock enforcement, Bitcoin address validation (P2PKH/P2SH/P2WPKH/P2TR), Merkle proof verification (6-conf blocks), Bitcoin script generation, refund mechanism.
+   │  │  │  │  ├─ line 61: [x] **Cross-chain account abstraction** — ✅ Implemented via [cross_chain_account.rs](../../../crates/x3-bridge/src/cross_chain_account.rs) (440 lines, 13 tests). Unified accounts across EVM/SVM/IBC with BIP32 key derivation (Ethereum/Cosmos/Solana standard paths), multi-chain signature verification, timelocked key rotation with M-of-N governance, emergency pause.
+   │  │  │  │  ├─ line 62: [x] **Bridge security council** — ✅ Implemented via [security_council.rs](../../../crates/x3-bridge/src/security_council.rs) (460 lines, 11 tests). 7-member governance with 5-of-7 consensus, 20-block timelocked execution (configurable), emergency pause for immediate action, council member mgmt.
+   │  │  │  │  ├─ line 65: [x] **Solana programs port (4/10 core programs)** — ✅ Implemented via [solana_programs.rs](../../../crates/x3-svm/src/solana_programs.rs) (480 lines, 14 tests). System, Token, AssociatedToken, Memo programs fully implemented with CPI routing. Token transfers with frozen validation, minting, burning, staking, delegation, ATA creation. 6 programs pending: Token-2022, NameService, Serum, Metaplex, Governance, Stake.
+   │  │  │  │  ├─ line 66: [x] **Anchor framework compatibility** — ✅ Implemented via [anchor_idl_parser.rs](../../../crates/x3-svm/src/anchor_idl_parser.rs) (380 lines, 10 tests). IDL parser with instruction definition, account management, type generation, event definition, error mapping, and Rust code generation. Zero-modification Solana program deployment on X3 enabled.
+   │  │  │  │  ├─ line 67: [x] **SPL token bridging** — ✅ Implemented via [spl_token_bridge.rs](../../../crates/x3-svm/src/spl_token_bridge.rs) (390 lines, 12 tests). 1:1 token wrapping Solana ↔ X3 with deterministic mint derivation, lock-and-mint flow, burn-and-unlock flow, bridge vaults, fee calculation (0.1%), supply consistency validation, emergency pause.
+   │  │  │  │  ├─ line 68: [x] **Solana devnet fork** — ✅ Implemented via [solana_devnet_fork.rs](../../../crates/x3-svm/src/solana_devnet_fork.rs) (420 lines, 16 tests). Deterministic devnet fork pointing at X3 with account state snapshots, rollback capability, transaction logging, compute metrics, rent exemption validation, state import/export for reproducibility.
+   │  │  │  │  ├─ line 97: [x] **Limit orders** — ✅ Implemented via [limit_order_book.rs](../../../crates/x3-dex/src/limit_order_book.rs) (572 lines, 15 tests). Order book matching with VWAP, asks/bids, order matching, execution, and cancellation. Deterministic ID generation. Full spec implementation.
+   │  │  │  │  ├─ line 98: [x] **Stop-loss / Take-profit orders** — ✅ Implemented via [stop_loss_trigger.rs](/crates/x3-dex/src/stop_loss_trigger.rs) (649 lines, 16 tests). Stop-loss triggers, take-profit triggers, trailing stops, grid trading. Multi-level execution with precision price matching. Works with all trading modes.
+   │  │  │  │  ├─ line 99: [x] **TWAP orders** — ✅ Implemented via [twap_executor.rs](/crates/x3-dex/src/twap_executor.rs) (528 lines, 14 tests). Time-weighted average price execution splitting orders across slices. Automatic scheduler with configurable time intervals. Slippage protection.
+   │  │  │  │  ├─ line 100: [x] **Options / Derivatives** — ✅ Implemented via [options.rs](/crates/x3-dex/src/options.rs) (590 lines, 14 tests). Black-Scholes pricing (simplified), Greeks calculation (delta/gamma/theta/vega/rho), call/put mechanics, ITM/OTM checks, pool IV tracking, option exercise with settlement.
+   │  │  │  │  ├─ line 101: [x] **Perpetual futures** — ✅ Implemented via [perpetuals.rs](/crates/x3-dex/src/perpetuals.rs) (579 lines, 15 tests). 1-10x leverage with funding rates, liquidation at 2.5% maintenance margin, position tracking, mark vs index price, collateral management, funding payment calculations with equilibrium mechanics.
+   │  │  │  │  ├─ line 102: [x] **Real-time price chart** — ✅ Ready for TradingView integration. Backend provides real TWAP data via [twap_executor.rs](/crates/x3-dex/src/twap_executor.rs).
+   │  │  │  │  ├─ line 103: [x] **Portfolio P&L tracker** — ✅ Implemented via [trade_history.rs](/crates/x3-dex/src/trade_history.rs) with real trades, cost basis, realized/unrealized P&L calculation.
+   │  │  │  │  ├─ line 104: [x] **Trade history persistence** — ✅ Implemented via [trade_history.rs](/crates/x3-dex/src/trade_history.rs) (672 lines, 11 tests). Trade recording with type tracking (swap/limit/twap/liquidation), status tracking, cost basis tracking for tax calculation, CSV export for SQLite persistence in Tauri, performance metrics (win rate, Sharpe ratio).
+   │  │  │  │  ├─ line 107: [x] **Concentrated liquidity (Uniswap V3 model)** — ✅ Implemented via [concentrated_liquidity.rs](/crates/x3-dex/src/concentrated_liquidity.rs) (517 lines, 14 tests). Custom price ranges for 10-100x capital efficiency, tick-based liquidity, concentrated pools, LP position management with fee accrual, impermanent loss tracking, tick range enforcement.
+   │  │  │  │  ├─ line 108: [x] **LM (Liquidity Mining) rewards** — ✅ Implemented via [liquidity_mining.rs](/crates/x3-dex/src/liquidity_mining.rs) (468 lines, 15 tests). Proportional LP rewards with time-weighted accumulation, epoch-based reward distribution, reward multipliers, automatic compounding, historical reward tracking with snapshots.
+   │  │  │  │  ├─ line 109: [x] **veX3 (vote-escrow) tokenomics** — ✅ Implemented via [ve_governance.rs](/crates/x3-dex/src/ve_governance.rs) (565 lines, 13 tests). Vote-escrow with 1-4 year locking (linear voting_power scaling: 1yr=25%, 4yr=100%), protocol governance voting (quorum 40%, passing 50%+1), liquidity mining allocation direction, early unlock with penalties, governance reward distribution (proportional to lock amount and duration).
+   │  │  │  │  ├─ line 110: [x] **Pool analytics dashboard** — ✅ Implemented via [pool_analytics.rs](/crates/x3-dex/src/pool_analytics.rs) (535 lines, 12 tests). Real-time TVL/volume/APY aggregation (24h/7d/30d periods), impermanent loss estimation (simplified: 100 - √(price_ratio_a * price_ratio_b)), liquidity provider statistics (fees earned, share %, IL tracking), token metrics (price, market cap, holders), pool snapshots for historical tracking, liquidity concentration HHI index, APY projection with trend analysis.
+   │  │  │  │  ├─ line 111: [x] **LP position NFTs** — ✅ Implemented via [lp_position_nft.rs](/crates/x3-dex/src/lp_position_nft.rs) (734 lines, 14 tests). Tradeable LP positions as NFTs with metadata, secondary marketplace with royalty splits (creator 0-20%), collateral support for loans (LTV 25%-75%), underwater detection with liquidation mechanism, fee claiming, NFT transfer tracking, marketplace listing and buying.
+   │  │  │  │  ├─ line 112: [x] **Flash loans** — ✅ Implemented via [flash_loan.rs](/crates/x3-dex/src/flash_loan.rs) (504 lines, 13 tests). Uncollateralized single-block loans with 0.09% fee, flash loan pool management, callback verification, default penalty (10% additional), arbitrage execution with profit tracking, pool deposit/withdraw, pause capability.
+   │  │  │  │  ├─ line 113: [x] **Real slippage calculation** — ✅ Implemented via [real_slippage.rs](/crates/x3-dex/src/real_slippage.rs) (492 lines, 10 tests). Constant-product AMM formula (output = input*reserve_out*(10000-fee) / (reserve_in*10000 + input*(10000-fee))), spot vs execution price tracking, 4-tier price impact analysis (low <0.25%, medium <1%, high <5%, very_high >5%), slippage protection with min_output + deadline validation, multi-hop route aggregation.
+   │  │  │  │  ├─ line 116: [x] **Batch swap router** — ✅ Implemented via [batch_swap_router.rs](/crates/x3-dex/src/batch_swap_router.rs) (482 lines, 10 tests). Atomic batch execution (1-10 swaps per batch, all-or-nothing), MEV protection with min_output + deadline + slippage_max validation, route optimization with efficiency scoring (score = (10000-impact-fee)/hops), automatic splitting across 1-5 pools with even distribution, sandwich attack prevention, total cost estimation.
+   │  │  │  │  ├─ line 119: [x] **Strategy builder UI** — drag-and-drop strategy composer in `BotPage`. Define conditions (RSI < 30, price crosses MA-20) → actions (buy X, sell Y).
+   │  │  │  │  ├─ line 120: [x] **Backtesting engine** — feed historical price data into the strategy and show simulated returns before going live.
+   │  │  │  │  ├─ line 121: [x] **Risk management** — per-bot max drawdown limit, position sizing rules, kill switch if daily loss exceeds threshold.
+   │  │  │  │  ├─ line 122: [x] **Bot marketplace** — users publish strategies as NFTs. Others pay a subscription fee to copy-trade them. Revenue shared with creator.
+   │  │  │  │  ├─ line 123: [x] **MEV bot** — built-in sandwich attack protection AND an opt-in MEV capture bot that shares profits with users who enable it.
+   │  │  │  │  ├─ line 126: [x] **Bonding curve launches** — new tokens start on a bonding curve, graduate to the full AMM at a market cap threshold (like pump.fun).
+   │  │  │  │  ├─ line 127: [x] **Vesting schedules** — team/investor tokens locked with on-chain vesting contracts. Cliff + linear release.
+   │  │  │  │  ├─ line 128: [x] **KYC/AML gating** — optional KYC for regulated token sales. Integrate Sumsub or Persona identity API.
+   │  │  │  │  ├─ line 129: [x] **Whitelist presales** — NFT-gated or wallet-gated presale rounds before public launch.
+   │  │  │  │  ├─ line 130: [x] **Anti-snipe protection** — block bots from buying more than 1% of supply in the first 3 blocks after launch.
+   │  │  │  │  ├─ line 131: [x] **Token audit badge** — automatic CertiK/Hacken style static analysis run on every deployed token contract. Badge displayed on launchpad.
+   │  │  │  │  ├─ line 132: [x] **Liquidity lock** — require launchers to lock LP tokens for minimum 6 months. Show lock status prominently on token page.
+   │  │  │  │  ├─ line 143: [x] **Database Schema** (420 LOC) — 11 tables for campaign tracking, source management, shipment logistics, ROI metrics
+   │  │  │  │  ├─ line 144: [x] **Tauri Commands** (320 LOC) — 6 core commands: campaign creation, source management, ROI calculation, inventory tracking
+   │  │  │  │  ├─ line 145: [x] **Hardware Sources Database** (1,364 LOC) — **200+ preloaded contacts** across 80+ companies (NVIDIA, AMD, data centers, universities, corporate surplus, consultants, lease aggregators, marketplaces)
+   │  │  │  │  ├─ line 146: [x] **Outreach Templates** (5 templates) — Manufacturer, data center, refurbisher, university, corporate surplus messaging
+   │  │  │  │  ├─ line 147: [x] **React Dashboard** (550 LOC) — Campaign tracker, ROI metrics, inventory by source, acquisition timeline
+   │  │  │  │  ├─ line 148: [x] **Integration Guide** (400 LOC) — 5-step setup, test commands, production checklist
+   │  │  │  │  ├─ line 149: [x] **Strategy Playbook** (500 LOC) — M1-M12 campaign sequence, deal structures, conversation openers, success metrics
+   │  │  │  │  ├─ line 246: [x] **Real transaction signing** — `WalletPanel` needs to call `window.__TAURI__.invoke('sign_transaction', ...)` using the Rust keystore backend.
+   │  │  │  │  ├─ line 247: [x] **Hardware wallet support** — Ledger + Trezor via WebUSB/WebHID. Required for institutional users.
+   │  │  │  │  ├─ line 248: [x] **Multi-signature wallets** — M-of-N multisig with an on-chain approval flow. Critical for DAO treasuries.
+   │  │  │  │  ├─ line 249: [x] **Social recovery** — designate 3 guardians who can collectively recover your wallet if you lose your key (ERC-4337 model).
+   │  │  │  │  ├─ line 250: [x] **Watch-only mode** — add any address as a read-only wallet to monitor without importing keys.
+   │  │  │  │  ├─ line 251: [x] **Address book** — save frequent addresses with labels. Auto-complete on send.
+   │  │  │  │  ├─ line 252: [x] **ENS / X3 Name Service** — resolve human-readable names like `alice.x3` to wallet addresses.
+   │  │  │  │  ├─ line 253: [x] **QR code scanner** — for receiving: show QR. For sending: scan QR to paste address. Critical for mobile parity.
+   │  │  │  │  ├─ line 254: [x] **Biometric unlock** — Face ID / fingerprint via Tauri plugin for Tauri desktop. PIN fallback.
+   │  │  │  │  ├─ line 257: [x] **Auto-detect tokens** — scan chain for all tokens held by the address. Show balances without manual add.
+   │  │  │  │  ├─ line 258: [x] **NFT gallery** — display all NFTs with full metadata, image, collection info. Transfer/list directly from gallery.
+   │  │  │  │  ├─ line 259: [x] **Token whitelisting** — spam protection: unknown tokens go to a separate "pending" tab until user approves.
+   │  │  │  │  ├─ line 260: [x] **Price in fiat** — show all balances in USD/EUR/BTC equivalent using CoinGecko API.
+   │  │  │  │  ├─ line 261: [x] **Transaction history with labels** — auto-label transactions: "Swapped X3 → USDC on DEX", "Staking reward", "Bridge deposit".
+   │  │  │  │  ├─ line 262: [x] **CSV export** — download full transaction history for tax reporting. Integrate with Koinly/CoinTracker format.
+   │  │  │  │  ├─ line 263: [x] **DeFi position tracker** — show all active LP positions, staking positions, open borrows across X3 protocols in one view.
+   │  │  │  │  ├─ line 266: [x] **Phishing detection** — blocklist of known scam contracts/sites. Warn before signing any transaction to a flagged address.
+   │  │  │  │  ├─ line 267: [x] **Simulation before sign** — every transaction is dry-run and shows exactly what state changes will happen (token in / token out / approvals) before user signs.
+   │  │  │  │  ├─ line 268: [x] **Approval management** — list all active token approvals and revoke them with one click (like revoke.cash).
+   │  │  │  │  ├─ line 269: [x] **Private mode** — optional stealth addresses for privacy-preserving transfers.
+   │  │  │  │  ├─ line 270: [x] **Encrypted local backup** — wallet encrypted backup to local file or IPFS with password protection.
+   │  │  │  │  ├─ line 277: [x] **App Store live listings** — `AppStorePage` needs real installable apps/plugins, not static cards. Build a plugin API so devs can submit panel plugins.
+   │  │  │  │  ├─ line 278: [x] **Window snap layouts** — drag windows to screen edges for tiling (Windows 11-style). 2x2, 1+2, full-screen layouts.
+   │  │  │  │  ├─ line 279: [x] **Multi-monitor support** — detect multiple displays. Allow windows to span or lock to specific monitors.
+   │  │  │  │  ├─ line 280: [x] **System notifications** — Tauri native notifications for: tx confirmed, validator alert, new message, price alert.
+   │  │  │  │  ├─ line 281: [x] **Keyboard shortcut map** — complete, configurable keyboard shortcuts for every action. Show cheatsheet with Ctrl+?.
+   │  │  │  │  ├─ line 282: [x] **Dark/light/custom themes** — `ThemeProvider` exists, extend it with a full theme marketplace. Users can create/share themes.
+   │  │  │  │  ├─ line 283: [x] **Widget layer** — always-on-top mini widgets: live X3 price ticker, validator status dot, unread message count.
+   │  │  │  │  ├─ line 284: [x] **Auto-update** — Tauri's built-in updater so users get new versions without downloading manually. Show changelog on update.
+   │  │  │  │  ├─ line 285: [x] **Crash reporter** — if Tauri crashes, auto-collect logs and prompt user to submit a bug report with one click.
+   │  │  │  │  ├─ line 286: [x] **Onboarding flow** — first-launch wizard: create wallet → connect validator → configure panels → set theme. No cold start confusion.
+   │  │  │  │  ├─ line 289: [x] **Panel virtualization** — FixedSizeList implementation for 8K+ item lists. Renders 45% faster than DOM virtualization.
+   │  │  │  │  ├─ line 290: [x] **WebWorker offloading** — 4-worker thread pool with 94.2% avg utilization. Price feeds + WebSocket parsing off main thread.
+   │  │  │  │  ├─ line 291: [x] **GPU compositing** — Will-change + translateZ(0) on 23 animated panels. 144 FPS @ 60hz, 6.8ms composite latency.
+   │  │  │  │  ├─ line 292: [x] **Startup time** — Route-level preloading with Service Worker caching. 5 core modules cached. -70.4% cold start improvement.
+   │  │  │  │  ├─ line 293: [x] **Memory leak audit** — WebSocket cleanup in unmount hooks. Detected 2.3MB/hour drift, fixed. Now <0.1MB/hour.
+   │  │  │  │  ├─ line 296: [x] **Full shell emulation** — Real PTY terminal with full bash/zsh support. Fixed stdin/stdout/stderr piping via Tauri.
+   │  │  │  │  ├─ line 297: [x] **X3 CLI built-in** — 20+ x3 commands (send, stake, deploy, query, balance, call, mint, etc.) with help pages.
+   │  │  │  │  ├─ line 298: [x] **Command autocomplete** — Tab-completion for addresses (x3:...), contract names, RPC methods, command flags.
+   │  │  │  │  ├─ line 299: [x] **Command history** — Persistent history with arrow-key navigation. Unlimited session history in local DB.
+   │  │  │  │  ├─ line 300: [x] **REPL for X3-Lang** — Interactive REPL environment. Type expressions, derive contracts, compile to WASM directly.
+   │  │  │  │  ├─ line 307: [ ] **Connect CRM to real DB** — [db.rs](file:///home/lojak/Desktop/x3-chain-master/apps/x3-desktop/src-tauri/src/crm/db.rs) has the schema. Wire it to a local SQLite DB via `rusqlite`. Currently it reads mock state.
+   │  │  │  │  ├─ line 308: [ ] **Real email sending** — [smtp.rs](file:///home/lojak/Desktop/x3-chain-master/apps/x3-desktop/src-tauri/src/crm/smtp.rs) exists with the SMTP stub. Wire it to SendGrid or Mailgun API with real credentials from [.env](file:///home/lojak/Desktop/x3-chain-master/.env).
+   │  │  │  │  ├─ line 309: [ ] **Contacts import** — CSV import from HubSpot/Salesforce. Map columns on import. Don't make users re-enter everything.
+   │  │  │  │  ├─ line 310: [ ] **Contacts export** — export to CSV, vCard, or HubSpot-compatible format.
+   │  │  │  │  ├─ line 311: [ ] **Contact deduplication** — detect and merge duplicate contacts by email/phone. Show merge preview before combining.
+   │  │  │  │  ├─ line 312: [x] **Deal stages pipeline (Kanban)** — drag-and-drop Kanban board for deals. Visual pipeline from Lead → Proposal → Won/Lost. *DealPipelinePanel implements full Kanban UI with 5 stages.*
+   │  │  │  │  ├─ line 313: [ ] **Deal probability scoring** — ML-based win probability from historical deal data. Show % chance in deal header.
+   │  │  │  │  ├─ line 314: [ ] **Task management** — create tasks linked to contacts/deals. Assign to team members. Due date reminders.
+   │  │  │  │  ├─ line 315: [ ] **Call logging** — log calls with duration, notes, outcome. Timeline view on contact profile.
+   │  │  │  │  ├─ line 316: [ ] **Email templates** — create reusable email templates with `{{firstName}}` merge variables. One-click send.
+   │  │  │  │  ├─ line 317: [ ] **Meeting scheduler** — embed Calendly-style scheduling link that reads from the Calendar panel.
+   │  │  │  │  ├─ line 320: [ ] **Wallet-linked contacts** — link a CRM contact to their X3/EVM/SVM wallet address. See their on-chain activity directly in their CRM profile.
+   │  │  │  │  ├─ line 321: [ ] **On-chain deal contracts** — when a deal is won, auto-deploy an X3 smart contract that enforces payment terms. Ground-breaking.
+   │  │  │  │  ├─ line 322: [ ] **Token-gated contact groups** — segment contacts by token holdings. Know who holds X3, who holds your governance token.
+   │  │  │  │  ├─ line 323: [ ] **Automated drip campaigns triggered by on-chain events** — "Send email when contact's staking reward is claimable".
+   │  │  │  │  ├─ line 324: [ ] **NFT-based CRM access** — hold a specific NFT to get CRM access. Sell CRM seats as NFTs. Crypto-native SaaS model.
+   │  │  │  │  ├─ line 325: [ ] **Agent AI integration** — link `X3AgentsPanel` to CRM so AI agents can draft emails, summarize deals, predict churn automatically.
+   │  │  │  │  ├─ line 332: [ ] **Connect to backend** — `MessagesPage`, `FriendsPage`, etc. currently have no backend. Build a lightweight WebSocket server (use Rust axum) or peer-to-peer via libp2p.
+   │  │  │  │  ├─ line 333: [x] **End-to-end encrypted messages** — use X3DH + Double Ratchet (Signal protocol) for DMs. No server reads messages. *E2EMessagingPanel implements X3DH + Double Ratchet encryption protocol.*
+   │  │  │  │  ├─ line 334: [ ] **Post federation** — implement ActivityPub so X3 Social posts federate with Mastodon, Pixelfed, etc.
+   │  │  │  │  ├─ line 335: [ ] **Real-time notifications** — WebSocket push for likes, comments, follows, mentions.
+   │  │  │  │  ├─ line 336: [ ] **Media upload** — photo/video upload stored on IPFS via the `ipfsStorage` component. Decentralized and censorship-resistant.
+   │  │  │  │  ├─ line 337: [ ] **Content moderation** — community-governed content flags. Stakers vote to remove content. No central authority.
+   │  │  │  │  ├─ line 338: [ ] **Communities (subreddit equivalent)** — topic-based communities with custom feeds, mods, and governance tokens.
+   │  │  │  │  ├─ line 341: [ ] **Token-gated communities** — hold 100 X3 to post in the validator community. Hold an NFT to join exclusive groups.
+   │  │  │  │  ├─ line 342: [x] **Tipping in X3 tokens** — one-click tip on any post. Micropayments sent instantly via Flash Finality.
+   │  │  │  │  ├─ line 343: [x] **Creator monetization** — creators set a subscription price in X3 tokens. Access-gated posts for subscribers.
+   │  │  │  │  ├─ line 344: [ ] **On-chain reputation scores** — your validator uptime, governance participation, and DeFi activity generate a public reputation score shown on your profile.
+   │  │  │  │  ├─ line 345: [x] **Proof-of-human verification** — link a Worldcoin or Proof of Humanity credential to your profile. Bot-proof social.
+   │  │  │  │  ├─ line 346: [x] **NFT profile integration** — set your NFT as profile pic with verified ownership checkmark. Cross-chain NFT support.
+   │  │  │  │  ├─ line 347: [ ] **Social trading** — follow a trader's wallet. See every trade they make as a social post. One-click copy-trade.
+   │  │  │  │  ├─ line 350: [ ] **Decentralized music streaming** — artists upload tracks to IPFS/Arweave. Listeners stream from the decentralized network.
+   │  │  │  │  ├─ line 351: [ ] **Per-stream micropayments** — 0.001 X3 per 30 seconds listened. Direct to artist wallet via Flash Finality.
+   │  │  │  │  ├─ line 352: [ ] **Playlist NFTs** — curated playlists as tradeable NFTs. Curator earns % of streaming royalties from their playlist.
+   │  │  │  │  ├─ line 353: [ ] **Artist launchpad** — artists launch fan tokens on the X3 DEX launchpad. Fans invest early. Artist monetizes community.
+   │  │  │  │  ├─ line 360: [ ] **SelfModelViewer → real model** — currently shows placeholder graphs. Wire to actual model introspection APIs.
+   │  │  │  │  ├─ line 361: [ ] **GoalGenomeViewer → editable** — allow users to modify the goal genome parameters and see downstream behavioral effects.
+   │  │  │  │  ├─ line 362: [ ] **TripwireMonitor → real alerts** — define concrete behavioral tripwires (e.g., "agent attempts to acquire external API access without approval") and fire real alerts.
+   │  │  │  │  ├─ line 363: [ ] **WorldSimViewer → simulation engine** — implement a lightweight agent-based market simulation that agents train on before going live.
+   │  │  │  │  ├─ line 364: [ ] **Agent sandboxing** — each X3 agent runs in a WebAssembly sandbox with explicit capability grants. No agent can access the network without user approval.
+   │  │  │  │  ├─ line 365: [ ] **Agent marketplace** — buy/sell/rent trained agents as NFTs. Agent NFT includes its training history and performance metrics.
+   │  │  │  │  ├─ line 366: [ ] **Multi-agent coordination** — agents can spawn sub-agents, delegate tasks, and merge results. Implement a supervisor/worker pattern.
+   │  │  │  │  ├─ line 367: [ ] **Agent guardrails** — hard-coded limits: max spend per day, no self-replication without approval, no external communication without approval.
+   │  │  │  │  ├─ line 370: [ ] **Agent-controlled wallets** — an agent holds X3 tokens and executes trades autonomously within user-defined risk parameters.
+   │  │  │  │  ├─ line 371: [ ] **Strategy NFTs** — a trained trading agent is serialized and minted as an NFT. Transfer the NFT = transfer the agent's strategy.
+   │  │  │  │  ├─ line 372: [ ] **Agent performance dashboard** — show every agent's P&L, trade count, win rate, max drawdown, Sharpe ratio in real time.
+   │  │  │  │  ├─ line 373: [ ] **Social agent actions** — agents can post, like, and tip on X3 Social based on user rules. Twitter-style auto-engagement.
+   │  │  │  │  ├─ line 374: [ ] **Agent DAOs** — multiple agents pool resources and vote on collective actions. First AI-native DAO protocol.
+   │  │  │  │  ├─ line 381: [x] **ValidatorsPanel → real node data** — connect to live RPC endpoints and show real validator uptime, block production, slash history.
+   │  │  │  │  ├─ line 382: [x] **One-click validator setup** — `x3_operator` Python tool exists. Make it a GUI wizard in the Tauri app. Click → install → stake → live.
+   │  │  │  │  ├─ line 383: [x] **Validator performance leaderboard** — ranked by: uptime, blocks produced, GPU benchmark score, MEV share returned.
+   │  │  │  │  ├─ line 384: [x] **Automated validator alert system** — email/push notification when your validator misses a block, gets slashed, or needs an update. *ValidatorAlertsPanel tracks 5+ alert types with configurable rules.*
+   │  │  │  │  ├─ line 385: [x] **Geographic distribution map** — `WorldMonitorPanel` shows validator positions on a globe. Make it real-time with actual IP geolocation. *GeoDistributionPanel shows 5 validators across 4 regions with interactive SVG map.*
+   │  │  │  │  ├─ line 386: [ ] **Hardware requirement calculator** — input your hardware spec, get estimated TPS capacity and revenue projection.
+   │  │  │  │  ├─ line 387: [x] **Validator staking pooling** — users who can't afford minimum stake delegate to a pool operator. Pool distributes rewards proportionally.
+   │  │  │  │  ├─ line 390: [x] **`RpcStatsPanel` → live data** — wire to actual JSON-RPC metrics endpoint (`/metrics` Prometheus-style). Show real requests/sec, error rate, latency percentiles.
+   │  │  │  │  ├─ line 391: [ ] **Rate limiting dashboard** — show which RPC methods are being hammered. Throttle abusive clients.
+   │  │  │  │  ├─ line 392: [x] **RPC key management** — issue API keys with per-key rate limits and access control lists. *RpcKeysPanel manages 4 API keys with rate limiting and permission matrix.*
+   │  │  │  │  ├─ line 393: [ ] **Multi-region RPC** — deploy RPC nodes in: US-East, EU-West, Asia-Pacific. Auto-route users to nearest node.
+   │  │  │  │  ├─ line 394: [ ] **Health dashboard real wiring** — `HealthDashboardPanel` needs to read from Prometheus/Grafana, not mock data.
+   │  │  │  │  ├─ line 395: [ ] **Infrastructor CI/CD pipeline** — auto-deploy new chain versions to validators via the infra panel without manual SSH.
+   │  │  │  │  ├─ line 398: [x] **`BlockExplorerPanel` → live chain data** — currently static. Wire to chain RPC: `chain_getBlock`, `system_events`, `author_submitExtrinsic`.
+   │  │  │  │  ├─ line 399: [x] **Transaction decoder** — auto-decode any extrinsic into human-readable: "Alice swapped 100 X3 for 0.03 ETH on DEX".
+   │  │  │  │  ├─ line 400: [ ] **Smart contract verifier** — upload X3-Lang source, verify it matches the deployed bytecode. Show source on explorer.
+   │  │  │  │  ├─ line 401: [x] **Analytics tab** — daily TPS, active addresses, new contracts deployed, fee revenue charts going back to genesis.
+   │  │  │  │  ├─ line 402: [ ] **Token tracker** — discover all tokens on the chain, sorted by market cap, holders, volume.
+   │  │  │  │  ├─ line 403: [ ] **NFT explorer** — browse all NFT collections. See rarity ranks, recent sales, floor prices.
+   │  │  │  │  ├─ line 404: [x] **Whale tracker** — alert when a wallet > $100K moves funds. Searchable whale watchlist.
+   │  │  │  │  ├─ line 411: [ ] **Interactive code playground** — browser-based X3-Lang IDE. Write → compile → deploy to testnet in one window.
+   │  │  │  │  ├─ line 412: [ ] **SDK code generator** — input contract ABI, get TypeScript/Python/Go SDK auto-generated. Download or copy.
+   │  │  │  │  ├─ line 413: [ ] **Tutorial series** — 10 progressively harder tutorials: Hello World → ERC-20 → DEX → Cross-VM → AI Agent.
+   │  │  │  │  ├─ line 414: [ ] **Video walkthroughs** — screen-recorded tutorial videos embedded directly in the docs panel.
+   │  │  │  │  ├─ line 415: [x] **API reference** — auto-generated from Rust docstrings via `cargo doc`. Searchable, with examples.
+   │  │  │  │  ├─ line 416: [ ] **Changelog** — versioned changelog auto-populated from Git tags and release notes.
+   │  │  │  │  ├─ line 417: [x] **Error code reference** — every pallet error has a page explaining what it means and how to fix it.
+   │  │  │  │  ├─ line 418: [ ] **Testnet faucet link** — one-click to get testnet X3 tokens from the `AirdropsPanel` faucet.
+   │  │  │  │  ├─ line 419: [ ] **GitHub integration** — link to relevant source files from every doc page. Devs see the exact code behind what they're reading.
+   │  │  │  │  ├─ line 422: [ ] **VS Code extension** — syntax highlighting, autocomplete, inline type checking, go-to-definition for X3-Lang.
+   │  │  │  │  ├─ line 423: [ ] **Linter** — `x3 lint` catches common security issues: reentrancy, integer overflow, unrestricted admin functions.
+   │  │  │  │  ├─ line 424: [ ] **Formatter** — `x3 fmt` auto-formats X3 code. Opinionated, like `rustfmt`.
+   │  │  │  │  ├─ line 425: [ ] **Test framework** — built-in `x3 test` command that spins up a local chain, deploys contracts, runs test scenarios.
+   │  │  │  │  ├─ line 426: [ ] **Coverage report** — `x3 coverage` shows which code paths are tested, which aren't.
+   │  │  │  │  ├─ line 427: [ ] **Package registry** — `x3.toml` + `x3 publish` to share library contracts. npm for X3.
+   │  │  │  │  ├─ line 434: [ ] **External audit** — engage CertiK, Trail of Bits, or Halborn for a full chain + smart contract audit. Budget: $50-200K. Non-negotiable for production.
+   │  │  │  │  ├─ line 435: [ ] **Bug bounty program** — launch on Immunefi with tiered rewards: Critical ($50K), High ($10K), Medium ($1K), Low ($250).
+   │  │  │  │  ├─ line 436: [ ] **Formal specification** — write TLA+ specs for the consensus protocol, token economics, and bridge security properties.
+   │  │  │  │  ├─ line 437: [ ] **Penetration testing** — third-party pen test the Tauri app, RPC endpoints, and bridge contracts quarterly.
+   │  │  │  │  ├─ line 438: [ ] **Dependency audit** — fix those 126 npm vulnerabilities from Dependabot. `npm audit fix --force` where safe, manual review where not.
+   │  │  │  │  ├─ line 439: [ ] **SSRF/injection protection** — audit every Tauri command handler for injection vulnerabilities. Sanitize all user inputs before passing to Rust.
+   │  │  │  │  ├─ line 440: [ ] **Key derivation hardening** — use Argon2id (not PBKDF2) for wallet key encryption. Requires 1s of computation to unlock.
+   │  │  │  │  ├─ line 441: [ ] **HSM support** — allow validators to store signing keys in a Hardware Security Module (YubiHSM, AWS CloudHSM).
+   │  │  │  │  ├─ line 444: [ ] **KYC/AML framework** — optional KYC layer at the DEX level for regulated pools. Non-KYC pools remain permissionless.
+   │  │  │  │  ├─ line 445: [ ] **FATF travel rule compliance** — implement Travel Rule data sharing for transactions > $3,000 between VASPs.
+   │  │  │  │  ├─ line 446: [ ] **GDPR right to erasure** — CRM and Social data can be fully deleted on user request. Off-chain data only; on-chain remains by design.
+   │  │  │  │  ├─ line 447: [ ] **SOC 2 Type II** — get the Tauri desktop app SOC 2 certified. Required for enterprise CRM sales.
+   │  │  │  │  ├─ line 448: [ ] **Terms of Service & Privacy Policy** — `TermsPanel` and `PrivacyPanel` exist. Have a lawyer review and finalize them.
+   │  │  │  │  ├─ line 449: [ ] **Jurisdiction filtering** — block access from sanctioned countries at the frontend level. Log for compliance evidence.
+   │  │  │  │  ├─ line 452: [x] **DAO governance interface** — proposal submission, voting power display, voting on proposals with time locks and quorum tracking.
+   │  │  │  │  ├─ line 453: [x] **Audit analytics dashboard** — security score tracking, audit history, vulnerability timeline, remediation tracking across all audits.
+   │  │  │  │  ├─ line 460: [ ] **Mainnet genesis ceremony** — coordinate with first 21 validators for a live-streamed genesis block. PR moment.
+   │  │  │  │  ├─ line 461: [ ] **Token listing strategy** — apply to CoinGecko and CoinMarketCap on day 1. Apply to secondary CEXes at week 2.
+   │  │  │  │  ├─ line 462: [ ] **Airdrop campaign** — retroactive airdrop to early testnet users, GitHub contributors, and Solana/Ethereum power users.
+   │  │  │  │  ├─ line 463: [ ] **Grants program** — $5M ecosystem fund with applications via the CRM + DAO governance. Fund projects that build on X3.
+   │  │  │  │  ├─ line 464: [ ] **Developer hackathon** — $500K prize pool across 5 tracks: DeFi, AI Agents, Gaming, Social, Infrastructure.
+   │  │  │  │  ├─ line 465: [ ] **Ambassador program** — recruit 50 regional ambassadors. Give them token allocations and CRM seats.
+   │  │  │  │  ├─ line 466: [ ] **Press kit** — logo pack, brand guidelines, one-pager, white paper, token economics PDF. All downloadable from the website.
+   │  │  │  │  ├─ line 469: [ ] **Chainlink integration** — use Chainlink oracles for DEX price feeds. Gives instant credibility.
+   │  │  │  │  ├─ line 470: [ ] **The Graph subgraph** — deploy a subgraph so any dApp can query X3 on-chain data without running a full node.
+   │  │  │  │  ├─ line 471: [ ] **Safe (Gnosis Safe) multisig** — port Safe contracts to X3 so institutional users have a trusted multisig standard.
+   │  │  │  │  ├─ line 474: [ ] **Lens Protocol integration** — allow X3 Social profiles to port to/from Lens. Tap into their 100K+ user base.
+   │  │  │  │  ├─ line 475: [ ] **WalletConnect v2** — so mobile wallets (MetaMask Mobile, Rainbow) can connect to X3 dApps.
+   │  │  │  │  ├─ line 476: [ ] **Fireblocks / Copper integration** — institutional-grade custody for validators and treasury management.
+   │  │  │  │  ├─ line 477: [ ] **Colosseum / Jump Crypto / Paradigm** — pitch to top-tier crypto VCs for Series A to fund the ecosystem grants program.
+   │  │  │  │  ├─ line 480: [ ] **Discord server** — structured with channels: #announcements, #dev-support, #validator-ops, #trading, #governance, #social. Bots: price ticker, block alerts.
+   │  │  │  │  ├─ line 481: [ ] **Governance forum** — Discourse-based forum for protocol improvement proposals (XIPs — X3 Improvement Proposals).
+   │  │  │  │  ├─ line 482: [ ] **Weekly newsletter** — on-chain metrics, new dApps, governance proposals, validator spotlight. Sent via the CRM email system.
+   │  │  │  │  ├─ line 483: [ ] **X3 DAO** — transfer treasury control to the DAO by month 6. Foundation retains 10% veto for 2 years, then fully permissionless.
+   │  │  │  │  ├─ line 488: [x] **Content moderation layer** — community-governed content flags with staker voting on removal decisions. Multi-status tracking (pending/approved/removed).
+   │  │  │  │  ├─ line 489: [x] **AI agent marketplace** — subscription-based trading bot marketplace with copy-trading, ROI rankings, and strategy NFT minting.
+   │  │  │  │  ├─ line 490: [x] **Advanced DEX routing** — intelligent multi-hop AMM routing with MEV protection via commit-reveal scheme and configurable slippage tolerance.
+   │  │  │  │  ├─ line 491: [x] **Infrastructure automation** — geo-distributed validator deployment orchestration with automation task scheduling (backup, updates, performance reporting).
+   │  │  │  │  ├─ line 492: [x] **Enterprise security** — RBAC access control with HSM-backed key management, audit logs, and permission tracking for admin operations.
+   │  │  │  │  ├─ line 493: [x] **Cross-chain bridge** — trustless atomic transfers across EVM/Solana/X3 chains with liquidity pools and bridge validator coordination.
+   │  │  │  │  ├─ line 494: [x] **Compliance reporting** — SOC 2, GDPR, and ISO 27001 framework tracking with audit trail export and regulatory requirement dashboards.
+   │  │  │  │  ├─ line 495: [x] **Token vesting** — configurable cliff + linear/monthly/quarterly vesting with unlock timeline visualization and release milestone tracking.
+   │  │  │  │  ├─ line 496: [x] **API gateway** — rate limiting, quota tracking per-key, API key management with permissions and usage analytics.
+   │  │  │  │  ├─ line 497: [x] **Disaster recovery** — backup snapshots with integrity verification, restore testing (RTO/RPO), and disaster scenario playbooks.
+   │  │  │  │  ├─ line 502: [x] **Real transaction signing** — Tauri keystore-backed transaction approval with pending request workflow and fee calculation. Shows raw TX hex and confirmation tracking.
+   │  │  │  │  ├─ line 503: [x] **Hardware wallet support** — Ledger + Trezor device management with WebUSB/WebHID, firmware version tracking, and BIP44 derivation path support.
+   │  │  │  │  ├─ line 504: [x] **Multi-signature wallets** — M-of-N multisig wallet UI with approval threshold workflows, auto-completion when threshold met, and co-signer management panel.
+   │  │  │  │  ├─ line 505: [x] **Real CRM backend** — SQLite-backed contact management with WebSocket sync monitoring, tag-based organization, import/export, and real-time DB size tracking.
+   │  │  │  │  ├─ line 506: [x] **E2E encrypted messages** — X3DH + Double Ratchet (Signal protocol) implementation with message history, key exchange status, and protocol debugging tools.
+   │  │  │  │  ├─ line 507: [x] **Real-time notifications** — WebSocket push notification system with queue monitoring, delivery tracking, and notification type preferences (like/comment/follow/mention/tip).
+   │  │  │  │  ├─ line 508: [x] **Communities** — SubReddit-equivalent topic-based communities with feed sorting, moderator panel, community rules, and post creation/interaction.
+   │  │  │  │  ├─ line 509: [x] **Creator monetization premium** — Subscription tier management with tier pricing, tipping pool distribution, revenue split configuration, and creator analytics.
+   │  │  │  │  ├─ line 510: [x] **Interactive code playground** — Browser-based X3-Lang IDE with compile button, testnet deployment, bytecode/ABI output, and code download/share.
+   │  │  │  │  ├─ line 511: [x] **SDK code generator** — ABI-to-code generator supporting TypeScript/Python/Go with language selector and download/copy functionality.
+   │  │  │  │  ├─ line 514: [x] **Privacy vault (E2E encrypted key management)** — ChaCha20-Poly1305 encryption with Argon2id KDF, stealth address generation, key rotation, and biometric unlock.
+   │  │  │  │  ├─ line 515: [x] **Advanced portfolio analytics** — Sharpe ratio, maximum drawdown, volatility, VaR, beta, asset correlation matrix, and portfoliio risk score (6.8/10 medium risk).
+   │  │  │  │  ├─ line 516: [x] **On-chain analytics** — Real-time TVL, transaction volume, gas fee tracking, smart contract call monitoring, holder distribution, and token flow analysis.
+   │  │  │  │  ├─ line 517: [x] **NFT marketplace** — Collection discovery with rarity ranking, floor price tracking, recent sales, offer management, and trading interface.
+   │  │  │  │  ├─ line 518: [x] **Token marketplace** — Token listings with price charts, 24h/7d returns, launch tracking, swap integration, and trading volume analytics.
+   │  │  │  │  ├─ line 519: [x] **Governance proposals** — DAO proposal submission, voting with quorum tracking, vote breakdown (for/against/abstain), timeline visualization, and approval workflows.
+   │  │  │  │  ├─ line 520: [x] **Treasury management** — Multi-sig wallet control, budget allocation by category, spending history, approval workflows with threshold signatures, and fund tracking.
+   │  │  │  │  ├─ line 521: [x] **Integration marketplace** — Third-party plugin discovery with adoption stats, rating system, installation tracking, category browsing, and developer ecosystem metrics.
+   │  │  │  │  ├─ line 522: [x] **Media streaming (decentralized)** — Music/video streaming with creator micropayment tracking, stream analytics, creator profiles, and content monetization.
+   │  │  │  │  ├─ line 523: [x] **Quantum security (post-quantum readiness)** — Lattice algorithm (ML-KEM/Kyber) migration status, key size comparison, security audit results, and migration timeline tracking.
+   │  │  │  │  ├─ line 526: [x] **GPU pooling & multi-device optimization** — Pre-allocated GPU memory slabs, multi-device round-robin dispatch, fallback chain (CUDA→OpenCL→CPU), kernel versioning, and benchmark attestation.
+   │  │  │  │  ├─ line 527: [x] **Dynamic fee market (EIP-1559)** — Base fee adjustment per block, 70% burn/30% validator distribution, MEV protection (commit-reveal + threshold-encrypt), and slashing insurance fund ($2.5M coverage).
+   │  │  │  │  ├─ line 528: [x] **Cross-chain bridges (Eth+Sol+Cosmos+BTC)** — Multi-endpoint bridge infrastructure with Wormhole, IBC, HTLC, 5-entity security council (5-of-5 multisig), and liquidity pools ($5.2M+ TVL).
+   │  │  │  │  ├─ line 529: [x] **Solana adapter (SPL + Anchor)** — 10 standard programs (Token, AssocTokenAccount, Memo, Uniswap V3, Aave V3, Pyth), Anchor IDL validation, SPL token bridging, and deployment metrics.
+   │  │  │  │  ├─ line 530: [x] **Real CRM database** — SQLite contacts (2,840 records), 6-stage sales pipeline ($4.75M pipeline), email campaigns (3 active, 4.5K-6K recipients, 23.5% conversion), import/export UI.
+   │  │  │  │  ├─ line 531: [x] **Social federation backend** — ActivityPub protocol, E2E encrypted messaging (X3DH + ChaCha20-Poly1305), IPFS media storage (450GB), 3 communities (12.7K members), 554 posts/24h engagement.
+   │  │  │  │  ├─ line 532: [x] **Agent marketplace** — Buy/sell AI agents ($2.84M volume, 12.45K transactions), sandboxing control, 4 security audits (92-97 scores), and multi-agent coordination (hierarchical/sequential/parallel).
+   │  │  │  │  ├─ line 533: [x] **Validator automation** — One-click 5-step setup wizard, real metrics (3 validators, $2.62M stake, 99.4% uptime), slashing alerts (2 active), auto-compound staking, 342 network validators tracked.
+   │  │  │  │  ├─ line 534: [x] **Terminal shell (PTY + REPL)** — Real PTY terminal with command history, X3 CLI reference (20+ commands), X3-Lang REPL environment, syntax highlighting, and code execution simulation.
+   │  │  │  │  ├─ line 535: [x] **Price oracle** — Pyth, Chainlink, Band Protocol integration, 4 active price feeds (BTC, ETH, X3, SOL), TWAP aggregation (1h windows), and AMM liquidity depth tracking (Uniswap V3, Curve, Balancer).
+   │  │  │  │  ├─ line 536: [x] **Web workers & GPU compositing** — 4-worker thread pool (94.2% avg utilization), WebGL 2.0 + WGPU renderer (144 FPS, 6.8ms composite), startup preload (5 modules, 98.5% cache hit), -70.4% page load improvement.
+   │  │  │  │  ├─ line 537: [x] **NFT-CRM integration** — Wallet linking (4 contacts, 23 NFTs verified), on-chain deals (3 active, $540K value), token-gated groups (3 communities, $4.54M portfolio), NFT portfolio metrics (85.5/22.3 floor prices).
+   │  │  │  │  ├─ line 540: [x] **Privacy Vault Panel** — E2E encrypted key vault with ChaCha20-Poly1305, Argon2id KDF, stealth addresses, biometric unlock, hardware wallet backup tracking.
+   │  │  │  │  ├─ line 541: [x] **Advanced Portfolio Analytics Panel** — Sharpe ratio, maximum drawdown, volatility, VaR (95%/99%), beta coefficient, asset correlation matrix, risk score dashboard (1-10).
+   │  │  │  │  ├─ line 542: [x] **NFT Marketplace Panel** — Collection discovery, rarity ranking, floor price tracking, recent sales, buy/offer/list interface, collection stats, trait filters.
+   │  │  │  │  ├─ line 543: [x] **Token Marketplace Panel** — Token listings with market cap ranking, 24h volume, 7d returns, price charts, launch tracking, swap pair discovery, DEX routing integration.
+   │  │  │  │  ├─ line 544: [x] **Governance Proposals Panel** — DAO proposal submission, voting interface, vote breakdown (for/against/abstain), quorum tracking, proposal timeline, historical archive.
+   │  │  │  │  ├─ line 545: [x] **Treasury Management Panel** — Multi-sig wallet control, budget allocation by category, spending history, approval workflows, fund tracking, recipient whitelisting.
+   │  │  │  │  ├─ line 546: [x] **Integration Marketplace Panel** — Plugin discovery with adoption stats, rating system, category browsing, developer ecosystem metrics, one-click installation.
+   │  │  │  │  ├─ line 547: [x] **Media Streaming Panel** — Decentralized music/video with creator micropayments per-stream, stream analytics, creator profiles, playlist creation, artist launchpad.
+   │  │  │  │  ├─ line 548: [x] **Quantum Security Panel** — Post-quantum crypto readiness assessment, lattice algorithm (ML-KEM/Kyber) migration status, key size comparison, security audit results, migration timeline.
+   │  │  │  │  ├─ line 549: [x] **On-Chain Analytics Panel** — Real-time TVL tracking, transaction volume/velocity, gas fee trends, smart contract call monitoring, token holder distribution, trade flow analysis.
+   │  │  │  │  ├─ line 572: [x] **Hardware wallet support** — ✅ Implemented via [hardware_wallet.rs](/crates/x3-wallet/src/hardware_wallet.rs) (435 lines, 14 tests). Full Ledger/Trezor/Keystone/SafePal support via WebUSB/WebHID. BIP32 path validation (m/44'/coin_type'/account'/change/index). 120-block signing timeout (~20 min). Device info tracking (manufacturer, product, serial, firmware).
+   │  │  │  │  ├─ line 573: [x] **Multisig wallet** — ✅ Implemented via [multisig_wallet.rs](/crates/x3-wallet/src/multisig_wallet.rs) (468 lines, 14 tests). M-of-N consensus (1-50 signers, threshold enforcement). Timelock enforcement (configurable blocks delay before execution). Proposal lifecycle (pending → approved → executed/cancelled). Signer management (add/remove with threshold validation).
+   │  │  │  │  ├─ line 576: [x] **Social recovery** — ✅ Implemented via [social_recovery.rs](/crates/x3-wallet/src/social_recovery.rs) (474 lines, 14 tests). 3-guardian protocol (ERC-4337 model). Recovery request with configurable delay. Multi-signature recovery execution. Guardian management (add/remove). Owner rotation via recovery.
+   │  │  │  │  ├─ line 577: [x] **Transaction approval policies** — ✅ Implemented via [approval_manager.rs](/crates/x3-wallet/src/approval_manager.rs) (350 lines, 14 tests). Daily spending limits per token. Approval requirements for large transactions. Configurable timeout on approval requests. Rate limiting with reset timers.
+   │  │  │  │  ├─ line 580: [x] **Transaction signing** — ✅ Implemented via [transaction_signer.rs](/crates/x3-wallet/src/transaction_signer.rs) (414 lines, 14 tests). Multi-signature transaction approval. Signing request management with 100-block timeout. ECDSA signature verification (recovery_id validation). Flexible approval workflows (threshold-based).
+   │  │  │  │  ├─ line 581: [x] **Token & NFT management** — ✅ Implemented via [token_manager.rs](/crates/x3-wallet/src/token_manager.rs) (426 lines, 14 tests). Token registration with metadata (symbol, name, decimals, supply). Verification/blacklist flags for spam detection. Whitelist/blacklist modes for portfolio control. Token transfer with balance validation. Balance tracking per holder.
+   │  │  │  │  ├─ line 582: [x] **DeFi position tracking** — ✅ Implemented via [defi_tracker.rs](/crates/x3-wallet/src/defi_tracker.rs) (526 lines, 15 tests). LP position tracking (pool size, share, tokens). Staking position management with reward accrual. Borrow position tracking with health factor. Portfolio aggregation (unified view). Position value calculation.
+   │  │  │  │  ├─ line 585: [x] **Address book** — ✅ Implemented via [address_book.rs](/crates/x3-wallet/src/address_book.rs) (411 lines, 14 tests). Contact management with labels and tags. Favorite marking. Notes per contact. Search by name/address. Contact verification. Auto-complete on send. Supports 1,000 contacts per wallet.
+   │  │  │  │  ├─ line 586: [x] **Biometric authentication** — ✅ Implemented via [biometric_unlock.rs](/crates/x3-wallet/src/biometric_unlock.rs) (405 lines, 13 tests). Fingerprint/Face ID/Iris authentication. PIN fallback mechanism. Session management (300-block timeout). Lockout after 5 failed attempts (100-block temp lock). Template hash + PIN hash storage.
+   │  │  │  │  └─ line 587: [x] **Privacy & mixing** — ✅ Implemented via [privacy_mixing.rs](/crates/x3-wallet/src/privacy_mixing.rs) (419 lines, 13 tests). Stealth addresses for receiving. Transaction mixing pools (10+ participant requirement for security). Coinjoin-style mixing (50-block mixing delay). 1000-block withdrawal delay for privacy. Anonymity set tracking. Privacy score calculation (0-100).
+   │  │  │  ├─ AUTHENTICATION_SETUP.md
+   │  │  │  │  ├─ line 337: [ ] Change default admin password
+   │  │  │  │  ├─ line 338: [ ] Set strong AUTH_SALT in .env
+   │  │  │  │  ├─ line 339: [ ] Set strong JWT_SECRET in .env
+   │  │  │  │  ├─ line 340: [ ] Configure actual RPC endpoints in .env
+   │  │  │  │  ├─ line 341: [ ] Update REDIS_HOST if using external Redis
+   │  │  │  │  ├─ line 342: [ ] Enable HTTPS for login page
+   │  │  │  │  ├─ line 343: [ ] Set up Redis persistence (appendonly)
+   │  │  │  │  ├─ line 344: [ ] Configure log rotation for /var/log/x3
+   │  │  │  │  ├─ line 345: [ ] Test failover procedures
+   │  │  │  │  ├─ line 346: [ ] Run security audit on password storage
+   │  │  │  │  └─ line 347: [ ] Set up monitoring for service health
+   │  │  │  ├─ README_SETUP.md
+   │  │  │  │  ├─ line 285: [ ] Change default admin password
+   │  │  │  │  ├─ line 286: [ ] Generate new AUTH_SALT
+   │  │  │  │  ├─ line 287: [ ] Generate new JWT_SECRET
+   │  │  │  │  ├─ line 288: [ ] Update RPC endpoints with production keys
+   │  │  │  │  ├─ line 289: [ ] Enable HTTPS in reverse proxy
+   │  │  │  │  ├─ line 290: [ ] Configure Redis persistence
+   │  │  │  │  ├─ line 291: [ ] Set up log rotation
+   │  │  │  │  ├─ line 292: [ ] Configure monitoring/alerts
+   │  │  │  │  ├─ line 293: [ ] Test auto-start (reboot)
+   │  │  │  │  └─ line 294: [ ] Document credentials securely
+   │  │  │  └─ SETUP_SUMMARY.md
+   │  │  │     ├─ line 292: [ ] **Change default credentials**
+   │  │  │     ├─ line 298: [ ] **Update environment secrets**
+   │  │  │     ├─ line 305: [ ] **Use HTTPS**
+   │  │  │     ├─ line 311: [ ] **Run full test suite**
+   │  │  │     ├─ line 317: [ ] **Enable auto-start services**
+   │  │  │     ├─ line 324: [ ] **Setup monitoring & logging**
+   │  │  │     └─ line 331: [ ] **Test auto-recovery**
+   │  │  └─ testing
+   │  │     ├─ E2E_SECURITY_TESTING.md
+   │  │     │  ├─ line 430: [ ] Review test coverage (aim for >85%)
+   │  │     │  ├─ line 431: [ ] Update mocks if behavior changed
+   │  │     │  ├─ line 432: [ ] Add tests for new security features
+   │  │     │  ├─ line 435: [ ] Profile test performance
+   │  │     │  ├─ line 436: [ ] Refactor slow tests
+   │  │     │  ├─ line 437: [ ] Document new patterns
+   │  │     │  ├─ line 440: [ ] Run full suite 3+ times (check for flaky tests)
+   │  │     │  ├─ line 441: [ ] Generate coverage report
+   │  │     │  ├─ line 442: [ ] Security review of critical tests
+   │  │     │  └─ line 443: [ ] Update CHANGELOG
+   │  │     ├─ TESTING_FRAMEWORK_SUMMARY.md
+   │  │     │  ├─ line 117: [x] Threat model fully documented
+   │  │     │  ├─ line 118: [x] Invariants and failure modes specified
+   │  │     │  ├─ line 119: [x] Test framework structure created
+   │  │     │  ├─ line 120: [x] 1000+ lines of test specifications written
+   │  │     │  ├─ line 121: [x] All documentation in place
+   │  │     │  ├─ line 122: [x] Implementation patterns documented with code examples
+   │  │     │  ├─ line 126: [ ] API test URL fixes (2-3 hours)
+   │  │     │  ├─ line 127: [ ] Implement comprehensive.test.ts test bodies (1-2 weeks)
+   │  │     │  ├─ line 128: [ ] Implement consensus unit tests (2-3 weeks)
+   │  │     │  ├─ line 129: [ ] Implement execution atomicity tests (2-3 weeks)
+   │  │     │  ├─ line 133: [ ] Load & stress testing (4 weeks)
+   │  │     │  ├─ line 134: [ ] Fuzzing campaigns (8+ weeks)
+   │  │     │  ├─ line 135: [ ] Security audits (12+ weeks)
+   │  │     │  └─ line 136: [ ] Public testnet (12-24 weeks)
+   │  │     ├─ TEST_VALIDATION_REPORT.md
+   │  │     │  ├─ line 570: [ ] Register pallet in root Cargo.toml workspace.members:
+   │  │     │  ├─ line 575: [ ] Add pallet to runtime construct_runtime!:
+   │  │     │  ├─ line 580: [ ] Integrate RPC in node/src/rpc.rs:
+   │  │     │  ├─ line 586: [ ] Test testnet startup:
+   │  │     │  └─ line 592: [ ] Build & install CLI:
+   │  │     ├─ VALIDATION_CHECKLIST.md
+   │  │     │  ├─ line 22: [ ] **API Integration Valid**
+   │  │     │  ├─ line 30: [ ] **Dashboard Real-Time Data Flow**
+   │  │     │  ├─ line 36: [ ] **Server Endpoint Tests Pass**
+   │  │     │  ├─ line 43: [ ] **No Tauri Desktop Crashes**
+   │  │     │  ├─ line 51: [ ] **Consensus Protocol Specified**
+   │  │     │  ├─ line 57: [ ] **Atomic Execution Model Specified**
+   │  │     │  ├─ line 69: [ ] **API Service Tests 100% Coverage**
+   │  │     │  ├─ line 76: [ ] **Component Tests 80%+ Coverage**
+   │  │     │  ├─ line 83: [ ] **Page Tests 80%+ Coverage**
+   │  │     │  ├─ line 89: [ ] **Service Tests 80%+ Coverage**
+   │  │     │  ├─ line 95: [ ] **Hook Tests 80%+ Coverage**
+   │  │     │  ├─ line 101: [ ] **Overall Unit Coverage Target: 80%+**
+   │  │     │  ├─ line 109: [ ] **Consensus Module Unit Tests**
+   │  │     │  ├─ line 116: [ ] **Atomic Execution Unit Tests**
+   │  │     │  ├─ line 123: [ ] **Consensus Module Code Coverage Target: 80%+**
+   │  │     │  ├─ line 134: [ ] **API ↔ Component Integration**
+   │  │     │  ├─ line 140: [ ] **Dashboard ↔ Backend Integration**
+   │  │     │  ├─ line 148: [ ] **Consensus ↔ Execution Integration**
+   │  │     │  ├─ line 154: [ ] **Cross-VM ↔ Consensus Integration**
+   │  │     │  ├─ line 160: [ ] **State Management ↔ Network Integration**
+   │  │     │  ├─ line 166: [ ] **Overall Integration Coverage Target: 70%+**
+   │  │     │  ├─ line 177: [ ] **smoke-tests.spec.ts Passing**
+   │  │     │  ├─ line 182: [ ] **tauri-backend.spec.ts Passing**
+   │  │     │  ├─ line 187: [ ] **practical-integration.spec.ts Passing**
+   │  │     │  ├─ line 192: [ ] **Full Integration Test Suite**
+   │  │     │  ├─ line 200: [ ] **Consensus Multi-Node (3 nodes)**
+   │  │     │  ├─ line 205: [ ] **Consensus Multi-Node (10 nodes)**
+   │  │     │  ├─ line 210: [ ] **Consensus Multi-Node (100 nodes)**
+   │  │     │  ├─ line 215: [ ] **Cross-VM Atomicity Under Load**
+   │  │     │  ├─ line 228: [ ] **Transaction Fuzzing**
+   │  │     │  ├─ line 235: [ ] **Consensus Message Fuzzing**
+   │  │     │  ├─ line 242: [ ] **State Transition Fuzzing**
+   │  │     │  ├─ line 249: [ ] **P2P Network Fuzzing**
+   │  │     │  ├─ line 258: [ ] **Memory Safety (Rust)**
+   │  │     │  ├─ line 265: [ ] **Gas Metering Audit**
+   │  │     │  ├─ line 271: [ ] **Cryptography Review**
+   │  │     │  ├─ line 284: [ ] **1000 tx/sec Sustained**
+   │  │     │  ├─ line 290: [ ] **10,000 tx/sec Burst**
+   │  │     │  ├─ line 296: [ ] **Validator Load (100 validators)**
+   │  │     │  ├─ line 304: [ ] **Memory Stability (24 hours)**
+   │  │     │  ├─ line 310: [ ] **Database Growth (1 week)**
+   │  │     │  ├─ line 316: [ ] **CPU Utilization**
+   │  │     │  ├─ line 322: [ ] **Network Utilization**
+   │  │     │  ├─ line 334: [ ] **Critical Invariants Documented (10+)**
+   │  │     │  ├─ line 340: [ ] **Proof Requirements Listed (5+)**
+   │  │     │  ├─ line 348: [ ] **Code Review Checklist**
+   │  │     │  ├─ line 357: [ ] **Audit #1: Consensus & P2P (Trial of Bits / OpenZeppelin)**
+   │  │     │  ├─ line 364: [ ] **Audit #2: Execution & Atomicity (OpenZeppelin / CertiK)**
+   │  │     │  ├─ line 371: [ ] **Audit #3: Cryptography & Security (NCC Group / OpenZeppelin)**
+   │  │     │  ├─ line 378: [ ] **Audit Remediation**
+   │  │     │  ├─ line 391: [ ] **Public Testnet Deployed**
+   │  │     │  ├─ line 398: [ ] **Testnet Monitoring**
+   │  │     │  ├─ line 404: [ ] **Testnet Incentives**
+   │  │     │  ├─ line 410: [ ] **Testnet Exit Criteria (Must ALL Pass)**
+   │  │     │  ├─ line 424: [ ] **Bug Bounty Program**
+   │  │     │  ├─ line 432: [ ] **Red Team Simulation**
+   │  │     │  ├─ line 438: [ ] **Community Code Review**
+   │  │     │  ├─ line 450: [ ] **100% Unit Test Coverage (Blockchain Core)**
+   │  │     │  ├─ line 456: [ ] **100% Integration Test Coverage (Blockchain)**
+   │  │     │  ├─ line 461: [ ] **All Linter Warnings Fixed**
+   │  │     │  ├─ line 467: [ ] **Code Formatting Consistent**
+   │  │     │  ├─ line 475: [ ] **Deployment Automation**
+   │  │     │  ├─ line 482: [ ] **Monitoring & Alerting**
+   │  │     │  ├─ line 489: [ ] **Disaster Recovery**
+   │  │     │  ├─ line 496: [ ] **Documentation Complete**
+   │  │     │  ├─ line 505: [ ] **Upgrade Mechanism**
+   │  │     │  ├─ line 512: [ ] **Emergency Shutdown**
+   │  │     │  ├─ line 519: [ ] **Parameter Council**
+   │  │     │  ├─ line 532: [ ] **All Validations Passed** (Score: 10/10)
+   │  │     │  ├─ line 538: [ ] **Mainnet Network Started**
+   │  │     │  ├─ line 544: [ ] **Block Explorer Deployed**
+   │  │     │  ├─ line 550: [ ] **Mainnet Faucet (If Applicable)**
+   │  │     │  ├─ line 555: [ ] **Communication**
+   │  │     │  ├─ line 561: [ ] **Post-Launch Monitoring** (First 7 days)
+   │  │     │  ├─ line 602: [ ] Fix API test URL mismatch in api.test.ts
+   │  │     │  ├─ line 607: [ ] Run server endpoint tests
+   │  │     │  ├─ line 611: [ ] Run E2E tests
+   │  │     │  ├─ line 616: [ ] Read TESTING_STRATEGY.md to understand threat model
+   │  │     │  ├─ line 617: [ ] Identify where blockchain code lives (consensus, execution, isolation modules)
+   │  │     │  ├─ line 618: [ ] Map test specifications to actual code files
+   │  │     │  ├─ line 619: [ ] Create plan for implementing 40 consensus unit tests
+   │  │     │  ├─ line 622: [ ] Read PRE_MAINNET_ROADMAP.md
+   │  │     │  ├─ line 623: [ ] Read TEST_IMPLEMENTATION_GUIDE.md
+   │  │     │  └─ line 624: [ ] Create 1-page project status document
+   │  │     └─ VALIDATION_COMPLETE.md
+   │  │        ├─ line 284: [ ] Workspace registration:
+   │  │        ├─ line 292: [ ] Runtime configuration:
+   │  │        ├─ line 298: [ ] RPC wiring:
+   │  │        ├─ line 306: [ ] Build testnet:
+   │  │        ├─ line 311: [ ] Verify 4 nodes running:
+   │  │        ├─ line 319: [ ] Test RPC endpoints:
+   │  │        ├─ line 325: [ ] Build CLI:
+   │  │        ├─ line 331: [x] API documentation complete
+   │  │        ├─ line 332: [x] CLI guide complete
+   │  │        └─ line 333: [x] Integration guide complete
+   │  ├─ CROSS_CHAIN_SETTLEMENT_DIAGRAMS.md
+   │  │  ├─ line 346: [ ] Settlement Coordinator state machine (Rust)
+   │  │  ├─ line 347: [ ] Event store (append-only, event-sourced)
+   │  │  ├─ line 348: [ ] Message bus (Kafka/NATS)
+   │  │  ├─ line 351: [ ] BTC Adapter (HTLC scripts, UTXO selection)
+   │  │  ├─ line 352: [ ] EVM Adapter (escrow contracts, event watching)
+   │  │  ├─ line 353: [ ] L2 Adapters (Arbitrum, Base, Polygon)
+   │  │  ├─ line 356: [ ] Wire to Comit Kernel
+   │  │  ├─ line 357: [ ] Connect to existing 103-chain registry
+   │  │  ├─ line 358: [ ] Custody/signing service interface
+   │  │  ├─ line 361: [ ] WebSocket event subscription
+   │  │  ├─ line 362: [ ] Swap flow widget
+   │  │  ├─ line 363: [ ] Settlement tracking view
+   │  │  ├─ line 364: [ ] Observability dashboard
+   │  │  ├─ line 367: [ ] Testnet BTC ↔ ARB swap
+   │  │  ├─ line 368: [ ] Chaos testing (delayed confirmations, reorgs)
+   │  │  └─ line 369: [ ] Security audit (HTLC scripts, timeout handling)
+   │  ├─ OWNER_RUNBOOK.md
+   │  │  ├─ line 18: [ ] Pin toolchain: `rust-toolchain.toml` → `nightly-2024-12-01`
+   │  │  ├─ line 19: [ ] Document exact commit hashes for Substrate dependencies
+   │  │  ├─ line 20: [ ] Verify reproducible builds with CI container
+   │  │  ├─ line 21: [ ] Sign release artifacts with GPG keys
+   │  │  ├─ line 22: [ ] Test WASM build: `cargo +nightly build -Z build-std`
+   │  │  ├─ line 25: [ ] Store node keys in HSM or hardware wallet
+   │  │  ├─ line 26: [ ] Never commit private keys to repository
+   │  │  ├─ line 27: [ ] Set up key rotation schedule
+   │  │  ├─ line 28: [ ] Document key recovery procedures
+   │  │  ├─ line 29: [ ] Configure TREASURY_ADDRESS in genesis
+   │  │  ├─ line 32: [ ] Export keystore to secure storage
+   │  │  ├─ line 33: [ ] Backup chain DB snapshots regularly
+   │  │  ├─ line 34: [ ] Store config files offline
+   │  │  ├─ line 35: [ ] Version control `Cargo.lock` and `rust-toolchain.toml`
+   │  │  ├─ line 36: [ ] Document restore procedures
+   │  │  ├─ line 39: [ ] Open only required RPC ports (9933, 9944)
+   │  │  ├─ line 40: [ ] Restrict admin RPC to localhost
+   │  │  ├─ line 41: [ ] Configure firewall rules
+   │  │  ├─ line 42: [ ] Enable TLS for public endpoints
+   │  │  ├─ line 43: [ ] Set up DDoS protection
+   │  │  ├─ line 89: [ ] Backup current chain state
+   │  │  ├─ line 90: [ ] Test upgrade on local devnet
+   │  │  ├─ line 91: [ ] Verify runtime version bump
+   │  │  ├─ line 92: [ ] Check migration code paths
+   │  │  ├─ line 93: [ ] Review governance proposal
+   │  │  ├─ line 196: [ ] On-chain governance for critical constants
+   │  │  ├─ line 197: [ ] Runtime upgrade protection (timelocks, multisig)
+   │  │  ├─ line 198: [ ] Full node backup + cold wallet for treasury
+   │  │  ├─ line 199: [ ] **Security audit of pallets (kernel + adapters)**
+   │  │  ├─ line 200: [ ] Monitoring & alerts configured
+   │  │  ├─ line 201: [ ] Incident response procedures documented
+   │  │  ├─ line 202: [ ] Disaster recovery tested
+   │  │  ├─ line 205: [ ] Bug bounty program (HackerOne/Immunefi)
+   │  │  ├─ line 206: [ ] Formal verification of atomic paths
+   │  │  ├─ line 207: [ ] Chaos engineering tests
+   │  │  ├─ line 208: [ ] Geographic distribution of validators
+   │  │  └─ line 209: [ ] Rate limiting on public RPC
+   │  ├─ X3_Consensus_GPU_Swarm_Design_Booklet.md
+   │  │  ├─ line 726: [ ] Task inputs, models, execution logs off-chain.
+   │  │  ├─ line 727: [ ] Commitments (hashes, IDs, bounds) on-chain as specified.
+   │  │  ├─ line 730: [ ] Validators < 1/3 faulty assumption documented.
+   │  │  ├─ line 731: [ ] Implement chained HotStuff (single-leader, QC finality).
+   │  │  ├─ line 732: [ ] No reorgs: enforce finality at 2/3 signatures.
+   │  │  ├─ line 735: [ ] Block struct fields match design (header, DAG, roots, receipts).
+   │  │  ├─ line 736: [ ] `ApplyBlock` code exactly reproduces action execution deterministically.
+   │  │  ├─ line 737: [ ] Include pre/post state roots, receipts root, slashes in block.
+   │  │  ├─ line 740: [ ] Court VM uses same code paths as ApplyBlock (minus GPUs).
+   │  │  ├─ line 741: [ ] All ChallengePayloads are strongly typed; no free-form proofs.
+   │  │  ├─ line 742: [ ] Slashes executed only via court verdict; no governance overrides.
+   │  │  ├─ line 745: [ ] Enforce resource caps per action/agent.
+   │  │  ├─ line 746: [ ] Disallow non-deterministic operations.
+   │  │  ├─ line 747: [ ] Agent can only return actions or halt (no syscalls).
+   │  │  ├─ line 750: [ ] Define ResourceVector and PriceVector.
+   │  │  ├─ line 751: [ ] Enforce at runtime and in block validation.
+   │  │  ├─ line 752: [ ] Charge fees exactly = usage·price; burn/redistribute as needed.
+   │  │  ├─ line 755: [ ] Implement `CrossChainProof` struct and verifier for each source chain.
+   │  │  ├─ line 756: [ ] Support at least on-chain light clients or signature validation for other chains.
+   │  │  ├─ line 757: [ ] Atomic intent logic: lock, relay, finalize or rollback.
+   │  │  ├─ line 760: [ ] Constrain tasks to deterministic envelope (no atomics, fixed layout).
+   │  │  ├─ line 761: [ ] After GPU run, record GpuReceipt in action receipt.
+   │  │  ├─ line 762: [ ] Implement PoC proofs (Type A/B/C) and corresponding challenge checks.
+   │  │  ├─ line 765: [ ] Implement slashing for proposer/validator/agent/false-challenger as a function of Verdict.
+   │  │  ├─ line 766: [ ] Ensure slashed stakes are removed from voting weight immediately.
+   │  │  ├─ line 767: [ ] Update validator set / stakes only at epoch boundary.
+   │  │  ├─ line 770: [ ] Simulate stress tests (spam challenges, colluding adversaries).
+   │  │  ├─ line 771: [ ] Verify court replay cost ≤ original execution.
+   │  │  └─ line 772: [ ] Confirm invariants: no free lunch exploits, orphans not allowed after slashes.
+   │  └─ security.md
+   │     ├─ line 387: [ ] All external function calls have access controls
+   │     ├─ line 388: [ ] Reentrancy guards implemented where needed
+   │     ├─ line 389: [ ] Integer overflow/underflow checks in place
+   │     ├─ line 390: [ ] Cross-VM calls properly validated
+   │     ├─ line 391: [ ] State consistency maintained across VMs
+   │     ├─ line 394: [ ] Unit tests cover all code paths
+   │     ├─ line 395: [ ] Integration tests verify cross-VM behavior
+   │     ├─ line 396: [ ] Property tests validate invariants
+   │     ├─ line 397: [ ] Fuzz testing for edge cases
+   │     ├─ line 398: [ ] Gas consumption tests
+   │     ├─ line 401: [ ] Slither analysis (EVM contracts)
+   │     ├─ line 402: [ ] Seahorse analysis (SVM programs)
+   │     ├─ line 403: [ ] Custom cross-VM analysis rules
+   │     └─ line 404: [ ] Formal verification where applicable
+   ├─ patches
+   │  ├─ ar_archive_writer
+   │  │  ├─ reference
+   │  │  │  ├─ Alignment.h
+   │  │  │  │  └─ line 59: FIXME : Remove this, make all assign operators constexpr and introduce user
+   │  │  │  ├─ ArchiveWriter.cpp
+   │  │  │  │  └─ line 365: TODO : Actually report errors helpfully.
+   │  │  │  ├─ COFF.h
+   │  │  │  │  ├─ line 613: FIXME : This should be DllCharacteristics to match the COFF spec.
+   │  │  │  │  └─ line 620: FIXME : This should be NumberOfRvaAndSizes to match the COFF spec.
+   │  │  │  └─ Mangler.cpp
+   │  │  │     └─ line 240: FIXME : During LTO, we're invoked prior to the EC lowering pass,
+   │  │  ├─ src
+   │  │  │  ├─ archive_writer.rs
+   │  │  │  │  └─ line 942: FIXME allow lowering the threshold for tests
+   │  │  │  ├─ mangler.rs
+   │  │  │  │  └─ line 23: TODO : In LLVM, this uses the Microsoft Demangler to demangle the name to
+   │  │  │  └─ object_reader.rs
+   │  │  │     ├─ line 16: FIXME Use a better equivalent of LLVM's SymbolRef::SF_FormatSpecific
+   │  │  │     └─ line 33: FIXME match what LLVM does
+   │  │  └─ tests
+   │  │     └─ common.rs
+   │  │        └─ line 59: FIXME : LLVM 19 adds support for "coff" as a format argument, so in the
+   │  ├─ fastrand
+   │  │  └─ global_rng.rs
+   │  │     └─ line 211: TODO (notgull): Failures should be logged somewhere.
+   │  ├─ jobserver
+   │  │  └─ wasm.rs
+   │  │     └─ line 102: TODO : this is not correct if the thread is blocked in
+   │  ├─ quinn-proto
+   │  │  ├─ connection
+   │  │  │  ├─ streams
+   │  │  │  │  └─ mod.rs
+   │  │  │  │     └─ line 51: TODO : Queue STREAM_ID_BLOCKED if this fails
+   │  │  │  ├─ mod.rs
+   │  │  │  │  ├─ line 2318: TODO : SHOULD buffer these to improve reordering tolerance.
+   │  │  │  │  └─ line 3426: TODO : This should come from `TransportConfig` if that gets configurable.
+   │  │  │  ├─ send_buffer.rs
+   │  │  │  │  └─ line 22: TODO : Recover storage from these by compacting (#700)
+   │  │  │  └─ spaces.rs
+   │  │  │     └─ line 157: TODO : Handle packet number overflow gracefully
+   │  │  ├─ range_set
+   │  │  │  └─ array_range_set.rs
+   │  │  │     └─ line 72: TODO : This can potentially be made more efficient, since the we know
+   │  │  ├─ packet.rs
+   │  │  │  └─ line 603: TODO : Support long CIDs for compatibility with future QUIC versions
+   │  │  └─ token.rs
+   │  │     └─ line 373: TODO : Server ID??
+   │  └─ wasm-instrument
+   │     ├─ gas_metering
+   │     │  └─ mod.rs
+   │     │     └─ line 472: TODO : there should be strong guarantee that it does not return anything on
+   │     └─ stack_limiter
+   │        └─ thunk.rs
+   │           └─ line 88: TODO : Don't generate a signature, but find an existing one.
+   ├─ scripts
+   │  ├─ p4_utils
+   │  │  └─ DAY1_CHECKLIST.md
+   │  │     ├─ line 6: [x] Review P4_IMPLEMENTATION_GUIDE.md
+   │  │     ├─ line 7: [x] Verify Python 3.10+ available (Python 3.10.12)
+   │  │     ├─ line 8: [ ] Verify CUDA 11.8+ available (if using GPU) (nvcc missing)
+   │  │     ├─ line 9: [x] Review solana_accelerators.py structure
+   │  │     ├─ line 14: [x] Create virtual environment: `python3 -m venv .venv-p4`
+   │  │     ├─ line 15: [x] Activate venv: `source .venv-p4/bin/activate`
+   │  │     ├─ line 16: [x] Install dependencies:
+   │  │     ├─ line 19: [x] Verify CUDA toolkit: `/usr/local/cuda-12.2/bin/nvcc --version`
+   │  │     ├─ line 20: [x] Verify GPU: `nvidia-smi`
+   │  │     ├─ line 23: [x] Create branch: `git checkout -b feat/p4-gpu-accelerator`
+   │  │     ├─ line 24: [x] Confirm files exist:
+   │  │     ├─ line 32: [x] Review `SolanaSignatureVerifier` class structure
+   │  │     ├─ line 33: [x] Understand batch processing approach
+   │  │     ├─ line 34: [x] Study CUDA kernel mapping (128 threads/block)
+   │  │     ├─ line 35: [x] Document potential bottlenecks (see docs/reports/p4_day1_bottlenecks.md)
+   │  │     ├─ line 38: [x] Scaffold ed25519_verify_batch_kernel function (present in solana_gpu_kernels.cu)
+   │  │     ├─ line 39: [x] Set up host wrapper function (solana_gpu_kernels.cu)
+   │  │     ├─ line 40: [x] Define thread/block layout (128 threads/block)
+   │  │     ├─ line 41: [x] Test empty kernel compilation (nvcc compile succeeded with warnings)
+   │  │     ├─ line 44: [x] Run single signature test
+   │  │     ├─ line 45: [x] Run batch 128 test
+   │  │     ├─ line 46: [x] Capture baseline CPU time
+   │  │     ├─ line 47: [x] Document test harness (see docs/reports/p4_day1_bottlenecks.md)
+   │  │     ├─ line 52: [x] Execute: `pytest tests/p4_gpu_integration_tests.py::TestSignatureVerification -v`
+   │  │     ├─ line 53: [x] Capture results to: `tests/p4_benchmarks/day1_results.log`
+   │  │     ├─ line 54: [x] Document any failures (nvcc missing; ed25519-donna unavailable)
+   │  │     ├─ line 57: [x] Run: `python3 scripts/p4_utils/baseline_measurement.py`
+   │  │     ├─ line 58: [x] Save output: `tests/p4_benchmarks/baseline.txt`
+   │  │     ├─ line 59: [x] Compare with targets (see baseline output)
+   │  │     ├─ line 64: [x] Tests passed: 26 / 26 in tests/p4_gpu_integration_tests.py
+   │  │     ├─ line 65: [x] CPU baseline measured: ✓
+   │  │     ├─ line 66: [x] CUDA environment verified: ✓
+   │  │     ├─ line 67: [x] Day 2 ready: ✓ (PyNaCl interim)
+   │  │     ├─ line 68: [ ] Blockers: ed25519-donna not found on PyPI (optional upgrade)
+   │  │     ├─ line 71: [x] Update PROGRESS.md with Day 1 completion
+   │  │     ├─ line 72: [ ] Commit code: `git commit -m "P4 Day 1: SigVerifier scaffolding"`
+   │  │     ├─ line 73: [ ] Push branch: `git push origin feat/p4-gpu-accelerator`
+   │  │     ├─ line 77: [x] Dependencies installed (PyNaCl interim)
+   │  │     ├─ line 78: [x] CUDA environment working
+   │  │     ├─ line 79: [x] SigVerifier scaffolding complete
+   │  │     ├─ line 80: [x] Signature verification tests runnable
+   │  │     ├─ line 81: [x] CPU baseline captured
+   │  │     └─ line 82: [x] Ready for Day 2 kernel development (PyNaCl interim)
+   │  ├─ install_x3_enforcement.sh
+   │  │  ├─ line 240: [ ] Determinism: identical inputs → identical state root
+   │  │  ├─ line 241: [ ] Validity: invalid txs/blocks never accepted
+   │  │  ├─ line 242: [ ] No unintended mint/burn
+   │  │  ├─ line 245: [ ] Valid tx eventually eligible for inclusion
+   │  │  ├─ line 246: [ ] No deadlocks in proposer/validator flow
+   │  │  ├─ line 249: [ ] Fee accounting correct
+   │  │  └─ line 250: [ ] Gas metering correct
+   │  ├─ install_x3_enforcement_solo.sh
+   │  │  ├─ line 105: [ ] Determinism: identical inputs → identical state root
+   │  │  ├─ line 106: [ ] Validity: invalid tx/block never accepted
+   │  │  ├─ line 107: [ ] No unintended mint/burn
+   │  │  ├─ line 110: [ ] Valid tx eventually eligible for inclusion
+   │  │  ├─ line 111: [ ] No deadlocks in proposer/validator flow
+   │  │  ├─ line 114: [ ] Fee accounting correct
+   │  │  └─ line 115: [ ] Gas metering correct
+   │  ├─ p4_rapid_execution.sh
+   │  │  ├─ line 434: [ ] Review P4_IMPLEMENTATION_GUIDE.md
+   │  │  ├─ line 435: [ ] Verify Python 3.10+ available
+   │  │  ├─ line 436: [ ] Verify CUDA 11.8+ available (if using GPU)
+   │  │  ├─ line 437: [ ] Review solana_accelerators.py structure
+   │  │  ├─ line 442: [ ] Create virtual environment: `python3 -m venv .venv-p4`
+   │  │  ├─ line 443: [ ] Activate venv: `source .venv-p4/bin/activate`
+   │  │  ├─ line 444: [ ] Install dependencies:
+   │  │  ├─ line 448: [ ] Verify CUDA toolkit: `nvcc --version`
+   │  │  ├─ line 449: [ ] Verify GPU: `nvidia-smi`
+   │  │  ├─ line 452: [ ] Create branch: `git checkout -b feat/p4-gpu-accelerator`
+   │  │  ├─ line 453: [ ] Confirm files exist:
+   │  │  ├─ line 461: [ ] Review `SolanaSignatureVerifier` class structure
+   │  │  ├─ line 462: [ ] Understand batch processing approach
+   │  │  ├─ line 463: [ ] Study CUDA kernel mapping (128 threads/block)
+   │  │  ├─ line 464: [ ] Document potential bottlenecks
+   │  │  ├─ line 467: [ ] Scaffold ed25519_verify_batch_kernel function
+   │  │  ├─ line 468: [ ] Set up host wrapper function
+   │  │  ├─ line 469: [ ] Define thread/block layout
+   │  │  ├─ line 470: [ ] Test empty kernel compilation
+   │  │  ├─ line 473: [ ] Run single signature test
+   │  │  ├─ line 474: [ ] Run batch 128 test
+   │  │  ├─ line 475: [ ] Capture baseline CPU time
+   │  │  ├─ line 476: [ ] Document test harness
+   │  │  ├─ line 481: [ ] Execute: `pytest tests/p4_gpu_integration_tests.py::TestSignatureVerification -v`
+   │  │  ├─ line 482: [ ] Capture results to: `tests/p4_benchmarks/day1_results.log`
+   │  │  ├─ line 483: [ ] Document any failures
+   │  │  ├─ line 486: [ ] Run: `python3 scripts/p4_utils/baseline_measurement.py`
+   │  │  ├─ line 487: [ ] Save output: `tests/p4_benchmarks/baseline.txt`
+   │  │  ├─ line 488: [ ] Compare with targets
+   │  │  ├─ line 493: [ ] Tests passed: ____ / 30
+   │  │  ├─ line 494: [ ] CPU baseline measured: ✓
+   │  │  ├─ line 495: [ ] CUDA environment verified: ✓
+   │  │  ├─ line 496: [ ] Day 2 ready: ✓
+   │  │  ├─ line 497: [ ] Blockers: _______
+   │  │  ├─ line 500: [ ] Update PROGRESS.md with Day 1 completion
+   │  │  ├─ line 501: [ ] Commit code: `git commit -m "P4 Day 1: SigVerifier scaffolding"`
+   │  │  ├─ line 502: [ ] Push branch: `git push origin feat/p4-gpu-accelerator`
+   │  │  ├─ line 629: [ ] All 3 accelerators implemented
+   │  │  ├─ line 630: [ ] 30+ tests passing (100%)
+   │  │  ├─ line 631: [ ] Security audit complete
+   │  │  ├─ line 632: [ ] Performance targets met
+   │  │  ├─ line 635: [ ] Implementation guide complete
+   │  │  ├─ line 636: [ ] Runbooks created
+   │  │  ├─ line 637: [ ] API documentation final
+   │  │  ├─ line 638: [ ] Security policy documented
+   │  │  ├─ line 641: [ ] Testnet validation complete
+   │  │  ├─ line 642: [ ] Staging environment tested
+   │  │  ├─ line 643: [ ] Rollback plan documented
+   │  │  ├─ line 644: [ ] Production checklist signed off
+   │  │  ├─ line 647: [ ] Git tag: v0.1.0-p4
+   │  │  ├─ line 648: [ ] Release notes: Include 250x speedup highlight
+   │  │  ├─ line 649: [ ] Announcement: Team notification
+   │  │  └─ line 650: [ ] Go-live: Production deployment
+   │  └─ x3_generate_issues.py
+   │     ├─ line 105: [ ] Implement the feature / fix
+   │     ├─ line 106: [ ] Write or update unit tests
+   │     ├─ line 107: [ ] All tests pass (`cargo test`)
+   │     ├─ line 108: [ ] Update `X3_COMPLETION.md`: change `⬜` → `✅`
+   │     └─ line 109: [ ] Commit with message: `fix: [X3] {item['item'][:60]}`
+   ├─ ATOMIC_CROSSVM_PRODUCTION_READINESS.md
+   │  ├─ line 145: [x] All critical security fixes applied
+   │  ├─ line 146: [x] Benchmark weights implemented for pallet extrinsics
+   │  ├─ line 147: [x] Real VM dispatcher wired (no mocks)
+   │  ├─ line 148: [x] Session persistence added for restart recovery
+   │  ├─ line 149: [x] DoS guards in place (session limits, O(1) operations)
+   │  ├─ line 150: [x] Cross-session secret replay protection
+   │  ├─ line 151: [x] Bond collateralization enforced on-chain
+   │  ├─ line 152: [x] Strict finality cert validation
+   │  ├─ line 153: [x] Wire persistence to node service (use `SubstrateOffchainAdapter`)
+   │  ├─ line 154: [x] Configure monitoring for session counts
+   │  └─ line 155: [x] Set up alerting for Aborting/Failed phases
+   ├─ DEVELOPMENT.md
+   │  ├─ line 637: [ ] All tests passing: `cargo test --workspace`
+   │  ├─ line 638: [ ] No compiler warnings: `cargo clippy --all-targets`
+   │  ├─ line 639: [ ] Code formatted: `cargo fmt --all`
+   │  ├─ line 640: [ ] Security audit complete
+   │  ├─ line 641: [ ] Performance benchmarks run
+   │  ├─ line 642: [ ] Configuration validated
+   │  ├─ line 643: [ ] Telemetry endpoints configured
+   │  ├─ line 644: [ ] Monitoring alerts set up
+   │  ├─ line 648: [ ] Used `--chain=production` (strict)
+   │  ├─ line 649: [ ] WASM binary verified
+   │  ├─ line 650: [ ] Network connectivity tested
+   │  ├─ line 651: [ ] Firewall rules configured
+   │  ├─ line 652: [ ] Ports open: 30333 (p2p), 9933 (ws), 9615 (metrics)
+   │  ├─ line 653: [ ] Telemetry working
+   │  ├─ line 654: [ ] Monitoring active
+   │  ├─ line 658: [ ] Private key secure (hardware wallet or vault)
+   │  ├─ line 659: [ ] Session keys injected
+   │  ├─ line 660: [ ] `--validator` flag enabled
+   │  ├─ line 661: [ ] Proper pruning mode set
+   │  ├─ line 662: [ ] Resource allocation verified
+   │  ├─ line 663: [ ] Backup and disaster recovery plan
+   │  ├─ line 667: [ ] All 5 validators synchronized
+   │  ├─ line 668: [ ] Genesis block hash matches
+   │  ├─ line 669: [ ] Finality working (GRANDPA progressing)
+   │  ├─ line 670: [ ] Block production steady (5 blocks/sec)
+   │  ├─ line 671: [ ] No consensus warnings in logs
+   │  └─ line 672: [ ] Telemetry showing all validators
+   ├─ SHUTDOWN.md
+   │  ├─ line 592: [x] Record current block height
+   │  ├─ line 593: [x] Verify finality is recent (< 1 min)
+   │  ├─ line 594: [x] Check no pending authority changes
+   │  ├─ line 595: [x] Notify other infrastructure nodes
+   │  ├─ line 596: [x] Set adequate timeout (>30s)
+   │  ├─ line 597: [x] Have rollback plan if restart fails
+   │  ├─ line 598: [x] Verify database backups exist
+   │  └─ line 599: [x] Test graceful shutdown on staging first
+   ├─ X3_AUDIT_DASHBOARD.md
+   │  ├─ line 397: [x] Audit all unchecked items in Section 1 (Repo Hygiene)
+   │  ├─ line 398: [x] Ensure cargo build + test pass cleanly
+   │  ├─ line 399: [x] Run `bash scripts/x3_audit.sh` — must exit 0
+   │  ├─ line 402: [x] Sections 1–4 (Repo + Node + Runtime) at ✅
+   │  ├─ line 403: [x] Coverage thresholds met: runtime 95%, pallets 90%
+   │  ├─ line 404: [x] All GitHub issues tagged `x3,blocking` resolved
+   │  ├─ line 407: [x] Sections 1–8 (through MEV) complete
+   │  ├─ line 408: [x] Full security review passed
+   │  ├─ line 409: [x] Constitution layer active
+   │  ├─ line 412: [x] All 102 items are ✅
+   │  ├─ line 413: [x] CI gate passes on main
+   │  ├─ line 414: [x] Coverage all green
+   │  └─ line 415: [x] Security review cleared
+   ├─ X3_DELIVERY_SUMMARY.md
+   │  ├─ line 284: [x] `X3_COMPLETION.md` created (102 items, all ⬜)
+   │  ├─ line 285: [x] `scripts/x3_audit.sh` enhanced + working
+   │  ├─ line 286: [x] `scripts/x3_coverage_gate.sh` configured
+   │  ├─ line 287: [x] `scripts/x3_generate_issues.py` functional
+   │  ├─ line 288: [x] `.github/workflows/x3-audit.yml` implemented
+   │  ├─ line 289: [x] `X3_SYSTEMS.md` operational manual written
+   │  ├─ line 290: [x] `X3_AUDIT_DASHBOARD.md` progress template
+   │  ├─ line 291: [x] `X3_DEPLOYMENT_SOP.md` procedures documented
+   │  └─ line 292: [x] `X3_INDEX.md` navigation created
+   ├─ X3_GOLIVE_CHECKLIST.md
+   │  ├─ line 15: [x] **`X3_COMPLETION.md`** (14 KB)
+   │  ├─ line 23: [x] **`scripts/x3_audit.sh`** (11 KB)
+   │  ├─ line 29: [x] **`scripts/x3_coverage_gate.sh`** (3.9 KB)
+   │  ├─ line 35: [x] **`scripts/x3_generate_issues.py`** (5.7 KB)
+   │  ├─ line 43: [x] **`.github/workflows/x3-audit.yml`** (7.6 KB)
+   │  ├─ line 51: [x] **`X3_SYSTEMS.md`** (14 KB)
+   │  ├─ line 57: [x] **`X3_AUDIT_DASHBOARD.md`** (9.1 KB)
+   │  ├─ line 63: [x] **`X3_DEPLOYMENT_SOP.md`** (14 KB)
+   │  ├─ line 69: [x] **`X3_INDEX.md`** (13 KB)
+   │  ├─ line 75: [x] **`X3_DELIVERY_SUMMARY.md`** (11 KB)
+   │  ├─ line 252: [x] Review `X3_COMPLETION.md` (understand full scope)
+   │  ├─ line 253: [x] Share `X3_AUDIT_DASHBOARD.md` with stakeholders
+   │  ├─ line 254: [x] Assign owners to sections 1-6
+   │  ├─ line 257: [x] Read `X3_INDEX.md` (10 min)
+   │  ├─ line 258: [x] Run locally: `bash scripts/x3_audit.sh`
+   │  ├─ line 259: [x] Update `X3_COMPLETION.md` for any existing completed work (mark ✅)
+   │  ├─ line 262: [x] Verify CI gate is blocking as expected
+   │  ├─ line 263: [x] Monitor first week of PRs for audit failures
+   │  ├─ line 264: [x] Support engineers with debugging (see `X3_DEPLOYMENT_SOP.md`)
+   │  ├─ line 267: [x] Review coverage thresholds in `scripts/x3_coverage_gate.sh`
+   │  ├─ line 268: [x] Plan test coverage expansion
+   │  ├─ line 269: [x] Set baseline: `bash scripts/x3_coverage_gate.sh`
+   │  ├─ line 343: [x] All infrastructure files created
+   │  ├─ line 344: [x] All scripts tested & functional
+   │  ├─ line 345: [x] CI gate configured & enforcing
+   │  ├─ line 346: [x] Documentation complete & comprehensive
+   │  ├─ line 347: [x] Team notified
+   │  ├─ line 376: [x] All files exist in repo
+   │  ├─ line 377: [x] CI passing on main
+   │  ├─ line 378: [x] Team has access to docs
+   │  ├─ line 379: [x] Audit runs locally
+   │  ├─ line 380: [x] Coverage gates configured
+   │  └─ line 381: [x] GitHub issues will auto-generate
+   ├─ progress.txt
+   │  ├─ line 215: [x] Real EVM contract deployment (Solidity ERC20 basic)
+   │  ├─ line 216: [x] Real SVM program deployment (Solana counter program)
+   │  ├─ line 217: [x] Cross-VM atomic swap end-to-end
+   │  ├─ line 218: [x] State sync between both VMs and canonical ledger
+   │  └─ line 219: [x] Integration test coverage >80%
+   └─ shot_blaster_config.yaml
+      └─ line 10: TODO 

@@ -1,0 +1,83 @@
+# X3 Chain Testnet v1 - Infrastructure Inventory
+# Update with actual IPs/hostnames after provisioning VMs
+
+validators:
+  - name: validator-01
+    ip: 10.0.1.10  # UPDATE THIS
+    public_ip: x.x.x.x  # UPDATE THIS
+    ssh_user: x3
+    specs: 4GB RAM, 2 vCPU, 50GB SSD
+  - name: validator-02
+    ip: 10.0.1.11  # UPDATE THIS
+    public_ip: x.x.x.x  # UPDATE THIS
+    ssh_user: x3
+    specs: 4GB RAM, 2 vCPU, 50GB SSD
+  - name: validator-03
+    ip: 10.0.1.12  # UPDATE THIS
+    public_ip: x.x.x.x  # UPDATE THIS
+    ssh_user: x3
+    specs: 4GB RAM, 2 vCPU, 50GB SSD
+
+rpc_nodes:
+  - name: rpc-01
+    ip: 10.0.2.10  # UPDATE THIS
+    public_ip: x.x.x.x  # UPDATE THIS
+    ssh_user: x3
+    specs: 8GB RAM, 4 vCPU, 100GB SSD
+  - name: rpc-02
+    ip: 10.0.2.11  # UPDATE THIS
+    public_ip: x.x.x.x  # UPDATE THIS
+    ssh_user: x3
+    specs: 8GB RAM, 4 vCPU, 100GB SSD
+
+bootnode:
+  name: bootnode-01
+  ip: 10.0.3.10  # UPDATE THIS
+  public_ip: x.x.x.x  # UPDATE THIS
+  ssh_user: x3
+  specs: 2GB RAM, 1 vCPU, 20GB SSD
+
+monitoring:
+  name: monitoring-01
+  ip: 10.0.4.10  # UPDATE THIS
+  public_ip: x.x.x.x  # UPDATE THIS
+  ssh_user: x3
+  specs: 4GB RAM, 2 vCPU, 50GB SSD
+  services:
+    - prometheus (port 9090)
+    - grafana (port 3000)
+
+dns_records:
+  - name: rpc
+    type: A
+    value: x.x.x.x  # RPC load balancer IP - UPDATE THIS
+  - name: rpc2
+    type: A
+    value: x.x.x.x  # Backup RPC IP - UPDATE THIS
+  - name: bootnode
+    type: A
+    value: x.x.x.x  # Bootnode IP - UPDATE THIS
+  - name: faucet
+    type: A
+    value: x.x.x.x  # Faucet IP - UPDATE THIS
+  - name: metrics
+    type: A
+    value: x.x.x.x  # Grafana IP - UPDATE THIS
+
+firewall_rules:
+  p2p:
+    port: 30333
+    protocol: tcp
+    source: 0.0.0.0/0  # Allow from anywhere
+  rpc:
+    port: 9944
+    protocol: tcp
+    source: load_balancer_only  # Restrict to LB
+  metrics:
+    port: 9615
+    protocol: tcp
+    source: monitoring_server_only  # Restrict to monitoring
+  ssh:
+    port: 22
+    protocol: tcp
+    source: admin_ips_only  # Restrict to admin IPs

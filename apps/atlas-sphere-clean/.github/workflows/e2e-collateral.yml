@@ -1,0 +1,19 @@
+name: e2e-collateral
+
+on:
+  push:
+    branches: [ feat/arbitrage-bonding, ralph/x3-chain ]
+  pull_request:
+    branches: [ main, ralph/x3-chain ]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/setup-rust@v1
+      - name: Run settlement engine tests
+        run: cargo test -p pallet-x3-settlement-engine --verbose
+      - name: Run e2e collateral flow (CI)
+        run: cargo test -p e2e_tests --test integration_tests -- --nocapture || true

@@ -1,0 +1,94 @@
+rules:
+  # ── hardcoded localhost / dev endpoints in Python orchestration ─────────────
+  - id: py-no-localhost-endpoints
+    patterns:
+      - pattern: |
+          "$URL"
+      - metavariable-regex:
+          metavariable: $URL
+          regex: '^(http|ws)s?://(localhost|127\.0\.0\.1):[0-9]+'
+    message: |
+      Hardcoded local endpoint $URL in $PATH.
+      Use environment variables (os.getenv / config) for all RPC/API endpoints.
+    languages: [python]
+    severity: ERROR
+    paths:
+      exclude:
+        - "tests/**"
+        - "**/test_*.py"
+        - "**/*_test.py"
+        - "scripts/testnet/**"
+
+  # ── bare except in chain orchestration code ─────────────────────────────────
+  - id: py-no-bare-except
+    patterns:
+      - pattern: |
+          try:
+            ...
+          except:
+            ...
+    message: |
+      Bare except: in $PATH swallows all exceptions including KeyboardInterrupt.
+      Catch specific exception types.
+    languages: [python]
+    severity: WARNING
+    paths:
+      include:
+        - "scripts/**"
+        - "deployment/**"
+        - "tests/**"
+
+  # ── subprocess with shell=True ──────────────────────────────────────────────
+  - id: py-no-shell-true
+    patterns:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+    message: |
+      shell=True in subprocess call ($PATH) is a command injection risk.
+      Pass a list of arguments and set shell=False.
+    languages: [python]
+    severity: ERROR
+    paths:
+      exclude:
+        - "tests/**"
+        - "**/test_*.py"
+
+  # ── hardcoded private key material in Python ────────────────────────────────
+  - id: py-no-hardcoded-privkey
+    patterns:
+      - pattern-regex: '(?i)(private[_\s]?key|secret[_\s]?key|mnemonic)\s*=\s*["\x27][0-9a-f]{32,}'
+    message: |
+      Possible hardcoded private key or mnemonic in $PATH.
+      Use environment variables or a secrets manager.
+    languages: [python]
+    severity: ERROR
+
+  # ── print() in production deployment/scripts ────────────────────────────────
+  - id: py-prefer-logging
+    patterns:
+      - pattern: print(...)
+    message: |
+      print() in $PATH — use the logging module for production scripts
+      so that output can be controlled by log level and captured by monitoring.
+    languages: [python]
+    severity: INFO
+    paths:
+      include:
+        - "scripts/**"
+        - "deployment/**"
+
+  # ── mock/stub flags left in production config ────────────────────────────────
+  - id: py-no-mock-in-prod-config
+    patterns:
+      - pattern: |
+          MOCK_$X = True
+      - pattern: |
+          USE_STUB_$X = True
+      - pattern: |
+          TEST_MODE = True
+    message: |
+      Mock/stub/test flag enabled in $PATH. Ensure this is gated behind
+      an environment variable and not the default in production.
+    languages: [python]
+    severity: WARNING

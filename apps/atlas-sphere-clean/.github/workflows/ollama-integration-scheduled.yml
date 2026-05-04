@@ -1,0 +1,194 @@
+name: Scheduled Ollama Integration Tests
+
+on:
+  schedule:
+    # Monday 03:00 UTC weekly
+    - cron: '0 3 * * 1'
+  workflow_dispatch: {}
+
+env:
+  OLLAMA_URL: http://localhost:11434
+
+jobs:
+  scheduled-ollama:
+    name: Weekly Ollama streaming E2E
+    runs-on: ubuntu-latest
+    # Only run when explicitly enabled via repository secret
+    if: ${{ secrets.RUN_OLLAMA_INTEGRATION == 'true' }}
+    env:
+      OLLAMA_PULL_TEST_MODEL: ${{ secrets.OLLAMA_PULL_TEST_MODEL }}
+      OLLAMA_STREAM_TEST_MODEL: ${{ secrets.OLLAMA_PULL_TEST_MODEL }}
+      # Issue configuration (override via secrets if desired)
+      OLLAMA_ISSUE_LABELS: ${{ secrets.OLLAMA_ISSUE_LABELS || 'integration,ollama,ollama-integration-failure' }}
+      OLLAMA_ISSUE_MILESTONE: ${{ secrets.OLLAMA_ISSUE_MILESTONE || '' }}
+      OLLAMA_ISSUE_ASSIGNEE: ${{ secrets.OLLAMA_ISSUE_ASSIGNEE || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Ollama model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama
+          key: ollama-models-${{ runner.os }}-${{ env.OLLAMA_PULL_TEST_MODEL }}
+
+      - name: Start prebuilt Ollama image (if configured)
+        if: ${{ env.OLLAMA_TEST_IMAGE != '' }}
+        run: |
+          echo "Starting prebuilt image: $OLLAMA_TEST_IMAGE"
+          docker run -d --rm --name ollama-scheduled -p 11434:11434 "$OLLAMA_TEST_IMAGE"
+
+      - name: Start Ollama (docker)
+        if: ${{ env.OLLAMA_TEST_IMAGE == '' }}
+        run: |
+          docker pull ollama/ollama:latest
+          docker run -d --rm --name ollama-scheduled -v $HOME/.ollama:/root/.ollama -p 11434:11434 ollama/ollama:latest
+
+      - name: Wait for Ollama
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sS --max-time 2 http://localhost:11434/api/models >/dev/null 2>&1; then
+              echo "Ollama ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Ollama did not become ready" >&2
+          exit 1
+
+      - name: (Optional) Pull test model
+        if: ${{ env.OLLAMA_PULL_TEST_MODEL != '' }}
+        run: |
+          echo "Pulling model: $OLLAMA_PULL_TEST_MODEL"
+          docker exec ollama-scheduled ollama pull "$OLLAMA_PULL_TEST_MODEL"
+
+      - name: Run streaming E2E tests
+        id: run_tests
+        env:
+          OLLAMA_URL: http://localhost:11434
+          OLLAMA_STREAM_TEST_MODEL: ${{ secrets.OLLAMA_PULL_TEST_MODEL }}
+        continue-on-error: true
+        run: |
+          python -m pip install -r requirements-dev.txt || true
+          set +e
+          PYTHONPATH=. pytest -q swarm/tests/test_ollama_streaming.py -q
+          RET=$?
+          echo "exit_code=$RET" >> $GITHUB_OUTPUT
+          set -e
+
+      - name: Verify model presence in running Ollama
+        id: check_model
+        if: always()
+        env:
+          MODEL: ${{ secrets.OLLAMA_PULL_TEST_MODEL }}
+        run: |
+          echo "Checking for model presence (MODEL=$MODEL)"
+          if [ -z "$MODEL" ]; then
+            echo "present=unknown" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if curl -sS --max-time 5 http://localhost:11434/api/models | grep -q "$MODEL"; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue / comment on failure
+        if: always()
+        uses: actions/github-script@v6
+        id: create_issue
+        env:
+          ISSUE_LABELS: ${{ env.OLLAMA_ISSUE_LABELS }}
+          ISSUE_MILESTONE: ${{ env.OLLAMA_ISSUE_MILESTONE }}
+          ISSUE_ASSIGNEE: ${{ env.OLLAMA_ISSUE_ASSIGNEE }}
+        with:
+          script: |
+            const model_present = '${{ steps.check_model.outputs.present }}'
+            const tests_failed = ${{ steps.run_tests.outputs.exit_code }} != '0'
+
+            if (!(tests_failed || model_present === 'false')) {
+              core.info('Tests passed and model present; nothing to do')
+              return
+            }
+
+            // Build title and body
+            const title = tests_failed ? 'Ollama streaming E2E tests failed' : 'Ollama test model missing on scheduled run'
+            const body = `Scheduled Ollama Integration detected an issue.\n\n- Tests exit_code: ${{ steps.run_tests.outputs.exit_code }}\n- Model present: ${{ steps.check_model.outputs.present }}\n\nCheck the workflow run logs for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+
+            // Prepare labels and assignees
+            const labelsEnv = process.env.ISSUE_LABELS || 'integration,ollama,ollama-integration-failure'
+            const labels = labelsEnv.split(',').map(s => s.trim()).filter(Boolean)
+            if (tests_failed) labels.push('tests-failed')
+            if (model_present === 'false') labels.push('model-missing')
+
+            const assignee = (process.env.ISSUE_ASSIGNEE || '').trim()
+
+            // Resolve milestone number (if provided)
+            let milestoneNumber = undefined
+            const milestoneTitle = (process.env.ISSUE_MILESTONE || '').trim()
+            if (milestoneTitle) {
+              const ms = await github.rest.issues.listMilestonesForRepo({ owner: context.repo.owner, repo: context.repo.repo })
+              const found = ms.data.find(m => m.title === milestoneTitle)
+              if (found) {
+                milestoneNumber = found.number
+              } else {
+                core.info(`Milestone '${milestoneTitle}' not found; skipping milestone assignment`)
+              }
+            }
+
+            // Create the issue
+            const createParams = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels
+            }
+            if (assignee) createParams.assignees = [assignee]
+            if (milestoneNumber) createParams.milestone = milestoneNumber
+
+            const issue = await github.rest.issues.create(createParams)
+
+            // If run was triggered by a PR, add a comment
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `Automated check failed during scheduled Ollama integration run. See workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+              })
+            }
+
+            core.info(`Created issue #${issue.data.number}`)
+            return issue.data.number
+
+      - name: Send Slack notification (if configured)
+        if: ${{ always() && secrets.SLACK_WEBHOOK }}
+        run: |
+          ISSUE_NUM=${{ steps.create_issue.outputs.result }}
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG="Ollama Integration detected an issue. Issue: #${ISSUE_NUM:-N/A} - ${WORKFLOW_URL}"
+          curl -sS -X POST -H 'Content-type: application/json' --data "{\"text\": \"${MSG}\"}" "${{ secrets.SLACK_WEBHOOK }}" || true
+
+      - name: Send email notification (if configured)
+        if: ${{ always() && secrets.MAIL_SMTP_HOST }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SMTP_HOST }}
+          server_port: ${{ secrets.MAIL_SMTP_PORT || 587 }}
+          username: ${{ secrets.MAIL_SMTP_USER }}
+          password: ${{ secrets.MAIL_SMTP_PASS }}
+          subject: "[Ollama Integration] Issue created: ${{ steps.create_issue.outputs.result }}"
+          body: |
+            The scheduled Ollama integration workflow detected an issue.
+
+            - Issue: ${{ steps.create_issue.outputs.result }}
+            - Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM }}
+
+      - name: Teardown Ollama
+        if: always()
+        run: |
+          docker stop ollama-scheduled || true

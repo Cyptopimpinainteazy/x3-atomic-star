@@ -1,0 +1,57 @@
+[package]
+name = "pallet-x3-settlement-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "X3 Settlement Engine - Protocol-level atomic settlement for BTC, EVM, and SVM"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+license = "MIT"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { package = "scale-info", version = "2.10", default-features = false, features = ["derive"] }
+log = { version = "0.4", default-features = false }
+
+# Substrate dependencies
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2603" }
+ripemd = { version = "0.1", default-features = false }
+
+# Internal dependencies
+pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
+pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
+
+[dev-dependencies]
+pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "log/std",
+    "frame-support/std",
+    "frame-system/std",
+    "sp-core/std",
+    "sp-std/std",
+    "sp-runtime/std",
+    "sp-io/std",
+    "ripemd/std",
+    "pallet-x3-kernel/std",
+    "pallet-atomic-trade-engine/std",
+]
+runtime-benchmarks = [
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+]
+try-runtime = [
+    "frame-support/try-runtime",
+]

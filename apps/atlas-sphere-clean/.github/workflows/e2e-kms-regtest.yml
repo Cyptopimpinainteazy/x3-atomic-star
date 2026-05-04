@@ -1,0 +1,79 @@
+name: E2E - KMS + Regtest
+
+on:
+  push:
+    branches: [ e2e-kms-regtest ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  e2e-kms-regtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Ganache (ethereum)
+        run: |
+          docker run -d --name ganache -p 8545:8545 trufflesuite/ganache-cli:latest -d
+          # give ganache a moment
+          sleep 2
+
+      - name: Start Bitcoind (regtest)
+        run: |
+          # Regtest RPC default port is 18443 inside container
+          # Enable txindex for getrawtransaction on confirmed txs
+          docker run -d --name bitcoind -p 18443:18443 \
+            ruimarinho/bitcoin-core:23 \
+            -regtest \
+            -server \
+            -txindex \
+            -rpcbind=0.0.0.0:18443 \
+            -rpcallowip=0.0.0.0/0 \
+            -rpcuser=user \
+            -rpcpassword=pass \
+            -fallbackfee=0.0002 \
+            -printtoconsole
+          # wait for RPC to become ready
+          for i in {1..30}; do
+            if docker logs bitcoind 2>&1 | grep -q "Done loading"; then
+              echo "bitcoind ready"; break
+            fi
+            echo "waiting for bitcoind..."; sleep 2
+          done
+          # Quick sanity check
+          sleep 2
+          curl -s --user user:pass --data-binary '{"jsonrpc":"1.0","id":"test","method":"getblockchaininfo","params":[]}' -H 'content-type: application/json' http://127.0.0.1:18443/ | head -c 200 || echo "RPC check done"
+
+      - name: Install Node & dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install relayer deps
+        run: |
+          cd scripts/relayer
+          # Use npm install since package.json was updated without updating lock file
+          npm install
+
+      - name: Run relayer E2E smoke (uses LocalKmsProvider)
+        env:
+          BITCOIN_RPC_URL: "http://user:pass@127.0.0.1:18443/"
+          ETHEREUM_RPC_URL: "http://127.0.0.1:8545"
+          # Key id used by test payload; bootstrap reads RELAYER_LOCAL_KMS_KEY_ID
+          RELAYER_KMS_KEY_ID: "local-1"
+          RELAYER_LOCAL_KMS_KEY_ID: "local-1"
+          # Deterministic regtest WIF generated from seed Buffer.alloc(32, 0x42)
+          # Valid compressed WIF for regtest network
+          RELAYER_LOCAL_KMS_WIF: "cPoVxi18CnxHUQjYNpjRM3RYUVFA61wuTNQez7BtRKkfp9Fw6RTW"
+          KMS_LOCAL_WIF: "cPoVxi18CnxHUQjYNpjRM3RYUVFA61wuTNQez7BtRKkfp9Fw6RTW"
+        run: |
+          cd scripts/relayer
+          # Tests run via ts-node (transpileOnly), no pre-build needed
+          npm test --if-present
+
+      - name: Collect logs
+        if: always()
+        run: |
+          docker logs --tail 200 ganache || true
+          docker logs --tail 200 bitcoind || true

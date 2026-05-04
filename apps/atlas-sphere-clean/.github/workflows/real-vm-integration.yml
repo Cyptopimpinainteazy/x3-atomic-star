@@ -1,0 +1,31 @@
+name: Real VM Integration Tests
+
+on:
+  push:
+    branches: [ main, feature/**, opt/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  real-vm-checks:
+    name: Build & Tests (std + wasm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rustup & toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rust-src
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libssl-dev clang libclang-dev
+      - name: Run real VM checks
+        env:
+          CARGO_TERM_COLOR: always
+        run: |
+          chmod +x ./.github/scripts/run_real_vm_checks.sh
+          ./.github/scripts/run_real_vm_checks.sh
