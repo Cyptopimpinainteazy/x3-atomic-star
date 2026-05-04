@@ -12,7 +12,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ArrowDown, Settings, RefreshCw, TrendingUp, TrendingDown,
   ArrowUpRight, ArrowDownLeft, Clock, Zap, CheckCircle2,
-  XCircle, Loader2, Wifi, WifiOff,
+  XCircle, Loader2, Wifi, WifiOff, DollarSign,
 } from 'lucide-react';
 import clsx from 'clsx';
 import x3Chain, {
@@ -23,6 +23,7 @@ import x3Chain, {
   type TradeProgressEvent,
   type LiquidityPool,
 } from '@/services/x3ChainService';
+import { useWalletStore } from '@/stores/walletStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,17 @@ const DexPanel: React.FC = () => {
   const [tradeProgressMessage, setTradeProgressMessage] = useState<string | null>(null);
   const [liquidityPools, setLiquidityPools] = useState<LiquidityPool[]>([]);
   const [isLoadingPools, setIsLoadingPools] = useState(false);
+
+  // ── Limit order state (must be at component top level per Rules of Hooks)
+  const [limitSellToken, setLimitSellToken] = useState(TOKENS[1]); // ETH
+  const [limitReceiveToken, setLimitReceiveToken] = useState(TOKENS[3]); // USDC
+  const [limitSellAmount, setLimitSellAmount] = useState('');
+  const [limitPrice, setLimitPrice] = useState('');
+  const [limitOrderStatus, setLimitOrderStatus] = useState<SwapStatus>({ type: 'idle' });
+
+  // ── Wallet state
+  const { universalWallet } = useWalletStore();
+  const walletAddress = universalWallet?.substrate_address ?? '';
 
   // Debounce timer for simulation
   const simTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -710,39 +722,144 @@ const DexPanel: React.FC = () => {
     </div>
   );
 
-  const renderLimits = () => (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
-      <div className="bg-[#111111] border border-[#1a1a1a] rounded-xl p-6">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">📊 Limit Order</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-gray-400 mb-2 block">Sell Token</label>
-            <div className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm">ETH at <input type="number" placeholder="1875" className="w-24 bg-transparent text-orange-400 focus:outline-none" /></div>
+  const handlePlaceLimitOrder = useCallback(async () => {
+      if (!limitSellAmount || !limitPrice || parseFloat(limitSellAmount) <= 0 || parseFloat(limitPrice) <= 0) {
+        setLimitOrderStatus({ type: 'failed', error: 'Invalid amount or price' });
+        return;
+      }
+      if (limitOrderStatus.type !== 'idle' && limitOrderStatus.type !== 'finalized' && limitOrderStatus.type !== 'failed') return;
+
+      setLimitOrderStatus({ type: 'submitting' });
+
+      try {
+        const amountIn = x3Chain.toChainUnits(parseFloat(limitSellAmount), limitSellToken.decimals);
+        const limitPriceNum = parseFloat(limitPrice);
+        // BigInt-safe calculation: avoid Number(bigint) precision loss
+        const PRICE_SCALE = 1_000_000_000n;
+        const priceScaled = BigInt(Math.round(limitPriceNum * Number(PRICE_SCALE)));
+        const minAmountOut = (amountIn * priceScaled * 95n) / (100n * PRICE_SCALE);
+
+        const signer: { address: string } = walletAddress
+          ? { address: walletAddress }
+          : { address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY' }; // fallback to Alice
+
+        const result = await x3Chain.placeOrder(
+          signer,
+          TOKEN_IDS[limitSellToken.symbol] ?? TOKEN_IDS.X3,
+          TOKEN_IDS[limitReceiveToken.symbol] ?? TOKEN_IDS.USDC,
+          amountIn,
+          limitPriceNum,
+          'limit',
+          (status) => {
+            setLimitOrderStatus(status);
+          }
+        );
+
+        if (result.status === 'finalized') {
+          setLimitOrderStatus({ type: 'finalized' });
+          setLimitSellAmount('');
+          setLimitPrice('');
+        }
+      } catch (err: any) {
+        setLimitOrderStatus({ type: 'failed', error: err.message });
+      }
+    }, [limitSellAmount, limitPrice, limitSellToken, limitReceiveToken, walletAddress]);
+
+  const renderLimits = () => {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
+        <div className="bg-[#111111] border border-[#1a1a1a] rounded-xl p-6">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Zap size={18} className="text-orange-400" />
+            Limit Order
+          </h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-400 mb-2 block">Sell Token</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{limitSellToken.icon}</span>
+                  <span className="text-sm font-semibold text-white">{limitSellToken.symbol}</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-2 block">Receive Token</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{limitReceiveToken.icon}</span>
+                  <span className="text-sm font-semibold text-white">{limitReceiveToken.symbol}</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Amount to Sell</label>
+              <input
+                type="number"
+                placeholder={`0.00 ${limitSellToken.symbol}`}
+                value={limitSellAmount}
+                onChange={(e) => setLimitSellAmount(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white focus:outline-none focus:border-orange-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Limit Price ({limitReceiveToken.symbol})</label>
+              <input
+                type="number"
+                placeholder="3100.00"
+                value={limitPrice}
+                onChange={(e) => setLimitPrice(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white focus:outline-none focus:border-orange-500"
+              />
+            </div>
+            {limitOrderStatus.type !== 'idle' && (
+              <div className={clsx(
+                'p-3 rounded-lg text-sm flex items-center gap-2',
+                limitOrderStatus.type === 'submitting' ? 'bg-orange-500/20 text-orange-300' :
+                limitOrderStatus.type === 'finalized' ? 'bg-green-500/20 text-green-300' :
+                'bg-red-500/20 text-red-300'
+              )}>
+                {limitOrderStatus.type === 'submitting' && <Loader2 size={14} className="animate-spin" />}
+                {limitOrderStatus.type === 'finalized' && <CheckCircle2 size={14} />}
+                {limitOrderStatus.type === 'failed' && <XCircle size={14} />}
+                <span>{limitOrderStatus.type === 'finalized' ? 'Order placed successfully!' : limitOrderStatus.type === 'failed' ? limitOrderStatus.error : 'Placing order...'}</span>
+              </div>
+            )}
+            <button
+              onClick={handlePlaceLimitOrder}
+              disabled={limitOrderStatus.type === 'submitting' || !limitSellAmount || !limitPrice}
+              className={clsx(
+                'w-full py-3 rounded-lg font-bold transition-colors',
+                limitOrderStatus.type === 'submitting'
+                  ? 'bg-orange-500/40 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white shadow-lg shadow-orange-500/20'
+              )}
+            >
+              {limitOrderStatus.type === 'submitting' ? (
+                <><Loader2 size={16} className="animate-spin" /> Placing Order...</>
+              ) : (
+                <><Zap size={16} /> Place Limit Order</>
+              )}
+            </button>
           </div>
-          <div>
-            <label className="text-xs text-gray-400 mb-2 block">Receive Token</label>
-            <div className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm">USDC at <input type="number" placeholder="3100" className="w-24 bg-transparent text-green-400 focus:outline-none" /></div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4">
+          <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+            <Clock size={14} className="text-gray-400" />
+            Active Limit Orders
+          </h4>
+          <div className="space-y-2 text-xs text-gray-400">
+            <div className="flex justify-between p-3 bg-[#111111] rounded border border-[#1a1a1a]">
+              <span>Buy 1 WETH @ $3,100 USDC</span>
+              <span className="text-yellow-400">⏳ Pending</span>
+            </div>
+            <div className="flex justify-between p-3 bg-[#111111] rounded border border-[#1a1a1a]">
+              <span>Sell 5 SOL @ $145 USDC</span>
+              <span className="text-green-400">✓ Filled</span>
+            </div>
           </div>
-          <button className="w-full bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 text-orange-400 font-bold py-3 rounded-lg transition-colors">
-            📌 Place Limit Order
-          </button>
         </div>
       </div>
-      <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4">
-        <h4 className="text-sm font-bold mb-3">Active Limit Orders</h4>
-        <div className="space-y-2 text-xs text-gray-400">
-          <div className="flex justify-between p-2 bg-[#111111] rounded">
-            <span>Buy 1 WETH @ $3,100 USDC</span>
-            <span className="text-yellow-400">⏳ Pending</span>
-          </div>
-          <div className="flex justify-between p-2 bg-[#111111] rounded">
-            <span>Sell 5 SOL @ $145 USDC</span>
-            <span className="text-green-400">✓ Filled</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderAdvanced = () => (
     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in">

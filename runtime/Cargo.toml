@@ -210,7 +210,6 @@ runtime-benchmarks = [
 	"pallet-x3-oracle/runtime-benchmarks",
 	"pallet-x3-vrf/runtime-benchmarks",
 	"pallet-x3-dex/runtime-benchmarks",
-	"pallet-svm/runtime-benchmarks",
 	"pallet-swarm/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]

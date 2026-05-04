@@ -5,20 +5,26 @@
 //!
 //! ## Ticket coverage
 //! - TICKET-4.5-001: Core type definitions (`types.rs`) — implemented
-//! - TICKET-4.5-002: Vault storage and band invariants — TODO
-//! - TICKET-4.5-003: Lane storage and freeze mechanics — TODO
-//! - TICKET-4.5-004: Inventory reserve and release — TODO
-//! - TICKET-4.5-006: Global and lane unsettled notional tracking — TODO
+//! - TICKET-4.5-002: Vault storage and band invariants — implemented
+//! - TICKET-4.5-003: Lane storage and freeze mechanics — implemented
+//! - TICKET-4.5-004: Inventory reserve and release — implemented
+//! - TICKET-4.5-006: Global and lane unsettled notional tracking — implemented
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod inventory;
 pub mod types;
+pub mod weights;
+
+pub use weights::WeightInfo;
 
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;
 
 pub use pallet::*;
 
@@ -26,6 +32,7 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
     use super::types::*;
+    use super::weights::WeightInfo;
     use frame_support::{pallet_prelude::*, traits::Get, BoundedVec};
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::{Saturating, Zero};
@@ -53,6 +60,9 @@ pub mod pallet {
 
         #[pallet::constant]
         type MaxLiquiditySources: Get<u32>;
+
+        /// Weight information for the extrinsics in this pallet
+        type WeightInfo: WeightInfo;
     }
 
     // -----------------------------------------------------------------------
@@ -189,7 +199,7 @@ pub mod pallet {
         // --- Vault lifecycle ---
 
         #[pallet::call_index(0)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::create_vault())]
         pub fn create_vault(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -241,7 +251,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(1)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::update_vault_bands())]
         pub fn update_vault_bands(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -273,7 +283,7 @@ pub mod pallet {
         // --- Lane lifecycle ---
 
         #[pallet::call_index(2)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::register_lane())]
         pub fn register_lane(
             origin: OriginFor<T>,
             lane_id: LaneId,
@@ -314,7 +324,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(3)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::freeze_lane())]
         pub fn freeze_lane(
             origin: OriginFor<T>,
             lane_id: LaneId,
@@ -332,7 +342,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(4)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::unfreeze_lane())]
         pub fn unfreeze_lane(
             origin: OriginFor<T>,
             lane_id: LaneId,
@@ -357,7 +367,7 @@ pub mod pallet {
         /// Reserve `amount` from `available_balance` into `reserved_balance`.
         /// Rejects if vault is frozen or available balance is insufficient.
         #[pallet::call_index(5)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::reserve_inventory())]
         pub fn reserve_inventory(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -369,7 +379,7 @@ pub mod pallet {
 
         /// Release `amount` from `reserved_balance` back to `available_balance`.
         #[pallet::call_index(6)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::release_inventory())]
         pub fn release_inventory(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -381,7 +391,7 @@ pub mod pallet {
 
         /// Move `amount` from `available_balance` to `pending_out_balance` (funds in flight).
         #[pallet::call_index(7)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::record_pending_out())]
         pub fn record_pending_out(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -393,7 +403,7 @@ pub mod pallet {
 
         /// Confirm settlement: reduce `pending_out_balance` by `amount`.
         #[pallet::call_index(8)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::confirm_settlement())]
         pub fn confirm_settlement(
             origin: OriginFor<T>,
             vault_id: VaultId,
@@ -405,7 +415,7 @@ pub mod pallet {
 
         /// Fund a vault from treasury — adds to `available_balance`.
         #[pallet::call_index(9)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::fund_vault())]
         pub fn fund_vault(
             origin: OriginFor<T>,
             vault_id: VaultId,

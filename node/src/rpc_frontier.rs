@@ -850,6 +850,38 @@ where
         }))
     })?;
 
+    // eth_getTransactionLogs — returns EVM logs for a specific transaction by hash
+    let c = client.clone();
+    module.register_method("eth_getTransactionLogs", move |params, _| {
+        let tx_hash_hex: String = params.one()?;
+        let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
+        let tx_hash_bytes = hex::decode(stripped)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+        if tx_hash_bytes.len() != 32 {
+            return Err(jsonrpsee::core::Error::Custom(
+                "Transaction hash must be 32 bytes".into(),
+            ));
+        }
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let logs_bytes: Vec<Vec<u8>> = api
+            .get_evm_transaction_logs(at, tx_hash_bytes)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        let logs: Vec<serde_json::Value> = logs_bytes.iter()
+            .filter_map(|bytes| {
+                use codec::Decode;
+                let log = pallet_x3_kernel::ExecutionLog::decode(&mut &bytes[..]).ok()?;
+                Some(serde_json::json!({
+                    "address": format!("0x{}", hex::encode(&log.address)),
+                    "topics": log.topics.iter().map(|t| format!("0x{}", hex::encode(t.as_bytes()))).collect::<Vec<_>>(),
+                    "data": format!("0x{}", hex::encode(&log.data)),
+                    "blockNumber": format!("0x{:x}", log.block_number)
+                }))
+            })
+            .collect();
+        Ok(serde_json::Value::Array(logs))
+    })?;
+
     Ok(module)
 }
 
@@ -1084,6 +1116,114 @@ where
             .get_svm_transaction_count(at, bytes)
             .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
         Ok(serde_json::json!({ "value": count }))
+    })?;
+
+    // svm_deployContract — deploys a new EVM contract with the given bytecode
+    let c = client.clone();
+    module.register_method("svm_deployContract", move |params, _| {
+        let (caller_hex, bytecode_hex, gas_limit): (String, String, u64) = params.parse()?;
+        let caller_bytes = if caller_hex.is_empty() || caller_hex == "0x" {
+            None
+        } else {
+            Some(decode_address(&caller_hex)?)
+        };
+        let bytecode_stripped = bytecode_hex.strip_prefix("0x").unwrap_or(&bytecode_hex);
+        let bytecode = hex::decode(bytecode_stripped)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid bytecode: {}", e)))?;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let result: Result<Vec<u8>, Vec<u8>> = api
+            .deploy_evm_contract(at, caller_bytes, bytecode, gas_limit)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        match result {
+            Ok(contract_address) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(contract_address)))),
+            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+                "Contract deployment failed: {}",
+                String::from_utf8_lossy(&err)
+            ))),
+        }
+    })?;
+
+    // svm_getContractReceipt — returns the EVM contract creation receipt
+    let c = client.clone();
+    module.register_method("svm_getContractReceipt", move |params, _| {
+        let contract_address_hex: String = params.one()?;
+        let contract_address_bytes = decode_address(&contract_address_hex)?;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let receipt_opt: Option<Vec<u8>> = api
+            .get_evm_contract_receipt(at, contract_address_bytes)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        match receipt_opt {
+            Some(receipt_bytes) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(receipt_bytes)))),
+            None => Ok(serde_json::Value::Null),
+        }
+    })?;
+
+    // svm_getProgramData — returns the SVM program data for a deployed SVM program
+    let c = client.clone();
+    module.register_method("svm_getProgramData", move |params, _| {
+        let pubkey_str: String = params.one()?;
+        let bytes = decode_svm_pubkey(&pubkey_str)?;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let program_data_opt: Option<Vec<u8>> = api
+            .get_svm_program_data(at, bytes)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        match program_data_opt {
+            Some(data) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(data)))),
+            None => Ok(serde_json::Value::Null),
+        }
+    })?;
+
+    // svm_getAccountData — returns the SVM account data for a SVM address
+    let c = client.clone();
+    module.register_method("svm_getAccountData", move |params, _| {
+        let pubkey_str: String = params.one()?;
+        let bytes = decode_svm_pubkey(&pubkey_str)?;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let account_data_opt: Option<Vec<u8>> = api
+            .get_svm_account_data(at, bytes)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        match account_data_opt {
+            Some(data) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(data)))),
+            None => Ok(serde_json::Value::Null),
+        }
+    })?;
+
+    // svm_getSlotHistory — returns the SVM slot history for recent blockhashes
+    let c = client.clone();
+    module.register_method("svm_getSlotHistory", move |params, _| {
+        let config: Option<serde_json::Value> = params.one().ok();
+        let limit = config
+            .as_ref()
+            .and_then(|v| v.get("limit"))
+            .and_then(|l| l.as_u64())
+            .unwrap_or(50) as u32;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let slot_history: Vec<u64> = api
+            .get_svm_slot_history(at, limit)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        Ok(serde_json::json!({ "slots": slot_history.iter().map(|s| format!("0x{:x}", s)).collect::<Vec<_>>() }))
+    })?;
+
+    // svm_getRecentBlockhashes — returns the SVM recent blockhashes
+    let c = client.clone();
+    module.register_method("svm_getRecentBlockhashes", move |params, _| {
+        let config: Option<serde_json::Value> = params.one().ok();
+        let limit = config
+            .as_ref()
+            .and_then(|v| v.get("limit"))
+            .and_then(|l| l.as_u64())
+            .unwrap_or(50) as u32;
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+        let blockhashes: Vec<sp_core::H256> = api
+            .get_svm_recent_blockhashes(at, limit)
+            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        Ok(serde_json::json!({ "blockhashes": blockhashes.iter().map(|bh| format!("0x{}", hex::encode(bh.as_bytes()))).collect::<Vec<_>>() }))
     })?;
 
     Ok(module)

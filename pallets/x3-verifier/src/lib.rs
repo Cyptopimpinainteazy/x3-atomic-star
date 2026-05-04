@@ -730,16 +730,33 @@ pub mod pallet {
 
             let msg_hash = keccak_256(&msg);
 
-            // In production, verify against executor's public key
-            // For now, we do a basic length check
-            if receipt.signature.len() != 64 {
+            // Verify signature length for secp256k1 ECDSA (65 bytes: r, s, v)
+            if receipt.signature.len() != 65 {
                 return Err(Error::<T>::InvalidSignature.into());
             }
 
-            // Placeholder for actual signature verification
-            // Would use sp_io::crypto::secp256k1_ecdsa_recover or similar
-            let _signature_bytes = receipt.signature.as_slice();
-            let _message = H256::from(msg_hash);
+            // Recover the public key from the signature
+            let signature_bytes: [u8; 65] = receipt.signature.as_slice().try_into()
+                .map_err(|_| Error::<T>::InvalidSignature)?;
+            // msg_hash is already [u8; 32] from keccak_256 — use directly
+            let recovered_pk = sp_io::crypto::secp256k1_ecdsa_recover(&signature_bytes, &msg_hash)
+                .map_err(|_| Error::<T>::InvalidSignature)?;
+
+            // recovered_pk is 64-byte uncompressed XY coordinates (no 0x04 prefix).
+            // Derive AccountId via Ethereum-style: keccak256(XY)[12..] → 20-byte address,
+            // then pad to AccountId via blake2_256 for substrate compatibility.
+            let pk_hash = keccak_256(&recovered_pk);
+            // Last 20 bytes of keccak256(pubkey) = Ethereum address
+            let eth_addr = &pk_hash[12..]; // 20 bytes
+            // Derive substrate AccountId from the Ethereum address via blake2_256
+            let recovered_account_id_bytes = sp_io::hashing::blake2_256(eth_addr);
+            let recovered_account = T::AccountId::decode(&mut &recovered_account_id_bytes[..])
+                .map_err(|_| Error::<T>::InvalidSignature)?;
+
+            // Compare the recovered AccountId with the executor in the receipt
+            if recovered_account != receipt.executor {
+                return Err(Error::<T>::InvalidSignature.into());
+            }
 
             Ok(())
         }

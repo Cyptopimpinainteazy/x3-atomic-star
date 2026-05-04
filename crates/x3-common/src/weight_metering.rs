@@ -28,6 +28,8 @@
 
 use sp_std::vec::Vec;
 
+use crate::signing::KeyType;
+
 /// Error type for weight metering operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeightError {

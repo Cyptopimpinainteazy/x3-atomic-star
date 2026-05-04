@@ -22,7 +22,8 @@
 //! assert!(signature.verify(b"hello world", &public_key));
 //! ```
 
-use sp_core::{ed25519, sr25519, Pair, H256};
+use sp_core::{ed25519, sr25519, Pair};
+use sp_core::crypto::Ss58Codec;
 use sp_io::hashing::{blake2_256, keccak_256};
 use sp_runtime::traits::Verify;
 
@@ -117,7 +118,10 @@ impl Signature {
             }
             (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) => {
                 // EVM uses secp256k1_ecdsa_recover with 65-byte signature (r, s, v)
-                sp_io::crypto::secp256k1_ecdsa_recover(sig, &blake2_256(message)).is_ok()
+                match sp_io::crypto::secp256k1_ecdsa_recover(sig, &blake2_256(message)) {
+                    Ok(recovered) => recovered.as_ref() == &pk[1..],
+                    Err(_) => false,
+                }
             }
             (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) => {
                 sr25519::Signature::verify(sig, message, pk)
@@ -130,13 +134,16 @@ impl Signature {
     pub fn verify_hash(&self, message_hash: &[u8; 32], public_key: &PublicKey) -> bool {
         match (self, public_key) {
             (Signature::Ed25519(sig), PublicKey::Ed25519(pk)) => {
-                ed25519::Signature::verify(sig, message_hash, pk)
+                ed25519::Signature::verify(sig, &message_hash[..], pk)
             }
             (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) => {
-                sp_io::crypto::secp256k1_ecdsa_recover(sig, message_hash).is_ok()
+                match sp_io::crypto::secp256k1_ecdsa_recover(sig, message_hash) {
+                    Ok(recovered) => recovered.as_ref() == &pk[1..],
+                    Err(_) => false,
+                }
             }
             (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) => {
-                sr25519::Signature::verify(sig, message_hash, pk)
+                sr25519::Signature::verify(sig, &message_hash[..], pk)
             }
             _ => false,
         }
@@ -180,7 +187,7 @@ pub struct Ed25519Signer {
 impl Ed25519Signer {
     /// Generate a new ed25519 keypair
     pub fn generate() -> Self {
-        let (pair, _) = ed25519::Pair::generate_with_phrase(None);
+        let (pair, _, _) = ed25519::Pair::generate_with_phrase(None);
         let public_key = pair.public();
         Self { pair, public_key }
     }
@@ -238,12 +245,12 @@ pub struct Secp256k1Signer {
 impl Secp256k1Signer {
     /// Generate a new secp256k1 keypair
     pub fn generate() -> Self {
-        use secp256k1::{rand::thread_rng, KeyPair, Secp256k1};
+        use secp256k1::{rand::thread_rng, Secp256k1};
 
         let secp = Secp256k1::new();
-        let keypair = KeyPair::new(&secp, &mut thread_rng());
-        let secret_key = keypair.secret_key().secret_bytes();
-        let public_key = keypair.public_key().serialize_uncompressed();
+        let (secret_key, public_key) = secp.generate_keypair(&mut thread_rng());
+        let secret_key = secret_key.secret_bytes();
+        let public_key = public_key.serialize_uncompressed();
 
         let mut pk = [0u8; 65];
         pk.copy_from_slice(&public_key);
@@ -253,11 +260,11 @@ impl Secp256k1Signer {
 
     /// Create a signer from a secret key (32 bytes)
     pub fn from_secret_key(secret: &[u8; 32]) -> Result<Self, &'static str> {
-        use secp256k1::{KeyPair, Secp256k1};
+        use secp256k1::{Secp256k1, SecretKey};
 
         let secp = Secp256k1::new();
-        let keypair = KeyPair::from_secret_key(&secp, secret);
-        let public_key = keypair.public_key().serialize_uncompressed();
+        let secret_key = SecretKey::from_slice(secret).map_err(|_| "Invalid secret key")?;
+        let public_key = secret_key.public_key(&secp).serialize_uncompressed();
 
         let mut pk = [0u8; 65];
         pk.copy_from_slice(&public_key);
@@ -292,9 +299,7 @@ impl Signer for Secp256k1Signer {
         let message_hash = blake2_256(message);
         let message = Message::from_digest_slice(&message_hash).unwrap();
         let secret_key = secp256k1::SecretKey::from_slice(&self.secret_key).unwrap();
-        let keypair = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
-
-        let signature = secp.sign_ecdsa(&message, &keypair);
+        let signature = secp.sign_ecdsa(&message, &secret_key);
         let mut sig_bytes = [0u8; 65];
         let compact = signature.serialize_compact();
         sig_bytes[..32].copy_from_slice(&compact[..32]);
@@ -310,9 +315,7 @@ impl Signer for Secp256k1Signer {
         let secp = Secp256k1::new();
         let message = Message::from_digest_slice(message_hash).unwrap();
         let secret_key = secp256k1::SecretKey::from_slice(&self.secret_key).unwrap();
-        let keypair = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
-
-        let signature = secp.sign_ecdsa(&message, &keypair);
+        let signature = secp.sign_ecdsa(&message, &secret_key);
         let mut sig_bytes = [0u8; 65];
         let compact = signature.serialize_compact();
         sig_bytes[..32].copy_from_slice(&compact[..32]);
@@ -337,7 +340,7 @@ pub struct Sr25519Signer {
 impl Sr25519Signer {
     /// Generate a new sr25519 keypair
     pub fn generate() -> Self {
-        let (pair, _) = sr25519::Pair::generate_with_phrase(None);
+        let (pair, _, _) = sr25519::Pair::generate_with_phrase(None);
         let public_key = pair.public();
         Self { pair, public_key }
     }
@@ -410,12 +413,19 @@ pub fn verify_signature(
             ed25519::Signature::verify(&sig, message, &pk)
         }
         KeyType::Secp256k1 => {
+            // secp256k1_ecdsa_recover returns 64-byte uncompressed key (no 0x04 prefix).
+            // public_key is expected to be 65 bytes (uncompressed with 0x04 prefix).
             if signature.len() != 65 || public_key.len() != 65 {
                 return false;
             }
             let mut sig = [0u8; 65];
             sig.copy_from_slice(signature);
-            sp_io::crypto::secp256k1_ecdsa_recover(&sig, &blake2_256(message)).is_ok()
+            let mut pk = [0u8; 64];
+            pk.copy_from_slice(&public_key[1..]); // skip 0x04 prefix
+            match sp_io::crypto::secp256k1_ecdsa_recover(&sig, &blake2_256(message)) {
+                Ok(recovered) => recovered.as_ref() == pk.as_ref(),
+                Err(_) => false,
+            }
         }
         KeyType::Sr25519 => {
             if signature.len() != 64 || public_key.len() != 32 {
@@ -458,15 +468,22 @@ pub fn verify_signature_hash(
                 buf.copy_from_slice(public_key);
                 buf
             });
-            ed25519::Signature::verify(&sig, message_hash, &pk)
+            ed25519::Signature::verify(&sig, &message_hash[..], &pk)
         }
         KeyType::Secp256k1 => {
+            // secp256k1_ecdsa_recover returns 64-byte uncompressed key (no 0x04 prefix).
+            // public_key is expected to be 65 bytes (uncompressed with 0x04 prefix).
             if signature.len() != 65 || public_key.len() != 65 {
                 return false;
             }
             let mut sig = [0u8; 65];
             sig.copy_from_slice(signature);
-            sp_io::crypto::secp256k1_ecdsa_recover(&sig, message_hash).is_ok()
+            let mut pk = [0u8; 64];
+            pk.copy_from_slice(&public_key[1..]); // skip 0x04 prefix
+            match sp_io::crypto::secp256k1_ecdsa_recover(&sig, message_hash) {
+                Ok(recovered) => recovered.as_ref() == pk.as_ref(),
+                Err(_) => false,
+            }
         }
         KeyType::Sr25519 => {
             if signature.len() != 64 || public_key.len() != 32 {
@@ -482,7 +499,7 @@ pub fn verify_signature_hash(
                 buf.copy_from_slice(public_key);
                 buf
             });
-            sr25519::Signature::verify(&sig, message_hash, &pk)
+            sr25519::Signature::verify(&sig, &message_hash[..], &pk)
         }
     }
 }

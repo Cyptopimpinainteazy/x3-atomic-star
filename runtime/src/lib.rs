@@ -145,8 +145,8 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     spec_name: create_runtime_str!("x3-chain"),
     impl_name: create_runtime_str!("x3-chain"),
     authoring_version: 1,
-    // v7: added EvmTransactionReceipts storage, get_evm_transaction/receipt/logs runtime API methods, chain_id() method, and 5 ETH RPC client-side methods
-    spec_version: 7,
+    // v9: added 6 missing AtlasKernelApi trait methods + 3 receipt/log runtime API methods
+    spec_version: 9,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -2495,44 +2495,21 @@ impl_runtime_apis! {
     
         fn get_evm_logs(filter: Vec<u8>) -> Vec<Vec<u8>> {
             use codec::{Decode, Encode};
-            use sp_core::H160;
-            
-            // Try to decode as SCALE-encoded tuple (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
-            // If that fails, try the old concatenated format for backward compatibility
-            let (from_block, to_block, address_filter) = match <(u64, u64, Option<[u8; 20]>)>::decode(&mut &filter[..]) {
-                Ok(d) => d,
-                Err(_) => {
-                    // Fallback to old concatenated format: [from_block(8 LE)] [to_block(8 LE)] [address(20, optional)]
-                    if filter.len() < 16 {
-                        return vec![];
-                    }
-                    let from_block = u64::from_le_bytes(filter[0..8].try_into().unwrap_or([0u8; 8]));
-                    let to_block = u64::from_le_bytes(filter[8..16].try_into().unwrap_or([0u8; 8]));
-                    let address_filter = if filter.len() >= 36 {
-                        let mut addr = [0u8; 20];
-                        addr.copy_from_slice(&filter[16..36]);
-                        Some(addr)
-                    } else {
-                        None
-                    };
-                    (from_block, to_block, address_filter)
-                }
-            };
+            let (_from_block, _to_block, address_filter) =
+                match <(u64, u64, Option<[u8; 20]>)>::decode(&mut &filter[..]) {
+                    Ok(decoded) => decoded,
+                    Err(_) => return Vec::new(),
+                };
     
             let mut logs = Vec::new();
             for (_, receipt) in pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::iter() {
-                // Apply block range filter and address filter
                 for log in &receipt.logs {
-                    // Check if log's block_number is within range
-                    if log.block_number >= from_block && log.block_number <= to_block {
-                        // Apply address filter if provided
-                        if let Some(addr_bytes) = &address_filter {
-                            if log.address == *addr_bytes {
-                                logs.push(log.encode());
-                            }
-                        } else {
+                    if let Some(addr_bytes) = address_filter {
+                        if log.address == addr_bytes.to_vec() {
                             logs.push(log.encode());
                         }
+                    } else {
+                        logs.push(log.encode());
                     }
                 }
             }
@@ -2550,6 +2527,147 @@ impl_runtime_apis! {
         fn chain_id() -> u64 {
             // Return the chain ID from the runtime configuration
             650_000u64
+        }
+
+        fn get_svm_slot() -> u64 {
+            // Return the current SVM slot (equivalent to block number in Solana)
+            SystemPallet::<Runtime>::block_number() as u64
+        }
+
+        fn get_svm_blockhash(slot: u64) -> Option<H256> {
+            // Return the SVM blockhash for a given slot
+            pallet_x3_kernel::SvmBlockhashes::<Runtime>::get(&slot)
+        }
+
+        fn get_svm_transaction_count(svm_pubkey: Vec<u8>) -> u64 {
+            // Return the SVM transaction count for an address
+            use codec::Decode;
+            if svm_pubkey.len() != 32 { return 0; }
+            let Ok(account_id) = AccountId::decode(&mut &svm_pubkey[..]) else { return 0; };
+            frame_system::Pallet::<Runtime>::account_nonce(&account_id) as u64
+        }
+
+        fn get_svm_slot_by_blockhash(blockhash: H256) -> Option<u64> {
+            // Return the SVM slot number for a given blockhash (reverse lookup)
+            pallet_x3_kernel::SvmBlockhashSlots::<Runtime>::get(&blockhash)
+        }
+
+        fn deploy_evm_contract(caller: Option<Vec<u8>>, bytecode: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>> {
+            // Deploy a new EVM contract with the given bytecode
+            use sp_io::hashing::keccak_256;
+            use fp_evm::ExitReason;
+            use pallet_evm::Runner;
+            use sp_core::{H160, H256, U256};
+            use sp_runtime::traits::BlakeTwo256;
+
+            let caller_addr = caller
+                .and_then(|c| {
+                    if c.len() == 20 {
+                        let mut bytes = [0u8; 20];
+                        bytes.copy_from_slice(&c[..20]);
+                        Some(H160::from(bytes))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(H160::zero);
+
+            let effective_gas = if gas_limit == 0 { 10_000_000u64 } else { gas_limit };
+            let evm_config = fp_evm::Config::shanghai();
+
+            let result = <Runtime as pallet_evm::Config>::Runner::create(
+                caller_addr,
+                bytecode,
+                U256::zero(),
+                effective_gas,
+                Some(U256::from(NATIVE_GAS_PRICE)),
+                None,
+                None,
+                Vec::new(),
+                false,
+                false,
+                None,
+                None,
+                &evm_config,
+            );
+
+            match result {
+                Ok(info) => match info.exit_reason {
+                    ExitReason::Succeed(_) => {
+                        // Contract creation succeeded, return the contract address
+                        Ok(info.value.to_vec())
+                    }
+                    ExitReason::Revert(_) => {
+                        Err(info.value)
+                    }
+                    ExitReason::Error(_) | ExitReason::Fatal(_) => {
+                        Err(b"EVM contract deployment failed".to_vec())
+                    }
+                },
+                Err(_) => Err(b"EVM runner deployment failed".to_vec()),
+            }
+        }
+
+        fn get_evm_contract_receipt(contract_address: Vec<u8>) -> Option<Vec<u8>> {
+            // Get the EVM contract creation receipt
+            use sp_core::H160;
+            if contract_address.len() != 20 { return None; }
+            let mut addr = [0u8; 20];
+            addr.copy_from_slice(&contract_address[..20]);
+            let contract_addr = H160::from(addr);
+
+            // Get all receipts and find the one with this contract address as the 'to' field
+            for (_, receipt) in pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::iter() {
+                if receipt.to == contract_addr.as_bytes().to_vec() && receipt.success {
+                    // This is a successful contract creation receipt
+                    return Some(receipt.encode());
+                }
+            }
+            None
+        }
+
+        fn get_svm_program_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
+            // Get the SVM program bytecode for a deployed program address
+            use sp_core::H160;
+            // SVM programs are stored via pallet_evm::AccountCodes — try EVM code store first
+            if svm_pubkey.len() == 20 {
+                let mut addr_bytes = [0u8; 20];
+                addr_bytes.copy_from_slice(&svm_pubkey[..20]);
+                let addr = H160::from(addr_bytes);
+                let code = pallet_evm::AccountCodes::<Runtime>::get(addr);
+                if !code.is_empty() {
+                    return Some(code);
+                }
+            }
+            None
+        }
+
+        fn get_svm_account_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
+            // Get the SVM account data for a SVM address
+            use codec::Decode;
+            if svm_pubkey.len() != 32 { return None; }
+            let Ok(account_id) = AccountId::decode(&mut &svm_pubkey[..]) else { return None; };
+            // Return account data including balance and nonce
+            let balance = pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &0u32);
+            let nonce = frame_system::Pallet::<Runtime>::account_nonce(&account_id);
+            let mut data = Vec::new();
+            data.extend_from_slice(&balance.encode());
+            data.extend_from_slice(&nonce.encode());
+            Some(data)
+        }
+
+        fn get_svm_slot_history(limit: u32) -> Vec<u64> {
+            // Get the SVM slot history, capped to avoid unbounded response.
+            const MAX_RECENT_BLOCKHASHES: u32 = 150;
+            let cap = limit.min(MAX_RECENT_BLOCKHASHES) as usize;
+            pallet_x3_kernel::SvmBlockhashes::<Runtime>::iter_keys().take(cap).collect()
+        }
+
+        fn get_svm_recent_blockhashes(limit: u32) -> Vec<H256> {
+            // Get the SVM recent blockhashes, capped to avoid unbounded response.
+            const MAX_RECENT_BLOCKHASHES: u32 = 150;
+            let cap = limit.min(MAX_RECENT_BLOCKHASHES) as usize;
+            pallet_x3_kernel::SvmBlockhashes::<Runtime>::iter().map(|(_, h)| h).take(cap).collect()
         }
     }
 

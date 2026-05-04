@@ -351,9 +351,11 @@ impl EvmFinalityVerifier {
         hasher.update(message);
         let message_hash = hasher.finalize();
 
-        // In no_std mode, we verify the structure is correct
-        // Actual BLS verification requires heap allocation which is not available
-        Ok(true)
+        // In no_std mode, BLS verification requires heap allocation which is not available
+        // This is a known limitation - use std feature for actual signature verification
+        Err(DispatchError::Other(
+            b"BLS verification requires std feature".to_vec(),
+        ))
     }
 
     /// Verify state root matches expected value
@@ -631,9 +633,11 @@ impl SvmFinalityVerifier {
 
         #[cfg(not(feature = "std"))]
         {
-            // In no_std mode, we verify the structure is correct
-            // Actual ed25519 verification requires heap allocation which is not available
-            Ok(true)
+            // In no_std mode, ed25519 verification requires heap allocation which is not available
+            // This is a known limitation - use std feature for actual signature verification
+            Err(DispatchError::Other(
+                b"Ed25519 verification requires std feature".to_vec(),
+            ))
         }
     }
 

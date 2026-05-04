@@ -1145,9 +1145,808 @@ class X3ChainService {
     const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '');
     return fracStr ? `${whole}.${fracStr}` : whole.toString();
   }
-}
+
+// ─── DEX Methods (Step 1: Pool Management) ────────────────────────────────────
+
+  /**
+   * Create a new liquidity pool
+   */
+  async createPool(
+    signer: string | { address: string },
+    tokenA: string,
+    tokenB: string,
+    feeBps: number,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const createTx = (api.tx as any).x3Dex.createPool(tokenA, tokenB, feeBps);
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        createTx,
+        onStatus ?? (() => {}),
+      );
+
+      // Extract batchId from TradeBatchCreated event if present
+      const batchEvent = result.events?.find?.((e: any) =>
+        e.event?.section === 'atomicTradeEngine' && e.event?.method === 'TradeBatchCreated'
+      );
+      const batchId = batchEvent?.event?.data?.[0]?.toString?.() ?? result.blockHash;
+
+      const receipt: TradeReceipt = {
+        batchId,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Add liquidity to an existing pool
+   */
+  async addLiquidity(
+    signer: string | { address: string },
+    poolId: string,
+    amountADesired: bigint,
+    amountBDesired: bigint,
+    amountAMin: bigint,
+    amountBMin: bigint,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const addTx = (api.tx as any).x3Dex.addLiquidity(
+        poolId,
+        amountADesired.toString(),
+        amountBDesired.toString(),
+        amountAMin.toString(),
+        amountBMin.toString(),
+      );
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        addTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Remove liquidity from a pool position
+   */
+  async removeLiquidity(
+    signer: string | { address: string },
+    positionId: string,
+    lpAmount: bigint,
+    amountAMin: bigint,
+    amountBMin: bigint,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const removeTx = (api.tx as any).x3Dex.removeLiquidity(
+        positionId,
+        lpAmount.toString(),
+        amountAMin.toString(),
+        amountBMin.toString(),
+      );
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        removeTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Get user's LP positions
+   */
+  async getUserLPPositions(address: string): Promise<{ positionId: string; poolId: string; lpAmount: bigint }[]> {
+    const api = await this.getApi();
+
+    try {
+      const entries = await (api.query as any).x3Dex.lpPositions.entries();
+      return entries
+        .filter(([key, _value]: [any, any]) => {
+          // lpPositions key: (owner, poolId) => owner is args[0]
+          const owner = key.args?.[0]?.toString?.() ?? '';
+          return owner.toLowerCase() === address.toLowerCase();
+        })
+        .map(([key, value]: [any, any]) => ({
+          positionId: key.args?.[1]?.toString?.() ?? '',  // poolId is args[1]
+          poolId: key.args?.[1]?.toString?.() ?? '',
+          lpAmount: this._toBigInt(value?.lpAmount ?? value?.amount ?? 0) ?? 0n,
+        }));
+    } catch (err: any) {
+      console.warn('[X3Chain] getUserLPPositions query failed', err?.message ?? err);
+      return [];
+    }
+  }
+
+// ─── DEX Methods (Step 1: Orderbook) ──────────────────────────────────────────
+
+  /**
+   * Subscribe to orders for a trading pair
+   */
+  subscribeOrders(
+    pair: string,
+    callback: (orders: { id: string; price: number; size: number; side: 'buy' | 'sell' }[]) => void,
+  ): () => void {
+    let unsubPromise: Promise<any> | null = null;
+
+    unsubPromise = this.getApi().then(api => {
+      return api.query.system.events((events: any[]) => {
+        const orders: any[] = [];
+        events.forEach((record: any) => {
+          const { event } = record;
+          if (event.section === 'atomicTradeEngine' && event.method === 'TradeBatchCreated') {
+            try {
+              const batchId = event.data[0]?.toString?.() ?? '';
+              const tokenIn = event.data[2]?.toString?.() ?? '';
+              const tokenOut = event.data[3]?.toString?.() ?? '';
+              const pairKey = [tokenIn, tokenOut].sort().join('/');
+              if (pair && pairKey !== pair && tokenIn !== pair && tokenOut !== pair) return;
+              const price = Number(event.data[4]?.toString?.() ?? 0);
+              const size = Number(event.data[5]?.toString?.() ?? 0);
+              // Determine side from token direction: if tokenIn < tokenOut alphabetically it's a 'buy'
+              const side: 'buy' | 'sell' = tokenIn < tokenOut ? 'buy' : 'sell';
+
+              orders.push({
+                id: batchId,
+                price: price || 1.25,
+                size: size / 1e12,
+                side,
+              });
+            } catch (e) {
+              console.warn('[X3Chain] Failed to parse order event:', e);
+            }
+          }
+        });
+
+        if (orders.length > 0) {
+          callback(orders);
+        }
+      });
+    });
+
+    return () => {
+      unsubPromise?.then(unsub => { if (typeof unsub === 'function') unsub(); });
+    };
+  }
+
+  /**
+   * Place a limit order
+   */
+  async placeOrder(
+    signer: string | { address: string },
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: bigint,
+    limitPrice: number,
+    orderType: 'limit' | 'stop-loss' | 'twap',
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const legs: TradeLeg[] = [{
+        vmType: VmType.Cross,
+        tokenIn,
+        tokenOut,
+        amountIn,
+        minAmountOut: (amountIn * BigInt(Math.round(limitPrice * 1_000_000)) * 95n) / (100n * 1_000_000n),
+        deadline: 0,
+      }];
+
+      const createTx = (api.tx as any).atomicTradeEngine.createTradeBatch(
+        legs.map(leg => ({
+          ammProtocol: 'ConstantProduct',
+          vmType: leg.vmType === VmType.EVM ? 'Evm' : leg.vmType === VmType.SVM ? 'Svm' : leg.vmType === VmType.Cross ? 'CrossVm' : 'X3',
+          assetIn: leg.tokenIn,
+          assetOut: leg.tokenOut,
+          amountIn: leg.amountIn.toString(),
+          minAmountOut: leg.minAmountOut.toString(),
+          routeData: '0x',
+        })),
+        50, // default slippage
+        await this._getBlockDeadline(api, 30),
+        await this._getTradeNonce(api, signerAddress),
+      );
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        createTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Cancel an order
+   */
+  async cancelOrder(
+    signer: string | { address: string },
+    batchId: string,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const cancelTx = (api.tx as any).atomicTradeEngine.cancelTradeBatch(batchId);
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        cancelTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+// ─── DEX Methods (Step 1: Concentrated Liquidity) ─────────────────────────────
+
+  /**
+   * Get concentrated liquidity positions
+   */
+  async getConcentratedPositions(address: string): Promise<{ positionId: string; poolId: string; liquidity: bigint }[]> {
+    const api = await this.getApi();
+
+    try {
+      const result: any = await (api.rpc as any).x3.getConcentratedPositions?.(address);
+      if (!result) return [];
+
+      const json = this._asJson(result);
+      return Array.isArray(json) ? json.map((p: any) => ({
+        positionId: String(p.positionId ?? p.position_id ?? ''),
+        poolId: String(p.poolId ?? p.pool_id ?? ''),
+        liquidity: this._toBigInt(p.liquidity ?? p.amount ?? 0),
+      })) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Collect fees from a position
+   */
+  async collectFees(
+    signer: string | { address: string },
+    positionId: string,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const collectTx = (api.tx as any).x3Dex.collectFees(positionId);
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        collectTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+// ─── DEX Methods (Step 1: State Call Simulation) ──────────────────────────────
+
+  /**
+   * Dry run a swap via state_call RPC
+   */
+  async dryRunSwap(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: bigint,
+    slippageBps: number = 50,
+  ): Promise<SimulationResult> {
+    const api = await this.getApi();
+
+    try {
+      const result: any = await (api.rpc as any).state.call?.('AtomicTradeEngineApi_simulate_trade', [
+        tokenIn,
+        tokenOut,
+        amountIn.toString(),
+        slippageBps,
+      ]);
+
+      if (result) {
+        return this._parseSimulationResult(result);
+      }
+    } catch {
+      // Fallback to local simulation
+    }
+
+    return this._localSimulate(tokenIn, tokenOut, amountIn, slippageBps);
+  }
+
+// ─── DEX Methods (Step 1: LP NFT Marketplace) ─────────────────────────────────
+
+  /**
+   * Get LP NFTs
+   */
+  async getLpNfts(): Promise<{ assetId: string; name: string; symbol: string; totalSupply: bigint }[]> {
+    const api = await this.getApi();
+
+    try {
+      const entries = await (api.query as any).x3AssetRegistry.assets.entries();
+      return entries
+        .filter(([key, value]: [any, any]) => {
+          const json = this._asJson(value);
+          return json.assetType?.toString?.() === 'LiquidityPool' || json.asset_type === 'LiquidityPool';
+        })
+        .map(([key, value]: [any, any]) => ({
+          assetId: key.args?.[0]?.toString?.() ?? '',
+          name: String(value?.name ?? value?.metadata?.name ?? ''),
+          symbol: String(value?.symbol ?? value?.metadata?.symbol ?? ''),
+          totalSupply: this._toBigInt(value?.totalSupply ?? value?.total_supply ?? 0),
+        }));
+    } catch (err: any) {
+      console.warn('[X3Chain] getLpNfts query failed', err?.message ?? err);
+      return [];
+    }
+  }
+
+  /**
+   * Buy an LP NFT
+   */
+  async buyLpNft(
+    signer: string | { address: string },
+    assetId: string,
+    price: bigint,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const buyTx = (api.tx as any).atomicTradeEngine.createTradeBatch(
+        [{
+          ammProtocol: 'ConstantProduct',
+          vmType: 'X3',
+          assetIn: TOKEN_IDS.X3,
+          assetOut: assetId,
+          amountIn: price.toString(),
+          minAmountOut: (price * 95n / 100n).toString(),
+          routeData: '0x',
+        }],
+        50,
+        await this._getBlockDeadline(api, 30),
+        await this._getTradeNonce(api, signerAddress),
+      );
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        buyTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+// ─── DEX Methods (Step 1: Vesting) ────────────────────────────────────────────
+
+  /**
+   * Get vesting schedules for an address
+   */
+  async getVestingSchedules(address: string): Promise<{ assetId: string; startTime: number; endTime: number; amount: bigint }[]> {
+    const api = await this.getApi();
+
+    try {
+      const entries = await (api.query as any).x3Vesting.schedules.entries();
+      return entries
+        .filter(([key, value]: [any, any]) => {
+          const owner = key.args?.[0]?.toString?.() ?? '';
+          return owner.toLowerCase() === address.toLowerCase();
+        })
+        .map(([key, value]: [any, any]) => ({
+          assetId: key.args?.[1]?.toString?.() ?? '',
+          startTime: Number(value?.startTime ?? value?.start_time ?? 0),
+          endTime: Number(value?.endTime ?? value?.end_time ?? 0),
+          amount: this._toBigInt(value?.amount ?? value?.totalSupply ?? value?.total_supply ?? 0) ?? 0n,
+        }));
+    } catch (err: any) {
+      console.warn('[X3Chain] getVestingSchedules query failed', err?.message ?? err);
+      return [];
+    }
+  }
+
+  /**
+   * Claim vested tokens
+   */
+  async claimVested(
+    signer: string | { address: string },
+    assetId: string,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const claimTx = (api.tx as any).x3Vesting.claim(assetId);
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        claimTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+// ─── DEX Methods (Step 1: Strategy/Automation) ────────────────────────────────
+
+  /**
+   * Register a strategy
+   */
+  async registerStrategy(
+    signer: string | { address: string },
+    condition: string,
+    action: string,
+    maxFee: bigint,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const registerTx = (api.tx as any).x3Automation.registerTask(condition, action, maxFee.toString());
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        registerTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Cancel a strategy
+   */
+  async cancelStrategy(
+    signer: string | { address: string },
+    taskId: string,
+    onStatus?: (status: SwapStatus) => void,
+  ): Promise<TradeReceipt> {
+    const api = await this.getApi();
+    const signerAddress = typeof signer === 'string' ? signer : signer.address;
+
+    try {
+      const cancelTx = (api.tx as any).x3Automation.cancelTask(taskId);
+
+      const result = await this._signAndFinalize(
+        api,
+        signer,
+        signerAddress,
+        cancelTx,
+        onStatus ?? (() => {}),
+      );
+
+      const receipt: TradeReceipt = {
+        batchId: result.blockHash,
+        status: 'finalized',
+        txHash: result.blockHash,
+        blockNumber: result.blockNumber,
+        legsExecuted: 0,
+      };
+
+      onStatus?.({ type: 'finalized', receipt });
+      return receipt;
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      onStatus?.({ type: 'failed', error: msg });
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Get user's strategies
+   */
+  async getUserStrategies(address: string): Promise<{ taskId: string; condition: string; action: string; active: boolean }[]> {
+    const api = await this.getApi();
+
+    try {
+      const entries = await (api.query as any).x3Automation.accountTasks.entries();
+      return entries
+        .filter(([key, value]: [any, any]) => {
+          const owner = key.args?.[0]?.toString?.() ?? '';
+          return owner.toLowerCase() === address.toLowerCase();
+        })
+        .map(([key, value]: [any, any]) => ({
+          taskId: key.args?.[1]?.toString?.() ?? '',  // taskId is args[1], owner is args[0]
+          condition: String(value?.condition ?? value?.condition_data ?? ''),
+          action: String(value?.action ?? value?.action_data ?? ''),
+          active: Boolean(value?.active ?? value?.is_active ?? true),
+        }));
+    } catch (err: any) {
+      console.warn('[X3Chain] getUserStrategies query failed', err?.message ?? err);
+      return [];
+    }
+  }
+
+// ─── DEX Methods (Step 1: DePIN Marketplace) ──────────────────────────────────
+
+  /**
+   * Get marketplace listings
+   */
+  async getMarketplaceListings(): Promise<{ id: string; provider: string; jobType: string; price: bigint; gpuRequirements: string }[]> {
+    const api = await this.getApi();
+
+    try {
+      const pending = await (api.query as any).depinMarketplace.pendingOrders?.();
+      const providers = await (api.query as any).depinMarketplace.providers?.entries?.();
+
+      const listings: any[] = [];
+
+      if (pending && Array.isArray(pending)) {
+        pending.forEach((order: any) => {
+          listings.push({
+            id: String(order.id ?? order.orderId ?? ''),
+            provider: String(order.provider ?? order.providerId ?? ''),
+            jobType: String(order.jobType ?? order.job_type ?? ''),
+            price: this._toBigInt(order.price ?? order.amount ?? 0),
+            gpuRequirements: String(order.gpuRequirements ?? order.gpu_requirements ?? ''),
+          });
+        });
+      }
+
+      if (providers && Array.isArray(providers)) {
+        providers.forEach(([key, value]: [any, any]) => {
+          listings.push({
+            id: key.args?.[0]?.toString?.() ?? '',
+            provider: key.args?.[0]?.toString?.() ?? '',
+            jobType: 'compute',
+            price: this._toBigInt(value?.price ?? value?.rate ?? 0),
+            gpuRequirements: String(value?.gpuRequirements ?? value?.gpu_requirements ?? ''),
+          });
+        });
+      }
+
+      return listings;
+    } catch (err: any) {
+      console.warn('[X3Chain] getMarketplaceListings query failed', err?.message ?? err);
+      return [];
+    }
+  }
+
+  /**
+   * Subscribe to marketplace updates
+   */
+  subscribeToMarketplace(callback: (listings: any[]) => void): () => void {
+    let unsubPromise: Promise<any> | null = null;
+
+    unsubPromise = this.getApi().then(api => {
+      return api.query.system.events((events: any[]) => {
+        events.forEach((record: any) => {
+          const { event } = record;
+          if (event.section === 'depinMarketplace' && event.method === 'OrderCreated') {
+            try {
+              const listing = {
+                id: event.data[0]?.toString?.() ?? '',
+                provider: event.data[1]?.toString?.() ?? '',
+                jobType: event.data[2]?.toString?.() ?? '',
+                price: Number(event.data[3]?.toString?.() ?? 0),
+                gpuRequirements: event.data[4]?.toString?.() ?? '',
+              };
+              callback([listing]);
+            } catch (e) {
+              console.warn('[X3Chain] Failed to parse marketplace event:', e);
+            }
+          }
+        });
+      });
+    });
+
+    return () => {
+      unsubPromise?.then(unsub => { if (typeof unsub === 'function') unsub(); });
+    };
+  }
+
+// ─── DEX Methods (Step 1: MEV / Private Mempool) ──────────────────────────────
+
+  /**
+   * Get MEV stats
+   */
+  async getMevStats(): Promise<{ totalArbitrageProfits: bigint; sandwichAttempts: number; protectedTransactions: number } | null> {
+    const api = await this.getApi();
+
+    try {
+      const result: any = await (api.rpc as any).x3.getMevStats?.();
+      if (!result) return null;
+
+      const json = this._asJson(result);
+      return {
+        totalArbitrageProfits: this._toBigInt(json.totalArbitrageProfits ?? json.total_arbitrage_profits ?? 0),
+        sandwichAttempts: Number(json.sandwichAttempts ?? json.sandwich_attempts ?? 0),
+        protectedTransactions: Number(json.protectedTransactions ?? json.protected_transactions ?? 0),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+// ─── DEX Methods (Step 1: Backtesting) ────────────────────────────────────────
+
+  /**
+   * Get historical prices
+   */
+  async getHistoricalPrices(
+    tokenA: string,
+    tokenB: string,
+    fromBlock: number,
+    toBlock: number,
+  ): Promise<{ blockNumber: number; price: number }[]> {
+    const api = await this.getApi();
+
+    try {
+      const result: any = await (api.rpc as any).x3.getHistoricalPrices?.(tokenA, tokenB, fromBlock, toBlock);
+      if (!result) return [];
+
+      const json = this._asJson(result);
+      return Array.isArray(json) ? json.map((p: any) => ({
+        blockNumber: Number(p.blockNumber ?? p.block_number ?? 0),
+        price: Number(p.price ?? 0),
+      })) : [];
+    } catch {
+      return [];
+    }
+  }
 
 // ─── Export singleton ─────────────────────────────────────────────────────────
+}
 
 export const x3Chain = new X3ChainService();
 export default x3Chain;

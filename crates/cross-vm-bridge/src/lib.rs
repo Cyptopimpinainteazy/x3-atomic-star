@@ -38,9 +38,6 @@ mod attack_arbitrage;
 /// types in this file remain valid and will be migrated in a later patch.
 pub mod canonical;
 
-// Cross-VM Bridge Finality Verifier for EVM and SVM
-pub mod bridge;
-
 pub use canonical::{
     CrossVmCall, CrossVmPayload, CrossVmReceipt, CrossVmStatus, VmId, CALL_HASH_DOMAIN,
     CROSS_VM_CALL_VERSION, MAX_CROSS_VM_DEADLINE_BLOCKS, MAX_CROSS_VM_PAYLOAD,

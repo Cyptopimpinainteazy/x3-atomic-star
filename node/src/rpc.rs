@@ -1,12 +1,13 @@
 //! X3 Chain node RPC module wiring.
 //!
 //! Assembles the full JSON-RPC module used by the service.
-//! Merges substrate system RPCs, transaction-payment RPCs, and the
-//! Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
+//! Merges substrate system RPCs, transaction-payment RPCs, chain RPCs,
+//! and the Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
 
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{core::Error as JsonRpseeError, RpcModule};
 use sc_client_api::BlockBackend;
+use sc_rpc::chain::ChainApiServer;
 use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
@@ -108,6 +109,10 @@ where
     // Merge SVM-compatible JSON-RPC endpoints.
     let svm_module = crate::rpc_frontier::create_svm_rpc(client.clone())?;
     module.merge(svm_module)?;
+
+    // Merge chain RPC for WebSocket subscriptions (chain_subscribeNewHeads, etc.)
+    let chain_rpc = sc_rpc::chain::new_full(client.clone(), pool.clone())?;
+    module.merge(ChainApiServer::into_rpc(chain_rpc))?;
 
     // Initialize DEX RPC integration.
     let wallet_dex = Arc::new(WalletDexRpc::<Block, FullClient>::new(client.clone()));

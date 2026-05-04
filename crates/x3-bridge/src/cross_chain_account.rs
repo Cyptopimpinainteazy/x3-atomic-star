@@ -36,7 +36,7 @@ pub enum ChainType {
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct MultiChainSignature {
-    pub signer: [u8; 32],
+    pub signer: Vec<u8>,
     pub message_hash: [u8; 32],
     pub signature: Vec<u8>,
     pub chain_type: ChainType,
@@ -176,8 +176,15 @@ impl CrossChainAccountManager {
         account: &CrossChainAccount,
         signature: &MultiChainSignature,
     ) -> Result<bool, &'static str> {
-        // Verify signer is associated with account
-        if signature.signer != account.account_id && signature.signer != account.x3_address {
+        // Verify signer is associated with account.
+        // EVM/secp256k1 chains use a 20-byte Ethereum address; other chains use the 32-byte account_id.
+        let key_type_check = Self::chain_type_to_key_type(signature.chain_type);
+        if key_type_check == KeyType::Secp256k1 {
+            let evm_addr = account.evm_address.as_ref().ok_or("Account has no EVM address")?;
+            if signature.signer != evm_addr.as_slice() {
+                return Err("EVM signer address not recognized for this account");
+            }
+        } else if signature.signer != account.account_id.as_slice() && signature.signer != account.x3_address.as_slice() {
             return Err("Signer not recognized for this account");
         }
 
@@ -208,6 +215,10 @@ impl CrossChainAccountManager {
                 match account.evm_address {
                     Some(stored_addr) => {
                         // Use the signing module's to_evm_address function
+                        // Secp256k1 public keys are 65 bytes (uncompressed format)
+                        if signature.signer.len() != 65 {
+                            return Err("Invalid secp256k1 public key length");
+                        }
                         let recovered_addr = x3_common::signing::PublicKey::Secp256k1({
                             let mut pk = [0u8; 65];
                             pk.copy_from_slice(&signature.signer);
@@ -545,7 +556,7 @@ mod tests {
             account.account_id = sr_pubkey.0;
 
             let sig = MultiChainSignature {
-                signer: sr_pubkey.0,
+                signer: sr_pubkey.0.to_vec(),
                 message_hash,
                 signature: sr_sig.0.to_vec(),
                 chain_type: ChainType::X3,
@@ -562,7 +573,7 @@ mod tests {
         account.key_rotation_nonce = 5;
 
         let sig = MultiChainSignature {
-            signer: account.account_id,
+            signer: account.account_id.to_vec(),
             message_hash: [3; 32],
             signature: vec![1, 2, 3],
             chain_type: ChainType::X3,

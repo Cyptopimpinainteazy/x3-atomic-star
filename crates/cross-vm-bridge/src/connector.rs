@@ -182,20 +182,13 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
                             });
                         }
                     }
-                    if let Some(error) = json.get("error") {
-                        let error_msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
-                        return Err(DispatchError::Other(
-                            format!("RPC error: {}", error_msg).as_bytes().to_vec(),
-                        ));
+                    if let Some(_error) = json.get("error") {
+                        return Err(DispatchError::Other("LiveNodeDispatcher: RPC error"));
                     }
                 }
-                Err(DispatchError::Other(
-                    b"LiveNodeDispatcher: Failed to parse RPC response".to_vec(),
-                ))
+                Err(DispatchError::Other("LiveNodeDispatcher: Failed to parse RPC response"))
             }
-            Err(e) => Err(DispatchError::Other(
-                format!("RPC request failed: {}", e).as_bytes().to_vec(),
-            )),
+            Err(_e) => Err(DispatchError::Other("LiveNodeDispatcher: RPC request failed")),
         }
     }
 
@@ -209,7 +202,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     ) -> Result<CrossVmResult, DispatchError> {
         // In no_std mode, fail closed - use runtime pallet dispatch instead
         Err(DispatchError::Other(
-            b"LiveNodeDispatcher: EVM transaction submission not available in no-std mode - use runtime pallet dispatch".to_vec(),
+            "LiveNodeDispatcher: EVM transaction submission not available in no-std mode - use runtime pallet dispatch",
         ))
     }
 
@@ -266,20 +259,13 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
                             });
                         }
                     }
-                    if let Some(error) = json.get("error") {
-                        let error_msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
-                        return Err(DispatchError::Other(
-                            format!("RPC error: {}", error_msg).as_bytes().to_vec(),
-                        ));
+                    if let Some(_error) = json.get("error") {
+                        return Err(DispatchError::Other("LiveNodeDispatcher: RPC error"));
                     }
                 }
-                Err(DispatchError::Other(
-                    b"LiveNodeDispatcher: Failed to parse RPC response".to_vec(),
-                ))
+                Err(DispatchError::Other("LiveNodeDispatcher: Failed to parse RPC response"))
             }
-            Err(e) => Err(DispatchError::Other(
-                format!("RPC request failed: {}", e).as_bytes().to_vec(),
-            )),
+            Err(_e) => Err(DispatchError::Other("LiveNodeDispatcher: RPC request failed")),
         }
     }
 
@@ -292,7 +278,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     ) -> Result<CrossVmResult, DispatchError> {
         // In no_std mode, fail closed - use runtime pallet dispatch instead
         Err(DispatchError::Other(
-            b"LiveNodeDispatcher: SVM transaction submission not available in no-std mode - use runtime pallet dispatch".to_vec(),
+            "LiveNodeDispatcher: SVM transaction submission not available in no-std mode - use runtime pallet dispatch",
         ))
     }
 
@@ -302,7 +288,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         call: &CrossVmCall,
     ) -> Result<CrossVmReceipt, DispatchError> {
         if !self.connected {
-            self.reconnect()?;
+            return Err(DispatchError::Other("LiveNodeDispatcher: not connected"));
         }
 
         // Enforce trait contract: version + target

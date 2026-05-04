@@ -3,7 +3,7 @@
 //! No storage, no logic, no extrinsics — types only.
 //! Every type must implement Encode, Decode, MaxEncodedLen, TypeInfo, Debug, Clone, PartialEq.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
 #[cfg(feature = "std")]

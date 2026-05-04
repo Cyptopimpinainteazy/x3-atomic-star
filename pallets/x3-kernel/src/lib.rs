@@ -3903,6 +3903,10 @@ sp_api::decl_runtime_apis! {
         /// Filter is decoded as (from_block: u64, to_block: u64, address: Option<Vec<u8>>).
         /// Returns SCALE-encoded ExecutionLog entries.
         fn get_evm_logs(filter: Vec<u8>) -> Vec<Vec<u8>>;
+
+        /// Get EVM logs for a specific transaction by hash.
+        /// Returns SCALE-encoded ExecutionLog entries.
+        fn get_evm_transaction_logs(tx_hash: Vec<u8>) -> Vec<Vec<u8>>;
         
         /// Get the chain ID for the current network.
         fn chain_id() -> u64;
@@ -3918,6 +3922,26 @@ sp_api::decl_runtime_apis! {
 
         /// Get the SVM slot number for a given blockhash (reverse lookup)
         fn get_svm_slot_by_blockhash(blockhash: H256) -> Option<u64>;
+
+        /// Deploy a new EVM contract with the given bytecode
+        fn deploy_evm_contract(caller: Option<Vec<u8>>, bytecode: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>>;
+
+        /// Get the EVM contract creation receipt
+        fn get_evm_contract_receipt(contract_address: Vec<u8>) -> Option<Vec<u8>>;
+
+        /// Get the SVM program data for a deployed SVM program
+        fn get_svm_program_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>>;
+
+        /// Get the SVM account data for a SVM address
+        fn get_svm_account_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>>;
+
+        /// Get the SVM slot history for recent blockhashes.
+        /// `limit` caps the number of entries returned (max: MAX_RECENT_BLOCKHASHES = 150).
+        fn get_svm_slot_history(limit: u32) -> Vec<u64>;
+
+        /// Get the SVM recent blockhashes.
+        /// `limit` caps the number of entries returned (max: MAX_RECENT_BLOCKHASHES = 150).
+        fn get_svm_recent_blockhashes(limit: u32) -> Vec<H256>;
     }
 }
 
