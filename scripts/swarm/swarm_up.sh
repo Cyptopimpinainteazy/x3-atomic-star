@@ -13,6 +13,7 @@ API_BIN_CANDIDATES=(
 WORKER_BIN=""
 WORKER_BIN_CANDIDATES=(
   "$ROOT_DIR/target/debug/x3-swarm-worker"
+  "$ROOT_DIR/services/x3-swarm-worker/target/debug/x3-swarm-worker"
   "$ROOT_DIR/crates/x3-swarm-core/services/x3-swarm-worker/target/debug/x3-swarm-worker"
 )
 for candidate in "${API_BIN_CANDIDATES[@]}"; do
