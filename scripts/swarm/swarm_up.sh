@@ -2,6 +2,8 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs/swarm"
+API_HEALTH_URL="http://127.0.0.1:8787/health"
+
 mkdir -p "$LOG_DIR"
 
 API_BIN=""
@@ -16,6 +18,19 @@ WORKER_BIN_CANDIDATES=(
   "$ROOT_DIR/services/x3-swarm-worker/target/debug/x3-swarm-worker"
   "$ROOT_DIR/crates/x3-swarm-core/services/x3-swarm-worker/target/debug/x3-swarm-worker"
 )
+
+pid_alive() {
+  local pid_file="$1"
+  if [ -f "$pid_file" ]; then
+    local pid
+    pid=$(<"$pid_file")
+    if ps -p "$pid" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
 for candidate in "${API_BIN_CANDIDATES[@]}"; do
   if [ -x "$candidate" ]; then
     API_BIN="$candidate"
@@ -38,26 +53,48 @@ fi
 echo "Starting swarm API if available..."
 
 if [ -n "$API_BIN" ]; then
-  echo "Launching x3-swarm-api..."
-  nohup "$API_BIN" > "$LOG_DIR/x3-swarm-api.log" 2>&1 &
-  echo $! > "$LOG_DIR/x3-swarm-api.pid"
-  echo "x3-swarm-api started (pid $(cat "$LOG_DIR/x3-swarm-api.pid"), logs: $LOG_DIR/x3-swarm-api.log)"
+  if pid_alive "$LOG_DIR/x3-swarm-api.pid"; then
+    echo "x3-swarm-api already running (pid $(<"$LOG_DIR/x3-swarm-api.pid"))"
+  elif curl -fsS "$API_HEALTH_URL" >/dev/null 2>&1; then
+    echo "x3-swarm-api already responding at $API_HEALTH_URL"
+  else
+    echo "Launching x3-swarm-api..."
+    nohup "$API_BIN" > "$LOG_DIR/x3-swarm-api.log" 2>&1 &
+    api_pid=$!
+    sleep 0.5
+    if ps -p "$api_pid" >/dev/null 2>&1; then
+      echo "$api_pid" > "$LOG_DIR/x3-swarm-api.pid"
+      echo "x3-swarm-api started (pid $api_pid, logs: $LOG_DIR/x3-swarm-api.log)"
+    else
+      echo "ERROR: x3-swarm-api failed to start. Check $LOG_DIR/x3-swarm-api.log"
+    fi
+  fi
 else
   echo "ERROR: x3-swarm-api binary not found. Build it with cargo build --manifest-path $ROOT_DIR/crates/x3-swarm-core/services/x3-swarm-api/Cargo.toml"
 fi
 
 if [ -n "$WORKER_BIN" ]; then
-  echo "Launching x3-swarm-worker..."
-  nohup "$WORKER_BIN" > "$LOG_DIR/x3-swarm-worker.log" 2>&1 &
-  echo $! > "$LOG_DIR/x3-swarm-worker.pid"
-  echo "x3-swarm-worker started (pid $(cat "$LOG_DIR/x3-swarm-worker.pid"), logs: $LOG_DIR/x3-swarm-worker.log)"
+  if pid_alive "$LOG_DIR/x3-swarm-worker.pid"; then
+    echo "x3-swarm-worker already running (pid $(<"$LOG_DIR/x3-swarm-worker.pid"))"
+  else
+    echo "Launching x3-swarm-worker..."
+    nohup "$WORKER_BIN" > "$LOG_DIR/x3-swarm-worker.log" 2>&1 &
+    worker_pid=$!
+    sleep 0.5
+    if ps -p "$worker_pid" >/dev/null 2>&1; then
+      echo "$worker_pid" > "$LOG_DIR/x3-swarm-worker.pid"
+      echo "x3-swarm-worker started (pid $worker_pid, logs: $LOG_DIR/x3-swarm-worker.log)"
+    else
+      echo "ERROR: x3-swarm-worker failed to start. Check $LOG_DIR/x3-swarm-worker.log"
+    fi
+  fi
 else
   echo "WARNING: x3-swarm-worker binary not found. Build it with cargo build --manifest-path $ROOT_DIR/crates/x3-swarm-core/services/x3-swarm-worker/Cargo.toml"
 fi
 
 echo "Waiting for API to become healthy..."
 sleep 2
-if command -v curl >/dev/null 2>&1 && curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1 && curl -fsS "$API_HEALTH_URL" >/dev/null 2>&1; then
   echo "Seeding swarm task queue..."
   scripts/swarm/swarm_task_queue.sh > "$ROOT_DIR/reports/swarm_task_queue.json" || true
 else
