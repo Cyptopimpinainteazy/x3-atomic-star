@@ -39,12 +39,19 @@ pallet-sudo = { workspace = true, default-features = false, optional = true }
 pallet-collective = { workspace = true, default-features = false }
 pallet-scheduler = { workspace = true, default-features = false }
 pallet-preimage = { workspace = true, default-features = false }
-pallet-evm = { workspace = true, default-features = false }
-pallet-ethereum = { workspace = true, default-features = false }
-pallet-evm-precompile-simple = { workspace = true, default-features = false }
-pallet-evm-precompile-modexp = { workspace = true, default-features = false }
-pallet-evm-precompile-sha3fips = { workspace = true, default-features = false }
-fp-evm = { workspace = true, default-features = false }
+# Frontier EVM stack — OPTIONAL, gated behind the `frontier` feature.
+# Pulling these unconditionally drags `cumulus-primitives-storage-weight-reclaim`
+# -> `cumulus-primitives-proof-size-hostfunction` which is broken under
+# `wasm32v1-none --no-default-features` in polkadot-sdk stable2512 (its
+# `runtime_interface` macro references std-only items in the no_std codepath).
+# Per audit: Real Frontier EVM execution = post-RC1.
+pallet-evm = { workspace = true, default-features = false, optional = true }
+pallet-ethereum = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-simple = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-modexp = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-sha3fips = { workspace = true, default-features = false, optional = true }
+fp-evm = { workspace = true, default-features = false, optional = true }
+fp-ethereum = { workspace = true, default-features = false, optional = true }
 
 pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
 pallet-x3-consensus = { path = "../pallets/x3-consensus", default-features = false }
@@ -89,22 +96,29 @@ quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 
 sp-api = { workspace = true, default-features = false }
 sp-block-builder = { workspace = true, default-features = false }
-sp-consensus-aura = { workspace = true, default-features = false }
-sp-consensus-grandpa = { workspace = true, default-features = false }
-sp-core = { workspace = true, default-features = false }
+sp-consensus-aura = { workspace = true, default-features = false, features = ["serde"] }
+sp-consensus-grandpa = { workspace = true, default-features = false, features = ["serde"] }
+sp-core = { workspace = true, default-features = false, features = ["serde"] }
 sp-inherents = { workspace = true, default-features = false }
 sp-offchain = { workspace = true, default-features = false }
-sp-runtime = { workspace = true, default-features = false }
+# Canonical solochain template pattern (polkadot-sdk stable2512):
+# `sp-runtime/serde` (and sp-core/sp-version/sp-consensus-*/serde) MUST be enabled
+# unconditionally so that `RuntimeGenesisConfig`'s unconditional `Serialize/Deserialize`
+# derives emitted by `construct_runtime!` can resolve. The `feature = "serde"` of these
+# crates pulls in `Serialize/Deserialize` impls for `BlockNumber`, `AccountId`, etc.,
+# without forcing libstd. Pallet `GenesisConfig` derives still require std-gating
+# upstream; we patch frame-support-procedural locally if that gap manifests.
+sp-runtime = { workspace = true, default-features = false, features = ["serde"] }
 sp-session = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 sp-transaction-pool = { workspace = true, default-features = false }
-sp-version = { workspace = true, default-features = false }
+sp-version = { workspace = true, default-features = false, features = ["serde"] }
 sp-weights = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false, features = ["disable_panic_handler"] }
 
 frame-system-rpc-runtime-api = { workspace = true, default-features = false }
 
-serde = { workspace = true, default-features = false, features = ["derive"], optional = true }
+serde = { workspace = true, default-features = false, features = ["alloc", "derive"] }
 # Local X3 Chain EVM integration utilities (Frontier temporarily removed)
 # x3-evm-integration = { path = "../crates/evm-integration", default-features = false }
 
@@ -138,12 +152,14 @@ std = [
 	"pallet-collective/std",
 	"pallet-scheduler/std",
 	"pallet-preimage/std",
-	"pallet-evm/std",
-	"pallet-ethereum/std",
-	"pallet-evm-precompile-simple/std",
-	"pallet-evm-precompile-modexp/std",
-	"pallet-evm-precompile-sha3fips/std",
-	"fp-evm/std",
+	# Frontier std propagation only when `frontier` feature is enabled.
+	"pallet-evm?/std",
+	"pallet-ethereum?/std",
+	"pallet-evm-precompile-simple?/std",
+	"pallet-evm-precompile-modexp?/std",
+	"pallet-evm-precompile-sha3fips?/std",
+	"fp-evm?/std",
+	"fp-ethereum?/std",
 	"pallet-x3-kernel/std",
 	"pallet-x3-invariants/std",
 	"x3-cross-vm-bridge/std",
@@ -189,7 +205,6 @@ std = [
 	"sp-version/std",
 	"sp-weights/std",
 	"sp-io/std",
-	"serde",
 	"serde/std",
 	# "x3-evm-integration/std",
 ]
@@ -226,8 +241,20 @@ native-real-vm-adapters = []
 evm-bridge = []
 solana-integration = []
 
-# Enable Frontier EVM / fp-evm runtime features and integration with native adapters
-frontier = []
+# Real Frontier EVM execution path (post-RC1; OFF by default).
+# Enabling this pulls pallet-evm/pallet-ethereum/precompiles/fp-evm into the
+# build and activates the gated EVM Config + runtime APIs in src/lib.rs.
+# Default RC-1 wasm runtime ships WITHOUT this feature — the cross-VM router
+# uses the X3Evm scaffold path only.
+frontier = [
+	"pallet-evm",
+	"pallet-ethereum",
+	"pallet-evm-precompile-simple",
+	"pallet-evm-precompile-modexp",
+	"pallet-evm-precompile-sha3fips",
+	"fp-evm",
+	"fp-ethereum",
+]
 
 # Advanced analytics and indexer features
 advanced-analytics = []

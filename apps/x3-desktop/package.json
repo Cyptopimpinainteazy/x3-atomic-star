@@ -5,18 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "echo 'x3-desktop build skipped due to deep esbuild incompatibility'",
+    "build": "vite build",
     "preview": "vite preview",
     "tauri": "GST_PLUGIN_PATH=\"$HOME/.local/gst-webvtt${GST_PLUGIN_PATH:+:$GST_PLUGIN_PATH}\" tauri",
     "tauri:dev": "npm run tauri -- dev",
     "tauri:build": "npm run tauri -- build",
-    "test": "echo \"No test suites configured for CI gate\"",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@polkadot/api": "^16.5.4",
@@ -86,6 +86,7 @@
   },
   "overrides": {
     "path-to-regexp": "^0.1.10",
-    "axios": "^1.7.4"
+    "axios": "^1.7.4",
+    "tinyexec": "^1.1.2"
   }
 }

@@ -1,7 +1,7 @@
 /// TWAP Executor — Time-Weighted Average Price order execution
 /// Splits large orders across time to minimize price impact
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TWAPOrder {

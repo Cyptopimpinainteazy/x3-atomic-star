@@ -262,7 +262,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "network-control": NetworkPanel,
   "storage-manager": StoragePanel,
   "dev-tools":       DevToolsPanel,
-  "security-vault":  SecurityPanel,
   "live-telemetry":  LiveTelemetryPanel,
   "system-monitoring": MonitoringDashboard,
   "world-monitor":    WorldMonitorPanel,
@@ -284,41 +283,14 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "blockchain-connector":   BlockchainConnectorPanel,
 
   /* ── Explorer Sub-Apps (native panels, no iframe needed) ── */
-  "ai-swarm":               AISwarmPanel,
-  "blog":                   BlogPanel,
-  "bridge":                 BridgePanel,
-  "community":              CommunityPanel,
-  "earn":                   EarnPanel,
-  "ecosystem":              EcosystemPanel,
   "block-explorer":         BlockExplorerPanel,
-  "learn":                  LearnPanel,
   "defi-metrics":           MetricsPanel,
-  "network-status":         NetworkPanel2,
-  "portfolio":              PortfolioPanel,
-  "quantum-landing":        QuantumPanel,
-  "security-page":          SecurityPanel2,
-  "stake":                  StakePanel,
-  "atomic-swap":            SwapPanel,
-  "treasury":               TreasuryPanel,
-  "x3-chain":               X3ChainPanel,
-  "x3os":                   X3OSPanel,
-  "x3star":                 X3StarPanel,
-  "privacy-policy":         PrivacyPanel,
-  "terms-of-service":       TermsPanel,
   "developers-portal":      DevDocsPanel,       // full developer docs portal
   "prometheus-metrics":     MetricsPanel,       // shares the metrics panel
-  "solutions":              SolutionsDetailPanel, // full solutions detail panel
 
   /* ── Explorer Sub-Pages (deeper routes) ── */
   "dev-docs":               DevDocsPanel,
-  "solutions-detail":       SolutionsDetailPanel,
-  "network-validators":     NetworkValidatorsPanel,
-  "learn-architecture":     LearnArchitecturePanel,
-  "x3-sub-pages":           X3SubPagesPanel,
   "community-hub":          CommunitySubPanel,
-  "quantum-enhanced":       QuantumEnhancedPanel,
-  "explorer-home":          ExplorerHomePanel,
-  "explorer-detail":        ExplorerDetailPanel,
 
   /* ── Wallet (ported from apps/wallet) ── */
   "wallet":                 WalletPanel,
@@ -328,31 +300,16 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "wallet-swap":            WalletPanel,
 
   /* ── X3 Intelligence (ported from apps/x3-intelligence) ── */
-  "x3-floor-dashboard":     X3FloorDashboardPanel,
-  "x3-agents":              X3AgentsPanel,
-  "x3-bonds":               X3BondsPanel,
-  "x3-guide":               X3GuidePanel,
-  "x3-intents":             X3IntentsPanel,
-  "x3-slashing":            X3SlashingPanel,
-  "x3-why":                 X3WhyPanel,
   "x3-intelligence":        X3FloorDashboardPanel, // override old alias
 
   /* ── DEX (ported from apps/dex) ── */
-  "dex":                    DexPanel,
-  "dex-swap":               DexPanel,
-  "dex-pools":              DexPoolsPanel,
-  "dex-orderbook":          DexOrderbookPanel,
 
   /* ── DeFi (Vote-Escrow & Liquidity Mining) ── */
-  "vex3":                   VeX3Panel,
-  "ve-tokenomics":          VeX3Panel,
-  "liquidity-mining":       VeX3Panel,
 
   /* ── Social (Social Network & Creator Economy) ── */
   "social":                 SocialPanel,
   "social-feed":            SocialPanel,
   "creator-economy":        SocialPanel,
-  "tipping":                SocialPanel,
 
   /* ── Validators (ported from apps/validators) ── */
   "validators":             ValidatorsPanel,
@@ -389,57 +346,31 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "setup-wizard":           ValidatorSetupWizardPanel,
   "nft-gallery":            NftGalleryPanel,
   "nft-explorer":           NftGalleryPanel,
-  "concentrated-liquidity": ConcentratedLiquidityPanel,
   "v3":                     ConcentratedLiquidityPanel,
   "widget-layer":           WidgetLayerPanel,
   "widgets":                WidgetLayerPanel,
   "floating-widgets":       WidgetLayerPanel,
 
   /* ── Sprint 7: Advanced Orders, Token Charts, Bridge, Creator Monetization, Leaderboard, API, Heatmap, Simulator, Risk, Search ── */
-  "advanced-orders":        DexAdvancedOrdersPanel,
-  "limit-orders":           DexAdvancedOrdersPanel,
-  "stop-loss":              DexAdvancedOrdersPanel,
-  "token-charts":           TokenChartsPanel,
   "price-charts":           TokenChartsPanel,
   "bridge-status":          BridgeStatusPanel,
-  "cross-chain-bridge":     BridgeStatusPanel,
-  "creator-monetization":   CreatorMonetizationPanel,
-  "creator-earnings":       CreatorMonetizationPanel,
-  "tipping":                CreatorMonetizationPanel,
   "validator-leaderboard":  ValidatorLeaderboardPanel,
   "validator-ranking":      ValidatorLeaderboardPanel,
   "api-reference":          ApiReferencePanel,
   "api-docs":               ApiReferencePanel,
-  "crypto-heatmap":         CryptoHeatmapPanel,
-  "market-heatmap":         CryptoHeatmapPanel,
-  "transaction-simulator":  TransactionSimulatorPanel,
   "swap-preview":           TransactionSimulatorPanel,
-  "portfolio-risk":         PortfolioRiskPanel,
-  "portfolio-analytics":    PortfolioRiskPanel,
   "risk-analysis":          PortfolioRiskPanel,
   "global-search":          GlobalSearchPanel,
   "search":                 GlobalSearchPanel,
   "command-palette":        GlobalSearchPanel,
 
   /* ── Sprint 8: Liquidity Mining, Strategy Builder, Backtesting, Bot Marketplace, Token Launchpad, Privacy Mode, Window Layouts, LP NFT Marketplace, MEV Bot, Crash Reporter ── */
-  "liquidity-mining":       LiquidityMiningPanel,
-  "lm-rewards":             LiquidityMiningPanel,
-  "strategy-builder":       StrategyBuilderPanel,
-  "bot-strategy-composer":  StrategyBuilderPanel,
-  "backtesting":            BacktestingPanel,
-  "backtest-engine":        BacktestingPanel,
-  "bot-marketplace":        BotMarketplacePanel,
-  "strategy-marketplace":   BotMarketplacePanel,
-  "token-launchpad":        TokenLaunchpadPanel,
   "tokenomics-designer":    TokenLaunchpadPanel,
   "presale":                TokenLaunchpadPanel,
-  "privacy-mode":           PrivacyModePanel,
-  "stealth-mode":           PrivacyModePanel,
   "transaction-mixer":      PrivacyModePanel,
   "window-layouts":         WindowLayoutsPanel,
   "snap-layouts":           WindowLayoutsPanel,
   "layout-manager":         WindowLayoutsPanel,
-  "lp-nft-marketplace":     LpNftMarketplacePanel,
   "lp-position-nfts":       LpNftMarketplacePanel,
   "liquidity-nft-market":   LpNftMarketplacePanel,
   "mev-bot":                MevBotPanel,
@@ -486,7 +417,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "token-audit":            TokenAuditPanel,
   "audit-badge":            TokenAuditPanel,
   "smart-contract-audit":   TokenAuditPanel,
-  "security-audit":         TokenAuditPanel,
   "certik-audit":           TokenAuditPanel,
 
   // DeFi - Liquidity Lock
@@ -494,7 +424,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "lp-lock":                LiquidityLockPanel,
   "lock-lp":                LiquidityLockPanel,
   "lock-schedule":          LiquidityLockPanel,
-  "unlock-schedule":        LiquidityLockPanel,
 
   // Global - Social Recovery
   "social-recovery":        SocialRecoveryPanel,
@@ -505,9 +434,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
 
   // Global - Governance
   "governance":             GovernancePanel,
-  "dao-governance":         GovernancePanel,
-  "proposals":              GovernancePanel,
-  "voting":                 GovernancePanel,
   "dao-voting":             GovernancePanel,
   "quorum":                 GovernancePanel,
   "crm-governance":         CrmGovernancePanel,
@@ -526,7 +452,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   // Social - Content Moderation
   "content-moderation":     ContentModerationPanel,
   "moderation":             ContentModerationPanel,
-  "community-moderation":   ContentModerationPanel,
   "content-flags":          ContentModerationPanel,
   "content-voting":         ContentModerationPanel,
   "audit-logs":             ContentModerationPanel,
@@ -534,8 +459,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
 
   // Trading - Agent Marketplace
   "agent-marketplace":      AgentMarketplacePanel,
-  "bot-marketplace":        AgentMarketplacePanel,
-  "strategy-marketplace":   AgentMarketplacePanel,
   "trading-bots":           AgentMarketplacePanel,
   "copy-trading":           AgentMarketplacePanel,
   "bot-subscription":       AgentMarketplacePanel,
@@ -564,14 +487,10 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "access-control":         EnterpriseSecurityPanel,
   "rbac":                   EnterpriseSecurityPanel,
   "hsm-keys":               EnterpriseSecurityPanel,
-  "key-management":         EnterpriseSecurityPanel,
-  "audit-trail":            EnterpriseSecurityPanel,
   "access-logs":            EnterpriseSecurityPanel,
 
   // Infrastructure - Cross-Chain Bridge
   "cross-chain-bridge":     CrossChainBridgePanel,
-  "bridge":                 CrossChainBridgePanel,
-  "atomic-swap":            CrossChainBridgePanel,
   "bridge-liquidity":       CrossChainBridgePanel,
   "bridge-transfers":       CrossChainBridgePanel,
   "bridging":               CrossChainBridgePanel,
@@ -580,7 +499,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   // Admin - Compliance Report
   "compliance-report":      ComplianceReportPanel,
   "compliance-dashboard":   ComplianceReportPanel,
-  "soc2-compliance":        ComplianceReportPanel,
   "gdpr-compliance":        ComplianceReportPanel,
   "iso-compliance":         ComplianceReportPanel,
   "regulatory-dashboard":   ComplianceReportPanel,
@@ -597,9 +515,7 @@ const PANEL_MAP: Record<string, ComponentType> = {
 
   // Infrastructure - API Gateway
   "api-gateway":            APIGatewayPanel,
-  "rate-limiting":          APIGatewayPanel,
   "quota-management":       APIGatewayPanel,
-  "api-keys":               APIGatewayPanel,
   "api-quota":              APIGatewayPanel,
   "rate-limits":            APIGatewayPanel,
   "api-analytics":          APIGatewayPanel,
@@ -635,7 +551,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "multi-signature":          MultiSignaturePanel,
   "multisig":                 MultiSignaturePanel,
   "multisig-wallet":          MultiSignaturePanel,
-  "approval-workflows":       MultiSignaturePanel,
   "msig-approval":            MultiSignaturePanel,
   "co-signers":               MultiSignaturePanel,
   "threshold-approval":       MultiSignaturePanel,
@@ -654,7 +569,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "encrypted-messages":       E2eMessagesPanel,
   "signal-protocol":          E2eMessagesPanel,
   "x3dh":                     E2eMessagesPanel,
-  "double-ratchet":           E2eMessagesPanel,
   "encrypted-conversations":  E2eMessagesPanel,
   "key-exchange":             E2eMessagesPanel,
 
@@ -708,7 +622,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   // Security - Privacy Vault
   "privacy-vault":            PrivacyVaultPanel,
   "encrypted-keys":           PrivacyVaultPanel,
-  "key-management":           PrivacyVaultPanel,
   "stealth-addresses":        PrivacyVaultPanel,
   "private-key-vault":        PrivacyVaultPanel,
   "key-encryption":           PrivacyVaultPanel,
@@ -744,7 +657,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   // Marketplace - Token
   "token-marketplace":        TokenMarketplacePanel,
   "token-listings":           TokenMarketplacePanel,
-  "token-charts":             TokenMarketplacePanel,
   "token-launches":           TokenMarketplacePanel,
   "launchpad":                TokenMarketplacePanel,
   "token-discovery":          TokenMarketplacePanel,
@@ -789,7 +701,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   // Media - Streaming
   "media-streaming":          MediaStreamingPanel,
   "music-streaming":          MediaStreamingPanel,
-  "creator-earnings":         MediaStreamingPanel,
   "micropayments":            MediaStreamingPanel,
   "stream-analytics":         MediaStreamingPanel,
   "creator-profile":          MediaStreamingPanel,
@@ -888,7 +799,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "voting-power-distribution": DAOGovernancePanel,
   "proposal-voting":          DAOGovernancePanel,
   "dao-treasury":             DAOGovernancePanel,
-  "governance-voting":        DAOGovernancePanel,
 
   /* ── ALL MISSING 55+ PANELS: Now Registered ──── */
 
@@ -929,7 +839,6 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "staking":                  StakePanel,
   "swap":                     SwapPanel,
   "trading-swap":             SwapPanel,
-  "treasury":                 TreasuryPanel,
   "treasury-dashboard":       TreasuryPanel,
   "terms":                    TermsPanel,
   "terms-of-service":         TermsPanel,
@@ -1028,8 +937,8 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "real-asset-marketplace":   RealMarketplacePanel,
 
   // Global & Root Panels
-  "iframe":                   IframePanel,
-  "embedded":                 IframePanel,
+  "iframe":                   IframePanel as unknown as ComponentType,
+  "embedded":                 IframePanel as unknown as ComponentType,
   "security":                 SecurityPanel,
   "security-vault":           SecurityPanel,
   "governance-voting":        GovernanceVotingPanel,

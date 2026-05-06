@@ -18,11 +18,11 @@ pub mod state;
 /// Minimal no-std EVM executor (SputnikVM) — available in both std and no-std builds
 pub mod mini_evm;
 
-/// Frontier EVM execution backend
-#[cfg(feature = "std")]
+/// Frontier EVM execution backend (gated behind `frontier` feature; OFF in default RC-1 build).
+#[cfg(all(feature = "std", feature = "frontier"))]
 pub mod frontier;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "frontier"))]
 pub use frontier::FrontierEvmExecutor;
 
 /// Result type for EVM operations

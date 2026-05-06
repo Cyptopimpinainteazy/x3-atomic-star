@@ -1,6 +1,8 @@
 use crate::policy::ApprovalRequirement;
+use tracing::info;
 
 /// Approval gate for high-risk operations.
+#[derive(Debug, Clone)]
 pub struct ApprovalGate {
     requirement: ApprovalRequirement,
 }
@@ -14,11 +16,12 @@ impl ApprovalGate {
         match self.requirement {
             ApprovalRequirement::None => true,
             ApprovalRequirement::HumanReview => {
-                println!("Human review required for: {}", context);
+                info!("Human review required for: {}", context);
                 false // Stub: wait for input
             }
+            ApprovalRequirement::SecurityReview => false,
+            ApprovalRequirement::GovernanceReview => false,
             ApprovalRequirement::Blocked => false,
-            _ => false,
         }
     }
 

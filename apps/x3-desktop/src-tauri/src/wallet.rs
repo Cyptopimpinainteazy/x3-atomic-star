@@ -6,7 +6,7 @@ use sp_core::{sr25519, Pair};
 use sp_core::crypto::Ss58Codec;
 use solana_sdk::signature::{Keypair, SeedDerivable, Signer};
 use bs58;
-use tauri::{command, AppHandle, State};
+use tauri::{command, AppHandle, Emitter, State};
 use crate::wallet_core::substrate_hook::{SubstrateHookManager, SubstrateHookEvent};
 
 #[derive(Debug, thiserror::Error, serde::Serialize)]
@@ -159,7 +159,7 @@ pub async fn run_cross_chain_intent(draft: crate::wallet_core::ipc::IntentDraft)
 #[command]
 pub async fn subscribe_substrate_events(app: AppHandle, state: State<'_, crate::SubstrateState>) -> Result<String, String> {
     let rpc_url = "ws://127.0.0.1:9944";
-    let manager = SubstrateHookManager::new(rpc_url);
+    let mut manager = SubstrateHookManager::new(rpc_url);
     let handler = manager.get_handler("default");
 
     let app_handle = app.clone();
@@ -208,7 +208,7 @@ pub async fn subscribe_substrate_events(app: AppHandle, state: State<'_, crate::
 
 #[command]
 pub async fn get_substrate_hook_state(state: State<'_, crate::SubstrateState>) -> Result<String, String> {
-    if let Some(manager) = &*state.manager.read().unwrap() {
+    if let Some(manager) = &mut *state.manager.write().unwrap() {
         let handler = manager.get_handler("default");
         let hook_state = handler.get_state();
         let response = serde_json::json!({
@@ -301,14 +301,14 @@ pub async fn import_wallet_backup(backup: String) -> Result<String, String> {
 
 #[command]
 pub async fn query_block(block_number: Option<u64>, block_hash: Option<String>) -> Result<String, String> {
-    let method = if let Some(hash) = block_hash {
+    let method = if block_hash.is_some() {
         "chain_getBlock"
     } else {
         "chain_getBlockHash"
     };
     let params = if let Some(number) = block_number {
         serde_json::json!([number])
-    } else if let Some(hash) = block_hash {
+    } else if let Some(hash) = block_hash.as_ref() {
         serde_json::json!([hash])
     } else {
         serde_json::json!([])

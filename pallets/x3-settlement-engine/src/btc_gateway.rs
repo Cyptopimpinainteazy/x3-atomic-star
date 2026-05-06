@@ -13,10 +13,10 @@
 
 use crate::types::{BtcBlockHeader, BtcUtxoState};
 use codec::{Decode, DecodeWithMemTracking, Encode};
+use core::fmt::Debug;
 use ripemd::{Digest, Ripemd160};
 use scale_info::TypeInfo;
 use sp_core::{H256, U256};
-use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// BTC HTLC parameters

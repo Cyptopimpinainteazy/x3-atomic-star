@@ -11,13 +11,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, Send, Receive, ArrowLeftRight, History, Settings, 
+  LayoutDashboard, Send, ArrowDownLeft, ArrowLeftRight, History, Settings, 
   Shield, Lock, Key, Globe, ChevronDown, Plus, Search, Filter,
   Clock, CheckCircle, AlertCircle, Loader2, Copy, QrCode, Download,
   Trash2, Eye, EyeOff, Smartphone, Fingerprint, ShieldCheck, LockKeyhole
 } from 'lucide-react';
-import { useWalletStore, type ActiveView } from '@/stores/walletStore';
-import { formatAddress, getChainName } from '@/hooks/useWalletConnection';
+import { useWalletStore } from '@/stores/walletStore';
+
+const formatAddress = (address: string) => {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
 
 // ============================================================================
 // Types and Interfaces
@@ -199,7 +203,7 @@ export function WalletDashboardPanel({ className }: WalletPanelProps) {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <QuickAction icon={<Send className="w-5 h-5" />} label="Send" color="from-blue-500 to-cyan-500" />
-        <QuickAction icon={<Receive className="w-5 h-5" />} label="Receive" color="from-green-500 to-emerald-500" />
+        <QuickAction icon={<ArrowDownLeft className="w-5 h-5" />} label="Receive" color="from-green-500 to-emerald-500" />
         <QuickAction icon={<ArrowLeftRight className="w-5 h-5" />} label="Swap" color="from-purple-500 to-pink-500" />
         <QuickAction icon={<History className="w-5 h-5" />} label="History" color="from-orange-500 to-red-500" />
       </div>
@@ -464,7 +468,7 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
             transaction.type === 'send' ? 'bg-red-500/20 text-red-400' :
             'bg-blue-500/20 text-blue-400'
           }`}>
-            {transaction.type === 'receive' ? <Receive className="w-4 h-4" /> :
+            {transaction.type === 'receive' ? <ArrowDownLeft className="w-4 h-4" /> :
              transaction.type === 'send' ? <Send className="w-4 h-4" /> :
              <ArrowLeftRight className="w-4 h-4" />}
           </div>

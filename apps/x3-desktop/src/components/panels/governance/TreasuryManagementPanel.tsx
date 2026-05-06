@@ -19,7 +19,9 @@ export default function TreasuryManagementPanel() {
   // Calculate totals from chain data
   const totalTreasury = parseFloat(balance || "0") / 1000000000000;
   const totalAllocated = snapshot?.totalAllocated ? parseFloat(snapshot.totalAllocated) / 1000000000000 : 0;
-  const pendingApprovals = snapshot?.pendingProposals || 0;
+  const pendingApprovals = Array.isArray(snapshot?.pendingProposals)
+    ? snapshot.pendingProposals.length
+    : 0;
 
   return (
     <div className="w-full h-full bg-[#0a0a0f] text-white p-6 flex flex-col">
@@ -40,7 +42,7 @@ export default function TreasuryManagementPanel() {
           </div>
           <div className="bg-[#15151b] border border-[#2a2a35] rounded-lg p-3">
             <div className="text-xs text-gray-400 mb-1">Multi-Sig Wallets</div>
-            <div className="text-lg font-bold text-green-400">{wallets.length}</div>
+            <div className="text-lg font-bold text-green-400">{wallets?.length ?? 0}</div>
           </div>
           <div className="bg-[#15151b] border border-[#2a2a35] rounded-lg p-3">
             <div className="text-xs text-gray-400 mb-1">Pending Approvals</div>

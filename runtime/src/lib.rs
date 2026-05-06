@@ -33,9 +33,10 @@ use pallet_agent_memory;
 use pallet_atomic_trade_engine;
 use pallet_aura;
 use pallet_balances;
-use pallet_ethereum;
 use pallet_collective;
 use pallet_cross_chain_validator;
+#[cfg(feature = "frontier")]
+use pallet_ethereum;
 use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
@@ -73,7 +74,9 @@ use sp_runtime::{
 use sp_session::{GetSessionNumber, GetValidatorCount};
 use sp_std::prelude::*;
 
+#[cfg(feature = "frontier")]
 mod precompiles;
+#[cfg(feature = "frontier")]
 use precompiles::FrontierPrecompiles;
 
 pub mod fraud_proofs;
@@ -150,7 +153,8 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
-    state_version: 1,
+    // X3 (stable2512): RuntimeVersion no longer carries `state_version`.
+    system_version: 1,
 };
 
 parameter_types! {
@@ -204,6 +208,7 @@ impl Get<U256> for BlockGasLimit {
 }
 
 pub struct PrecompilesValue;
+#[cfg(feature = "frontier")]
 impl Get<FrontierPrecompiles<Runtime>> for PrecompilesValue {
     fn get() -> FrontierPrecompiles<Runtime> {
         FrontierPrecompiles::new()
@@ -279,8 +284,6 @@ construct_runtime!(
         TransactionPayment: pallet_transaction_payment,
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
-        EVM: pallet_evm,
-        Ethereum: pallet_ethereum,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
@@ -310,6 +313,10 @@ construct_runtime!(
         X3Oracle: pallet_x3_oracle,
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
+        #[cfg(feature = "frontier")]
+        Evm: pallet_evm,
+        #[cfg(feature = "frontier")]
+        Ethereum: pallet_ethereum,
     }
 );
 
@@ -327,8 +334,6 @@ construct_runtime!(
         TransactionPayment: pallet_transaction_payment,
         Scheduler: pallet_scheduler,
         Preimage: pallet_preimage,
-        EVM: pallet_evm,
-        Ethereum: pallet_ethereum,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
         X3Coin: pallet_x3_coin,
@@ -358,6 +363,10 @@ construct_runtime!(
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
         X3Consensus: pallet_x3_consensus,
+        #[cfg(feature = "frontier")]
+        Evm: pallet_evm,
+        #[cfg(feature = "frontier")]
+        Ethereum: pallet_ethereum,
     }
 );
 
@@ -447,7 +456,6 @@ parameter_types! {
 }
 
 impl pallet_x3_dex::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxPools = MaxPools;
     type WeightInfo = ();
     type EconomicHalt = X3SupplyLedger;
@@ -472,7 +480,9 @@ impl frame_support::traits::OnUnbalanced<NegativeImbalance> for DealWithFees {
     }
 }
 
+#[cfg(feature = "frontier")]
 pub struct FixedGasPrice;
+#[cfg(feature = "frontier")]
 impl pallet_evm::FeeCalculator for FixedGasPrice {
     fn min_gas_price() -> (U256, Weight) {
         (U256::from(NATIVE_GAS_PRICE), Weight::zero())
@@ -503,6 +513,13 @@ impl frame_system::Config for Runtime {
     type OnSetCode = ();
     type MaxConsumers = ConstU32<16>;
     type Nonce = Index;
+    type RuntimeTask = RuntimeTask;
+    type ExtensionsWeightInfo = ();
+    type SingleBlockMigrations = ();
+    type MultiBlockMigrator = ();
+    type PreInherents = ();
+    type PostInherents = ();
+    type PostTransactions = ();
 }
 
 impl pallet_timestamp::Config for Runtime {
@@ -517,31 +534,39 @@ impl pallet_aura::Config for Runtime {
     type MaxAuthorities = MaxAuthorities;
     type DisabledValidators = ();
     type AllowMultipleBlocksPerSlot = ConstBool<true>; // Enable multiple blocks per slot for higher TPS
+    type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type KeyOwnerProof = sp_session::MembershipProof;
-    type EquivocationReportSystem =
-        pallet_grandpa::EquivocationReportSystem<Self, Offences, (), ()>;
+    type KeyOwnerProof = sp_core::Void;
+    type EquivocationReportSystem = ();
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
+    type MaxNominators = ConstU32<0>;
 }
 
 impl pallet_session::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type ValidatorId = <Self as frame_system::Config>::AccountId;
-    type ValidatorIdOf = pallet_session::historical::NoteHistoricalRoot<Self, Offences>;
+    // X3 (stable2512): canonical ValidatorIdOf is ConvertInto; NoteHistoricalRoot lives on SessionManager.
+    type ValidatorIdOf = sp_runtime::traits::ConvertInto;
     type ShouldEndSession = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
     type NextSessionRotation = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
     type SessionManager = ();
     type SessionHandler = <SessionKeys as sp_runtime::traits::OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type WeightInfo = pallet_session::weights::SubstrateWeight<Self>;
+    type DisablingStrategy = pallet_session::disabling::UpToLimitDisablingStrategy;
+    type Currency = Balances;
+    // X3 (stable2512): KeyDeposit is now `()` per canonical solo runtime; no key deposit on testnet.
+    type KeyDeposit = ();
 }
 
 impl pallet_session::historical::Config for Runtime {
+    // X3 (stable2512): historical::Config now requires RuntimeEvent.
+    type RuntimeEvent = RuntimeEvent;
     type FullIdentification = ();
     type FullIdentificationOf = ();
 }
@@ -560,12 +585,14 @@ impl pallet_balances::Config for Runtime {
     type AccountStore = System;
     type MaxLocks = ConstU32<50>;
     type MaxReserves = ConstU32<50>;
-    type MaxHolds = ConstU32<0>;
     type MaxFreezes = ConstU32<0>;
     type ReserveIdentifier = [u8; 8];
     type FreezeIdentifier = ();
     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-    type RuntimeHoldReason = ();
+    // X3 (stable2512): wire aggregated RuntimeHoldReason so pallet_session::HoldReason converts.
+    type RuntimeHoldReason = RuntimeHoldReason;
+    type RuntimeFreezeReason = ();
+    type DoneSlashHandler = ();
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -575,6 +602,7 @@ impl pallet_transaction_payment::Config for Runtime {
     type WeightToFee = IdentityFee<Balance>;
     type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
     type FeeMultiplierUpdate = ();
+    type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
 }
 
 #[cfg(feature = "dev")]
@@ -603,6 +631,9 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
     type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
     type SetMembersOrigin = frame_system::EnsureRoot<AccountId>;
     type MaxProposalWeight = MaxProposalWeight;
+    type DisapproveOrigin = frame_system::EnsureRoot<AccountId>;
+    type KillOrigin = frame_system::EnsureRoot<AccountId>;
+    type Consideration = ();
 }
 
 // ── Fraud-proof inline pallet config ─────────────────────────────────────────
@@ -615,16 +646,19 @@ impl crate::fraud_proofs::pallet::pallet::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
 }
 
+#[cfg(feature = "frontier")]
 impl pallet_evm::Config for Runtime {
+    type AccountProvider = pallet_evm::FrameSystemAccountProvider<Self>;
     type FeeCalculator = FixedGasPrice;
     type GasWeightMapping = pallet_evm::FixedGasWeightMapping<Self>;
     type WeightPerGas = WeightPerGas;
-    type BlockHashMapping = pallet_evm::SubstrateBlockHashMapping<Self>;
+    type BlockHashMapping = pallet_ethereum::EthereumBlockHashMapping<Self>;
     type CallOrigin = pallet_evm::EnsureAddressRoot<AccountId>;
+    type CreateOriginFilter = ();
+    type CreateInnerOriginFilter = ();
     type WithdrawOrigin = pallet_evm::EnsureAddressTruncated;
     type AddressMapping = pallet_evm::HashedAddressMapping<BlakeTwo256>;
     type Currency = Balances;
-    type RuntimeEvent = RuntimeEvent;
     type PrecompilesType = FrontierPrecompiles<Self>;
     type PrecompilesValue = PrecompilesValue;
     type ChainId = ChainId;
@@ -634,27 +668,22 @@ impl pallet_evm::Config for Runtime {
     type OnCreate = ();
     type FindAuthor = ();
     type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
+    type GasLimitStorageGrowthRatio = ConstU64<16>;
     type Timestamp = Timestamp;
     type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 }
 
-impl pallet_ethereum::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type StateRoot = pallet_ethereum::IntermediateStateRoot<Self>;
+#[cfg(feature = "frontier")]
+parameter_types! {
+    pub const PostBlockAndTxnHashes: pallet_ethereum::PostLogContent =
+        pallet_ethereum::PostLogContent::BlockAndTxnHashes;
 }
 
-/// Mapping from Ethereum block hash to Substrate block number.
-/// This is required for eth_getBlockByHash to work correctly.
-pub struct EthereumBlockHashMapping;
-
-impl fp_ethereum::BlockHashMapping<Runtime> for EthereumBlockHashMapping {
-    fn block_hash(block_number: u32) -> H256 {
-        use sp_runtime::traits::Hash;
-        
-        // Get the block at the given number
-        let header = frame_system::Pallet::<Runtime>::block_hash(block_number);
-        H256::from_slice(header.as_ref())
-    }
+#[cfg(feature = "frontier")]
+impl pallet_ethereum::Config for Runtime {
+    type StateRoot = pallet_ethereum::IntermediateStateRoot<RuntimeVersion>;
+    type PostLogContent = PostBlockAndTxnHashes;
+    type ExtraDataLength = ConstU32<30>;
 }
 
 // Helper types for pallet_x3_kernel::Config bridge escrow bindings
@@ -990,19 +1019,19 @@ impl pallet_x3_kernel::Config for Runtime {
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:
-    // - Native runtime (std): use real native adapters.
-    // - WASM runtime (no_std): use inline interpreter adapters.
-    #[cfg(feature = "std")]
+    // - Native runtime (std + frontier): use real native adapters with EVM.
+    // - WASM runtime / non-frontier: use inline interpreter adapters.
+    #[cfg(all(feature = "std", feature = "frontier"))]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
-    #[cfg(feature = "std")]
-    type SvmAdapter = pallet_x3_kernel::adapters::RbpfSvmAdapter;
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "frontier"))]
+    type SvmAdapter = pallet_x3_kernel::adapters::real_adapters::RbpfSvmAdapter;
+    #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
     type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type CrossChainProofVerifier = SubstrateProofVerifier;
@@ -1084,20 +1113,30 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type WeightInfo = pallet_atomic_trade_engine::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // Use the same VM adapters as AtlasKernel
-    #[cfg(feature = "std")]
+    // Native (std + frontier): real native adapters; WASM/non-std: inline interpreter adapters.
+    #[cfg(all(feature = "std", feature = "frontier"))]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
-    #[cfg(feature = "std")]
-    type SvmAdapter = pallet_x3_kernel::adapters::RbpfSvmAdapter;
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "frontier"))]
+    type SvmAdapter = pallet_x3_kernel::adapters::real_adapters::RbpfSvmAdapter;
+    #[cfg(all(feature = "std", feature = "frontier"))]
     type X3Adapter = pallet_x3_kernel::adapters::real_adapters::X3VmAdapter;
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
+    type EvmAdapter = pallet_x3_kernel::wasm_adapters::WasmEvmAdapter;
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
+    type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
+    #[cfg(not(all(feature = "std", feature = "frontier")))]
+    type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
     type DefaultTradeEvmGasLimit = DefaultTradeEvmGasLimit;
     type DefaultTradeSvmComputeLimit = DefaultTradeSvmComputeLimit;
     type DefaultTradeX3GasLimit = DefaultTradeX3GasLimit;
     type AmmRegistrarOrigin = EnsureRootOrHalfCouncil;
     type Settlement = RuntimeSettlementBridge;
+    type MaxTradeLegs = MaxTradeLegs;
+    type MaxCheckpoints = MaxCheckpoints;
+    type MaxPendingBatchesPerAccount = MaxPendingBatchesPerAccount;
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "frontier"))]
 mod native_vm_adapters {
     use super::*;
     use codec::Encode;
@@ -1148,6 +1187,7 @@ mod native_vm_adapters {
                 None,                                      // max_priority_fee_per_gas
                 None,                                      // nonce
                 Vec::new(),                                // access_list
+                Vec::new(),                                // authorization_list
                 false,                                     // is_transactional (dry run for kernel)
                 false,                                     // validate (skip signature check)
                 None,                                      // weight_limit
@@ -1171,12 +1211,17 @@ mod native_vm_adapters {
                             address: log.address.as_bytes().to_vec(),
                             topics: log.topics,
                             data: log.data,
+                            block_number: frame_system::Pallet::<super::Runtime>::block_number()
+                                .saturated_into(),
                         })
                         .collect(),
                     state_changes,
                     protocol_version: 1,
                     migration_history: Vec::new(),
                     compatibility_flags: 0,
+                    from: source.as_bytes().to_vec(),
+                    to: vec![],
+                    value: 0u128,
                 });
             }
 
@@ -1191,6 +1236,7 @@ mod native_vm_adapters {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false,
                 false,
                 None,
@@ -1225,6 +1271,7 @@ mod native_vm_adapters {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false, // non-transactional for estimation
                 false,
                 None,
@@ -1267,12 +1314,17 @@ mod native_vm_adapters {
                     address: log.address.as_bytes().to_vec(),
                     topics: log.topics,
                     data: log.data,
+                    block_number: frame_system::Pallet::<super::Runtime>::block_number()
+                        .saturated_into(),
                 })
                 .collect(),
             state_changes,
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: source.as_bytes().to_vec(),
+            to: target.map(|t| t.as_bytes().to_vec()).unwrap_or_default(),
+            value: 0u128,
         }
     }
 
@@ -1309,7 +1361,7 @@ mod native_vm_adapters {
 
     fn svm_config(compute_limit: u64) -> SvmConfig {
         let slot = frame_system::Pallet::<super::Runtime>::block_number().saturated_into::<u64>();
-        let ts: i64 = pallet_timestamp::Pallet::<super::Runtime>::now().saturated_into();
+        let ts: i64 = pallet_timestamp::Now::<super::Runtime>::get().saturated_into();
 
         SvmConfig {
             compute_unit_limit: compute_limit,
@@ -1363,12 +1415,17 @@ mod native_vm_adapters {
                     address: vec![0u8; 32],
                     topics: Vec::new(),
                     data,
+                    block_number: frame_system::Pallet::<super::Runtime>::block_number()
+                        .saturated_into(),
                 })
                 .collect(),
             state_changes,
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: vec![],
+            to: vec![],
+            value: 0u128,
         }
     }
 
@@ -1504,6 +1561,8 @@ impl pallet_scheduler::Config for Runtime {
     type RuntimeOrigin = RuntimeOrigin;
     type PalletsOrigin = OriginCaller;
     type RuntimeCall = RuntimeCall;
+    // X3 (stable2512): scheduler now requires explicit BlockNumberProvider.
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
     type MaximumWeight = MaximumSchedulerWeight;
     type ScheduleOrigin = EnsureRootOrHalfCouncil;
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
@@ -1524,8 +1583,9 @@ impl pallet_preimage::Config for Runtime {
     type WeightInfo = ();
     type Currency = Balances;
     type ManagerOrigin = EnsureRootOrHalfCouncil;
-    type BaseDeposit = PreimageBaseDeposit;
-    type ByteDeposit = PreimageByteDeposit;
+    // RC-1: no per-byte deposit; preimage costs governed by extrinsic weight only.
+    // Post-mainnet hardening will introduce HoldConsideration with calibrated rates.
+    type Consideration = ();
 }
 
 // ===== Governance Pallet Configuration =====
@@ -1613,6 +1673,7 @@ impl pallet_treasury::Config for Runtime {
     type ProposalBond = ProposalBond;
     type ProposalBondMinimum = ProposalBondMinimum;
     type WeightInfo = ();
+    // X3 (stable2512): local pallet-treasury Config does not declare BlockNumberProvider.
 }
 
 // ===== Agent Accounts Pallet Configuration =====
@@ -2002,12 +2063,14 @@ impl_runtime_apis! {
             VERSION
         }
 
-        fn execute_block(block: Block) {
+        // X3 (stable2512): Core::execute_block now takes LazyBlock.
+        fn execute_block(block: <Block as BlockT>::LazyBlock) {
             Executive::execute_block(block);
         }
 
-        fn initialize_block(header: &<Block as BlockT>::Header) {
-            Executive::initialize_block(header);
+        // X3 (stable2512): Core::initialize_block returns ExtrinsicInclusionMode.
+        fn initialize_block(header: &<Block as BlockT>::Header) -> sp_runtime::ExtrinsicInclusionMode {
+            Executive::initialize_block(header)
         }
     }
 
@@ -2056,6 +2119,10 @@ impl_runtime_apis! {
         }
 
         fn map_evm_address(address: Vec<u8>) -> Option<AccountId> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use sp_core::H160;
             use sp_runtime::traits::BlakeTwo256;
             if address.len() != 20 {
@@ -2068,9 +2135,19 @@ impl_runtime_apis! {
             // Use the runtime's AddressMapping type from pallet_evm
             // to derive AccountId from EVM address
             Some(<pallet_evm::HashedAddressMapping<BlakeTwo256> as pallet_evm::AddressMapping<AccountId>>::into_account_id(evm_addr))
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
         }
 
         fn get_evm_balance(evm_address: Vec<u8>, asset_id: AssetId) -> Option<Balance> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use sp_core::H160;
             use sp_runtime::traits::BlakeTwo256;
             if evm_address.len() != 20 { return None; }
@@ -2079,18 +2156,38 @@ impl_runtime_apis! {
             let evm_addr = H160::from(slice);
             let account_id: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256> as pallet_evm::AddressMapping<AccountId>>::into_account_id(evm_addr);
             Some(pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &asset_id))
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
         }
 
         fn get_evm_code(evm_address: Vec<u8>) -> Vec<u8> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use sp_core::H160;
             if evm_address.len() != 20 { return Vec::new(); }
             let mut slice = [0u8; 20];
             slice.copy_from_slice(&evm_address[..20]);
             let evm_addr = H160::from(slice);
             pallet_evm::AccountCodes::<Runtime>::get(evm_addr)
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Vec::new() }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Vec::new() }
         }
 
         fn get_evm_storage(evm_address: Vec<u8>, storage_key: H256) -> Option<H256> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use sp_core::H160;
             if evm_address.len() != 20 { return None; }
             let mut slice = [0u8; 20];
@@ -2098,9 +2195,19 @@ impl_runtime_apis! {
             let evm_addr = H160::from(slice);
             let val = pallet_evm::AccountStorages::<Runtime>::get(evm_addr, storage_key);
             if val == H256::zero() { None } else { Some(val) }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
         }
 
         fn get_evm_nonce(evm_address: Vec<u8>) -> u64 {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use sp_core::H160;
             use sp_runtime::traits::BlakeTwo256;
             if evm_address.len() != 20 { return 0; }
@@ -2110,6 +2217,12 @@ impl_runtime_apis! {
             let account_id: AccountId = <pallet_evm::HashedAddressMapping<BlakeTwo256>
                 as pallet_evm::AddressMapping<AccountId>>::into_account_id(evm_addr);
             frame_system::Pallet::<Runtime>::account_nonce(&account_id) as u64
+            }
+            #[cfg(not(feature = "frontier"))]
+            { 0 }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { 0 }
         }
 
         fn get_svm_balance(svm_pubkey: Vec<u8>) -> u64 {
@@ -2133,6 +2246,10 @@ impl_runtime_apis! {
         }
 
         fn submit_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             // Payload contract:
             // [caller(20)] [to(20)] [value(16 LE)] [data_len(4 LE)] [data...]
             use sp_io::hashing::keccak_256;
@@ -2211,6 +2328,7 @@ impl_runtime_apis! {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false,
                 false,
                 None,
@@ -2225,7 +2343,7 @@ impl_runtime_apis! {
                         let receipt = pallet_x3_kernel::ExecutionReceipt {
                             version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
                             success: true,
-                            gas_used: info.used_gas.standard,
+                            gas_used: info.used_gas.standard.low_u64(),
                             return_data: info.value.to_vec(),
                             logs: info
                                 .logs
@@ -2259,7 +2377,7 @@ impl_runtime_apis! {
                         let receipt = pallet_x3_kernel::ExecutionReceipt {
                             version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
                             success: false,
-                            gas_used: info.used_gas.standard,
+                            gas_used: info.used_gas.standard.low_u64(),
                             return_data: info.value.to_vec(),
                             logs: info
                                 .logs
@@ -2293,7 +2411,7 @@ impl_runtime_apis! {
                         let receipt = pallet_x3_kernel::ExecutionReceipt {
                             version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
                             success: false,
-                            gas_used: info.used_gas.standard,
+                            gas_used: info.used_gas.standard.low_u64(),
                             return_data: info.value.to_vec(),
                             logs: info
                                 .logs
@@ -2349,6 +2467,12 @@ impl_runtime_apis! {
                     Err(b"EVM runner call failed".to_vec())
                 }
             }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
 
         fn submit_svm_instruction(program_id: [u8; 32], instruction_data: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
@@ -2365,6 +2489,10 @@ impl_runtime_apis! {
         }
 
         fn call_evm(caller: Option<Vec<u8>>, evm_address: Vec<u8>, input: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use fp_evm::ExitReason;
             use pallet_evm::Runner;
             use sp_core::{H160, U256};
@@ -2400,6 +2528,7 @@ impl_runtime_apis! {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false,
                 false,
                 None,
@@ -2417,9 +2546,19 @@ impl_runtime_apis! {
                 },
                 Err(_) => Err(b"EVM runner call failed".to_vec()),
             }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
 
         fn estimate_evm_gas(caller: Option<Vec<u8>>, evm_address: Vec<u8>, input: Vec<u8>, gas_limit: u64) -> Result<u64, Vec<u8>> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             use fp_evm::ExitReason;
             use pallet_evm::Runner;
             use sp_core::{H160, U256};
@@ -2456,6 +2595,7 @@ impl_runtime_apis! {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false,
                 false,
                 None,
@@ -2473,8 +2613,14 @@ impl_runtime_apis! {
                 },
                 Err(_) => Err(b"EVM runner estimate failed".to_vec()),
             }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
-    
+
         fn get_evm_transaction(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
             let hash = decode_evm_tx_hash(&tx_hash)?;
             pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::get(&hash)
@@ -2486,13 +2632,13 @@ impl_runtime_apis! {
             pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::get(&hash)
                 .map(|receipt| receipt.encode())
         }
-        
+
         fn get_evm_transaction_by_hash(tx_hash: Vec<u8>) -> Option<Vec<u8>> {
             let hash = decode_evm_tx_hash(&tx_hash)?;
             pallet_x3_kernel::EvmTransactions::<Runtime>::get(&hash)
                 .map(|tx| tx.encode())
         }
-    
+
         fn get_evm_logs(filter: Vec<u8>) -> Vec<Vec<u8>> {
             use codec::{Decode, Encode};
             let (_from_block, _to_block, address_filter) =
@@ -2500,7 +2646,7 @@ impl_runtime_apis! {
                     Ok(decoded) => decoded,
                     Err(_) => return Vec::new(),
                 };
-    
+
             let mut logs = Vec::new();
             for (_, receipt) in pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::iter() {
                 for log in &receipt.logs {
@@ -2515,7 +2661,23 @@ impl_runtime_apis! {
             }
             logs
         }
-    
+
+        // X3 (stable2512): AtlasKernelRuntimeApi gained `get_evm_transaction_logs` —
+        // returns SCALE-encoded ExecutionLog entries for a single tx hash.
+        fn get_evm_transaction_logs(tx_hash: Vec<u8>) -> Vec<Vec<u8>> {
+            use codec::Encode;
+            if tx_hash.len() != 32 {
+                return Vec::new();
+            }
+            let mut hash_bytes = [0u8; 32];
+            hash_bytes.copy_from_slice(&tx_hash[..32]);
+            let hash = sp_core::H256::from(hash_bytes);
+            match pallet_x3_kernel::EvmTransactionReceipts::<Runtime>::get(&hash) {
+                Some(receipt) => receipt.logs.iter().map(|log| log.encode()).collect(),
+                None => Vec::new(),
+            }
+        }
+
         fn validate_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
             // Stateless validation: check payload length without mutating state.
             if raw_tx.len() < (20 + 20 + 16 + 4) {
@@ -2523,7 +2685,7 @@ impl_runtime_apis! {
             }
             Ok(vec![])
         }
-        
+
         fn chain_id() -> u64 {
             // Return the chain ID from the runtime configuration
             650_000u64
@@ -2553,6 +2715,10 @@ impl_runtime_apis! {
         }
 
         fn deploy_evm_contract(caller: Option<Vec<u8>>, bytecode: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             // Deploy a new EVM contract with the given bytecode
             use sp_io::hashing::keccak_256;
             use fp_evm::ExitReason;
@@ -2584,6 +2750,7 @@ impl_runtime_apis! {
                 None,
                 None,
                 Vec::new(),
+                Vec::new(), // authorization_list
                 false,
                 false,
                 None,
@@ -2595,10 +2762,10 @@ impl_runtime_apis! {
                 Ok(info) => match info.exit_reason {
                     ExitReason::Succeed(_) => {
                         // Contract creation succeeded, return the contract address
-                        Ok(info.value.to_vec())
+                        Ok(info.value.as_bytes().to_vec())
                     }
                     ExitReason::Revert(_) => {
-                        Err(info.value)
+                        Err(info.value.as_bytes().to_vec())
                     }
                     ExitReason::Error(_) | ExitReason::Fatal(_) => {
                         Err(b"EVM contract deployment failed".to_vec())
@@ -2606,9 +2773,19 @@ impl_runtime_apis! {
                 },
                 Err(_) => Err(b"EVM runner deployment failed".to_vec()),
             }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
 
         fn get_evm_contract_receipt(contract_address: Vec<u8>) -> Option<Vec<u8>> {
+            #[cfg(feature = "frontier")]
+            {
+            #[cfg(feature = "frontier")]
+            {
             // Get the EVM contract creation receipt
             use sp_core::H160;
             if contract_address.len() != 20 { return None; }
@@ -2624,21 +2801,31 @@ impl_runtime_apis! {
                 }
             }
             None
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
+            }
+            #[cfg(not(feature = "frontier"))]
+            { None }
         }
 
         fn get_svm_program_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
             // Get the SVM program bytecode for a deployed program address
-            use sp_core::H160;
-            // SVM programs are stored via pallet_evm::AccountCodes — try EVM code store first
-            if svm_pubkey.len() == 20 {
-                let mut addr_bytes = [0u8; 20];
-                addr_bytes.copy_from_slice(&svm_pubkey[..20]);
-                let addr = H160::from(addr_bytes);
-                let code = pallet_evm::AccountCodes::<Runtime>::get(addr);
-                if !code.is_empty() {
-                    return Some(code);
+            // X3 (stable2512, RC-1 scope): pallet_evm is feature-gated under `frontier`.
+            #[cfg(feature = "frontier")]
+            {
+                use sp_core::H160;
+                if svm_pubkey.len() == 20 {
+                    let mut addr_bytes = [0u8; 20];
+                    addr_bytes.copy_from_slice(&svm_pubkey[..20]);
+                    let addr = H160::from(addr_bytes);
+                    let code = pallet_evm::AccountCodes::<Runtime>::get(addr);
+                    if !code.is_empty() {
+                        return Some(code);
+                    }
                 }
             }
+            let _ = svm_pubkey;
             None
         }
 
@@ -2731,7 +2918,7 @@ impl_runtime_apis! {
                 evm_gas: 0,
                 svm_compute: 0,
                 route: vec![],
-                error: Some("No route available for token pair".to_string()),
+                error: Some(b"No route available for token pair".to_vec()),
             }
         }
 
@@ -2830,7 +3017,8 @@ impl_runtime_apis! {
         }
 
         fn authorities() -> Vec<sp_consensus_aura::sr25519::AuthorityId> {
-            Aura::authorities().to_vec()
+            // X3 (stable2512): Pallet::authorities() removed; read storage directly.
+            pallet_aura::Authorities::<Runtime>::get().into_inner()
         }
     }
 
@@ -2874,8 +3062,9 @@ impl_runtime_apis! {
             data.create_extrinsics()
         }
 
+        // X3 (stable2512): check_inherents now takes LazyBlock.
         fn check_inherents(
-            block: Block,
+            block: <Block as BlockT>::LazyBlock,
             data: sp_inherents::InherentData,
         ) -> sp_inherents::CheckInherentsResult {
             data.check_extrinsics(&block)

@@ -39,7 +39,7 @@ export default function TreasuryPanel() {
   // Calculate fee distribution from allocations
   const feeDistribution = treasurySnapshot?.allocations ? treasurySnapshot.allocations.map((alloc: any, idx: number) => ({
     label: alloc.name || `Allocation ${idx + 1}`,
-    pct: 100 / treasurySnapshot.allocations.length,
+    pct: 100 / (treasurySnapshot.allocations?.length ?? 1),
     amount: alloc.amount || "0",
     color: ["bg-purple-500", "bg-blue-500", "bg-cyan-500", "bg-green-500", "bg-orange-500", "bg-red-500"][idx % 6],
   })) : [];
@@ -111,7 +111,7 @@ export default function TreasuryPanel() {
           <h2 className="text-lg font-semibold">Fee Distribution</h2>
         </div>
         <div className="space-y-3">
-          {feeDistribution.map((d) => (
+          {feeDistribution.map((d: { label: string; pct: number; amount: string; color: string }) => (
             <div key={d.label} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-300">{d.label}</span>
@@ -138,7 +138,7 @@ export default function TreasuryPanel() {
           <h2 className="text-lg font-semibold">Recent Transactions</h2>
         </div>
         <div className="space-y-3">
-          {recentTransactions.map((tx, i) => (
+          {recentTransactions.map((tx: { type: string; desc: string; amount: string; time: string; status: string }, i: number) => (
             <div
               key={i}
               className="flex items-center justify-between bg-slate-900/50 rounded-lg p-3"
@@ -199,7 +199,7 @@ export default function TreasuryPanel() {
           <h2 className="text-lg font-semibold">Revenue Streams</h2>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {revenueStreams.map((r) => (
+          {revenueStreams.map((r: { protocol: string; revenue: string; feeRate: string; volume: string; growth: string }) => (
             <div key={r.protocol} className="bg-slate-900/50 rounded-lg p-4">
               <div className="text-sm font-semibold mb-2">{r.protocol}</div>
               <div className="space-y-1.5 text-xs">

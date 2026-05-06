@@ -338,6 +338,12 @@ export interface GovernanceSnapshot {
     votingPeriod: number;
     enactmentPeriod: number;
   };
+  /** Total tokens currently staked / locked for governance */
+  totalStaked?: string;
+  /** Unique voters who have cast at least one vote */
+  voterCount?: number;
+  /** Average participation rate across recent proposals (0–100) */
+  avgParticipation?: number;
 }
 
 export interface Delegation {
@@ -360,6 +366,13 @@ export interface TreasuryProposal {
   createdAt: number;
 }
 
+export interface TreasuryAllocation {
+  category: string;
+  amount: string;
+  percentage: number;
+  recipient?: string;
+}
+
 export interface TreasurySnapshot {
   proposalCount: number;
   pendingProposals: TreasuryProposal[];
@@ -370,6 +383,12 @@ export interface TreasurySnapshot {
     totalSpent: string;
     recurringTotal: string;
   };
+  /** Alias kept for backwards-compat with panels that use .proposals */
+  proposals?: TreasuryProposal[];
+  /** Treasury allocations per category or wallet */
+  allocations?: TreasuryAllocation[];
+  /** Total funds already allocated (human-readable amount string) */
+  totalAllocated?: string;
 }
 
 export interface TreasuryWallet {
@@ -395,7 +414,7 @@ export async function getGovernanceSnapshot(): Promise<GovernanceSnapshot | null
     // Count unique voters from all proposals
     const voters = new Set<string>();
     for (const [key, value] of proposals) {
-      const votes = await api.query.governance.proposalVotes(key.args[0].toNumber());
+      const votes = await api.query.governance.proposalVotes((key.args[0] as any).toNumber()) as any;
       if (votes.ayes) {
         votes.ayes.forEach((v: any) => voters.add(v.toString()));
       }
@@ -405,13 +424,13 @@ export async function getGovernanceSnapshot(): Promise<GovernanceSnapshot | null
     }
 
     const delegations = await api.query.governance.delegations.entries();
-    const configData = config.unwrap();
+    const configData = (config as any).unwrap();
 
     return {
-      proposalCount: proposalCount.toNumber(),
-      activeProposals: activeProposals.length,
+      proposalCount: (proposalCount as any).toNumber(),
+      activeProposals: activeProposals,
       totalVoters: voters.size,
-      totalDelegations: delegations.length,
+      totalDelegations: (delegations as any[]).length,
       config: {
         quorum: Number(configData.quorum.toString()) / 100,
         threshold: Number(configData.threshold.toString()) / 100,
@@ -432,9 +451,9 @@ export async function getProposalList(): Promise<GovernanceProposal[]> {
     const proposals: GovernanceProposal[] = [];
 
     for (const [key, value] of entries) {
-      const proposalId = key.args[0].toNumber();
-      const proposal = value.unwrap();
-      const votes = await api.query.governance.proposalVotes(proposalId);
+      const proposalId = (key.args[0] as any).toNumber();
+      const proposal = (value as any).unwrap();
+      const votes = await api.query.governance.proposalVotes(proposalId) as any;
 
       proposals.push({
         id: proposalId,
@@ -464,9 +483,9 @@ export async function getProposalList(): Promise<GovernanceProposal[]> {
 export async function getProposalTally(proposalId: number): Promise<{ ayes: number; nays: number; total: number } | null> {
   const api = await getApi();
   try {
-    const votes = await api.query.governance.proposalVotes(proposalId);
-    const ayes = Number(votes.ayes?.length || 0);
-    const nays = Number(votes.nays?.length || 0);
+    const votes = await api.query.governance.proposalVotes(proposalId) as any;
+    const ayes = Number((votes as any).ayes?.length || 0);
+    const nays = Number((votes as any).nays?.length || 0);
     return { ayes, nays, total: ayes + nays };
   } catch (e) {
     console.error(`Error fetching proposal ${proposalId} tally:`, e);
@@ -477,7 +496,7 @@ export async function getProposalTally(proposalId: number): Promise<{ ayes: numb
 export async function getDelegation(address: string): Promise<Delegation | null> {
   const api = await getApi();
   try {
-    const delegation = await api.query.governance.delegations(address);
+    const delegation = await api.query.governance.delegations(address) as any;
     if (!delegation.isSome) return null;
 
     const del = delegation.unwrap();
@@ -497,16 +516,16 @@ export async function getTreasurySnapshot(): Promise<TreasurySnapshot | null> {
   try {
     const [proposals, signers, isPaused] = await Promise.all([
       api.query.treasury.proposals.entries(),
-      api.query.treasury.signers(),
-      api.query.treasury.isPaused(),
+      api.query.treasury.signers() as unknown as any[],
+      api.query.treasury.isPaused() as any,
     ]);
 
     const treasuryAccount = (await import('./client')).getTreasuryAccountId();
 
     const treasuryProposals: TreasuryProposal[] = [];
     for (const [key, value] of proposals) {
-      const proposalId = key.args[0].toNumber();
-      const proposal = value.unwrap();
+      const proposalId = (key.args[0] as any).toNumber();
+      const proposal = (value as any).unwrap();
 
       treasuryProposals.push({
         id: proposalId,
@@ -544,7 +563,7 @@ export async function getTreasuryBalance(): Promise<string> {
   const api = await getApi();
   try {
     const treasuryAccountId = (await import('./client')).getTreasuryAccountId();
-    const accountData = await api.query.system.account(treasuryAccountId);
+    const accountData = await api.query.system.account(treasuryAccountId) as any;
     return accountData.data.free.toString();
   } catch (e) {
     console.error('Error fetching treasury balance:', e);
@@ -556,7 +575,7 @@ export async function getTreasuryWallets(): Promise<TreasuryWallet[]> {
   const api = await getApi();
   try {
     const treasuryAccountId = (await import('./client')).getTreasuryAccountId();
-    const accountData = await api.query.system.account(treasuryAccountId);
+    const accountData = await api.query.system.account(treasuryAccountId) as any;
     return [{
       address: treasuryAccountId,
       balance: accountData.data.free.toString(),
@@ -575,8 +594,8 @@ export async function getAIProposals(): Promise<GovernanceProposal[]> {
     const proposals: GovernanceProposal[] = [];
 
     for (const [key, value] of entries) {
-      const proposalId = key.args[0].toNumber();
-      const proposal = value.unwrap();
+      const proposalId = (key.args[0] as any).toNumber();
+      const proposal = (value as any).unwrap();
 
       proposals.push({
         id: proposalId,
@@ -611,7 +630,7 @@ export async function getTopDelegates(count = 10): Promise<{ address: string; po
 
     for (const [key, value] of delegations) {
       const delegator = key.args[0].toString();
-      const del = value.unwrap();
+      const del = (value as any).unwrap();
       const power = del.balance.toString();
 
       if (!powers[del.target.toString()]) {
@@ -621,7 +640,7 @@ export async function getTopDelegates(count = 10): Promise<{ address: string; po
     }
 
     return Object.entries(powers)
-      .sort((a, b) => BigInt(b[1]) - BigInt(a[1]))
+      .sort((a, b) => (BigInt(b[1]) > BigInt(a[1]) ? 1 : BigInt(b[1]) < BigInt(a[1]) ? -1 : 0))
       .slice(0, count)
       .map(([address, power]) => ({ address, power }));
   } catch (e) {
@@ -651,12 +670,12 @@ export async function submitGovernanceProposal(
       titleBytes,
       descriptionBytes,
       touchesInvariants,
-      proofCommitment ? Uint8Array.from(proofCommitment.replace('0x', ''), 'hex') : null,
-      constitutionHash ? Uint8Array.from(constitutionHash.replace('0x', ''), 'hex') : null,
+      proofCommitment ? new Uint8Array(Buffer.from(proofCommitment.replace('0x', ''), 'hex')) : null,
+      constitutionHash ? new Uint8Array(Buffer.from(constitutionHash.replace('0x', ''), 'hex')) : null,
     );
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error submitting governance proposal:', e);
     return { success: false, txHash: '', error: e.message };
@@ -679,7 +698,7 @@ export async function castVote(
     );
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error casting vote on proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -696,7 +715,7 @@ export async function delegateVote(
     const tx = api.tx.governance.delegate(target, conviction);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error delegating vote:', e);
     return { success: false, txHash: '', error: e.message };
@@ -709,7 +728,7 @@ export async function undelegateVote(signer: any): Promise<{ success: boolean; t
     const tx = api.tx.governance.undelegate();
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error undelegating vote:', e);
     return { success: false, txHash: '', error: e.message };
@@ -726,7 +745,7 @@ export async function fastTrackProposal(
     const tx = api.tx.governance.fastTrack(proposalId, delay);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error fast-tracking proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -742,7 +761,7 @@ export async function cancelProposal(
     const tx = api.tx.governance.cancelProposal(proposalId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error cancelling proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -758,7 +777,7 @@ export async function finalizeProposal(
     const tx = api.tx.governance.finalizeProposal(proposalId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error finalizing proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -771,7 +790,7 @@ export async function unlockVotes(signer: any, account: string): Promise<{ succe
     const tx = api.tx.governance.unlock(account);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error unlocking votes for ${account}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -797,7 +816,7 @@ export async function submitTreasuryProposal(
     );
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error submitting treasury proposal:', e);
     return { success: false, txHash: '', error: e.message };
@@ -813,7 +832,7 @@ export async function approveTreasuryProposal(
     const tx = api.tx.treasury.approveProposal(proposalId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error approving treasury proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -829,7 +848,7 @@ export async function rejectTreasuryProposal(
     const tx = api.tx.treasury.rejectProposal(proposalId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error rejecting treasury proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -845,7 +864,7 @@ export async function executeTreasuryProposal(
     const tx = api.tx.treasury.executeProposal(proposalId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error executing treasury proposal ${proposalId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -869,7 +888,7 @@ export async function createRecurringPayment(
     );
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error creating recurring payment:', e);
     return { success: false, txHash: '', error: e.message };
@@ -885,7 +904,7 @@ export async function cancelRecurringPayment(
     const tx = api.tx.treasury.cancelRecurringPayment(paymentId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error cancelling recurring payment ${paymentId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -913,7 +932,7 @@ export async function registerYieldStrategy(
     );
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error registering yield strategy:', e);
     return { success: false, txHash: '', error: e.message };
@@ -931,7 +950,7 @@ export async function executeYieldStrategy(
     const tx = api.tx.treasury.executeYieldStrategy(strategyId, amount, maxIterations);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error executing yield strategy ${strategyId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -949,7 +968,7 @@ export async function reportYieldReturn(
     const tx = api.tx.treasury.reportYieldReturn(strategyId, totalReturn, principal);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error reporting yield return for strategy ${strategyId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -965,7 +984,7 @@ export async function deactivateYieldStrategy(
     const tx = api.tx.treasury.deactivateYieldStrategy(strategyId);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error(`Error deactivating yield strategy ${strategyId}:`, e);
     return { success: false, txHash: '', error: e.message };
@@ -983,7 +1002,7 @@ export async function pauseTreasury(
     const tx = api.tx.treasury.pause(reasonBytes);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error pausing treasury:', e);
     return { success: false, txHash: '', error: e.message };
@@ -996,7 +1015,7 @@ export async function unpauseTreasury(signer: any): Promise<{ success: boolean; 
     const tx = api.tx.treasury.unpause();
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error unpausing treasury:', e);
     return { success: false, txHash: '', error: e.message };
@@ -1012,7 +1031,7 @@ export async function updateTreasurySigners(
     const tx = api.tx.treasury.updateSigners(signers);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error updating treasury signers:', e);
     return { success: false, txHash: '', error: e.message };
@@ -1028,7 +1047,7 @@ export async function depositToTreasury(
     const tx = api.tx.treasury.deposit(amount);
 
     const result = await tx.signAndSend(signer, { nonce: -1 });
-    return { success: true, txHash: result.txHash.toString() };
+    return { success: true, txHash: result.hash.toString() };
   } catch (e: any) {
     console.error('Error depositing to treasury:', e);
     return { success: false, txHash: '', error: e.message };

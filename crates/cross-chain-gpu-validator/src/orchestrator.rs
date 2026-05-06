@@ -33,7 +33,7 @@ pub struct AtomicSwapOrchestrator {
 impl AtomicSwapOrchestrator {
     pub async fn new(redis_url: &str, default_timeout_secs: u64) -> Result<Self> {
         let registry = Arc::new(AtomicRegistry::new(redis_url, 3600).await?);
-        let evm_validator = Arc::new(EvmValidator::new(32, false));
+        let evm_validator = Arc::new(EvmValidator::new());
         let svm_validator = Arc::new(SvmValidator::new());
         let failover = Arc::new(FailoverManager::new(32));
 

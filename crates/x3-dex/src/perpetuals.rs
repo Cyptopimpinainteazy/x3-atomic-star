@@ -1,6 +1,7 @@
 /// Perpetual Futures Engine — Unlimited-expiry leveraged derivatives with funding rates
 /// Enables up to 10x leverage, funding rate equilibrium, and liquidation mechanics
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PerpetualPosition {

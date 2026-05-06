@@ -6,13 +6,13 @@ edition = "2021"
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
 scale-info = { version = "2.11", default-features = false, features = ["derive"] }
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-frame-system = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-sp-io = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512" }
-frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-stable2512", optional = true }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512" }
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, branch = "stable2512", optional = true }
 
 [dev-dependencies]
 

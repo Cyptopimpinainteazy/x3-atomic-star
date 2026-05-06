@@ -1,4 +1,4 @@
-use parity_scale_codec::Encode;
+use codec::Encode;
 use sc_service::GenericChainSpec;
 use sc_service::{ChainSpec as ServiceChainSpec, ChainType};
 use serde::Deserialize;
@@ -10,12 +10,12 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, SystemConfig, TreasuryConfig,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig,
     X3CoinConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
-pub type ChainSpec = GenericChainSpec<RuntimeGenesisConfig>;
+pub type ChainSpec = GenericChainSpec;
 
 const DEFAULT_PROTOCOL_ID: &str = "x3";
 const X3: u128 = 1_000_000_000_000;
@@ -252,28 +252,23 @@ pub fn development_config() -> Result<ChainSpec, String> {
     // executed via Council::propose(threshold=1, ...) without a Sudo pallet.
     let council_members = vec![get_account_id_from_seed::<sr25519::Public>("Alice")?];
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Development",
-        "x3_chain_dev",
-        ChainType::Development,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                Vec::new(),
-                sp_core::H160::zero(),
-                [0u8; 32],
-            )
-        },
-        vec![],
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        Vec::new(),
+        sp_core::H160::zero(),
+        [0u8; 32],
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Development")
+        .with_id("x3_chain_dev")
+        .with_chain_type(ChainType::Development)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Build the local testnet `ChainSpec` used during development.
@@ -298,28 +293,23 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Bob")?,
     ];
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Local Testnet",
-        "x3_chain_local",
-        ChainType::Local,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                Vec::new(),
-                sp_core::H160::zero(),
-                [0u8; 32],
-            )
-        },
-        vec![],
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        Vec::new(),
+        sp_core::H160::zero(),
+        [0u8; 32],
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Local Testnet")
+        .with_id("x3_chain_local")
+        .with_chain_type(ChainType::Local)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Build a local 3-validator `ChainSpec` (Alice/Bob/Charlie) for MVP consensus validation.
@@ -346,28 +336,23 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Charlie")?,
     ];
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Local 3-Validator Testnet",
-        "x3_chain_local3",
-        ChainType::Local,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                Vec::new(),
-                sp_core::H160::zero(),
-                [0u8; 32],
-            )
-        },
-        vec![],
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        Vec::new(),
+        sp_core::H160::zero(),
+        [0u8; 32],
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Local 3-Validator Testnet")
+        .with_id("x3_chain_local3")
+        .with_chain_type(ChainType::Local)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Build the staging `ChainSpec` matching the release network parameters.
@@ -399,28 +384,24 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         return Err("Staging network requires non-zero SVM escrow address".to_string());
     }
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Staging",
-        "x3_chain_staging",
-        ChainType::Live,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                treasury_signers.clone(),
-                evm_escrow,
-                svm_escrow,
-            )
-        },
-        bootnodes,
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        treasury_signers,
+        evm_escrow,
+        svm_escrow,
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Staging")
+        .with_id("x3_chain_staging")
+        .with_chain_type(ChainType::Live)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_boot_nodes(bootnodes)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Build a multi-validator testnet `ChainSpec` for external testing.
@@ -464,28 +445,24 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         return Err("Testnet network requires non-zero SVM escrow address".to_string());
     }
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Testnet",
-        "x3_chain_testnet",
-        ChainType::Live,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                treasury_signers.clone(),
-                evm_escrow,
-                svm_escrow,
-            )
-        },
-        bootnodes,
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        treasury_signers,
+        evm_escrow,
+        svm_escrow,
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Testnet")
+        .with_id("x3_chain_testnet")
+        .with_chain_type(ChainType::Live)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_boot_nodes(bootnodes)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Build the production `ChainSpec` for mainnet deployment.
@@ -526,28 +503,24 @@ pub fn production_config() -> Result<ChainSpec, String> {
         return Err("Production network requires non-zero SVM escrow address".to_string());
     }
 
-    Ok(ChainSpec::from_genesis(
-        "X3 Chain Production",
-        "x3_chain_production",
-        ChainType::Live,
-        move || {
-            x3_chain_genesis(
-                wasm_binary,
-                initial_authorities.clone(),
-                endowed_accounts.clone(),
-                council_members.clone(),
-                treasury_signers.clone(),
-                evm_escrow,
-                svm_escrow,
-            )
-        },
-        bootnodes,
-        None,
-        Some(DEFAULT_PROTOCOL_ID),
-        None,
-        Default::default(),
-        None,
-    ))
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        treasury_signers,
+        evm_escrow,
+        svm_escrow,
+    );
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Production")
+        .with_id("x3_chain_production")
+        .with_chain_type(ChainType::Live)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_boot_nodes(bootnodes)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
 }
 
 /// Parse a 20-byte EVM address from an env var (hex with or without 0x prefix).
@@ -599,7 +572,6 @@ fn parse_svm_escrow_from_env(var: &str) -> [u8; 32] {
 }
 
 fn x3_chain_genesis(
-    wasm_binary: &[u8],
     initial_authorities: Vec<(AuraId, GrandpaId)>,
     endowed_accounts: Vec<AccountId>,
     council_members: Vec<AccountId>,
@@ -635,11 +607,8 @@ fn x3_chain_genesis(
         .collect();
 
     RuntimeGenesisConfig {
-        system: SystemConfig {
-            code: wasm_binary.to_vec(),
-            ..Default::default()
-        },
-        balances: BalancesConfig { balances },
+        system: Default::default(),
+        balances: BalancesConfig { balances, dev_accounts: None },
         aura: AuraConfig {
             authorities: aura_authorities,
         },
@@ -667,6 +636,8 @@ fn x3_chain_genesis(
             ecosystem_allocations: Vec::new(),
             liquidity_allocations: Vec::new(),
         },
+        session: Default::default(),
+        ethereum: Default::default(),
         evolution_core: Default::default(),
         x3_verifier: Default::default(),
         depin_marketplace: Default::default(),

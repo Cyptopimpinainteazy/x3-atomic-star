@@ -6,15 +6,13 @@
 //! expanded into a full FRAME pallet storage design as part of the ADR work.
 
 use codec::{Decode, DecodeWithMemTracking, Encode};
+use core::fmt::Debug;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Bond types used for different policies
-#[derive(
-    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo,
-)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo)]
 pub enum BondType {
     InitialMargin,
     MaintenanceMargin,
@@ -22,9 +20,7 @@ pub enum BondType {
 }
 
 /// Bond state
-#[derive(
-    Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo,
-)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Copy, PartialEq, Eq, Debug, TypeInfo)]
 pub enum BondState {
     Locked,
     Withdrawable,

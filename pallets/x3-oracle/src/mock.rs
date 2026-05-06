@@ -2,7 +2,10 @@
 
 use super::*;
 use crate as pallet_x3_oracle;
-use frame_support::{parameter_types, traits::{ConstU32, Everything}};
+use frame_support::{
+    parameter_types,
+    traits::{ConstU32, Everything},
+};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{

@@ -1,5 +1,5 @@
 //! X3 Swarm Core - Autonomous Agent System
-//! 
+//!
 //! This crate provides the core infrastructure for X3's autonomous swarm agents
 //! that can scan, build, test, audit, break, fix, and prove the system.
 
@@ -20,7 +20,7 @@ pub use approval::ApprovalGate;
 pub use events::SwarmEvent;
 pub use guard::{evaluate_path, ForbiddenPathGuard, GuardAction};
 pub use memory::SwarmMemoryEntry;
-pub use policy::{AgentPolicy, ApprovalRequirement, default_agent_policies};
+pub use policy::{default_agent_policies, AgentPolicy, ApprovalRequirement};
 pub use report::SwarmReport;
 pub use scheduler::SwarmScheduler;
 pub use scoreboard::SwarmScoreboard;

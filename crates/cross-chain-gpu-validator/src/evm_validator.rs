@@ -3,16 +3,13 @@
 //! Provides GPU-accelerated validation of Ethereum block headers using Keccak256.
 
 use crate::error::ValidatorError;
-use crate::kernels::Keccak256Kernel;
 use crate::failover::CpuFallback;
-use crate::orchestrator::SwarmOrchestrator;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::kernels::Keccak256Kernel;
 
 /// EVM Header Validator
 ///
-//! Validates Ethereum block headers using GPU-accelerated Keccak256 hashing.
-//! Falls back to CPU validation if GPU is unavailable.
+/// Validates Ethereum block headers using GPU-accelerated Keccak256 hashing.
+/// Falls back to CPU validation if GPU is unavailable.
 
 pub struct EvmHeaderValidator {
     gpu_kernel: Option<Keccak256Kernel>,
@@ -23,8 +20,8 @@ impl EvmHeaderValidator {
     /// Create a new EVM header validator
     pub fn new() -> Self {
         // Try to initialize GPU kernel, fall back to CPU if unavailable
-        let gpu_kernel = Keccak256Kernel::new().ok();
-        
+        let gpu_kernel = Some(Keccak256Kernel::new(32, true));
+
         Self {
             gpu_kernel,
             cpu_fallback: CpuFallback::new(),
@@ -33,18 +30,18 @@ impl EvmHeaderValidator {
 
     /// Validate an EVM block header
     ///
-    //! Validates:
-    //! - Block hash (Keccak256 ofRLP-encoded header)
-    //! - Parent hash
-    //! - State root
-    //! - Receipts root
-    //! - Difficulty (or prevrandao for EIP-4399)
-    //! - Gas limit and gas used
-    //! - Timestamp
-    //! - Block number
-    //! - Coinbase
-    //!
-    //! Returns the validated block hash if successful.
+    /// Validates:
+    /// - Block hash (Keccak256 of RLP-encoded header)
+    /// - Parent hash
+    /// - State root
+    /// - Receipts root
+    /// - Difficulty (or prevrandao for EIP-4399)
+    /// - Gas limit and gas used
+    /// - Timestamp
+    /// - Block number
+    /// - Coinbase
+    ///
+    /// Returns the validated block hash if successful.
     pub async fn validate_header(
         &self,
         block_number: u64,
@@ -154,6 +151,8 @@ impl EvmHeaderValidator {
     }
 }
 
+pub type EvmValidator = EvmHeaderValidator;
+
 impl Default for EvmHeaderValidator {
     fn default() -> Self {
         Self::new()
@@ -177,40 +176,20 @@ mod tests {
         // Valid header
         assert!(validator
             .validate_basic_fields(
-                1,
-                [1u8; 32],
-                [2u8; 32],
-                [3u8; 32],
-                30_000_000,
-                20_000_000,
-                1234567890,
+                1, [1u8; 32], [2u8; 32], [3u8; 32], 30_000_000, 20_000_000, 1234567890,
             )
             .is_ok());
 
         // Invalid: gas_used > gas_limit
         assert!(validator
             .validate_basic_fields(
-                1,
-                [1u8; 32],
-                [2u8; 32],
-                [3u8; 32],
-                10_000_000,
-                20_000_000,
-                1234567890,
+                1, [1u8; 32], [2u8; 32], [3u8; 32], 10_000_000, 20_000_000, 1234567890,
             )
             .is_err());
 
         // Invalid: zero timestamp
         assert!(validator
-            .validate_basic_fields(
-                1,
-                [1u8; 32],
-                [2u8; 32],
-                [3u8; 32],
-                30_000_000,
-                20_000_000,
-                0,
-            )
+            .validate_basic_fields(1, [1u8; 32], [2u8; 32], [3u8; 32], 30_000_000, 20_000_000, 0,)
             .is_err());
     }
 }

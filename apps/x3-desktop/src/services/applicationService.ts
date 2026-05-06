@@ -303,7 +303,7 @@ export const DEFAULT_APPLICATIONS: Application[] = [
   {
     id: "stake",
     name: "Stake",
-    description: "Staking interface — flexible to locked tiers, 5-15% APY, rewards",
+    description: "Staking interface — validator delegation, lock tiers, and reward tracking",
     category: "defi",
     icon: { type: "file", path: "/assets/icons/stake.svg", color: "#ff6d00" },
     launchCommand: { type: "internal", target: "stake" },
@@ -311,7 +311,7 @@ export const DEFAULT_APPLICATIONS: Application[] = [
   {
     id: "atomic-swap",
     name: "Atomic Swap",
-    description: "Cross-chain swaps across 103 EVM chains in 6 seconds, no bridges",
+    description: "Cross-chain swap console — guarded by current router/gateway feature flags",
     category: "defi",
     icon: { type: "file", path: "/assets/icons/swap.svg", color: "#00e5ff" },
     launchCommand: { type: "internal", target: "atomic-swap" },
@@ -319,7 +319,7 @@ export const DEFAULT_APPLICATIONS: Application[] = [
   {
     id: "treasury",
     name: "Treasury",
-    description: "DAO treasury — $89M value, distribution, revenue, burn rate",
+    description: "DAO treasury dashboard — balances, distribution, revenue, burn tracking",
     category: "blockchain",
     icon: { type: "file", path: "/assets/icons/treasury.svg", color: "#ffd700" },
     launchCommand: { type: "internal", target: "treasury" },

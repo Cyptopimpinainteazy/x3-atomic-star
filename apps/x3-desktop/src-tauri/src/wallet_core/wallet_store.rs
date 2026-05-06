@@ -7,11 +7,12 @@
 //! - Wallet recovery functionality
 //! - Multi-chain wallet support
 
-use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Key, Nonce};
+use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Nonce};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::num::NonZeroU32;
 
 /// Wallet encryption configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,25 +125,25 @@ impl WalletStore {
     /// Derive encryption key from master password using PBKDF2
     fn derive_key(&self, master_password: &str) -> [u8; 32] {
         use ring::pbkdf2::{derive, PBKDF2_HMAC_SHA256};
-        use ring::rand::SystemRandom;
         
         let salt = self.encryption_config.salt.as_bytes();
         let mut key = [0u8; 32];
-        let prng = SystemRandom::new();
-        derive(PBKDF2_HMAC_SHA256, 100000, salt, master_password.as_bytes(), &mut key);
+        let iterations = NonZeroU32::new(100_000).expect("PBKDF2 iteration count is non-zero");
+        derive(PBKDF2_HMAC_SHA256, iterations, salt, master_password.as_bytes(), &mut key);
         key
     }
 
     /// Encrypt wallet data using AES-256-GCM
     pub fn encrypt_data(&self, plaintext: &str, master_password: &str) -> Result<String, WalletStoreError> {
         let key = self.derive_key(master_password);
-        let cipher = Aes256Gcm::new(Key::from_slice(&key));
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| WalletStoreError::Encryption(format!("Invalid key: {}", e)))?;
         
         let mut nonce_bytes = [0u8; 12];
         rand::rngs::OsRng.fill(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
         
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes().into())
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes())
             .map_err(|e| WalletStoreError::Encryption(format!("Encryption failed: {}", e)))?;
         
         // Combine nonce and ciphertext, then base64 encode
@@ -156,7 +157,8 @@ impl WalletStore {
     /// Decrypt wallet data using AES-256-GCM
     pub fn decrypt_data(&self, ciphertext: &str, master_password: &str) -> Result<String, WalletStoreError> {
         let key = self.derive_key(master_password);
-        let cipher = Aes256Gcm::new(Key::from_slice(&key));
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| WalletStoreError::Decryption(format!("Invalid key: {}", e)))?;
         
         let combined = STANDARD.decode(ciphertext)
             .map_err(|e| WalletStoreError::Decryption(format!("Invalid base64: {}", e)))?;
@@ -168,7 +170,7 @@ impl WalletStore {
         let (nonce_bytes, ciphertext_bytes) = combined.split_at(12);
         let nonce = Nonce::from_slice(nonce_bytes);
         
-        let plaintext = cipher.decrypt(nonce, ciphertext_bytes.into())
+        let plaintext = cipher.decrypt(nonce, ciphertext_bytes)
             .map_err(|e| WalletStoreError::Decryption(format!("Decryption failed: {}", e)))?;
         
         String::from_utf8(plaintext)
@@ -209,14 +211,15 @@ impl WalletStore {
     pub fn retrieve_wallet(
         &self,
         wallet_id: &str,
+        master_password: &str,
     ) -> Result<(String, String), WalletStoreError> {
         let wallet_data = self
             .wallets
             .get(wallet_id)
             .ok_or_else(|| WalletStoreError::WalletNotFound(wallet_id.to_string()))?;
 
-        let mnemonic = self.decrypt_data(&wallet_data.encrypted_mnemonic)?;
-        let seed = self.decrypt_data(&wallet_data.encrypted_seed)?;
+        let mnemonic = self.decrypt_data(&wallet_data.encrypted_mnemonic, master_password)?;
+        let seed = self.decrypt_data(&wallet_data.encrypted_seed, master_password)?;
 
         Ok((mnemonic, seed))
     }

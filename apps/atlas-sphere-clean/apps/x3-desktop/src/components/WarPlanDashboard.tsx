@@ -1,7 +1,7 @@
 // TIER 9: React Dashboard Components for Funding War Plan
 // Financial projections, cap table simulator, runway visualization
 
-import React, { useState, usEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LineChart,
   Line,
@@ -50,7 +50,7 @@ export const FinancialProjectionChart: React.FC<{ projectionData: any }> = ({
           <XAxis dataKey="month" />
           <YAxis />
           <Tooltip
-            formatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+            formatter={(value) => `$${(Number(value) / 1000).toFixed(1)}k`}
             labelFormatter={(label) => `Month ${label}`}
           />
           <Legend />
@@ -79,7 +79,10 @@ export const FinancialProjectionChart: React.FC<{ projectionData: any }> = ({
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
           <YAxis />
-          <Tooltip formatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
+          <Tooltip formatter={(value) => {
+            const amount = Number(value ?? 0);
+            return `$${(amount / 1000000).toFixed(1)}M`;
+          }} />
           <Legend />
           <Line
             type="monotone"
@@ -133,7 +136,7 @@ export const ScenarioComparison: React.FC<{ scenarios: any }> = ({
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis />
-          <Tooltip formatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
+          <Tooltip formatter={(value) => `$${(Number(value) / 1000000).toFixed(1)}M`} />
           <Legend />
           <Bar dataKey="revenue" fill="#8884d8" name="Revenue" />
           <Bar dataKey="burn" fill="#ff7300" name="Burn" />
@@ -260,7 +263,10 @@ export const CapTableSimulator: React.FC<{ capTable: any }> = ({ capTable }) => 
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
+            label={({ name, value }) => {
+              const numeric = Number(value ?? 0);
+              return `${name}: ${numeric.toFixed(1)}%`;
+            }}
             outerRadius={80}
             fill="#8884d8"
             dataKey="value"
@@ -452,7 +458,10 @@ export const TreasuryRunwayDashboard: React.FC<{ runwayData: any }> = ({
           <XAxis dataKey="month" />
           <YAxis />
           <Tooltip
-            formatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
+            formatter={(value) => {
+              const amount = Number(value ?? 0);
+              return `$${(amount / 1000000).toFixed(1)}M`;
+            }}
             labelFormatter={(label) => `Month ${label}`}
           />
           <Area

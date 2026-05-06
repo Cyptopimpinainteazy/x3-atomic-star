@@ -18,7 +18,7 @@ API available at http://127.0.0.1:8787. Syncing task queue to swarm API...
     "required_commands": [
       "cargo test -p x3-swarm-core -- --nocapture"
     ],
-    "status": "Pending",
+    "status": "Passed",
     "approval_required": "manual",
     "risk": "medium"
   },
@@ -39,7 +39,7 @@ API available at http://127.0.0.1:8787. Syncing task queue to swarm API...
     "required_commands": [
       "cat data/agent-memory/*.jsonl"
     ],
-    "status": "Pending",
+    "status": "Passed",
     "approval_required": "auto",
     "risk": "low"
   },
@@ -62,7 +62,7 @@ API available at http://127.0.0.1:8787. Syncing task queue to swarm API...
     "required_commands": [
       "scripts/swarm/swarm_report.sh"
     ],
-    "status": "Pending",
+    "status": "Passed",
     "approval_required": "auto",
     "risk": "low"
   }

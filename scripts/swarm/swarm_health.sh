@@ -6,8 +6,7 @@ API_URL="http://127.0.0.1:8787"
 HEALTH_URL="$API_URL/health"
 STATUS_URL="$API_URL/status"
 TASKS_URL="$API_URL/tasks"
-MEMORY_URL="$API_URL/memory"
-EVENTS_URL="$API_URL/events"
+CURL_OPTS=(-fsS --connect-timeout 2 --max-time 5)
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "ERROR: curl is required for swarm health checks"
@@ -24,7 +23,7 @@ echo "== X3 Swarm Health Check =="
 api_ok=false
 all_ok=true
 
-if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+if curl "${CURL_OPTS[@]}" "$HEALTH_URL" >/dev/null 2>&1; then
   echo "- API /health: ok"
   api_ok=true
 else
@@ -32,14 +31,14 @@ else
   all_ok=false
 fi
 
-if curl -fsS "$STATUS_URL" >/dev/null 2>&1; then
+if curl "${CURL_OPTS[@]}" "$STATUS_URL" >/dev/null 2>&1; then
   echo "- API /status: ok"
 else
   echo "WARNING: API /status endpoint is unavailable"
 fi
 
-if curl -fsS "$TASKS_URL" >/dev/null 2>&1; then
-  task_count=$(curl -fsS "$TASKS_URL" | python3 -c 'import sys, json; data=json.load(sys.stdin); print(len(data))')
+if tasks_response=$(curl "${CURL_OPTS[@]}" "$TASKS_URL" 2>/dev/null); then
+  task_count=$(printf '%s' "$tasks_response" | python3 -c 'import sys, json; data=json.load(sys.stdin); print(len(data))')
   echo "- API /tasks: $task_count task(s) returned"
 else
   echo "WARNING: API /tasks endpoint is unavailable"

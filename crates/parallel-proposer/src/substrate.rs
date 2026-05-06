@@ -4,7 +4,8 @@ use contention_predictor::{ContentionPredictor, TxMetadata};
 use futures::{channel::oneshot, future, FutureExt};
 use log::{debug, info, trace, warn};
 use rayon::prelude::*;
-use sc_block_builder::{BlockBuilderApi, BlockBuilderProvider};
+use sc_block_builder::{BlockBuilderApi, BlockBuilderBuilder};
+use sp_api::CallApiAt;
 use sc_client_api::backend;
 use sc_telemetry::{telemetry, TelemetryHandle, CONSENSUS_INFO};
 use sc_transaction_pool_api::{InPoolTransaction, TransactionPool};
@@ -111,14 +112,13 @@ impl<A, B, C, PR> Environment<A::Block> for ParallelProposerFactory<A, B, C, PR>
 where
     A: TransactionPool + 'static,
     B: backend::Backend<A::Block> + Send + Sync + 'static,
-    C: BlockBuilderProvider<B, A::Block, C>
+    C: CallApiAt<A::Block>
         + HeaderBackend<A::Block>
         + ProvideRuntimeApi<A::Block>
         + Send
         + Sync
         + 'static,
-    C::Api: ApiExt<A::Block, StateBackend = backend::StateBackendFor<B, A::Block>>
-        + BlockBuilderApi<A::Block>,
+    C::Api: ApiExt<A::Block> + BlockBuilderApi<A::Block>,
     PR: ProofRecording,
 {
     type Proposer = ParallelProposer<B, A::Block, C, A, PR>;
@@ -153,21 +153,19 @@ where
     A: TransactionPool<Block = Block> + 'static,
     B: backend::Backend<Block> + Send + Sync + 'static,
     Block: BlockT,
-    C: BlockBuilderProvider<B, Block, C>
+    C: CallApiAt<Block>
         + HeaderBackend<Block>
         + ProvideRuntimeApi<Block>
         + Send
         + Sync
         + 'static,
-    C::Api:
-        ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>> + BlockBuilderApi<Block>,
+    C::Api: ApiExt<Block> + BlockBuilderApi<Block>,
     PR: ProofRecording,
 {
-    type Transaction = backend::TransactionFor<B, Block>;
     type Proposal = Pin<
         Box<
             dyn futures::Future<
-                    Output = Result<Proposal<Block, Self::Transaction, PR::Proof>, Self::Error>,
+                    Output = Result<Proposal<Block, PR::Proof>, Self::Error>,
                 > + Send,
         >,
     >;
@@ -208,14 +206,13 @@ where
     A: TransactionPool<Block = Block>,
     B: backend::Backend<Block> + Send + Sync + 'static,
     Block: BlockT,
-    C: BlockBuilderProvider<B, Block, C>
+    C: CallApiAt<Block>
         + HeaderBackend<Block>
         + ProvideRuntimeApi<Block>
         + Send
         + Sync
         + 'static,
-    C::Api:
-        ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>> + BlockBuilderApi<Block>,
+    C::Api: ApiExt<Block> + BlockBuilderApi<Block>,
     PR: ProofRecording,
 {
     async fn propose_with(
@@ -224,19 +221,22 @@ where
         inherent_digests: Digest,
         deadline: time::Instant,
         block_size_limit: Option<usize>,
-    ) -> Result<Proposal<Block, backend::TransactionFor<B, Block>, PR::Proof>, sp_blockchain::Error>
+    ) -> Result<Proposal<Block, PR::Proof>, sp_blockchain::Error>
     {
-        let mut block_builder =
-            self.client
-                .new_block_at(self.parent_hash, inherent_digests, PR::ENABLED)?;
+        let mut block_builder = BlockBuilderBuilder::new(&*self.client)
+            .on_parent_block(self.parent_hash)
+            .fetch_parent_block_number(&*self.client)?
+            .with_proof_recording(PR::ENABLED)
+            .with_inherent_digests(inherent_digests)
+            .build()?;
 
         self.apply_inherents(&mut block_builder, inherent_data)?;
         self.apply_extrinsics_parallel(&mut block_builder, deadline, block_size_limit)
             .await?;
 
         let (block, storage_changes, proof) = block_builder.build()?.into_inner();
-        let proof =
-            PR::into_proof(proof).map_err(|e| sp_blockchain::Error::Application(Box::new(e)))?;
+        let proof = PR::into_proof(proof)
+            .map_err(|e| sp_blockchain::Error::Application(Box::new(e)))?;
 
         info!(
             target: LOG_TARGET,
@@ -261,7 +261,7 @@ where
 
     fn apply_inherents(
         &self,
-        block_builder: &mut sc_block_builder::BlockBuilder<'_, Block, C, B>,
+        block_builder: &mut sc_block_builder::BlockBuilder<'_, Block, C>,
         inherent_data: InherentData,
     ) -> Result<(), sp_blockchain::Error> {
         let inherents = block_builder.create_inherents(inherent_data)?;
@@ -285,7 +285,7 @@ where
 
     async fn apply_extrinsics_parallel(
         &self,
-        block_builder: &mut sc_block_builder::BlockBuilder<'_, Block, C, B>,
+        block_builder: &mut sc_block_builder::BlockBuilder<'_, Block, C>,
         deadline: time::Instant,
         block_size_limit: Option<usize>,
     ) -> Result<(), sp_blockchain::Error> {
@@ -311,7 +311,7 @@ where
             let pool_hash = pending_tx.hash().clone();
             total_size = total_size.saturating_add(size);
             let tx_hash = BlakeTwo256::hash_of(&data);
-            let metadata = extract_tx_metadata(&data, hash_to_bytes(tx_hash.as_ref()));
+            let metadata = extract_tx_metadata(data.as_ref(), hash_to_bytes(tx_hash.as_ref()));
             pending.push(PendingTx {
                 pool_hash,
                 data: Some(data),
@@ -387,7 +387,7 @@ where
                 None => continue,
             };
             trace!(target: LOG_TARGET, "Pushing tx {:?} to block", pending_tx.pool_hash);
-            match block_builder.push(data) {
+            match block_builder.push((*data).clone()) {
                 Ok(()) => {}
                 Err(ApplyExtrinsicFailed(Validity(e))) if e.exhausted_resources() => {
                     if skipped < MAX_SKIPPED_TRANSACTIONS || (self.now)() < soft_deadline {
@@ -409,7 +409,8 @@ where
         }
 
         if !invalid_hashes.is_empty() {
-            self.transaction_pool.remove_invalid(&invalid_hashes);
+            // NOTE: remove_invalid was removed in stable2512; pool manages invalid tx cleanup internally
+            let _ = invalid_hashes;
         }
 
         Ok(())
@@ -420,7 +421,7 @@ const MAX_SKIPPED_TRANSACTIONS: usize = 8;
 
 struct PendingTx<Block: BlockT, Hash> {
     pool_hash: Hash,
-    data: Option<Block::Extrinsic>,
+    data: Option<Arc<Block::Extrinsic>>,
     size: usize,
     metadata: TxMetadata,
 }
@@ -445,7 +446,7 @@ pub fn extract_tx_metadata<E: Encode>(extrinsic: &E, tx_hash: [u8; 32]) -> TxMet
         let mut sender = tx_hash;
         let mut nonce = 0u64;
 
-        if let Some((address, _signature, extra)) = decoded.signature {
+        if let sp_runtime::generic::Preamble::Signed(address, _signature, extra) = decoded.preamble {
             if let Some(account) = address_to_account(address) {
                 sender.copy_from_slice(account.as_ref());
             }

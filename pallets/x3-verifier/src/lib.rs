@@ -736,7 +736,10 @@ pub mod pallet {
             }
 
             // Recover the public key from the signature
-            let signature_bytes: [u8; 65] = receipt.signature.as_slice().try_into()
+            let signature_bytes: [u8; 65] = receipt
+                .signature
+                .as_slice()
+                .try_into()
                 .map_err(|_| Error::<T>::InvalidSignature)?;
             // msg_hash is already [u8; 32] from keccak_256 — use directly
             let recovered_pk = sp_io::crypto::secp256k1_ecdsa_recover(&signature_bytes, &msg_hash)
@@ -748,7 +751,7 @@ pub mod pallet {
             let pk_hash = keccak_256(&recovered_pk);
             // Last 20 bytes of keccak256(pubkey) = Ethereum address
             let eth_addr = &pk_hash[12..]; // 20 bytes
-            // Derive substrate AccountId from the Ethereum address via blake2_256
+                                           // Derive substrate AccountId from the Ethereum address via blake2_256
             let recovered_account_id_bytes = sp_io::hashing::blake2_256(eth_addr);
             let recovered_account = T::AccountId::decode(&mut &recovered_account_id_bytes[..])
                 .map_err(|_| Error::<T>::InvalidSignature)?;

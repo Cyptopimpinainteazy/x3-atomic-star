@@ -1,7 +1,7 @@
 // Comprehensive keyboard shortcut system with customization and cheatsheet display
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface KeyCombo {
   ctrl: boolean;
@@ -81,7 +81,7 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
     id: 'nav.validator',
     name: 'Go to Validators',
     description: 'Jump to validators panel',
-    combo: { ctrl: true, alt: true, alt: false, key: '1' },
+    combo: { ctrl: true, shift: false, alt: true, key: '1' },
     category: 'Navigation',
     enabled: true,
     customizable: true,
@@ -90,7 +90,7 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
     id: 'nav.wallet',
     name: 'Go to Wallet',
     description: 'Jump to wallet panel',
-    combo: { ctrl: true, alt: true, alt: false, key: '2' },
+    combo: { ctrl: true, shift: false, alt: true, key: '2' },
     category: 'Navigation',
     enabled: true,
     customizable: true,
@@ -99,7 +99,7 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
     id: 'nav.dex',
     name: 'Go to DEX',
     description: 'Jump to DEX trading panel',
-    combo: { ctrl: true, alt: true, alt: false, key: '3' },
+    combo: { ctrl: true, shift: false, alt: true, key: '3' },
     category: 'Navigation',
     enabled: true,
     customizable: true,
@@ -108,7 +108,7 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
     id: 'nav.terminal',
     name: 'Go to Terminal',
     description: 'Jump to terminal panel',
-    combo: { ctrl: true, alt: true, alt: false, key: 't' },
+    combo: { ctrl: true, shift: false, alt: true, key: 't' },
     category: 'Navigation',
     enabled: true,
     customizable: true,
@@ -146,7 +146,7 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
     id: 'dex.quick.swap',
     name: 'Quick Swap',
     description: 'Execute last used swap',
-    combo: { ctrl: true, alt: true, alt: false, key: 's' },
+    combo: { ctrl: true, shift: false, alt: true, key: 's' },
     category: 'DEX Trading',
     enabled: true,
     customizable: true,

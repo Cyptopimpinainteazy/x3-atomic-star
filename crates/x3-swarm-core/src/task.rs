@@ -1,8 +1,9 @@
+use crate::{policy::ApprovalRequirement, AgentKind, AgentPermissionTier};
 use serde::{Deserialize, Serialize};
-use crate::{AgentKind, AgentPermissionTier, policy::ApprovalRequirement};
+use std::hash::Hash;
 
 /// Core task structure for swarm agents.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTask {
     pub id: String,
     pub title: String,
@@ -14,7 +15,17 @@ pub struct AgentTask {
     pub required_commands: Vec<String>,
     pub approval_required: ApprovalRequirement,
     pub status: TaskStatus,
-    pub risk: String,
+    pub risk: RiskLevel,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RiskLevel {
+    #[default]
+    Low,
+    Medium,
+    High,
+    Critical,
 }
 
 impl AgentTask {
@@ -30,13 +41,13 @@ impl AgentTask {
             required_commands: vec![],
             approval_required: ApprovalRequirement::None,
             status: TaskStatus::Pending,
-            risk: "low".to_string(),
+            risk: RiskLevel::Low,
         }
     }
 }
 
 /// Result from agent task execution.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentResult {
     pub task_id: String,
     pub status: TaskStatus,
@@ -47,18 +58,13 @@ pub struct AgentResult {
 }
 
 /// Task execution status.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
+    #[default]
     Pending,
     Running,
     Passed,
     Failed,
     Blocked,
     NeedsApproval,
-}
-
-impl Default for TaskStatus {
-    fn default() -> Self {
-        TaskStatus::Pending
-    }
 }

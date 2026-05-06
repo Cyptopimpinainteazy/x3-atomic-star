@@ -22,6 +22,7 @@ interface TipPool {
 }
 
 interface RevenueSplit {
+  id: string;
   recipient: string;
   percentage: number;
   address: string;

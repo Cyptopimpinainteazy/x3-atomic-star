@@ -1,6 +1,7 @@
 /// Concentrated Liquidity — Uniswap V3 model with capital efficiency
 /// LPs set custom price ranges for 10-100x capital efficiency vs basic AMM
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ConcentratedPosition {

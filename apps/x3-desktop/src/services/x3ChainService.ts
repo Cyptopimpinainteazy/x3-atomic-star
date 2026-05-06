@@ -392,9 +392,41 @@ class X3ChainService {
     return this.wsEndpoint;
   }
 
-  private async getApi(): Promise<ApiPromise> {
+  async getApi(): Promise<ApiPromise> {
     if (this.api?.isConnected) return this.api;
     return this.connect();
+  }
+
+  /** Cast a governance vote on a proposal.
+   *  @param _signer  ApiPromise returned by getApi() (used for chain access)
+   *  @param proposalId  On-chain proposal id
+   *  @param vote  "Aye" | "Nay"
+   *  @param balance  Token amount as string (e.g. "1000000000000")
+   *  @param conviction  Conviction multiplier
+   */
+  async castVote(
+    _signer: ApiPromise,
+    proposalId: number,
+    vote: string,
+    balance: string,
+    conviction: string,
+  ): Promise<{ success: boolean; txHash?: string; error?: string }> {
+    const api = await this.getApi();
+    const isAye = vote === 'Aye' || vote === 'for';
+    return new Promise((resolve, reject) => {
+      api.tx.governance
+        .vote(proposalId, { Standard: { vote: { aye: isAye, conviction }, balance } })
+        .signAndSend(balance /* placeholder — caller must inject signer */, ({ status, dispatchError }) => {
+          if (status.isInBlock || status.isFinalized) {
+            if (dispatchError) {
+              reject(new Error(dispatchError.toString()));
+            } else {
+              resolve({ success: true, txHash: status.hash?.toHex() });
+            }
+          }
+        })
+        .catch(reject);
+    });
   }
 
   // ── Chain info ──────────────────────────────────────────────────────────────
@@ -1487,7 +1519,7 @@ class X3ChainService {
       return Array.isArray(json) ? json.map((p: any) => ({
         positionId: String(p.positionId ?? p.position_id ?? ''),
         poolId: String(p.poolId ?? p.pool_id ?? ''),
-        liquidity: this._toBigInt(p.liquidity ?? p.amount ?? 0),
+        liquidity: this._toBigInt(p.liquidity ?? p.amount ?? 0) ?? 0n,
       })) : [];
     } catch {
       return [];
@@ -1909,7 +1941,7 @@ class X3ChainService {
 
       const json = this._asJson(result);
       return {
-        totalArbitrageProfits: this._toBigInt(json.totalArbitrageProfits ?? json.total_arbitrage_profits ?? 0),
+        totalArbitrageProfits: this._toBigInt(json.totalArbitrageProfits ?? json.total_arbitrage_profits ?? 0) ?? 0n,
         sandwichAttempts: Number(json.sandwichAttempts ?? json.sandwich_attempts ?? 0),
         protectedTransactions: Number(json.protectedTransactions ?? json.protected_transactions ?? 0),
       };
@@ -1949,4 +1981,5 @@ class X3ChainService {
 }
 
 export const x3Chain = new X3ChainService();
+export const x3ChainService = x3Chain;
 export default x3Chain;

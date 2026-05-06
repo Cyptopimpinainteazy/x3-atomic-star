@@ -198,7 +198,10 @@ pub mod pallet {
             &self,
             instruction: &x3_svm_integration::SvmInstruction,
             _payer: [u8; 32],
-            _accounts: &[(x3_svm_integration::SvmAccountMeta, x3_svm_integration::AccountUpdate)],
+            _accounts: &[(
+                x3_svm_integration::SvmAccountMeta,
+                x3_svm_integration::AccountUpdate,
+            )],
             config: &x3_svm_integration::SvmConfig,
         ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
             // For execution, we need the program bytecode - delegate to execute_bpf
@@ -709,12 +712,11 @@ pub mod pallet {
             );
 
             // Check program exists and is executable
-            let _program = Programs::<T>::get(&program_id)
-                .ok_or(Error::<T>::ProgramNotFound)?;
-            
-            let program_account = Accounts::<T>::get(&program_id)
-                .ok_or(Error::<T>::ProgramNotFound)?;
-            
+            let _program = Programs::<T>::get(&program_id).ok_or(Error::<T>::ProgramNotFound)?;
+
+            let program_account =
+                Accounts::<T>::get(&program_id).ok_or(Error::<T>::ProgramNotFound)?;
+
             ensure!(program_account.executable, Error::<T>::ProgramNotExecutable);
 
             // Get program bytecode
@@ -726,10 +728,10 @@ pub mod pallet {
             // Also cache account info to avoid double storage reads in persistence loop
             // Only include accounts that exist in storage (filter out non-existent accounts)
             let mut original_accounts: sp_std::vec::Vec<(
-                [u8; 32],  // pubkey
-                u64,       // original lamports
+                [u8; 32], // pubkey
+                u64,      // original lamports
             )> = sp_std::vec::Vec::new();
-            
+
             for (pubkey, _, is_writable) in &accounts {
                 if *is_writable {
                     // Only add accounts that exist in storage - filter out non-existent
@@ -759,21 +761,24 @@ pub mod pallet {
                     // Persist state changes for writable accounts using cached original values
                     for upd in &exec_result.account_updates {
                         // Check if this account was in our writable list (exists in storage)
-                        if let Some((_, original_lamports)) = original_accounts.iter()
+                        if let Some((_, original_lamports)) = original_accounts
+                            .iter()
                             .find(|(pk, _)| pk[..] == upd.pubkey[..])
                         {
                             // Calculate delta using cached original value (no double read)
-                            lamport_delta = lamport_delta.saturating_add(
-                                upd.lamports as i64 - (*original_lamports as i64)
-                            );
+                            lamport_delta = lamport_delta
+                                .saturating_add(upd.lamports as i64 - (*original_lamports as i64));
 
                             // Update lamports using try_mutate
-                            Accounts::<T>::try_mutate(&upd.pubkey, |maybe_info| -> DispatchResult {
-                                if let Some(info) = maybe_info.as_mut() {
-                                    info.lamports = upd.lamports;
-                                }
-                                Ok(())
-                            })?;
+                            Accounts::<T>::try_mutate(
+                                &upd.pubkey,
+                                |maybe_info| -> DispatchResult {
+                                    if let Some(info) = maybe_info.as_mut() {
+                                        info.lamports = upd.lamports;
+                                    }
+                                    Ok(())
+                                },
+                            )?;
 
                             // Update data (even if empty - BPF program may clear data intentionally)
                             let bounded_data = BoundedVec::try_from(upd.data.clone())

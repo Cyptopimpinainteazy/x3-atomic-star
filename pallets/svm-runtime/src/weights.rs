@@ -61,15 +61,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
         let base_weight: u64 = 500_000_000;
         let per_account_reads = 20_000_000; // ~2 reads per account (info + data)
         let per_account_writes = 10_000_000; // ~1 write per writable account
-        
+
         Weight::from_parts(
             base_weight
                 .saturating_add((account_count as u64).saturating_mul(per_account_reads))
                 .saturating_add((account_count as u64).saturating_mul(per_account_writes) / 2),
             0,
         )
-            .saturating_add(RocksDbWeight::get().reads(5)) // base reads: program info, bytecode, etc.
-            .saturating_add(RocksDbWeight::get().writes(2))
+        .saturating_add(RocksDbWeight::get().reads(5)) // base reads: program info, bytecode, etc.
+        .saturating_add(RocksDbWeight::get().writes(2))
     }
 
     /// Weight for `transfer`

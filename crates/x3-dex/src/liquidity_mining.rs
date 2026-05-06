@@ -1,6 +1,7 @@
 /// Liquidity Mining Rewards — Proportional X3 token emissions to LP providers
 /// Incentivizes liquidity provision with transparent reward distribution
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LiquidityMiningReward {

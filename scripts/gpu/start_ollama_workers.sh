@@ -12,12 +12,10 @@ fi
 
 echo "Launching Ollama worker processes..."
 
-echo "- GPU 0 / RTX: PlannerAgent + CodeAgent" > "$ROOT_DIR/logs/swarm/ollama_worker_roles.log"
-echo "- GPU 1 / GTX 1070: TestBuilderAgent" >> "$ROOT_DIR/logs/swarm/ollama_worker_roles.log"
-echo "- GPU 2 / GTX 1070: AuditorAgent + BreakerAgent" >> "$ROOT_DIR/logs/swarm/ollama_worker_roles.log"
-echo "- GPU 3 / GTX 1070: MarketingAgent + GrantAgent" >> "$ROOT_DIR/logs/swarm/ollama_worker_roles.log"
+echo "- Single local Ollama service: swarm helper model qwen3:8b" > "$ROOT_DIR/logs/swarm/ollama_worker_roles.log"
 
-nohup ollama serve --model qwen3:8b > "$ROOT_DIR/logs/swarm/ollama_worker.log" 2>&1 &
-  echo "$!" > "$ROOT_DIR/logs/swarm/ollama_worker.pid"
-  echo "Ollama GPU worker started with PID $(cat "$ROOT_DIR/logs/swarm/ollama_worker.pid")"
-  echo "Role mapping written to $ROOT_DIR/logs/swarm/ollama_worker_roles.log"
+ollama pull qwen3:8b >/dev/null
+nohup ollama serve > "$ROOT_DIR/logs/swarm/ollama_worker.log" 2>&1 &
+echo "$!" > "$ROOT_DIR/logs/swarm/ollama_worker.pid"
+echo "Ollama GPU worker started with PID $(cat "$ROOT_DIR/logs/swarm/ollama_worker.pid")"
+echo "Role mapping written to $ROOT_DIR/logs/swarm/ollama_worker_roles.log"

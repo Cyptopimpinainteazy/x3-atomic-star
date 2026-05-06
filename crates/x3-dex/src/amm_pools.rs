@@ -1,6 +1,7 @@
 /// AMM Liquidity Pools — ConstantProduct (Uniswap V2-style) pool implementation with LP token management.
 /// Enables AMM-based trading across X3, supports multi-pool routing, and governs LP rewards.
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use sp_std::prelude::*;
 use sp_runtime::scale_info::TypeInfo;
 
 #[derive(

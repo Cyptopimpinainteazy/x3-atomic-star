@@ -23,43 +23,37 @@ use x3_common::{
 
 /// Decode a SVM pubkey from either a 0x-prefixed hex string (32 bytes) or
 /// a base58-encoded Solana-style pubkey.
-fn decode_svm_pubkey(s: &str) -> Result<Vec<u8>, jsonrpsee::core::Error> {
+fn decode_svm_pubkey(s: &str) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned> {
     if let Some(hex_str) = s.strip_prefix("0x") {
         let bytes = hex::decode(hex_str)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid hex pubkey: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid hex pubkey: {}", e), None::<()>))?;
         if bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "SVM pubkey must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "SVM pubkey must be 32 bytes".to_string(), None::<()>));
         }
         return Ok(bytes);
     }
     // base58 decode
     let bytes = bs58::decode(s)
         .into_vec()
-        .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid base58 pubkey: {}", e)))?;
+        .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid base58 pubkey: {}", e), None::<()>))?;
     if bytes.len() != 32 {
-        return Err(jsonrpsee::core::Error::Custom(
-            "SVM pubkey must be 32 bytes".into(),
-        ));
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "SVM pubkey must be 32 bytes".to_string(), None::<()>));
     }
     Ok(bytes)
 }
 
 /// Helper: decode a hex EVM address string to a 20-byte Vec
-fn decode_address(s: &str) -> Result<Vec<u8>, jsonrpsee::core::Error> {
+fn decode_address(s: &str) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned> {
     let stripped = s.strip_prefix("0x").unwrap_or(s);
     let bytes = hex::decode(stripped)
-        .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid address: {}", e)))?;
+        .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid address: {}", e), None::<()>))?;
     if bytes.len() != 20 {
-        return Err(jsonrpsee::core::Error::Custom(
-            "Address must be 20 bytes".into(),
-        ));
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Address must be 20 bytes".to_string(), None::<()>));
     }
     Ok(bytes)
 }
 
-fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::core::Error> {
+fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
     let Some(raw_gas) = tx_obj.get("gas") else {
         return Ok(10_000_000);
     };
@@ -71,35 +65,29 @@ fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::core::E
     if let Some(gas_str) = raw_gas.as_str() {
         if let Some(stripped) = gas_str.strip_prefix("0x") {
             return u64::from_str_radix(stripped, 16)
-                .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid gas: {}", e)));
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid gas: {}", e), None::<()>));
         }
 
         return gas_str
             .parse::<u64>()
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid gas: {}", e)));
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid gas: {}", e), None::<()>));
     }
 
-    Err(jsonrpsee::core::Error::Custom(
-        "Invalid gas value: expected integer or string".into(),
-    ))
+    Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid gas value: expected integer or string".to_string(), None::<()>))
 }
 
-fn decode_u64_block_param(s: &str) -> Result<u64, jsonrpsee::core::Error> {
+fn decode_u64_block_param(s: &str) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
     if s == "latest" {
-        return Err(jsonrpsee::core::Error::Custom(
-            "latest must be handled separately".into(),
-        ));
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "latest must be handled separately".to_string(), None::<()>));
     }
     if s == "earliest" {
         return Ok(0);
     }
     if let Some(stripped) = s.strip_prefix("0x") {
         return u64::from_str_radix(stripped, 16)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid block number: {}", e)));
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid block number: {}", e), None::<()>));
     }
-    Err(jsonrpsee::core::Error::Custom(
-        "Invalid block number format".into(),
-    ))
+    Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid block number format".to_string(), None::<()>))
 }
 
 fn to_hex_quantity_u64(v: u64) -> String {
@@ -165,7 +153,7 @@ where
 
     // eth_getBalance — returns native balance for an EVM address as hex wei
     let c = client.clone();
-    module.register_method("eth_getBalance", move |params, _| {
+    module.register_method("eth_getBalance", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (address_hex, _block): (String, serde_json::Value) =
             params.parse().unwrap_or_else(|_| {
                 let s: String = params.one().unwrap_or_default();
@@ -176,14 +164,14 @@ where
         let at = c.info().best_hash;
         let balance: Balance = api
             .get_evm_balance(at, bytes, 0u32)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?
             .unwrap_or_default();
-        Ok(format!("0x{:x}", balance))
+        Ok(serde_json::Value::String(format!("0x{:x}", balance)))
     })?;
 
     // eth_getCode — returns contract bytecode for an EVM address as 0x-prefixed hex
     let c = client.clone();
-    module.register_method("eth_getCode", move |params, _| {
+    module.register_method("eth_getCode", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (address_hex, _block): (String, serde_json::Value) =
             params.parse().unwrap_or_else(|_| {
                 let s: String = params.one().unwrap_or_default();
@@ -194,25 +182,23 @@ where
         let at = c.info().best_hash;
         let code: Vec<u8> = api
             .get_evm_code(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
-        Ok(format!("0x{}", hex::encode(code)))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
+        Ok(serde_json::Value::String(format!("0x{}", hex::encode(code))))
     })?;
 
     // eth_getStorageAt — returns EVM storage value at (address, slot) as 0x-prefixed hex
     let c = client.clone();
-    module.register_method("eth_getStorageAt", move |params, _| {
+    module.register_method("eth_getStorageAt", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (address_hex, slot_hex, _block): (String, String, serde_json::Value) =
             params
                 .parse()
-                .map_err(|e| jsonrpsee::core::Error::Custom(e.to_string()))?;
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, e.to_string(), None::<()>))?;
         let addr_bytes = decode_address(&address_hex)?;
         let slot_stripped = slot_hex.strip_prefix("0x").unwrap_or(&slot_hex);
         let slot_bytes = hex::decode(slot_stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid slot: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid slot: {}", e), None::<()>))?;
         if slot_bytes.len() > 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Slot must be ≤32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Slot must be ≤32 bytes".to_string(), None::<()>));
         }
         let mut key = [0u8; 32];
         let offset = 32 - slot_bytes.len();
@@ -222,16 +208,16 @@ where
         let at = c.info().best_hash;
         let val: Option<sp_core::H256> = api
             .get_evm_storage(at, addr_bytes, storage_key)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
-        Ok(format!(
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
+        Ok(serde_json::Value::String(format!(
             "0x{}",
             hex::encode(val.unwrap_or_default().as_bytes())
-        ))
+        )))
     })?;
 
     // eth_getTransactionCount — returns account nonce as hex
     let c = client.clone();
-    module.register_method("eth_getTransactionCount", move |params, _| {
+    module.register_method("eth_getTransactionCount", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (address_hex, _block): (String, serde_json::Value) =
             params.parse().unwrap_or_else(|_| {
                 let s: String = params.one().unwrap_or_default();
@@ -242,13 +228,13 @@ where
         let at = c.info().best_hash;
         let nonce: u64 = api
             .get_evm_nonce(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
-        Ok(format!("0x{:x}", nonce))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
+        Ok(serde_json::Value::String(format!("0x{:x}", nonce)))
     })?;
 
     // eth_call — execute a read-only EVM call and return raw output bytes.
     let c = client.clone();
-    module.register_method("eth_call", move |params, _| {
+    module.register_method("eth_call", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (tx_obj, _block): (serde_json::Value, serde_json::Value) =
             params.parse().unwrap_or_else(|_| {
                 let tx: serde_json::Value = params
@@ -260,7 +246,7 @@ where
         let target = tx_obj
             .get("to")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| jsonrpsee::core::Error::Custom("Missing to address".into()))?;
+            .ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Missing to address".to_string(), None::<()>))?;
         let target_bytes = decode_address(target)?;
         let caller = tx_obj
             .get("from")
@@ -271,30 +257,30 @@ where
         let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
         let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
         let input_data = hex::decode(data_stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid data: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid data: {}", e), None::<()>))?;
         let gas_limit = parse_gas_limit(&tx_obj)?;
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let result: Result<Vec<u8>, Vec<u8>> = api
             .call_evm(at, caller, target_bytes, input_data, gas_limit)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("EVM API error: {}", e), None::<()>))?;
 
         match result {
-            Ok(output) => Ok(format!("0x{}", hex::encode(output))),
-            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+            Ok(output) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(output)))),
+            Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                 "EVM call failed: {}",
                 String::from_utf8_lossy(&err)
-            ))),
+            ), None::<()>)),
         }
     })?;
 
     // eth_estimateGas — estimate gas using runtime EVM dry-run logic.
     let c = client.clone();
-    module.register_method("eth_estimateGas", move |params, _| {
+    module.register_method("eth_estimateGas", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_obj: serde_json::Value = params
             .one()
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid params: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid params: {}", e), None::<()>))?;
 
         let target_bytes = if let Some(target) = tx_obj.get("to").and_then(|v| v.as_str()) {
             decode_address(target)?
@@ -310,72 +296,70 @@ where
         let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
         let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
         let input_data = hex::decode(data_stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid data: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid data: {}", e), None::<()>))?;
         let gas_limit = parse_gas_limit(&tx_obj)?;
 
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let result: Result<u64, Vec<u8>> = api
             .estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("EVM API error: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("EVM API error: {}", e), None::<()>))?;
 
         match result {
-            Ok(gas) => Ok(format!("0x{:x}", gas)),
-            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+            Ok(gas) => Ok(serde_json::Value::String(format!("0x{:x}", gas))),
+            Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                 "Gas estimation failed: {}",
                 String::from_utf8_lossy(&err)
-            ))),
+            ), None::<()>)),
         }
     })?;
 
     // eth_sendRawTransaction — submit a signed RLP-encoded Ethereum transaction
     // Executes via the X3 kernel EVM adapter and returns the keccak256 tx hash.
     let c = client.clone();
-    module.register_method("eth_sendRawTransaction", move |params, _| {
+    module.register_method("eth_sendRawTransaction", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let raw_hex: String = params.one()?;
         let stripped = raw_hex.strip_prefix("0x").unwrap_or(&raw_hex);
         let raw_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid hex: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid hex: {}", e), None::<()>))?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let result: Result<Vec<u8>, Vec<u8>> = api
             .submit_evm_transaction(at, raw_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match result {
-            Ok(tx_hash) => Ok(format!("0x{}", hex::encode(tx_hash))),
-            Err(err_bytes) => Err(jsonrpsee::core::Error::Custom(format!(
+            Ok(tx_hash) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(tx_hash)))),
+            Err(err_bytes) => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                 "EVM execution failed: {}",
                 String::from_utf8_lossy(&err_bytes)
-            ))),
+            ), None::<()>)),
         }
     })?;
 
     // eth_getTransactionByHash — returns EVM transaction object by hash
     let c = client.clone();
-    module.register_method("eth_getTransactionByHash", move |params, _| {
+    module.register_method("eth_getTransactionByHash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let tx_opt: Option<Vec<u8>> = api
             .get_evm_transaction_by_hash(at, tx_hash_bytes.clone())
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match tx_opt {
             Some(tx_bytes) => {
                 use codec::Decode;
                 let tx = pallet_x3_kernel::pallet::EvmTransactionData::decode(&mut &tx_bytes[..])
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Decode error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Decode error: {:?}", e), None::<()>))?;
 
                 let receipt_opt: Option<Vec<u8>> = api
                     .get_evm_receipt(at, tx_hash_bytes.clone())
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
 
                 let block_number_opt = receipt_opt
                     .and_then(|receipt_bytes| {
@@ -416,7 +400,7 @@ where
 
                 let chain_id = api
                     .chain_id(at)
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
 
                 Ok(serde_json::json!({
                     "hash": to_hex_hash_32(&tx_hash_bytes).unwrap_or_default(),
@@ -446,26 +430,24 @@ where
 
     // eth_getTransactionReceipt — returns EVM transaction receipt by hash (Ethereum-compatible format)
     let c = client.clone();
-    module.register_method("eth_getTransactionReceipt", move |params, _| {
+    module.register_method("eth_getTransactionReceipt", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_receipt(at, tx_hash_bytes.clone())
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
             Some(receipt_bytes) => {
                 use codec::Decode;
                 let receipt = pallet_x3_kernel::ExecutionReceipt::decode(&mut &receipt_bytes[..])
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Decode error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Decode error: {:?}", e), None::<()>))?;
                 let tx_hash = format!("0x{}", hex::encode(&tx_hash_bytes));
                 let logs: Vec<serde_json::Value> = receipt.logs.iter().map(|log| {
                     serde_json::json!({
@@ -487,21 +469,21 @@ where
 
     // eth_getLogs — returns EVM logs matching a filter
     let c = client.clone();
-    module.register_method("eth_getLogs", move |params, _| {
+    module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid fromBlock: {}", e)))
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
             }).unwrap_or(Ok(0))?;
         let to_block = filter.get("toBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid toBlock: {}", e)))
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid toBlock: {}", e), None::<()>))
             }).unwrap_or(Ok(0))?;
         let address = filter.get("address")
             .and_then(|v| v.as_str())
@@ -525,7 +507,7 @@ where
         let at = c.info().best_hash;
         let logs_bytes: Vec<Vec<u8>> = api
             .get_evm_logs(at, filter_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         let logs: Vec<serde_json::Value> = logs_bytes.iter()
             .filter_map(|bytes| {
                 use codec::Decode;
@@ -548,71 +530,63 @@ where
 
     // x3_getEvmTransaction — returns raw EVM transaction receipt by hash
     let c = client.clone();
-    module.register_method("x3_getEvmTransaction", move |params, _| {
+    module.register_method("x3_getEvmTransaction", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_transaction(at, tx_hash_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
-            Some(receipt_bytes) => Ok(format!("0x{}", hex::encode(receipt_bytes))),
-            None => Err(jsonrpsee::core::Error::Custom(
-                "Transaction not found".into(),
-            )),
+            Some(receipt_bytes) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(receipt_bytes)))),
+            None => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction not found".to_string(), None::<()>)),
         }
     })?;
 
     // x3_getEvmReceipt — returns raw EVM transaction receipt by hash (alternative endpoint)
     let c = client.clone();
-    module.register_method("x3_getEvmReceipt", move |params, _| {
+    module.register_method("x3_getEvmReceipt", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_receipt(at, tx_hash_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
-            Some(receipt_bytes) => Ok(format!("0x{}", hex::encode(receipt_bytes))),
-            None => Err(jsonrpsee::core::Error::Custom(
-                "Transaction receipt not found".into(),
-            )),
+            Some(receipt_bytes) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(receipt_bytes)))),
+            None => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction receipt not found".to_string(), None::<()>)),
         }
     })?;
 
     // x3_getEvmLogs — returns raw EVM logs matching a filter
     let c = client.clone();
-    module.register_method("x3_getEvmLogs", move |params, _| {
+    module.register_method("x3_getEvmLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid fromBlock: {}", e)))
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
             }).unwrap_or(Ok(0))?;
         let to_block = filter.get("toBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid toBlock: {}", e)))
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid toBlock: {}", e), None::<()>))
             }).unwrap_or(Ok(0))?;
         let address = filter.get("address")
             .and_then(|v| v.as_str())
@@ -636,33 +610,31 @@ where
         let at = c.info().best_hash;
         let logs_bytes: Vec<Vec<u8>> = api
             .get_evm_logs(at, filter_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         let logs: Vec<String> = logs_bytes.iter().map(|bytes| format!("0x{}", hex::encode(bytes))).collect();
         Ok(serde_json::json!({ "logs": logs }))
     })?;
 
     // x3_getEvmTransactionByHash — returns formatted EVM transaction by hash
     let c = client.clone();
-    module.register_method("x3_getEvmTransactionByHash", move |params, _| {
+    module.register_method("x3_getEvmTransactionByHash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_transaction(at, tx_hash_bytes.clone())
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
             Some(receipt_bytes) => {
                 use codec::Decode;
                 let receipt = pallet_x3_kernel::ExecutionReceipt::decode(&mut &receipt_bytes[..])
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Decode error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Decode error: {:?}", e), None::<()>))?;
                 let tx_hash = format!("0x{}", hex::encode(&tx_hash_bytes));
                 Ok(serde_json::json!({
                     "transactionHash": tx_hash,
@@ -672,34 +644,30 @@ where
                     "logsCount": receipt.logs.len()
                 }))
             }
-            None => Err(jsonrpsee::core::Error::Custom(
-                "Transaction not found".into(),
-            )),
+            None => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction not found".to_string(), None::<()>)),
         }
     })?;
 
     // x3_getEvmReceiptByHash — returns formatted EVM receipt by hash
     let c = client.clone();
-    module.register_method("x3_getEvmReceiptByHash", move |params, _| {
+    module.register_method("x3_getEvmReceiptByHash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_receipt(at, tx_hash_bytes.clone())
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
             Some(receipt_bytes) => {
                 use codec::Decode;
                 let receipt = pallet_x3_kernel::ExecutionReceipt::decode(&mut &receipt_bytes[..])
-                    .map_err(|e| jsonrpsee::core::Error::Custom(format!("Decode error: {:?}", e)))?;
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Decode error: {:?}", e), None::<()>))?;
                 let tx_hash = format!("0x{}", hex::encode(&tx_hash_bytes));
                 Ok(serde_json::json!({
                     "transactionHash": tx_hash,
@@ -708,38 +676,36 @@ where
                     "logsCount": receipt.logs.len()
                 }))
             }
-            None => Err(jsonrpsee::core::Error::Custom(
-                "Transaction receipt not found".into(),
-            )),
+            None => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction receipt not found".to_string(), None::<()>)),
         }
     })?;
 
     // eth_blockNumber — returns the current block number as hex
     let c = client.clone();
-    module.register_method("eth_blockNumber", move |_, _| {
+    module.register_method("eth_blockNumber", move |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let info = c.info();
-        Ok(format!("0x{:x}", info.best_number))
+        Ok(serde_json::Value::String(format!("0x{:x}", info.best_number)))
     })?;
 
     // eth_chainId — returns the chain ID as hex
     let c = client.clone();
-    module.register_method("eth_chainId", move |_, _| {
+    module.register_method("eth_chainId", move |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let chain_id = c.runtime_api().chain_id(c.info().best_hash)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
-        Ok(format!("0x{:x}", chain_id))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
+        Ok(serde_json::Value::String(format!("0x{:x}", chain_id)))
     })?;
 
     // net_version — returns the network version as string
     let c = client.clone();
-    module.register_method("net_version", move |_, _| {
+    module.register_method("net_version", move |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let chain_id = c.runtime_api().chain_id(c.info().best_hash)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
-        Ok(format!("{}", chain_id))
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
+        Ok(serde_json::Value::String(format!("{}", chain_id)))
     })?;
 
     // eth_getBlockByNumber — returns block info by block number
     let c = client.clone();
-    module.register_method("eth_getBlockByNumber", move |params, _| {
+    module.register_method("eth_getBlockByNumber", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (block_param, _full): (serde_json::Value, bool) =
             params.parse().unwrap_or_else(|_| (serde_json::Value::String("latest".to_string()), false));
         
@@ -752,22 +718,20 @@ where
                 }
             }
             serde_json::Value::Number(n) => n.as_u64().ok_or_else(|| {
-                jsonrpsee::core::Error::Custom("Invalid block number".into())
+                jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid block number".to_string(), None::<()>)
             })?,
-            _ => return Err(jsonrpsee::core::Error::Custom("Invalid block number type".into())),
+            _ => return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid block number type".to_string(), None::<()>)),
         };
 
         if block_number > u32::MAX as u64 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Block number exceeds supported range".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Block number exceeds supported range".to_string(), None::<()>));
         }
         
-        let block = c.block(sp_blockchain::BlockId::Number(block_number as u32))
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        let block = c.block(c.hash((block_number as u32).into()).map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Hash lookup error: {:?}", e), None::<()>))?.ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32602, "Block not found".to_string(), None::<()>))?)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         
         let header = match block {
-            Some(b) => b.1,
+            Some(b) => b.block.header.clone(),
             None => return Ok(serde_json::Value::Null),
         };
         let hash = header.hash();
@@ -799,28 +763,26 @@ where
 
     // eth_getBlockByHash — returns block info by block hash
     let c = client.clone();
-    module.register_method("eth_getBlockByHash", move |params, _| {
+    module.register_method("eth_getBlockByHash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (hash_hex, _full): (String, bool) =
             params.parse().unwrap_or_else(|_| ("0x".to_string(), false));
         
         let stripped = hash_hex.strip_prefix("0x").unwrap_or(&hash_hex);
         let hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid hash: {}", e), None::<()>))?;
         if hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Block hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Block hash must be 32 bytes".to_string(), None::<()>));
         }
         
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&hash_bytes);
         let block_hash = sp_core::H256::from(hash);
         
-        let block = c.block(sp_blockchain::BlockId::Hash(block_hash))
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+        let block = c.block(block_hash)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         
         let header = match block {
-            Some(b) => b.1,
+            Some(b) => b.block.header.clone(),
             None => return Ok(serde_json::Value::Null),
         };
         let hash = header.hash();
@@ -852,21 +814,19 @@ where
 
     // eth_getTransactionLogs — returns EVM logs for a specific transaction by hash
     let c = client.clone();
-    module.register_method("eth_getTransactionLogs", move |params, _| {
+    module.register_method("eth_getTransactionLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let tx_hash_hex: String = params.one()?;
         let stripped = tx_hash_hex.strip_prefix("0x").unwrap_or(&tx_hash_hex);
         let tx_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid tx hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid tx hash: {}", e), None::<()>))?;
         if tx_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Transaction hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Transaction hash must be 32 bytes".to_string(), None::<()>));
         }
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let logs_bytes: Vec<Vec<u8>> = api
             .get_evm_transaction_logs(at, tx_hash_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         let logs: Vec<serde_json::Value> = logs_bytes.iter()
             .filter_map(|bytes| {
                 use codec::Decode;
@@ -903,40 +863,40 @@ where
 
     // svm_getBalance — returns lamport balance for a base58 or hex SVM pubkey
     let c = client.clone();
-    module.register_method("svm_getBalance", move |params, _| {
+    module.register_method("svm_getBalance", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let balance: u64 = api
             .get_svm_balance(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "value": balance }))
     })?;
 
     // svm_isProgram — returns whether a pubkey has a deployed executable program
     let c = client.clone();
-    module.register_method("svm_isProgram", move |params, _| {
+    module.register_method("svm_isProgram", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let is_prog: bool = api
             .is_svm_program(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "result": is_prog }))
     })?;
 
     // svm_getAccountInfo — returns account metadata for a SVM pubkey
     let c = client.clone();
-    module.register_method("svm_getAccountInfo", move |params, _| {
+    module.register_method("svm_getAccountInfo", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let balance: u64 = api
             .get_svm_balance(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({
             "value": {
                 "lamports": balance,
@@ -949,15 +909,13 @@ where
 
     // svm_getBlockByHash — returns block info by hash
     let c = client.clone();
-    module.register_method("svm_getBlockByHash", move |params, _| {
+    module.register_method("svm_getBlockByHash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (block_hash_hex, _config): (String, Option<serde_json::Value>) = params.parse()?;
         let stripped = block_hash_hex.strip_prefix("0x").unwrap_or(&block_hash_hex);
         let block_hash_bytes = hex::decode(stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid block hash: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid block hash: {}", e), None::<()>))?;
         if block_hash_bytes.len() != 32 {
-            return Err(jsonrpsee::core::Error::Custom(
-                "Block hash must be 32 bytes".into(),
-            ));
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Block hash must be 32 bytes".to_string(), None::<()>));
         }
         let mut block_hash = [0u8; 32];
         block_hash.copy_from_slice(&block_hash_bytes);
@@ -968,48 +926,48 @@ where
         let slot = {
             // Convert block_hash to H256 for the runtime API
             let block_hash_h256 = sp_core::H256::from(block_hash);
-            api.get_svm_slot_by_blockhash(at, block_hash_h256)
-                .or_else(|| {
-                    // Fallback: scan the forward index (slot -> blockhash) to find the slot
-                    // This is needed because the reverse index may not be populated yet
-                    // We scan a reasonable range of recent slots (last 1000 blocks)
-                    let current_slot = api.get_svm_slot(at);
-                    (current_slot.saturating_sub(1000)..=current_slot)
-                        .find_map(|s| {
-                            api.get_svm_blockhash(at, s).and_then(|bh| {
-                                if bh.as_bytes() == block_hash {
-                                    Some(s)
-                                } else {
-                                    None
-                                }
-                            })
-                        })
-                })
-                .ok_or_else(|| {
-                    jsonrpsee::core::Error::Custom(format!(
-                        "Block hash not found: 0x{}",
-                        hex::encode(block_hash)
-                    ))
-                })?
+            let maybe_direct = api
+                .get_svm_slot_by_blockhash(at, block_hash_h256)
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("API error: {:?}", e), None::<()>))?;
+            if let Some(s) = maybe_direct {
+                s
+            } else {
+                // Fallback: scan the forward index (slot -> blockhash) to find the slot
+                let current_slot = api
+                    .get_svm_slot(at)
+                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("API error: {:?}", e), None::<()>))?;
+                (current_slot.saturating_sub(1000)..=current_slot)
+                    .find_map(|s| {
+                        let bh = api.get_svm_blockhash(at, s).ok()??;
+                        if bh.as_bytes() == block_hash { Some(s) } else { None }
+                    })
+                    .ok_or_else(|| {
+                        jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
+                            "Block hash not found: 0x{}",
+                            hex::encode(block_hash)
+                        ), None::<()>)
+                    })?
+            }
         };
         
         // Get the blockhash for this slot (to verify and get the actual blockhash)
         let actual_blockhash = api
             .get_svm_blockhash(at, slot)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("API error: {:?}", e), None::<()>))?
             .ok_or_else(|| {
-                jsonrpsee::core::Error::Custom(format!(
+                jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                     "Blockhash not found for slot {}: runtime error",
                     slot
-                ))
+                ), None::<()>)
             })?;
         
         // Verify the blockhash matches (sanity check)
         if actual_blockhash.as_bytes() != block_hash {
-            return Err(jsonrpsee::core::Error::Custom(format!(
+            return Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                 "Blockhash mismatch: expected 0x{}, got 0x{}",
                 hex::encode(block_hash),
                 hex::encode(actual_blockhash.as_bytes())
-            )));
+            ), None::<()>));
         }
         
         Ok(serde_json::json!({
@@ -1025,24 +983,25 @@ where
             "hash": format!("0x{}", hex::encode(actual_blockhash.as_bytes())),
             "previousBlockhash": format!("0x{}", hex::encode([0u8; 32])),
             "reward": [],
-            "blockTime": None,
-            "blockHeight": None
+            "blockTime": serde_json::Value::Null,
+            "blockHeight": serde_json::Value::Null
         }))
     })?;
 
     // svm_getBlockByNumber — returns block info by slot number
     let c = client.clone();
-    module.register_method("svm_getBlockByNumber", move |params, _| {
+    module.register_method("svm_getBlockByNumber", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (slot_str, _config): (String, Option<serde_json::Value>) = params.parse()?;
         let stripped = slot_str.strip_prefix("0x").unwrap_or(&slot_str);
         let slot: u64 = u64::from_str_radix(stripped, 16)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid slot: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid slot: {}", e), None::<()>))?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         // Get the blockhash for this slot
         let blockhash = api
             .get_svm_blockhash(at, slot)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?
+            .ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Blockhash not found for slot".to_string(), None::<()>))?;
         Ok(serde_json::json!({
             "slot": format!("0x{:x}", slot),
             "blockhash": format!("0x{}", hex::encode(blockhash.as_bytes())),
@@ -1056,25 +1015,26 @@ where
             "hash": format!("0x{}", hex::encode(blockhash.as_bytes())),
             "previousBlockhash": format!("0x{}", hex::encode([0u8; 32])),
             "reward": [],
-            "blockTime": None,
-            "blockHeight": None
+            "blockTime": serde_json::Value::Null,
+            "blockHeight": serde_json::Value::Null
         }))
     })?;
 
     // svm_getLatestBlockhash — returns the latest blockhash
     let c = client.clone();
-    module.register_method("svm_getLatestBlockhash", move |params, _| {
+    module.register_method("svm_getLatestBlockhash", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let _config: Option<serde_json::Value> = params.one().ok();
         let api = c.runtime_api();
         let at = c.info().best_hash;
         // Get the current slot
         let slot = api
             .get_svm_slot(at)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         // Get the blockhash for this slot
         let blockhash = api
             .get_svm_blockhash(at, slot)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?
+            .ok_or_else(|| jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Blockhash not found for slot".to_string(), None::<()>))?;
         Ok(serde_json::json!({
             "slot": format!("0x{:x}", slot),
             "blockhash": format!("0x{}", hex::encode(blockhash.as_bytes())),
@@ -1088,39 +1048,39 @@ where
             "hash": format!("0x{}", hex::encode(blockhash.as_bytes())),
             "previousBlockhash": format!("0x{}", hex::encode([0u8; 32])),
             "reward": [],
-            "blockTime": None,
-            "blockHeight": None
+            "blockTime": serde_json::Value::Null,
+            "blockHeight": serde_json::Value::Null
         }))
     })?;
 
     // svm_getSlot — returns the current slot number
     let c = client.clone();
-    module.register_method("svm_getSlot", move |params, _| {
+    module.register_method("svm_getSlot", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let _config: Option<serde_json::Value> = params.one().ok();
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let slot: u64 = api
             .get_svm_slot(at)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "value": slot }))
     })?;
 
     // svm_getTransactionCount — returns transaction count for an address
     let c = client.clone();
-    module.register_method("svm_getTransactionCount", move |params, _| {
+    module.register_method("svm_getTransactionCount", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let count: u64 = api
             .get_svm_transaction_count(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "value": count }))
     })?;
 
     // svm_deployContract — deploys a new EVM contract with the given bytecode
     let c = client.clone();
-    module.register_method("svm_deployContract", move |params, _| {
+    module.register_method("svm_deployContract", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let (caller_hex, bytecode_hex, gas_limit): (String, String, u64) = params.parse()?;
         let caller_bytes = if caller_hex.is_empty() || caller_hex == "0x" {
             None
@@ -1129,31 +1089,31 @@ where
         };
         let bytecode_stripped = bytecode_hex.strip_prefix("0x").unwrap_or(&bytecode_hex);
         let bytecode = hex::decode(bytecode_stripped)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Invalid bytecode: {}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid bytecode: {}", e), None::<()>))?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let result: Result<Vec<u8>, Vec<u8>> = api
             .deploy_evm_contract(at, caller_bytes, bytecode, gas_limit)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match result {
             Ok(contract_address) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(contract_address)))),
-            Err(err) => Err(jsonrpsee::core::Error::Custom(format!(
+            Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!(
                 "Contract deployment failed: {}",
                 String::from_utf8_lossy(&err)
-            ))),
+            ), None::<()>)),
         }
     })?;
 
     // svm_getContractReceipt — returns the EVM contract creation receipt
     let c = client.clone();
-    module.register_method("svm_getContractReceipt", move |params, _| {
+    module.register_method("svm_getContractReceipt", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let contract_address_hex: String = params.one()?;
         let contract_address_bytes = decode_address(&contract_address_hex)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let receipt_opt: Option<Vec<u8>> = api
             .get_evm_contract_receipt(at, contract_address_bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match receipt_opt {
             Some(receipt_bytes) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(receipt_bytes)))),
             None => Ok(serde_json::Value::Null),
@@ -1162,14 +1122,14 @@ where
 
     // svm_getProgramData — returns the SVM program data for a deployed SVM program
     let c = client.clone();
-    module.register_method("svm_getProgramData", move |params, _| {
+    module.register_method("svm_getProgramData", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let program_data_opt: Option<Vec<u8>> = api
             .get_svm_program_data(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match program_data_opt {
             Some(data) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(data)))),
             None => Ok(serde_json::Value::Null),
@@ -1178,14 +1138,14 @@ where
 
     // svm_getAccountData — returns the SVM account data for a SVM address
     let c = client.clone();
-    module.register_method("svm_getAccountData", move |params, _| {
+    module.register_method("svm_getAccountData", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let pubkey_str: String = params.one()?;
         let bytes = decode_svm_pubkey(&pubkey_str)?;
         let api = c.runtime_api();
         let at = c.info().best_hash;
         let account_data_opt: Option<Vec<u8>> = api
             .get_svm_account_data(at, bytes)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         match account_data_opt {
             Some(data) => Ok(serde_json::Value::String(format!("0x{}", hex::encode(data)))),
             None => Ok(serde_json::Value::Null),
@@ -1194,7 +1154,7 @@ where
 
     // svm_getSlotHistory — returns the SVM slot history for recent blockhashes
     let c = client.clone();
-    module.register_method("svm_getSlotHistory", move |params, _| {
+    module.register_method("svm_getSlotHistory", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let config: Option<serde_json::Value> = params.one().ok();
         let limit = config
             .as_ref()
@@ -1205,13 +1165,13 @@ where
         let at = c.info().best_hash;
         let slot_history: Vec<u64> = api
             .get_svm_slot_history(at, limit)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "slots": slot_history.iter().map(|s| format!("0x{:x}", s)).collect::<Vec<_>>() }))
     })?;
 
     // svm_getRecentBlockhashes — returns the SVM recent blockhashes
     let c = client.clone();
-    module.register_method("svm_getRecentBlockhashes", move |params, _| {
+    module.register_method("svm_getRecentBlockhashes", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let config: Option<serde_json::Value> = params.one().ok();
         let limit = config
             .as_ref()
@@ -1222,7 +1182,7 @@ where
         let at = c.info().best_hash;
         let blockhashes: Vec<sp_core::H256> = api
             .get_svm_recent_blockhashes(at, limit)
-            .map_err(|e| jsonrpsee::core::Error::Custom(format!("Runtime error: {:?}", e)))?;
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
         Ok(serde_json::json!({ "blockhashes": blockhashes.iter().map(|bh| format!("0x{}", hex::encode(bh.as_bytes()))).collect::<Vec<_>>() }))
     })?;
 

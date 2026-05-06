@@ -180,11 +180,16 @@ impl CrossChainAccountManager {
         // EVM/secp256k1 chains use a 20-byte Ethereum address; other chains use the 32-byte account_id.
         let key_type_check = Self::chain_type_to_key_type(signature.chain_type);
         if key_type_check == KeyType::Secp256k1 {
-            let evm_addr = account.evm_address.as_ref().ok_or("Account has no EVM address")?;
+            let evm_addr = account
+                .evm_address
+                .as_ref()
+                .ok_or("Account has no EVM address")?;
             if signature.signer != evm_addr.as_slice() {
                 return Err("EVM signer address not recognized for this account");
             }
-        } else if signature.signer != account.account_id.as_slice() && signature.signer != account.x3_address.as_slice() {
+        } else if signature.signer != account.account_id.as_slice()
+            && signature.signer != account.x3_address.as_slice()
+        {
             return Err("Signer not recognized for this account");
         }
 
@@ -223,7 +228,8 @@ impl CrossChainAccountManager {
                             let mut pk = [0u8; 65];
                             pk.copy_from_slice(&signature.signer);
                             pk
-                        }).to_evm_address();
+                        })
+                        .to_evm_address();
 
                         if recovered_addr == stored_addr {
                             Ok(true)

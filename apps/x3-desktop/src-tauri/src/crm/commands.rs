@@ -74,7 +74,7 @@ pub fn crm_update_contact(db: State<'_, CrmDb>, contact_id: String, user_id: Str
     opt_push!(website); opt_push!(notes); opt_push!(tags); opt_push!(source);
     opt_push!(stage); opt_push!(priority);
     p.push(Box::new(contact_id.clone()));
-    p.push(Box::new(user_id));
+    p.push(Box::new(user_id.clone()));
 
     let params_ref: Vec<&dyn rusqlite::types::ToSql> = p.iter().map(|b| b.as_ref()).collect();
     let affected_rows = conn.execute(&sql, params_ref.as_slice()).map_err(e)?;
@@ -197,7 +197,7 @@ pub fn crm_update_event(db: State<'_, CrmDb>, event_id: String, user_id: String,
     if let Some(v) = input.reminder_mins { p.push(Box::new(v)); }
     if let Some(v) = input.completed { p.push(Box::new(v as i32)); }
     p.push(Box::new(event_id.clone()));
-    p.push(Box::new(user_id));
+    p.push(Box::new(user_id.clone()));
     
     let params_ref: Vec<&dyn rusqlite::types::ToSql> = p.iter().map(|b| b.as_ref()).collect();
     let affected_rows = conn.execute(&sql, params_ref.as_slice()).map_err(e)?;
@@ -309,7 +309,7 @@ pub fn crm_update_deal(db: State<'_, CrmDb>, deal_id: String, user_id: String, i
     if let Some(v) = input.won { p.push(Box::new(v as i32)); }
     if let Some(v) = input.lost { p.push(Box::new(v as i32)); }
     p.push(Box::new(deal_id.clone()));
-    p.push(Box::new(user_id));
+    p.push(Box::new(user_id.clone()));
 
     let params_ref: Vec<&dyn rusqlite::types::ToSql> = p.iter().map(|b| b.as_ref()).collect();
     let affected_rows = conn.execute(&sql, params_ref.as_slice()).map_err(e)?;

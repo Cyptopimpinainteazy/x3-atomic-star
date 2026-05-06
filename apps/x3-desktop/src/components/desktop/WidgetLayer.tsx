@@ -2,8 +2,8 @@
 // Persistent widgets that appear on top of other windows
 
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { Listen, UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 export interface Widget {
   id: string;
@@ -92,7 +92,7 @@ export const WidgetLayer: React.FC = () => {
 
     const setupPriceListener = async () => {
       try {
-        unlistener = await Listen('price-update', (event: any) => {
+        unlistener = await listen('price-update', (event: any) => {
           const ticker: PriceTicker = event.payload;
           setPrices(prev => new Map(prev).set(ticker.symbol, ticker));
         });
@@ -114,7 +114,7 @@ export const WidgetLayer: React.FC = () => {
 
     const setupValidatorListener = async () => {
       try {
-        unlistener = await Listen('validator-status-update', (event: any) => {
+        unlistener = await listen('validator-status-update', (event: any) => {
           setValidatorStatus(event.payload);
         });
       } catch (error) {
@@ -135,7 +135,7 @@ export const WidgetLayer: React.FC = () => {
 
     const setupMessageListener = async () => {
       try {
-        unlistener = await Listen('message-count-update', (event: any) => {
+        unlistener = await listen('message-count-update', (event: any) => {
           setMessageCount(event.payload.count);
         });
       } catch (error) {

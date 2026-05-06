@@ -8,9 +8,9 @@ fi
 
 PROMPT="$1"
 
-echo "Asking GPU worker: $PROMPT"
+echo "Asking GPU worker with provided prompt."
 if command -v ollama >/dev/null 2>&1; then
-  ollama query qwen3:8b --prompt "$PROMPT"
+  ollama run qwen3:8b "$PROMPT"
 else
   echo "ERROR: ollama not installed or not available in PATH."
   exit 1

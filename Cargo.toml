@@ -40,7 +40,12 @@ members = [
     "crates/x3-lsp",
     "crates/x3-integration",
     "crates/x3-gpu-validator-swarm",
+    "crates/x3-swarm-core",
     "crates/x3-sidecar",
+    "crates/x3-readiness",
+    "crates/x3-evolution-core",
+    "crates/x3-swarm-core/services/x3-swarm-api",
+    "crates/x3-swarm-core/services/x3-swarm-worker",
     "crates/x3-evolution",
     "crates/quantum-swarm",
     "crates/chronos-flash",
@@ -201,7 +206,7 @@ tokio = { version = "1.0", features = ["full"], default-features = false }
 trie-db = { version = "0.31.0", default-features = false }
 
 # Common FRAME & Substrate workspace deps (referenced with `workspace = true` in members)
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, features = ["experimental"] }
 frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
@@ -225,6 +230,7 @@ sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2
 sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
@@ -290,6 +296,7 @@ pallet-evm-precompile-modexp = { git = "https://github.com/polkadot-evm/frontier
 pallet-evm-precompile-sha3fips = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fp-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fp-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fp-ethereum = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fp-self-contained = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fc-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fc-rpc-core = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
@@ -313,7 +320,7 @@ base64ct = { version = "=1.6.0" }
 
 # CLI & RPC ecosystem
 clap = { version = "4.4.18", features = ["derive"] }
-jsonrpsee = { version = "0.22.5", default-features = false, features = ["macros", "client", "server"] }
+jsonrpsee = { version = "0.24.10", default-features = false, features = ["macros", "client", "server"] }
 
 # Build profiles - reduce codegen-units to avoid LLVM SIGSEGV crashes in 1.85
 [profile.release]
@@ -406,6 +413,11 @@ sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 # Patch polkadot-sdk with local modifications for prometheus fix and executor bulk-memory support
 [patch."https://github.com/paritytech/polkadot-sdk"]
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+# X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
+# that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std
+# wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under
+# polkadot-sdk stable2512.
+frame-support-procedural = { path = "patches/frame-support-procedural" }
 # sc-network patches removed due to SDK version mismatches (stable2603 vs stable2512)
 # Using SDK versions directly instead
 # sc-network = { path = "patches/sc-network" }

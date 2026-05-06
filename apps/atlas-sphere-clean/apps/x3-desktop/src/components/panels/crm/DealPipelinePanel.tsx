@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Plus, DragDropIcon, CheckCircle2, Clock, DollarSign } from 'lucide-react';
+import { TrendingUp, Plus, CheckCircle2, Clock, DollarSign } from 'lucide-react';
 
 interface Deal {
   id: string;

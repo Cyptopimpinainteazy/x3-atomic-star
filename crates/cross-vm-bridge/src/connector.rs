@@ -10,21 +10,21 @@
 //!   - X3_RECONNECT_MAX  - Maximum reconnect attempts (default: '5')
 //!   - X3_RECONNECT_DELAY - Reconnect delay in ms (default: '1000')
 
-use sp_runtime::DispatchError;
-use sp_std::vec::Vec;
-use parity_scale_codec::{Encode, Decode};
+use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
+use sp_runtime::DispatchError;
+use sp_std::vec::Vec;
 
 use crate::{
-    CrossVmDispatcher, CrossVmResult, CrossVmReceipt, CrossVmCall, CrossVmStatus, VmId,
+    CrossVmCall, CrossVmDispatcher, CrossVmReceipt, CrossVmResult, CrossVmStatus, VmId,
     CROSS_VM_CALL_VERSION, MAX_CROSS_VM_PAYLOAD,
 };
 
 #[cfg(feature = "std")]
-use jsonrpsee::http_client::HttpClientBuilder;
-#[cfg(feature = "std")]
 use hex::FromHex;
+#[cfg(feature = "std")]
+use jsonrpsee::http_client::HttpClientBuilder;
 
 /// Configuration for the live node connector
 #[derive(Clone, Debug)]
@@ -126,14 +126,14 @@ impl LiveNodeDispatcher {
     fn reconnect(&mut self) -> Result<(), DispatchError> {
         if self.reconnect_attempts < self.config.reconnect_max_attempts {
             self.reconnect_attempts += 1;
-            
+
             // Exponential backoff: delay * 2^(attempt - 1)
             let delay_ms = self.config.reconnect_delay_ms * (1 << (self.reconnect_attempts - 1));
-            
+
             // Sleep using std::thread::sleep for std feature
             #[cfg(feature = "std")]
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-            
+
             Ok(())
         } else {
             Err(DispatchError::Other("Max reconnection attempts reached"))
@@ -153,10 +153,10 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         // Construct JSON-RPC eth_sendRawTransaction call
         // The raw transaction is expected to be provided in the input parameter
         // as a hex-encoded RLP-encoded transaction
-        
+
         let endpoint = self.config.endpoint.clone();
         let hex_input = format!("0x{}", hex::encode(input));
-        
+
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "eth_sendRawTransaction",
@@ -186,9 +186,13 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
                         return Err(DispatchError::Other("LiveNodeDispatcher: RPC error"));
                     }
                 }
-                Err(DispatchError::Other("LiveNodeDispatcher: Failed to parse RPC response"))
+                Err(DispatchError::Other(
+                    "LiveNodeDispatcher: Failed to parse RPC response",
+                ))
             }
-            Err(_e) => Err(DispatchError::Other("LiveNodeDispatcher: RPC request failed")),
+            Err(_e) => Err(DispatchError::Other(
+                "LiveNodeDispatcher: RPC request failed",
+            )),
         }
     }
 
@@ -215,12 +219,12 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     ) -> Result<CrossVmResult, DispatchError> {
         // Construct JSON-RPC svm_executeInstruction call
         // This matches the surface in node/src/rpc_frontier.rs
-        
+
         let endpoint = self.config.endpoint.clone();
         let hex_caller = format!("0x{}", hex::encode(caller));
         let hex_program = format!("0x{}", hex::encode(program_id));
         let hex_input_data = format!("0x{}", hex::encode(input));
-        
+
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "svm_executeInstruction",
@@ -263,9 +267,13 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
                         return Err(DispatchError::Other("LiveNodeDispatcher: RPC error"));
                     }
                 }
-                Err(DispatchError::Other("LiveNodeDispatcher: Failed to parse RPC response"))
+                Err(DispatchError::Other(
+                    "LiveNodeDispatcher: Failed to parse RPC response",
+                ))
             }
-            Err(_e) => Err(DispatchError::Other("LiveNodeDispatcher: RPC request failed")),
+            Err(_e) => Err(DispatchError::Other(
+                "LiveNodeDispatcher: RPC request failed",
+            )),
         }
     }
 
@@ -293,7 +301,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
 
         // Enforce trait contract: version + target
         call.ensure_current_version()?;
-        
+
         if call.target != VmId::X3Vm {
             return Ok(CrossVmReceipt {
                 call_hash: call.call_hash(&H256::zero()),
@@ -310,7 +318,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         // 2. Submit the execution request to the X3 Chain node
         // 3. Wait for the execution result
         // 4. Return the receipt with the execution results
-        
+
         // For now, return a success receipt (simulated)
         Ok(CrossVmReceipt {
             call_hash: call.call_hash(&H256::zero()),
@@ -401,14 +409,18 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         // Fail closed until real RPC plumbing is implemented.
         // Returning zero addresses would be misleading as it suggests
         // the bridge is ready when it's not.
-        panic!("LiveNodeDispatcher: get_evm_bridge_escrow not yet implemented - RPC plumbing required");
+        panic!(
+            "LiveNodeDispatcher: get_evm_bridge_escrow not yet implemented - RPC plumbing required"
+        );
     }
 
     fn get_svm_bridge_escrow(&self) -> [u8; 32] {
         // Fail closed until real RPC plumbing is implemented.
         // Returning zero addresses would be misleading as it suggests
         // the bridge is ready when it's not.
-        panic!("LiveNodeDispatcher: get_svm_bridge_escrow not yet implemented - RPC plumbing required");
+        panic!(
+            "LiveNodeDispatcher: get_svm_bridge_escrow not yet implemented - RPC plumbing required"
+        );
     }
 }
 

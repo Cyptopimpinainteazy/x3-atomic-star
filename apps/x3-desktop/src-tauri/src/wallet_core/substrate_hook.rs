@@ -9,8 +9,7 @@
 //! - Error handling and retry logic
 
 use serde::{Deserialize, Serialize};
-use sp_core::{H256, Pair};
-use sp_runtime::AccountId32;
+use sp_core::{crypto::AccountId32, H256};
 use std::collections::HashMap;
 
 /// Substrate hook event types

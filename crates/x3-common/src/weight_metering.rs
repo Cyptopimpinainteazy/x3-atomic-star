@@ -27,8 +27,10 @@
 //! ```
 
 use sp_std::vec::Vec;
+extern crate alloc;
+use alloc::string::String;
 
-use crate::signing::KeyType;
+use crate::KeyType;
 
 /// Error type for weight metering operations
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,13 +49,25 @@ impl sp_std::fmt::Display for WeightError {
     fn fmt(&self, f: &mut sp_std::fmt::Formatter<'_>) -> sp_std::fmt::Result {
         match self {
             WeightError::ComputeLimitExceeded(consumed, limit) => {
-                write!(f, "Compute unit limit exceeded: consumed {} > limit {}", consumed, limit)
+                write!(
+                    f,
+                    "Compute unit limit exceeded: consumed {} > limit {}",
+                    consumed, limit
+                )
             }
             WeightError::GasLimitExceeded(consumed, limit) => {
-                write!(f, "Gas limit exceeded: consumed {} > limit {}", consumed, limit)
+                write!(
+                    f,
+                    "Gas limit exceeded: consumed {} > limit {}",
+                    consumed, limit
+                )
             }
             WeightError::BudgetExceeded(consumed, budget) => {
-                write!(f, "Budget exceeded: consumed {} > budget {}", consumed, budget)
+                write!(
+                    f,
+                    "Budget exceeded: consumed {} > budget {}",
+                    consumed, budget
+                )
             }
             WeightError::InvalidConfig(msg) => {
                 write!(f, "Invalid weight configuration: {}", msg)
@@ -515,7 +529,9 @@ mod tests {
         let mut meter = WeightMeter::new(config);
 
         // Should succeed within budget
-        meter.consume_operation(Operation::Sign(KeyType::Ed25519)).unwrap();
+        meter
+            .consume_operation(Operation::Sign(KeyType::Ed25519))
+            .unwrap();
 
         // Should fail when exceeding budget
         // (100 + 100 = 200, which is within the 50,000 budget)
@@ -523,7 +539,9 @@ mod tests {
         config.max_operation_budget = 150;
         let mut meter = WeightMeter::new(config);
 
-        meter.consume_operation(Operation::Sign(KeyType::Ed25519)).unwrap();
+        meter
+            .consume_operation(Operation::Sign(KeyType::Ed25519))
+            .unwrap();
         assert!(matches!(
             meter.consume_operation(Operation::Sign(KeyType::Ed25519)),
             Err(WeightError::BudgetExceeded(_, _))

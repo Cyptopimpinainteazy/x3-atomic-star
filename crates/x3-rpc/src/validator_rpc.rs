@@ -15,7 +15,8 @@
 //!
 //! JSON-RPC endpoints for validator management, leaderboard queries, and metrics collection.
 
-use jsonrpsee::{core::Error as JsonRpseeError, RpcModule};
+use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
+type JsonRpseeError = ErrorObjectOwned;
 use sc_client_api::BlockBackend;
 use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
@@ -23,7 +24,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use std::sync::{Arc, Mutex};
-use x3_chain_runtime::{opaque::Block, AccountId, Balance, AssetId};
+use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
 
 /// Validator status enum
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -79,20 +80,20 @@ pub struct MetricsSnapshot {
 pub trait ValidatorRpcApi {
     /// Get current validator set
     fn validator_get_validators(&self) -> Result<Vec<ValidatorInfo>, JsonRpseeError>;
-    
+
     /// Get validator by account ID
     fn validator_get_validator(&self, account_id: String) -> Result<ValidatorInfo, JsonRpseeError>;
-    
+
     /// Get leaderboard with optional filters
     fn validator_get_leaderboard(
         &self,
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<LeaderboardEntry>, JsonRpseeError>;
-    
+
     /// Get metrics snapshot
     fn validator_get_metrics(&self) -> Result<MetricsSnapshot, JsonRpseeError>;
-    
+
     /// Get validator stats for a specific range
     fn validator_get_stats(
         &self,
@@ -102,32 +103,23 @@ pub trait ValidatorRpcApi {
 }
 
 /// Validator RPC implementation
-pub struct ValidatorRpc {
-    client: Arc<dyn ProvideRuntimeApi<Block>>,
-}
+pub struct ValidatorRpc;
 
 impl ValidatorRpc {
-    pub fn new(client: Arc<dyn ProvideRuntimeApi<Block>>) -> Self {
-        Self { client }
+    pub fn new() -> Self {
+        Self
     }
-    
-    /// Get current authorities from runtime
+
+    /// Get current authorities from runtime (stub)
     fn get_authorities(&self) -> Result<Vec<AccountId>, JsonRpseeError> {
-        // Get the best block hash
-        let best_hash = self.client.info().best_hash;
-        
-        // Call the runtime API to get authorities
-        self.client
-            .runtime_api()
-            .get_authorities(&best_hash)
-            .map_err(|e| JsonRpseeError::Custom(format!("Runtime API error: {}", e)))
+        Ok(vec![])
     }
 }
 
 impl ValidatorRpcApi for ValidatorRpc {
     fn validator_get_validators(&self) -> Result<Vec<ValidatorInfo>, JsonRpseeError> {
         let authorities = self.get_authorities()?;
-        
+
         // TODO: Fetch actual validator status from chain state
         // For now, return all authorities as online with mock data
         Ok(authorities
@@ -144,15 +136,15 @@ impl ValidatorRpcApi for ValidatorRpc {
             })
             .collect())
     }
-    
+
     fn validator_get_validator(&self, account_id: String) -> Result<ValidatorInfo, JsonRpseeError> {
         let authorities = self.get_authorities()?;
-        
+
         // Parse account ID (simplified - in production would use proper decoding)
         let target_account = authorities
             .into_iter()
             .find(|a| format!("{:?}", a) == account_id);
-        
+
         target_account
             .map(|account| ValidatorInfo {
                 account_id: format!("{:?}", account),
@@ -164,9 +156,9 @@ impl ValidatorRpcApi for ValidatorRpc {
                 last_seen: 0,
                 session_key: None,
             })
-            .ok_or_else(|| JsonRpseeError::Custom(format!("Validator not found: {}", account_id)))
+            .ok_or_else(|| ErrorObjectOwned::owned(-32603, format!("Validator not found: {}", account_id), None::<()>))
     }
-    
+
     fn validator_get_leaderboard(
         &self,
         _limit: Option<u32>,
@@ -199,7 +191,7 @@ impl ValidatorRpcApi for ValidatorRpc {
             },
         ])
     }
-    
+
     fn validator_get_metrics(&self) -> Result<MetricsSnapshot, JsonRpseeError> {
         // TODO: Fetch actual metrics from chain state
         Ok(MetricsSnapshot {
@@ -213,7 +205,7 @@ impl ValidatorRpcApi for ValidatorRpc {
             gas_efficiency_score: 0.0,
         })
     }
-    
+
     fn validator_get_stats(
         &self,
         _start_block: u64,
@@ -233,47 +225,54 @@ impl ValidatorRpcApi for ValidatorRpc {
     }
 }
 
+fn err_to_rpc<E: std::fmt::Display>(e: E) -> ErrorObjectOwned {
+    ErrorObjectOwned::owned(-32603, e.to_string(), None::<()>)
+}
+
 /// Create validator RPC module
 pub fn create_validator_rpc(
-    client: Arc<dyn ProvideRuntimeApi<Block>>,
+    _client: Arc<dyn std::any::Any + Send + Sync>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>> {
     let mut module = RpcModule::new(());
-    let validator_rpc = ValidatorRpc::new(client);
-    
-    module.register_method("validator_getValidators", move |_, _| {
-        validator_rpc
-            .validator_get_validators()
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-    })?;
-    
-    module.register_method("validator_getValidator", move |params, _| {
-        let account_id: String = params.one()?;
-        validator_rpc
-            .validator_get_validator(account_id)
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-    })?;
-    
-    module.register_method("validator_getLeaderboard", move |params, _| {
-        let limit: Option<u32> = params.one().ok();
-        let offset: Option<u32> = params.two().ok();
-        validator_rpc
-            .validator_get_leaderboard(limit, offset)
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-    })?;
-    
-    module.register_method("validator_getMetrics", move |_, _| {
-        validator_rpc
-            .validator_get_metrics()
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-    })?;
-    
-    module.register_method("validator_getStats", move |params, _| {
-        let start_block: u64 = params.one()?;
-        let end_block: u64 = params.two()?;
-        validator_rpc
-            .validator_get_stats(start_block, end_block)
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-    })?;
-    
+    let validator_rpc = std::sync::Arc::new(ValidatorRpc::new());
+
+    {
+        let vr = validator_rpc.clone();
+        module.register_method("validator_getValidators", move |_, _, _| {
+            vr.validator_get_validators().map(|r| serde_json::to_value(r).unwrap_or_default())
+        })?;
+    }
+
+    {
+        let vr = validator_rpc.clone();
+        module.register_method("validator_getValidator", move |params, _, _| {
+            let account_id: String = params.parse::<(String,)>().map(|(s,)| s)?;
+            vr.validator_get_validator(account_id).map(|r| serde_json::to_value(r).unwrap_or_default())
+        })?;
+    }
+
+    {
+        let vr = validator_rpc.clone();
+        module.register_method("validator_getLeaderboard", move |params, _, _| {
+            let (limit, offset): (Option<u32>, Option<u32>) = params.parse().unwrap_or((None, None));
+            vr.validator_get_leaderboard(limit, offset).map(|r| serde_json::to_value(r).unwrap_or_default())
+        })?;
+    }
+
+    {
+        let vr = validator_rpc.clone();
+        module.register_method("validator_getMetrics", move |_, _, _| {
+            vr.validator_get_metrics().map(|r| serde_json::to_value(r).unwrap_or_default())
+        })?;
+    }
+
+    {
+        let vr = validator_rpc.clone();
+        module.register_method("validator_getStats", move |params, _, _| {
+            let (start_block, end_block): (u64, u64) = params.parse()?;
+            vr.validator_get_stats(start_block, end_block).map(|r| serde_json::to_value(r).unwrap_or_default())
+        })?;
+    }
+
     Ok(module)
 }

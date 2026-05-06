@@ -3,7 +3,11 @@
 //! Find best routes across multiple AMM pools for optimal prices.
 //! Uses Bellman-Ford longest-path variant to maximize output.
 
-use std::collections::{HashMap, VecDeque};
+use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+#[cfg(feature = "std")]
+use std::collections::VecDeque;
+#[cfg(not(feature = "std"))]
+use alloc::collections::VecDeque;
 
 /// Pool for routing
 #[derive(Clone, Debug)]
@@ -29,8 +33,8 @@ pub struct Path {
 
 /// Route finder (graph-based)
 pub struct RouteFinder {
-    pub pools: HashMap<String, PoolEdge>,
-    pub graph: HashMap<String, Vec<String>>, // token → connected pools
+    pub pools: BTreeMap<String, PoolEdge>,
+    pub graph: BTreeMap<String, Vec<String>>, // token → connected pools
 }
 
 impl Default for RouteFinder {
@@ -42,8 +46,8 @@ impl Default for RouteFinder {
 impl RouteFinder {
     pub fn new() -> Self {
         Self {
-            pools: HashMap::new(),
-            graph: HashMap::new(),
+            pools: BTreeMap::new(),
+            graph: BTreeMap::new(),
         }
     }
 

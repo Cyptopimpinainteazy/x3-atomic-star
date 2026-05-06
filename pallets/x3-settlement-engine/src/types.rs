@@ -1,10 +1,10 @@
 //! Core types for the X3 Settlement Engine
 
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use core::fmt::Debug;
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::Debug;
 use sp_std::vec::Vec;
 
 /// Maximum size for escrow address data
@@ -20,15 +20,7 @@ pub const MAX_RECEIPT_DATA_SIZE: u32 = 1024;
 
 /// Settlement intent: the source of truth for an atomic swap
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 #[scale_info(skip_type_params(AccountId))]
 pub struct SettlementIntent<AccountId> {
@@ -58,15 +50,7 @@ pub struct SettlementIntent<AccountId> {
 
 /// Asset specification (chain + token + amount)
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 pub struct AssetSpec {
     /// Chain where asset resides
@@ -79,15 +63,7 @@ pub struct AssetSpec {
 
 /// Token identifier (chain-agnostic)
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 pub enum TokenId {
     /// Native currency (ETH, SOL, BTC)
@@ -140,15 +116,7 @@ pub enum IntentState {
 
 /// Settlement transfer: tracks individual cross-chain settlement operations
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 #[scale_info(skip_type_params(AccountId, Balance))]
 pub struct SettlementTransfer<AccountId, Balance> {
@@ -178,15 +146,7 @@ pub struct SettlementTransfer<AccountId, Balance> {
 
 /// Escrow leg for a settlement intent
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 #[scale_info(skip_type_params(AccountId))]
 pub struct EscrowLeg<AccountId> {
@@ -261,15 +221,7 @@ pub struct BtcUtxoState {
 
 /// BTC block header (80 bytes, compact)
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 pub struct BtcBlockHeader {
     /// Block version
@@ -294,15 +246,7 @@ pub struct BtcBlockHeader {
 
 /// Settlement proof for external chain verification
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 pub struct SettlementProof {
     /// Type of proof
@@ -400,15 +344,7 @@ pub enum ExternalChainId {
 
 /// Finality configuration for a chain
 #[derive(
-    Clone,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    Debug,
-    TypeInfo,
-    MaxEncodedLen,
-    PartialEq,
-    Eq,
+    Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
 )]
 pub struct FinalityConfig {
     /// Chain ID

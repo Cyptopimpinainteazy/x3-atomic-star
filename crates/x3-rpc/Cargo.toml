@@ -14,12 +14,20 @@ jsonrpc-derive = { version = "18.0", default-features = false }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
+# Runtime
+x3-chain-runtime = { path = "../../runtime", features = ["std", "frontier"] }
+pallet-x3-kernel = { path = "../../pallets/x3-kernel", features = ["std"] }
+
 # Substrate RPC infrastructure
 sp-api = { workspace = true }
 sp-blockchain = { workspace = true }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 sc-rpc-api = { workspace = true }
+sc-client-api = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
+sp-block-builder = { workspace = true }
+jsonrpsee = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }

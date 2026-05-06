@@ -9,13 +9,12 @@ use poh_generator::PoHState;
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
-use sc_executor::NativeElseWasmExecutor;
 use sc_service::{
-    new_native_or_wasm_executor, ChainType, Configuration, Error as ServiceError,
+    ChainType, Configuration, Error as ServiceError,
     KeystoreContainer, PartialComponents, TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
-use sp_api::HeaderT;
+use sp_runtime::traits::Header as HeaderT;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::{crypto::KeyTypeId, Pair};
 use sp_runtime::{
@@ -209,28 +208,8 @@ impl GpuSidecarHealthMonitor {
         log::info!("🔄 GPU sidecar health monitor reset");
     }
 }
-/// X3 Chain native executor implementation
-pub struct AtlasSphereExecutorDispatch;
-
-impl sc_executor::NativeExecutionDispatch for AtlasSphereExecutorDispatch {
-    type ExtendHostFunctions = sp_io::SubstrateHostFunctions;
-
-    fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-        x3_chain_runtime::api::dispatch(method, data)
-    }
-
-    fn native_version() -> sc_executor::NativeVersion {
-        x3_chain_runtime::native_version()
-    }
-}
-
-/// Executor for X3 Chain
-///
-/// In normal builds we use `NativeElseWasmExecutor` so the node can
-/// execute both natively and via the embedded WASM runtime. For
-/// `skip-wasm-build` development builds, we force a pure native
-/// executor to avoid deserializing a missing or dummy WASM blob.
-pub type Executor = NativeElseWasmExecutor<AtlasSphereExecutorDispatch>;
+/// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
+pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -294,31 +273,27 @@ fn maybe_insert_dev_keys(
 }
 
 fn tuned_transaction_pool_options(
-    mut options: sc_transaction_pool::Options,
-) -> sc_transaction_pool::Options {
+    _existing: sc_transaction_pool::TransactionPoolOptions,
+) -> sc_transaction_pool::TransactionPoolOptions {
     let network_speed = NetworkSpeed::detect();
-    let (ready_count, future_count, ready_bytes, future_bytes) = network_speed.pool_sizing();
+    let (ready_count, future_count, ready_bytes, _future_bytes) = network_speed.pool_sizing();
 
-    // Apply network-speed-specific sizing
-    options.ready.count = options.ready.count.max(ready_count);
-    options.future.count = options.future.count.max(future_count);
-    options.ready.total_bytes = options.ready.total_bytes.max(ready_bytes);
-    options.future.total_bytes = options.future.total_bytes.max(future_bytes);
-
-    // Ban time: 60s instead of default 1800s — faster retry for legitimate bursts
     const TX_POOL_BAN_TIME_SECS: u64 = 60;
-    options.ban_time = Duration::from_secs(TX_POOL_BAN_TIME_SECS);
-
     log::info!(
-        "🔗 TX Pool configured for {:?} network: {} ready / {} future, {} MiB / {} MiB",
+        "🔗 TX Pool configured for {:?} network: {} ready / {} future, {} MiB",
         network_speed,
         ready_count,
         future_count,
         ready_bytes / 1024 / 1024,
-        future_bytes / 1024 / 1024
     );
 
-    options
+    sc_transaction_pool::TransactionPoolOptions::new_with_params(
+        ready_count,
+        ready_bytes,
+        Some(TX_POOL_BAN_TIME_SECS),
+        sc_transaction_pool::TransactionPoolType::SingleState,
+        false,
+    )
 }
 
 /// Apply the tuned limits to a runtime configuration before the pool is built.
@@ -359,8 +334,8 @@ pub fn new_partial(
         FullClient,
         FullBackend,
         SelectChain,
-        sc_consensus::DefaultImportQueue<Block, FullClient>,
-        sc_transaction_pool::FullPool<Block, FullClient>,
+        sc_consensus::DefaultImportQueue<Block>,
+        sc_transaction_pool::TransactionPoolHandle<Block, FullClient>,
         (
             sc_consensus_grandpa::GrandpaBlockImport<FullBackend, Block, FullClient, SelectChain>,
             sc_consensus_grandpa::LinkHalf<Block, FullClient, SelectChain>,
@@ -382,7 +357,7 @@ pub fn new_partial(
         .transpose()?;
 
     // Create executor
-    let executor = new_native_or_wasm_executor::<AtlasSphereExecutorDispatch>(config);
+    let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
 
     // Build partial components
     let (client, backend, keystore_container, task_manager) =
@@ -407,17 +382,21 @@ pub fn new_partial(
     // Select chain implementation (longest chain rule)
     let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
-    let transaction_pool = sc_transaction_pool::BasicPool::new_full(
-        config.transaction_pool.clone(),
-        config.role.is_authority().into(),
-        config.prometheus_registry(),
-        task_manager.spawn_essential_handle(),
-        client.clone(),
+    let transaction_pool = Arc::from(
+        sc_transaction_pool::Builder::new(
+            task_manager.spawn_essential_handle(),
+            client.clone(),
+            config.role.is_authority().into(),
+        )
+        .with_options(config.transaction_pool.clone())
+        .with_prometheus(config.prometheus_registry())
+        .build(),
     );
 
     // Create GRANDPA block import wrapper
     let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
         client.clone(),
+        512u32,
         &client,
         select_chain.clone(),
         telemetry.as_ref().map(|x| x.handle()),
@@ -635,7 +614,7 @@ impl CrossVmBridgeSafetyGate {
 }
 
 /// Start a new X3 Chain full node with complete consensus and networking
-pub fn new_full(
+pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>>(
     mut config: Configuration,
     feature_flags: NodeFeatureFlags,
 ) -> Result<TaskManager, ServiceError> {
@@ -654,7 +633,13 @@ pub fn new_full(
     } = new_partial(&config)?;
 
     // configure network protocols; GRANDPA may be disabled when using Flash Finality
-    let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
+    let mut net_config = sc_network::config::FullNetworkConfiguration::<
+        Block,
+        <Block as sp_runtime::traits::Block>::Hash,
+        N,
+    >::new(&config.network, config.prometheus_registry().cloned());
+    let metrics = N::register_notification_metrics(config.prometheus_registry());
+    let peer_store_handle = net_config.peer_store_handle();
 
     // decide whether GRANDPA should be active; tests can call the helper below.
     let enable_grandpa = compute_enable_grandpa(&config, feature_flags);
@@ -677,11 +662,18 @@ pub fn new_full(
     let grandpa_protocol_name =
         sc_consensus_grandpa::protocol_standard_name(&genesis_hash, &config.chain_spec);
 
-    if enable_grandpa {
-        net_config.add_notification_protocol(sc_consensus_grandpa::grandpa_peers_set_config(
-            grandpa_protocol_name.clone(),
-        ));
-    }
+    let grandpa_notification_service = if enable_grandpa {
+        let (grandpa_protocol_config, grandpa_notification_service) =
+            sc_consensus_grandpa::grandpa_peers_set_config::<_, N>(
+                grandpa_protocol_name.clone(),
+                metrics.clone(),
+                peer_store_handle.clone(),
+            );
+        net_config.add_notification_protocol(grandpa_protocol_config);
+        Some(grandpa_notification_service)
+    } else {
+        None
+    };
 
     let warp_sync = if enable_grandpa {
         Some(Arc::new(
@@ -695,17 +687,29 @@ pub fn new_full(
         None
     };
 
-    if feature_flags.enable_flash_finality {
-        let mut flash_proto = sc_network::config::NonDefaultSetConfig::new(
+    let flash_notification_service = if feature_flags.enable_flash_finality {
+        let (flash_proto, flash_notif) = N::notification_config(
             FLASH_FINALITY_PROTOCOL_ID.into(),
+            vec![],
             1024 * 1024,
+            None,
+            sc_network::config::SetConfig {
+                in_peers: 25,
+                out_peers: 25,
+                reserved_nodes: vec![],
+                non_reserved_mode: sc_network::config::NonReservedPeerMode::Accept,
+            },
+            metrics.clone(),
+            peer_store_handle.clone(),
         );
-        flash_proto.allow_non_reserved(25, 25);
         net_config.add_notification_protocol(flash_proto);
-    }
+        Some(flash_notif)
+    } else {
+        None
+    };
 
     // Build networking service
-    let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
+    let (network, system_rpc_tx, tx_handler_controller, sync_service) =
         sc_service::build_network(sc_service::BuildNetworkParams {
             config: &config,
             net_config,
@@ -714,7 +718,9 @@ pub fn new_full(
             spawn_handle: task_manager.spawn_handle(),
             import_queue,
             block_announce_validator_builder: None,
-            warp_sync_params: warp_sync.map(|w| sc_service::WarpSyncParams::WithProvider(w)),
+            warp_sync_config: warp_sync.map(|w| sc_service::WarpSyncConfig::WithProvider(w)),
+            block_relay: None,
+            metrics,
         })?;
 
     let role = config.role.clone();
@@ -834,15 +840,15 @@ pub fn new_full(
         let transaction_pool = transaction_pool.clone();
         let gadget = flash_finality_gadget.clone();
         let limiter = rate_limiter.clone();
-        Box::new(move |deny_unsafe, _subscription_executor| {
+        Box::new(move |subscription_executor: sc_rpc::SubscriptionTaskExecutor| {
             crate::rpc::create_full(
                 client.clone(),
                 transaction_pool.clone(),
-                deny_unsafe,
                 gadget.clone(),
                 limiter.clone(),
+                subscription_executor,
             )
-            .map_err(|e| ServiceError::Other(format!("RPC module creation failed: {:?}", e)))
+            .map_err(Into::into)
         })
     };
 
@@ -856,16 +862,17 @@ pub fn new_full(
         keystore: keystore_container.keystore(),
         transaction_pool: transaction_pool.clone(),
         rpc_builder,
-        network: network.clone(),
+        network: Arc::new(network.clone()),
         system_rpc_tx,
         tx_handler_controller,
         sync_service: sync_service.clone(),
         telemetry: telemetry.as_mut(),
+        tracing_execute_block: None,
     })?;
 
     // Start Aura block authoring if this is an authority node
     if role.is_authority() {
-        let proposer_factory = ParallelProposerFactory::new(
+        let proposer_factory: ParallelProposerFactory<_, FullBackend, FullClient, _> = ParallelProposerFactory::new(
             task_manager.spawn_handle(),
             client.clone(),
             transaction_pool.clone(),
@@ -924,7 +931,7 @@ pub fn new_full(
     if enable_grandpa {
         let grandpa_config = sc_consensus_grandpa::Config {
             gossip_duration: std::time::Duration::from_millis(100),
-            justification_period: 64,
+            justification_generation_period: 512u32,
             name: Some(name.clone()),
             observer_enabled: false,
             keystore: Some(keystore_container.keystore()),
@@ -942,6 +949,7 @@ pub fn new_full(
             link: grandpa_link,
             network: network.clone(),
             sync: Arc::new(sync_service.clone()),
+            notification_service: grandpa_notification_service.expect("grandpa notification service present when grandpa enabled; qed"),
             voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry,
             shared_voter_state: SharedVoterState::empty(),
@@ -956,8 +964,7 @@ pub fn new_full(
         );
     }
 
-    // Start the network
-    network_starter.start_network();
+    // Network starts automatically in stable2512 (start_network removed)
 
     // Spawn a background task to watch finalized blocks and log events with emojis
     {
@@ -1022,6 +1029,7 @@ pub fn new_full(
             network.clone(),
             sync_service.clone(),
             keystore_container.keystore(),
+            flash_notification_service.expect("flash notification service present when flash finality enabled; qed"),
         );
 
         task_manager.spawn_essential_handle().spawn(

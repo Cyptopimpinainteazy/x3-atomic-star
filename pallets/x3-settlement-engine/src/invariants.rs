@@ -15,9 +15,9 @@
 
 use crate::types::{IntentState, InvariantViolationType, RefundReason};
 use codec::{Decode, DecodeWithMemTracking, Encode};
+use core::fmt::Debug;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::Debug;
 use sp_std::{vec, vec::Vec};
 
 /// Invariant check result
@@ -251,9 +251,7 @@ impl InvariantEnforcer {
 }
 
 /// VM execution event for reentrancy detection
-#[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
-)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq)]
 pub enum VmExecutionEvent {
     /// Entered VM execution
     Enter(VmType),
@@ -262,9 +260,7 @@ pub enum VmExecutionEvent {
 }
 
 /// VM type identifier
-#[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq,
-)]
+#[derive(Clone, Copy, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PartialEq, Eq)]
 pub enum VmType {
     Evm,
     Svm,

@@ -9,6 +9,11 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is required for self-test"
+  exit 1
+fi
+
 echo "Running X3 swarm self-test..."
 
 if curl -fsS "$API_HEALTH_URL" >/dev/null 2>&1; then
@@ -18,7 +23,14 @@ else
   exit 1
 fi
 
-TASK_COUNT=$(curl -fsS "$TASKS_URL" | python3 -c 'import sys, json; data=json.load(sys.stdin); print(len(data))')
+tasks_response=$(curl -fsS "$TASKS_URL") || {
+  echo "ERROR: Tasks endpoint request failed"
+  exit 1
+}
+TASK_COUNT=$(printf '%s' "$tasks_response" | python3 -c 'import sys, json; data=json.load(sys.stdin); print(len(data))') || {
+  echo "ERROR: Tasks endpoint returned invalid JSON"
+  exit 1
+}
 if [ "$TASK_COUNT" -ge 0 ]; then
   echo "- Tasks endpoint returned $TASK_COUNT task(s)"
   if [ "$TASK_COUNT" -eq 0 ]; then
@@ -26,6 +38,14 @@ if [ "$TASK_COUNT" -ge 0 ]; then
   fi
 else
   echo "ERROR: Tasks endpoint returned invalid data"
+  exit 1
+fi
+
+echo "- Generating swarm task report"
+if "$ROOT_DIR/scripts/swarm/approve_task.sh" report "$ROOT_DIR/reports/swarm_task_summary.md" >/dev/null 2>&1; then
+  echo "- Swarm task report created: $ROOT_DIR/reports/swarm_task_summary.md"
+else
+  echo "ERROR: failed to generate swarm task report"
   exit 1
 fi
 

@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmScoreboard {
-    pub agent_scores: HashMap<String, f64>,
-    pub task_success_rate: f64,
-    pub total_tasks_completed: u64,
-    pub total_tasks_failed: u64,
+    agent_scores: HashMap<String, f64>,
+    task_success_rate: f64,
+    total_tasks_succeeded: u64,
+    total_tasks_failed: u64,
 }
 
 impl Default for SwarmScoreboard {
@@ -14,7 +14,7 @@ impl Default for SwarmScoreboard {
         Self {
             agent_scores: HashMap::new(),
             task_success_rate: 0.0,
-            total_tasks_completed: 0,
+            total_tasks_succeeded: 0,
             total_tasks_failed: 0,
         }
     }
@@ -25,19 +25,27 @@ impl SwarmScoreboard {
         let score = self.agent_scores.entry(agent.to_string()).or_insert(0.0);
         if success {
             *score += 1.0;
-            self.total_tasks_completed += 1;
+            self.total_tasks_succeeded += 1;
         } else {
             *score -= 1.0;
             self.total_tasks_failed += 1;
         }
-        self.task_success_rate = if self.total_tasks_completed + self.total_tasks_failed == 0 {
-            0.0
-        } else {
-            self.total_tasks_completed as f64 / (self.total_tasks_completed + self.total_tasks_failed) as f64
-        };
+        debug_assert!(self.total_tasks_succeeded + self.total_tasks_failed > 0);
+        self.task_success_rate = self.total_tasks_succeeded as f64
+            / (self.total_tasks_succeeded + self.total_tasks_failed) as f64;
     }
 
     pub fn success_rate(&self) -> f64 {
         self.task_success_rate
+    }
+
+    pub fn agent_scores(&self) -> &HashMap<String, f64> {
+        &self.agent_scores
+    }
+    pub fn total_tasks_succeeded(&self) -> u64 {
+        self.total_tasks_succeeded
+    }
+    pub fn total_tasks_failed(&self) -> u64 {
+        self.total_tasks_failed
     }
 }

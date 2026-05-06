@@ -26,6 +26,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::DecodeWithMemTracking;
     use sp_runtime::traits::SaturatedConversion;
+    use sp_std::vec::Vec;
 
     /// Asset identifier type for price feeds
     pub type AssetId = u32;

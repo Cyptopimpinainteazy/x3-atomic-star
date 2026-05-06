@@ -303,8 +303,14 @@ fn submit_evm_transaction_persists_receipt_and_transaction_metadata() {
     new_test_ext().execute_with(|| {
         let to = [0x11; 20];
         let input = [0xab; 56];
-        let raw_tx = legacy_evm_tx(to, &[0x01, 0x02], &[0x13, 0x88], &[0x52, 0x08], Some(&input));
-        let tx_hash = H256::from(sp_io::hashing::keccak256(&raw_tx));
+        let raw_tx = legacy_evm_tx(
+            to,
+            &[0x01, 0x02],
+            &[0x13, 0x88],
+            &[0x52, 0x08],
+            Some(&input),
+        );
+        let tx_hash = H256::from(sp_io::hashing::keccak_256(&raw_tx));
 
         let returned_hash =
             AtlasKernel::submit_evm_transaction(raw_tx.clone()).expect("transaction should store");
@@ -334,7 +340,10 @@ fn submit_evm_transaction_persists_receipt_and_transaction_metadata() {
             }
         );
 
-        assert_eq!(SubmittedComits::<Test>::get(tx_hash), Some(System::block_number()));
+        assert_eq!(
+            SubmittedComits::<Test>::get(tx_hash),
+            Some(System::block_number())
+        );
     });
 }
 
@@ -343,7 +352,7 @@ fn submit_evm_transaction_rejects_replay_without_overwriting_stored_records() {
     new_test_ext().execute_with(|| {
         let to = [0x22; 20];
         let raw_tx = legacy_evm_tx(to, &[0x2a], &[0x01], &[0x52, 0x08], None);
-        let tx_hash = H256::from(sp_io::hashing::keccak256(&raw_tx));
+        let tx_hash = H256::from(sp_io::hashing::keccak_256(&raw_tx));
 
         assert_ok!(AtlasKernel::submit_evm_transaction(raw_tx.clone()));
         let original_receipt =
@@ -354,9 +363,15 @@ fn submit_evm_transaction_rejects_replay_without_overwriting_stored_records() {
             AtlasKernel::submit_evm_transaction(raw_tx).expect_err("replay must be rejected");
         assert_eq!(replay_err, b"replay".to_vec());
 
-        assert_eq!(EvmTransactionReceipts::<Test>::get(tx_hash), Some(original_receipt));
+        assert_eq!(
+            EvmTransactionReceipts::<Test>::get(tx_hash),
+            Some(original_receipt)
+        );
         assert_eq!(EvmTransactions::<Test>::get(tx_hash), Some(original_tx));
-        assert_eq!(SubmittedComits::<Test>::get(tx_hash), Some(System::block_number()));
+        assert_eq!(
+            SubmittedComits::<Test>::get(tx_hash),
+            Some(System::block_number())
+        );
     });
 }
 

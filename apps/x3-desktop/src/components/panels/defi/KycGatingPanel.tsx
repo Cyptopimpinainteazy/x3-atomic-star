@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Shield, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Shield, FileText, CheckCircle, AlertCircle, Fingerprint } from "lucide-react";
 import clsx from "clsx";
 
 interface KycLevel {
@@ -90,7 +90,7 @@ export default function KycGatingPanel() {
             </>
           ) : (
             <>
-              <ID className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
+              <Fingerprint className="text-blue-400 flex-shrink-0 mt-0.5" size={16} />
               <div>
                 <div className="font-semibold text-blue-400">Not Verified</div>
                 <div className="text-xs text-gray-400">You are currently at general trading limits</div>

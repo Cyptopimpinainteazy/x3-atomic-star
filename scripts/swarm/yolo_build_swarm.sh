@@ -8,22 +8,14 @@ echo "=================================================="
 
 mkdir -p reports logs/swarm data/agent-memory
 
-if find . \
-  -path './.git' -prune -o \
-  -path './target' -prune -o \
-  -path './node_modules' -prune -o \
-  \( -name '.env' -o -name '*.key' -o -name '*seed*' -o -name '*private*' \) \
-  -print | grep -q .; then
-  echo "WARNING: Possible secret files found. Swarm must not read or edit them." | tee reports/swarm_secret_warning.md
-fi
-
-echo "[1/9] Validate forbidden safety files"
 forbidden_found=$(find . \
   -path './.git' -prune -o \
-  -path './target' -prune -o \
-  -path './node_modules' -prune -o \
-  \( -name '.env' -o -name '*.key' -o -name '*seed*' -o -name '*private*' \) \
+  -path '*/target' -prune -o \
+  -path '*/node_modules' -prune -o \
+  \( -name '.env' -o -name '.env.*' -o -name '*.key' -o -name '*_seed*' -o -name '*-seed*' -o -name '*private_key*' \) \
   -print)
+
+echo "[1/9] Validate forbidden safety files"
 if [ -n "$forbidden_found" ]; then
   printf "%s\n" "$forbidden_found" > reports/swarm_secret_warning.md
   echo "WARNING: Possible secret files found. Swarm must not read or edit them."
@@ -41,7 +33,7 @@ fi
 
 echo "[4/9] Swarm scan"
 if [ -x scripts/swarm/swarm_scan.sh ]; then
-  scripts/swarm/swarm_scan.sh || true
+  scripts/swarm/swarm_scan.sh
 fi
 
 echo "[5/9] Rust swarm tests"

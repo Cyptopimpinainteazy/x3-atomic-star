@@ -1,7 +1,7 @@
 // Frontend hooks for TIER 6 CRM API integration
 // Use these in React components to call backend Tauri commands
 
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
 
 // ============================================
@@ -310,7 +310,7 @@ export function useCrmLeadScoring(userId: string) {
 }
 
 export function useCrmAnalytics(userId: string) {
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

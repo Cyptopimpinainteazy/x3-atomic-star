@@ -276,9 +276,9 @@ export default function ComplianceReportPanel() {
                 <div className="flex items-start justify-between">
                   <div className="font-semibold text-sm">{req.requirement}</div>
                   <span className={clsx("font-bold text-sm", getStatusColor(req.status))}>
-                    {req.status === "met" && <CheckCircle size={14} inline />}
-                    {req.status === "in-progress" && <Clock size={14} inline />}
-                    {req.status === "pending" && <AlertTriangle size={14} inline />}
+                    {req.status === "met" && <CheckCircle size={14} />}
+                    {req.status === "in-progress" && <Clock size={14} />}
+                    {req.status === "pending" && <AlertTriangle size={14} />}
                     {" " + req.status.toUpperCase()}
                   </span>
                 </div>

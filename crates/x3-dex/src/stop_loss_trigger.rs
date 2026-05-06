@@ -1,7 +1,7 @@
 /// Stop-Loss / Take-Profit Triggers — Price-based automatic order execution
 /// Monitors price feeds and executes orders when thresholds are reached
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct StopLossTrigger {

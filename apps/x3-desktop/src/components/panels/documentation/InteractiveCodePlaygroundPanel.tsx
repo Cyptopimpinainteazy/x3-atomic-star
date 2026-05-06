@@ -287,7 +287,7 @@ export default function InteractiveCodePlaygroundPanel() {
                     </div>
                     <div className="bg-[#15151b] border border-[#2a2a35] rounded p-2 text-xs">
                       <div className="text-gray-400">Gas Used</div>
-                      <div className="font-bold text-yellow-400 mt-0.5">{(deploymentResult.gasUsed / 1000000).toFixed(2)}M</div>
+                      <div className="font-bold text-yellow-400 mt-0.5">{((deploymentResult.gasUsed ?? 0) / 1000000).toFixed(2)}M</div>
                     </div>
                   </div>
                 )}

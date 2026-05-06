@@ -146,11 +146,10 @@ export default function RealTimeNotificationsPanel() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const notificationsByType = settings.groupByType
-    ? Object.fromEntries(
-        Object.entries(Object.groupBy(notifications, "type")).map(
-          ([type, nots]: [string, Notification[] | undefined]) => [type, nots || []]
-        )
-      )
+    ? notifications.reduce<Record<string, Notification[]>>((acc, n) => {
+        (acc[n.type] ??= []).push(n);
+        return acc;
+      }, {})
     : {};
 
   return (

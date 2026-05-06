@@ -160,7 +160,7 @@ export const DEMO_EMAIL_TEMPLATES = [
 <ul>
   <li>30-day pilot for {{department}}</li>
   <li>No-risk guarantee</li>
-  <li>${{discount}}k special pricing</li>
+  <li>${'{{discount}}'}k special pricing</li>
 </ul>
 <p>Let's move forward?</p>`,
   },

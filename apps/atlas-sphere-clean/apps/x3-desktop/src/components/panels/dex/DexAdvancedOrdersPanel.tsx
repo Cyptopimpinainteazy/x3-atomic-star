@@ -57,10 +57,17 @@ const MOCK_ORDERS: Order[] = [
 export default function DexAdvancedOrdersPanel() {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createData, setCreateData] = useState({
+  const [createData, setCreateData] = useState<{
+    pair: string;
+    type: Order["type"];
+    direction: Order["direction"];
+    size: number;
+    limitPrice: number;
+    triggerPrice: number;
+  }>({
     pair: "X3/USDC",
-    type: "limit" as const,
-    direction: "buy" as const,
+    type: "limit",
+    direction: "buy",
     size: 100,
     limitPrice: 0.95,
     triggerPrice: 1.05,

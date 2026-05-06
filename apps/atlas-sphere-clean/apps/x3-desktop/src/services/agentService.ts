@@ -3,6 +3,7 @@
  * 4 Layers: Strategic • Execution • Media • Growth
  * All powered by local Ollama (free, no API keys).
  */
+import { invoke } from '@tauri-apps/api/core';
 // Use a lazy guarded invoke helper to avoid browser crashes when Tauri is not present
 export async function fallbackInvoke<T>(cmd: string, args?: any): Promise<T> {
   if (typeof window === 'undefined' || (!(window as any).__TAURI_INTERNALS__ && !(window as any).__TAURI__)) {

@@ -24,7 +24,8 @@ pub mod merkle_proof_validator;
 // Gap #3: Merkle settlement integration for bridge commit phase
 pub mod merkle_settlement_bridge;
 
-// Live Node RPC connector for cross-VM operations
+// Live Node RPC connector for cross-VM operations (std-only: uses jsonrpsee + std::env)
+#[cfg(feature = "std")]
 pub mod connector;
 
 #[cfg(test)]
@@ -212,6 +213,75 @@ pub trait CrossVmDispatcher {
 
     /// Get the SVM bridge escrow program address
     fn get_svm_bridge_escrow(&self) -> [u8; 32];
+
+    /// Get the current SVM slot height.
+    fn get_svm_slot(&self) -> u64 {
+        0
+    }
+
+    /// Get the SVM blockhash for a slot.
+    fn get_svm_blockhash(&self, _slot: u64) -> Option<H256> {
+        None
+    }
+
+    /// Get the SVM transaction count for a pubkey.
+    fn get_svm_transaction_count(&self, _svm_pubkey: Vec<u8>) -> u64 {
+        0
+    }
+
+    /// Get the slot corresponding to an SVM blockhash.
+    fn get_svm_slot_by_blockhash(_blockhash: H256) -> Option<u64>
+    where
+        Self: Sized,
+    {
+        None
+    }
+
+    /// Parse raw Ethereum transaction metadata.
+    fn parse_ethereum_transaction(_raw_tx: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u128), Vec<u8>>
+    where
+        Self: Sized,
+    {
+        Err(b"unsupported".to_vec())
+    }
+
+    /// Parse raw Ethereum transaction metadata including gas and input fields.
+    fn parse_ethereum_transaction_with_gas(
+        _raw_tx: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>, u128, u64, Vec<u8>, u64, u128), Vec<u8>>
+    where
+        Self: Sized,
+    {
+        Err(b"unsupported".to_vec())
+    }
+
+    /// Submit a raw EVM transaction.
+    fn submit_evm_transaction(_raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>>
+    where
+        Self: Sized,
+    {
+        Err(b"unsupported".to_vec())
+    }
+
+    /// Validate a raw EVM transaction without mutating state.
+    fn validate_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>>
+    where
+        Self: Sized,
+    {
+        if raw_tx.is_empty() {
+            Err(b"empty transaction".to_vec())
+        } else {
+            Ok(raw_tx)
+        }
+    }
+
+    /// Return EVM logs matching a SCALE-encoded filter.
+    fn get_evm_logs(_filter: Vec<u8>) -> Vec<Vec<u8>>
+    where
+        Self: Sized,
+    {
+        Vec::new()
+    }
 }
 
 /// Default no-op dispatcher (used when no runtime dispatcher is configured).

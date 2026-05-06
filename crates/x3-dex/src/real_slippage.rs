@@ -1,7 +1,7 @@
 /// Real Slippage Calculator — Deterministic slippage calculation using constant-product AMM formula
 /// Provides users with transparent real-time slippage estimates before trade execution
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolReserves {

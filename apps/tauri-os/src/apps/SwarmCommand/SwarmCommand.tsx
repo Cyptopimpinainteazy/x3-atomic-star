@@ -1,4 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+const API_BASE = "http://127.0.0.1:8787";
+const REQUEST_TIMEOUT_MS = 5_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 type TaskRecord = {
   id: string;
@@ -23,30 +36,56 @@ export function SwarmCommand() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      const statusResp = await fetch("http://127.0.0.1:8787/health");
+      setError(null);
+      const statusResp = await fetchWithTimeout(`${API_BASE}/health`);
       if (!statusResp.ok) throw new Error("Health endpoint unavailable");
       setHealth(await statusResp.json());
 
-      const tasksResp = await fetch("http://127.0.0.1:8787/tasks");
+      const tasksResp = await fetchWithTimeout(`${API_BASE}/tasks`);
       if (!tasksResp.ok) throw new Error("Tasks endpoint unavailable");
       setTasks(await tasksResp.json());
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err instanceof DOMException && err.name === "AbortError" ? "Request timed out" : (err as Error).message);
       setHealth(null);
       setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  async function approveTask(taskId: string) {
+    try {
+      const resp = await fetchWithTimeout(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/approve`, { method: "POST" });
+      if (!resp.ok) throw new Error("Approve failed");
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function rejectTask(taskId: string) {
+    try {
+      const resp = await fetchWithTimeout(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/reject`, { method: "POST" });
+      if (!resp.ok) throw new Error("Reject failed");
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   const backendConnected = !!health && !error;
   const latestTask = tasks[0] ?? null;
+  const pendingManualTasks = tasks.filter((task) => task.status === "Pending" && task.approval_required === "manual");
 
   return (
     <div style={{ padding: 24, fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}>
@@ -55,7 +94,9 @@ export function SwarmCommand() {
 
       <section style={{ marginBottom: 24 }}>
         <h2>Backend Status</h2>
-        {backendConnected ? (
+        {loading ? (
+          <p>Loading swarm status...</p>
+        ) : backendConnected ? (
           <div>
             <p>Service: {health?.service}</p>
             <p>Status: {health?.status}</p>
@@ -118,7 +159,21 @@ export function SwarmCommand() {
         <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
           <h3>Approval Gate</h3>
           <p>Latest approval required: {latestTask?.approval_required ?? "None"}</p>
-          <p>Pending approvals: {tasks.filter((task) => task.status === "NeedsApproval").length}</p>
+          <p>Pending manual approvals: {pendingManualTasks.length}</p>
+          {pendingManualTasks.map((task) => (
+            <div key={task.id} style={{ marginTop: 12, padding: 12, background: "#fafafa", borderRadius: 8 }}>
+              <strong>{task.title}</strong>
+              <div>{task.feature} · {task.agent}</div>
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => approveTask(task.id)} style={{ marginRight: 8, padding: "6px 10px" }}>
+                  Approve
+                </button>
+                <button onClick={() => rejectTask(task.id)} style={{ padding: "6px 10px" }}>
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
@@ -135,7 +190,7 @@ export function SwarmCommand() {
 
         <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
           <h3>Kill Switch</h3>
-          <p>{health?.kill_switch ? "Kill switch engaged" : "Kill switch clear"}</p>
+          <p>{health == null ? "Kill switch status unknown (backend disconnected)" : health.kill_switch ? "Kill switch engaged" : "Kill switch clear"}</p>
           <p>Use the API kill switch endpoint to halt swarm execution if needed.</p>
         </div>
 
@@ -155,4 +210,3 @@ export function SwarmCommand() {
   );
 }
 
-}

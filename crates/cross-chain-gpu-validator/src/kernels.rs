@@ -106,6 +106,16 @@ impl Keccak256Kernel {
         }
     }
 
+    /// Hash a single input using the same Keccak256 implementation as batch hashing.
+    pub fn hash(&self, input: &[u8]) -> Result<[u8; 32]> {
+        let mut hasher = Keccak256::new();
+        hasher.update(input);
+        let digest = hasher.finalize();
+        let mut output = [0u8; 32];
+        output.copy_from_slice(&digest);
+        Ok(output)
+    }
+
     /// Hash a batch of inputs with GPU acceleration
     /// Returns (hashes, timing_ms)
     pub fn hash_batch_gpu(&self, inputs: &[&[u8]]) -> Result<(Vec<Vec<u8>>, u64)> {

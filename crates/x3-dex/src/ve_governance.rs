@@ -1,7 +1,7 @@
 /// veX3 Governance Engine — Vote-Escrow tokenomics for decentralized protocol governance
 /// Users lock X3 tokens (1-4 years) to gain voting power and direct liquidity mining rewards
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct VeX3Lock {

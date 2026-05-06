@@ -209,7 +209,7 @@ export default function MediaStreamingPanel() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <div className="font-semibold">{creator.name}</div>
-                      {creator.verified && <badge className="text-xs px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded font-bold">✓</badge>}
+                      {creator.verified && <span className="text-xs px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded font-bold">✓</span>}
                     </div>
                     <div className="text-xs text-gray-400">{creator.followers.toLocaleString()} followers</div>
                   </div>

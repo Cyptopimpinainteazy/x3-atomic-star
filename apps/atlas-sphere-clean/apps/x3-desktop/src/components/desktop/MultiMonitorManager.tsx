@@ -1,8 +1,8 @@
 // Multi-monitor support: detect displays, lock windows to monitors, span across displays
 
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { appWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window';
 
 interface Monitor {
   id: number;
@@ -76,7 +76,7 @@ export const MultiMonitorManager: React.FC = () => {
       const x = monitor.x + (monitor.width - 800) / 2;
       const y = monitor.y + (monitor.height - 600) / 2;
 
-      const targetWindow = appWindow;
+      const targetWindow = getCurrentWindow();
       await targetWindow.setPosition(new PhysicalPosition(x, y));
 
       // Lock to this monitor
@@ -122,7 +122,7 @@ export const MultiMonitorManager: React.FC = () => {
         height: maxY - minY,
       };
 
-      const targetWindow = appWindow;
+      const targetWindow = getCurrentWindow();
       await targetWindow.setPosition(new PhysicalPosition(spans.x, spans.y));
       await targetWindow.setSize(
         new LogicalSize(spans.width, spans.height)

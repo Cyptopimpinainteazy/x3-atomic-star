@@ -7,7 +7,7 @@ mod wallet;
 mod wallet_core;
 
 use chrono::Utc;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Serialize, Deserialize};
 use std::fmt;
 use std::sync::{Arc, RwLock};

@@ -12,7 +12,7 @@ sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
-sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
+sp-application-crypto = { workspace = true, default-features = false }
 
 # Note: Schnorrkel VRF would be added for production
 

@@ -5,9 +5,9 @@
 
 use crate::types::{EscrowLeg, EscrowLegState, ExternalChainId};
 use codec::{Decode, DecodeWithMemTracking, Encode};
+use core::fmt::Debug;
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::Debug;
 use sp_std::{vec, vec::Vec};
 
 /// Escrow operation to be executed atomically

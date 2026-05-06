@@ -32,7 +32,7 @@ export default function GovernancePanel() {
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [userVote, setUserVote] = useState<{ [key: string]: "for" | "against" | null }>({});
 
-  const totalStaked = snapshot?.totalStaked || 50000000;
+  const totalStaked = Number(snapshot?.totalStaked ?? 0) || 50000000;
   const currentVotingPower = userVotingPower;
   const delegatedVotingPower = 0;
 

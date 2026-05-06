@@ -1,7 +1,7 @@
 /// LP Position NFT Engine — Mint liquidity provider positions as tradeable NFTs
 /// Enables LP position ownership transfer, collateralization, and secondary market trading
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LPPositionNFT {

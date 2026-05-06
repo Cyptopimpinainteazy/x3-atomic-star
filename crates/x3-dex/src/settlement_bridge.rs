@@ -92,6 +92,7 @@
 use crate::limit_order_book::{LimitOrder, OrderExecution};
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_core::H256;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct OrderSettlementIntent {

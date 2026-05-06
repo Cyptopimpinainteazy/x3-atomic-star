@@ -22,21 +22,13 @@
 //! assert!(signature.verify(b"hello world", &public_key));
 //! ```
 
-use sp_core::{ed25519, sr25519, Pair};
 use sp_core::crypto::Ss58Codec;
+use sp_core::{ed25519, sr25519, Pair};
 use sp_io::hashing::{blake2_256, keccak_256};
 use sp_runtime::traits::Verify;
 
-/// Key type for cryptographic signing
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeyType {
-    /// ed25519 for SVM/Cosmos
-    Ed25519,
-    /// secp256k1 for EVM
-    Secp256k1,
-    /// sr25519 for Substrate/X3
-    Sr25519,
-}
+/// Re-export of the canonical [`KeyType`] (defined at crate root for no-std use).
+pub use crate::KeyType;
 
 /// Public key wrapper for different signature schemes
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -194,8 +186,8 @@ impl Ed25519Signer {
 
     /// Create a signer from a seed phrase
     pub fn from_phrase(phrase: &str, password: Option<&str>) -> Result<Self, &'static str> {
-        let (pair, _) = ed25519::Pair::from_phrase(phrase, password)
-            .map_err(|_| "Invalid seed phrase")?;
+        let (pair, _) =
+            ed25519::Pair::from_phrase(phrase, password).map_err(|_| "Invalid seed phrase")?;
         let public_key = pair.public();
         Ok(Self { pair, public_key })
     }
@@ -255,7 +247,10 @@ impl Secp256k1Signer {
         let mut pk = [0u8; 65];
         pk.copy_from_slice(&public_key);
 
-        Self { secret_key, public_key: pk }
+        Self {
+            secret_key,
+            public_key: pk,
+        }
     }
 
     /// Create a signer from a secret key (32 bytes)
@@ -272,7 +267,10 @@ impl Secp256k1Signer {
         let mut sk = [0u8; 32];
         sk.copy_from_slice(secret);
 
-        Ok(Self { secret_key: sk, public_key: pk })
+        Ok(Self {
+            secret_key: sk,
+            public_key: pk,
+        })
     }
 
     /// Create a signer from a hex-encoded secret key
@@ -347,8 +345,8 @@ impl Sr25519Signer {
 
     /// Create a signer from a seed phrase
     pub fn from_phrase(phrase: &str, password: Option<&str>) -> Result<Self, &'static str> {
-        let (pair, _) = sr25519::Pair::from_phrase(phrase, password)
-            .map_err(|_| "Invalid seed phrase")?;
+        let (pair, _) =
+            sr25519::Pair::from_phrase(phrase, password).map_err(|_| "Invalid seed phrase")?;
         let public_key = pair.public();
         Ok(Self { pair, public_key })
     }

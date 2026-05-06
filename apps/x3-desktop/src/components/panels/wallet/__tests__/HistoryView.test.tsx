@@ -1,3 +1,4 @@
+/// <reference types="vitest/globals" />
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import WalletPanel from '../WalletPanel';

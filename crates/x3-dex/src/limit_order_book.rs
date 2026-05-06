@@ -1,7 +1,7 @@
 /// Limit Order Book — Offchain order book with on-chain settlement
 /// Enables users to place buy/sell limit orders that execute when price reaches target
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct LimitOrder {

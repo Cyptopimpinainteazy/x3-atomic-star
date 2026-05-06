@@ -756,7 +756,7 @@ const DexPanel: React.FC = () => {
         );
 
         if (result.status === 'finalized') {
-          setLimitOrderStatus({ type: 'finalized' });
+          setLimitOrderStatus({ type: 'finalized', receipt: { batchId: '', status: 'finalized', legsExecuted: 1 } });
           setLimitSellAmount('');
           setLimitPrice('');
         }

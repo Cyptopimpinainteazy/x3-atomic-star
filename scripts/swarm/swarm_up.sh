@@ -24,9 +24,10 @@ pid_alive() {
   if [ -f "$pid_file" ]; then
     local pid
     pid=$(<"$pid_file")
-    if ps -p "$pid" >/dev/null 2>&1; then
+    if [[ "$pid" =~ ^[0-9]+$ ]] && ps -p "$pid" >/dev/null 2>&1; then
       return 0
     fi
+    rm -f "$pid_file"
   fi
   return 1
 }
@@ -94,9 +95,9 @@ fi
 
 echo "Waiting for API to become healthy..."
 sleep 2
-if command -v curl >/dev/null 2>&1 && curl -fsS "$API_HEALTH_URL" >/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1 && curl -fsS --connect-timeout 2 --max-time 5 "$API_HEALTH_URL" >/dev/null 2>&1; then
   echo "Seeding swarm task queue..."
-  scripts/swarm/swarm_task_queue.sh > "$ROOT_DIR/reports/swarm_task_queue.json" || true
+  "$ROOT_DIR/scripts/swarm/swarm_task_queue.sh" > "$ROOT_DIR/reports/swarm_task_queue.json" || true
 else
   echo "API did not become healthy in time; skipping task seeding."
 fi

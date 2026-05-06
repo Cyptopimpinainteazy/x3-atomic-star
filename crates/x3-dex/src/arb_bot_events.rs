@@ -1,7 +1,7 @@
 /// Arbitrage Bot Event System — WebSocket-based event streaming for MEV opportunities
 /// Enables bots to subscribe to detected arbitrage opportunities and capture discrepancies
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct ArbOpportunity {

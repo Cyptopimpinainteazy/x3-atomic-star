@@ -10,6 +10,9 @@ pub enum ValidatorError {
     #[error("GPU validation failed: {0}")]
     GpuValidationError(String),
 
+    #[error("validation failed: {0}")]
+    Validation(String),
+
     #[error("CPU validation fallback failed: {0}")]
     CpuValidationError(String),
 

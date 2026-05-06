@@ -107,7 +107,7 @@ export default function GovernanceVotingPanel() {
                   <div
                     key={proposal.id}
                     className="bg-[#15151b] border border-[#2a2a35] rounded-lg p-4 hover:border-[#3a3a45] transition cursor-pointer"
-                    onClick={() => setSelectedProposal(selectedProposal === proposal.id ? null : proposal.id)}
+                    onClick={() => setSelectedProposal(selectedProposal === String(proposal.id) ? null : String(proposal.id))}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
@@ -150,7 +150,7 @@ export default function GovernanceVotingPanel() {
                     </div>
 
                     {/* Expanded Details */}
-                    {selectedProposal === proposal.id && (
+                    {selectedProposal === String(proposal.id) && (
                       <div className="mt-4 pt-4 border-t border-[#2a2a35] space-y-3">
                         <p className="text-xs text-gray-400 leading-relaxed">{proposal.description}</p>
                         <div className="flex justify-between text-xs">

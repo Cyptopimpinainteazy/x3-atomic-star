@@ -1,7 +1,7 @@
 /// Options & Derivatives Engine — Black-Scholes pricing for call/put options with settlement
 /// Enables options trading, volatility trading, and hedging strategies
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct Option {

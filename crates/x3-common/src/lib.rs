@@ -195,17 +195,34 @@ impl Token {
     }
 }
 
-// Re-export signing module for external use
+// Re-export signing module for external use.
+// Signing requires std (uses SS58 codec, format!, secp256k1 RNG, mnemonic phrases).
+// Off-chain consumers (node RPC, bridge host code) build with std.
+#[cfg(feature = "std")]
 pub mod signing;
+#[cfg(feature = "std")]
 pub use signing::{
-    Signer, Ed25519Signer, Secp256k1Signer, Sr25519Signer,
-    Signature, PublicKey, KeyType,
-    verify_signature, verify_signature_hash,
+    verify_signature, verify_signature_hash, Ed25519Signer, PublicKey, Secp256k1Signer, Signature,
+    Signer, Sr25519Signer,
 };
+
+/// Key type identifier for cryptographic schemes.
+///
+/// Defined at crate root (not in `signing`) so it remains available in `no_std`
+/// builds for weight metering and other on-chain consumers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyType {
+    /// ed25519 for SVM/Cosmos
+    Ed25519,
+    /// secp256k1 for EVM
+    Secp256k1,
+    /// sr25519 for Substrate/X3
+    Sr25519,
+}
 
 // Re-export weight metering module for external use
 pub mod weight_metering;
 pub use weight_metering::{
-    ComputeMeter, GasMeter, WeightMeter, WeightConfig, OperationCosts,
-    WeightResult, WeightError, HashAlgorithm, Operation,
+    ComputeMeter, GasMeter, HashAlgorithm, Operation, OperationCosts, WeightConfig, WeightError,
+    WeightMeter, WeightResult,
 };

@@ -1,3 +1,9 @@
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
+
 # Do not force `SKIP_WASM_BUILD` globally.
 # Setting it here causes runtime/build.rs to generate a stub `wasm_binary.rs`
 # (WASM_BINARY = None), which breaks node startup for dev/local chains.

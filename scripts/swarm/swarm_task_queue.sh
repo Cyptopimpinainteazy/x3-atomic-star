@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 API_URL="http://127.0.0.1:8787"
+export API_URL
 
 TASK_QUEUE='[
   {
@@ -39,18 +39,34 @@ TASK_QUEUE='[
   }
 ]'
 
-if command -v curl >/dev/null 2>&1 && curl -fsS "$API_URL/health" >/dev/null 2>&1; then
-  echo "API available at $API_URL. Syncing task queue to swarm API..."
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is required to synchronize swarm tasks" >&2
+  exit 1
+fi
+
+if command -v curl >/dev/null 2>&1 && curl -fsS --connect-timeout 2 --max-time 5 "$API_URL/health" >/dev/null 2>&1; then
+  echo "API available at $API_URL. Syncing task queue to swarm API..." >&2
   export TASK_QUEUE
   python3 - <<'PY'
-import json, urllib.request, os
+import json, os, sys, urllib.error, urllib.request
 api = os.environ.get('API_URL', 'http://127.0.0.1:8787')
 tasks = json.loads(os.environ['TASK_QUEUE'])
 results = []
 for task in tasks:
     req = urllib.request.Request(api + '/tasks', data=json.dumps(task).encode('utf-8'), headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req) as resp:
-        results.append(json.loads(resp.read().decode('utf-8')))
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            results.append(json.loads(resp.read().decode('utf-8')))
+    except urllib.error.HTTPError as error:
+        body = error.read().decode('utf-8')
+        if error.code == 409:
+            results.append({'title': task.get('title'), 'status': 'duplicate', 'api_response': body})
+            continue
+        print(f'ERROR: failed to create task {task.get("title")}: HTTP {error.code} {body}', file=sys.stderr)
+        raise SystemExit(1)
+    except urllib.error.URLError as error:
+        print(f'ERROR: failed to create task {task.get("title")}: {error}', file=sys.stderr)
+        raise SystemExit(1)
 print(json.dumps(results, indent=2))
 PY
 else

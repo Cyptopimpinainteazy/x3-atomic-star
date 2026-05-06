@@ -114,6 +114,54 @@ jobs:
           path: launch-gates/reports/
           if-no-files-found: ignore
 
+  swarm-ci:
+    name: x3-swarm — unit tests + self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [fmt-clippy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install prerequisites (jq, curl, python3)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl python3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-swarm
+
+      - name: cargo test -p x3-swarm-core
+        run: cargo test -p x3-swarm-core --all-targets
+
+      - name: Build swarm binaries (API + worker)
+        run: |
+          cargo build -p x3-swarm-api   --release
+          cargo build -p x3-swarm-worker --release
+
+      # Start the API server in the background; swarm_self_test.sh waits for
+      # it to become healthy before exercising the full task lifecycle.
+      - name: swarm self-test (end-to-end)
+        timeout-minutes: 10
+        run: |
+          # Launch the API and capture its PID for clean teardown.
+          SWARM_KILL_SWITCH_TOKEN=ci-test \
+            ./target/release/x3-swarm-api &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
+
+          # Give the server a moment to bind.
+          for i in $(seq 1 15); do
+            curl -sf http://127.0.0.1:8787/health && break
+            sleep 1
+          done
+
+          bash scripts/swarm/swarm_self_test.sh
+
   e2e-internal-mainnet:
     name: e2e — internal_mainnet_happy_path
     runs-on: ubuntu-latest

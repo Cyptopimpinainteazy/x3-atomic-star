@@ -6,9 +6,9 @@ license = "Apache-2.0"
 
 [dependencies]
 parity-scale-codec = { workspace = true, features = ["derive"] }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512" }
-sp-io = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512" }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 x3-common = { path = "../x3-common" }
 hex = "0.4"
 tracing = "0.1"

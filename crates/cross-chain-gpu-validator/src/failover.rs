@@ -12,6 +12,29 @@ pub struct FailoverManager {
     cpu_kernel_keccak: Keccak256Kernel,
 }
 
+/// CPU-only validation fallback used by header validators.
+pub struct CpuFallback {
+    kernel: Keccak256Kernel,
+}
+
+impl CpuFallback {
+    pub fn new() -> Self {
+        Self {
+            kernel: Keccak256Kernel::new(32, false),
+        }
+    }
+
+    pub fn validate_hash(&self, _height: u64, expected_hash: [u8; 32]) -> Result<[u8; 32]> {
+        self.kernel.hash(&expected_hash)
+    }
+}
+
+impl Default for CpuFallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FailoverManager {
     pub fn new(batch_size: usize) -> Self {
         Self {

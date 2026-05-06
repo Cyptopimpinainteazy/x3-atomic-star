@@ -1,7 +1,7 @@
 /// Trade History Persistence — Store and query user trade history for tax & performance reporting
 /// Integrates with Tauri SQLite database for persistent, queryable trade records
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeRecord {

@@ -2,7 +2,7 @@
 // Users can create, share, and rate themes
 
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface ThemeColors {
   primary: string;

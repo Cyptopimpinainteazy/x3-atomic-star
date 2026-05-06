@@ -100,6 +100,8 @@ use sp_runtime::traits::MaybeSerializeDeserialize;
 use sp_std::convert::TryInto;
 use sp_std::marker::PhantomData;
 use sp_std::vec::Vec;
+extern crate alloc;
+use alloc::format;
 use x3_cross_vm_bridge::{
     CrossVmBridge, CrossVmCall, CrossVmDispatcher, CrossVmOperation, CrossVmReceipt, CrossVmResult,
     CrossVmStatus, VmId,
@@ -648,7 +650,9 @@ pub mod pallet {
         StorageMap<_, Blake2_128Concat, H256, EvmTransactionData, OptionQuery>;
 
     /// Data structure for storing EVM transaction metadata.
-    #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+    #[derive(
+        Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo,
+    )]
     pub struct EvmTransactionData {
         /// Raw transaction bytes (RLP-encoded)
         pub raw: Vec<u8>,
@@ -733,8 +737,7 @@ pub mod pallet {
     /// SVM blockhashes keyed by slot number.
     /// Maps each slot to its corresponding blockhash for SVM block queries.
     #[pallet::storage]
-    pub type SvmBlockhashes<T: Config> =
-        StorageMap<_, Blake2_128Concat, u64, H256, OptionQuery>;
+    pub type SvmBlockhashes<T: Config> = StorageMap<_, Blake2_128Concat, u64, H256, OptionQuery>;
 
     /// SVM transaction counts keyed by SVM public key (32 bytes).
     /// Tracks the number of transactions sent from each SVM account.
@@ -745,8 +748,7 @@ pub mod pallet {
     /// Reverse index: SVM blockhashes keyed by blockhash.
     /// Maps each blockhash to its corresponding slot number for reverse lookups.
     #[pallet::storage]
-    pub type SvmBlockhashSlots<T: Config> =
-        StorageMap<_, Blake2_128Concat, H256, u64, OptionQuery>;
+    pub type SvmBlockhashSlots<T: Config> = StorageMap<_, Blake2_128Concat, H256, u64, OptionQuery>;
 
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
@@ -2385,9 +2387,9 @@ pub mod pallet {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             };
 
             let changes_applied =
@@ -3040,9 +3042,9 @@ pub mod pallet {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             });
 
             let _svm_receipt = svm_tx.map(|_tx| ExecutionReceipt {
@@ -3055,9 +3057,9 @@ pub mod pallet {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             });
 
             // Merge receipts into unified state
@@ -3415,11 +3417,11 @@ pub mod pallet {
             // [nonce, gas_price, gas_limit, to, value, input, v, r, s]
             // For legacy transactions (type 0), the format is:
             // [nonce, gasPrice, gasLimit, to, value, data, v, r, s]
-            
+
             if raw_tx.is_empty() {
                 return Err("Empty transaction".as_bytes().to_vec());
             }
-            
+
             // Check if this is a typed transaction (EIP-2718)
             // EIP-2718 transactions start with a type byte (0x01, 0x02, 0x03)
             if raw_tx[0] >= 0x01 && raw_tx[0] <= 0x03 {
@@ -3427,27 +3429,27 @@ pub mod pallet {
                 // Format: [type, [nonce, gas_limit, to, value, data, access_list, max_fee_per_gas, max_priority_fee_per_gas, signature_y_parity, signature_r, signature_s]]
                 return Err("Typed transactions not fully supported".as_bytes().to_vec());
             }
-            
+
             // Legacy transaction - decode RLP
             // The RLP encoding of a list [nonce, gasPrice, gasLimit, to, value, data, v, r, s]
             // For transactions without signature (pre-signing), we can still extract from/to/value
-            
+
             // Simple approach: try to decode as RLP list
             // For a valid transaction, we need at least: nonce, gasPrice, gasLimit, to, value
             // The 'to' field is 20 bytes (H160), 'value' is 16 bytes (u128)
-            
+
             // Extract 'to' address (bytes 39-58 for a minimal transaction without signature)
             // Format: [nonce (1-8 bytes), gasPrice (1-8 bytes), gasLimit (1-8 bytes), to (20 bytes), value (1-16 bytes), ...]
-            
+
             // For a minimal transaction with just the required fields:
             // - nonce: 1 byte (0x80 = 0)
             // - gasPrice: 1 byte (0x80 = 0)
             // - gasLimit: 1 byte (0x80 = 0)
             // - to: 20 bytes (0x94 = 0x80 + 20)
             // - value: 1 byte (0x80 = 0)
-            
+
             let mut offset = 0;
-            
+
             // Skip nonce (single byte 0x80 for value 0)
             if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3456,7 +3458,7 @@ pub mod pallet {
                 let len = raw_tx[offset] & 0x7f;
                 offset += 1 + len as usize;
             }
-            
+
             // Skip gasPrice
             if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3464,7 +3466,7 @@ pub mod pallet {
                 let len = raw_tx[offset] & 0x7f;
                 offset += 1 + len as usize;
             }
-            
+
             // Skip gasLimit
             if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3472,12 +3474,14 @@ pub mod pallet {
                 let len = raw_tx[offset] & 0x7f;
                 offset += 1 + len as usize;
             }
-            
+
             // Extract 'to' address (20 bytes, prefixed with 0x94)
             if offset + 1 > raw_tx.len() {
-                return Err("Invalid transaction: missing 'to' field".as_bytes().to_vec());
+                return Err("Invalid transaction: missing 'to' field"
+                    .as_bytes()
+                    .to_vec());
             }
-            
+
             let to = if raw_tx[offset] == 0x94 && offset + 21 <= raw_tx.len() {
                 // 20-byte address
                 let addr = raw_tx[offset + 1..offset + 21].to_vec();
@@ -3488,14 +3492,18 @@ pub mod pallet {
                 offset += 1;
                 Vec::new()
             } else {
-                return Err("Invalid transaction: malformed 'to' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'to' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Extract 'value' (16 bytes for u128)
             if offset >= raw_tx.len() {
-                return Err("Invalid transaction: missing 'value' field".as_bytes().to_vec());
+                return Err("Invalid transaction: missing 'value' field"
+                    .as_bytes()
+                    .to_vec());
             }
-            
+
             let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
                 // Value is 0
                 offset += 1;
@@ -3504,7 +3512,9 @@ pub mod pallet {
                 // Short string encoding
                 let len = (raw_tx[offset] & 0x7f) as usize;
                 if offset + 1 + len > raw_tx.len() {
-                    return Err("Invalid transaction: malformed 'value' field".as_bytes().to_vec());
+                    return Err("Invalid transaction: malformed 'value' field"
+                        .as_bytes()
+                        .to_vec());
                 }
                 let mut value_bytes = [0u8; 16];
                 let src_start = offset + 1;
@@ -3514,31 +3524,35 @@ pub mod pallet {
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
-                return Err("Invalid transaction: malformed 'value' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'value' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             Ok((Vec::new(), to, value)) // from is empty for unsigned transactions
         }
 
         /// Parse RLP-encoded Ethereum transaction to extract sender, recipient, value, gas, input, nonce, and gas_price.
         /// This extends parse_ethereum_transaction to include gas and input fields needed for RPC compatibility.
-        fn parse_ethereum_transaction_with_gas(raw_tx: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u128, u64, Vec<u8>, u64, u128), Vec<u8>> {
+        fn parse_ethereum_transaction_with_gas(
+            raw_tx: &[u8],
+        ) -> Result<(Vec<u8>, Vec<u8>, u128, u64, Vec<u8>, u64, u128), Vec<u8>> {
             // RLP-encoded transaction format for legacy transactions (type 0):
             // [nonce, gasPrice, gasLimit, to, value, data, v, r, s]
-            
+
             if raw_tx.is_empty() {
                 return Err("Empty transaction".as_bytes().to_vec());
             }
-            
+
             // Check if this is a typed transaction (EIP-2718)
             if raw_tx[0] >= 0x01 && raw_tx[0] <= 0x03 {
                 // Typed transaction - not fully supported yet
                 return Err("Typed transactions not fully supported".as_bytes().to_vec());
             }
-            
+
             // Legacy transaction - decode RLP
             let mut offset = 0;
-            
+
             // Skip nonce (single byte 0x80 for value 0)
             if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3546,7 +3560,7 @@ pub mod pallet {
                 let len = raw_tx[offset] & 0x7f;
                 offset += 1 + len as usize;
             }
-            
+
             // Skip gasPrice
             let gas_price = if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3554,7 +3568,9 @@ pub mod pallet {
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
                 let len = (raw_tx[offset] & 0x7f) as usize;
                 if offset + 1 + len > raw_tx.len() {
-                    return Err("Invalid transaction: malformed 'gasPrice' field".as_bytes().to_vec());
+                    return Err("Invalid transaction: malformed 'gasPrice' field"
+                        .as_bytes()
+                        .to_vec());
                 }
                 let mut price_bytes = [0u8; 16];
                 let src_start = offset + 1;
@@ -3564,9 +3580,11 @@ pub mod pallet {
                 offset += 1 + len;
                 u128::from_be_bytes(price_bytes)
             } else {
-                return Err("Invalid transaction: malformed 'gasPrice' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'gasPrice' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Skip gasLimit
             let gas = if offset < raw_tx.len() && raw_tx[offset] == 0x80 {
                 offset += 1;
@@ -3574,7 +3592,9 @@ pub mod pallet {
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
                 let len = (raw_tx[offset] & 0x7f) as usize;
                 if offset + 1 + len > raw_tx.len() {
-                    return Err("Invalid transaction: malformed 'gasLimit' field".as_bytes().to_vec());
+                    return Err("Invalid transaction: malformed 'gasLimit' field"
+                        .as_bytes()
+                        .to_vec());
                 }
                 let mut gas_bytes = [0u8; 8];
                 let src_start = offset + 1;
@@ -3584,14 +3604,18 @@ pub mod pallet {
                 offset += 1 + len;
                 u64::from_be_bytes(gas_bytes)
             } else {
-                return Err("Invalid transaction: malformed 'gasLimit' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'gasLimit' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Extract 'to' address (20 bytes, prefixed with 0x94)
             if offset + 1 > raw_tx.len() {
-                return Err("Invalid transaction: missing 'to' field".as_bytes().to_vec());
+                return Err("Invalid transaction: missing 'to' field"
+                    .as_bytes()
+                    .to_vec());
             }
-            
+
             let to = if raw_tx[offset] == 0x94 && offset + 21 <= raw_tx.len() {
                 let addr = raw_tx[offset + 1..offset + 21].to_vec();
                 offset += 21;
@@ -3600,21 +3624,27 @@ pub mod pallet {
                 offset += 1;
                 Vec::new()
             } else {
-                return Err("Invalid transaction: malformed 'to' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'to' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Extract 'value' (16 bytes for u128)
             if offset >= raw_tx.len() {
-                return Err("Invalid transaction: missing 'value' field".as_bytes().to_vec());
+                return Err("Invalid transaction: missing 'value' field"
+                    .as_bytes()
+                    .to_vec());
             }
-            
+
             let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
                 offset += 1;
                 0u128
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
                 let len = (raw_tx[offset] & 0x7f) as usize;
                 if offset + 1 + len > raw_tx.len() {
-                    return Err("Invalid transaction: malformed 'value' field".as_bytes().to_vec());
+                    return Err("Invalid transaction: malformed 'value' field"
+                        .as_bytes()
+                        .to_vec());
                 }
                 let mut value_bytes = [0u8; 16];
                 let src_start = offset + 1;
@@ -3624,49 +3654,57 @@ pub mod pallet {
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
-                return Err("Invalid transaction: malformed 'value' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'value' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Extract 'data' (input)
             if offset >= raw_tx.len() {
-                return Err("Invalid transaction: missing 'data' field".as_bytes().to_vec());
+                return Err("Invalid transaction: missing 'data' field"
+                    .as_bytes()
+                    .to_vec());
             }
-            
+
             let input = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
                 offset += 1;
                 Vec::new()
             } else if raw_tx[offset] >= 0xb8 && raw_tx[offset] <= 0xbf {
                 let len = (raw_tx[offset] & 0x7f) as usize;
                 if offset + 1 + len > raw_tx.len() {
-                    return Err("Invalid transaction: malformed 'data' field".as_bytes().to_vec());
+                    return Err("Invalid transaction: malformed 'data' field"
+                        .as_bytes()
+                        .to_vec());
                 }
                 let data = raw_tx[offset + 1..offset + 1 + len].to_vec();
                 offset += 1 + len;
                 data
             } else {
-                return Err("Invalid transaction: malformed 'data' field".as_bytes().to_vec());
+                return Err("Invalid transaction: malformed 'data' field"
+                    .as_bytes()
+                    .to_vec());
             };
-            
+
             // Extract nonce (we already parsed it, but need to return it)
             // For simplicity, return 0 as nonce since we can't easily extract it from the RLP
             let nonce = 0u64;
-            
+
             Ok((Vec::new(), to, value, gas, input, nonce, gas_price))
         }
 
         fn submit_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
             // Parse the raw EVM transaction (RLP-encoded) to extract sender, recipient, and value
             // The ExecutionReceipt struct has from/to/value fields that should be populated
-            
+
             // Compute tx_hash first for replay check
-            let tx_hash = sp_io::hashing::keccak256(&raw_tx);
+            let tx_hash = sp_io::hashing::keccak_256(&raw_tx);
             let tx_hash_h256 = H256::from(tx_hash);
-            
+
             // Check for replay - if already submitted, reject
             if SubmittedComits::<T>::contains_key(tx_hash_h256) {
                 return Err(b"replay".to_vec());
             }
-            
+
             // Try to parse the transaction to extract from/to/value
             let (from, to, value) = match Self::parse_ethereum_transaction(&raw_tx) {
                 Ok((f, t, v)) => (f, t, v),
@@ -3676,19 +3714,19 @@ pub mod pallet {
                     (Vec::new(), Vec::new(), 0)
                 }
             };
-            
+
             // Execute via configured EVM adapter
             let mut receipt = T::EvmAdapter::execute(&raw_tx, 10_000_000)
                 .map_err(|e| format!("{:?}", e).into_bytes())?;
-            
+
             // Populate from/to/value from the parsed transaction
             receipt.from = from;
             receipt.to = to;
             receipt.value = value;
-            
+
             // Store the receipt keyed by transaction hash
             EvmTransactionReceipts::<T>::insert(tx_hash_h256, receipt.clone());
-            
+
             // Store the full transaction data for RPC compatibility
             // Parse the raw transaction to extract gas and input
             let tx_data = match Self::parse_ethereum_transaction_with_gas(&raw_tx) {
@@ -3717,11 +3755,11 @@ pub mod pallet {
                 }
             };
             EvmTransactions::<T>::insert(tx_hash_h256, tx_data);
-            
+
             // Record transaction as submitted for replay prevention
             let current_block = frame_system::Pallet::<T>::block_number();
             SubmittedComits::<T>::insert(tx_hash_h256, current_block);
-            
+
             Ok(tx_hash.to_vec())
         }
 
@@ -3761,27 +3799,27 @@ pub mod pallet {
                         (from_block, to_block, address_filter)
                     }
                 };
-            
+
             // Get current SVM slot as upper bound (since EVM logs are tied to SVM blocks)
-            let current_slot = Self::get_svm_slot();
-            
+            let current_slot = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+
             // Determine actual to_block (use current slot if to_block is 0 or exceeds current slot)
             let actual_to_block = if to_block == 0 || to_block > current_slot {
                 current_slot
             } else {
                 to_block
             };
-            
+
             // Filter logs server-side based on block range and optional address
             let mut result_logs = Vec::new();
-            
+
             // Iterate through all transaction receipts in the storage
             // For each receipt, check if its logs match the filter criteria
             for (_tx_hash, receipt) in EvmTransactionReceipts::<T>::iter() {
                 // Check if receipt's block_number is within the filter range
                 // Note: ExecutionReceipt doesn't have block_number directly
                 // We need to add it or derive it from the execution context
-                
+
                 for log in receipt.logs {
                     // Check if log's block_number is within range
                     // Since ExecutionLog has block_number field, we can filter on it
@@ -3797,7 +3835,7 @@ pub mod pallet {
                     }
                 }
             }
-            
+
             result_logs
         }
     }
@@ -3907,7 +3945,7 @@ sp_api::decl_runtime_apis! {
         /// Get EVM logs for a specific transaction by hash.
         /// Returns SCALE-encoded ExecutionLog entries.
         fn get_evm_transaction_logs(tx_hash: Vec<u8>) -> Vec<Vec<u8>>;
-        
+
         /// Get the chain ID for the current network.
         fn chain_id() -> u64;
 

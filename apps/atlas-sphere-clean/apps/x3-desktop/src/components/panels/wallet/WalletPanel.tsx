@@ -392,7 +392,6 @@ const SendView = () => {
                  const payload = { action: 'send', to: '0x...', amount: '0' };
                  try {
                    // Attempt Tauri invoke (desktop)
-                   // @ts-expect-error
                    await invoke('sign_transaction', { payload });
                    alert('Sign request sent to keystore (Tauri).');
                  } catch (err) {
@@ -1300,7 +1299,7 @@ const txIcon = (type: string) => {
 
 // Auto-generate human-readable transaction labels
 const getTransactionLabel = (tx: any): string => {
-  const baseLabel = {
+  const baseLabel = ({
     send: 'Sent',
     receive: 'Received',
     swap: 'Swapped',
@@ -1308,7 +1307,7 @@ const getTransactionLabel = (tx: any): string => {
     stake: 'Staking reward',
     mint: 'Minted',
     burn: 'Burned',
-  }[tx.type] || 'Transaction';
+  } as Record<string, string>)[tx.type] || 'Transaction';
   
   // Add status/detail suffix
   if (tx.status === 'pending') return baseLabel + ' (pending)';

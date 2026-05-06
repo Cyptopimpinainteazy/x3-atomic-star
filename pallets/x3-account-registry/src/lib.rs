@@ -34,7 +34,15 @@ pub mod pallet {
 
     /// Classification of an account.
     #[derive(
-        Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo,
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        TypeInfo,
         MaxEncodedLen,
     )]
     #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -165,7 +173,10 @@ pub mod pallet {
             );
 
             let nonce = CrossVmNonces::<T>::get(&who);
-            Self::deposit_event(Event::NonceAnchored { account: who, nonce });
+            Self::deposit_event(Event::NonceAnchored {
+                account: who,
+                nonce,
+            });
             Ok(())
         }
     }

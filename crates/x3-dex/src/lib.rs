@@ -1,8 +1,12 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(unused_imports, unused_variables)]
 
 //! X3 DEX Core
 //!
 //! Multi-hop routing, liquidity pools, AMM execution, and advanced trading features.
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 pub mod amm_pools;
 pub mod arb_bot_events;

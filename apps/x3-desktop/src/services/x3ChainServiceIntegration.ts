@@ -43,7 +43,7 @@ export class X3ChainService {
   private config: X3ChainServiceConfig;
   private cache: Map<string, { value: any; timestamp: number; ttl: number }>;
   private connectionStatus: ConnectionStatus;
-  private operationStats: Map<string, number>;
+  private operationStats: Map<string, { count: number; totalDuration: number }>;
 
   constructor(config: Partial<X3ChainServiceConfig> = {}) {
     this.config = {
@@ -98,7 +98,7 @@ export class X3ChainService {
     });
   }
 
-  private clearCache(): void {
+  private _clearCache(): void {
     this.cache.clear();
   }
 
@@ -328,7 +328,7 @@ export class X3ChainService {
    * Clear the chain operation cache
    */
   async clearCache(): Promise<void> {
-    this.cache.clear();
+    this._clearCache();
     await invoke('clear_chain_cache');
   }
 

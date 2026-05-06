@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use crate::{AgentKind, TaskStatus};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 /// Swarm events for logging and reactivity.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SwarmEvent {
     TaskEnqueued { task_id: String, agent: AgentKind },
     TaskStarted { task_id: String },
@@ -13,9 +13,18 @@ pub enum SwarmEvent {
     MemoryRecorded { entry_id: String },
 }
 
-impl SwarmEvent {
-    pub fn timestamp(&self) -> String {
-        Utc::now().to_rfc3339()
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TimestampedEvent {
+    pub event: SwarmEvent,
+    pub timestamp: String,
+}
+
+impl TimestampedEvent {
+    pub fn new(event: SwarmEvent) -> Self {
+        Self {
+            event,
+            timestamp: Utc::now().to_rfc3339(),
+        }
     }
 }
 
@@ -24,8 +33,7 @@ pub struct EventBus;
 
 impl EventBus {
     pub fn emit(event: SwarmEvent) {
-        // Stub: log/print in real impl
-        println!("Event: {:?}", event);
+        tracing::info!("Event: {:?}", event);
     }
 
     pub fn subscribe() -> Vec<SwarmEvent> {

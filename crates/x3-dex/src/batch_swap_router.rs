@@ -1,7 +1,7 @@
 /// Batch Swap Router — Execute multiple swaps atomically with MEV protection
 /// Enables batch execution, path optimization, and sandwich attack prevention
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct SwapInstruction {

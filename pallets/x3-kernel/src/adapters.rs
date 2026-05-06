@@ -181,9 +181,9 @@ impl EvmExecutorAdapter for FailingMockEvmAdapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             });
         }
         // Otherwise delegate to normal mock
@@ -221,9 +221,9 @@ impl SvmExecutorAdapter for FailingMockSvmAdapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             });
         }
         // Otherwise delegate to normal mock
@@ -333,9 +333,9 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             });
         }
 
@@ -434,9 +434,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             })
         }
 
@@ -518,9 +518,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             })
         }
 
@@ -587,9 +587,9 @@ pub mod real_adapters {
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
-            from: Vec::new(),
-            to: Vec::new(),
-            value: 0,
+                from: Vec::new(),
+                to: Vec::new(),
+                value: 0,
             })
         }
 

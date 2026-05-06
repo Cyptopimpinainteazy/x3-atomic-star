@@ -168,9 +168,10 @@ pub struct ConnectionStatus {
 impl X3ChainService {
     /// Create a new x3ChainService
     pub fn new(config: X3ChainServiceConfig) -> Self {
+        let cache_ttl_ms = config.cache_ttl_ms;
         Self {
             config,
-            cache: ChainCache::new(Duration::from_millis(config.cache_ttl_ms)),
+            cache: ChainCache::new(Duration::from_millis(cache_ttl_ms)),
             connection_status: ConnectionStatus {
                 connected: false,
                 last_connected: None,
@@ -188,6 +189,7 @@ impl X3ChainService {
         operation: ChainOperation,
     ) -> Result<ChainOperationResult, X3ChainServiceError> {
         let start_time = Instant::now();
+        let operation_name = format!("{:?}", &operation);
 
         let result = match operation {
             ChainOperation::QueryBlock { block_number, block_hash } => {
@@ -220,9 +222,7 @@ impl X3ChainService {
 
         let execution_time_ms = start_time.elapsed().as_millis() as u64;
 
-        // Update operation stats
-        let operation_name = format!("{:?}", operation);
-        *self.operation_stats.entry(operation_name).or_insert(0) += 1;
+        *self.operation_stats.entry(operation_name.clone()).or_insert(0) += 1;
 
         match result {
             Ok(data) => Ok(ChainOperationResult {
@@ -286,7 +286,7 @@ impl X3ChainService {
             "address": address,
             "nonce": 0,
             "data": {
-                "free": 1000000000000,
+                "free": 1_000_000_000_000i64,
                 "reserved": 0,
                 "misc_frozen": 0,
                 "fee_frozen": 0
@@ -307,7 +307,8 @@ impl X3ChainService {
         address: &str,
         asset_id: Option<String>,
     ) -> Result<serde_json::Value, X3ChainServiceError> {
-        let cache_key = format!("balance_{}_{}", address, asset_id.unwrap_or("X3".to_string()));
+        let asset = asset_id.unwrap_or_else(|| "X3".to_string());
+        let cache_key = format!("balance_{}_{}", address, asset);
 
         if let Some(cached) = self.cache.get(&cache_key) {
             return Ok(cached.clone());
@@ -315,8 +316,8 @@ impl X3ChainService {
 
         let result = serde_json::json!({
             "address": address,
-            "asset_id": asset_id.unwrap_or("X3".to_string()),
-            "free": 1000000000000,
+            "asset_id": asset,
+            "free": 1_000_000_000_000i64,
             "reserved": 0,
             "frozen": 0,
             "flags": []
@@ -405,7 +406,7 @@ impl X3ChainService {
         let result = serde_json::json!({
             "gas_limit": 1000000,
             "gas_price": 1000000000,
-            "total_fee": 1000000000000,
+            "total_fee": 1_000_000_000_000i64,
             "weight": 500000000
         });
 

@@ -2,7 +2,7 @@
 // Supports: 2x2 grid, 1 large + 2 small, fullscreen
 
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 export enum SnapLayout {
   TwoByTwo = 'two-by-two',      // 2x2 equal grid

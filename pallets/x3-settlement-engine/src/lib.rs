@@ -124,8 +124,7 @@ pub mod pallet {
     // ============================================================================
 
     type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
-    type BalanceOf<T> =
-        <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
+    type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
 
     // ============================================================================
     // Pallet Definition
@@ -144,8 +143,7 @@ pub mod pallet {
         type SettlementWeightInfo: crate::weights::WeightInfo;
 
         /// Currency for deposits and fees.
-        type Currency:
-            Currency<<Self as frame_system::Config>::AccountId>
+        type Currency: Currency<<Self as frame_system::Config>::AccountId>
             + ReservableCurrency<<Self as frame_system::Config>::AccountId>;
 
         /// Cross-chain validator provider for proof verification
@@ -263,14 +261,24 @@ pub mod pallet {
     /// Bond record storage: bond_id -> BondRecord
     #[pallet::storage]
     #[pallet::getter(fn bonds)]
-    pub type Bonds<T: Config> =
-        StorageMap<_, Blake2_128Concat, H256, BondRecord<AccountIdOf<T>, BalanceOf<T>>, OptionQuery>;
+    pub type Bonds<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        H256,
+        BondRecord<AccountIdOf<T>, BalanceOf<T>>,
+        OptionQuery,
+    >;
 
     /// Mapping from owner -> vector of bond ids (bounded for simplicity)
     #[pallet::storage]
     #[pallet::getter(fn bonds_by_owner)]
-    pub type BondsByOwner<T: Config> =
-        StorageMap<_, Blake2_128Concat, AccountIdOf<T>, BoundedVec<H256, ConstU32<100>>, ValueQuery>;
+    pub type BondsByOwner<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        AccountIdOf<T>,
+        BoundedVec<H256, ConstU32<100>>,
+        ValueQuery,
+    >;
 
     #[pallet::type_value]
     pub fn DefaultBondCounter() -> u64 {
@@ -284,15 +292,7 @@ pub mod pallet {
 
     // Bond record stored on-chain
     #[derive(
-        Clone,
-        Encode,
-        Decode,
-        DecodeWithMemTracking,
-        Debug,
-        TypeInfo,
-        MaxEncodedLen,
-        PartialEq,
-        Eq,
+        Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
     )]
     #[scale_info(skip_type_params(AccountId, Balance))]
     pub struct BondRecord<AccountId, Balance> {
@@ -1664,7 +1664,11 @@ pub mod pallet {
 
     impl<T: Config> Pallet<T> {
         /// Generate unique intent ID
-        pub fn generate_intent_id(maker: &AccountIdOf<T>, taker: &AccountIdOf<T>, nonce: u64) -> H256 {
+        pub fn generate_intent_id(
+            maker: &AccountIdOf<T>,
+            taker: &AccountIdOf<T>,
+            nonce: u64,
+        ) -> H256 {
             let mut data = maker.encode();
             data.extend(taker.encode());
             data.extend(nonce.to_le_bytes());

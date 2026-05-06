@@ -1,5 +1,5 @@
 /// Wallet Service RPC - Phase 3 Implementation
-/// 
+///
 /// Provides comprehensive wallet management API endpoints including:
 /// - Wallet creation, import, and backup
 /// - Balance queries and token management
@@ -7,13 +7,13 @@
 /// - Network selection (mainnet/testnet/local)
 /// - Security features (PIN protection, biometric auth)
 /// - Wallet status monitoring
-
 use jsonrpc_core::{Error, Result};
 use jsonrpc_derive::rpc;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::traits::Block as BlockT;
 use std::sync::Arc;
+use x3_chain_runtime::{AccountId, AssetId, Balance};
 
 // ============================================================================
 // Request/Response Types
@@ -258,7 +258,10 @@ pub trait WalletServiceApi {
 
     /// Submit a signed transaction
     #[rpc(name = "wallet_submitTransaction")]
-    fn submit_transaction(&self, request: SubmitTransactionRequest) -> Result<SubmitTransactionResponse>;
+    fn submit_transaction(
+        &self,
+        request: SubmitTransactionRequest,
+    ) -> Result<SubmitTransactionResponse>;
 
     /// Get transaction history
     #[rpc(name = "wallet_getTransactions")]
@@ -266,7 +269,8 @@ pub trait WalletServiceApi {
 
     /// Get wallet status
     #[rpc(name = "wallet_getWalletStatus")]
-    fn get_wallet_status(&self, request: GetWalletStatusRequest) -> Result<GetWalletStatusResponse>;
+    fn get_wallet_status(&self, request: GetWalletStatusRequest)
+        -> Result<GetWalletStatusResponse>;
 
     /// List all wallets
     #[rpc(name = "wallet_listWallets")]
@@ -304,7 +308,12 @@ impl<Block, Client> WalletServiceApi for WalletServiceRpc<Block, Client>
 where
     Block: BlockT,
     Client: HeaderBackend<Block> + ProvideRuntimeApi<Block> + 'static,
-    <Client as ProvideRuntimeApi<Block>>::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<Block, <Block as BlockT>::AccountId, <Block as BlockT>::Balance, <Block as BlockT>::AssetId>,
+    <Client as ProvideRuntimeApi<Block>>::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<
+        Block,
+        AccountId,
+        Balance,
+        AssetId,
+    >,
 {
     fn create_wallet(&self, request: CreateWalletRequest) -> Result<CreateWalletResponse> {
         // Input validation
@@ -313,7 +322,9 @@ where
         }
 
         if request.password_hash.len() < 32 {
-            return Err(Error::invalid_params("Password hash must be at least 32 characters"));
+            return Err(Error::invalid_params(
+                "Password hash must be at least 32 characters",
+            ));
         }
 
         // Generate or use provided mnemonic
@@ -375,10 +386,11 @@ where
     fn get_balance(&self, request: GetBalanceRequest) -> Result<GetBalanceResponse> {
         // Query runtime for balances
         // In production: query actual balances from chain state
-        
+
         let tokens = vec![
             TokenBalance {
-                token_id: "0x0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                token_id: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
                 symbol: "X3".to_string(),
                 name: "X3 Sphere".to_string(),
                 balance: "1250000000000000000000".to_string(), // 1250 X3 with 18 decimals
@@ -387,7 +399,8 @@ where
                 network: request.network.clone(),
             },
             TokenBalance {
-                token_id: "0x0000000000000000000000000000000000000000000000000000000000000001".to_string(),
+                token_id: "0x0000000000000000000000000000000000000000000000000000000000000001"
+                    .to_string(),
                 symbol: "ETH".to_string(),
                 name: "Ethereum".to_string(),
                 balance: "2450000000000000000".to_string(), // 2.45 ETH
@@ -432,7 +445,10 @@ where
         })
     }
 
-    fn submit_transaction(&self, request: SubmitTransactionRequest) -> Result<SubmitTransactionResponse> {
+    fn submit_transaction(
+        &self,
+        request: SubmitTransactionRequest,
+    ) -> Result<SubmitTransactionResponse> {
         // In production: submit transaction to mempool
         let transaction_hash = format!("0x{}", &request.signed_transaction[7..71]);
 
@@ -453,7 +469,8 @@ where
 
         let transactions = vec![
             TransactionInfo {
-                hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
+                hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                    .to_string(),
                 from: "0x1234567890123456789012345678901234567890".to_string(),
                 to: "0xabcdef1234567890abcdef1234567890abcdef12".to_string(),
                 amount: "1000000000000000000".to_string(), // 1 X3
@@ -463,11 +480,13 @@ where
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_secs() - 3600,
+                    .as_secs()
+                    - 3600,
                 fee: Some("210000000000000".to_string()),
             },
             TransactionInfo {
-                hash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890".to_string(),
+                hash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+                    .to_string(),
                 from: "0xabcdef1234567890abcdef1234567890abcdef12".to_string(),
                 to: "0x1234567890123456789012345678901234567890".to_string(),
                 amount: "5000000000000000000".to_string(), // 5 X3
@@ -477,7 +496,8 @@ where
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_secs() - 1800,
+                    .as_secs()
+                    - 1800,
                 fee: Some("210000000000000".to_string()),
             },
         ];
@@ -491,7 +511,10 @@ where
         })
     }
 
-    fn get_wallet_status(&self, request: GetWalletStatusRequest) -> Result<GetWalletStatusResponse> {
+    fn get_wallet_status(
+        &self,
+        request: GetWalletStatusRequest,
+    ) -> Result<GetWalletStatusResponse> {
         // In production: query actual wallet status from storage
         Ok(GetWalletStatusResponse {
             status: WalletStatus {
@@ -531,7 +554,8 @@ where
                 last_active: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_secs() - 86400,
+                    .as_secs()
+                    - 86400,
                 total_balance_usd: Some("5000.00".to_string()),
             },
         ];

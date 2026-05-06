@@ -3,16 +3,13 @@
 //! Provides GPU-accelerated validation of Solana block headers using SHA256 and Secp256k1.
 
 use crate::error::ValidatorError;
-use crate::kernels::Keccak256Kernel;
 use crate::failover::CpuFallback;
-use crate::orchestrator::SwarmOrchestrator;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::kernels::Keccak256Kernel;
 
 /// SVM Header Validator
-//!
-//! Validates Solana block headers using GPU-accelerated hashing.
-//! Falls back to CPU validation if GPU is unavailable.
+///
+/// Validates Solana block headers using GPU-accelerated hashing.
+/// Falls back to CPU validation if GPU is unavailable.
 
 pub struct SvmHeaderValidator {
     gpu_kernel: Option<Keccak256Kernel>,
@@ -23,8 +20,8 @@ impl SvmHeaderValidator {
     /// Create a new SVM header validator
     pub fn new() -> Self {
         // Try to initialize GPU kernel, fall back to CPU if unavailable
-        let gpu_kernel = Keccak256Kernel::new().ok();
-        
+        let gpu_kernel = Some(Keccak256Kernel::new(32, true));
+
         Self {
             gpu_kernel,
             cpu_fallback: CpuFallback::new(),
@@ -33,19 +30,19 @@ impl SvmHeaderValidator {
 
     /// Validate an SVM block header
     ///
-    //! Validates:
-    //! - Slot number
-    //! - Block hash (SHA256 of header)
-    //! - State root
-    //! - Parent slot
-    //! - Timestamp
-    //! - Hash (block hash)
-    //! - Height
-    //! - Transactions root
-    //! - rewards
-    //! - block_height
-    //!
-    //! Returns the validated slot number if successful.
+    /// Validates:
+    /// - Slot number
+    /// - Block hash (SHA256 of header)
+    /// - State root
+    /// - Parent slot
+    /// - Timestamp
+    /// - Hash (block hash)
+    /// - Height
+    /// - Transactions root
+    /// - rewards
+    /// - block_height
+    ///
+    /// Returns the validated slot number if successful.
     pub async fn validate_header(
         &self,
         slot: u64,
@@ -56,14 +53,7 @@ impl SvmHeaderValidator {
         height: u64,
     ) -> Result<u64, ValidatorError> {
         // Validate basic header fields
-        self.validate_basic_fields(
-            slot,
-            block_hash,
-            state_root,
-            parent_slot,
-            timestamp,
-            height,
-        )?;
+        self.validate_basic_fields(slot, block_hash, state_root, parent_slot, timestamp, height)?;
 
         // Validate block hash using GPU or CPU fallback
         self.validate_hash(slot, block_hash)?;
@@ -117,11 +107,7 @@ impl SvmHeaderValidator {
     }
 
     /// Validate block hash using GPU or CPU fallback
-    fn validate_hash(
-        &self,
-        slot: u64,
-        expected_hash: [u8; 32],
-    ) -> Result<(), ValidatorError> {
+    fn validate_hash(&self, slot: u64, expected_hash: [u8; 32]) -> Result<(), ValidatorError> {
         match &self.gpu_kernel {
             Some(kernel) => {
                 // Use GPU for hash validation
@@ -136,7 +122,9 @@ impl SvmHeaderValidator {
             }
             None => {
                 // Fall back to CPU validation
-                self.cpu_fallback.validate_hash(slot, expected_hash)
+                self.cpu_fallback
+                    .validate_hash(slot, expected_hash)
+                    .map(|_| ())
             }
         }
     }
@@ -156,6 +144,8 @@ impl SvmHeaderValidator {
         Ok(gpu_result == cpu_result)
     }
 }
+
+pub type SvmValidator = SvmHeaderValidator;
 
 impl Default for SvmHeaderValidator {
     fn default() -> Self {
@@ -179,62 +169,27 @@ mod tests {
 
         // Valid header
         assert!(validator
-            .validate_basic_fields(
-                100,
-                [1u8; 32],
-                [2u8; 32],
-                99,
-                1234567890,
-                100,
-            )
+            .validate_basic_fields(100, [1u8; 32], [2u8; 32], 99, 1234567890, 100,)
             .is_ok());
 
         // Invalid: zero slot
         assert!(validator
-            .validate_basic_fields(
-                0,
-                [1u8; 32],
-                [2u8; 32],
-                0,
-                1234567890,
-                0,
-            )
+            .validate_basic_fields(0, [1u8; 32], [2u8; 32], 0, 1234567890, 0,)
             .is_err());
 
         // Invalid: zero timestamp
         assert!(validator
-            .validate_basic_fields(
-                100,
-                [1u8; 32],
-                [2u8; 32],
-                99,
-                0,
-                100,
-            )
+            .validate_basic_fields(100, [1u8; 32], [2u8; 32], 99, 0, 100,)
             .is_err());
 
         // Invalid: parent_slot >= slot
         assert!(validator
-            .validate_basic_fields(
-                100,
-                [1u8; 32],
-                [2u8; 32],
-                100,
-                1234567890,
-                100,
-            )
+            .validate_basic_fields(100, [1u8; 32], [2u8; 32], 100, 1234567890, 100,)
             .is_err());
 
         // Invalid: zero state_root for non-genesis
         assert!(validator
-            .validate_basic_fields(
-                100,
-                [1u8; 32],
-                [0u8; 32],
-                99,
-                1234567890,
-                100,
-            )
+            .validate_basic_fields(100, [1u8; 32], [0u8; 32], 99, 1234567890, 100,)
             .is_err());
     }
 }

@@ -32,6 +32,7 @@ pub mod pallet {
         traits::{AtLeast32BitUnsigned, CheckedAdd, SaturatedConversion},
         Saturating,
     };
+    use sp_std::vec::Vec;
     use x3_vrf::{RandomnessRequest, RandomnessResult};
 
     /// Maximum number of pending randomness requests per account

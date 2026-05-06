@@ -2,8 +2,8 @@
 // Uses native Tauri notifications
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { Listen, UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 export enum NotificationCategory {
   Transaction = 'transaction',
@@ -95,7 +95,7 @@ export const SystemNotifications: React.FC = () => {
 
       for (const eventType of eventTypes) {
         try {
-          const unlisten = await Listen(eventType, (event: any) => {
+          const unlisten = await listen(eventType, (event: any) => {
             handleNotificationEvent(eventType, event.payload);
           });
           unlisteners.push(unlisten);

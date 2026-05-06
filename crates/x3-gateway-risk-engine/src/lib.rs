@@ -266,3 +266,71 @@ mod tests {
         assert!(!assessment.factors.is_empty());
     }
 }
+
+/// Decision from the route risk engine.
+#[derive(Clone, Debug)]
+pub struct RouteRiskDecision {
+    /// Whether the route is allowed.
+    pub allow_route: bool,
+    /// Human-readable reason.
+    pub reason: String,
+}
+
+/// Input for route-level risk evaluation.
+#[derive(Clone, Debug, Default)]
+pub struct RouteRiskInput {
+    /// Estimated value in USD of the pending operations.
+    pub value_usd: u64,
+    /// Number of recent failures observed.
+    pub recent_failures: u32,
+    /// Whether verifier quorum has been met.
+    pub verifier_quorum_met: bool,
+}
+
+/// Simple risk policy configuration.
+#[derive(Clone, Debug, Default)]
+pub struct RiskPolicy {
+    /// Maximum USD value allowed per route batch.
+    pub max_value_usd: u64,
+    /// Maximum tolerated recent failures before blocking.
+    pub max_recent_failures: u32,
+}
+
+/// Stateful gateway risk engine that evaluates route safety.
+#[derive(Clone, Debug, Default)]
+pub struct GatewayRiskEngine {
+    policy: RiskPolicy,
+}
+
+impl GatewayRiskEngine {
+    /// Create a new engine with the given policy.
+    pub fn new(policy: RiskPolicy) -> Self {
+        Self { policy }
+    }
+
+    /// Evaluate whether a route is safe to proceed.
+    pub fn evaluate(&self, input: RouteRiskInput) -> RouteRiskDecision {
+        if self.policy.max_value_usd > 0 && input.value_usd > self.policy.max_value_usd {
+            return RouteRiskDecision {
+                allow_route: false,
+                reason: format!("value_usd {} exceeds limit {}", input.value_usd, self.policy.max_value_usd),
+            };
+        }
+        if self.policy.max_recent_failures > 0 && input.recent_failures > self.policy.max_recent_failures {
+            return RouteRiskDecision {
+                allow_route: false,
+                reason: format!("recent_failures {} exceeds limit {}", input.recent_failures, self.policy.max_recent_failures),
+            };
+        }
+        if !input.verifier_quorum_met {
+            return RouteRiskDecision {
+                allow_route: false,
+                reason: "verifier quorum not met".to_string(),
+            };
+        }
+        RouteRiskDecision {
+            allow_route: true,
+            reason: "ok".to_string(),
+        }
+    }
+}

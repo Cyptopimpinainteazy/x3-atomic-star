@@ -4,8 +4,8 @@
 //! the solana-rbpf virtual machine.
 
 use crate::{
-    serialize_accounts, AccountUpdate, SvmAccountMeta, SvmConfig, SvmError,
-    SvmExecutionResult, SvmExecutor, SvmInstruction, SvmResult,
+    serialize_accounts, AccountUpdate, SvmAccountMeta, SvmConfig, SvmError, SvmExecutionResult,
+    SvmExecutor, SvmInstruction, SvmResult,
 };
 use solana_rbpf::{
     elf::Executable,
@@ -58,7 +58,6 @@ impl Default for RbpfSvmExecutor {
         Self::new()
     }
 }
-
 
 /// Context for X3 syscall execution
 /// Tracks compute units, logs, and return data during BPF execution

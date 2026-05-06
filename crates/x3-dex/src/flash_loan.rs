@@ -1,7 +1,7 @@
 /// Flash Loan Engine — Uncollateralized single-transaction loans with 0.09% fee
 /// Enables risk-free arbitrage and liquidations within atomic transactions
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct FlashLoan {

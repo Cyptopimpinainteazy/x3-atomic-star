@@ -40,10 +40,9 @@ impl core::fmt::Display for Error {
     }
 }
 
-// Implement `std::error::Error` for non-wasm std targets.
-// This is required by rand_core 0.9+ which uses `getrandom::Error` in trait bounds.
-#[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
-impl std::error::Error for Error {}
+// Implement `core::error::Error` (stable since Rust 1.81) so this works in
+// no_std contexts too. `rand_core` requires `getrandom::Error: core::error::Error`.
+impl core::error::Error for Error {}
 
 /// Fill `dest` with random bytes.
 #[inline]

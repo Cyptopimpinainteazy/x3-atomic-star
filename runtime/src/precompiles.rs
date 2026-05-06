@@ -43,7 +43,7 @@ where
             a if a == hash(4) => Some(Identity::execute(handle)),
             a if a == hash(5) => Some(Modexp::execute(handle)),
             // X3 specific extras
-            a if a == hash(1024) => Some(Sha3FIPS256::execute(handle)),
+            a if a == hash(1024) => Some(Sha3FIPS256::<R, ()>::execute(handle)),
             a if a == hash(1025) => Some(ECRecoverPublicKey::execute(handle)),
             _ => None,
         }

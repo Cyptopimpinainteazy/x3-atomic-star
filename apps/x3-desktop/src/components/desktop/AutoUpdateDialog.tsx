@@ -2,8 +2,8 @@
 // Notifies users of new versions and allows upgrade/deferral
 
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { relaunch } from '@tauri-apps/api/process';
+import { invoke } from '@tauri-apps/api/core';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 export interface UpdateVersion {
   version: string;
@@ -249,21 +249,21 @@ export const AutoUpdateDialog: React.FC = () => {
               <div className="details-grid">
                 <div className="detail-item">
                   <label>Current Version</label>
-                  <value>v{updateInfo.current_version}</value>
+                  <span>v{updateInfo.current_version}</span>
                 </div>
                 <div className="detail-item">
                   <label>Latest Version</label>
-                  <value>v{updateInfo.latest_version}</value>
+                  <span>v{updateInfo.latest_version}</span>
                 </div>
                 {latestVersion && (
                   <>
                     <div className="detail-item">
                       <label>Release Date</label>
-                      <value>{new Date(latestVersion.release_date).toLocaleDateString()}</value>
+                      <span>{new Date(latestVersion.release_date).toLocaleDateString()}</span>
                     </div>
                     <div className="detail-item">
                       <label>Download Size</label>
-                      <value>{formatBytes(latestVersion.download_size)}</value>
+                      <span>{formatBytes(latestVersion.download_size)}</span>
                     </div>
                   </>
                 )}

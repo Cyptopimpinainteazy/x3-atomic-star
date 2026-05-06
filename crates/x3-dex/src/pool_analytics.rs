@@ -1,7 +1,7 @@
 /// Pool Analytics Engine — Real-time TVL, volume, APY, and performance tracking
 /// Aggregates pool metrics for liquidity provider decision-making and protocol analytics
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
-use sp_std::vec::Vec;
+use sp_std::prelude::*;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct PoolAnalytics {

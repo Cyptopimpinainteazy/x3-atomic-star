@@ -35,11 +35,11 @@ pub use wallet_dex_rpc::{
     HardwareSigningRequest, SwapRequest, SwapResponse, WalletDexApi, WalletDexRpc,
 };
 pub use wallet_service_rpc::{
-    CreateWalletRequest, CreateWalletResponse, GetBalanceRequest, GetBalanceResponse,
-    GetTransactionsRequest, GetTransactionsResponse, GetWalletStatusRequest,
-    GetWalletStatusResponse, ImportWalletRequest, ListWalletsRequest, ListWalletsResponse,
-    NetworkConfig, SetNetworkRequest, SetNetworkResponse, SignTransactionRequest,
-    SignTransactionResponse, SubmitTransactionRequest, SubmitTransactionResponse,
-    TokenBalance, TransactionInfo, WalletServiceApi, WalletServiceRpc, WalletStatus,
-    BackupWalletRequest, BackupWalletResponse,
+    BackupWalletRequest, BackupWalletResponse, CreateWalletRequest, CreateWalletResponse,
+    GetBalanceRequest, GetBalanceResponse, GetTransactionsRequest, GetTransactionsResponse,
+    GetWalletStatusRequest, GetWalletStatusResponse, ImportWalletRequest, ListWalletsRequest,
+    ListWalletsResponse, NetworkConfig, SetNetworkRequest, SetNetworkResponse,
+    SignTransactionRequest, SignTransactionResponse, SubmitTransactionRequest,
+    SubmitTransactionResponse, TokenBalance, TransactionInfo, WalletServiceApi, WalletServiceRpc,
+    WalletStatus,
 };

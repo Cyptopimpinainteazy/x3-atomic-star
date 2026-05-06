@@ -100,7 +100,7 @@ pub use prometheus::{
         AtomicF64 as F64, AtomicU64 as U64, GenericCounter, GenericCounterVec, GenericGauge,
         GenericGaugeVec,
     },
-    exponential_buckets, linear_buckets, Histogram, HistogramOpts, HistogramVec, Opts, Registry,
+    exponential_buckets, histogram_opts, linear_buckets, Histogram, HistogramOpts, HistogramVec, Opts, Registry,
 };
 
 /// Counter type alias.

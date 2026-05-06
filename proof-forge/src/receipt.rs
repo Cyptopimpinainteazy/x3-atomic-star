@@ -126,13 +126,8 @@ impl Receipt {
         for file in &self.relevant_files {
             // Ignore claim-receipt files as freshness inputs to avoid cyclical
             // staleness (one claim refresh updating another claim's evidence).
-            if file
-                .to_string_lossy()
-                .contains("proof/receipts/claims/")
-                && file
-                    .extension()
-                    .map(|ext| ext == "json")
-                    .unwrap_or(false)
+            if file.to_string_lossy().contains("proof/receipts/claims/")
+                && file.extension().map(|ext| ext == "json").unwrap_or(false)
             {
                 continue;
             }

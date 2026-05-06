@@ -94,19 +94,16 @@ const MOCK_TIPS: TipPool[] = [
 
 const MOCK_SPLITS: RevenueSplit[] = [
   {
-    id: "1",
     recipient: "Creator (Me)",
     percentage: 85,
     address: "x3c7b...2f4a",
   },
   {
-    id: "2",
     recipient: "Platform Fee",
     percentage: 10,
     address: "x3plat...fee1",
   },
   {
-    id: "3",
     recipient: "Moderator",
     percentage: 5,
     address: "x3mod...9c8e",

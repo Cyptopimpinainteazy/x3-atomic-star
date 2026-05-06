@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REPORT_FILE="$ROOT_DIR/reports/swarm_report.md"
 API_URL="http://127.0.0.1:8787"
+CURL_OPTS=(-fsS --connect-timeout 2 --max-time 5)
 
 mkdir -p "$ROOT_DIR/reports"
 
@@ -15,31 +16,31 @@ echo "- Generated at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$REPORT_FILE"
 echo >> "$REPORT_FILE"
 echo "## Swarm Health Summary" >> "$REPORT_FILE"
 
-if command -v curl >/dev/null 2>&1 && curl -fsS "$API_URL/health" >/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1 && curl "${CURL_OPTS[@]}" "$API_URL/health" >/dev/null 2>&1; then
   echo "- API /health: ok" >> "$REPORT_FILE"
   echo "- API URL: $API_URL" >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo "## API Snapshot" >> "$REPORT_FILE"
   echo '```json' >> "$REPORT_FILE"
-  curl -fsS "$API_URL/status" >> "$REPORT_FILE"
+  curl "${CURL_OPTS[@]}" "$API_URL/status" >> "$REPORT_FILE" || echo '{"error":"status unavailable"}' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo '```' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo "### Current Tasks" >> "$REPORT_FILE"
   echo '```json' >> "$REPORT_FILE"
-  curl -fsS "$API_URL/tasks" >> "$REPORT_FILE"
+  curl "${CURL_OPTS[@]}" "$API_URL/tasks" >> "$REPORT_FILE" || echo '[]' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo '```' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo "### Memory Entries" >> "$REPORT_FILE"
   echo '```json' >> "$REPORT_FILE"
-  curl -fsS "$API_URL/memory" >> "$REPORT_FILE"
+  curl "${CURL_OPTS[@]}" "$API_URL/memory" >> "$REPORT_FILE" || echo '[]' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo '```' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo "### Recent Events" >> "$REPORT_FILE"
   echo '```json' >> "$REPORT_FILE"
-  curl -fsS "$API_URL/events" >> "$REPORT_FILE"
+  curl "${CURL_OPTS[@]}" "$API_URL/events" >> "$REPORT_FILE" || echo '[]' >> "$REPORT_FILE"
   echo >> "$REPORT_FILE"
   echo '```' >> "$REPORT_FILE"
 else
@@ -49,8 +50,13 @@ fi
 
 echo >> "$REPORT_FILE"
 echo "## Local Scan" >> "$REPORT_FILE"
-echo "- Generated file list from scripts/swarm/swarm_scan.sh" >> "$REPORT_FILE"
+echo "- First 50 source/report files, excluding generated dependency and build directories" >> "$REPORT_FILE"
 echo >> "$REPORT_FILE"
-find "$ROOT_DIR" -type f | grep -E '\.(rs|sh|toml|md)$' | head -50 >> "$REPORT_FILE" || true
+(cd "$ROOT_DIR" && find . \
+  -path './.git' -prune -o \
+  -path './node_modules' -prune -o \
+  -path './target' -prune -o \
+  -type f \( -name '*.rs' -o -name '*.sh' -o -name '*.toml' -o -name '*.md' \) \
+  -print | sed 's#^./##' | head -50) >> "$REPORT_FILE" || true
 
 echo "X3 swarm report written to $REPORT_FILE"

@@ -1,13 +1,13 @@
 #![cfg(test)]
 
 use crate as pallet_x3_kernel;
+use core::sync::atomic::{AtomicBool, Ordering};
 use frame_support::{
     construct_runtime, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, Get},
 };
 use frame_system as system;
 use parity_scale_codec::Encode;
-use core::sync::atomic::{AtomicBool, Ordering};
 use sp_core::{H160, H256};
 use sp_io::TestExternalities;
 use sp_runtime::{

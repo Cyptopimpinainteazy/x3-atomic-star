@@ -28,7 +28,7 @@ health_endpoint = "/health/runtime"
 proof_report = "reports/testnet_readiness_report.md"
 readiness_score = 0
 blockers = []
-dangerous_paths = ["runtime", "chain specs", "validator keys"]
+dangerous_paths = ["runtime", "chain-specs", "validator keys"]
 
 [atomic_router]
 mode = "LIVE_TESTNET"
@@ -176,7 +176,9 @@ dangerous_paths = ["mainnet deployment", "approval gates"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "crates/x3-swarm-core"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/x3-swarm-core"
 proof_report = "reports/swarm_health_report.md"
+readiness_score = 0
 required_tests = [
   "swarm_agent_can_receive_task",
   "swarm_agent_cannot_touch_forbidden_files",
@@ -184,77 +186,99 @@ required_tests = [
   "swarm_kill_switch_stops_agents"
 ]
 blockers = []
+dangerous_paths = ["keys", "secrets", "mainnet"]
 
 [repo_scanner_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/swarm/swarm_scan.sh"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/repo-scanner-agent"
 proof_report = "reports/swarm_scan_report.md"
+readiness_score = 0
 required_tests = [
   "swarm_scan_generates_report"
 ]
 blockers = []
+dangerous_paths = ["keys", "secrets", "mainnet"]
 
 [testbuilder_agent]
 mode = "GUARDED_TESTNET"
 crate_or_service = "x3-swarm-core"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/testbuilder-agent"
 proof_report = "reports/swarm_task_queue.md"
+readiness_score = 0
 required_tests = [
   "testbuilder_generates_test_task",
   "testbuilder_cannot_edit_forbidden_paths"
 ]
 blockers = []
+dangerous_paths = ["keys", "validator_keys", "mainnet"]
 
 [auditor_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "x3-swarm-core"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/auditor-agent"
 proof_report = "reports/swarm_audit_report.md"
+readiness_score = 0
 required_tests = [
   "auditor_generates_findings",
   "auditor_does_not_modify_files"
 ]
 blockers = []
+dangerous_paths = ["keys", "secrets", "mainnet"]
 
 [breaker_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "x3-swarm-core"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/breaker-agent"
 proof_report = "reports/swarm_breaker_report.md"
+readiness_score = 0
 required_tests = [
   "breaker_generates_attack_tests",
   "breaker_cannot_touch_mainnet"
 ]
 blockers = []
+dangerous_paths = ["keys", "secrets", "mainnet"]
 
 [fixer_agent]
 mode = "GUARDED_TESTNET"
 crate_or_service = "x3-swarm-core"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/fixer-agent"
 proof_report = "reports/swarm_fixer_report.md"
+readiness_score = 0
 required_tests = [
   "fixer_requires_approval_for_runtime",
   "fixer_adds_regression_test"
 ]
 blockers = []
+dangerous_paths = ["runtime", "pallets", "mainnet"]
 
 [marketing_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "x3-readiness"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/marketing-agent"
 proof_report = "reports/marketing_claims_audit.md"
+readiness_score = 0
 required_tests = [
   "marketing_rejects_unverified_claim"
 ]
 blockers = []
+dangerous_paths = ["unsupported-claims", "mainnet"]
 
 [grant_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "x3-grantsmith"
 tauri_app = "SwarmCommand"
+health_endpoint = "/health/grant-agent"
 proof_report = "reports/grant_pipeline_report.md"
+readiness_score = 0
 required_tests = [
   "grant_agent_generates_draft"
 ]
 blockers = []
+dangerous_paths = ["grant-funding", "mainnet"]

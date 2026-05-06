@@ -1,9 +1,10 @@
 use flash_finality::{FlashFinalityGadget, GossipMessage, FLASH_FINALITY_PROTOCOL_ID};
 use futures::{future, prelude::*};
 use log::{debug, info, warn};
-use parity_scale_codec::{Decode, Encode};
+use codec::{Decode, Encode};
 use sc_client_api::BlockchainEvents;
 use sc_network::PeerId;
+use sc_network::service::traits::NotificationService;
 use sc_network_gossip::{
     GossipEngine, MessageIntent, Network, Syncing, ValidationResult, Validator, ValidatorContext,
 };
@@ -72,6 +73,7 @@ where
         network: N,
         sync_service: S,
         keystore: KeystorePtr,
+        notification_service: Box<dyn NotificationService>,
     ) -> Self
     where
         N: Network<Block> + Send + Clone + 'static,
@@ -81,6 +83,7 @@ where
         let gossip_engine = Arc::new(Mutex::new(GossipEngine::new(
             network,
             sync_service,
+            notification_service,
             FLASH_FINALITY_PROTOCOL_ID,
             validator,
             None,
