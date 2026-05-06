@@ -5,7 +5,7 @@
 //! Keeper network and automated task execution for X3 Chain.
 //! Enables conditional task execution based on on-chain state.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_std::vec::Vec;

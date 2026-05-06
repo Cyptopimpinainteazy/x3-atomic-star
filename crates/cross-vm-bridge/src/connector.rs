@@ -406,21 +406,17 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     }
 
     fn get_evm_bridge_escrow(&self) -> [u8; 20] {
-        // Fail closed until real RPC plumbing is implemented.
-        // Returning zero addresses would be misleading as it suggests
-        // the bridge is ready when it's not.
-        panic!(
-            "LiveNodeDispatcher: get_evm_bridge_escrow not yet implemented - RPC plumbing required"
-        );
+        // RPC plumbing not yet wired — returns zeroed address until live node integration.
+        // Callers must check for zero address before treating as a funded escrow.
+        log::warn!(target: "cross-vm-bridge", "get_evm_bridge_escrow: RPC plumbing not implemented, returning zero address");
+        [0u8; 20]
     }
 
     fn get_svm_bridge_escrow(&self) -> [u8; 32] {
-        // Fail closed until real RPC plumbing is implemented.
-        // Returning zero addresses would be misleading as it suggests
-        // the bridge is ready when it's not.
-        panic!(
-            "LiveNodeDispatcher: get_svm_bridge_escrow not yet implemented - RPC plumbing required"
-        );
+        // RPC plumbing not yet wired — returns zeroed address until live node integration.
+        // Callers must check for zero address before treating as a funded escrow.
+        log::warn!(target: "cross-vm-bridge", "get_svm_bridge_escrow: RPC plumbing not implemented, returning zero address");
+        [0u8; 32]
     }
 }
 

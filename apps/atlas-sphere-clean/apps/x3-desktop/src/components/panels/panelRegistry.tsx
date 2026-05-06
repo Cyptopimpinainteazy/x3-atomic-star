@@ -259,7 +259,7 @@ const CrmGovernancePanel = lazy(() => import("@/components/panels/governance/Crm
  * Map of appId → lazy-loaded panel component.
  * Add new panels here as they are created.
  */
-const PANEL_MAP: Record<string, ComponentType> = {
+const PANEL_MAP: Record<string, PanelComponent> = {
   "swarm-health":   SwarmHealthPanel,
   "network-control": NetworkPanel,
   "storage-manager": StoragePanel,

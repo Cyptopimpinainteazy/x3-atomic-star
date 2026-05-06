@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
   "command_run": "x3-proof verify x3.x3lang.compiler_reproducibility",
   "artifact_hash": "b4b0e454e83efcd703e36bf5df1528784732bdba89734437b311cda4222f2bed",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -10,7 +10,7 @@
     "x3-lang/tests/verify_bytecode.rs",
     "docs/x3-lang/README.md"
   ],
-  "timestamp": "2026-05-02T02:00:25.124801172Z",
+  "timestamp": "2026-05-06T12:38:56.281325382Z",
   "result": {
     "claim_id": "x3.x3lang.compiler_reproducibility",
     "claim": "X3Language compiler/VM/test artifacts are present",
@@ -40,15 +40,15 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "x3-lang/Cargo.toml": "true",
-      "x3-lang/vm/Cargo.toml": "true",
       "x3-lang/compiler/Cargo.toml": "true",
-      "x3-lang/tests/verify_bytecode.rs": "true",
-      "docs/x3-lang/README.md": "true"
+      "docs/x3-lang/README.md": "true",
+      "x3-lang/vm/Cargo.toml": "true",
+      "x3-lang/Cargo.toml": "true",
+      "x3-lang/tests/verify_bytecode.rs": "true"
     },
-    "timestamp": "2026-05-02T02:00:25.119871482Z",
+    "timestamp": "2026-05-06T12:38:56.276236327Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "412bc2b9f5c0da4e63be5f43d492b0a9b6dce8e6655b9b34010948407ee9eac1"
+  "binding_hash": "cfc06aed714841a6231da369e8cf0f4b5ea934d070959b8ed69537431ce4be7b"
 }

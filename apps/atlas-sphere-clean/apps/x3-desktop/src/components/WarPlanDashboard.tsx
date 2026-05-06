@@ -275,7 +275,10 @@ export const CapTableSimulator: React.FC<{ capTable: any }> = ({ capTable }) => 
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
+          <Tooltip formatter={(value) => {
+            const numeric = Number(value ?? 0);
+            return `${numeric.toFixed(1)}%`;
+          }} />
         </PieChart>
       </ResponsiveContainer>
 

@@ -24,13 +24,13 @@ pub mod pallet {
     use frame_support::{
         ensure,
         pallet_prelude::*,
-        sp_runtime::{SaturatedConversion, Saturating},
-        traits::{Currency, Get},
+        traits::{Currency, Get, ReservableCurrency},
         BoundedVec,
     };
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::Encode;
-    use sp_core::{Get as SpGet, H256};
+    use sp_core::H256;
+    use sp_runtime::traits::{SaturatedConversion, Saturating};
     use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
     // Note: Would integrate with oracle pallet for price data
 
@@ -247,7 +247,7 @@ pub mod pallet {
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::execute_task())]
         pub fn execute_task(origin: OriginFor<T>, task_id: TaskId) -> DispatchResult {
-            let _keeper = ensure_signed(origin)?; // In production, verify keeper authorization
+            let keeper = ensure_signed(origin)?;
 
             let mut task = Tasks::<T>::get(task_id).ok_or(Error::<T>::TaskNotFound)?;
             ensure!(task.status == TaskStatus::Active, Error::<T>::InvalidTask);
@@ -286,7 +286,7 @@ pub mod pallet {
             let execution_fee = T::ExecutionFee::get().min(task.max_fee);
             T::Currency::transfer(
                 &task.owner,
-                &execution_result.keeper,
+                &keeper,
                 execution_fee,
                 frame_support::traits::ExistenceRequirement::KeepAlive,
             )?;
@@ -306,7 +306,14 @@ pub mod pallet {
     }
 }
 
-impl<T: Config> Pallet<T> {
+use frame_support::{ensure, pallet_prelude::DispatchResult, traits::{Currency, Get, ReservableCurrency}};
+use parity_scale_codec::Encode;
+use sp_core::H256;
+use sp_runtime::{traits::SaturatedConversion, DispatchError};
+use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId};
+use pallet::BalanceOf;
+
+impl<T: pallet::Config> pallet::Pallet<T> {
     /// Generate a unique task ID
     fn generate_task_id(counter: u64, account: &T::AccountId) -> TaskId {
         let mut data = Vec::new();
@@ -389,7 +396,6 @@ impl<T: Config> Pallet<T> {
                     gas_used: 21000,
                     fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
                     output: vec![],
-                    keeper: task.owner.clone(), // Simplified - would be actual keeper
                 })
             }
             Action::Custom(_) => {
@@ -400,7 +406,6 @@ impl<T: Config> Pallet<T> {
                     gas_used: 10000,
                     fee_charged: T::ExecutionFee::get().saturated_into::<u128>(),
                     output: vec![],
-                    keeper: task.owner.clone(),
                 })
             }
         }

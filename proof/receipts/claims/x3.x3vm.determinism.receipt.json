@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
   "command_run": "x3-proof verify x3.x3vm.determinism",
-  "artifact_hash": "c9e299be02b9028e9448104afcd91f9e00ed68581cdc499b5bc3fb1a7cd6797f",
+  "artifact_hash": "87729b3d8ab6cc72e9d7bbf4c575fc87b614aa9e3921b773387ca7b3ace72bca",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "crates/x3-vm/Cargo.toml",
@@ -9,7 +9,7 @@
     "crates/x3-vm/src/bridge.rs",
     "proof/receipts/claims/x3.x3vm.determinism.receipt.json"
   ],
-  "timestamp": "2026-05-02T02:00:28.842446749Z",
+  "timestamp": "2026-05-06T12:38:56.275252673Z",
   "result": {
     "claim_id": "x3.x3vm.determinism",
     "claim": "X3VM determinism and execution artifacts are present",
@@ -40,15 +40,15 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "crates/x3-vm/src/vm.rs": "true",
-      "proof/receipts/claims/x3.x3vm.determinism.receipt.json": "true",
-      "crates/x3-vm/Cargo.toml": "true",
+      "crates/x3-vm/src/bridge.rs": "true",
       "x3vm_check": "true",
-      "crates/x3-vm/src/bridge.rs": "true"
+      "crates/x3-vm/Cargo.toml": "true",
+      "proof/receipts/claims/x3.x3vm.determinism.receipt.json": "true",
+      "crates/x3-vm/src/vm.rs": "true"
     },
-    "timestamp": "2026-05-02T02:00:28.834541131Z",
-    "duration_ms": 1842
+    "timestamp": "2026-05-06T12:38:56.263934293Z",
+    "duration_ms": 1222
   },
   "limitations": [],
-  "binding_hash": "fb5d5c3e7155cd72922c338a3ded3862c7bf117c7dcc07d6fcb47b5aa7d048f2"
+  "binding_hash": "acf5b659362d0a7f82ff0dd1bdc739b2c3dd4718af08068ed32e571a1d4bde8e"
 }

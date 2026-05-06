@@ -313,6 +313,7 @@ construct_runtime!(
         X3Oracle: pallet_x3_oracle,
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
+        X3Automation: pallet_x3_automation,
         #[cfg(feature = "frontier")]
         Evm: pallet_evm,
         #[cfg(feature = "frontier")]
@@ -362,6 +363,7 @@ construct_runtime!(
         X3Oracle: pallet_x3_oracle,
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
+        X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
         #[cfg(feature = "frontier")]
         Evm: pallet_evm,
@@ -459,6 +461,23 @@ impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
     type WeightInfo = ();
     type EconomicHalt = X3SupplyLedger;
+}
+
+parameter_types! {
+    pub const MaxTasksPerAccount: u32 = 100;
+    pub const BaseRegistrationFee: Balance = 1_000_000_000;
+    pub const ExecutionFee: Balance = 500_000_000;
+    pub const MaxTaskExpiryBlocks: u32 = 2_628_000; // ~1 year at 12s blocks
+}
+
+impl pallet_x3_automation::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type MaxTasksPerAccount = MaxTasksPerAccount;
+    type BaseRegistrationFee = BaseRegistrationFee;
+    type ExecutionFee = ExecutionFee;
+    type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
+    type WeightInfo = ();
 }
 
 parameter_types! {

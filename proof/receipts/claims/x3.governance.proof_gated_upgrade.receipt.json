@@ -1,20 +1,20 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
   "command_run": "x3-proof verify x3.governance.proof_gated_upgrade",
-  "artifact_hash": "7347440e77f82d50c8faa9d3313d02c6fd43259a12e08a8d4c090035d37bdf36",
+  "artifact_hash": "229f4e4f10b57e93a677f42db579eadea5f9e6d0684bc465fbd7a64088ccfaba",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "pallets/governance/src/lib.rs",
     "pallets/governance/src/tests.rs"
   ],
-  "timestamp": "2026-05-02T01:56:12.673203204Z",
+  "timestamp": "2026-05-06T12:38:57.490618826Z",
   "result": {
     "claim_id": "x3.governance.proof_gated_upgrade",
     "claim": "Governance flash-loan takeover resistance",
-    "status": "verified",
+    "status": "blocked",
     "proof_level": "P7",
     "edge_case_level": "E8",
-    "hack_level": "H8",
+    "hack_level": "H0",
     "operator_level": "I8",
     "degraded_level": "D6",
     "files_inspected": [
@@ -24,21 +24,22 @@
     "commands_run": [
       "cargo test -p pallet-governance flash_loan_governance -- --nocapture"
     ],
-    "passed_checks": [
-      "flash_loan_governance_takeover_fails passed"
+    "passed_checks": [],
+    "failed_checks": [
+      "flash_loan_governance_takeover_fails failed",
+      "test failure: tests::flash_loan_governance_takeover_fails"
     ],
-    "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
-    "score": 1.0,
+    "score": 0.0,
     "evidence": {
+      "failed_attack_tests": "2",
       "expected_attack_tests": "1",
-      "passed_attack_tests": "1",
-      "failed_attack_tests": "0"
+      "passed_attack_tests": "0"
     },
-    "timestamp": "2026-05-02T01:56:12.663459279Z",
-    "duration_ms": 100978
+    "timestamp": "2026-05-06T12:38:57.484283349Z",
+    "duration_ms": 1151
   },
   "limitations": [],
-  "binding_hash": "29d5423b40df3a9180734f692612b5ba53327a5f30c84af2051b1eba7522df87"
+  "binding_hash": "e560a91e83c27f44991eed7984737e7290d1e2042ea34a98d76bd7eab2bc112f"
 }

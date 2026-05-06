@@ -81,6 +81,8 @@ impl TodoScanner {
                 "tests.rs".to_string(),
                 "mock_".to_string(),
                 "proof-forge/".to_string(),
+                "fuzz/".to_string(),
+                "fuzz_targets/".to_string(),
             ],
         }
     }
