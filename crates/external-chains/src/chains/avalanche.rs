@@ -61,8 +61,7 @@ impl AvalancheAdapter {
         calldata.extend_from_slice(&[0u8; 32]); // feeAmount = 0
 
         // Required gas limit
-        let mut gas_bytes = [0u8; 32];
-        required_gas_limit.to_big_endian(&mut gas_bytes);
+        let gas_bytes = required_gas_limit.to_big_endian();
         calldata.extend_from_slice(&gas_bytes);
 
         // Message offset

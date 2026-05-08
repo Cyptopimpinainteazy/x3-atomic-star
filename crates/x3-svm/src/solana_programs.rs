@@ -1,7 +1,7 @@
 /// Solana Programs Port — Rust implementations of 10 standard Solana programs for X3 SVM compatibility
 /// Enables direct CPI compatibility without relying on WebAssembly cross-VM translation
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

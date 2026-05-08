@@ -1,6 +1,6 @@
 //! Core types used throughout the X3 SDK.
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use serde::{Deserialize, Serialize};
 use sp_core::H256;
 

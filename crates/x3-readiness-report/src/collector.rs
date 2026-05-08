@@ -99,7 +99,7 @@ impl Collector {
 
         // ── RC-1 specific gates ──────────────────────────────────────────────
         // IXL bundle gate: verify the router's IXL integration endpoint is live.
-        report.ixl_bundle_gate = match Self::rpc_call(endpoint, "x3_router_ixlStatus", &[]) {
+        report.ixl_bundle_gate = match Self::rpc_call(&endpoint, "x3_router_ixlStatus", &[]) {
             Ok(v) if v.get("wired").and_then(|b| b.as_bool()) == Some(true) => {
                 ReadinessCheck::pass("IXL bundle execution wired and reported live by node")
             }
@@ -115,7 +115,7 @@ impl Collector {
 
         // Packet lifecycle gate: verify replay guard and commitment storage.
         report.packet_lifecycle_gate =
-            match Self::rpc_call(endpoint, "x3_router_packetLifecycleStatus", &[]) {
+            match Self::rpc_call(&endpoint, "x3_router_packetLifecycleStatus", &[]) {
                 Ok(v) if v.get("replay_guard").and_then(|b| b.as_bool()) == Some(true) => {
                     ReadinessCheck::pass("packet lifecycle wired: replay guard + commitments live")
                 }
@@ -130,7 +130,7 @@ impl Collector {
 
         // LiquidityCore gate: spot AMM + LP lock must be callable.
         report.liquidity_core_gate =
-            match Self::rpc_call(endpoint, "x3_liquidityCore_spotAmmStatus", &[]) {
+            match Self::rpc_call(&endpoint, "x3_liquidityCore_spotAmmStatus", &[]) {
                 Ok(v) if v.get("spot_amm_active").and_then(|b| b.as_bool()) == Some(true) => {
                     ReadinessCheck::pass("LiquidityCore spot AMM active and LP locks enforced")
                 }
@@ -145,7 +145,7 @@ impl Collector {
 
         // External bridges disabled gate: MUST be false at genesis.
         report.external_bridges_disabled =
-            match Self::rpc_call(endpoint, "x3_router_externalBridgesEnabled", &[]) {
+            match Self::rpc_call(&endpoint, "x3_router_externalBridgesEnabled", &[]) {
                 Ok(v) if v.as_bool() == Some(false) => ReadinessCheck::pass(
                     "external bridges are DISABLED — scope-freeze rule satisfied",
                 ),

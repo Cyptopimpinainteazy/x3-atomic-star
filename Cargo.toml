@@ -37,6 +37,7 @@ members = [
     "crates/x3-wallet",
     "crates/x3-indexer",
     "crates/x3-gateway",
+    "crates/x3-circuit-breaker",
     "crates/x3-lsp",
     "crates/x3-integration",
     "crates/x3-gpu-validator-swarm",
@@ -295,7 +296,7 @@ pallet-evm-precompile-simple = { git = "https://github.com/polkadot-evm/frontier
 pallet-evm-precompile-modexp = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 pallet-evm-precompile-sha3fips = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fp-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
-fp-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fp-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false, features = ["serde"] }
 fp-ethereum = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fp-self-contained = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
 fc-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }

@@ -321,14 +321,16 @@ The work tracked here is not done when a prototype exists. It is done when each 
 
 ## Immediate next implementation tickets
 
-1. Create `docs/swarm-governance/INVARIANT_REGISTRY.md` with stable invariant IDs and enforcement mapping.
-2. Create `docs/swarm-governance/CAPABILITY_ENVELOPES.md` for each node and agent class.
-3. Create `docs/swarm-governance/EMERGENCY_POWERS.md` covering pause, degrade, quarantine, and kill semantics.
-4. Create `docs/swarm-governance/AGENT_LAW.md` covering genesis, spawning, strikes, and termination.
-5. Create `docs/swarm-ops/OPERATOR_COCKPIT_SPEC.md` for the unified live dashboard.
-6. Create `docs/swarm-ops/OUTBOUND_POLICY.md` covering publishing, outreach, and disclosure rules.
-7. Create `docs/swarm-ops/ROLLOUT_STAGES.md` with measurable promotion criteria.
-8. Map each item above into implementation issues or phases with named ownership.
+All document artifacts below are **complete** as of 2026-05-08. The next step is wiring the open code gaps identified within each document.
+
+1. ✅ [docs/swarm-governance/INVARIANT_REGISTRY.md](../../docs/swarm-governance/INVARIANT_REGISTRY.md) — stable invariant IDs and enforcement mapping. **9 Band 0 coverage gaps remain in code.**
+2. ✅ [docs/swarm-governance/CAPABILITY_ENVELOPES.md](../../docs/swarm-governance/CAPABILITY_ENVELOPES.md) — capability envelopes for all node and agent classes. **Quorum gate, Sentinel-Judge/Scribe enforcement, and stake requirements are planned in code.**
+3. ✅ [docs/swarm-governance/EMERGENCY_POWERS.md](../../docs/swarm-governance/EMERGENCY_POWERS.md) — pause, degrade, quarantine, and kill semantics. **Degrade state machine, agent kill path, expiry enforcement, and audit trail are planned in code.**
+4. ✅ [docs/swarm-governance/AGENT_LAW.md](../../docs/swarm-governance/AGENT_LAW.md) — genesis records, spawning rules, misconduct ladder, and termination. **Genesis persistence, misconduct ladder state machine, and kill path are planned in code.**
+5. ✅ [docs/swarm-ops/OPERATOR_COCKPIT_SPEC.md](../../docs/swarm-ops/OPERATOR_COCKPIT_SPEC.md) — unified live dashboard specification. **All panels are specified; unified telemetry aggregation and dashboard frontend are planned.**
+6. ✅ [docs/swarm-ops/OUTBOUND_POLICY.md](../../docs/swarm-ops/OUTBOUND_POLICY.md) — publishing, outreach, and disclosure rules with tier definitions. **Publishing gate service, content provenance storage, and do-not-contact register are planned.**
+7. ✅ [docs/swarm-ops/ROLLOUT_STAGES.md](../../docs/swarm-ops/ROLLOUT_STAGES.md) — four-stage rollout with measurable exit criteria. **Stage 1 exit is blocked by 8 named code gaps listed in the document.**
+8. **Next step:** each open-gap item in the documents above maps to a code implementation task. The Stage 1 exit blockers in `ROLLOUT_STAGES.md` are the prioritised list.
 
 ## Security swarm build-pack status
 
@@ -339,3 +341,4 @@ The first concrete scaffold for the security-specific portion of this plan now e
 The current recommended implementation sequence across the multichain adapter, proving pipeline, security swarm, treasury backbone, omnichain token layer, auctions, launchpads, dApp hub, and user surfaces is tracked in [GO_MODE_EXECUTION_ORDER.md](GO_MODE_EXECUTION_ORDER.md). Use that file as the practical order-of-operations document when choosing what to ship next.
 
 The operator-grade specification for the liquidity, inventory, and solvency layer described in `Phase 4.5` now lives in [docs/specs/X3_LIQUIDITY_INVENTORY_SOLVENCY_SPEC.md](docs/specs/X3_LIQUIDITY_INVENTORY_SOLVENCY_SPEC.md). Use it when implementing route reservation, vault policy, rebalance logic, partner capacity, solvency gates, and lane freeze behavior.
+Allo

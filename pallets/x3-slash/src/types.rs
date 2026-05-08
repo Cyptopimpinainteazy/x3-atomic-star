@@ -1,6 +1,6 @@
 //! Types for the x3-slash pallet.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 use sp_core::H256;

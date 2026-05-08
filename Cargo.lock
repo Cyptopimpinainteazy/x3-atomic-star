@@ -26302,6 +26302,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-circuit-breaker"
+version = "0.1.0"
+
+[[package]]
 name = "x3-cli"
 version = "0.1.0"
 dependencies = [

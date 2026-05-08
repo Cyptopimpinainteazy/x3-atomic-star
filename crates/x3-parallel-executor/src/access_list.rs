@@ -7,7 +7,7 @@
 
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 
 /// A storage key: 32-byte canonical form matching Substrate's StorageKey.

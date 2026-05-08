@@ -11,7 +11,7 @@
 //! - Abort: Release from escrow, refund to original owner
 //! - Timeout: Slash escrow, validator loses bond
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{
     pallet_prelude::*,
     traits::{Currency, ReservableCurrency},

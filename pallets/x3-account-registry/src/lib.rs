@@ -13,7 +13,7 @@ pub use pallet::*;
 pub mod pallet {
     use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
-    use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+    use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
     use scale_info::TypeInfo;
     #[cfg(feature = "std")]
     use serde::{Deserialize, Serialize};

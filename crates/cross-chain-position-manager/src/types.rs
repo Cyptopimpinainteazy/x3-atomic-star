@@ -3,7 +3,7 @@
 //! This module defines all the fundamental types used throughout the system,
 //! ensuring consistency and type safety across different modules.
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 pub use sp_core::{H160, H256, U256};

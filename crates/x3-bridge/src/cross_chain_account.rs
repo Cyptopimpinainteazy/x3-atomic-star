@@ -178,7 +178,7 @@ impl CrossChainAccountManager {
     ) -> Result<bool, &'static str> {
         // Verify signer is associated with account.
         // EVM/secp256k1 chains use a 20-byte Ethereum address; other chains use the 32-byte account_id.
-        let key_type_check = Self::chain_type_to_key_type(signature.chain_type);
+        let key_type_check = Self::chain_type_to_key_type(signature.chain_type.clone());
         if key_type_check == KeyType::Secp256k1 {
             let evm_addr = account
                 .evm_address
@@ -199,7 +199,7 @@ impl CrossChainAccountManager {
         }
 
         // Convert chain type to key type
-        let key_type = Self::chain_type_to_key_type(signature.chain_type);
+        let key_type = Self::chain_type_to_key_type(signature.chain_type.clone());
 
         // Verify signature using the unified signing module
         let signature_valid = x3_common::signing::verify_signature_hash(

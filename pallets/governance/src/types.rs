@@ -3,7 +3,7 @@
 use crate::pallet::Config as GovernanceConfig;
 use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::BlockNumberFor;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::{Percent, RuntimeDebug};
 use sp_std::prelude::*;

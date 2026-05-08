@@ -18,6 +18,7 @@ pub mod chain;
 pub mod engine;
 pub mod epoch;
 pub mod error;
+pub mod finality_registry;
 pub mod hasher;
 pub mod types;
 pub mod verifier;
@@ -25,6 +26,7 @@ pub mod verifier;
 pub use chain::ProofChain;
 pub use engine::ProofEngine;
 pub use engine::ProofEngineConfig;
+pub use finality_registry::{FinalityError, FinalityRecord, FinalityRegistry};
 pub use epoch::{
     EpochProof, RecursiveProofAggregator, ZkBlockProof, ZkBlockVerifier, ZkProofError,
     BLOCKS_PER_EPOCH,

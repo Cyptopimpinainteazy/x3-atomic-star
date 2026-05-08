@@ -1,6 +1,6 @@
 /// Hardware Wallet Integration — Ledger & Trezor support via WebUSB/WebHID
 /// Institutional-grade key management without exposing private keys to the application
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

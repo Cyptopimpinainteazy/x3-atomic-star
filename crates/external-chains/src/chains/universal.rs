@@ -165,8 +165,7 @@ impl UniversalEvmAdapter {
         calldata.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]);
         calldata.extend_from_slice(&[0u8; 12]);
         calldata.extend_from_slice(to.as_bytes());
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
         calldata
     }
@@ -178,8 +177,7 @@ impl UniversalEvmAdapter {
         calldata.extend_from_slice(&[0x09, 0x5e, 0xa7, 0xb3]);
         calldata.extend_from_slice(&[0u8; 12]);
         calldata.extend_from_slice(spender.as_bytes());
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
         calldata
     }

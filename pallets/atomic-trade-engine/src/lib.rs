@@ -68,7 +68,7 @@ pub use runtime_api::*;
 pub use types::{AmmProtocol, VmType};
 pub use weights::WeightInfo;
 
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{
     pallet_prelude::*,
     traits::{Currency, UnixTime},

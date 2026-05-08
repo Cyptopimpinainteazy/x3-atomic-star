@@ -270,7 +270,14 @@ parameter_types! {
     pub const DaRetentionBlocks: BlockNumber = 432_000;
 }
 
-#[cfg(feature = "dev")]
+// construct_runtime! is split into four explicit variants (dev×frontier) because
+// the stable2512 proc-macro does NOT evaluate #[cfg(feature)] inside its body —
+// it generates references to all listed pallets unconditionally. Optional deps
+// (pallet-evm/pallet-ethereum) that are absent when `frontier` is off would
+// cause unresolvable-crate errors. Four blocks avoids any #[cfg] inside the macro.
+
+// ── dev + no-frontier (local devnet with sudo, EVM stack excluded) ───────────
+#[cfg(all(feature = "dev", not(feature = "frontier")))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -314,14 +321,61 @@ construct_runtime!(
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
-        #[cfg(feature = "frontier")]
+    }
+);
+
+// ── dev + frontier (local devnet with sudo AND EVM stack) ────────────────────
+#[cfg(all(feature = "dev", feature = "frontier"))]
+construct_runtime!(
+    pub enum Runtime {
+        System: frame_system,
+        Timestamp: pallet_timestamp,
+        Aura: pallet_aura,
+        Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
+        Balances: pallet_balances,
+        TransactionPayment: pallet_transaction_payment,
+        Scheduler: pallet_scheduler,
+        Preimage: pallet_preimage,
+        AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
+        X3Coin: pallet_x3_coin,
+        AtomicTradeEngine: pallet_atomic_trade_engine,
+        Council: pallet_collective::<Instance1>,
+        Sudo: pallet_sudo,
+        Governance: pallet_governance,
+        Treasury: pallet_treasury,
+        AgentAccounts: pallet_agent_accounts,
+        AgentMemory: pallet_agent_memory,
+        EvolutionCore: pallet_evolution_core,
+        X3Verifier: pallet_x3_verifier,
+        X3DomainRegistry: pallet_x3_domain_registry,
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3TokenFactory: pallet_x3_token_factory,
+        X3AccountRegistry: pallet_x3_account_registry,
+        CrossChainValidator: pallet_cross_chain_validator,
+        X3SettlementEngine: pallet_x3_settlement_engine,
+        Swarm: pallet_swarm,
+        DepinMarketplace: pallet_depin_marketplace,
+        PrivateExecution: pallet_private_execution,
+        FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Sequencer: pallet_x3_sequencer,
+        X3Da: pallet_x3_da,
+        X3Oracle: pallet_x3_oracle,
+        X3Vrf: pallet_x3_vrf,
+        X3Dex: pallet_x3_dex,
+        X3Automation: pallet_x3_automation,
         Evm: pallet_evm,
-        #[cfg(feature = "frontier")]
         Ethereum: pallet_ethereum,
     }
 );
 
-#[cfg(not(feature = "dev"))]
+// ── production + no-frontier (RC1 default: no sudo, no EVM stack) ────────────
+#[cfg(all(not(feature = "dev"), not(feature = "frontier")))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -365,9 +419,55 @@ construct_runtime!(
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
-        #[cfg(feature = "frontier")]
+    }
+);
+
+// ── production + frontier (post-RC1: no sudo, full EVM stack) ────────────────
+#[cfg(all(not(feature = "dev"), feature = "frontier"))]
+construct_runtime!(
+    pub enum Runtime {
+        System: frame_system,
+        Timestamp: pallet_timestamp,
+        Aura: pallet_aura,
+        Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
+        Balances: pallet_balances,
+        TransactionPayment: pallet_transaction_payment,
+        Scheduler: pallet_scheduler,
+        Preimage: pallet_preimage,
+        AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
+        X3Coin: pallet_x3_coin,
+        AtomicTradeEngine: pallet_atomic_trade_engine,
+        Council: pallet_collective::<Instance1>,
+        Governance: pallet_governance,
+        Treasury: pallet_treasury,
+        AgentAccounts: pallet_agent_accounts,
+        AgentMemory: pallet_agent_memory,
+        EvolutionCore: pallet_evolution_core,
+        X3Verifier: pallet_x3_verifier,
+        X3DomainRegistry: pallet_x3_domain_registry,
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3TokenFactory: pallet_x3_token_factory,
+        X3AccountRegistry: pallet_x3_account_registry,
+        CrossChainValidator: pallet_cross_chain_validator,
+        X3SettlementEngine: pallet_x3_settlement_engine,
+        Swarm: pallet_swarm,
+        DepinMarketplace: pallet_depin_marketplace,
+        PrivateExecution: pallet_private_execution,
+        FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Sequencer: pallet_x3_sequencer,
+        X3Da: pallet_x3_da,
+        X3Oracle: pallet_x3_oracle,
+        X3Vrf: pallet_x3_vrf,
+        X3Dex: pallet_x3_dex,
+        X3Automation: pallet_x3_automation,
+        X3Consensus: pallet_x3_consensus,
         Evm: pallet_evm,
-        #[cfg(feature = "frontier")]
         Ethereum: pallet_ethereum,
     }
 );

@@ -308,6 +308,8 @@ pub mod pallet {
 
 use frame_support::{ensure, pallet_prelude::DispatchResult, traits::{Currency, Get, ReservableCurrency}};
 use parity_scale_codec::Encode;
+use sp_std::vec::Vec;
+use sp_std::vec;
 use sp_core::H256;
 use sp_runtime::{traits::SaturatedConversion, DispatchError};
 use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId};

@@ -761,8 +761,8 @@ impl RelayerSafetyPipeline {
             Ok(())
         } else {
             Err(format!(
-                "risk_gate_blocked: tier={:?}, reason={}",
-                decision.tier, decision.reason
+                "risk_gate_blocked: reason={}",
+                decision.reason
             ))
         }
     }

@@ -3,7 +3,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
 

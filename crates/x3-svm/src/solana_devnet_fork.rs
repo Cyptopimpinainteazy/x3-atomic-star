@@ -1,7 +1,7 @@
 /// Solana Devnet Fork — Test environment pointing at X3 with full Solana compatibility
 /// Allows testing Solana programs against X3 SVM with deterministic state snapshots
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

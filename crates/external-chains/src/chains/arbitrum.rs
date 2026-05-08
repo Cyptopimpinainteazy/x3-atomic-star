@@ -58,8 +58,7 @@ impl ArbitrumAdapter {
         calldata.extend_from_slice(to.as_bytes());
 
         // Amount (32 bytes)
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
 
         // Data offset

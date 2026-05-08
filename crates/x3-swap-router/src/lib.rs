@@ -4,7 +4,7 @@
 //!
 //! DEX swap routing with AI-powered optimization using oracle price data.
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::U256;
 use sp_std::vec::Vec;
@@ -97,7 +97,7 @@ impl AiRouteOptimizer {
             let mut score = 0u64;
 
             // Lower price impact is better
-            let impact_penalty = route.price_impact.saturated_into::<u64>().min(10000);
+            let impact_penalty = route.price_impact.low_u64().min(10000);
             score += 10000 - impact_penalty;
 
             // Higher confidence is better
@@ -106,10 +106,10 @@ impl AiRouteOptimizer {
             // Oracle price alignment (simplified)
             if let (Some(fp), Some(tp)) = (from_price, to_price) {
                 let expected_output = amount_in
-                    .saturated_into::<u128>()
+                    .low_u128()
                     .saturating_mul(tp as u128)
                     .saturating_div(fp as u128);
-                let actual_output = route.total_output.saturated_into::<u128>();
+                let actual_output = route.total_output.low_u128();
 
                 if actual_output >= expected_output {
                     score += 1000; // Bonus for better than oracle price

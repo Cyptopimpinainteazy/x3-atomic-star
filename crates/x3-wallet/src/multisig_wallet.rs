@@ -1,6 +1,6 @@
 /// Multisig Wallet Engine — M-of-N signature consensus for DAO treasuries
 /// Threshold-based approvals with timelock and quorum tracking
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

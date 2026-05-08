@@ -83,8 +83,7 @@ impl PolygonAdapter {
         calldata.extend_from_slice(&[0x2e, 0x1a, 0x7d, 0x4d]);
 
         // Amount
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
 
         calldata

@@ -8,6 +8,8 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*};
 use std::collections::VecDeque;
 #[cfg(not(feature = "std"))]
 use alloc::collections::VecDeque;
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
 
 /// Pool for routing
 #[derive(Clone, Debug)]

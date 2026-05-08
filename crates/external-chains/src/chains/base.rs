@@ -337,8 +337,7 @@ impl ChainAdapter for BaseAdapter {
             calldata.extend_from_slice(&[0u8; 12]);
             calldata.extend_from_slice(transfer.dest_token.as_bytes());
             // amount (as u256 big-endian)
-            let mut amount_bytes = [0u8; 32];
-            transfer.amount.to_big_endian(&mut amount_bytes);
+            let amount_bytes = transfer.amount.to_big_endian();
             calldata.extend_from_slice(&amount_bytes);
             // min gas limit
             calldata.extend_from_slice(&[0u8; 28]);

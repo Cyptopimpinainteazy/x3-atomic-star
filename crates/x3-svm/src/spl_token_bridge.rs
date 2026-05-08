@@ -1,7 +1,7 @@
 /// SPL Token Bridging — 1:1 token wrapping between Solana and X3 with deterministic mint derivation
 /// Enables seamless cross-chain token transfers: Solana SPL ↔ X3 wrapped tokens
 
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 use sp_core::H256;
 

@@ -1,6 +1,6 @@
 /// Token Manager — ERC-20-like token tracking and whitelist management
 /// Track balances, whitelist tokens, detect spam
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

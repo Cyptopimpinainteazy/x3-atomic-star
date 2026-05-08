@@ -12,7 +12,7 @@
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::{H160, H256, U256};
 

@@ -115,7 +115,7 @@ sp-std = { workspace = true, default-features = false }
 sp-transaction-pool = { workspace = true, default-features = false }
 sp-version = { workspace = true, default-features = false, features = ["serde"] }
 sp-weights = { workspace = true, default-features = false }
-sp-io = { workspace = true, default-features = false, features = ["disable_panic_handler"] }
+sp-io = { workspace = true, default-features = false }
 
 frame-system-rpc-runtime-api = { workspace = true, default-features = false }
 

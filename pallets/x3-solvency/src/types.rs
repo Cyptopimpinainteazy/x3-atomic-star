@@ -1,4 +1,4 @@
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{BoundedVec, Parameter};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;

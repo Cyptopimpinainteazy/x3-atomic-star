@@ -24,7 +24,7 @@ mod tests;
 #[cfg(test)]
 mod mock;
 
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::*;
 use frame_support::traits::UnixTime;
 use frame_system::pallet_prelude::*;

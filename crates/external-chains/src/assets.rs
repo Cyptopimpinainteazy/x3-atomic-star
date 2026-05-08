@@ -4,7 +4,7 @@
 //! Handles asset mapping, mirroring, and cross-chain token equivalence.
 
 use crate::ChainType;
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::{H160, H256, U256};
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};

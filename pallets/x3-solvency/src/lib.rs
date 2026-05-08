@@ -496,7 +496,7 @@ pub mod pallet {
 // GateKind helper — keeps events human-readable
 // ──────────────────────────────────────────────
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 

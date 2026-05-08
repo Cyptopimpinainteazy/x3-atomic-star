@@ -10,9 +10,17 @@ export default defineConfig({
     react(),
   ],
   optimizeDeps: {
-    // Avoid dependency discovery to reduce Rolldown pre-bundle issues in Vite 8.
-    noDiscovery: true,
-    include: ["buffer", "process"],
+    include: [
+      "buffer",
+      "cookie",
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react-router",
+      "react-router-dom",
+      "zustand",
+      "use-sync-external-store/shim/with-selector",
+    ],
   },
   define: {
     global: "globalThis",
@@ -28,6 +36,7 @@ export default defineConfig({
   clearScreen: false,
   server: {
     port: 5173,
+    strictPort: true,
     // Allow connections from Cloudflare Tunnel and local Tauri
     host: host || "0.0.0.0",
     hmr: host ? { protocol: "ws", host, port: 5173 } : undefined,

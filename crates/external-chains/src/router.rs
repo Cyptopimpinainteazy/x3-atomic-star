@@ -662,8 +662,7 @@ impl ProductionRouter {
 
     fn encode_swap_payload(&self, leg: &RouteLeg, _sender: H160, amount: U256) -> ComitPayload {
         let mut calldata = vec![0x38, 0xed, 0x17, 0x39];
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
         calldata.extend_from_slice(&[0u8; 32]);
 
@@ -685,8 +684,7 @@ impl ProductionRouter {
     ) -> ComitPayload {
         let mut calldata = vec![0xBB, 0xBB, 0xBB, 0xBB];
         calldata.extend_from_slice(recipient.as_bytes());
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
         calldata.extend_from_slice(&leg.to_chain.to_be_bytes());
 
@@ -711,8 +709,7 @@ impl ProductionRouter {
 
     fn encode_unwrap_payload(&self, leg: &RouteLeg, amount: U256) -> ComitPayload {
         let mut calldata = vec![0x2e, 0x1a, 0x7d, 0x4d];
-        let mut amount_bytes = [0u8; 32];
-        amount.to_big_endian(&mut amount_bytes);
+        let amount_bytes = amount.to_big_endian();
         calldata.extend_from_slice(&amount_bytes);
 
         ComitPayload {
