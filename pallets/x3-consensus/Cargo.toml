@@ -24,6 +24,7 @@ pallet-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "st
 pallet-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 pallet-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 pallet-offences = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
@@ -44,6 +45,7 @@ std = [
 	"pallet-grandpa/std",
 	"pallet-session/std",
 	"pallet-offences/std",
+	"log/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking",

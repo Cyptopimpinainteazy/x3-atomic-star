@@ -7,6 +7,8 @@
 //! and slashing for consensus violations.
 
 pub use pallet::*;
+// Re-export the log crate so the outer SessionManager impl can use it.
+use log;
 
 #[cfg(test)]
 mod mock;
@@ -240,6 +242,46 @@ pub mod pallet {
         pub fn is_validator(who: &T::AccountId) -> bool {
             Validators::<T>::get().contains(who)
         }
+    }
+}
+
+/// Implement `pallet_session::SessionManager` so the session pallet calls into this pallet
+/// at every session boundary to obtain the next validator set.
+///
+/// This must live **outside** the `#[frame_support::pallet]` macro block so it is not subject
+/// to FRAME's attribute-macro rewriting.
+impl<T: Config> pallet_session::SessionManager<T::AccountId> for Pallet<T> {
+    /// Called by `pallet_session` before a new session begins.
+    ///
+    /// Returns `Some(validators)` when a queued validator set is ready to be activated
+    /// (i.e., `ValidatorSetActivationBlock` has been set and the current block number is
+    /// at or past that block).  Returns `None` to keep the existing set unchanged.
+    fn new_session(new_index: u32) -> Option<Vec<T::AccountId>> {
+        let current_block = frame_system::Pallet::<T>::block_number();
+        if let Some(activation_block) = ValidatorSetActivationBlock::<T>::get() {
+            if current_block >= activation_block {
+                let next = NextValidators::<T>::get().into_inner();
+                if !next.is_empty() {
+                    log::info!(
+                        target: "x3-consensus",
+                        "📋 Session {} activating queued validator set ({} validators)",
+                        new_index,
+                        next.len()
+                    );
+                    return Some(next);
+                }
+            }
+        }
+        None
+    }
+
+    fn end_session(_end_index: u32) {
+        // No cleanup needed; ValidatorSetActivationBlock is cleared in on_initialize
+        // after the set is activated.
+    }
+
+    fn start_session(_start_index: u32) {
+        // Nothing to do at session start; new validators were already returned in new_session.
     }
 }
 

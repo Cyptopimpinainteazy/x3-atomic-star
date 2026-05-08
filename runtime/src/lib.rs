@@ -673,7 +673,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = sp_runtime::traits::ConvertInto;
     type ShouldEndSession = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
     type NextSessionRotation = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
-    type SessionManager = ();
+    type SessionManager = X3Consensus;
     type SessionHandler = <SessionKeys as sp_runtime::traits::OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type WeightInfo = pallet_session::weights::SubstrateWeight<Self>;

@@ -12409,6 +12409,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "log",
  "pallet-aura",
  "pallet-grandpa",
  "pallet-offences",
