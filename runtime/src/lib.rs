@@ -652,7 +652,7 @@ impl pallet_aura::Config for Runtime {
     type AuthorityId = sp_consensus_aura::sr25519::AuthorityId;
     type MaxAuthorities = MaxAuthorities;
     type DisabledValidators = ();
-    type AllowMultipleBlocksPerSlot = ConstBool<true>; // Enable multiple blocks per slot for higher TPS
+    type AllowMultipleBlocksPerSlot = ConstBool<false>; // Single block per slot: stable consensus for mainnet
     type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
 
