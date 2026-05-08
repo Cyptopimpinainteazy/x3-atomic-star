@@ -108,17 +108,56 @@ fn load_bootnodes() -> Vec<sc_network::config::MultiaddrWithPeerId> {
             .collect();
     }
 
-    let info_path = PathBuf::from("deployment/keys/bootnode-info.txt");
-    let Ok(contents) = std::fs::read_to_string(info_path) else {
-        return Vec::new();
-    };
+    for path in candidate_bootnode_info_paths() {
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            return parse_bootnode_info(&contents);
+        }
+    }
 
+    Vec::new()
+}
+
+fn candidate_bootnode_info_paths() -> Vec<PathBuf> {
+    let mut candidates = vec![PathBuf::from("deployment/keys/bootnode-info.txt")];
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.join("deployment/keys/bootnode-info.txt"));
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join("deployment/keys/bootnode-info.txt"));
+            candidates.push(exe_dir.join("../deployment/keys/bootnode-info.txt"));
+            candidates.push(exe_dir.join("../../deployment/keys/bootnode-info.txt"));
+        }
+    }
+
+    candidates
+}
+
+fn parse_bootnode_info(contents: &str) -> Vec<sc_network::config::MultiaddrWithPeerId> {
     contents
         .lines()
         .map(str::trim)
         .filter(|line| line.starts_with("/ip4/") || line.starts_with("/dns"))
         .filter_map(|line| line.parse::<sc_network::config::MultiaddrWithPeerId>().ok())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_bootnodes_prefers_env_override() {
+        std::env::set_var(
+            "TESTNET_BOOTNODES",
+            "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWQFqC8XGZQ7ZV2gASVxE4xNDK1YtaY6QLdMqkAxE6Y9S3",
+        );
+        let bootnodes = load_bootnodes();
+        std::env::remove_var("TESTNET_BOOTNODES");
+        assert_eq!(bootnodes.len(), 1);
+    }
 }
 
 fn assert_no_forbidden_live_seed() -> Result<(), String> {

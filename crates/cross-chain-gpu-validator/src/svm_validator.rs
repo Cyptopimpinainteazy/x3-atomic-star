@@ -65,7 +65,7 @@ impl SvmHeaderValidator {
     fn validate_basic_fields(
         &self,
         slot: u64,
-        block_hash: [u8; 32],
+        _block_hash: [u8; 32],
         state_root: [u8; 32],
         parent_slot: u64,
         timestamp: u64,

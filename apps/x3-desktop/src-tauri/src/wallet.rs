@@ -6,6 +6,7 @@ use sp_core::{sr25519, Pair};
 use sp_core::crypto::Ss58Codec;
 use solana_sdk::signature::{Keypair, SeedDerivable, Signer};
 use bs58;
+use std::sync::{Mutex, OnceLock};
 use tauri::{command, AppHandle, Emitter, State};
 use crate::wallet_core::substrate_hook::{SubstrateHookManager, SubstrateHookEvent};
 
@@ -120,31 +121,87 @@ pub fn get_evm_chain_count() -> usize {
 }
 
 #[command]
-pub async fn store_wallet_secure(_wallet: UniversalWallet) -> Result<(), WalletError> {
-    // Use Tauri's store plugin for secure storage
-    // For now, placeholder - in production would encrypt and store
-    Ok(())
+pub async fn store_wallet_secure(wallet: UniversalWallet) -> Result<(), WalletError> {
+    let master_password = std::env::var("X3_WALLET_MASTER_PASSWORD").map_err(|_| {
+        WalletError::CryptoError(
+            "X3_WALLET_MASTER_PASSWORD is required for secure wallet storage".to_string(),
+        )
+    })?;
+
+    let mut store = wallet_store()
+        .lock()
+        .map_err(|e| WalletError::CryptoError(format!("Wallet store lock poisoned: {}", e)))?;
+    let wallet_id = format!(
+        "wallet_{}",
+        hex::encode(sp_core::hashing::keccak_256(wallet.substrate_address.as_bytes()))[0..16]
+            .to_uppercase()
+    );
+
+    store
+        .store_wallet(
+            &wallet_id,
+            &wallet.mnemonic,
+            &wallet.seed_hex,
+            "m/44'/354'/0'/0/0",
+            &master_password,
+        )
+        .map_err(|e| WalletError::CryptoError(format!("Failed to store wallet: {}", e)))
 }
 
 #[command]
-pub async fn get_wallet_balance(_chain_id: String, _address: String) -> Result<String, WalletError> {
-    // Use blockchain connector to fetch balance
-    // Placeholder - would integrate with ChainDB
-    Ok("0.0".to_string())
+pub async fn get_wallet_balance(chain_id: String, address: String) -> Result<String, WalletError> {
+    let params = serde_json::json!({
+        "wallet_id": address,
+        "token_id": serde_json::Value::Null,
+        "network": chain_id,
+    });
+
+    let result = crate::rpc_call("wallet_getBalance", params)
+        .await
+        .ok_or_else(|| WalletError::CryptoError("Failed to query wallet balance".to_string()))?;
+
+    Ok(result.to_string())
 }
 
 #[command]
-pub async fn submit_cross_swap(_from_chain: String, _to_chain: String, _amount: String) -> Result<String, WalletError> {
-    // Integrate with Comit v2 for atomic swaps
-    // Placeholder
-    Ok("swap_tx_hash".to_string())
+pub async fn submit_cross_swap(from_chain: String, to_chain: String, amount: String) -> Result<String, WalletError> {
+    let amount_in = amount
+        .parse::<u128>()
+        .map_err(|e| WalletError::CryptoError(format!("Invalid amount: {}", e)))?;
+
+    let token_in = sp_core::hashing::blake2_256(from_chain.as_bytes());
+    let token_out = sp_core::hashing::blake2_256(to_chain.as_bytes());
+
+    let params = serde_json::json!({
+        "token_in": format!("0x{}", hex::encode(token_in)),
+        "token_out": format!("0x{}", hex::encode(token_out)),
+        "amount_in": amount_in.to_string(),
+        "min_amount_out": amount_in.to_string(),
+        "wallet_id": format!("0x{}", hex::encode([0u8; 32])),
+        "require_approval": false,
+        "approval_threshold": "0",
+    });
+
+    let result = crate::rpc_call("walletDex_executeSwap", params)
+        .await
+        .ok_or_else(|| WalletError::CryptoError("Failed to submit cross swap".to_string()))?;
+
+    Ok(result.to_string())
 }
 
 #[command]
-pub async fn execute_x3_script(_script: String, _wallet: UniversalWallet) -> Result<String, WalletError> {
-    // Execute x3-lang script with wallet context
-    // Placeholder
-    Ok("execution_result".to_string())
+pub async fn execute_x3_script(script: String, _wallet: UniversalWallet) -> Result<String, WalletError> {
+    if !script.starts_with("0x") {
+        return Err(WalletError::CryptoError(
+            "script must be SCALE-encoded extrinsic bytes (0x-prefixed)".to_string(),
+        ));
+    }
+
+    let result = crate::rpc_call("author_submitExtrinsic", serde_json::json!([script]))
+        .await
+        .ok_or_else(|| WalletError::CryptoError("Failed to execute x3 script".to_string()))?;
+
+    Ok(result.to_string())
 }
 
 #[command]
@@ -247,6 +304,16 @@ pub async fn unregister_substrate_hook(hook_id: String, state: State<'_, crate::
 
 use crate::wallet_core::wallet_store::WalletStore;
 
+static WALLET_STORE: OnceLock<Mutex<WalletStore>> = OnceLock::new();
+
+fn wallet_store() -> &'static Mutex<WalletStore> {
+    WALLET_STORE.get_or_init(|| {
+        let mut store = WalletStore::new();
+        store.initialize();
+        Mutex::new(store)
+    })
+}
+
 #[command]
 pub async fn store_wallet_encrypted(
     wallet_id: String,
@@ -255,7 +322,9 @@ pub async fn store_wallet_encrypted(
     derivation_path: String,
     master_password: String,
 ) -> Result<(), String> {
-    let mut store = WalletStore::new();
+    let mut store = wallet_store()
+        .lock()
+        .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .store_wallet(&wallet_id, &mnemonic, &seed, &derivation_path, &master_password)
         .map_err(|e| format!("Failed to store wallet: {}", e))
@@ -263,7 +332,9 @@ pub async fn store_wallet_encrypted(
 
 #[command]
 pub async fn retrieve_wallet_encrypted(wallet_id: String, master_password: String) -> Result<String, String> {
-    let mut store = WalletStore::new();
+    let store = wallet_store()
+        .lock()
+        .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .retrieve_wallet(&wallet_id, &master_password)
         .map(|(mnemonic, seed)| format!("{{\"wallet_id\": \"{}\", \"mnemonic\": \"{}\", \"seed\": \"{}\"}}", wallet_id, mnemonic, seed))
@@ -272,7 +343,9 @@ pub async fn retrieve_wallet_encrypted(wallet_id: String, master_password: Strin
 
 #[command]
 pub async fn delete_wallet(wallet_id: String) -> Result<(), String> {
-    let mut store = WalletStore::new();
+    let mut store = wallet_store()
+        .lock()
+        .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .delete_wallet(&wallet_id)
         .map_err(|e| format!("Failed to delete wallet: {}", e))
@@ -280,7 +353,9 @@ pub async fn delete_wallet(wallet_id: String) -> Result<(), String> {
 
 #[command]
 pub async fn export_wallet_backup(wallet_id: String) -> Result<String, String> {
-    let mut store = WalletStore::new();
+    let store = wallet_store()
+        .lock()
+        .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .export_backup(&wallet_id)
         .map_err(|e| format!("Failed to export wallet backup: {}", e))
@@ -288,7 +363,9 @@ pub async fn export_wallet_backup(wallet_id: String) -> Result<String, String> {
 
 #[command]
 pub async fn import_wallet_backup(backup: String) -> Result<String, String> {
-    let mut store = WalletStore::new();
+    let mut store = wallet_store()
+        .lock()
+        .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .import_backup(&backup)
         .map(|wallet_id| format!("{{\"wallet_id\": \"{}\", \"status\": \"imported\"}}", wallet_id))
@@ -301,58 +378,69 @@ pub async fn import_wallet_backup(backup: String) -> Result<String, String> {
 
 #[command]
 pub async fn query_block(block_number: Option<u64>, block_hash: Option<String>) -> Result<String, String> {
-    let method = if block_hash.is_some() {
-        "chain_getBlock"
-    } else {
-        "chain_getBlockHash"
-    };
-    let params = if let Some(number) = block_number {
-        serde_json::json!([number])
-    } else if let Some(hash) = block_hash.as_ref() {
-        serde_json::json!([hash])
-    } else {
-        serde_json::json!([])
-    };
-    match crate::rpc_call(method, params).await {
+    if let Some(hash) = block_hash {
+        return match crate::rpc_call("chain_getBlock", serde_json::json!([hash])).await {
+            Some(result) => Ok(result.to_string()),
+            None => Err("Failed to query block by hash".to_string()),
+        };
+    }
+
+    if let Some(number) = block_number {
+        let hash = crate::rpc_call("chain_getBlockHash", serde_json::json!([number]))
+            .await
+            .ok_or_else(|| "Failed to resolve block hash".to_string())?;
+        return match crate::rpc_call("chain_getBlock", serde_json::json!([hash])).await {
+            Some(result) => Ok(result.to_string()),
+            None => Err("Failed to query block by number".to_string()),
+        };
+    }
+
+    match crate::rpc_call("chain_getBlock", serde_json::json!([])).await {
         Some(result) => Ok(result.to_string()),
-        None => Err("Failed to query block".to_string()),
+        None => Err("Failed to query latest block".to_string()),
     }
 }
 
 #[command]
 pub async fn query_account(address: String, at_block: Option<u64>) -> Result<String, String> {
-    let at_param = if let Some(block) = at_block {
+    let _at_param = if let Some(block) = at_block {
         serde_json::json!([format!("0x{:x}", block)])
     } else {
         serde_json::json!([])
     };
-    
-    // First get nonce
+
+    // Get nonce first.
     let nonce_result = crate::rpc_call("system_accountNextIndex", serde_json::json!([address])).await;
     let nonce = if let Some(n) = nonce_result {
         n.as_u64().unwrap_or(0)
     } else {
         0
     };
-    
-    // Then get balance from storage
-    let balance_result = crate::rpc_call("state_getStorage", serde_json::json!(["0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9", address])).await;
-    let balance = if let Some(b) = balance_result {
-        b.to_string()
-    } else {
-        "0".to_string()
-    };
-    
+
+    // Query canonical balance through wallet RPC using the structured request expected by the node.
+    let balance_params = serde_json::json!({
+        "wallet_id": address,
+        "token_id": serde_json::Value::Null,
+        "network": "local",
+    });
+    let balance_result = crate::rpc_call("wallet_getBalance", balance_params).await;
+    let balance = balance_result.unwrap_or_else(|| serde_json::json!({}));
+
     serde_json::to_string(&serde_json::json!({
         "address": address,
         "nonce": nonce,
-        "free": balance
+        "balance": balance
     })).map_err(|e| format!("Failed to serialize account: {}", e))
 }
 
 #[command]
 pub async fn query_balance(address: String, asset_id: Option<String>) -> Result<String, String> {
-    match crate::rpc_call("wallet_getBalance", serde_json::json!([address])).await {
+    let params = serde_json::json!({
+        "wallet_id": address,
+        "token_id": asset_id,
+        "network": "local",
+    });
+    match crate::rpc_call("wallet_getBalance", params).await {
         Some(result) => Ok(result.to_string()),
         None => Err("Failed to query balance".to_string()),
     }

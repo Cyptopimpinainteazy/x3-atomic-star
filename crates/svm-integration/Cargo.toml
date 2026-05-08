@@ -45,3 +45,4 @@ std = [
     "log/std",
     "solana_rbpf",
 ]
+test-utils = []

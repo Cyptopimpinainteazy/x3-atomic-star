@@ -2139,6 +2139,7 @@ checksum = "1bc2832c24239b0141d5674bb9174f9d68a8b5b3f2753311927c172ca46f7e9c"
 dependencies = [
  "funty",
  "radium",
+ "serde",
  "tap",
  "wyz",
 ]
@@ -6261,7 +6262,6 @@ dependencies = [
 [[package]]
 name = "frame-storage-access-test-runtime"
 version = "0.6.0"
-source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#3009eb276204ca587da5f931331f5ecda15bc8c6"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "parity-scale-codec",
@@ -26220,6 +26220,7 @@ dependencies = [
 name = "x3-chain-runtime"
 version = "0.1.0"
 dependencies = [
+ "bitvec",
  "fp-ethereum",
  "fp-evm",
  "frame-executive",
@@ -27175,6 +27176,7 @@ name = "x3-swap-router"
 version = "0.1.0"
 dependencies = [
  "parity-scale-codec",
+ "proptest",
  "scale-info",
  "sp-core",
  "sp-io",

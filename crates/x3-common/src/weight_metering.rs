@@ -26,7 +26,6 @@
 //! let cost = costs.signing_ed25519(); // Get ed25519 signing cost
 //! ```
 
-use sp_std::vec::Vec;
 extern crate alloc;
 use alloc::string::String;
 

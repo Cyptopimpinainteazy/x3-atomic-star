@@ -10,8 +10,6 @@ extern crate alloc;
 
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
-use sp_std::vec;
-use sp_std::vec::Vec;
 
 /// Real BPF execution module (std only – uses solana-rbpf JIT/ELF loader)
 #[cfg(feature = "std")]
@@ -244,12 +242,12 @@ pub trait SvmExecutor {
 }
 
 /// Real SVM executor using solana-rbpf (replaces mock for testing)
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 pub struct MockSvmExecutor {
     inner: RbpfSvmExecutor,
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 impl MockSvmExecutor {
     /// Create a new mock executor that delegates to real RbpfSvmExecutor
     pub fn new() -> Self {
@@ -259,14 +257,14 @@ impl MockSvmExecutor {
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 impl Default for MockSvmExecutor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 impl SvmExecutor for MockSvmExecutor {
     fn execute(
         &self,
@@ -460,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_mock_executor_success() {
-        let executor = MockSvmExecutor;
+        let executor = MockSvmExecutor::new();
         let instruction = SvmInstruction {
             program_id: [1u8; 32],
             accounts: vec![],
@@ -473,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_mock_executor_invalid_program_id() {
-        let executor = MockSvmExecutor;
+        let executor = MockSvmExecutor::new();
         let instruction = SvmInstruction {
             program_id: [0u8; 32], // zero = invalid
             accounts: vec![],
@@ -485,14 +483,14 @@ mod tests {
 
     #[test]
     fn test_mock_executor_bpf() {
-        let executor = MockSvmExecutor;
+        let executor = MockSvmExecutor::new();
         let result = executor.execute_bpf(&[0x79, 0x00], &[], &SvmConfig::default());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_mock_executor_empty_program() {
-        let executor = MockSvmExecutor;
+        let executor = MockSvmExecutor::new();
         let result = executor.execute_bpf(&[], &[], &SvmConfig::default());
         assert_eq!(result, Err(SvmError::InvalidPayload));
     }

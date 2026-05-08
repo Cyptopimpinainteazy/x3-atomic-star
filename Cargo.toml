@@ -173,7 +173,8 @@ resolver = "2"
 # - tempfile 3.8.1: uses compatible rustix
 # - errno 0.3.14: patched to provide stub implementation for wasm32
 #[patch.crates-io]
-trie-db = { version = "0.31.0", default-features = false }
+# NOTE: do not place `trie-db` directly under `[workspace]`; that triggers
+# `unused manifest key: workspace.trie-db` warnings on every cargo invocation.
 
 
 # Unified Substrate patch block is defined further down in this file
@@ -204,7 +205,7 @@ anyhow = { version = "1.0", default-features = false }
 tokio = { version = "1.0", features = ["full"], default-features = false }
 
 # Force trie-db 0.31.0 to evict 0.30.0 (future-incompat fix)
-trie-db = { version = "0.31.0", default-features = false }
+# Removed unused workspace dependency entry; `trie-db` is pinned via the patch block instead.
 
 # Common FRAME & Substrate workspace deps (referenced with `workspace = true` in members)
 frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, features = ["experimental"] }
@@ -414,6 +415,9 @@ sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 # Patch polkadot-sdk with local modifications for prometheus fix and executor bulk-memory support
 [patch."https://github.com/paritytech/polkadot-sdk"]
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+# X3 patch: avoid wasm-builder metadata panic in transitive benchmark helper runtime
+# used by frame-benchmarking-cli. The local patch emits a stub WASM_BINARY by default.
+frame-storage-access-test-runtime = { path = "patches/frame-storage-access-test-runtime" }
 # X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
 # that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std
 # wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under

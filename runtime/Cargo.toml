@@ -120,6 +120,8 @@ sp-io = { workspace = true, default-features = false }
 frame-system-rpc-runtime-api = { workspace = true, default-features = false }
 
 serde = { workspace = true, default-features = false, features = ["alloc", "derive"] }
+# Force bitvec serde support for NodeFeatures while staying no_std-compatible in wasm builds.
+bitvec = { version = "1", default-features = false, features = ["alloc", "serde"] }
 # Local X3 Chain EVM integration utilities (Frontier temporarily removed)
 # x3-evm-integration = { path = "../crates/evm-integration", default-features = false }
 

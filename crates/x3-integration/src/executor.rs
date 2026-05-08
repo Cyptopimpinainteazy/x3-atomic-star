@@ -4,7 +4,7 @@
 //! the X3 Kernel pallet's execution interface.
 
 #[cfg(not(feature = "std"))]
-use alloc::{format, string::ToString, vec, vec::Vec};
+use alloc::{format, vec, vec::Vec};
 
 use sp_core::H256;
 

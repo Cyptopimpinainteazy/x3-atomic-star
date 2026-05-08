@@ -24,3 +24,6 @@ std = [
     "sp-runtime/std",
     "sp-std/std",
 ]
+
+[dev-dependencies]
+proptest = "1.4"

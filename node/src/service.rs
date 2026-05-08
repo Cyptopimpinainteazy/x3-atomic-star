@@ -1365,12 +1365,13 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
                                 // Safety: prevent infinite restart loops beyond threshold
                                 if restart_count > 20 {
                                     log::error!(
-                                        "❌ {} exceeded restart threshold (20); giving up",
+                                        "❌ {} exceeded restart threshold (20); giving up. \
+                                         Node continuing in degraded mode without sidecar.",
                                         sidecar_task_name
                                     );
-                                    panic!(
-                                        "Sidecar service crashed 20 times; node is unrecoverable"
-                                    );
+                                    // Gracefully exit the restart loop; node continues without
+                                    // the sidecar (degraded mode). Do NOT panic the node process.
+                                    break;
                                 }
                             }
                         }
@@ -1403,8 +1404,14 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
                         log::info!("🌐 Cross-chain GPU validator loop completed");
                     }
                     Err(e) => {
-                        log::error!("🌐 Cross-chain GPU validator loop error: {:?}", e);
-                        panic!("Cross-chain validator critical failure: {}", e);
+                        log::error!(
+                            "🌐 Cross-chain GPU validator loop error: {:?}. \
+                             Node continuing in degraded mode without GPU validation.",
+                            e
+                        );
+                        // Return gracefully; do NOT panic the node process. GPU validation
+                        // is a non-essential service — the node can operate without it.
+                        return;
                     }
                 }
             }),

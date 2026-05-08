@@ -2,8 +2,14 @@
 
 use super::*;
 use crate::Pallet as VrfPallet;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::v2::*;
+use frame_support::{
+    assert_ok,
+    traits::{Currency, Get},
+};
 use frame_system::RawOrigin;
+use sp_runtime::traits::Saturating;
+use sp_std::vec;
 
 #[benchmarks]
 mod benchmarks {
@@ -16,7 +22,7 @@ mod benchmarks {
         let max_fee = T::BaseFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance
-        let _ = T::Currency::make_free_balance_be(&caller, max_fee.saturating_mul(2u32.into()));
+        let _ = T::Currency::make_free_balance_be(&caller, max_fee.saturating_mul(2u32.into()).into());
 
         #[extrinsic_call]
         request_randomness(RawOrigin::Signed(caller), seed, max_fee);
@@ -30,16 +36,16 @@ mod benchmarks {
         let max_fee = T::BaseFee::get().saturating_mul(2u32.into());
 
         // Give requester enough balance
-        let _ = T::Currency::make_free_balance_be(&requester, max_fee.saturating_mul(2u32.into()));
+        let _ = T::Currency::make_free_balance_be(&requester, max_fee.saturating_mul(2u32.into()).into());
 
         // Create a request
         assert_ok!(VrfPallet::<T>::request_randomness(
-            RawOrigin::Signed(requester).into(),
+            RawOrigin::Signed(requester.clone()).into(),
             seed.clone(),
             max_fee
         ));
 
-        let request_id = VrfPallet::<T>::account_requests(requester)[0];
+        let request_id = crate::pallet::AccountRequests::<T>::get(requester)[0];
 
         #[extrinsic_call]
         fulfill_randomness(RawOrigin::Signed(caller), request_id);
@@ -56,12 +62,12 @@ mod benchmarks {
 
         // Create a request
         assert_ok!(VrfPallet::<T>::request_randomness(
-            RawOrigin::Signed(caller).into(),
+            RawOrigin::Signed(caller.clone()).into(),
             seed,
             max_fee
         ));
 
-        let request_id = VrfPallet::<T>::account_requests(caller)[0];
+        let request_id = crate::pallet::AccountRequests::<T>::get(caller.clone())[0];
 
         #[extrinsic_call]
         cancel_randomness(RawOrigin::Signed(caller), request_id);

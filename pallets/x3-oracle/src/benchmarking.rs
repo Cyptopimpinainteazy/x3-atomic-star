@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::Pallet as OraclePallet;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 
 #[benchmarks]
@@ -11,7 +11,6 @@ mod benchmarks {
 
     #[benchmark]
     fn authorize_oracle() {
-        let caller: T::AccountId = whitelisted_caller();
         let account: T::AccountId = whitelisted_caller();
 
         #[extrinsic_call]
@@ -22,10 +21,9 @@ mod benchmarks {
 
     #[benchmark]
     fn deauthorize_oracle() {
-        let caller: T::AccountId = whitelisted_caller();
         let account: T::AccountId = whitelisted_caller();
 
-        AuthorizedOracles::<T>::insert(&account, ());
+        AuthorizedOracles::<T>::insert(&account, true);
 
         #[extrinsic_call]
         deauthorize_oracle(RawOrigin::Root, account.clone());
@@ -35,10 +33,9 @@ mod benchmarks {
 
     #[benchmark]
     fn submit_price() {
-        let caller: T::AccountId = whitelisted_caller();
         let account: T::AccountId = whitelisted_caller();
 
-        AuthorizedOracles::<T>::insert(&account, ());
+        AuthorizedOracles::<T>::insert(&account, true);
 
         #[extrinsic_call]
         submit_price(RawOrigin::Signed(account.clone()), 1, 1000);
