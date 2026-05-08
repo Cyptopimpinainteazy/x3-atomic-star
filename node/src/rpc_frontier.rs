@@ -471,9 +471,13 @@ where
     let c = client.clone();
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
+        let latest_block = c.info().best_number as u64;
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
+                if s == "latest" {
+                    return Ok(latest_block);
+                }
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
                     .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
@@ -481,10 +485,13 @@ where
         let to_block = filter.get("toBlock")
             .and_then(|v| v.as_str())
             .map(|s| {
+                if s == "latest" {
+                    return Ok(latest_block);
+                }
                 let stripped = s.strip_prefix("0x").unwrap_or(s);
                 u64::from_str_radix(stripped, 16)
                     .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid toBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
+            }).unwrap_or(Ok(latest_block))?;
         let address = filter.get("address")
             .and_then(|v| v.as_str())
             .map(decode_address)
@@ -860,6 +867,41 @@ where
     C::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
 {
     let mut module = RpcModule::new(());
+
+    // svm_executeInstruction — execute a raw SVM instruction payload via runtime API.
+    // params: [caller_hex_32, program_id_hex_32, instruction_data_hex]
+    let c = client.clone();
+    module.register_method("svm_executeInstruction", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+        let (caller_hex, program_hex, input_hex): (String, String, String) = params.parse()?;
+
+        let _caller = decode_svm_pubkey(&caller_hex)?;
+        let program_bytes = decode_svm_pubkey(&program_hex)?;
+        let data_stripped = input_hex.strip_prefix("0x").unwrap_or(&input_hex);
+        let instruction_data = hex::decode(data_stripped)
+            .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid instruction data: {}", e), None::<()>))?;
+
+        let mut program_id = [0u8; 32];
+        program_id.copy_from_slice(&program_bytes);
+
+        let api = c.runtime_api();
+        let at = c.info().best_hash;
+
+        match api.submit_svm_instruction(at, program_id, instruction_data) {
+            Ok(Ok(output)) => Ok(serde_json::json!({
+                "success": true,
+                "output": format!("0x{}", hex::encode(output))
+            })),
+            Ok(Err(err)) => Ok(serde_json::json!({
+                "success": false,
+                "error": String::from_utf8_lossy(&err).to_string()
+            })),
+            Err(e) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
+                -32603,
+                format!("Runtime error: {:?}", e),
+                None::<()>,
+            )),
+        }
+    })?;
 
     // svm_getBalance — returns lamport balance for a base58 or hex SVM pubkey
     let c = client.clone();
