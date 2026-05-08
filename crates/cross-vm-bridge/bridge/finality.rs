@@ -16,7 +16,7 @@ use sp_runtime::DispatchError;
 use sp_std::fmt::Debug;
 
 #[cfg(feature = "std")]
-use blst::{blst_scalar, blst_p1, blst_p2, blst_pk_to_affine, blst_p1_affine, blst_p2_affine, blst_aggregate_pk_in_g1, blst_scalar_from_bendian, blst_p1_mult, blst_p1_is_in_subgroup, blst_p1_affine_in_g1, blst_p2_affine_in_g2, blst_final_exp, blst_miller_loop, blst_pairing, blst_sig_of_aggregate_in_g1, blst_aggregate_in_g2, blst_signing_key_to_public_key, blst_keygen, blst_keygen_seeded, blst_keygen_async, blst_keygen_async_seeded, blst_keygen_async_seeded_vrf, blst_keygen_async_seeded_vrf_prove, blst_p1_affine_serialize, blst_p2_affine_serialize, blst_pk_serialize, blst_sk_serialize, blst_sk_check, blst_sk_gen, blst_sk_get_pk_in_g1, blst_sk_get_pk_in_g2, blst_sign, blst_verify, blst_aggregate_verify, blst_aggregate_verify_packed, blst_aggregate_verify_packed2, blst_verify_pk_in_g1, blst_verify_pk_in_g2, blst_final_exp_in_place, blst_miller_loop_in_place, blst_pairing_in_place, blst_sig_of_aggregate_in_g1_in_place, blst_aggregate_in_g2_in_place, blst_signing_key_to_public_key_in_place, blst_keygen_in_place, blst_keygen_seeded_in_place, blst_keygen_async_in_place, blst_keygen_async_seeded_in_place, blst_keygen_async_seeded_vrf_in_place, blst_keygen_async_seeded_vrf_prove_in_place, blst_p1_affine_serialize_in_place, blst_p2_affine_serialize_in_place, blst_pk_serialize_in_place, blst_sk_serialize_in_place, blst_sk_check_in_place, blst_sk_gen_in_place, blst_sk_get_pk_in_g1_in_place, blst_sk_get_pk_in_g2_in_place, blst_sign_in_place, blst_verify_in_place, blst_aggregate_verify_in_place, blst_aggregate_verify_packed_in_place, blst_aggregate_verify_packed2_in_place, blst_verify_pk_in_g1_in_place, blst_verify_pk_in_g2_in_place};
+use blst::min_pk::{PublicKey as BlstPublicKey, Signature as BlstSignature};
 
 /// Finality threshold: 2/3 of validators required
 pub const FINALITY_THRESHOLD_EVM: u32 = 66;
@@ -265,8 +265,8 @@ impl EvmFinalityVerifier {
         bitfield: &[u8],
         message: &[u8],
     ) -> Result<bool, DispatchError> {
-        use blst::Signature;
-        use blst::PublicKey;
+        use BlstSignature;
+        use BlstPublicKey;
 
         // BLS12-381 signatures are 96 bytes
         if aggregated_sig.len() != 96 {
@@ -283,19 +283,14 @@ impl EvmFinalityVerifier {
             ));
         }
 
-        // Compute message hash
-        let mut hasher = Sha256::new();
-        hasher.update(message);
-        let message_hash = hasher.finalize();
-
         // Deserialize the aggregated signature
-        let agg_sig = match Signature::from_bytes(aggregated_sig) {
+        let agg_sig = match BlstSignature::from_bytes(aggregated_sig) {
             Ok(sig) => sig,
             Err(_) => return Ok(false), // Invalid signature
         };
 
         // Collect public keys for verification
-        let mut pub_keys: Vec<PublicKey> = Vec::new();
+        let mut pub_keys: Vec<BlstPublicKey> = Vec::new();
         for (i, &pk_bytes) in public_keys.iter().enumerate() {
             if bitfield[i / 8] & (1 << (i % 8)) == 0 {
                 continue; // Skip if not in bitfield
@@ -305,17 +300,17 @@ impl EvmFinalityVerifier {
                     b"Public key must be 48 bytes".to_vec(),
                 ));
             }
-            match PublicKey::from_bytes(pk_bytes) {
+            match BlstPublicKey::from_bytes(pk_bytes) {
                 Ok(pk) => pub_keys.push(pk),
                 Err(_) => return Ok(false), // Invalid public key
             }
         }
 
-        // Verify the aggregate signature
-        // Note: fast_aggregate_verify requires all public keys to be in the bitfield
-        // For a more flexible verification, we would use aggregate_verify
+        // Verify the aggregate signature against the raw message bytes using the standard BLS DST.
         let result = agg_sig.fast_aggregate_verify(
-            &message_hash,
+            true,
+            message,
+            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
             &pub_keys,
         );
 
@@ -610,10 +605,10 @@ impl SvmFinalityVerifier {
 
         #[cfg(feature = "std")]
         {
-            use ed25519_dalek::{PublicKey, Signature, Verifier};
+            use ed25519_dalek::{Signature, VerifyingKey, Verifier};
 
             // Create public key from bytes
-            let pk = match PublicKey::from_bytes(public_key) {
+            let pk = match VerifyingKey::from_bytes(public_key) {
                 Ok(pk) => pk,
                 Err(_) => return Ok(false),
             };
@@ -624,8 +619,8 @@ impl SvmFinalityVerifier {
                 Err(_) => return Ok(false),
             };
 
-            // Verify the signature
-            match pk.verify(&message_hash, &sig) {
+            // Verify the signature over the raw message bytes
+            match pk.verify_strict(message, &sig) {
                 Ok(_) => Ok(true),
                 Err(_) => Ok(false),
             }
