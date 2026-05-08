@@ -134,8 +134,8 @@ pub mod pallet {
         >,
         /// Merkle proof for state transition
         pub merkle_proof: BoundedVec<H256, T::MaxProofDepth>,
-        /// Signature over receipt data
-        pub signature: BoundedVec<u8, ConstU32<64>>,
+        /// Signature over receipt data (secp256k1 ECDSA recoverable signature, 65 bytes r|s|v)
+        pub signature: BoundedVec<u8, ConstU32<65>>,
     }
 
     impl<T: Config> Clone for ExecutionReceipt<T> {
