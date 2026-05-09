@@ -6,19 +6,19 @@
  * Endpoints:
  *   WS mainnet (via tunnel) : wss://ws.x3star.net
  *   HTTP RPC (via tunnel)   : https://rpc.x3star.net
- *   WS local dev            : ws://localhost:9944
+ *   WS local dev            : ws://localhost:9933
  *   HTTP local dev          : http://localhost:9933
  *
  * To override, set before loading this script:
- *   window.X3_RPC_WS  = 'wss://your-node:9944'
- *   window.X3_RPC_HTTP = 'https://your-node'
+ *   window.X3_RPC_WS  = 'wss://ws.x3star.net' or 'ws://localhost:9933'
+ *   window.X3_RPC_HTTP = 'https://rpc.x3star.net' or 'http://localhost:9933'
  */
 (function X3LiveData() {
   'use strict';
 
   /* ── Config ── */
-  const WS_ENDPOINT   = window.X3_RPC_WS   || 'wss://rpc.atlassphere.io';
-  const HTTP_ENDPOINT = window.X3_RPC_HTTP  || 'https://rpc.atlassphere.io';
+  const WS_ENDPOINT   = window.X3_RPC_WS   || 'ws://localhost:9933';
+  const HTTP_ENDPOINT = window.X3_RPC_HTTP  || 'http://localhost:9933';
   const POLL_MS       = 6000; // 1 block time
 
   /* ── State ── */
@@ -45,7 +45,7 @@
 
   /* ── Substrate JSON-RPC helpers ── */
   function rpcPost(method, params = []) {
-    return fetch(HTTP_ENDPOINT + '/rpc', {
+    return fetch(HTTP_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: rpcId++, jsonrpc: '2.0', method, params }),
