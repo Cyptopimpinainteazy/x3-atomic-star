@@ -342,6 +342,7 @@ impl pallet_atomic_trade_engine::Config for Test {
     type AmmRegistrarOrigin = frame_system::EnsureRoot<u64>;
     type WeightInfo = ();
     type Settlement = pallet_atomic_trade_engine::NoOpSettlementBridge;
+    type SecurityHook = x3_security_events::NoOpHook;
 }
 
 /// Build genesis storage for testing

@@ -142,6 +142,7 @@ pub mod pallet {
 
     use frame_support::storage::{with_transaction, TransactionOutcome};
     use frame_support::traits::StorageVersion;
+    use x3_security_events::{SecurityEvent, SecurityEventHook, SecurityEventKind};
 
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
@@ -201,6 +202,11 @@ pub mod pallet {
         /// Settlement bridge for post-execution settlement intent creation.
         /// Use `NoOpSettlementBridge` in tests or when settlement is not needed.
         type Settlement: SettlementBridge<<Self as frame_system::Config>::AccountId>;
+
+        /// Security event hook. Called on trade leg and batch failures to notify the security
+        /// swarm of suspicious settlement behaviour.  Wire `x3_security_events::NoOpHook` in
+        /// tests and runtimes that do not yet have a live security subscriber.
+        type SecurityHook: x3_security_events::SecurityEventHook<BlockNumberFor<Self>>;
     }
 
     /// Active trade batches indexed by batch_id.
@@ -719,6 +725,17 @@ pub mod pallet {
                         reason,
                     });
 
+                    // Notify the security swarm: a batch failure is a critical
+                    // SettlementTimeoutSuspect event (all legs rolled back).
+                    T::SecurityHook::emit(SecurityEvent {
+                        kind: SecurityEventKind::SettlementTimeoutSuspect,
+                        block_number: frame_system::Pallet::<T>::block_number(),
+                        source_id: *b"atomic-trade-eng\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                        subject_id: *batch_id.as_fixed_bytes(),
+                        severity: 2,
+                        detail: [0u8; 32],
+                    });
+
                     // Return Ok to persist storage changes (batch was processed, just failed)
                     // Caller should check batch status or listen for TradeBatchFailed event
                 }
@@ -1199,6 +1216,17 @@ pub mod pallet {
                         failed_leg_index: 0,
                         reason: BatchFailureReason::KernelComitSubmissionFailed { comit_id },
                     });
+
+                    // Notify the security swarm: kernel-v2 batch rejection is a
+                    // critical SettlementTimeoutSuspect event.
+                    T::SecurityHook::emit(SecurityEvent {
+                        kind: SecurityEventKind::SettlementTimeoutSuspect,
+                        block_number: frame_system::Pallet::<T>::block_number(),
+                        source_id: *b"atomic-trade-eng\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                        subject_id: *batch_id.as_fixed_bytes(),
+                        severity: 2,
+                        detail: [0u8; 32],
+                    });
                 }
             }
 
@@ -1399,6 +1427,17 @@ pub mod pallet {
                             batch_id: batch.batch_id,
                             leg_index,
                             reason: reason.clone(),
+                        });
+
+                        // Notify the security swarm: a trade leg failure is a
+                        // SettlementTimeoutSuspect (possible griefing / stuck state).
+                        T::SecurityHook::emit(SecurityEvent {
+                            kind: SecurityEventKind::SettlementTimeoutSuspect,
+                            block_number: frame_system::Pallet::<T>::block_number(),
+                            source_id: *b"atomic-trade-eng\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                            subject_id: *batch.batch_id.as_fixed_bytes(),
+                            severity: 1,
+                            detail: [0u8; 32],
                         });
 
                         return Err((

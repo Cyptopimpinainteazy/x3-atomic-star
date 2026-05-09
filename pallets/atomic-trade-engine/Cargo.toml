@@ -36,6 +36,7 @@ pallet-timestamp = { workspace = true, default-features = false }
 
 # Local dependencies
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
+x3-security-events = { path = "../../crates/x3-security-events", default-features = false }
 
 # Optional: VM integration crates (std-only for now)
 x3-evm-integration = { path = "../../crates/evm-integration", default-features = false, optional = true }
@@ -62,6 +63,7 @@ std = [
     "frame-benchmarking?/std",
     "pallet-timestamp/std",
     "pallet-x3-kernel/std",
+    "x3-security-events/std",
     "x3-evm-integration?/std",
     "x3-svm-integration?/std",
     "log/std",
