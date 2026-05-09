@@ -522,7 +522,7 @@ where
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
         let latest_block = c.info().best_number as u64;
-        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block).unwrap_or(Ok(0))?;
+        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block)?;
         let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block)?;
         let address_list = parse_eth_log_filter_addresses(filter.get("address"))?;
         let filter_address = address_list.as_ref().and_then(|list| if list.len() == 1 { Some(list[0]) } else { None });
@@ -552,7 +552,7 @@ where
                 // Filter logs based on block range and optional address list
                 if log.block_number >= from_block && log.block_number <= to_block {
                     if let Some(addresses) = &address_list {
-                        if !addresses.iter().any(|a| a == &log.address) {
+                        if !addresses.iter().any(|a| a.as_slice() == log.address.as_slice()) {
                             return None;
                         }
                     }
@@ -617,8 +617,8 @@ where
     module.register_method("x3_getEvmLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
         let latest_block = c.info().best_number as u64;
-        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block).unwrap_or(Ok(0))?;
-        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block).unwrap_or(Ok(latest_block))?;
+        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block)?;
+        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block).unwrap_or(latest_block);
         let address_list = parse_eth_log_filter_addresses(filter.get("address"))?;
         let filter_address = address_list.as_ref().and_then(|list| if list.len() == 1 { Some(list[0]) } else { None });
 
@@ -647,7 +647,7 @@ where
                 if let Some(addresses) = &address_list {
                     use codec::Decode;
                     let log = pallet_x3_kernel::ExecutionLog::decode(&mut &bytes[..]).ok()?;
-                    if !addresses.iter().any(|a| a == &log.address) {
+                    if !addresses.iter().any(|a| a.as_slice() == log.address.as_slice()) {
                         return None;
                     }
                 }
