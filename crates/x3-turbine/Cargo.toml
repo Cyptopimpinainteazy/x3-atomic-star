@@ -26,7 +26,7 @@ lru = "0.12"
 futures = "0.3"
 async-trait = "0.1"
 libp2p = { version = "0.53", features = ["tcp", "noise", "yamux", "gossipsub", "mdns", "kad"] }
-multihash = "0.18"
+multihash = "0.19"
 
 [dev-dependencies]
 tokio-test = "0.4"
