@@ -448,7 +448,7 @@ pub mod pallet {
             asset_id: AssetId,
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
-            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| {
+            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| -> DispatchResult {
                 let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::AssetNotFound)?;
                 cfg.status = WrappedAssetStatus::Paused;
                 Ok(())
@@ -467,7 +467,7 @@ pub mod pallet {
             asset_id: AssetId,
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
-            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| {
+            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| -> DispatchResult {
                 let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::AssetNotFound)?;
                 ensure!(
                     cfg.status != WrappedAssetStatus::Deprecated,
@@ -491,7 +491,7 @@ pub mod pallet {
             fee_bps: u32,
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
-            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| {
+            RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| -> DispatchResult {
                 let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::AssetNotFound)?;
                 cfg.bridge_fee_bps = fee_bps;
                 Ok(())

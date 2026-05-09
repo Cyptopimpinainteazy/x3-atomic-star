@@ -360,9 +360,11 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3FlashLoan: pallet_x3_flashloan,
     }
 );
 
+// ── dev + frontier
 #[cfg(all(feature = "dev", feature = "frontier"))]
 construct_runtime!(
     pub enum Runtime {
@@ -427,6 +429,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3FlashLoan: pallet_x3_flashloan,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -495,6 +498,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3FlashLoan: pallet_x3_flashloan,
     }
 );
 
@@ -562,6 +566,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3FlashLoan: pallet_x3_flashloan,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -747,7 +752,7 @@ impl pallet_aura::Config for Runtime {
     type AuthorityId = sp_consensus_aura::sr25519::AuthorityId;
     type MaxAuthorities = MaxAuthorities;
     type DisabledValidators = ();
-    type AllowMultipleBlocksPerSlot = ConstBool<true>; // Enable multiple blocks per slot for higher TPS
+    type AllowMultipleBlocksPerSlot = ConstBool<false>;
     type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
 
@@ -768,7 +773,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = sp_runtime::traits::ConvertInto;
     type ShouldEndSession = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
     type NextSessionRotation = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
-    type SessionManager = ();
+    type SessionManager = X3Consensus;
     type SessionHandler = <SessionKeys as sp_runtime::traits::OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type WeightInfo = pallet_session::weights::SubstrateWeight<Self>;
@@ -2524,6 +2529,19 @@ impl pallet_x3_compute_market::Config for Runtime {
     type SessionExpiryBlocks = ComputeMarketSessionExpiryBlocks;
     type MinStakeForProvider = ComputeMarketMinStakeForProvider;
     type WeightInfo = ();
+}
+
+// ===== X3 Flash Loan Configuration =====
+parameter_types! {
+    pub const FlashLoanFeeBasisPoints: u32 = 9;   // 0.09% fee
+    pub const FlashLoanMaxLoanFraction: u32 = 50; // max 50% of pool per loan
+}
+
+impl pallet_x3_flashloan::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type FeeBasisPoints = FlashLoanFeeBasisPoints;
+    type MaxLoanFraction = FlashLoanMaxLoanFraction;
 }
 
 // ===== SVM Runtime Configuration =====

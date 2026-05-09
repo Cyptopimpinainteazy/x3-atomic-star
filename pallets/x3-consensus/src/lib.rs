@@ -34,6 +34,14 @@ pub mod pallet {
         #[pallet::constant]
         type MaxValidators: Get<u32>;
 
+        /// Fraction slashed per offence type, in basis points (0–10000).
+        /// E.g. 1000 means 10 % of the validator's current stake is deducted.
+        type SlashFraction: Get<u32>;
+
+        /// Minimum stake that must remain after any slash.
+        /// Prevents zeroing the stake entirely in a single report.
+        type MinStakeAfterSlash: Get<u128>;
+
         /// Weight information for extrinsics
         type WeightInfo: crate::weights::WeightInfo;
     }
@@ -58,6 +66,13 @@ pub mod pallet {
     pub type ValidatorSetActivationBlock<T: Config> =
         StorageValue<_, BlockNumberFor<T>, OptionQuery>;
 
+    /// Per-validator stake tracking used for slashing.
+    /// Populated when a validator is registered; updated on every slash.
+    #[pallet::storage]
+    #[pallet::getter(fn validator_stake)]
+    pub type ValidatorStake<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, ValidatorInfo, OptionQuery>;
+
     /// Consensus state tracking
     #[pallet::storage]
     #[pallet::getter(fn consensus_state)]
@@ -77,6 +92,12 @@ pub mod pallet {
             validator: T::AccountId,
             reason: SlashReason,
         },
+        /// Slash amount actually deducted from validator stake
+        SlashApplied {
+            validator: T::AccountId,
+            slash_amount: u128,
+            new_stake: u128,
+        },
     }
 
     /// Errors
@@ -88,6 +109,29 @@ pub mod pallet {
         InvalidValidatorSet,
         /// Consensus not initialized
         ConsensusNotInitialized,
+        /// Validator not found in the stake registry
+        ValidatorNotFound,
+    }
+
+    /// Per-validator stake record stored in [`ValidatorStake`].
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
+        Debug,
+        PartialEq,
+        Eq,
+        Default,
+    )]
+    pub struct ValidatorInfo {
+        /// Staked balance in the smallest token unit.
+        pub stake: u128,
+        /// Whether the validator is currently participating in block production.
+        /// Set to `false` when the stake falls to or below `MinStakeAfterSlash`.
+        pub is_active: bool,
     }
 
     /// Consensus information snapshot. Authorities are stored as encoded bytes to keep the
@@ -165,7 +209,13 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Report validator misbehavior
+        /// Report validator misbehavior and apply a proportional stake slash.
+        ///
+        /// The caller must be a signed account. The slash amount is computed as
+        /// `SlashFraction` basis points of the validator's current stake, with
+        /// the result floored at `MinStakeAfterSlash` to prevent a complete
+        /// zeroing in a single report. When the remaining stake reaches that
+        /// floor the validator is also marked inactive.
         #[pallet::call_index(1)]
         #[pallet::weight(<T as Config>::WeightInfo::report_misbehavior())]
         pub fn report_misbehavior(
@@ -173,11 +223,36 @@ pub mod pallet {
             validator: T::AccountId,
             reason: SlashReason,
         ) -> DispatchResult {
-            let _who = ensure_signed(origin)?;
+            let _reporter = ensure_signed(origin)?;
 
-            // RC-1: emit slashing event only; full offence reporting with cryptographic
-            // proofs is deferred to post-mainnet hardening (see RC-1 lockdown doc).
-            Self::deposit_event(Event::ValidatorSlashed { validator, reason });
+            // Look up the validator's current stake record.
+            let mut info = ValidatorStake::<T>::get(&validator)
+                .ok_or(Error::<T>::ValidatorNotFound)?;
+
+            // Compute slash: SlashFraction bps of the current stake.
+            let slash_bps = T::SlashFraction::get() as u128;
+            let slash_amount = info.stake.saturating_mul(slash_bps) / 10_000;
+            let min_remaining = T::MinStakeAfterSlash::get();
+
+            // Apply the slash, floored at MinStakeAfterSlash.
+            let new_stake = info.stake.saturating_sub(slash_amount).max(min_remaining);
+            let actual_slash = info.stake.saturating_sub(new_stake);
+            info.stake = new_stake;
+
+            // Deactivate the validator when it hits the minimum stake floor.
+            if new_stake <= min_remaining {
+                info.is_active = false;
+            }
+
+            ValidatorStake::<T>::insert(&validator, &info);
+
+            Self::deposit_event(Event::ValidatorSlashed { validator: validator.clone(), reason });
+            Self::deposit_event(Event::SlashApplied {
+                validator,
+                slash_amount: actual_slash,
+                new_stake,
+            });
+
             Ok(())
         }
     }
@@ -239,6 +314,25 @@ pub mod pallet {
         /// Check if account is a validator
         pub fn is_validator(who: &T::AccountId) -> bool {
             Validators::<T>::get().contains(who)
+        }
+    }
+
+    impl<T: Config> pallet_session::SessionManager<T::AccountId> for Pallet<T> {
+        fn new_session(_new_index: u32) -> Option<Vec<T::AccountId>> {
+            // Return the pending validator set if one is queued, else None (keep current).
+            // `try_get` returns Err(()) when the key is absent in storage (ValueQuery
+            // default is not in storage), correctly signalling "no rotation needed" to
+            // the session pallet when nothing has been queued via `set_validators`.
+            NextValidators::<T>::try_get()
+                .ok()
+                .map(|set| set.into_inner())
+        }
+
+        fn end_session(_end_index: u32) {}
+
+        fn start_session(_start_index: u32) {
+            // Clear pending set once the session pallet has activated it.
+            NextValidators::<T>::kill();
         }
     }
 }

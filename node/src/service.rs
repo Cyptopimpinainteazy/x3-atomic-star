@@ -1324,7 +1324,7 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
             let sidecar_task_name = sidecar_name.clone();
             let chain_name_for_sidecar = chain_name.clone();
 
-            task_manager.spawn_essential_handle().spawn(
+            task_manager.spawn_handle().spawn(
                 "x3-sidecar-monitor",
                 Some("bridge-sidecar"),
                 async move {
@@ -1365,12 +1365,10 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
                                 // Safety: prevent infinite restart loops beyond threshold
                                 if restart_count > 20 {
                                     log::error!(
-                                        "❌ {} exceeded restart threshold (20); giving up",
+                                        "❌ {} exceeded restart threshold (20); disabling sidecar — node continues without it",
                                         sidecar_task_name
                                     );
-                                    panic!(
-                                        "Sidecar service crashed 20 times; node is unrecoverable"
-                                    );
+                                    return; // graceful exit; non-essential task
                                 }
                             }
                         }
@@ -1395,7 +1393,7 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
             CrossChainValidator::new(orchestrator.clone(), config.network.protocol_version);
 
         // Spawn cross-chain validation task
-        task_manager.spawn_essential_handle().spawn(
+        task_manager.spawn_handle().spawn(
             "cross-chain-gpu-validator",
             Box::pin(async move {
                 match cross_chain_validator.run_validation_loop().await {
@@ -1403,8 +1401,11 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
                         log::info!("🌐 Cross-chain GPU validator loop completed");
                     }
                     Err(e) => {
-                        log::error!("🌐 Cross-chain GPU validator loop error: {:?}", e);
-                        panic!("Cross-chain validator critical failure: {}", e);
+                        log::error!(
+                            "🌐 Cross-chain GPU validator critical failure: {} — validator disabled, node continues",
+                            e
+                        );
+                        return;
                     }
                 }
             }),

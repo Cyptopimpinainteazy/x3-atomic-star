@@ -112,6 +112,7 @@ pallet-x3-launchpad = { path = "../pallets/x3-launchpad", default-features = fal
 pallet-x3-dapp-hub = { path = "../pallets/x3-dapp-hub", default-features = false }
 x3-revenue-sharing = { path = "../crates/x3-revenue-sharing", default-features = false }
 pallet-x3-compute-market = { path = "../pallets/x3-compute-market", default-features = false }
+pallet-x3-flashloan = { path = "../pallets/x3-flashloan", default-features = false }
 pallet-svm-runtime = { package = "pallet-svm", path = "../pallets/svm-runtime", default-features = false }
 
 sp-api = { workspace = true, default-features = false }
@@ -219,6 +220,7 @@ std = [
 	"pallet-x3-dapp-hub/std",
 	"x3-revenue-sharing/std",
 	"pallet-x3-compute-market/std",
+	"pallet-x3-flashloan/std",
 	"pallet-svm-runtime/std",
 	"x3-asset-kernel-types/std",
 	"pallet-x3-asset-registry/std",

@@ -49,6 +49,10 @@ parameter_types! {
     pub const Period: u64 = 1;
     pub const Offset: u64 = 0;
     pub const MinimumPeriod: u64 = 1;
+    /// 10 % slash per offence report.
+    pub const SlashFraction: u32 = 1_000;
+    /// Minimum stake that may remain after any single slash.
+    pub const MinStakeAfterSlash: u128 = 1_000_000;
 }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
@@ -151,6 +155,8 @@ impl crate::weights::WeightInfo for MockWeightInfo {
 impl Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
+    type SlashFraction = SlashFraction;
+    type MinStakeAfterSlash = MinStakeAfterSlash;
     type WeightInfo = MockWeightInfo;
 }
 

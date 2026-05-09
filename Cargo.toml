@@ -198,6 +198,8 @@ members = [
         "crates/x3-chain-onboarding",
         # Phase 12: A-tier hard metrics tracking — throughput, TVL, routes, DAU, incidents
         "crates/x3-metrics-tracker",
+        # Flash loan pallet: atomic borrow-use-repay with repay-or-revert invariant
+        "pallets/x3-flashloan",
 ]
 default-members = ["node"]
 resolver = "2"
