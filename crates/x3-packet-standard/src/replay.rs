@@ -33,20 +33,18 @@ impl ReplayGuard {
         self.seen.contains_key(&(*stream, sequence))
     }
 
-    /// Mark this packet as processed.  Idempotent: re-marking *the same*
-    /// packet hash is a no-op; marking a *different* hash for the same
-    /// `(stream, sequence)` is rejected as `SequenceReplay`.
+    /// Mark this packet as processed.  A `(stream, sequence)` pair that has
+    /// already been processed is always rejected — even if the same packet
+    /// hash is re-submitted — because the side-effects have already been
+    /// applied on-chain.
     pub fn mark_received(&mut self, packet: &Packet) -> Result<(), PacketError> {
         let key = (packet.stream_key(), packet.sequence);
         let new_hash = crate::proof::commit_packet(packet);
-        match self.seen.get(&key) {
-            Some(existing) if *existing == new_hash => Ok(()), // idempotent retry
-            Some(_) => Err(PacketError::SequenceReplay),
-            None => {
-                self.seen.insert(key, new_hash);
-                Ok(())
-            }
+        if self.seen.contains_key(&key) {
+            return Err(PacketError::SequenceReplay);
         }
+        self.seen.insert(key, new_hash);
+        Ok(())
     }
 
     /// Number of distinct (stream, sequence) entries.  Useful for tests and
@@ -115,8 +113,8 @@ mod tests {
         let mut g = ReplayGuard::new();
         let p = pkt(2, b"x");
         assert!(g.mark_received(&p).is_ok());
-        // Same packet, same hash — must succeed without growing the map.
-        assert!(g.mark_received(&p).is_ok());
+        // Same packet re-submitted: always rejected once seen, effects are applied.
+        assert!(g.mark_received(&p).is_err());
         assert_eq!(g.len(), 1);
     }
 

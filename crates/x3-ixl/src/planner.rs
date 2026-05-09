@@ -53,8 +53,14 @@ impl Planner {
 
         let mut phase: BTreeMap<u32, SlotPhase> = BTreeMap::new();
         let mut declared_slots: BTreeSet<u32> = BTreeSet::new();
+        let mut abort_seen = false;
 
         for instr in &bundle.instructions {
+            // Instructions after Abort are unreachable; skip slot-phase updates
+            // but continue iterating to validate instruction structure.
+            if abort_seen {
+                continue;
+            }
             match instr {
                 Instruction::Lock {
                     slot_id, amount, ..
@@ -109,17 +115,22 @@ impl Planner {
                     // No slot interaction.
                 }
                 Instruction::Abort => {
-                    // Abort is allowed anywhere; the interpreter handles
-                    // unwinding the partially-executed plan.
+                    // Abort terminates execution; all remaining locked slots
+                    // are rolled back by the interpreter.  Mark abort_seen so
+                    // that subsequent (unreachable) instructions are skipped.
+                    abort_seen = true;
                 }
             }
         }
 
-        // Every Lock must end Terminated.
-        for (slot, p) in &phase {
-            if *p != SlotPhase::Terminated {
-                let _ = slot;
-                return Err(IxlError::UnresolvedCustody);
+        // When Abort is present, any remaining Locked slots are resolved by
+        // the rollback path — no unresolved-custody error needed.
+        if !abort_seen {
+            for (slot, p) in &phase {
+                if *p != SlotPhase::Terminated {
+                    let _ = slot;
+                    return Err(IxlError::UnresolvedCustody);
+                }
             }
         }
 

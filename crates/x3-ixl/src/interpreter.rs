@@ -234,12 +234,13 @@ impl Interpreter {
                     .custody
                     .remove(slot_id)
                     .ok_or(IxlError::UnbalancedCustody)?;
-                if entry.kind != *kind {
-                    return Err(IxlError::InvalidOperands);
-                }
+                // `kind` on Settle is the destination VM for the credit effect;
+                // it does NOT need to match the source custody kind because
+                // cross-VM settlement (e.g., lock X3Native → settle to X3Evm)
+                // is the primary use case of the atomic kernel.
                 if entry.amount > 0 {
                     ctx.effects.push(LedgerEffect::CreditReceiver {
-                        kind: entry.kind,
+                        kind: *kind,
                         asset: entry.asset,
                         receiver: *receiver,
                         amount: entry.amount,
@@ -247,7 +248,7 @@ impl Interpreter {
                 }
                 receipt.push(ReceiptEntry::Settled {
                     slot_id: *slot_id,
-                    kind: entry.kind,
+                    kind: *kind,
                     asset: entry.asset,
                     receiver: *receiver,
                     amount: entry.amount,
