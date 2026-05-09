@@ -23,6 +23,13 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 
+[dev-dependencies]
+sp-io = { workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive"] }
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types" }
+
 [features]
 default = ["std"]
 std = [
