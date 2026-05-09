@@ -2,7 +2,7 @@
 
 use crate as pallet_x3_coin;
 use frame_support::{
-    construct_runtime, parameter_types,
+    construct_runtime, derive_impl, parameter_types,
     traits::{ConstBool, ConstU32},
 };
 use frame_system::EnsureRoot;
@@ -55,6 +55,7 @@ construct_runtime!(
 pub type Block = frame_system::mocking::MockBlock<Test>;
 
 // ─── frame_system ────────────────────────────────────────────────────────────
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
@@ -92,10 +93,11 @@ impl pallet_balances::Config for Test {
     type MaxLocks = ConstU32<50>;
     type MaxReserves = ConstU32<50>;
     type ReserveIdentifier = [u8; 8];
-    type RuntimeHoldReason = ();
+    type RuntimeHoldReason = RuntimeHoldReason;
+    type RuntimeFreezeReason = RuntimeFreezeReason;
     type FreezeIdentifier = ();
-    type MaxHolds = ConstU32<0>;
     type MaxFreezes = ConstU32<0>;
+    type DoneSlashHandler = ();
 }
 
 // ─── pallet_timestamp ────────────────────────────────────────────────────────
@@ -157,6 +159,7 @@ impl pallet_x3_kernel::Config for Test {
     type GovernanceOrigin = EnsureRoot<AccountId>;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
+    type EmergencyHaltController = ();
 }
 
 // ─── pallet_x3_coin ──────────────────────────────────────────────────────────
@@ -189,6 +192,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         balances: vec![
             (1, 1_000_000_000_000_u128), // Treasury — covers existential deposit
         ],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();

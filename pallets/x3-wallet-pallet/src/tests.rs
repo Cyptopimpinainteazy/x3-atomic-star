@@ -72,12 +72,12 @@ fn create_multisig_wallet_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], frame_support::traits::ConstU32<50>> = BoundedVec::try_from(vec![
+        let signers: Vec<[u8; 32]> = vec![
             [1u8; 32],
             [2u8; 32],
             [3u8; 32],
-        ])
-        .unwrap();
+        ]
+        ;
 
         assert_ok!(X3Wallet::create_multisig_wallet(
             RuntimeOrigin::signed(ALICE),
@@ -98,11 +98,11 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], frame_support::traits::ConstU32<50>> = BoundedVec::try_from(vec![
+        let signers: Vec<[u8; 32]> = vec![
             [1u8; 32],
             [2u8; 32],
-        ])
-        .unwrap();
+        ]
+        ;
 
         // Threshold 0 is invalid
         assert_noop!(
@@ -229,7 +229,7 @@ fn register_biometric_works() {
         ));
 
         // Check profile was created
-        let profile = X3Wallet::get_biometric_profile(&ALICE).unwrap();
+        let profile = X3Wallet::get_biometric_profile(&ALICE).expect("biometric profile should exist");
         assert_eq!(profile.biometric_type, biometric_type);
         assert_eq!(profile.template_hash, template_hash);
         assert!(profile.is_enabled);

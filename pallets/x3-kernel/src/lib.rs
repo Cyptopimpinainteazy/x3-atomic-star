@@ -64,6 +64,11 @@ pub trait EmergencyHaltController {
     fn trigger();
 }
 
+/// No-op emergency halt controller (for tests and environments without invariant checking).
+impl EmergencyHaltController for () {
+    fn trigger() {}
+}
+
 pub use packet_adapters::{
     deserialize_packet, get_domain_mask, get_packet_type, route_packet, validate_packet,
     DomainRoute, PacketAdapterError, PacketAdapterResult,

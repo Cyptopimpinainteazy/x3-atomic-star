@@ -243,12 +243,12 @@ pub trait SvmExecutor {
 }
 
 /// Real SVM executor using solana-rbpf (replaces mock for testing)
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub struct MockSvmExecutor {
     inner: RbpfSvmExecutor,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl MockSvmExecutor {
     /// Create a new mock executor that delegates to real RbpfSvmExecutor
     pub fn new() -> Self {
@@ -258,14 +258,14 @@ impl MockSvmExecutor {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl Default for MockSvmExecutor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl SvmExecutor for MockSvmExecutor {
     fn execute(
         &self,

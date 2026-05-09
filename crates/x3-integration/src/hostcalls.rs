@@ -416,7 +416,7 @@ mod cross_vm_tests {
 
         let ctx = CrossVmContext {
             evm: Some(Arc::new(x3_evm_integration::MockEvmExecutor)),
-            svm: Some(Arc::new(x3_svm_integration::MockSvmExecutor)),
+            svm: Some(Arc::new(x3_svm_integration::MockSvmExecutor::new())),
             ..CrossVmContext::default()
         };
 
