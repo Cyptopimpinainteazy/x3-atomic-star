@@ -17,8 +17,10 @@
   'use strict';
 
   /* ── Config ── */
-  const WS_ENDPOINT   = window.X3_RPC_WS   || 'ws://localhost:9933';
-  const HTTP_ENDPOINT = window.X3_RPC_HTTP  || 'http://localhost:9933';
+  // Production: wss://ws.x3star.net (HTTP: https://rpc.x3star.net)
+  // Local dev: ws://localhost:9944 (HTTP: http://localhost:9933)
+  const WS_ENDPOINT   = window.X3_RPC_WS   || 'wss://ws.x3star.net';
+  const HTTP_ENDPOINT = window.X3_RPC_HTTP  || 'https://rpc.x3star.net';
   const POLL_MS       = 6000; // 1 block time
 
   /* ── State ── */
