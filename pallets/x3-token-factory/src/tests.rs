@@ -236,8 +236,7 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) {
 
     let nonce = Router::next_nonce(src, sender.clone());
 
-    assert_ok!(Router::xvm_transfer(
-        RuntimeOrigin::signed(CREATOR),
+    assert_ok!(Router::do_initiate_transfer(
         asset_id,
         src,
         dst,
@@ -273,8 +272,7 @@ fn submit_xvm_expect_err(asset_id: AssetId, src: DomainId, dst: DomainId, amount
     let expires_at = now + 50;
 
     assert!(
-        Router::xvm_transfer(
-            RuntimeOrigin::signed(CREATOR),
+        Router::do_initiate_transfer(
             asset_id,
             src,
             dst,

@@ -72,7 +72,7 @@ fn create_multisig_wallet_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], 50> = BoundedVec::try_from(vec![
+        let signers: BoundedVec<[u8; 32], frame_support::traits::ConstU32<50>> = BoundedVec::try_from(vec![
             [1u8; 32],
             [2u8; 32],
             [3u8; 32],
@@ -98,7 +98,7 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], 50> = BoundedVec::try_from(vec![
+        let signers: BoundedVec<[u8; 32], frame_support::traits::ConstU32<50>> = BoundedVec::try_from(vec![
             [1u8; 32],
             [2u8; 32],
         ])

@@ -151,11 +151,77 @@ impl EvmHeaderValidator {
     }
 }
 
-pub type EvmValidator = EvmHeaderValidator;
-
 impl Default for EvmHeaderValidator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// High-level EVM state-root validator wrapping the GPU kernel.
+pub struct EvmValidator {
+    pub hasher: Keccak256Kernel,
+}
+
+/// EVM chain state submitted for validation.
+pub struct EvmStateRoot {
+    pub block_number: u64,
+    /// Expected transactions root (Vec<u8> for flexibility in tests).
+    pub state_root: Vec<u8>,
+    pub transactions: Vec<Vec<u8>>,
+}
+
+impl EvmValidator {
+    pub fn new(batch_size: usize, use_gpu: bool) -> Self {
+        Self { hasher: Keccak256Kernel::new(batch_size, use_gpu) }
+    }
+
+    /// Validate a single EVM state by computing a transaction root and comparing it to
+    /// the provided `state_root`.
+    pub async fn validate_state_root(
+        &self,
+        state: &EvmStateRoot,
+    ) -> Result<crate::ValidationResult, ValidatorError> {
+        let start = std::time::Instant::now();
+        if state.transactions.is_empty() {
+            return Ok(crate::ValidationResult {
+                valid: false,
+                error: Some("no transactions".to_string()),
+                duration_ms: 0,
+            });
+        }
+
+        let slices: Vec<&[u8]> = state.transactions.iter().map(|t| t.as_slice()).collect();
+        let (hashes, _) = self.hasher.hash_batch_cpu(&slices)?;
+
+        let computed_root = if hashes.len() == 1 {
+            hashes[0].clone()
+        } else {
+            let mut combined: Vec<u8> = Vec::with_capacity(hashes.len() * 32);
+            for h in &hashes {
+                combined.extend_from_slice(h);
+            }
+            self.hasher.hash(&combined)?.to_vec()
+        };
+
+        let valid = computed_root == state.state_root;
+        let duration_ms = start.elapsed().as_millis() as u64;
+        Ok(crate::ValidationResult {
+            valid,
+            error: if valid { None } else { Some("state root mismatch".to_string()) },
+            duration_ms,
+        })
+    }
+
+    /// Validate a batch of EVM states, returning one `ValidationResult` per state.
+    pub async fn validate_batch(
+        &self,
+        states: &[EvmStateRoot],
+    ) -> Result<Vec<crate::ValidationResult>, ValidatorError> {
+        let mut results = Vec::with_capacity(states.len());
+        for state in states {
+            results.push(self.validate_state_root(state).await?);
+        }
+        Ok(results)
     }
 }
 

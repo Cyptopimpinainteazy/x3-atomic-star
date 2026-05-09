@@ -145,11 +145,64 @@ impl SvmHeaderValidator {
     }
 }
 
-pub type SvmValidator = SvmHeaderValidator;
-
 impl Default for SvmHeaderValidator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// High-level SVM state validator wrapping the GPU kernel.
+pub struct SvmValidator {
+    hasher: Keccak256Kernel,
+}
+
+/// SVM chain state submitted for validation.
+pub struct SvmState {
+    pub slot: u64,
+    /// Block hash; must be exactly 32 bytes for a valid block.
+    pub block_hash: Vec<u8>,
+    pub transactions: Vec<Vec<u8>>,
+}
+
+impl SvmValidator {
+    pub fn new() -> Self {
+        Self { hasher: Keccak256Kernel::new(32, false) }
+    }
+
+    /// Validate that all transactions are non-empty.
+    pub async fn validate_transactions(
+        &self,
+        state: &SvmState,
+    ) -> Result<crate::ValidationResult, ValidatorError> {
+        let start = std::time::Instant::now();
+        for tx in &state.transactions {
+            if tx.is_empty() {
+                return Ok(crate::ValidationResult {
+                    valid: false,
+                    error: Some("empty transaction in SVM block".to_string()),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                });
+            }
+        }
+        Ok(crate::ValidationResult {
+            valid: true,
+            error: None,
+            duration_ms: start.elapsed().as_millis() as u64,
+        })
+    }
+
+    /// Validate that the block hash is exactly 32 bytes (Solana block hash constraint).
+    pub async fn validate_block_hash(
+        &self,
+        state: &SvmState,
+    ) -> Result<crate::ValidationResult, ValidatorError> {
+        let start = std::time::Instant::now();
+        let valid = state.block_hash.len() == 32;
+        Ok(crate::ValidationResult {
+            valid,
+            error: if valid { None } else { Some(format!("block_hash length {} != 32", state.block_hash.len())) },
+            duration_ms: start.elapsed().as_millis() as u64,
+        })
     }
 }
 

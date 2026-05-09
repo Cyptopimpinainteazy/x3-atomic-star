@@ -178,7 +178,8 @@ mod tests {
     #[test]
     fn test_basic_router() {
         let router = BasicSwapRouter;
-        let route = router.find_route(0, 1, U256::from(1000), 2).unwrap();
+        let route = BasicSwapRouter::find_route(0, 1, U256::from(1000), 2).unwrap();
+        let _ = router;
         assert_eq!(route.segments.len(), 1);
         assert_eq!(route.total_output, U256::from(1000));
     }

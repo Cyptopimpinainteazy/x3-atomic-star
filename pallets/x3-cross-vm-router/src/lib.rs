@@ -732,7 +732,7 @@ pub mod pallet {
             Ok(batch_start)
         }
 
-        fn do_initiate_transfer(
+        pub fn do_initiate_transfer(
             asset_id: AssetId,
             source: DomainId,
             destination: DomainId,
