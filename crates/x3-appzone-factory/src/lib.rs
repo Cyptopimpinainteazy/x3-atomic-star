@@ -365,7 +365,7 @@ impl AppZoneFactory {
         Ok(())
     }
 
-    fn update_framework_files(&self, app_dir: &Path) -> Result<(), AppZoneError> {
+    fn update_framework_files(&self, _app_dir: &Path) -> Result<(), AppZoneError> {
         // Update any framework-specific files
         // This would copy latest framework templates over existing files
         Ok(())
@@ -413,18 +413,20 @@ struct AppConfig {
     pallets: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct PalletsConfig {
     pallets: Vec<PalletConfig>,
 }
 
+#[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct PalletConfig {
     name: String,
     path: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct DeployConfig {
     network: String,
     app_name: String,
@@ -434,7 +436,7 @@ struct DeployConfig {
     confirmations: u32,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct DeployReceipt {
     network: String,
     app_name: String,
@@ -794,10 +796,7 @@ mod tests {
         let receipt = DeployReceipt {
             network: "mainnet".to_string(),
             app_name: "myapp".to_string(),
-            transaction_hash: [
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                24, 25, 26, 27, 28, 29, 30, 31, 32,
-            ],
+            transaction_hash: "0x0102030405060708090a0b0c0d0e0f10".to_string(),
             block_number: 12345678,
             deployed_at: 1640995200,
         };
@@ -807,7 +806,7 @@ mod tests {
 
         assert_eq!(deserialized.network, "mainnet");
         assert_eq!(deserialized.app_name, "myapp");
-        assert_eq!(deserialized.transaction_hash, [1; 32]);
+        assert_eq!(deserialized.transaction_hash, "0x0102030405060708090a0b0c0d0e0f10");
         assert_eq!(deserialized.block_number, 12345678);
         assert_eq!(deserialized.deployed_at, 1640995200);
     }

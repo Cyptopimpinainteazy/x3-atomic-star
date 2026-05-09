@@ -1,6 +1,5 @@
 use solana_program::pubkey::Pubkey;
 use solana_program_test::{processor, ProgramTest};
-use solana_sdk::account::Account;
 use solana_sdk::instruction::AccountMeta;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signature::Signer;
@@ -34,7 +33,7 @@ async fn deploy_and_increment_counter() -> Result<(), TransportError> {
     );
 
     // Start test banks client
-    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+    let (banks_client, payer, recent_blockhash) = program_test.start().await;
 
     // Invoke the program (increment)
     let instruction = solana_sdk::instruction::Instruction::new_with_bytes(

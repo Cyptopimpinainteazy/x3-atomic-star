@@ -10,8 +10,6 @@
 //! These tests use the x3-universal-contracts SDK to compile high-level actions
 //! into IXL bundles and test the complete runtime flow.
 
-use crate::TestResult;
-
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]

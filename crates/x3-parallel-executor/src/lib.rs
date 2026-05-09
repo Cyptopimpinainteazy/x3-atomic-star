@@ -247,7 +247,7 @@ impl AccessListBuilder {
     }
 
     /// Build access list for transaction
-    pub fn build_access_list(&self, tx: &Transaction) -> AccessList {
+    pub fn build_access_list(&self, _tx: &Transaction) -> AccessList {
         // Analyze transaction instructions to determine state access
         // This would integrate with IXL instruction analysis
         AccessList {
@@ -285,7 +285,7 @@ impl Conflict {
         Self { tx1, tx2, key }
     }
 
-    pub fn involves(&self, tx_id1: TransactionId, tx_id2: TransactionId) -> bool {
+    pub fn involves(&self, _tx_id1: TransactionId, _tx_id2: TransactionId) -> bool {
         // Convert indices to IDs for comparison
         false // Simplified for now
     }
@@ -494,7 +494,7 @@ mod tests {
         assert_eq!(result.results.len(), 1);
 
         result.commit_batch().unwrap();
-        assert_eq!(result.final_state_hash(), &[0; 32]);
+        assert_eq!(result.final_state_hash(), [0; 32]);
     }
 
     #[test]

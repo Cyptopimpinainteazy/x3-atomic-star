@@ -3,7 +3,7 @@
 //! Run with: cargo bench -p quantum-swarm
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use quantum_swarm::quantum::{CircuitBuilder, LocalSimulator, QuantumBackend, QuantumCircuit};
+use quantum_swarm::quantum::{CircuitBuilder, LocalSimulator, QuantumBackend};
 
 /// Benchmark quantum circuit creation
 fn bench_circuit_creation(c: &mut Criterion) {

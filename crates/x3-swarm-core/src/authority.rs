@@ -138,7 +138,7 @@ impl SwarmAuthority {
 mod tests {
     use super::*;
     use crate::{
-        genesis::{GenesisRecord, SupervisionMode},
+        genesis::GenesisRecord,
         AgentKind, AgentPermissionTier,
     };
 

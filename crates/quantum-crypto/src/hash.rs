@@ -3,7 +3,7 @@
 //! Wrapper module providing a unified interface for quantum-resistant hashing.
 //! Uses BLAKE3 internally with additional security features.
 
-use crate::blake3ext::{self, Hash256, Hash512, HashDomain};
+use crate::blake3ext::{self, Hash256, Hash512};
 use serde::{Deserialize, Serialize};
 
 /// Quantum-resistant hash configuration

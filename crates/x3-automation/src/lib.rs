@@ -207,7 +207,7 @@ pub mod execution {
     }
 
     /// Get current block number (placeholder - would be implemented by runtime)
-    fn get_current_block() -> u64 {
+    pub fn get_current_block() -> u64 {
         // In real implementation, this would access frame_system
         0
     }

@@ -48,12 +48,12 @@ fn main() {
     engine
         .record_state_write(b"k1".to_vec(), None, Some(b"v1".to_vec()))
         .unwrap();
-    let p1 = engine.emit_proof(1000, 10, None).unwrap();
+    let _p1 = engine.emit_proof(1000, 10, None).unwrap();
 
     engine
         .record_state_write(b"k2".to_vec(), None, Some(b"v2".to_vec()))
         .unwrap();
-    let p2 = engine.emit_proof(500, 5, None).unwrap();
+    let _p2 = engine.emit_proof(500, 5, None).unwrap();
 
     let (chain, receipt_info) = engine.finalize().unwrap();
     println!(
