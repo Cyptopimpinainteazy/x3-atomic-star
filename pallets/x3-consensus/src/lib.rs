@@ -9,6 +9,8 @@
 pub use pallet::*;
 // Re-export the log crate so the outer SessionManager impl can use it.
 use log;
+// Bring Vec into outer scope for SessionManager + OnOffenceHandler impls (no_std).
+use sp_std::vec::Vec;
 // Bring the legacy Currency trait into scope for the OnOffenceHandler impl.
 use frame_support::traits::Currency as LegacyCurrency;
 
