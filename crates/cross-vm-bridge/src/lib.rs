@@ -3111,13 +3111,14 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::TransferToEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [2u8; 20],
                 amount: 100,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         // Phase 1: Prepare
         let (nonces, prepare_events) = assert_ok(
@@ -3149,13 +3150,14 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::TransferToSvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToSvm {
                 source: [1u8; 20],
                 destination: vec![2; 32],
                 amount: 500,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         let (nonces, _) = assert_ok(
             bridge.prepare(&dispatcher),
@@ -3177,23 +3179,25 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::CallEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallEvm {
                 caller: vec![0xAA; 32],
                 contract: [0xBB; 20],
                 input: vec![1, 2, 3],
                 value: 0,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        bridge
-            .queue_operation(CrossVmOperation::CallSvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallSvm {
                 caller: [0xCC; 20],
                 pallet_index: 1,
                 call_index: 0,
                 input: vec![4, 5, 6],
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         let (results, events) = assert_ok(
             bridge.atomic_execute(&dispatcher),
@@ -4876,12 +4880,13 @@ mod x3vm_2pc_integration_tests {
 
         // First op: succeed and fill the batch
         let filler = make_call(VmId::X3Vm, 1000, [0xFF; 4]);
-        bridge
-            .queue_operation(CrossVmOperation::CallX3Vm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallX3Vm {
                 caller: [0u8; 32],
                 call: filler,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
         assert_eq!(bridge.x3vm_replay_map_len(), 1);
 
         // Second op: distinct call hash, must fail on batch-size gate
