@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # pallet-x3-inventory
 //!
 //! Vault model, lane model, and inventory manager for X3 liquidity control.

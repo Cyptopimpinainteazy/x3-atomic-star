@@ -54,6 +54,7 @@ impl pallet_x3_inventory::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type Balance = u128;
     type MaxLiquiditySources = MaxLiquiditySources;
+    type WeightInfo = pallet_x3_inventory::weights::SubstrateWeight<Test>;
 }
 
 parameter_types! {
@@ -68,7 +69,6 @@ impl pallet_x3_reservation::Config for Test {
 }
 
 parameter_types! {
-    pub const MaxChecksPerResult: u32 = 16;
     pub const QuoteStalenessBlocks: u32 = 20;
     pub const ObligationTimeoutBlocks: u32 = 200;
     pub const SnapshotRetentionBlocks: u32 = 1000;
@@ -76,7 +76,7 @@ parameter_types! {
 
 impl pallet_x3_solvency::Config for Test {
     type RuntimeEvent = RuntimeEvent;
-    type MaxChecksPerResult = MaxChecksPerResult;
+    type MaxChecksPerResult = ConstU32<16>;
     type QuoteStalenessBlocks = QuoteStalenessBlocks;
     type ObligationTimeoutBlocks = ObligationTimeoutBlocks;
     type SnapshotRetentionBlocks = SnapshotRetentionBlocks;

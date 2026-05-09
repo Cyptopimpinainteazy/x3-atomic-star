@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # Meme Overlord Pallet
 //!
 //! Auto-generates celebratory memes for profitable trades on X3 Chain.

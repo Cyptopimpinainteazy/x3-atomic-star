@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # SVM Pallet
 //!
 //! A Substrate pallet providing Solana Virtual Machine (SVM) functionality for X3 Chain.

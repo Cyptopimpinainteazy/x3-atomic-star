@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # X3 Solvency Pallet
 //!
 //! Implements the solvency gate pipeline:
