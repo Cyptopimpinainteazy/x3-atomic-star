@@ -12580,6 +12580,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-flashloan"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-invariants"
 version = "0.1.0"
 dependencies = [
@@ -24590,7 +24606,7 @@ version = "1.21.0"
 dependencies = [
  "getrandom 0.2.17",
  "js-sys",
- "serde_core",
+ "serde",
  "wasm-bindgen",
 ]
 
@@ -26521,6 +26537,7 @@ dependencies = [
  "pallet-x3-dapp-hub",
  "pallet-x3-dex",
  "pallet-x3-domain-registry",
+ "pallet-x3-flashloan",
  "pallet-x3-invariants",
  "pallet-x3-inventory",
  "pallet-x3-jury-anchor",
@@ -26625,6 +26642,8 @@ version = "0.1.0"
 dependencies = [
  "blake2 0.10.6",
  "invariant-macros",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
  "x3-backend",
  "x3-common",

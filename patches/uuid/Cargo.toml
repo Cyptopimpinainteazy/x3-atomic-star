@@ -172,7 +172,8 @@ optional = true
 default-features = false
 
 [dependencies.serde_core]
-version = "1.0.221"
+package = "serde"
+version = "1.0.195"
 optional = true
 default-features = false
 
