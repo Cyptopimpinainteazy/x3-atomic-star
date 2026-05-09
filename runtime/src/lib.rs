@@ -582,12 +582,16 @@ impl pallet_x3_automation::Config for Runtime {
 
 parameter_types! {
     pub const MaxValidators: u32 = 100;
+    /// Slash 10% of a validator's total balance per confirmed misbehavior.
+    pub const SlashFractionConsensus: sp_runtime::Perbill = sp_runtime::Perbill::from_percent(10);
 }
 
 impl pallet_x3_consensus::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
     type WeightInfo = pallet_x3_consensus::weights::SubstrateWeight<Runtime>;
+    type Currency = Balances;
+    type SlashFraction = SlashFractionConsensus;
 }
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
@@ -693,7 +697,7 @@ impl pallet_session::historical::Config for Runtime {
 impl pallet_offences::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
-    type OnOffenceHandler = ();
+    type OnOffenceHandler = X3Consensus;
 }
 
 impl pallet_balances::Config for Runtime {

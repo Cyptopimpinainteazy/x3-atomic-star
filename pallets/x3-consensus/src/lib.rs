@@ -9,6 +9,8 @@
 pub use pallet::*;
 // Re-export the log crate so the outer SessionManager impl can use it.
 use log;
+// Bring the legacy Currency trait into scope for the OnOffenceHandler impl.
+use frame_support::traits::Currency as LegacyCurrency;
 
 #[cfg(test)]
 mod mock;
@@ -19,9 +21,14 @@ mod tests;
 pub mod pallet {
     use super::*;
     use crate::weights::WeightInfo as _;
-    use frame_support::{pallet_prelude::*, traits::Get};
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{Currency, Get},
+        weights::Weight,
+    };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::Saturating;
+    use sp_runtime::traits::{Saturating, Zero};
+    use sp_runtime::Perbill;
     use sp_std::vec::Vec;
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -38,6 +45,13 @@ pub mod pallet {
 
         /// Weight information for extrinsics
         type WeightInfo: crate::weights::WeightInfo;
+
+        /// Currency used for slashing validator balances.
+        type Currency: frame_support::traits::Currency<Self::AccountId>;
+
+        /// Fraction of the validator's total balance to slash per misbehavior report.
+        #[pallet::constant]
+        type SlashFraction: Get<Perbill>;
     }
 
     #[pallet::pallet]
@@ -177,8 +191,23 @@ pub mod pallet {
         ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            // RC-1: emit slashing event only; full offence reporting with cryptographic
-            // proofs is deferred to post-mainnet hardening (see RC-1 lockdown doc).
+            // Slash a fraction of the misbehaving validator's total balance.
+            let slash_fraction = T::SlashFraction::get();
+            let total = <<T as Config>::Currency as frame_support::traits::Currency<T::AccountId>>::total_balance(&validator);
+            let slash_amount = slash_fraction * total;
+
+            if !slash_amount.is_zero() {
+                let (_, _) = <<T as Config>::Currency as frame_support::traits::Currency<T::AccountId>>::slash(&validator, slash_amount);
+                log::warn!(
+                    target: "x3-consensus",
+                    "⚡ Slashed validator {:?} by {:?} ({:?} of total balance) for {:?}",
+                    validator,
+                    slash_amount,
+                    slash_fraction,
+                    reason,
+                );
+            }
+
             Self::deposit_event(Event::ValidatorSlashed { validator, reason });
             Ok(())
         }
@@ -285,7 +314,54 @@ impl<T: Config> pallet_session::SessionManager<T::AccountId> for Pallet<T> {
     }
 }
 
-/// Weight information for the consensus pallet
+/// Implement `OnOffenceHandler` so the offences pallet can trigger slashing via this pallet.
+/// This is wired as `type OnOffenceHandler = X3Consensus` in the runtime's
+/// `pallet_offences::Config`.
+///
+/// The generic `FullId` captures whatever full-identification type is paired with the
+/// `ValidatorId` (e.g. `()` in minimal runtimes) without requiring the historical-session
+/// feature flag or `pallet_session::historical::Config` bounds.
+impl<T: Config, FullId> sp_staking::offence::OnOffenceHandler<
+    T::AccountId,
+    (T::AccountId, FullId),
+    frame_support::weights::Weight,
+> for Pallet<T> {
+    fn on_offence(
+        offenders: &[sp_staking::offence::OffenceDetails<
+            T::AccountId,
+            (T::AccountId, FullId),
+        >],
+        slash_fraction: &[sp_runtime::Perbill],
+        _session: sp_staking::SessionIndex,
+    ) -> frame_support::weights::Weight {
+        use frame_support::traits::Get as _;
+        use sp_runtime::traits::Zero as _;
+
+        let mut total_weight = frame_support::weights::Weight::zero();
+
+        for (details, fraction) in offenders.iter().zip(slash_fraction.iter()) {
+            let offender: &T::AccountId = &details.offender.0;
+            let total = <<T as Config>::Currency as LegacyCurrency<T::AccountId>>::total_balance(offender);
+            let slash_amount = *fraction * total;
+
+            if !slash_amount.is_zero() {
+                let (_, _) = <<T as Config>::Currency as LegacyCurrency<T::AccountId>>::slash(offender, slash_amount);
+                log::warn!(
+                    target: "x3-consensus",
+                    "⚡ OnOffenceHandler: slashed {:?} by fraction {:?}",
+                    offender,
+                    fraction,
+                );
+            }
+            total_weight =
+                total_weight.saturating_add(T::DbWeight::get().reads_writes(2, 1));
+        }
+
+        total_weight
+    }
+}
+
+
 pub mod weights {
     use frame_support::weights::Weight;
 
@@ -310,6 +386,19 @@ pub mod weights {
 
         fn on_initialize() -> Weight {
             Weight::from_parts(1_000_000, 0)
+        }
+    }
+
+    /// No-op weight implementation for use in mocks and tests.
+    impl WeightInfo for () {
+        fn set_validators() -> Weight {
+            Weight::zero()
+        }
+        fn report_misbehavior() -> Weight {
+            Weight::zero()
+        }
+        fn on_initialize() -> Weight {
+            Weight::zero()
         }
     }
 }
