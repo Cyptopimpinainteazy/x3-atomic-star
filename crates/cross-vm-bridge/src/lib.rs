@@ -2973,24 +2973,26 @@ mod tests {
     fn test_nonces_survive_clear() {
         let mut bridge = CrossVmBridge::new();
 
-        bridge
-            .queue_operation(CrossVmOperation::TransferToEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 100,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         bridge.clear();
 
         // Nonce counter should continue from where it left off
-        let n = bridge
-            .queue_operation(CrossVmOperation::TransferToEvm {
+        let n = assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 100,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
         assert_eq!(n, 2); // Not 1 — no replay
     }
 
