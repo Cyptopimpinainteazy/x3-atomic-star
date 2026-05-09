@@ -28,8 +28,14 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit
 
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
       - name: Run cargo audit
         run: cargo audit --format json --output cargo-audit-results.json || true
+
+      - name: Run cargo deny
+        run: cargo deny check advisories bans > cargo-deny-results.txt || true
 
       # NPM Security Analysis
       - name: Run npm audit
@@ -54,6 +60,11 @@ jobs:
           echo "## Rust Dependencies" >> security-report.md
           echo "\`\`\`json" >> security-report.md
           cat cargo-audit-results.json 2>/dev/null || echo "{}" >> security-report.md
+          echo "\`\`\`" >> security-report.md
+          echo "" >> security-report.md
+          echo "## Cargo Deny" >> security-report.md
+          echo "\`\`\`text" >> security-report.md
+          cat cargo-deny-results.txt 2>/dev/null || echo "No cargo-deny output" >> security-report.md
           echo "\`\`\`" >> security-report.md
           echo "" >> security-report.md
           echo "## NPM Packages" >> security-report.md
