@@ -14,7 +14,12 @@ debug = 0
 
 # Raise the compiler thread stack size to prevent ICE/SIGSEGV when type-checking
 # deep generic graphs in x3-gpu-validator-swarm + libp2p + Substrate dependencies.
+# Cap parallel jobs to 4: libsecp256k1 + Substrate generics cause memory pressure
+# when many 128 MB-stack rustc processes run concurrently.
+[build]
+jobs = 4
+
 [env]
-RUST_MIN_STACK = "33554432"
+RUST_MIN_STACK = "134217728"
 
 

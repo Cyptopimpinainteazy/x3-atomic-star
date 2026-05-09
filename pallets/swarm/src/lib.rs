@@ -86,10 +86,7 @@ pub mod pallet {
     // ========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
-        /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
+    pub trait Config: frame_system::Config<RuntimeEvent: From<Event<Self>>> {
         /// Currency for staking, rewards, and slashing.
         type Currency: ReservableCurrency<Self::AccountId>;
 

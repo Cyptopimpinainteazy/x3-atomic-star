@@ -85,7 +85,6 @@ parameter_types! {
 }
 
 impl pallet_swarm::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type AdminOrigin = frame_system::EnsureRoot<u64>;
     type SlashOrigin = frame_system::EnsureRoot<u64>;
