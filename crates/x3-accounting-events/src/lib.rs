@@ -358,42 +358,6 @@ impl<BlockNumber: Default + Copy, Balance: Default + Copy>
             is_cross_chain: true,
         }
     }
-
-    /// Construct a [`AccountingEventKind::RouteSettled`] event.
-    ///
-    /// `fee` defaults to zero because fees are ordinarily captured upstream by
-    /// [`Self::fee_collected`] and this event records only the settlement
-    /// confirmation. `fee_destination` is set to
-    /// [`FeeDestination::ProtocolTreasury`] as a neutral default; override it
-    /// after construction when a different destination applies.
-    ///
-    /// `is_cross_chain` is set to `true` automatically when `source_chain !=
-    /// dest_chain`.
-    #[must_use]
-    pub fn route_settled(
-        module: RevenueModule,
-        source_chain: u32,
-        dest_chain: u32,
-        asset_id: u32,
-        principal: Balance,
-        receipt_id: [u8; 32],
-        block: BlockNumber,
-    ) -> Self {
-        Self {
-            module,
-            kind: AccountingEventKind::RouteSettled,
-            source_chain,
-            dest_chain,
-            asset_id,
-            principal,
-            fee: Balance::default(),
-            fee_destination: FeeDestination::ProtocolTreasury,
-            splits: FeeSplits::default(),
-            receipt_id,
-            block,
-            is_cross_chain: source_chain != dest_chain,
-        }
-    }
 }
 
 // ─── Accounting spine trait ───────────────────────────────────────────────────

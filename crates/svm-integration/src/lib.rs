@@ -16,6 +16,9 @@ use sp_std::vec::Vec;
 #[cfg(feature = "std")]
 pub mod rbpf;
 
+/// SVM syscall table: sol_log, get_clock, sha256, cross-vm invoke
+pub mod syscalls;
+
 #[cfg(feature = "std")]
 pub use rbpf::RbpfSvmExecutor;
 
@@ -269,11 +272,14 @@ impl Default for MockSvmExecutor {
 impl SvmExecutor for MockSvmExecutor {
     fn execute(
         &self,
-        _instruction: &SvmInstruction,
+        instruction: &SvmInstruction,
         _payer: [u8; 32],
         _accounts: &[(SvmAccountMeta, AccountUpdate)],
         _config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
+        if instruction.program_id == [0u8; 32] {
+            return Err(SvmError::InvalidProgramId);
+        }
         Ok(SvmExecutionResult {
             success: true,
             output: vec![0x00],
@@ -286,10 +292,13 @@ impl SvmExecutor for MockSvmExecutor {
 
     fn execute_bpf(
         &self,
-        _program: &[u8],
+        program: &[u8],
         _input: &[u8],
         _config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
+        if program.is_empty() {
+            return Err(SvmError::InvalidPayload);
+        }
         Ok(SvmExecutionResult {
             success: true,
             output: vec![0x00],

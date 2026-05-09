@@ -307,7 +307,6 @@ pub mod pallet {
 
     // ── Errors ────────────────────────────────────────────────────────────────
 
-    #[derive(PartialEq)]
     #[pallet::error]
     pub enum Error<T> {
         /// Signer is already registered and active for this vault.

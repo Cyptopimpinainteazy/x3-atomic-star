@@ -98,6 +98,11 @@ mod tests;
 
 pub mod runtime_api;
 
+/// Fallback handler for cross-VM call failures
+pub mod fallback;
+/// Unified metering for cross-VM gas/compute-unit accounting
+pub mod metering;
+
 #[allow(clippy::too_many_arguments)]
 #[frame_support::pallet]
 pub mod pallet {

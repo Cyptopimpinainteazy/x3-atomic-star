@@ -15,6 +15,9 @@ use sp_std::vec::Vec;
 /// Account state management, contract code storage, and state database
 pub mod state;
 
+/// EVM precompile contracts (sha256, keccak256, x3 cross-vm precompile)
+pub mod precompiles;
+
 /// Minimal no-std EVM executor (SputnikVM) — available in both std and no-std builds
 pub mod mini_evm;
 
@@ -384,7 +387,7 @@ mod tests {
     fn test_default_config() {
         let config = EvmConfig::default();
         assert_eq!(config.gas_limit, 21_000_000);
-        assert_eq!(config.chain_id, 42);
+        assert_eq!(config.chain_id, 650_000);
     }
 
     #[test]

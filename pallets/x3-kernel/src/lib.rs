@@ -50,6 +50,16 @@ pub mod adapters;
 pub mod packet_adapters;
 
 pub mod wasm_adapters;
+
+// Asset kernel sub-modules (supply conservation, registry, mapping, mint/burn, external locks)
+pub mod supply;
+pub mod registry;
+pub mod mapping;
+pub mod mint_burn;
+pub mod external_locked;
+pub mod pending_transfer;
+pub mod invariant;
+
 pub use adapters::{
     EvmExecutorAdapter, FailingMockEvmAdapter, FailingMockSvmAdapter, FailingMockX3Adapter,
     MockEvmAdapter, MockSvmAdapter, MockX3Adapter, SvmExecutorAdapter, X3ExecutorAdapter,

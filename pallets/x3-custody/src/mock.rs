@@ -65,9 +65,6 @@ impl pallet_x3_custody::Config for Test {
 }
 
 /// Build clean test externalities with block number initialised to 1.
-///
-/// Block number is set to 1 so that events deposited within `execute_with`
-/// closures are stored — FRAME does not persist events at block 0 (genesis).
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut ext: sp_io::TestExternalities = frame_system::GenesisConfig::<Test>::default()
         .build_storage()

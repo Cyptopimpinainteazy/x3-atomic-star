@@ -24,9 +24,7 @@
 
 use crate::{
     mock::{new_test_ext, RuntimeOrigin, System, Test, X3Custody},
-    pallet::{
-        CustodyMap, KeyRotationSchedule, SignerLimits, TierThresholds, ValidatorKeyRegistry,
-    },
+    pallet::{CustodyMap, KeyRotationSchedule, SignerLimits, ValidatorKeyRegistry},
     AuthorizationTier, Error, KeyRole, SignerPolicy,
 };
 use frame_support::{assert_noop, assert_ok};
