@@ -46,7 +46,7 @@ tracing = "0.1"
 tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 prometheus = "0.14.0"
 metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
+metrics-exporter-prometheus = "0.18"
 
 # Utils
 thiserror = "1.0"
