@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3004,
+    port: 5177,
     proxy: {
       '/api': {
         target: process.env.VITE_X3_API_URL || 'https://api.x3star.net',

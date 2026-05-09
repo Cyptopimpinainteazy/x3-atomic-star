@@ -22,6 +22,7 @@ import CrmApp from "./pages/crm/CrmApp";
 import { AppStorePage } from "./pages/appstore/AppStorePage";
 import Test from "./Test";
 import BenchmarkUltimatePage from "./pages/benchmark-ultimate";
+import AllAppsLauncher from "./components/desktop/AllAppsLauncher";
 
 console.log("📦 App.tsx loaded");
 
@@ -120,6 +121,7 @@ const AppContent: React.FC = () => {
       <Route path="/crm/*" element={<CrmApp />} />
       <Route path="/appstore" element={<AppStorePage />} />
       <Route path="/benchmark-ultimate" element={<BenchmarkUltimatePage />} />
+      <Route path="/apps" element={<AllAppsLauncher />} />
       <Route path="*" element={
         <ThemeProvider>
           {/* Performance Monitor - Press P to toggle */}

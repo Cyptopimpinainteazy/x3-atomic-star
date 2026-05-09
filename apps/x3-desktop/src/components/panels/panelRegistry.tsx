@@ -253,6 +253,19 @@ const GovernanceVotingPanel = lazy(() => import("@/components/panels/governance/
 // Governance - CRM Swarm Governance
 const CrmGovernancePanel = lazy(() => import("@/components/panels/governance/CrmGovernancePanel"));
 
+/* ── Embedded External Apps (full standalone apps via IframePanel) ──── */
+const InfestructorDashboardPanel = lazy(() => import("@/components/panels/embeds/InfestructorDashboardPanel"));
+const InfraDashboardEmbedPanel   = lazy(() => import("@/components/panels/embeds/InfraDashboardPanel"));
+const X3FrontendPanel            = lazy(() => import("@/components/panels/embeds/X3FrontendPanel"));
+const ModularDashboardPanel      = lazy(() => import("@/components/panels/embeds/ModularDashboardPanel"));
+const ValidatorsGlobeEmbedPanel  = lazy(() => import("@/components/panels/embeds/ValidatorsGlobePanel"));
+const WalletAppPanel             = lazy(() => import("@/components/panels/embeds/WalletAppPanel"));
+const DexAppPanel                = lazy(() => import("@/components/panels/embeds/DexAppPanel"));
+const TpsMonitorEmbedPanel       = lazy(() => import("@/components/panels/embeds/TpsMonitorPanel"));
+const MainnetProgressEmbedPanel  = lazy(() => import("@/components/panels/embeds/MainnetProgressPanel"));
+const SwarmAutonomicEmbedPanel   = lazy(() => import("@/components/panels/embeds/SwarmAutonomicPanel"));
+const X3IntelligenceFullPanel    = lazy(() => import("@/components/panels/embeds/X3IntelligenceFullPanel"));
+
 /**
  * Map of appId → lazy-loaded panel component.
  * Add new panels here as they are created.
@@ -962,6 +975,21 @@ const PANEL_MAP: Record<string, ComponentType> = {
   "terminal":                 X3TerminalPanel,
   "cli":                      X3TerminalPanel,
   "shell":                    X3TerminalPanel,
+
+  /* ── Embedded External Apps (full standalone app iframes) ── */
+  "inferstructor-dashboard":  InfestructorDashboardPanel,
+  "infra-dashboard-embed":    InfraDashboardEmbedPanel,
+  "x3-frontend":              X3FrontendPanel,
+  "x3-fronend":               X3FrontendPanel,
+  "x3-landing":               X3FrontendPanel,
+  "modular-dashboard":        ModularDashboardPanel,
+  "validators-globe-embed":   ValidatorsGlobeEmbedPanel,
+  "wallet-app":               WalletAppPanel,
+  "dex-app":                  DexAppPanel,
+  "tps-monitor":              TpsMonitorEmbedPanel,
+  "mainnet-progress":         MainnetProgressEmbedPanel,
+  "swarm-autonomic":          SwarmAutonomicEmbedPanel,
+  "x3-intelligence-full":     X3IntelligenceFullPanel,
 };
 
 /**

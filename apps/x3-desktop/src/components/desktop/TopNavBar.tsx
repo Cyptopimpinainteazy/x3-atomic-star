@@ -254,6 +254,7 @@ const TopNavBar: React.FC = () => {
   ];
 
   const toolsMenuItems: MenuItem[] = [
+    { label: 'All Apps', icon: '🚀', shortcut: 'Ctrl+Shift+L', action: () => navigate('/apps') },
     { label: 'App Store', icon: '📦', shortcut: 'Ctrl+Shift+A', action: () => navigate('/appstore') },
     { divider: true },
     { label: 'Developer Tools', icon: '🛠️', shortcut: 'F12', action: () => console.log('Dev Tools') },

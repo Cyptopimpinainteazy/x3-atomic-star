@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3005,
+    port: 5178,
     proxy: {
       '/api': {
         target: process.env.VITE_X3_RPC_HTTP || 'https://rpc.x3star.net/rpc',

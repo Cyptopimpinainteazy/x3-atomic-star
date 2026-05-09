@@ -2934,7 +2934,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Closed));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// open substreams on both active connections
@@ -3344,7 +3344,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Closed));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// remote opens a substream, verify that peer state is updated to `Incoming`
@@ -3402,7 +3402,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Closed));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// remote opens a substream, verify that peer state is updated to `Incoming`
@@ -3458,7 +3458,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Closed));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// open substreams on both active connections
@@ -3482,7 +3482,7 @@ mod tests {
 			assert_eq!(connections[0].0, conn1);
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.on_swarm_event(FromSwarm::ConnectionClosed(
@@ -3640,7 +3640,7 @@ mod tests {
 			*backoff_until =
 				Some(Instant::now().checked_add(std::time::Duration::from_millis(100)).unwrap());
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.on_swarm_event(FromSwarm::ConnectionClosed(
@@ -3658,7 +3658,7 @@ mod tests {
 		{
 			timer_deadline
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		};
 
 		if until > Instant::now() {
@@ -3740,7 +3740,7 @@ mod tests {
 			assert!(std::matches!(connections[0], (_, ConnectionState::Open(_))));
 			assert_eq!(connections[0].0, conn);
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.peerset_report_disconnect(peer, set_id);
@@ -3754,7 +3754,7 @@ mod tests {
 			*backoff_until =
 				Some(Instant::now().checked_add(std::time::Duration::from_secs(2)).unwrap());
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.peerset_report_connect(peer, set_id);
@@ -3769,16 +3769,7 @@ mod tests {
 
 				*timer_deadline
 			} else {
-				panic!("invalid state");
-			};
-
-		// one of the peers has an active backoff timer so poll the notifications code until
-		// the timer has expired. Because the connection is still in the state of `Closing`,
-		// verify that the code continues to keep the peer disabled by resetting the timer
-		// after the first one expired.
-		if tokio::time::timeout(Duration::from_secs(5), async {
-			let mut params = MockPollParams { peer_id: PeerId::random(), addr: Multiaddr::empty() };
-
+			assert!(false, "invalid state");
 			loop {
 				futures::future::poll_fn(|cx| {
 					let _ = notif.poll(cx, &mut params);
@@ -3796,7 +3787,7 @@ mod tests {
 						break
 					}
 				} else {
-					panic!("invalid state");
+					assert!(false, "invalid state");
 				}
 			}
 		})
@@ -3852,7 +3843,7 @@ mod tests {
 			assert!(std::matches!(connections[0], (_, ConnectionState::Open(_))));
 			assert_eq!(connections[0].0, conn);
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.peerset_report_connect(peer, set_id);

@@ -33,13 +33,57 @@ interface AppStartupHint {
 const PORT_HINTS: Record<string, AppStartupHint[]> = {
   "3001": [
     {
+      appName: "X3 Wallet",
+      port: "3001",
+      command: "npm run dev",
+      workdir: "apps/wallet/",
+    },
+    {
       appName: "X3 App Store",
       port: "3001",
       command: "npm run dev",
       workdir: "x3-app-store/frontend/",
     },
   ],
+  "3002": [
+    {
+      appName: "X3 DEX",
+      port: "3002",
+      command: "npm run dev",
+      workdir: "apps/dex/",
+    },
+  ],
+  "3020": [
+    {
+      appName: "Blockchain TPS Tester",
+      port: "3020",
+      command: "PORT=3020 npm start",
+      workdir: "infra-structure/services/blockchain-tps/",
+    },
+  ],
+  "4173": [
+    {
+      appName: "X3 Landing & Pages",
+      port: "4173",
+      command: "npm run dev",
+      workdir: "x3fronend/",
+    },
+  ],
+  "5174": [
+    {
+      appName: "Inferstructor Dashboard",
+      port: "5174",
+      command: "npm run dev",
+      workdir: "apps/inferstructor-dashboard/",
+    },
+  ],
   "5175": [
+    {
+      appName: "Infra Dashboard",
+      port: "5175",
+      command: "npm run dev",
+      workdir: "infra-structure/dashboard/",
+    },
     {
       appName: "Ollama Code Reviewer",
       port: "5175",
@@ -49,24 +93,46 @@ const PORT_HINTS: Record<string, AppStartupHint[]> = {
   ],
   "5176": [
     {
+      appName: "Modular Dashboard",
+      port: "5176",
+      command: "npm run dev",
+      workdir: "apps/dashboard/",
+    },
+    {
       appName: "3aiXchange DEX",
       port: "5176",
       command: "npm run dev",
       workdir: "apps/3ai/dex/frontend/",
     },
   ],
+  "5177": [
+    {
+      appName: "Validator Globe",
+      port: "5177",
+      command: "npm run dev",
+      workdir: "apps/validators/",
+    },
+  ],
+  "5178": [
+    {
+      appName: "X3 Intelligence",
+      port: "5178",
+      command: "npm run dev",
+      workdir: "apps/x3-intelligence/",
+    },
+  ],
   "8080": [
+    {
+      appName: "Swarm Autonomic",
+      port: "8080",
+      command: "python -m swarm.autonomic",
+      workdir: "swarm_infrastructure/autonomic/",
+    },
     {
       appName: "GPU Validator Dashboard",
       port: "8080",
       command: "python -m cross_chain_gpu_validator.cli dashboard --port 8080",
       workdir: "cross-chain-gpu-validator/",
-    },
-    {
-      appName: "Autonomic Control Plane",
-      port: "8080",
-      command: "python -m swarm.autonomic",
-      workdir: "swarm/autonomic/",
     },
   ],
   "8787": [
@@ -75,14 +141,6 @@ const PORT_HINTS: Record<string, AppStartupHint[]> = {
       port: "8787",
       command: "python3 server.py --port 8787",
       workdir: "tools/foundry-hardhat-gui/",
-    },
-  ],
-  "3020": [
-    {
-      appName: "Blockchain TPS Tester",
-      port: "3020",
-      command: "PORT=3020 npm start",
-      workdir: "infra-structure/services/blockchain-tps/",
     },
   ],
   "9101": [

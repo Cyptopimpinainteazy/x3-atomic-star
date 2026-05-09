@@ -495,6 +495,22 @@
           { label: "Stress Test", href: "blockchain-stress-test.html" },
         ],
       },
+      {
+        label: "Apps Hub",
+        items: [
+          { label: "All Apps", href: "./apps-hub.html" },
+          { label: "X3 Intelligence", href: "./intelligence/" },
+          { label: "X3 Wallet", href: "./wallet/" },
+          { label: "X3 DEX", href: "./dex/" },
+          { label: "Validator Globe", href: "./validators/" },
+          { label: "Modular Dashboard", href: "./dashboard/" },
+          { label: "Inferstructor", href: "./inferstructor/" },
+          { label: "TPS Monitor", href: "./tps/" },
+          { label: "Swarm Autonomic", href: "./swarm-autonomic/" },
+          { label: "Mainnet Progress", href: "./mainnet-progress/" },
+          { label: "Infra Dashboard", href: "./infra-dashboard/" },
+        ],
+      },
     ];
 
     return menus
