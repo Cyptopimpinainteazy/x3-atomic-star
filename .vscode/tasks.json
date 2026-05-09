@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "run-refresh-runtime-weights",
+			"type": "shell",
+			"command": "./scripts/refresh-runtime-weights.sh",
+			"problemMatcher": []
+		},
+		{
+			"label": "run-refresh-runtime-weights-retry",
+			"type": "shell",
+			"command": "./scripts/refresh-runtime-weights.sh",
+			"problemMatcher": []
+		},
+		{
+			"label": "run-refresh-runtime-weights-after-segv-fix",
+			"type": "shell",
+			"command": "./scripts/refresh-runtime-weights.sh",
+			"problemMatcher": []
+		}
+	]
+}
