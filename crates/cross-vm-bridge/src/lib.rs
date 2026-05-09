@@ -2877,23 +2877,21 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [2u8; 20],
                 amount: 100,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToSvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToSvm {
                 source: [3u8; 20],
                 destination: vec![4; 32],
                 amount: 200,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         assert_ok(
             bridge.queue_operation(CrossVmOperation::CallEvm {
@@ -2922,14 +2920,13 @@ mod tests {
     fn test_get_operation_states() {
         let mut bridge = CrossVmBridge::new();
 
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [2u8; 20],
                 amount: 500,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         let states = bridge.get_operation_states();
         assert_eq!(states.len(), 1);
@@ -2944,23 +2941,21 @@ mod tests {
     fn test_nonces_are_monotonically_increasing() {
         let mut bridge = CrossVmBridge::new();
 
-        let n1 = assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        let n1 = bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 100,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
-        let n2 = assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToSvm {
+        let n2 = bridge
+            .queue_operation(CrossVmOperation::TransferToSvm {
                 source: [0u8; 20],
                 destination: vec![1; 32],
                 amount: 200,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         assert_eq!(n1, 1);
         assert_eq!(n2, 2);
@@ -3063,14 +3058,13 @@ mod tests {
         let mut bridge = CrossVmBridge::with_config(config);
 
         // First 300 — OK
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 300,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         // Next 201 — exceeds 500 epoch limit, auto-pauses
         let result = bridge.queue_operation(CrossVmOperation::TransferToEvm {
@@ -3084,14 +3078,6 @@ mod tests {
         // Reset epoch volume and resume
         bridge.reset_epoch_volume();
         bridge.resume();
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
-                source: vec![1; 32],
-                destination: [0u8; 20],
-                amount: 100,
-            }),
-            "queue_operation failed",
-        );
         assert!(!bridge.is_paused());
         assert_eq!(bridge.config.epoch_volume, 0);
     }
@@ -3550,44 +3536,38 @@ mod integration_tests {
         let dispatcher = NoOpDispatcher::testnet();
 
         // Queue a mixed batch
-        let n1 = assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        let n1 = bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [2u8; 20],
                 amount: 100,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
-        let n2 = assert_ok(
-            bridge.queue_operation(CrossVmOperation::CallEvm {
+        let n2 = bridge
+            .queue_operation(CrossVmOperation::CallEvm {
                 caller: vec![3; 32],
                 contract: [4u8; 20],
                 input: vec![0xAB, 0xCD],
                 value: 0,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
-        let n3 = assert_ok(
-            bridge.queue_operation(CrossVmOperation::AtomicSwap {
+        let n3 = bridge
+            .queue_operation(CrossVmOperation::AtomicSwap {
                 evm_party: [5u8; 20],
                 svm_party: vec![6; 32],
                 evm_asset: [0u8; 20],
                 svm_asset: vec![0u8; 32],
                 evm_amount: 500,
                 svm_amount: 1000,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         assert_eq!((n1, n2, n3), (1, 2, 3));
 
         // Full atomic: prepare + commit
-        let (results, events) = assert_ok(
-            bridge.atomic_execute(&dispatcher),
-            "atomic_execute failed",
-        );
+        let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(bridge.completed_count(), 3);
@@ -3616,14 +3596,13 @@ mod integration_tests {
         let mut bridge = CrossVmBridge::with_config(config);
 
         // Transfer 600 — OK
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 600,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
 
         // Transfer 500 — exceeds 1000 epoch limit
         let result = bridge.queue_operation(CrossVmOperation::TransferToEvm {
@@ -3639,14 +3618,13 @@ mod integration_tests {
         bridge.resume();
 
         // Should work again
-        assert_ok(
-            bridge.queue_operation(CrossVmOperation::TransferToEvm {
+        bridge
+            .queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [0u8; 20],
                 amount: 100,
-            }),
-            "queue_operation failed",
-        );
+            })
+            .unwrap();
         assert!(!bridge.is_paused());
     }
 }
@@ -4352,14 +4330,8 @@ mod x3vm_dispatcher_tests {
         let caller = [0u8; 32];
         let call = make_call(VmId::X3Vm);
 
-        let r1 = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
-        let r2 = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let r1 = d.execute_x3vm_tx(&caller, &call).unwrap();
+        let r2 = d.execute_x3vm_tx(&caller, &call).unwrap();
         assert_eq!(r1.call_hash, r2.call_hash);
         assert_eq!(r1.status, r2.status);
         assert_eq!(r1.gas_used, r2.gas_used);
@@ -4374,10 +4346,7 @@ mod x3vm_dispatcher_tests {
         let caller = [0u8; 32];
         let call = make_call(VmId::X3Vm);
 
-        let receipt = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let receipt = d.execute_x3vm_tx(&caller, &call).unwrap();
         let independent = call.call_hash(&H256::zero());
         assert_eq!(receipt.call_hash, independent);
     }
@@ -4417,10 +4386,7 @@ mod execute_call_routing_tests {
 
         assert_eq!(receipt.status, CrossVmStatus::Success);
         // call_hash MUST agree with the x3vm-direct path.
-        let direct = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let direct = d.execute_x3vm_tx(&caller, &call).unwrap();
         assert_eq!(receipt.call_hash, direct.call_hash);
     }
 
@@ -4474,10 +4440,7 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Evm, b"too-short".to_vec(), 100_000);
 
-        let receipt = assert_ok(
-            d.execute_call(&caller, &call),
-            "execute_call failed",
-        );
+        let receipt = d.execute_call(&caller, &call).unwrap();
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4489,10 +4452,7 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Svm, vec![0u8; 16], 50_000);
 
-        let receipt = assert_ok(
-            d.execute_call(&caller, &call),
-            "execute_call failed",
-        );
+        let receipt = d.execute_call(&caller, &call).unwrap();
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4850,10 +4810,7 @@ mod x3vm_2pc_integration_tests {
         let call = make_call(VmId::X3Vm, 7, [0; 4]);
         let key = CrossVmBridge::x3vm_replay_key(&call);
         assert!(!bridge.is_x3vm_call_replayed(&key));
-        assert_ok(
-            bridge.admit_x3vm_call_hash(key),
-            "admit_x3vm_call_hash failed",
-        );
+        bridge.admit_x3vm_call_hash(key).unwrap();
         assert!(bridge.is_x3vm_call_replayed(&key));
         // Second admission rejects
         let err = bridge.admit_x3vm_call_hash(key).expect_err("replay");
@@ -4868,10 +4825,7 @@ mod x3vm_2pc_integration_tests {
         let call = make_call(VmId::X3Vm, 901, [0; 4]);
         let key = CrossVmBridge::x3vm_replay_key(&call);
 
-        assert_ok(
-            bridge.admit_x3vm_call_hash(key),
-            "admit_x3vm_call_hash failed",
-        );
+        bridge.admit_x3vm_call_hash(key).unwrap();
         assert!(bridge.is_x3vm_call_replayed(&key));
         assert_eq!(bridge.x3vm_replay_map_len(), 1);
 
@@ -4897,10 +4851,7 @@ mod x3vm_2pc_integration_tests {
             call: call.clone(),
         };
 
-        assert_ok(
-            bridge.queue_operation(op.clone()),
-            "queue_operation failed",
-        );
+        bridge.queue_operation(op.clone()).unwrap();
         let key = CrossVmBridge::x3vm_replay_key(&call);
         assert!(bridge.is_x3vm_call_replayed(&key));
 
@@ -4909,10 +4860,7 @@ mod x3vm_2pc_integration_tests {
         assert!(bridge.abort_x3vm_admission(&key));
 
         // Requeue must now succeed
-        assert_ok(
-            bridge.queue_operation(op),
-            "queue_operation failed",
-        );
+        bridge.queue_operation(op).unwrap();
         assert!(bridge.is_x3vm_call_replayed(&key));
     }
 
