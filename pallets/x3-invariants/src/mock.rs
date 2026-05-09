@@ -64,6 +64,7 @@ impl crate::Config for Test {
     type DefaultMaxAgents = DefaultMaxAgents;
     type DefaultMaxProposalDepth = DefaultMaxProposalDepth;
     type WeightInfo = ();
+    type SecurityHook = x3_security_events::NoOpHook;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

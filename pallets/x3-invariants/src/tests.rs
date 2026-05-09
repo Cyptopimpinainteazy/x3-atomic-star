@@ -243,3 +243,197 @@ fn invariant_reporter_sets_proposal_depth() {
         assert_eq!(ProposalDepth::<Test>::get(), 42);
     });
 }
+
+// ── Phase 0 constitutional controls ───────────────────────────────────────────
+
+/// Registering an authority and then activating the kill switch must set
+/// `KillSwitches` to `true` for that module.
+#[test]
+fn register_and_activate_kill_switch() {
+    use crate::emergency::ModuleId;
+    use pallet::KillSwitches;
+    use parity_scale_codec::Encode;
+    use sp_io::hashing::blake2_256;
+
+    new_test_ext().execute_with(|| {
+        let module_id: ModuleId = [1u8; 32];
+        let account_id: u64 = 42;
+        let authority_id = blake2_256(&account_id.encode());
+
+        assert_ok!(Invariants::register_emergency_authority(
+            RuntimeOrigin::root(),
+            module_id,
+            authority_id,
+            1_000u64, // expires far in the future
+            false,    // evidence not required
+            [0xAAu8; 32],
+        ));
+
+        // Activate from the registered account at a block well before expiry.
+        System::set_block_number(1);
+        assert_ok!(Invariants::activate_kill_switch(
+            RuntimeOrigin::signed(account_id),
+            module_id,
+            None,
+        ));
+
+        assert!(
+            KillSwitches::<Test>::get(module_id),
+            "kill switch should be active after activation"
+        );
+    });
+}
+
+/// Activation must fail with `AuthorityExpired` when the current block is at or
+/// past the record's `expires_at_block`.
+#[test]
+fn activate_fails_when_expired() {
+    use crate::emergency::ModuleId;
+    use parity_scale_codec::Encode;
+    use sp_io::hashing::blake2_256;
+
+    new_test_ext().execute_with(|| {
+        let module_id: ModuleId = [2u8; 32];
+        let account_id: u64 = 42;
+        let authority_id = blake2_256(&account_id.encode());
+
+        assert_ok!(Invariants::register_emergency_authority(
+            RuntimeOrigin::root(),
+            module_id,
+            authority_id,
+            5u64, // expires at block 5
+            false,
+            [0u8; 32],
+        ));
+
+        // At block 5: `5 < 5` is false, so the record is considered expired.
+        System::set_block_number(5);
+        assert_noop!(
+            Invariants::activate_kill_switch(
+                RuntimeOrigin::signed(account_id),
+                module_id,
+                None,
+            ),
+            Error::<Test>::AuthorityExpired
+        );
+    });
+}
+
+/// Activation must fail with `NotTheRegisteredAuthority` when the signed origin
+/// does not match the `authority_id` stored in the registry.
+#[test]
+fn activate_fails_wrong_origin() {
+    use crate::emergency::ModuleId;
+    use parity_scale_codec::Encode;
+    use sp_io::hashing::blake2_256;
+
+    new_test_ext().execute_with(|| {
+        let module_id: ModuleId = [3u8; 32];
+        let registered_account: u64 = 42;
+        let authority_id = blake2_256(&registered_account.encode());
+
+        assert_ok!(Invariants::register_emergency_authority(
+            RuntimeOrigin::root(),
+            module_id,
+            authority_id,
+            1_000u64,
+            false,
+            [0u8; 32],
+        ));
+
+        System::set_block_number(1);
+
+        // Account 99 is not the registered authority; its hash won't match.
+        assert_noop!(
+            Invariants::activate_kill_switch(
+                RuntimeOrigin::signed(99u64),
+                module_id,
+                None,
+            ),
+            Error::<Test>::NotTheRegisteredAuthority
+        );
+    });
+}
+
+/// When `requires_evidence = true`, omitting the evidence hash must return
+/// `EvidenceRequired` and the kill switch must remain inactive.
+#[test]
+fn evidence_required_but_missing() {
+    use crate::emergency::ModuleId;
+    use pallet::KillSwitches;
+    use parity_scale_codec::Encode;
+    use sp_io::hashing::blake2_256;
+
+    new_test_ext().execute_with(|| {
+        let module_id: ModuleId = [4u8; 32];
+        let account_id: u64 = 42;
+        let authority_id = blake2_256(&account_id.encode());
+
+        assert_ok!(Invariants::register_emergency_authority(
+            RuntimeOrigin::root(),
+            module_id,
+            authority_id,
+            1_000u64,
+            true, // evidence IS required
+            [0u8; 32],
+        ));
+
+        System::set_block_number(1);
+
+        assert_noop!(
+            Invariants::activate_kill_switch(
+                RuntimeOrigin::signed(account_id),
+                module_id,
+                None, // evidence hash omitted
+            ),
+            Error::<Test>::EvidenceRequired
+        );
+
+        // Kill switch must remain inactive.
+        assert!(!KillSwitches::<Test>::get(module_id));
+    });
+}
+
+/// Registering a canonical truth source, reading it back, and then removing it
+/// must leave the storage entry absent.
+#[test]
+fn canonical_truth_roundtrip() {
+    use crate::emergency::DomainId;
+    use pallet::CanonicalTruthMap;
+
+    new_test_ext().execute_with(|| {
+        let domain_id: DomainId = [5u8; 32];
+        let pallet_name_hash = [0x10u8; 32];
+        let storage_item_hash = [0x20u8; 32];
+        let description_hash = [0x30u8; 32];
+
+        // Register.
+        assert_ok!(Invariants::register_canonical_truth_source(
+            RuntimeOrigin::root(),
+            domain_id,
+            pallet_name_hash,
+            storage_item_hash,
+            description_hash,
+        ));
+
+        // Verify stored fields.
+        let record = CanonicalTruthMap::<Test>::get(domain_id)
+            .expect("canonical truth record must exist after registration");
+        assert_eq!(record.domain_id, domain_id);
+        assert_eq!(record.pallet_name_hash, pallet_name_hash);
+        assert_eq!(record.storage_item_hash, storage_item_hash);
+        assert_eq!(record.description_hash, description_hash);
+
+        // Also verify via the public helper.
+        assert!(crate::get_canonical_source::<Test>(domain_id).is_some());
+
+        // Remove.
+        assert_ok!(Invariants::remove_canonical_truth_source(
+            RuntimeOrigin::root(),
+            domain_id,
+        ));
+
+        assert!(CanonicalTruthMap::<Test>::get(domain_id).is_none());
+        assert!(crate::get_canonical_source::<Test>(domain_id).is_none());
+    });
+}

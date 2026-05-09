@@ -38,6 +38,8 @@ mod benchmarking;
 pub mod weights;
 pub use weights::WeightInfo;
 
+pub mod emergency;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::WeightInfo;
@@ -45,6 +47,9 @@ pub mod pallet {
     use frame_support::{pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::Zero;
+    use crate::emergency::{AuthorityRecord, DomainId, EvidenceBundle, ModuleId, TruthSourceRecord};
+    use sp_io::hashing::blake2_256;
+    use x3_security_events::{SecurityEvent, SecurityEventHook};
 
     // ── Storage types ──────────────────────────────────────────────────────────
 
@@ -124,6 +129,11 @@ pub mod pallet {
 
         /// Weight information for this pallet's extrinsics.
         type WeightInfo: WeightInfo;
+
+        /// Security swarm hook. Called whenever a security-critical event occurs
+        /// (invariant breach, chain halt, kill switch activation). Implementations
+        /// forward these to off-chain monitoring; use `NoOpHook` in test mocks.
+        type SecurityHook: SecurityEventHook<BlockNumberFor<Self>>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────────
@@ -160,6 +170,35 @@ pub mod pallet {
             observed: u128,
             bound: u128,
         },
+
+        // ── Phase 0 constitutional control events ──────────────────────────
+
+        /// An emergency authority was registered for a module.
+        EmergencyAuthorityRegistered {
+            module_id: ModuleId,
+            authority_id: [u8; 32],
+            expires_at_block: BlockNumberFor<T>,
+        },
+        /// The expiry of an emergency authority record was updated.
+        EmergencyAuthorityExpired {
+            module_id: ModuleId,
+            new_expires_at_block: BlockNumberFor<T>,
+        },
+        /// The kill switch for a module was activated by its registered authority.
+        KillSwitchActivated {
+            module_id: ModuleId,
+            /// `true` if an evidence bundle hash was submitted with the activation.
+            evidence_provided: bool,
+        },
+        /// The kill switch for a module was deactivated by governance.
+        KillSwitchDeactivated { module_id: ModuleId },
+        /// A canonical truth source was registered (or updated) for a domain.
+        CanonicalTruthRegistered {
+            domain_id: DomainId,
+            pallet_name_hash: [u8; 32],
+        },
+        /// A canonical truth source was removed for a domain.
+        CanonicalTruthRemoved { domain_id: DomainId },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────────
@@ -171,6 +210,26 @@ pub mod pallet {
         BoundWeakeningNotAllowed,
         /// Supplied constitution hash is all-zeros (invalid).
         InvalidConstitutionHash,
+
+        // ── Phase 0 constitutional control errors ──────────────────────────
+
+        /// No emergency authority record exists for the given module.
+        AuthorityNotFound,
+        /// An unexpired authority record already exists for this module.
+        /// Call `update_emergency_expiry` to modify the existing record.
+        AuthorityAlreadyRegistered,
+        /// The authority record has expired (`current_block >= expires_at_block`).
+        AuthorityExpired,
+        /// The origin does not match the `authority_id` stored in the registry.
+        NotTheRegisteredAuthority,
+        /// `requires_evidence` is `true` on the authority record but no evidence hash was provided.
+        EvidenceRequired,
+        /// The kill switch for this module is already active.
+        KillSwitchAlreadyActive,
+        /// The kill switch for this module is not currently active.
+        KillSwitchNotActive,
+        /// No canonical truth source is registered for the given domain.
+        TruthSourceNotFound,
     }
 
     // ── Hooks ──────────────────────────────────────────────────────────────────
@@ -289,6 +348,228 @@ pub mod pallet {
             Self::deposit_event(Event::ConstitutionHashSet { hash });
             Ok(())
         }
+
+        // ── Phase 0 constitutional controls ───────────────────────────────────
+
+        /// Register an emergency authority for a module.
+        ///
+        /// Stores an `AuthorityRecord` keyed by `module_id`. Fails with
+        /// `AuthorityAlreadyRegistered` if a record already exists and has not yet
+        /// expired. Expired records may be overwritten.
+        ///
+        /// Origin: Root/governance.
+        #[pallet::call_index(4)]
+        #[pallet::weight(T::WeightInfo::register_emergency_authority())]
+        pub fn register_emergency_authority(
+            origin: OriginFor<T>,
+            module_id: ModuleId,
+            authority_id: [u8; 32],
+            expires_at_block: BlockNumberFor<T>,
+            requires_evidence: bool,
+            module_name_hash: [u8; 32],
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            // Reject if an unexpired record already exists.
+            if let Some(existing) = EmergencyAuthorities::<T>::get(module_id) {
+                let current_block = frame_system::Pallet::<T>::block_number();
+                ensure!(
+                    current_block >= existing.expires_at_block,
+                    Error::<T>::AuthorityAlreadyRegistered
+                );
+            }
+
+            EmergencyAuthorities::<T>::insert(
+                module_id,
+                AuthorityRecord {
+                    authority_id,
+                    expires_at_block,
+                    requires_evidence,
+                    module_name_hash,
+                },
+            );
+
+            Self::deposit_event(Event::EmergencyAuthorityRegistered {
+                module_id,
+                authority_id,
+                expires_at_block,
+            });
+            Ok(())
+        }
+
+        /// Update the expiry block of an existing emergency authority record.
+        ///
+        /// Emits `EmergencyAuthorityExpired` to log the update.
+        ///
+        /// Origin: Root/governance.
+        #[pallet::call_index(5)]
+        #[pallet::weight(T::WeightInfo::update_emergency_expiry())]
+        pub fn update_emergency_expiry(
+            origin: OriginFor<T>,
+            module_id: ModuleId,
+            new_expires_at_block: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            EmergencyAuthorities::<T>::try_mutate(module_id, |maybe_record| {
+                let record = maybe_record
+                    .as_mut()
+                    .ok_or(Error::<T>::AuthorityNotFound)?;
+                record.expires_at_block = new_expires_at_block;
+                Ok::<(), DispatchError>(())
+            })?;
+
+            Self::deposit_event(Event::EmergencyAuthorityExpired {
+                module_id,
+                new_expires_at_block,
+            });
+            Ok(())
+        }
+
+        /// Activate the kill switch for a module.
+        ///
+        /// The caller must be the registered emergency authority for the module
+        /// (verified by comparing `blake2_256(origin.encode())` to the stored
+        /// `authority_id`). The record must not be expired. If the record's
+        /// `requires_evidence` flag is set, `evidence_hash` must be `Some`.
+        ///
+        /// Stores an `EvidenceBundle` when a hash is provided.
+        ///
+        /// Origin: Signed (the registered authority).
+        #[pallet::call_index(6)]
+        #[pallet::weight(T::WeightInfo::activate_kill_switch())]
+        pub fn activate_kill_switch(
+            origin: OriginFor<T>,
+            module_id: ModuleId,
+            evidence_hash: Option<[u8; 32]>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            let record = EmergencyAuthorities::<T>::get(module_id)
+                .ok_or(Error::<T>::AuthorityNotFound)?;
+
+            let current_block = frame_system::Pallet::<T>::block_number();
+            ensure!(
+                current_block < record.expires_at_block,
+                Error::<T>::AuthorityExpired
+            );
+
+            // Verify the caller matches the stored authority by hashing their account encoding.
+            let origin_hash = blake2_256(&who.encode());
+            ensure!(
+                origin_hash == record.authority_id,
+                Error::<T>::NotTheRegisteredAuthority
+            );
+
+            if record.requires_evidence {
+                ensure!(evidence_hash.is_some(), Error::<T>::EvidenceRequired);
+            }
+
+            ensure!(
+                !KillSwitches::<T>::get(module_id),
+                Error::<T>::KillSwitchAlreadyActive
+            );
+
+            // Persist the evidence bundle if a hash was provided.
+            if let Some(hash) = evidence_hash {
+                KillSwitchEvidence::<T>::insert(
+                    module_id,
+                    EvidenceBundle {
+                        evidence_hash: hash,
+                        submitted_at: current_block,
+                        submitter: origin_hash,
+                    },
+                );
+            }
+
+            KillSwitches::<T>::insert(module_id, true);
+
+            T::SecurityHook::emit(SecurityEvent::kill_switch_activated(
+                module_id,
+                frame_system::Pallet::<T>::block_number(),
+            ));
+
+            Self::deposit_event(Event::KillSwitchActivated {
+                module_id,
+                evidence_provided: evidence_hash.is_some(),
+            });
+            Ok(())
+        }
+
+        /// Deactivate the kill switch for a module.
+        ///
+        /// Only governance (root) may lift a kill switch. Fails with
+        /// `KillSwitchNotActive` if the module is not currently killed.
+        ///
+        /// Origin: Root/governance.
+        #[pallet::call_index(7)]
+        #[pallet::weight(T::WeightInfo::deactivate_kill_switch())]
+        pub fn deactivate_kill_switch(
+            origin: OriginFor<T>,
+            module_id: ModuleId,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+            ensure!(
+                KillSwitches::<T>::get(module_id),
+                Error::<T>::KillSwitchNotActive
+            );
+            KillSwitches::<T>::insert(module_id, false);
+            Self::deposit_event(Event::KillSwitchDeactivated { module_id });
+            Ok(())
+        }
+
+        /// Register (or overwrite) the canonical truth source for a domain.
+        ///
+        /// Upserts a `TruthSourceRecord` into `CanonicalTruthMap`. An existing
+        /// entry is overwritten without error (governance may update the canonical
+        /// source when the authoritative pallet changes).
+        ///
+        /// Origin: Root/governance.
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::register_canonical_truth_source())]
+        pub fn register_canonical_truth_source(
+            origin: OriginFor<T>,
+            domain_id: DomainId,
+            pallet_name_hash: [u8; 32],
+            storage_item_hash: [u8; 32],
+            description_hash: [u8; 32],
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            CanonicalTruthMap::<T>::insert(
+                domain_id,
+                TruthSourceRecord {
+                    domain_id,
+                    pallet_name_hash,
+                    storage_item_hash,
+                    description_hash,
+                },
+            );
+
+            Self::deposit_event(Event::CanonicalTruthRegistered {
+                domain_id,
+                pallet_name_hash,
+            });
+            Ok(())
+        }
+
+        /// Remove the canonical truth source for a domain.
+        ///
+        /// Fails with `TruthSourceNotFound` if no record exists for the domain.
+        ///
+        /// Origin: Root/governance.
+        #[pallet::call_index(9)]
+        #[pallet::weight(T::WeightInfo::remove_canonical_truth_source())]
+        pub fn remove_canonical_truth_source(
+            origin: OriginFor<T>,
+            domain_id: DomainId,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+            CanonicalTruthMap::<T>::take(domain_id)
+                .ok_or(Error::<T>::TruthSourceNotFound)?;
+            Self::deposit_event(Event::CanonicalTruthRemoved { domain_id });
+            Ok(())
+        }
     }
 
     // ── Genesis ────────────────────────────────────────────────────────────────
@@ -358,6 +639,11 @@ pub mod pallet {
                         observed,
                         bound: max_supply,
                     });
+                    T::SecurityHook::emit(SecurityEvent::invariant_breach(
+                        blake2_256(b"MaxSupply"),
+                        block,
+                        ViolationCount::<T>::get(),
+                    ));
                     if HaltOnViolation::<T>::get() {
                         // S0-6: Replaced runtime panic with defensive log + halt
                         // event. Panicking inside `on_finalize` puts the node in
@@ -378,6 +664,10 @@ pub mod pallet {
                             observed,
                             bound: max_supply,
                         });
+                        T::SecurityHook::emit(SecurityEvent::chain_halt_raised(
+                            block,
+                            ViolationCount::<T>::get(),
+                        ));
                     }
                 }
             }
@@ -395,6 +685,11 @@ pub mod pallet {
                         observed: observed as u128,
                         bound: max_agents as u128,
                     });
+                    T::SecurityHook::emit(SecurityEvent::invariant_breach(
+                        blake2_256(b"MaxAgents"),
+                        block,
+                        ViolationCount::<T>::get(),
+                    ));
                     if HaltOnViolation::<T>::get() {
                         // S0-6: see comment on max-supply branch.
                         Halted::<T>::put(true);
@@ -410,6 +705,10 @@ pub mod pallet {
                             observed: observed as u128,
                             bound: max_agents as u128,
                         });
+                        T::SecurityHook::emit(SecurityEvent::chain_halt_raised(
+                            block,
+                            ViolationCount::<T>::get(),
+                        ));
                     }
                 }
             }
@@ -427,6 +726,11 @@ pub mod pallet {
                         observed: observed as u128,
                         bound: max_depth as u128,
                     });
+                    T::SecurityHook::emit(SecurityEvent::invariant_breach(
+                        blake2_256(b"MaxProposalDepth"),
+                        block,
+                        ViolationCount::<T>::get(),
+                    ));
                     if HaltOnViolation::<T>::get() {
                         // S0-6: see comment on max-supply branch.
                         Halted::<T>::put(true);
@@ -442,6 +746,10 @@ pub mod pallet {
                             observed: observed as u128,
                             bound: max_depth as u128,
                         });
+                        T::SecurityHook::emit(SecurityEvent::chain_halt_raised(
+                            block,
+                            ViolationCount::<T>::get(),
+                        ));
                     }
                 }
             }
@@ -480,6 +788,38 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn proposal_depth)]
     pub type ProposalDepth<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+    // ── Phase 0 constitutional controls ───────────────────────────────────────
+
+    /// Registry of emergency authorities per module.
+    ///
+    /// An authority may activate the kill switch for its module by presenting
+    /// a matching signed origin before the record's `expires_at_block`.
+    #[pallet::storage]
+    pub type EmergencyAuthorities<T: Config> =
+        StorageMap<_, Blake2_128Concat, ModuleId, AuthorityRecord<BlockNumberFor<T>>>;
+
+    /// Kill switch state per module.
+    ///
+    /// `true` means the module is killed and should refuse new state transitions.
+    /// Only the registered authority may activate; only governance may deactivate.
+    #[pallet::storage]
+    pub type KillSwitches<T: Config> =
+        StorageMap<_, Blake2_128Concat, ModuleId, bool, ValueQuery>;
+
+    /// Canonical truth source registry.
+    ///
+    /// Maps `domain_id` to the single authoritative pallet/storage-item pair.
+    #[pallet::storage]
+    pub type CanonicalTruthMap<T: Config> =
+        StorageMap<_, Blake2_128Concat, DomainId, TruthSourceRecord>;
+
+    /// Evidence bundles submitted to justify kill switch activations (one per module).
+    ///
+    /// Stored only when the caller supplies an `evidence_hash` at activation time.
+    #[pallet::storage]
+    pub type KillSwitchEvidence<T: Config> =
+        StorageMap<_, Blake2_128Concat, ModuleId, EvidenceBundle<BlockNumberFor<T>>>;
 }
 
 // ── InvariantKind enum (outside pallet macro, SCALE-encoded) ─────────────────
@@ -537,4 +877,28 @@ impl<T: Config> InvariantReporter for Pallet<T> {
     fn set_proposal_depth(depth: u32) {
         ProposalDepth::<T>::put(depth);
     }
+}
+
+// ── Phase 0 constitutional control helpers ────────────────────────────────────
+// These are free functions (outside the pallet macro) so that other pallets can
+// query kill-switch and canonical-truth state without importing pallet internals.
+
+use crate::emergency::{DomainId, ModuleId, TruthSourceRecord};
+
+/// Returns `true` if the given module's kill switch is currently active.
+///
+/// Other pallets should call this at the start of state-mutating extrinsics to
+/// respect emergency stops declared by the constitutional authority.
+pub fn is_module_killed<T: crate::pallet::Config>(module_id: ModuleId) -> bool {
+    crate::pallet::KillSwitches::<T>::get(module_id)
+}
+
+/// Returns the canonical truth source for a domain, if registered.
+///
+/// Use this to locate the authoritative pallet/storage-item for a given domain
+/// (e.g. `"balances"`, `"receipts"`) without hard-coding pallet coupling.
+pub fn get_canonical_source<T: crate::pallet::Config>(
+    domain_id: DomainId,
+) -> Option<TruthSourceRecord> {
+    crate::pallet::CanonicalTruthMap::<T>::get(domain_id)
 }

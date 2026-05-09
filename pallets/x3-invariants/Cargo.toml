@@ -27,6 +27,7 @@ sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 log = { version = "0.4", default-features = false }
 serde = { workspace = true, optional = true, features = ["derive"] }
+x3-security-events = { path = "../../crates/x3-security-events", default-features = false }
 
 [dev-dependencies]
 sp-io = { workspace = true }
@@ -48,6 +49,7 @@ std = [
     "serde/std",
     "log/std",
     "frame-benchmarking?/std",
+    "x3-security-events/std",
 ]
 runtime-benchmarks = [
     "frame-support/runtime-benchmarks",
