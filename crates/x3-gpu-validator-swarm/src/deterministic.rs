@@ -4,6 +4,12 @@
 
 use crate::crypto::{HashAlgorithm, HashOutput, VerificationResult};
 use crate::error::{SwarmError, SwarmResult};
+#[cfg(any(
+    feature = "cuda",
+    feature = "opencl",
+    feature = "metal",
+    feature = "vulkan"
+))]
 use crate::gpu_bytecode;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -344,77 +350,111 @@ impl DeterministicEngine {
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
     ) -> SwarmResult<ExecutionResult> {
-        // Try to get GPU hostcalls
-        let gpu_hostcalls = match self.get_gpu_hostcalls() {
-            Some(hostcalls) => hostcalls,
-            None => {
-                // GPU unavailable, fall back to CPU
-                warn!(
-                    "[Deterministic Engine] GPU unavailable for task {}, using CPU",
-                    task.task_id
-                );
-                return self.execute_cpu(task, algorithm);
-            }
-        };
+        // Without GPU features compiled in, route straight to CPU
+        #[cfg(not(any(
+            feature = "cuda",
+            feature = "opencl",
+            feature = "metal",
+            feature = "vulkan"
+        )))]
+        return self.execute_cpu(task, algorithm);
 
-        // Combine all inputs into a single batch
+        // With GPU features: use GPU hostcalls
+        #[cfg(any(
+            feature = "cuda",
+            feature = "opencl",
+            feature = "metal",
+            feature = "vulkan"
+        ))]
+        {
+            let gpu_hostcalls = match self.get_gpu_hostcalls() {
+                Some(hostcalls) => hostcalls,
+                None => {
+                    warn!(
+                        "[Deterministic Engine] GPU unavailable for task {}, using CPU",
+                        task.task_id
+                    );
+                    return self.execute_cpu(task, algorithm);
+                }
+            };
+
+            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+                Ok(outputs) => {
+                    debug!(
+                        "[Deterministic Engine] GPU execution completed for task {} (count: {})",
+                        task.task_id,
+                        outputs.len()
+                    );
+                    Ok(ExecutionResult::success(
+                        task.task_id.clone(),
+                        outputs,
+                        ExecutionMode::GpuOnly,
+                        0,
+                    ))
+                }
+                Err(e) => {
+                    error!(
+                        "[Deterministic Engine] GPU execution failed for task {}: {:?}",
+                        task.task_id, e
+                    );
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    /// Low-level GPU execution via X3 VM bytecode dispatch (requires a GPU feature flag)
+    #[cfg(any(
+        feature = "cuda",
+        feature = "opencl",
+        feature = "metal",
+        feature = "vulkan"
+    ))]
+    fn exec_on_gpu_device(
+        &self,
+        task: &DeterministicTask,
+        algorithm: HashAlgorithm,
+        gpu_hostcalls: Arc<GpuHostcalls>,
+    ) -> SwarmResult<Vec<HashOutput>> {
         let mut batch_data = Vec::new();
         for input in &task.inputs {
             batch_data.extend_from_slice(input);
         }
 
-        // Generate X3 bytecode for GPU execution
         let module = gpu_bytecode::generate_gpu_bytecode_for_algorithm(
             algorithm,
             batch_data,
             task.inputs.len() as i64,
         );
 
-        // Create VM and register GPU hostcalls
         let mut vm = VM::new(module);
         gpu_hostcalls.register_on_vm(&mut vm);
 
-        // Execute the GPU bytecode
         match vm.call_function(0, &[]) {
-            Ok(execution_result) => {
-                match execution_result.value {
-                    Some(x3_vm::Value::Bytes(hashes)) => {
-                        // Parse hashes back into HashOutput format
-                        let output_size = 32; // Standard hash size (SHA-256, Keccak-256, etc.)
-                        let mut outputs = Vec::new();
-                        for chunk in hashes.chunks(output_size) {
-                            outputs.push(bytes_to_hash_output(chunk));
-                        }
-
-                        debug!(
-                            "[Deterministic Engine] GPU execution completed for task {} (count: {})",
-                            task.task_id,
-                            outputs.len()
-                        );
-
-                        Ok(ExecutionResult::success(
-                            task.task_id.clone(),
-                            outputs,
-                            ExecutionMode::GpuOnly,
-                            execution_result.gas_used,
-                        ))
+            Ok(execution_result) => match execution_result.value {
+                Some(x3_vm::Value::Bytes(hashes)) => {
+                    let output_size = 32;
+                    let mut outputs = Vec::new();
+                    for chunk in hashes.chunks(output_size) {
+                        outputs.push(bytes_to_hash_output(chunk));
                     }
-                    other => {
-                        error!(
-                            "[Deterministic Engine] GPU execution returned unexpected value type: {:?}",
-                            other
-                        );
-                        Err(SwarmError::GpuError(format!(
-                            "GPU execution returned unexpected value: {:?}",
-                            other
-                        )))
-                    }
+                    Ok(outputs)
                 }
-            }
+                other => {
+                    error!(
+                        "[Deterministic Engine] GPU returned unexpected value type: {:?}",
+                        other
+                    );
+                    Err(SwarmError::GpuError(format!(
+                        "GPU returned unexpected value: {:?}",
+                        other
+                    )))
+                }
+            },
             Err(e) => {
                 error!(
-                    "[Deterministic Engine] GPU execution failed for task {}: {:?}",
-                    task.task_id, e
+                    "[Deterministic Engine] GPU execution failed: {:?}",
+                    e
                 );
                 Err(SwarmError::GpuError(format!("GPU execution failed: {}", e)))
             }
@@ -455,22 +495,48 @@ impl DeterministicEngine {
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
     ) -> SwarmResult<ExecutionResult> {
+        #[cfg(not(any(
+            feature = "cuda",
+            feature = "opencl",
+            feature = "metal",
+            feature = "vulkan"
+        )))]
+        return self.execute_cpu(task, algorithm);
+
+        #[cfg(any(
+            feature = "cuda",
+            feature = "opencl",
+            feature = "metal",
+            feature = "vulkan"
+        ))]
+        self.execute_with_verification_gpu(task, algorithm)
+    }
+
+    /// GPU+CPU dual-verification logic (only compiled when a GPU backend is enabled)
+    #[cfg(any(
+        feature = "cuda",
+        feature = "opencl",
+        feature = "metal",
+        feature = "vulkan"
+    ))]
+    fn execute_with_verification_gpu(
+        &self,
+        task: &DeterministicTask,
+        algorithm: HashAlgorithm,
+    ) -> SwarmResult<ExecutionResult> {
         let cpu_verification_enabled = self.cpu_verification_enabled.load(Ordering::SeqCst);
         let replay_mode_enabled = self.replay_mode_enabled.load(Ordering::SeqCst);
         let verification_level = *self.verification_level.read();
 
-        // Step 1: Execute on GPU with real hostcalls
-        let gpu_outputs = {
-            // Try to get GPU hostcalls
+        // Step 1: Execute on GPU
+        let gpu_outputs: Vec<HashOutput> = {
             let gpu_hostcalls = match self.get_gpu_hostcalls() {
                 Some(hostcalls) => hostcalls,
                 None => {
-                    // GPU unavailable, fall back to CPU
                     warn!(
                         "[Deterministic Engine] GPU unavailable for task {}, using CPU verification only",
                         task.task_id
                     );
-                    // If GPU unavailable, just do CPU verification and return
                     let cpu_outputs: Vec<HashOutput> = task
                         .inputs
                         .iter()
@@ -485,54 +551,14 @@ impl DeterministicEngine {
                 }
             };
 
-            // Combine all inputs into a single batch
-            let mut batch_data = Vec::new();
-            for input in &task.inputs {
-                batch_data.extend_from_slice(input);
-            }
-
-            // Generate X3 bytecode for GPU execution
-            let module = gpu_bytecode::generate_gpu_bytecode_for_algorithm(
-                algorithm,
-                batch_data,
-                task.inputs.len() as i64,
-            );
-
-            // Create VM and register GPU hostcalls
-            let mut vm = VM::new(module);
-            gpu_hostcalls.register_on_vm(&mut vm);
-
-            // Execute the GPU bytecode
-            match vm.call_function(0, &[]) {
-                Ok(execution_result) => {
-                    match execution_result.value {
-                        Some(x3_vm::Value::Bytes(hashes)) => {
-                            // Parse hashes back into HashOutput format
-                            let output_size = 32; // Standard hash size (SHA-256, Keccak-256, etc.)
-                            let mut outputs = Vec::new();
-                            for chunk in hashes.chunks(output_size) {
-                                outputs.push(bytes_to_hash_output(chunk));
-                            }
-
-                            debug!(
-                                "[Deterministic Engine] GPU execution completed for task {} (count: {})",
-                                task.task_id,
-                                outputs.len()
-                            );
-
-                            outputs
-                        }
-                        other => {
-                            error!(
-                                "[Deterministic Engine] GPU execution returned unexpected value type: {:?}",
-                                other
-                            );
-                            return Err(crate::error::SwarmError::GpuError(format!(
-                                "GPU execution returned unexpected value: {:?}",
-                                other
-                            )));
-                        }
-                    }
+            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+                Ok(outputs) => {
+                    debug!(
+                        "[Deterministic Engine] GPU execution completed for task {} (count: {})",
+                        task.task_id,
+                        outputs.len()
+                    );
+                    outputs
                 }
                 Err(e) => {
                     error!(
@@ -555,41 +581,30 @@ impl DeterministicEngine {
                 .map(|input| crate::crypto::compute_hash(&algorithm, input))
                 .collect();
 
-            // Check for divergence based on verification level
             let needs_verification = match verification_level {
-                VerificationLevel::Basic => true, // Always verify
-                VerificationLevel::Standard => true,
-                VerificationLevel::Strict => true,
+                VerificationLevel::Basic | VerificationLevel::Standard | VerificationLevel::Strict => true,
             };
 
-            // Use tolerance-based comparison for numerical computations
             let outputs_match = if task.task_type == TaskType::Custom {
-                // For custom computations that might involve floating point
                 Self::compare_with_tolerance(&gpu_outputs, &cpu_outputs, 1e-9)
             } else {
-                // For hash operations, exact match is expected
                 gpu_outputs == cpu_outputs
             };
 
             if needs_verification && !outputs_match {
-                // Additional verification: check if difference is within acceptable bounds
                 if Self::is_acceptable_divergence(&gpu_outputs, &cpu_outputs) {
-                    // Log warning but don't quarantine
                     warn!(
                         "[Deterministic Engine] Minor divergence detected within tolerance for task {}",
                         task.task_id
                     );
                 } else {
-                    // Divergence detected!
-
-                    // Step 3: Replay mode (if enabled) - re-run GPU to confirm
+                    // Step 3: Replay mode - re-run GPU to confirm divergence
                     if replay_mode_enabled {
                         info!(
                             "[Deterministic Engine] Divergence detected for task {}, entering replay mode",
                             task.task_id
                         );
 
-                        // Replay GPU execution
                         let gpu_hostcalls = match self.get_gpu_hostcalls() {
                             Some(hostcalls) => hostcalls,
                             None => {
@@ -606,63 +621,30 @@ impl DeterministicEngine {
                             }
                         };
 
-                        let mut batch_data = Vec::new();
-                        for input in &task.inputs {
-                            batch_data.extend_from_slice(input);
-                        }
-
-                        let module = gpu_bytecode::generate_gpu_bytecode_for_algorithm(
-                            algorithm,
-                            batch_data,
-                            task.inputs.len() as i64,
-                        );
-
-                        let mut vm = VM::new(module);
-                        gpu_hostcalls.register_on_vm(&mut vm);
-
-                        let replay_outputs = match vm.call_function(0, &[]) {
-                            Ok(execution_result) => match execution_result.value {
-                                Some(x3_vm::Value::Bytes(hashes)) => {
-                                    let output_size = 32;
-                                    let mut outputs = Vec::new();
-                                    for chunk in hashes.chunks(output_size) {
-                                        outputs.push(bytes_to_hash_output(chunk));
-                                    }
-                                    outputs
-                                }
-                                _ => {
+                        let replay_outputs =
+                            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+                                Ok(outputs) => outputs,
+                                Err(e) => {
                                     error!(
-                                            "[Deterministic Engine] GPU replay returned unexpected value for task {}",
-                                            task.task_id
-                                        );
+                                        "[Deterministic Engine] GPU replay failed for task {}: {}",
+                                        task.task_id, e
+                                    );
                                     gpu_outputs.clone()
                                 }
-                            },
-                            Err(e) => {
-                                error!(
-                                    "[Deterministic Engine] GPU replay failed for task {}: {}",
-                                    task.task_id, e
-                                );
-                                gpu_outputs.clone()
-                            }
-                        };
+                            };
 
-                        // Record replay for analysis
                         let record = ReplayRecord {
                             task: task.clone(),
                             original_output: gpu_outputs.clone(),
                             replay_output: replay_outputs.clone(),
                             cpu_output: cpu_outputs.clone(),
                             replay_matches_original: gpu_outputs == replay_outputs,
-                            cpu_matches_gpu: false, // Already known to be different
+                            cpu_matches_gpu: false,
                             timestamp: chrono::Utc::now().timestamp(),
                         };
                         self.replay_records.write().push(record);
-                        self.stats
-                            .replay_verifications
-                            .fetch_add(1, Ordering::SeqCst);
+                        self.stats.replay_verifications.fetch_add(1, Ordering::SeqCst);
 
-                        // If replay matches original but differs from CPU, GPU is divergent
                         if gpu_outputs == replay_outputs {
                             error!(
                                 "[Deterministic Engine] GPU divergence confirmed after replay for task {} (GPU differs from CPU)",
@@ -677,7 +659,6 @@ impl DeterministicEngine {
                         }
                     }
 
-                    // CPU and GPU differ - report divergence
                     error!(
                         "[Deterministic Engine] GPU/CPU divergence detected for task {}",
                         task.task_id
@@ -692,7 +673,6 @@ impl DeterministicEngine {
             }
         }
 
-        // Verification passed - return GPU results
         debug!(
             "[Deterministic Engine] Task {} verification passed",
             task.task_id

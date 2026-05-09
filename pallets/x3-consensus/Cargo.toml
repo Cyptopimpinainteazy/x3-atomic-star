@@ -27,6 +27,8 @@ pallet-offences = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 
 [dev-dependencies]
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 
 [features]
 default = ["std"]

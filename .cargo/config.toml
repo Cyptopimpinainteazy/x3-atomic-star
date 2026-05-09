@@ -12,4 +12,9 @@ debug = 0
 # embedded runtime WASM:
 #   SKIP_WASM_BUILD=1 cargo check
 
+# Raise the compiler thread stack size to prevent ICE/SIGSEGV when type-checking
+# deep generic graphs in x3-gpu-validator-swarm + libp2p + Substrate dependencies.
+[env]
+RUST_MIN_STACK = "33554432"
+
 

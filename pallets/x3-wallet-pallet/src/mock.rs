@@ -53,12 +53,16 @@ impl pallet_x3_wallet::Config for Test {
     type RuntimeEvent = RuntimeEvent;
 }
 
-/// Build genesis storage for tests.
+/// Build genesis storage for tests with ALICE pre-authorized as a minter.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    frame_system::GenesisConfig::<Test>::default()
+    let mut ext: sp_io::TestExternalities = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap()
-        .into()
+        .into();
+    ext.execute_with(|| {
+        crate::Minters::<Test>::insert(ALICE, ());
+    });
+    ext
 }
 
 /// Test accounts

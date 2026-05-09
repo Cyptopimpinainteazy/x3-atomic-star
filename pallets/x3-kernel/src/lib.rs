@@ -3525,7 +3525,7 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                value_bytes[dest_start..src_end].copy_from_slice(&raw_tx[src_start..src_end]);
+                value_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
@@ -3581,7 +3581,7 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                price_bytes[dest_start..src_end].copy_from_slice(&raw_tx[src_start..src_end]);
+                price_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(price_bytes)
             } else {
@@ -3605,7 +3605,7 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 8 - len;
-                gas_bytes[dest_start..src_end].copy_from_slice(&raw_tx[src_start..src_end]);
+                gas_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u64::from_be_bytes(gas_bytes)
             } else {
@@ -3655,7 +3655,7 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                value_bytes[dest_start..src_end].copy_from_slice(&raw_tx[src_start..src_end]);
+                value_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
