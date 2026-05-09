@@ -210,7 +210,9 @@ pub mod pallet {
             ensure!(threshold > 0 && threshold as usize <= signers.len(), Error::<T>::InvalidThreshold);
 
             let mut wallet_id = [0u8; 32];
-            wallet_id[0..16].copy_from_slice(&who.encode()[0..16.min(who.encode().len())]);
+            let encoded = who.encode();
+            let copy_len = encoded.len().min(32);
+            wallet_id[..copy_len].copy_from_slice(&encoded[..copy_len]);
 
             let multisig = MultisigWallet {
                 id: wallet_id,

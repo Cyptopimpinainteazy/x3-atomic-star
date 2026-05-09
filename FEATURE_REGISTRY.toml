@@ -282,3 +282,22 @@ required_tests = [
 ]
 blockers = []
 dangerous_paths = ["grant-funding", "mainnet"]
+
+[x3_wallet_pallet]
+mode = "LIVE_TESTNET"
+crate_or_service = "pallets/x3-wallet-pallet"
+tauri_app = "WalletVault"
+required_tests = [
+  "register_hardware_wallet",
+  "create_multisig_wallet",
+  "transfer_tokens",
+  "mint_tokens_authorized_only",
+  "add_remove_minter_root_only",
+  "register_biometric",
+  "initiate_recovery"
+]
+health_endpoint = "/health/x3-wallet"
+proof_report = "reports/wallet_pallet_report.md"
+readiness_score = 100
+blockers = []
+dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
