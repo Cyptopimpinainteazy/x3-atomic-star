@@ -3765,23 +3765,25 @@ mod message_passing_tests {
         let mut bridge = CrossVmBridge::new();
 
         // Queue three messages in order
-        let n1 = bridge
-            .queue_operation(CrossVmOperation::MessageToEvm {
+        let n1 = assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToEvm {
                 sender: vec![1u8; 32],
                 target_contract: [2u8; 20],
                 message: b"first".to_vec(),
                 nonce: 1,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let n2 = bridge
-            .queue_operation(CrossVmOperation::MessageToSvm {
+        let n2 = assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToSvm {
                 sender: [3u8; 20],
                 target_program: vec![4u8; 32],
                 message: b"second".to_vec(),
                 nonce: 2,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         let n3 = assert_ok(
             bridge.queue_operation(CrossVmOperation::MessageToEvm {
@@ -3798,7 +3800,7 @@ mod message_passing_tests {
         assert!(n2 < n3, "nonce ordering violated: n2={n2} n3={n3}");
 
         // All three execute in order
-        let results = bridge.execute_pending().unwrap();
+        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
     }
