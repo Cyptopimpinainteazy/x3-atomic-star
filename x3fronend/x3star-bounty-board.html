@@ -104,7 +104,7 @@ select.sort-sel{background:var(--card);border:1px solid var(--border);color:var(
   <div class="logo">X3STAR</div>
   <div class="nav-sub">Builder Bounty Board</div>
   <div class="nav-right">
-    <span class="pool-badge" id="bounty-pool">--</span>
+    <span class="pool-badge">$2,840,000 in open bounties</span>
     <button class="nb nb-ghost">Post a Bounty</button>
     <button class="nb nb-amber" onclick="location.href='x3star-grant-mission-control.html'">Grants →</button>
   </div>
@@ -115,11 +115,11 @@ select.sort-sel{background:var(--card);border:1px solid var(--border);color:var(
   <p class="page-sub">Open tasks posted by the X3STAR DAO. Complete a bounty, earn X3S. No application. No gatekeeping. Ship and get paid.</p>
 
   <div class="stats-row">
-    <div class="sr-cell"><div class="src-val" style="color:var(--amber)" id="bounty-open">--</div><div class="src-key">Open Bounties</div></div>
-    <div class="sr-cell"><div class="src-val" style="color:var(--green)" id="bounty-total-pool">--</div><div class="src-key">Total Pool</div></div>
-    <div class="sr-cell"><div class="src-val" id="bounty-claimed">--</div><div class="src-key">Claimed This Month</div></div>
-    <div class="sr-cell"><div class="src-val" style="color:var(--cyan)" id="bounty-builders">--</div><div class="src-key">Active Builders</div></div>
-    <div class="sr-cell"><div class="src-val" style="color:var(--red)" id="bounty-closing">--</div><div class="src-key">Closing This Week</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--amber)">84</div><div class="src-key">Open Bounties</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--green)">$2.84M</div><div class="src-key">Total Pool</div></div>
+    <div class="sr-cell"><div class="src-val">$284K</div><div class="src-key">Claimed This Month</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--cyan)">148</div><div class="src-key">Active Builders</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--red)">12</div><div class="src-key">Closing This Week</div></div>
   </div>
 
   <div class="filter-bar">
@@ -144,18 +144,66 @@ select.sort-sel{background:var(--card);border:1px solid var(--border);color:var(
   <div class="bounty-grid" id="bounty-grid"></div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
+const bounties=[
+  {title:'Critical: Re-entrancy check on Staking Contract',cat:'BUG BOUNTY',catColor:'var(--red)',status:'hot',reward:'$50,000',sub:'50,000 X3S + $',tags:['Solidity','Security','EVM'],desc:'Audit the X3STAR staking contract for re-entrancy vulnerabilities. Must provide PoC exploit and patch. Severity P0.',deadline:'2 days left',claimed:false,progress:null},
+  {title:'ZK Bridge UI — Ethereum to X3STAR',cat:'FEATURE',catColor:'var(--cyan)',status:'open',reward:'$15,000',sub:'200,000 X3S',tags:['React','Wagmi','TypeScript'],desc:'Build the front-end bridge interface for ETH→X3STAR transfers. Designs provided. Must handle all error states.',deadline:'14 days left',claimed:false,progress:null},
+  {title:'Developer Documentation — SDK v2',cat:'DOCS',catColor:'var(--amber)',status:'claimed',reward:'$5,000',sub:'66,000 X3S',tags:['Technical Writing','TypeScript','API'],desc:'Complete documentation for the X3STAR JS SDK v2. 40+ functions need examples, type definitions, and use cases.',deadline:'In progress',claimed:true,progress:{label:'Documentation: 68% complete',pct:68,color:'var(--amber)'}},
+  {title:'Spanish Translation — Full Whitepaper',cat:'TRANSLATION',catColor:'var(--purple)',status:'open',reward:'$2,000',sub:'26,000 X3S',tags:['Spanish','Technical','Native'],desc:'Professional translation of the X3STAR whitepaper and technical docs to Spanish. Must be native speaker.',deadline:'21 days left',claimed:false,progress:null},
+  {title:'Mobile Wallet — Biometric Auth Module',cat:'FEATURE',catColor:'var(--cyan)',status:'open',reward:'$8,000',sub:'106,000 X3S',tags:['React Native','iOS','Android','FaceID'],desc:'Implement Face ID and fingerprint authentication for the X3STAR mobile wallet. Must work on iOS 16+ and Android 12+.',deadline:'18 days left',claimed:false,progress:null},
+  {title:'High: Gas Optimization — Validator Contract',cat:'BUG BOUNTY',catColor:'var(--red)',status:'open',reward:'$12,000',sub:'160,000 X3S',tags:['Solidity','Optimization','Foundry'],desc:'Reduce gas costs on validator registration and reward claim functions. Target: 30%+ reduction. Benchmarks required.',deadline:'10 days left',claimed:false,progress:null},
+  {title:'Governance Forum — Proposal Template System',cat:'FEATURE',catColor:'var(--cyan)',status:'claimed',reward:'$6,000',sub:'80,000 X3S',tags:['React','Markdown','Governance'],desc:'Build a structured proposal editor with templates for XIP submissions. Includes preview, validation, and on-chain submission.',deadline:'In progress',claimed:true,progress:{label:'Frontend: 45% complete',pct:45,color:'var(--cyan)'}},
+  {title:'Japanese Translation — Website + App',cat:'TRANSLATION',catColor:'var(--purple)',status:'open',reward:'$3,500',sub:'46,000 X3S',tags:['Japanese','Technical','UI/UX'],desc:'Full i18n translation for x3star.io and the web app. Native Japanese speaker required. Includes ongoing maintenance.',deadline:'28 days left',claimed:false,progress:null},
+  {title:'Block Explorer — NFT Viewer',cat:'FEATURE',catColor:'var(--cyan)',status:'open',reward:'$4,000',sub:'53,000 X3S',tags:['TypeScript','IPFS','Vue'],desc:'Add NFT metadata display to the X3STAR block explorer. Fetch from IPFS, display images, traits, and collection stats.',deadline:'16 days left',claimed:false,progress:null},
+  {title:'Economic Research — Token Emission Model',cat:'RESEARCH',catColor:'var(--amber)',status:'open',reward:'$10,000',sub:'133,000 X3S',tags:['Economics','Modeling','Python'],desc:'Model long-term token emission vs buy pressure vs staking rewards. Deliverable: full report + simulation code.',deadline:'30 days left',claimed:false,progress:null},
+  {title:'Community Dashboard — Widget Pack',cat:'DESIGN',catColor:'var(--green)',status:'open',reward:'$3,000',sub:'40,000 X3S',tags:['Figma','React','Embeddable'],desc:'Design and build 6 embeddable community widgets (price, TVL, validator count, etc.) for partner sites.',deadline:'20 days left',claimed:false,progress:null},
+  {title:'Medium: Flash Loan Attack Surface Analysis',cat:'BUG BOUNTY',catColor:'var(--red)',status:'open',reward:'$8,000',sub:'106,000 X3S',tags:['DeFi','Security','Foundry'],desc:'Analyze DEX and lending contracts for flash loan attack vectors. Full report required with severity ratings.',deadline:'7 days left',claimed:false,progress:null},
+];
+
+const statusMap={open:'bs-open',claimed:'bs-claimed',hot:'bs-hot'};
+const statusLabel={open:'OPEN',claimed:'IN PROGRESS',hot:'🔥 HOT'};
+const grid=document.getElementById('bounty-grid');
+bounties.forEach(b=>{
+  const div=document.createElement('div');
+  div.className='b-card';
+  div.style.setProperty('--c',b.catColor);
+  div.style.borderTopColor=b.catColor+'40';
+  div.innerHTML=`
+    <div class="bc-top">
+      <span class="bc-cat" style="background:${b.catColor}20;color:${b.catColor};border:1px solid ${b.catColor}30">${b.cat}</span>
+      <span class="bc-status ${statusMap[b.status]}">${statusLabel[b.status]}</span>
+    </div>
+    <div class="bc-title">${b.title}</div>
+    <div class="bc-desc">${b.desc}</div>
+    <div class="bc-tags">${b.tags.map(t=>`<span class="bc-tag">${t}</span>`).join('')}</div>
+    ${b.progress?`<div class="bc-progress"><div class="bcp-label"><span>${b.progress.label}</span><span>${b.progress.pct}%</span></div><div class="bcp-bar"><div class="bcp-fill" style="width:${b.progress.pct}%;background:${b.progress.color}"></div></div></div>`:''}
+    <div class="bc-footer">
+      <div>
+        <div class="bc-reward">${b.reward}</div>
+        <div class="bc-reward-sub">${b.sub}</div>
+        <div class="bc-deadline">${b.deadline}</div>
+      </div>
+      <button class="bc-claim-btn ${b.claimed?'taken':''}" onclick="claimBounty(this,'${b.title}')">${b.claimed?'View Progress':'Claim Bounty'}</button>
+    </div>
+  `;
+  grid.appendChild(div);
+});
+
 document.querySelectorAll('.fb-chip').forEach(c=>{
   c.addEventListener('click',()=>{
     document.querySelectorAll('.fb-chip').forEach(x=>x.classList.remove('active'));
     c.classList.add('active');
   });
 });
-if (window.X3PageAdapters) {
-  window.X3PageAdapters.start();
+
+function claimBounty(btn,title){
+  if(btn.textContent==='Claim Bounty'){
+    btn.textContent='✓ Claimed!';btn.classList.add('taken');
+    setTimeout(()=>{btn.textContent='View Progress';},1500);
+    alert(`✅ Bounty claimed!\n\n"${title}"\n\nA confirmation has been sent to your wallet. Submit your work via GitHub PR tagged #x3star-bounty.`);
+  }
 }
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

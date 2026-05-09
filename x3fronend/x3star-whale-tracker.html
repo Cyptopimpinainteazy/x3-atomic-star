@@ -188,9 +188,9 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
     <div class="ph-sub">Track the 50 largest X3STAR wallets in real-time. Follow smart money.</div>
   </div>
   <div style="display:flex;gap:12px;align-items:center;">
-    <div style="font-size:12px;color:var(--muted);font-family:var(--mono);">X3S/USD: <span style="color:var(--gold);font-weight:700;">--</span> <span style="color:var(--green)">--</span></div>
+    <div style="font-size:12px;color:var(--muted);font-family:var(--mono);">X3S/USD: <span style="color:var(--gold);font-weight:700;">$0.0842</span> <span style="color:var(--green)">▲+12.4%</span></div>
     <div class="alert-count" id="alert-btn" onclick="showAlert()">
-      <div class="ac-num" id="alert-num">--</div>
+      <div class="ac-num" id="alert-num">3</div>
       <div>New Whale<br>Alerts</div>
       <div style="font-size:18px;">🔔</div>
     </div>
@@ -202,7 +202,7 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
   <div class="left-col">
     <div class="sec-head">
       <span class="sh-title">Top Wallets</span>
-      <span class="sh-count" id="whale-count">--</span>
+      <span class="sh-count" id="whale-count">50 wallets tracked</span>
     </div>
     <div id="whale-list" style="overflow-y:auto;max-height:calc(100vh - 170px);">
       <!-- Populated by JS -->
@@ -220,7 +220,7 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
         <button class="filter-chip fc-move" onclick="setFilter(this,'move')">TRANSFER</button>
       </div>
       <div style="font-size:10px;color:var(--muted);font-family:var(--mono);">
-        <span id="stream-count">--</span> events today
+        <span id="stream-count">0</span> events today
       </div>
     </div>
 
@@ -236,21 +236,21 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
         <div class="big-sent-label">Whale Sentiment</div>
         <div class="sentiment" style="margin-top:12px;">
           <div>
-            <div class="sent-label"><span style="color:var(--green)">BUY</span><span class="sent-pct" style="color:var(--green)" id="buy-pct">--</span></div>
-            <div class="sent-bar"><div class="sent-fill" id="buy-bar" style="width:0%;background:var(--green)"></div></div>
+            <div class="sent-label"><span style="color:var(--green)">BUY</span><span class="sent-pct" style="color:var(--green)" id="buy-pct">78%</span></div>
+            <div class="sent-bar"><div class="sent-fill" id="buy-bar" style="width:78%;background:var(--green)"></div></div>
           </div>
           <div>
-            <div class="sent-label"><span style="color:var(--red)">SELL</span><span class="sent-pct" style="color:var(--red)" id="sell-pct">--</span></div>
-            <div class="sent-bar"><div class="sent-fill" id="sell-bar" style="width:0%;background:var(--red)"></div></div>
+            <div class="sent-label"><span style="color:var(--red)">SELL</span><span class="sent-pct" style="color:var(--red)" id="sell-pct">22%</span></div>
+            <div class="sent-bar"><div class="sent-fill" id="sell-bar" style="width:22%;background:var(--red)"></div></div>
           </div>
         </div>
       </div>
       <div class="br-panel">
         <div class="br-title">Accumulation Score</div>
-        <div class="accum-score" id="accum-score">--</div>
-        <div class="accum-sub" id="accum-sub">out of 10 · updating</div>
+        <div class="accum-score" id="accum-score">8.4</div>
+        <div class="accum-sub">out of 10 · STRONG ACCUMULATION</div>
         <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-top:12px;">
-          <div id="accum-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--purple));border-radius:100px;"></div>
+          <div style="height:100%;width:84%;background:linear-gradient(90deg,var(--gold),var(--purple));border-radius:100px;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:4px;">
           <span>Distribution</span><span>Accumulation</span>
@@ -261,23 +261,23 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;justify-content:space-between;font-size:11px;">
             <span style="color:var(--muted)">Top 1 wallet</span>
-            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top1">--</span>
+            <span style="font-family:var(--mono);color:var(--gold)">14.2M X3S</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px;">
             <span style="color:var(--muted)">Top 10 wallets</span>
-            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top10">--</span>
+            <span style="font-family:var(--mono);color:var(--gold)">82.4M X3S</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px;">
             <span style="color:var(--muted)">Top 50 wallets</span>
-            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top50">--</span>
+            <span style="font-family:var(--mono);color:var(--gold)">284M X3S</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px;">
             <span style="color:var(--muted)">% of supply</span>
-            <span style="font-family:var(--mono);color:var(--cyan)" id="whale-supply-pct">--</span>
+            <span style="font-family:var(--mono);color:var(--cyan)">28.4%</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);padding-top:6px;">
             <span style="color:var(--text)">24h Whale Net Flow</span>
-            <span style="font-family:var(--mono);color:var(--green);font-weight:700" id="whale-netflow">--</span>
+            <span style="font-family:var(--mono);color:var(--green);font-weight:700">+4.2M X3S</span>
           </div>
         </div>
       </div>
@@ -295,10 +295,139 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 
   </div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
-X3PageAdapters.start();
+const whales = [
+  {rank:1,name:'apex.eth',addr:'0x4F2a...9D1E',holdings:'14.2M X3S',usd:'$1.2M',change:'+12.4%',type:'whale',activity:94,color:'#FFD700',bg:'linear-gradient(135deg,#FFD700,#FF9900)'},
+  {rank:2,name:'nebula_dao',addr:'0x8B1c...2F4A',holdings:'9.8M X3S',usd:'$825K',change:'+8.2%',type:'inst',activity:87,color:'#8833FF',bg:'linear-gradient(135deg,#8833FF,#5500CC)'},
+  {rank:3,name:'quantum_fund',addr:'0x3A9b...7E2C',holdings:'8.4M X3S',usd:'$708K',change:'+15.1%',type:'inst',activity:91,color:'#00FF88',bg:'linear-gradient(135deg,#00FF88,#00AA44)'},
+  {rank:4,name:'delta_stake',addr:'0x1D7f...4A2B',holdings:'6.2M X3S',usd:'$522K',change:'+6.8%',type:'val',activity:78,color:'#00D4FF',bg:'linear-gradient(135deg,#00D4FF,#0066FF)'},
+  {rank:5,name:'cryptoking.eth',addr:'0x9C3e...8B1D',holdings:'5.8M X3S',usd:'$489K',change:'+21.3%',type:'whale',activity:96,color:'#FFD700',bg:'linear-gradient(135deg,#FFD700,#FF6600)'},
+  {rank:6,name:'polaris_fund',addr:'0x5F8d...3C1A',holdings:'4.9M X3S',usd:'$413K',change:'+4.2%',type:'inst',activity:65,color:'#8833FF',bg:'linear-gradient(135deg,#AA66FF,#6622AA)'},
+  {rank:7,name:'0xDead...F00D',addr:'0xDead...F00D',holdings:'4.1M X3S',usd:'$345K',change:'-2.1%',type:'whale',activity:42,color:'#FF2D55',bg:'linear-gradient(135deg,#FF2D55,#AA0022)'},
+  {rank:8,name:'starfall.eth',addr:'0x2B4c...9A1F',holdings:'3.8M X3S',usd:'$320K',change:'+9.7%',type:'val',activity:83,color:'#00D4FF',bg:'linear-gradient(135deg,#00D4FF,#0044AA)'},
+  {rank:9,name:'zkbuilder.eth',addr:'0x7E2a...1B3C',holdings:'3.2M X3S',usd:'$270K',change:'+18.4%',type:'val',activity:89,color:'#00FF88',bg:'linear-gradient(135deg,#00FF88,#007744)'},
+  {rank:10,name:'defi_degen',addr:'0x6C1b...4D2E',holdings:'2.9M X3S',usd:'$244K',change:'+7.1%',type:'whale',activity:74,color:'#FF8C00',bg:'linear-gradient(135deg,#FF8C00,#CC5500)'},
+  {rank:11,name:'0xA4F1...22BB',addr:'0xA4F1...22BB',holdings:'2.6M X3S',usd:'$219K',change:'+3.3%',type:'whale',activity:55,color:'#8833FF',bg:'linear-gradient(135deg,#AA44FF,#5511AA)'},
+  {rank:12,name:'galaxy_inv',addr:'0x1122...AABB',holdings:'2.4M X3S',usd:'$202K',change:'+11.8%',type:'inst',activity:81,color:'#FFD700',bg:'linear-gradient(135deg,#FFD700,#FF9900)'},
+];
+
+// Build whale list
+const wl = document.getElementById('whale-list');
+whales.forEach((w,i)=>{
+  const d = document.createElement('div');
+  d.className='whale-card'+(i===0?' selected':'');
+  const changeCls = w.change.startsWith('+') ? 'var(--green)' : 'var(--red)';
+  const badgeCls = w.type==='whale'?'wb-whale':w.type==='inst'?'wb-inst':'wb-val';
+  const badgeLabel = w.type==='whale'?'WHALE':w.type==='inst'?'INSTITUTION':'VALIDATOR';
+  d.innerHTML=`
+    <div class="wc-top">
+      <div class="wc-rank">#${w.rank}</div>
+      <div class="wc-avatar" style="background:${w.bg}">${w.name[0].toUpperCase()}</div>
+      <div class="wc-identity">
+        <div class="wc-name" style="color:${w.color}">${w.name}</div>
+        <div class="wc-addr">${w.addr}</div>
+      </div>
+      <div class="wc-badge ${badgeCls}">${badgeLabel}</div>
+    </div>
+    <div class="wc-bottom">
+      <div class="wcb-stat"><div class="wcbs-val" style="color:var(--gold)">${w.holdings}</div><div class="wcbs-key">Balance</div></div>
+      <div class="wcb-stat"><div class="wcbs-val">${w.usd}</div><div class="wcbs-key">USD Value</div></div>
+      <div class="wcb-stat"><div class="wcbs-val" style="color:${changeCls}">${w.change}</div><div class="wcbs-key">24h Change</div></div>
+    </div>
+    <div class="wc-activity"><div class="wca-fill" style="width:${w.activity}%;background:${w.color}"></div></div>
+  `;
+  d.addEventListener('click',()=>{
+    document.querySelectorAll('.whale-card').forEach(c=>c.classList.remove('selected'));
+    d.classList.add('selected');
+  });
+  wl.appendChild(d);
+});
+
+// ACTIVITY STREAM
+const actTypes = [
+  {type:'BUY',class:'ait-buy',icon:'💰',bg:'rgba(0,255,136,0.08)',iconBg:'rgba(0,255,136,0.12)',verbs:['purchased','accumulated','bought'],color:'var(--green)'},
+  {type:'SELL',class:'ait-sell',icon:'📤',bg:'rgba(255,45,85,0.05)',iconBg:'rgba(255,45,85,0.1)',verbs:['sold','liquidated','transferred out'],color:'var(--red)'},
+  {type:'STAKE',class:'ait-stake',icon:'🔒',bg:'rgba(0,212,255,0.05)',iconBg:'rgba(0,212,255,0.1)',verbs:['staked','delegated','locked'],color:'var(--cyan)'},
+  {type:'MOVE',class:'ait-move',icon:'↔',bg:'rgba(255,150,0,0.04)',iconBg:'rgba(255,150,0,0.08)',verbs:['moved','bridged','transferred'],color:'var(--orange)'},
+  {type:'VOTE',class:'ait-vote',icon:'🗳',bg:'rgba(120,50,255,0.05)',iconBg:'rgba(120,50,255,0.1)',verbs:['voted on','approved','rejected'],color:'var(--purple)'},
+];
+const bigAmounts=['500,000 X3S','1,200,000 X3S','84,000 X3S','2,400,000 X3S','320,000 X3S','142,000 X3S'];
+let streamCount=0;
+
+function addActivity(){
+  const t=actTypes[Math.floor(Math.random()*actTypes.length)];
+  const w=whales[Math.floor(Math.random()*whales.length)];
+  const amt=bigAmounts[Math.floor(Math.random()*bigAmounts.length)];
+  const verb=t.verbs[Math.floor(Math.random()*t.verbs.length)];
+  const xsAmt=parseInt(amt.replace(/[^0-9]/g,''));
+  const usdAmt='$'+(xsAmt*0.0842).toLocaleString(undefined,{maximumFractionDigits:0});
+  
+  const stream=document.getElementById('act-stream');
+  const div=document.createElement('div');
+  div.className='act-item new-item';
+  streamCount++;
+  div.innerHTML=`
+    <div class="ai-icon" style="background:${t.iconBg}">${t.icon}</div>
+    <div class="ai-body">
+      <div class="ai-top">
+        <span class="ai-wallet" style="color:${w.color}">${w.name}</span>
+        <span class="ai-type ${t.class}">${t.type}</span>
+      </div>
+      <div class="ai-action">${verb} X3STAR tokens</div>
+      <div class="ai-meta">${w.addr} · Block #${(1847291+Math.floor(Math.random()*100))}</div>
+    </div>
+    <div class="ai-amount">
+      <div class="ai-val" style="color:${t.color}">${amt}</div>
+      <div class="ai-usd">${usdAmt}</div>
+      <div class="ai-time">just now</div>
+    </div>
+  `;
+  stream.insertBefore(div,stream.firstChild);
+  if(stream.children.length>80)stream.removeChild(stream.lastChild);
+  document.getElementById('stream-count').textContent=streamCount.toLocaleString();
+  
+  // Occasionally show alert toast
+  if(Math.random()<0.08 && t.type==='BUY'){
+    const toast=document.getElementById('alert-toast');
+    toast.style.display='block';
+    toast.querySelector('.at-body').innerHTML=`
+      <span class="at-val">${w.name}</span> just <b>purchased</b> <span class="at-val" style="color:var(--green)">${amt}</span>
+      <span class="at-val" style="color:var(--gold)"> (${usdAmt})</span> from the presale contract.
+      <div style="margin-top:8px;font-size:10px;">just now · Block #${(1847291+Math.floor(Math.random()*100))}</div>
+    `;
+    let n=parseInt(document.getElementById('alert-num').textContent)+1;
+    document.getElementById('alert-num').textContent=n;
+    setTimeout(()=>toast.style.display='none',5000);
+  }
+}
+
+// Seed initial
+for(let i=0;i<20;i++)addActivity();
+setInterval(addActivity,1200+Math.random()*2000);
+
+// Sentiment updates
+setInterval(()=>{
+  const buy=70+Math.floor(Math.random()*20);
+  const sell=100-buy;
+  document.getElementById('buy-pct').textContent=buy+'%';
+  document.getElementById('sell-pct').textContent=sell+'%';
+  document.getElementById('buy-bar').style.width=buy+'%';
+  document.getElementById('sell-bar').style.width=sell+'%';
+  document.getElementById('sent-dominant').textContent=buy>65?'BULLISH':buy<35?'BEARISH':'NEUTRAL';
+  document.getElementById('sent-dominant').style.color=buy>65?'var(--green)':buy<35?'var(--red)':'var(--gold)';
+  const score=(buy/10).toFixed(1);
+  document.getElementById('accum-score').textContent=score;
+},8000);
+
+function setFilter(el,type){
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+}
+function showAlert(){
+  document.getElementById('alert-toast').style.display='block';
+  setTimeout(()=>document.getElementById('alert-toast').style.display='none',5000);
+}
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

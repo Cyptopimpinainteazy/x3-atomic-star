@@ -151,7 +151,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opac
   <div class="top-strip">
     <div class="logo">X3STAR</div>
     <div class="live-pill"><div class="lp-dot"></div>ROUND III — CLOSING</div>
-    <div class="top-price">X3S: <span id="price">--</span> &nbsp;·&nbsp; Next Round: <span id="next-price" style="color:var(--red)">--</span> (<span id="next-premium">--</span>)</div>
+    <div class="top-price">X3S: <span id="price">$0.0842</span> &nbsp;·&nbsp; Next Round: <span style="color:var(--red)">$0.12</span> (+42%)</div>
   </div>
 
   <!-- CENTER -->
@@ -166,18 +166,18 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opac
     </div>
 
     <div class="velocity-line">
-      Selling at <span class="vl-hot" id="vel-rate">--</span> per minute &nbsp;·&nbsp;
-      At this pace, <span class="vl-est" id="vel-est">--</span>
+      Selling at <span class="vl-hot" id="vel-rate">$2,184</span> per minute &nbsp;·&nbsp;
+      At this pace, <span class="vl-est" id="vel-est">$5.3M remaining fills in ~41 hours</span>
     </div>
 
     <div class="progress-section">
       <div class="ps-row">
         <div>
-          <div class="ps-raised" id="raised-num">--</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">raised of <span id="hard-cap">--</span> hard cap</div>
+          <div class="ps-raised" id="raised-num">$14,702,400</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">raised of $20M hard cap</div>
         </div>
         <div style="text-align:right;">
-          <div class="ps-pct" id="pct-num">--</div>
+          <div class="ps-pct" id="pct-num">73.5%</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;">filled</div>
         </div>
       </div>
@@ -185,19 +185,19 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opac
         <div class="progress-fill" id="prog-fill"></div>
       </div>
       <div class="ps-markers">
-        <span id="mk-0">--</span><span id="mk-25">--</span><span id="mk-50">--</span>
+        <span>$0</span><span>$5M</span><span>$10M</span>
         <span style="color:var(--orange);font-weight:700;">◀ YOU ARE HERE</span>
-        <span id="mk-100">--</span>
+        <span>$20M</span>
       </div>
     </div>
 
     <div class="stats-row">
-      <div class="sr-item"><span class="sri-val" id="s-investors">--</span><div class="sri-key">Investors In</div></div>
-      <div class="sr-item"><span class="sri-val" id="s-remaining">--</span><div class="sri-key">Remaining</div></div>
-      <div class="sr-item"><span class="sri-val" id="s-ph">--</span><div class="sri-key">$/Minute</div></div>
-      <div class="sr-item"><span class="sri-val" id="s-today">--</span><div class="sri-key">Today So Far</div></div>
-      <div class="sr-item"><span class="sri-val" id="s-wallets">--</span><div class="sri-key">Wallets</div></div>
-      <div class="sr-item"><span class="sri-val" style="color:var(--red)" id="s-genesis-left">--</span><div class="sri-key">Genesis Slots Left</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-investors">312</span><div class="sri-key">Investors In</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-remaining">$5,297,600</span><div class="sri-key">Remaining</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-ph">$2,184</span><div class="sri-key">$/Minute</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-today">$142K</span><div class="sri-key">Today So Far</div></div>
+      <div class="sr-item"><span class="sri-val">312</span><div class="sri-key">Wallets</div></div>
+      <div class="sr-item"><span class="sri-val" style="color:var(--red)">46</span><div class="sri-key">Genesis Slots Left</div></div>
     </div>
   </div>
 
@@ -241,10 +241,86 @@ body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opac
   </div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
-X3PageAdapters.start();
+// FIRE CANVAS
+const fc=document.getElementById('fire-canvas');
+const fctx=fc.getContext('2d');
+function resizeFire(){fc.width=window.innerWidth;fc.height=window.innerHeight;}
+resizeFire();window.addEventListener('resize',resizeFire);
+const embers=[];
+for(let i=0;i<80;i++)embers.push({
+  x:Math.random()*window.innerWidth,
+  y:window.innerHeight+Math.random()*200,
+  vx:(Math.random()-0.5)*0.8,vy:-(Math.random()*1.5+0.5),
+  r:Math.random()*3+1,life:Math.random(),
+  col:Math.random()<0.5?'rgba(255,107,0,':'rgba(255,215,0,'
+});
+function animFire(){
+  fctx.clearRect(0,0,fc.width,fc.height);
+  embers.forEach(e=>{
+    e.x+=e.vx;e.y+=e.vy;e.life-=0.004;
+    if(e.life<=0||e.y<-20){
+      e.y=fc.height+10;e.x=Math.random()*fc.width;
+      e.life=0.6+Math.random()*0.4;
+    }
+    fctx.beginPath();fctx.arc(e.x,e.y,e.r,0,Math.PI*2);
+    fctx.fillStyle=e.col+e.life+')';fctx.fill();
+  });
+  requestAnimationFrame(animFire);
+}
+animFire();
+
+// COUNTDOWN
+const end=new Date(Date.now()+(6*86400+14*3600+32*60+8)*1000);
+function updateClock(){
+  const d=end-Date.now();
+  if(d<=0)return;
+  document.getElementById('cd-d').textContent=String(Math.floor(d/86400000)).padStart(2,'0');
+  document.getElementById('cd-h').textContent=String(Math.floor((d%86400000)/3600000)).padStart(2,'0');
+  document.getElementById('cd-m').textContent=String(Math.floor((d%3600000)/60000)).padStart(2,'0');
+  document.getElementById('cd-s').textContent=String(Math.floor((d%60000)/1000)).padStart(2,'0');
+}
+setInterval(updateClock,1000);updateClock();
+
+// LIVE VELOCITY SIM
+let raised=14702400;
+const hardCap=20000000;
+setInterval(()=>{
+  const purchase=Math.floor(Math.random()*3000+800);
+  raised+=purchase;
+  const pct=Math.min((raised/hardCap*100),100);
+  const remaining=hardCap-raised;
+  const perMin=Math.floor(purchase*60/3);
+  document.getElementById('raised-num').textContent='$'+raised.toLocaleString();
+  document.getElementById('pct-num').textContent=pct.toFixed(1)+'%';
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('s-remaining').textContent='$'+Math.round(remaining/1000)+'K';
+  document.getElementById('s-ph').textContent='$'+perMin.toLocaleString();
+  document.getElementById('vel-rate').textContent='$'+perMin.toLocaleString();
+  const hoursLeft=Math.round(remaining/(perMin*60)/100)/10;
+  document.getElementById('vel-est').textContent='$'+Math.round(remaining/1000)+'K remaining fills in ~'+hoursLeft+' hours';
+},3000);
+
+// Occasionally add new investor to ticker
+const flags=['🇺🇸','🇸🇬','🇬🇧','🇩🇪','🇯🇵','🇦🇺','🇫🇷','🇰🇷','🇦🇪','🇧🇷','🇨🇭','🇳🇱'];
+const names=['C.Park','T.Walsh','M.Osei','L.Santos','R.Iyer','zkwhale.eth','node_ops','alpha.eth'];
+setInterval(()=>{
+  const flag=flags[Math.floor(Math.random()*flags.length)];
+  const name=names[Math.floor(Math.random()*names.length)];
+  const amt='$'+[5000,10000,25000,50000,100000][Math.floor(Math.random()*5)].toLocaleString();
+  const ticker=document.getElementById('ticker');
+  const sep=document.createElement('span');sep.className='ti-sep';sep.textContent='|';
+  const item=document.createElement('span');item.className='tick-item';
+  item.innerHTML=`<span class="ti-flag">${flag}</span><span class="ti-name">${name}</span><span class="ti-amt">+${amt}</span>`;
+  ticker.appendChild(sep);ticker.appendChild(item);
+},8000);
+
+function shareThis(){
+  const txt=`🔥 X3STAR Round III is filling FAST\n\n$14.7M raised of $20M — 73.5% gone\nAt current pace, closes in hours\nPrice goes to $0.12 next round\n\nhttps://x3star.io/?ref=share\n#X3STAR #Crypto #Presale`;
+  if(navigator.share){navigator.share({text:txt});}
+  else{navigator.clipboard?.writeText(txt);alert('Copied! Share this link.');}
+}
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

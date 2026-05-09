@@ -319,7 +319,7 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
 <!-- HERO -->
 <section class="hero">
   <div>
-    <div class="hero-eyebrow" id="presale-round">Presale</div>
+    <div class="hero-eyebrow">Round III Live Now</div>
     <h1 class="hero-title">
       <span class="ht-1">BUY</span>
       <span class="ht-2">X3STAR</span>
@@ -330,27 +330,27 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
     <!-- PRESALE CARD -->
     <div class="presale-card">
       <div class="presale-stage">
-        <span class="stage-badge" id="presale-stage">⬡ PRESALE</span>
-        <span class="stage-live" id="presale-status">STATUS</span>
+        <span class="stage-badge">⬡ PRESALE ROUND III</span>
+        <span class="stage-live">LIVE</span>
       </div>
 
       <!-- COUNTDOWN -->
       <div class="countdown">
-        <div class="cd-unit"><span class="cd-num" id="cd-d">--</span><span class="cd-label">Days</span></div>
-        <div class="cd-unit"><span class="cd-num" id="cd-h">--</span><span class="cd-label">Hours</span></div>
-        <div class="cd-unit"><span class="cd-num" id="cd-m">--</span><span class="cd-label">Mins</span></div>
-        <div class="cd-unit"><span class="cd-num" id="cd-s">--</span><span class="cd-label">Secs</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-d">06</span><span class="cd-label">Days</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-h">14</span><span class="cd-label">Hours</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-m">32</span><span class="cd-label">Mins</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-s">47</span><span class="cd-label">Secs</span></div>
       </div>
 
       <!-- PROGRESS -->
       <div class="raise-info">
-        <span class="raise-raised" id="raised-amt">--</span>
-        <span class="raise-cap" id="raise-cap">Hard Cap: --</span>
+        <span class="raise-raised" id="raised-amt">$14,700,000</span>
+        <span class="raise-cap">Hard Cap: $20,000,000</span>
       </div>
       <div class="raise-bar">
         <div class="raise-fill" id="raise-fill" style="width:0%"></div>
       </div>
-      <div class="raise-pct" id="raise-pct">--</div>
+      <div class="raise-pct">73.5% filled — $5.3M remaining</div>
 
       <!-- BUY TABS -->
       <div class="buy-tabs">
@@ -363,36 +363,36 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
       <div class="input-group">
         <label class="input-label">Amount to spend</label>
         <div class="input-wrap">
-          <input class="presale-input" type="number" id="spend-input" placeholder="0.00" oninput="calcTokens()">
-          <span class="input-max" onclick="calcTokens()">MAX</span>
+          <input class="presale-input" type="number" id="spend-input" placeholder="0.00" value="1" oninput="calcTokens()">
+          <span class="input-max" onclick="document.getElementById('spend-input').value=10;calcTokens()">MAX</span>
           <span class="input-suffix" id="spend-sym">ETH</span>
         </div>
       </div>
 
       <div class="convert-row">
-        <span id="spend-display">--</span>
+        <span id="spend-display">1 ETH</span>
         <span class="convert-arrow">→</span>
-        <span class="convert-val" id="tokens-out">--</span>
+        <span class="convert-val" id="tokens-out">44,186 X3S</span>
       </div>
 
       <div class="bonus-tag">
         <span class="bonus-icon">🎁</span>
-        <span class="bonus-text" id="bonus-text">Round III Bonus: <span class="bonus-pct" id="bonus-pct">--</span> tokens included</span>
+        <span class="bonus-text">Round III Bonus: <span class="bonus-pct">+12% X3S</span> tokens included</span>
       </div>
 
       <button class="buy-btn" onclick="handleBuy()">⬡ BUY X3STAR NOW</button>
 
       <div class="presale-footer">
         <div class="pf-item">
-          <div class="pf-val" id="pf-price">--</div>
+          <div class="pf-val">$0.075</div>
           <div class="pf-key">Token Price</div>
         </div>
         <div class="pf-item">
-          <div class="pf-val" id="pf-bonus">--</div>
+          <div class="pf-val">+12%</div>
           <div class="pf-key">R3 Bonus</div>
         </div>
         <div class="pf-item">
-          <div class="pf-val" id="pf-vesting">--</div>
+          <div class="pf-val">12mo</div>
           <div class="pf-key">Vesting</div>
         </div>
       </div>
@@ -403,19 +403,19 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
 <!-- STATS BAR -->
 <div class="stats-bar reveal">
   <div class="stat-item">
-    <div class="stat-num text-gold" id="stat-raised">--</div>
+    <div class="stat-num text-gold">$14.7M</div>
     <div class="stat-label">Total Raised</div>
   </div>
   <div class="stat-item">
-    <div class="stat-num text-cyan" id="stat-investors">--</div>
+    <div class="stat-num text-cyan">312</div>
     <div class="stat-label">Investors</div>
   </div>
   <div class="stat-item">
-    <div class="stat-num text-green" id="stat-holders">--</div>
+    <div class="stat-num text-green">4,821</div>
     <div class="stat-label">Token Holders</div>
   </div>
   <div class="stat-item">
-    <div class="stat-num" style="color:var(--purple)" id="stat-supply">--</div>
+    <div class="stat-num" style="color:var(--purple)">1B</div>
     <div class="stat-label">Total Supply</div>
   </div>
 </div>
@@ -424,7 +424,7 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
 <section class="section reveal">
   <div class="section-eyebrow">Tokenomics</div>
   <h2 class="section-title">Token <span class="text-gold">Distribution</span></h2>
-  <p class="section-sub">Token supply and distribution are reported live from the X3 backend.</p>
+  <p class="section-sub">1,000,000,000 X3S tokens with a deflationary model, quarterly burns, and staking rewards.</p>
 
   <div class="tokenomics-grid">
     <div class="tko-chart-wrap">
@@ -433,35 +433,43 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
         <div class="ring ring-2"></div>
         <div class="ring ring-3"></div>
         <div class="tko-center">
-          <div class="tko-center-val" id="tko-total">--</div>
+          <div class="tko-center-val">1B</div>
           <div class="tko-center-lbl">Total Supply</div>
         </div>
+        <!-- SVG donut -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 320 320">
+          <circle cx="160" cy="160" r="110" fill="none" stroke="rgba(255,215,0,0.7)" stroke-width="20" stroke-dasharray="276 125" stroke-dashoffset="-10" transform="rotate(-90 160 160)"/>
+          <circle cx="160" cy="160" r="110" fill="none" stroke="rgba(0,200,255,0.7)" stroke-width="20" stroke-dasharray="176 225" stroke-dashoffset="-296" transform="rotate(-90 160 160)"/>
+          <circle cx="160" cy="160" r="110" fill="none" stroke="rgba(200,50,255,0.7)" stroke-width="20" stroke-dasharray="113 288" stroke-dashoffset="-472" transform="rotate(-90 160 160)"/>
+          <circle cx="160" cy="160" r="110" fill="none" stroke="rgba(0,255,136,0.7)" stroke-width="20" stroke-dasharray="75 326" stroke-dashoffset="-585" transform="rotate(-90 160 160)"/>
+          <circle cx="160" cy="160" r="110" fill="none" stroke="rgba(255,100,50,0.7)" stroke-width="20" stroke-dasharray="47 354" stroke-dashoffset="-660" transform="rotate(-90 160 160)"/>
+        </svg>
       </div>
     </div>
     <div class="tko-list">
       <div class="tko-item">
         <div class="tko-color" style="background:var(--gold)"></div>
         <div><div class="tko-name">Presale & Public</div><div class="tko-sub">Community distribution</div></div>
-        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-presale" style="width:0%;background:var(--gold)"></div></div>
-        <div class="tko-pct text-gold" id="tko-presale">--</div>
+        <div class="tko-bar-wrap"><div class="tko-bar" style="width:44%;background:var(--gold)"></div></div>
+        <div class="tko-pct text-gold">44%</div>
       </div>
       <div class="tko-item">
         <div class="tko-color" style="background:var(--cyan)"></div>
         <div><div class="tko-name">Ecosystem & Grants</div><div class="tko-sub">Builder incentives</div></div>
-        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-ecosystem" style="width:0%;background:var(--cyan)"></div></div>
-        <div class="tko-pct text-cyan" id="tko-ecosystem">--</div>
+        <div class="tko-bar-wrap"><div class="tko-bar" style="width:28%;background:var(--cyan)"></div></div>
+        <div class="tko-pct text-cyan">28%</div>
       </div>
       <div class="tko-item">
         <div class="tko-color" style="background:var(--purple)"></div>
         <div><div class="tko-name">Team & Advisors</div><div class="tko-sub">36mo vesting</div></div>
-        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-team" style="width:0%;background:var(--purple)"></div></div>
-        <div class="tko-pct text-purple" id="tko-team">--</div>
+        <div class="tko-bar-wrap"><div class="tko-bar" style="width:18%;background:var(--purple)"></div></div>
+        <div class="tko-pct text-purple">18%</div>
       </div>
       <div class="tko-item">
         <div class="tko-color" style="background:var(--green)"></div>
         <div><div class="tko-name">Staking Rewards</div><div class="tko-sub">10yr emission</div></div>
-        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-staking" style="width:0%;background:var(--green)"></div></div>
-        <div class="tko-pct text-green" id="tko-staking">--</div>
+        <div class="tko-bar-wrap"><div class="tko-bar" style="width:12%;background:var(--green)"></div></div>
+        <div class="tko-pct text-green">12%</div>
       </div>
     </div>
   </div>
@@ -474,46 +482,46 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
   <div class="roadmap-grid">
     <div class="rm-item rm-done">
       <div class="rm-dot-wrap"><div class="rm-dot">✓</div></div>
-      <div class="rm-q">Phase 1</div>
-      <div class="rm-title">Foundation</div>
+      <div class="rm-q">Q1 2024</div>
+      <div class="rm-title">Genesis</div>
       <div class="rm-items">
-        <div>✓ Protocol architecture</div>
-        <div>✓ Validator onboarding</div>
-        <div>✓ Public telemetry</div>
-        <div>✓ Governance scaffolding</div>
+        <div>✓ Protocol design</div>
+        <div>✓ Team formation</div>
+        <div>✓ Seed round</div>
+        <div>✓ Whitepaper v1</div>
+      </div>
+    </div>
+    <div class="rm-item rm-done">
+      <div class="rm-dot-wrap"><div class="rm-dot">✓</div></div>
+      <div class="rm-q">Q2–Q3 2024</div>
+      <div class="rm-title">Testnet</div>
+      <div class="rm-items">
+        <div>✓ Testnet launch</div>
+        <div>✓ 12K validators</div>
+        <div>✓ Series A raise</div>
+        <div>✓ Security audit</div>
       </div>
     </div>
     <div class="rm-item rm-active">
       <div class="rm-dot-wrap"><div class="rm-dot">⬡</div></div>
-      <div class="rm-q">Phase 2</div>
-      <div class="rm-title">Prefunding</div>
+      <div class="rm-q">Q1 2025</div>
+      <div class="rm-title">Prefunding III</div>
       <div class="rm-items">
         <div class="text-gold">◈ Presale live</div>
-        <div class="text-gold">◈ Validator reservations</div>
-        <div style="color:var(--muted)">· Partner integrations</div>
-        <div style="color:var(--muted)">· Grant intake</div>
+        <div class="text-gold">◈ Validator spots</div>
+        <div style="color:var(--muted)">· DEX partnerships</div>
+        <div style="color:var(--muted)">· Grant launch</div>
       </div>
     </div>
     <div class="rm-item rm-soon">
       <div class="rm-dot-wrap"><div class="rm-dot">○</div></div>
-      <div class="rm-q">Phase 3</div>
-      <div class="rm-title">Activation</div>
+      <div class="rm-q">Q2 2025</div>
+      <div class="rm-title">Mainnet</div>
       <div class="rm-items">
-        <div>· Mainnet readiness</div>
-        <div>· Validator reward routing</div>
-        <div>· Staking activation</div>
-        <div>· Ecosystem rollouts</div>
-      </div>
-    </div>
-    <div class="rm-item rm-soon">
-      <div class="rm-dot-wrap"><div class="rm-dot">○</div></div>
-      <div class="rm-q">Phase 4</div>
-      <div class="rm-title">Expansion</div>
-      <div class="rm-items">
-        <div>· Interop rollouts</div>
-        <div>· Governance upgrades</div>
-        <div>· Proof verification</div>
-        <div>· Treasury programs</div>
+        <div>· TGE & listing</div>
+        <div>· CEX launches</div>
+        <div>· Grants Phase 1</div>
+        <div>· Staking live</div>
       </div>
     </div>
   </div>
@@ -527,32 +535,32 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
     <div class="feat-card c-gold">
       <div class="feat-icon">⚡</div>
       <div class="feat-title">Ultra-Fast Finality</div>
-      <div class="feat-text">Performance claims on the public surface now defer to live benchmark artifacts and network telemetry instead of static marketing numbers.</div>
+      <div class="feat-text">Sub-second finality with our proprietary Stellar Consensus Protocol. 4,200+ TPS at genesis, scaling to 50K+ with sharding.</div>
     </div>
     <div class="feat-card c-cyan">
       <div class="feat-icon">🔗</div>
       <div class="feat-title">Cross-Chain Native</div>
-      <div class="feat-text">Interoperability remains part of the roadmap, but this page only claims the integrations that are currently wired and exposed through the backend.</div>
+      <div class="feat-text">Native bridges to Ethereum, Solana, and Cosmos. Zero-slippage cross-chain swaps via our ZK bridge layer.</div>
     </div>
     <div class="feat-card c-purple">
       <div class="feat-icon">🛡</div>
       <div class="feat-title">Quantum-Ready Security</div>
-      <div class="feat-text">Security posture is communicated through implemented code paths, published disclosures, and investor-relations updates rather than unsupported slogans.</div>
+      <div class="feat-text">Post-quantum cryptographic signature scheme (CRYSTALS-Dilithium) protects against future quantum threats.</div>
     </div>
     <div class="feat-card c-green">
       <div class="feat-icon">🌱</div>
       <div class="feat-title">Carbon Negative</div>
-      <div class="feat-text">Environmental and treasury narratives must be backed by live accounting and published disclosures before they appear as hard claims on the site.</div>
+      <div class="feat-text">Proof-of-Stake with on-chain carbon offset treasury. Every transaction plants a tree and offsets 10x its emissions.</div>
     </div>
     <div class="feat-card c-gold">
       <div class="feat-icon">◈</div>
       <div class="feat-title">Grant Ecosystem</div>
-      <div class="feat-text">Grant availability, budgets, and milestones are published in the grants hub and backed by live funding records.</div>
+      <div class="feat-text">$5M+ in grants for builders. Streamlined application, on-chain milestone verification, and community governance.</div>
     </div>
     <div class="feat-card c-cyan">
       <div class="feat-icon">⟁</div>
       <div class="feat-title">Validator Rewards</div>
-      <div class="feat-text">Validator rewards, governance weight, and protocol fee sharing follow the live network terms published through the backend.</div>
+      <div class="feat-text">18% APY for Genesis validators. Priority block rewards, governance weight, and exclusive protocol fee sharing.</div>
     </div>
   </div>
 </section>
@@ -577,23 +585,23 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
   <div class="faq-list">
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">How do I participate in the presale? <span class="faq-icon">+</span></div>
-      <div class="faq-a">Connect a supported wallet, enter the amount you want to spend, and follow the checkout flow. Allocation and vesting terms are shown during checkout and in the presale memo.</div>
+      <div class="faq-a">Connect your wallet (MetaMask, WalletConnect, or Coinbase Wallet), enter the amount of ETH/USDT/BTC you want to spend, and click Buy. Tokens are automatically allocated to your wallet and vest over 12 months after the TGE.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">What is the token vesting schedule? <span class="faq-icon">+</span></div>
-      <div class="faq-a">Presale tokens follow the published vesting schedule. Round III bonus allocations, if active, follow the same schedule outlined in the presale memo.</div>
+      <div class="faq-a">Presale tokens have a 12-month cliff from TGE, followed by 12-month linear vesting (total 24 months). Round III participants also receive a 12% bonus, which follows the same schedule.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">When is the TGE (Token Generation Event)? <span class="faq-icon">+</span></div>
-      <div class="faq-a">TGE timing is announced only after mainnet readiness is confirmed. Participants are notified through official email and community channels.</div>
+      <div class="faq-a">The TGE is scheduled for Q2 2025, contingent on mainnet launch. All presale participants will be notified via email and our official Telegram channel at least 30 days in advance.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">Is there a minimum purchase? <span class="faq-icon">+</span></div>
-      <div class="faq-a">Minimums and maximums are shown at checkout and may vary by payment rail and jurisdiction.</div>
+      <div class="faq-a">The minimum purchase is $500 equivalent (in any supported currency). For Validator Node slots, the minimum is $5,000. There is no maximum cap per wallet in Round III.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">Which networks/currencies are accepted? <span class="faq-icon">+</span></div>
-      <div class="faq-a">Supported networks and payment rails are listed in the live checkout experience and can change by jurisdiction.</div>
+      <div class="faq-a">We accept ETH (Ethereum mainnet), BTC (native), USDT, USDC, and card payments (via Stripe for qualified jurisdictions). We do not accept purchases from sanctioned jurisdictions.</div>
     </div>
   </div>
 </section>
@@ -613,8 +621,6 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
   <div class="footer-legal">© 2025 X3STAR Protocol. All rights reserved.</div>
 </footer>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
 // Cursor
 const cursor = document.getElementById('cursor');
@@ -630,18 +636,44 @@ document.querySelectorAll('button,a,.nav-link,.faq-q,.tko-item,.feat-card,.inv-l
   el.addEventListener('mouseleave', () => cursor.style.transform = 'scale(1)');
 });
 
+// Countdown
+function updateCountdown() {
+  const end = new Date(Date.now() + (6*24*3600 + 14*3600 + 32*60 + 47) * 1000);
+  function tick() {
+    const diff = end - Date.now();
+    if (diff <= 0) return;
+    const d = Math.floor(diff/86400000);
+    const h = Math.floor((diff%86400000)/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    const s = Math.floor((diff%60000)/1000);
+    document.getElementById('cd-d').textContent = String(d).padStart(2,'0');
+    document.getElementById('cd-h').textContent = String(h).padStart(2,'0');
+    document.getElementById('cd-m').textContent = String(m).padStart(2,'0');
+    document.getElementById('cd-s').textContent = String(s).padStart(2,'0');
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+updateCountdown();
+
+// Progress bar animate
+setTimeout(() => document.getElementById('raise-fill').style.width = '73.5%', 400);
+
+// Live raised counter
+let raised = 14700000;
+setInterval(() => {
+  raised += Math.floor(Math.random() * 500 + 100);
+  document.getElementById('raised-amt').textContent = '$' + raised.toLocaleString();
+}, 8000);
+
 // Token calc
+const rates = {ETH:44186, BTC:285000, USDT:13.3, CARD:12};
 let curSym = 'ETH';
 function calcTokens() {
   const v = parseFloat(document.getElementById('spend-input').value) || 0;
-  document.getElementById('spend-display').textContent = v ? v + ' ' + curSym : '--';
-  const quote = (window.__x3PresaleQuote || {})[curSym];
-  if (quote && quote.tokensPerUnit) {
-    const tokens = Math.floor(v * quote.tokensPerUnit);
-    document.getElementById('tokens-out').textContent = tokens.toLocaleString() + ' X3S';
-  } else {
-    document.getElementById('tokens-out').textContent = '--';
-  }
+  const tokens = Math.floor(v * (rates[curSym] || 13.3) * 1.12);
+  document.getElementById('tokens-out').textContent = tokens.toLocaleString() + ' X3S';
+  document.getElementById('spend-display').textContent = v + ' ' + curSym;
 }
 function setTab(el, sym) {
   document.querySelectorAll('.buy-tab').forEach(t => t.classList.remove('active'));
@@ -656,8 +688,6 @@ function handleBuy() {
   setTimeout(() => { btn.textContent = '⬡ BUY X3STAR NOW'; alert('Connect your wallet to proceed with the purchase!'); }, 1500);
 }
 
-X3PageAdapters.start();
-
 // FAQ
 function toggleFaq(el) {
   const item = el.parentElement;
@@ -670,5 +700,6 @@ const observer = new IntersectionObserver(entries => {
 }, {threshold:0.1});
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

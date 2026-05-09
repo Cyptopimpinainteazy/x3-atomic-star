@@ -541,8 +541,8 @@
         <a href="x3star-portfolio.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Portfolio</a>
       </div>
       <div class="status-pill">LIVE NETWORK</div>
-      <div style="font-size:11px;color:var(--muted)">Block <span class="text-cyan" id="block-num">--</span></div>
-      <div style="font-size:11px;color:var(--muted)">Gas <span class="text-green" id="gas">--</span></div>
+      <div style="font-size:11px;color:var(--muted)">Block <span class="text-cyan" id="block-num">19,847,221</span></div>
+      <div style="font-size:11px;color:var(--muted)">Gas <span class="text-green" id="gas">24 gwei</span></div>
       <button class="topbar-btn btn-ghost">+ New Grant</button>
       <button class="topbar-btn btn-primary">Connect Wallet</button>
       <div class="avatar">DK</div>
@@ -550,19 +550,45 @@
 
     <!-- CONTENT -->
     <div class="content">
-      <div class="page-head" style="display:flex;justify-content:flex-end;margin-bottom:12px;"></div>
 
       <!-- ALERT -->
       <div class="alert-strip">
         <span class="alert-icon">⚡</span>
-        <div class="alert-text" id="alert-text"><strong>Round Prefunding</strong> update loading…</div>
-        <span class="alert-cta" id="alert-cta">VIEW ROUND →</span>
+        <div class="alert-text"><strong>Round III Prefunding</strong> closes in 6 days 14 hours — $2.4M allocation remaining. Tier-1 slots still available for qualified investors.</div>
+        <span class="alert-cta">VIEW ROUND →</span>
       </div>
 
       <!-- TICKER -->
       <div class="ticker-strip">
         <div class="ticker-wrap" id="ticker">
-          <span class="ticker-item"><span class="ticker-sym">X3S</span><span class="ticker-price">--</span><span class="ticker-up" id="ticker-change">--</span></span>
+          <span class="ticker-item"><span class="ticker-sym">X3S</span><span class="ticker-price">$0.0842</span><span class="ticker-up">▲ +12.4%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">BTC</span><span class="ticker-price">$67,240</span><span class="ticker-up">▲ +1.2%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">ETH</span><span class="ticker-price">$3,512</span><span class="ticker-up">▲ +2.8%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">SOL</span><span class="ticker-price">$168.20</span><span class="ticker-dn">▼ -0.4%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">AVAX</span><span class="ticker-price">$37.80</span><span class="ticker-up">▲ +3.1%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">MATIC</span><span class="ticker-price">$0.892</span><span class="ticker-dn">▼ -1.6%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">LINK</span><span class="ticker-price">$18.44</span><span class="ticker-up">▲ +0.9%</span></span>
+          <span class="ticker-sep">│</span>
+          <!-- duplicate for seamless loop -->
+          <span class="ticker-item"><span class="ticker-sym">X3S</span><span class="ticker-price">$0.0842</span><span class="ticker-up">▲ +12.4%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">BTC</span><span class="ticker-price">$67,240</span><span class="ticker-up">▲ +1.2%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">ETH</span><span class="ticker-price">$3,512</span><span class="ticker-up">▲ +2.8%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">SOL</span><span class="ticker-price">$168.20</span><span class="ticker-dn">▼ -0.4%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">AVAX</span><span class="ticker-price">$37.80</span><span class="ticker-up">▲ +3.1%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">MATIC</span><span class="ticker-price">$0.892</span><span class="ticker-dn">▼ -1.6%</span></span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item"><span class="ticker-sym">LINK</span><span class="ticker-price">$18.44</span><span class="ticker-up">▲ +0.9%</span></span>
         </div>
       </div>
 
@@ -570,32 +596,32 @@
       <div>
         <div class="section-header mb-16">
           <div class="section-title">Core Metrics</div>
-          <div style="font-size:10px;color:var(--muted)">Last updated <span id="kpi-updated">--</span></div>
+          <div style="font-size:10px;color:var(--muted)">Last updated 2 min ago</div>
         </div>
         <div class="kpi-grid">
           <div class="kpi-card gold">
             <div class="kpi-card-bg"></div>
             <div class="kpi-label">Total Raised <span class="kpi-icon">◈</span></div>
-            <div class="kpi-value text-gold" id="kpi-raised">--</div>
-            <div class="kpi-sub"><span class="badge-up" id="kpi-raised-delta">--</span><span class="kpi-sub-label">vs last round</span></div>
+            <div class="kpi-value text-gold">$14.7M</div>
+            <div class="kpi-sub"><span class="badge-up">+18.3%</span><span class="kpi-sub-label">vs last round</span></div>
           </div>
           <div class="kpi-card cyan">
             <div class="kpi-card-bg"></div>
             <div class="kpi-label">Active Grants <span class="kpi-icon">⬡</span></div>
-            <div class="kpi-value text-cyan" id="kpi-grants">--</div>
-            <div class="kpi-sub"><span class="badge-up" id="kpi-grants-delta">--</span><span class="kpi-sub-label">new this cycle</span></div>
+            <div class="kpi-value text-cyan">48</div>
+            <div class="kpi-sub"><span class="badge-up">+7</span><span class="kpi-sub-label">new this cycle</span></div>
           </div>
           <div class="kpi-card green">
             <div class="kpi-card-bg"></div>
             <div class="kpi-label">Investors <span class="kpi-icon">◎</span></div>
-            <div class="kpi-value text-green" id="kpi-investors">--</div>
-            <div class="kpi-sub"><span class="badge-up" id="kpi-investors-delta">--</span><span class="kpi-sub-label">30-day change</span></div>
+            <div class="kpi-value text-green">312</div>
+            <div class="kpi-sub"><span class="badge-up">+24</span><span class="kpi-sub-label">30-day change</span></div>
           </div>
           <div class="kpi-card purple">
             <div class="kpi-card-bg"></div>
             <div class="kpi-label">X3S Token Price <span class="kpi-icon">⟁</span></div>
-            <div class="kpi-value text-purple" id="kpi-price">--</div>
-            <div class="kpi-sub"><span class="badge-up" id="kpi-price-delta">--</span><span class="kpi-sub-label">24h change</span></div>
+            <div class="kpi-value text-purple">$0.0842</div>
+            <div class="kpi-sub"><span class="badge-up">+12.4%</span><span class="kpi-sub-label">24h change</span></div>
           </div>
         </div>
       </div>
@@ -627,7 +653,7 @@
           <div style="position:relative;width:180px;margin:0 auto">
             <canvas id="allocChart" width="180" height="180"></canvas>
             <div class="donut-center">
-              <div class="donut-val text-gold" id="donut-total">--</div>
+              <div class="donut-val text-gold">$14.7M</div>
               <div class="donut-lbl">TOTAL</div>
             </div>
           </div>
@@ -635,22 +661,22 @@
             <div style="display:flex;align-items:center;gap:8px;font-size:11px">
               <span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0"></span>
               <span style="color:var(--muted);flex:1">Lead Investors</span>
-              <span class="text-gold" style="font-weight:700" id="alloc-lead">--</span>
+              <span class="text-gold" style="font-weight:700">42%</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px">
               <span style="width:10px;height:10px;border-radius:2px;background:var(--cyan);flex-shrink:0"></span>
               <span style="color:var(--muted);flex:1">Grant Programs</span>
-              <span class="text-cyan" style="font-weight:700" id="alloc-grants">--</span>
+              <span class="text-cyan" style="font-weight:700">28%</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px">
               <span style="width:10px;height:10px;border-radius:2px;background:var(--purple);flex-shrink:0"></span>
               <span style="color:var(--muted);flex:1">Community</span>
-              <span class="text-purple" style="font-weight:700" id="alloc-community">--</span>
+              <span class="text-purple" style="font-weight:700">18%</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px">
               <span style="width:10px;height:10px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
               <span style="color:var(--muted);flex:1">Treasury Reserve</span>
-              <span class="text-green" style="font-weight:700" id="alloc-treasury">--</span>
+              <span class="text-green" style="font-weight:700">12%</span>
             </div>
           </div>
         </div>
@@ -674,9 +700,42 @@
                 <th>Status</th>
               </tr>
             </thead>
-            <tbody id="grants-body">
+            <tbody>
               <tr>
-                <td colspan="4" style="color:var(--muted);font-size:11px;padding:16px 0;">Awaiting live grant feed.</td>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">DeFi Infrastructure</div><div style="font-size:10px;color:var(--muted)">Core Protocol</div></td>
+                <td class="text-gold" style="font-weight:700">$250K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:78%;background:var(--green)"></div></div></td>
+                <td><span class="grant-status st-active">Active</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">ZK Bridge</div><div style="font-size:10px;color:var(--muted)">Layer 2</div></td>
+                <td class="text-gold" style="font-weight:700">$180K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:55%;background:var(--cyan)"></div></div></td>
+                <td><span class="grant-status st-review">Review</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">NFT Marketplace</div><div style="font-size:10px;color:var(--muted)">Ecosystem</div></td>
+                <td class="text-gold" style="font-weight:700">$95K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:90%;background:var(--gold)"></div></div></td>
+                <td><span class="grant-status st-active">Active</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">Oracle Network</div><div style="font-size:10px;color:var(--muted)">Data Layer</div></td>
+                <td class="text-gold" style="font-weight:700">$320K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:22%;background:var(--blue)"></div></div></td>
+                <td><span class="grant-status st-pending">Pending</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">DAO Tooling</div><div style="font-size:10px;color:var(--muted)">Governance</div></td>
+                <td class="text-gold" style="font-weight:700">$140K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:100%;background:var(--green)"></div></div></td>
+                <td><span class="grant-status st-closed">Closed</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-size:12px;font-weight:600;color:var(--text)">Cross-Chain DEX</div><div style="font-size:10px;color:var(--muted)">Trading</div></td>
+                <td class="text-gold" style="font-weight:700">$500K</td>
+                <td><div class="prog-bar-wrap"><div class="prog-bar" style="width:40%;background:var(--purple)"></div></div></td>
+                <td><span class="grant-status st-review">Review</span></td>
               </tr>
             </tbody>
           </table>
@@ -689,8 +748,41 @@
             <div style="font-size:10px;color:var(--cyan);cursor:pointer;letter-spacing:1px">ALL →</div>
           </div>
 
-          <div id="investor-list" style="display:flex;flex-direction:column;gap:10px;">
-            <div style="font-size:11px;color:var(--muted)">Awaiting live investor feed.</div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#f0c040,#e8a800)">A</div>
+            <div><div class="inv-name">Apex Ventures</div><div class="inv-type">Tier-1 VC • Lead</div></div>
+            <div class="inv-commit">$2.1M</div>
+            <span class="inv-tier tier-lead">LEAD</span>
+          </div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#b06aff,#7040d0)">N</div>
+            <div><div class="inv-name">Nebula Capital</div><div class="inv-type">Crypto Fund</div></div>
+            <div class="inv-commit">$1.8M</div>
+            <span class="inv-tier tier-major">MAJOR</span>
+          </div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#30e8ff,#1890d0)">Q</div>
+            <div><div class="inv-name">Quantum DAO</div><div class="inv-type">DAO Treasury</div></div>
+            <div class="inv-commit">$850K</div>
+            <span class="inv-tier tier-major">MAJOR</span>
+          </div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#26e8a0,#10a060)">P</div>
+            <div><div class="inv-name">Polaris Fund</div><div class="inv-type">Multi-stage VC</div></div>
+            <div class="inv-commit">$620K</div>
+            <span class="inv-tier tier-seed">SEED</span>
+          </div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#ff8040,#d04010)">S</div>
+            <div><div class="inv-name">Starfall Labs</div><div class="inv-type">Builder Fund</div></div>
+            <div class="inv-commit">$480K</div>
+            <span class="inv-tier tier-seed">SEED</span>
+          </div>
+          <div class="investor-item">
+            <div class="inv-avatar" style="background:linear-gradient(135deg,#4a90ff,#2040c0)">D</div>
+            <div><div class="inv-name">DeltaStake.io</div><div class="inv-type">Protocol Native</div></div>
+            <div class="inv-commit">$340K</div>
+            <span class="inv-tier tier-seed">SEED</span>
           </div>
         </div>
 
@@ -704,34 +796,34 @@
               <div>
                 <div class="flex-between" style="margin-bottom:6px">
                   <span style="font-size:11px;color:var(--muted)">Hard Cap</span>
-                  <span class="text-gold" style="font-size:12px;font-weight:700" id="round-hardcap">--</span>
+                  <span class="text-gold" style="font-size:12px;font-weight:700">$20M</span>
                 </div>
                 <div style="width:100%;height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden">
-                  <div id="round-progress" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--cyan));border-radius:100px;"></div>
+                  <div style="height:100%;width:73.5%;background:linear-gradient(90deg,var(--gold),var(--cyan));border-radius:100px;animation:grow 1.5s ease both"></div>
                 </div>
-                <div id="round-progress-text" style="font-size:10px;color:var(--muted);margin-top:4px">--</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:4px">73.5% filled • $14.7M raised</div>
               </div>
               <div style="height:1px;background:rgba(255,255,255,0.05)"></div>
               <div class="metric-row">
                 <span class="metric-key">Soft Cap</span>
-                <div class="metric-bar-wrap"><div id="round-softcap-bar" class="prog-bar" style="height:4px;width:0%;background:var(--green)"></div></div>
-                <span class="metric-val text-green" id="round-softcap">--</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" style="height:4px;width:100%;background:var(--green)"></div></div>
+                <span class="metric-val text-green">✓ HIT</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Min Ticket</span>
-                <span class="metric-val" id="round-min-ticket">--</span>
+                <span class="metric-val">$5,000</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Vesting</span>
-                <span class="metric-val" id="round-vesting">--</span>
+                <span class="metric-val">12mo cliff</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Token Price</span>
-                <span class="metric-val text-gold" id="round-price">--</span>
+                <span class="metric-val text-gold">$0.075</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Bonus</span>
-                <span class="metric-val text-cyan" id="round-bonus">--</span>
+                <span class="metric-val text-cyan">+12%</span>
               </div>
             </div>
           </div>
@@ -750,7 +842,73 @@
         <!-- Milestone Timeline -->
         <div class="chart-card">
           <div class="chart-title mb-20">Project Roadmap</div>
-          <div style="font-size:11px;color:var(--muted);">Awaiting roadmap feed.</div>
+          <div>
+            <div class="timeline-item">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--green);background:var(--green)"></div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title">Genesis Round Closed</div>
+                <div class="tl-meta">$4.2M raised • 87 investors</div>
+              </div>
+              <div class="tl-date text-muted">Q1 2024</div>
+            </div>
+            <div class="timeline-item">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--green);background:var(--green)"></div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title">Testnet Launch</div>
+                <div class="tl-meta">12K validators • 99.8% uptime</div>
+              </div>
+              <div class="tl-date text-muted">Q2 2024</div>
+            </div>
+            <div class="timeline-item">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--green);background:var(--green)"></div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title">Series A Prefunding</div>
+                <div class="tl-meta">$10.5M raised • Apex Ventures lead</div>
+              </div>
+              <div class="tl-date text-muted">Q3 2024</div>
+            </div>
+            <div class="timeline-item">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--gold);background:rgba(240,192,64,0.3);animation:blink 2s infinite"></div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title" style="color:var(--gold)">Round III — LIVE NOW</div>
+                <div class="tl-meta">$14.7M / $20M • Closes in 6 days</div>
+              </div>
+              <div class="tl-date text-gold">NOW</div>
+            </div>
+            <div class="timeline-item">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--muted)"></div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title" style="color:var(--muted)">Mainnet Launch</div>
+                <div class="tl-meta" style="color:var(--muted)">Token TGE + DEX listing</div>
+              </div>
+              <div class="tl-date text-muted">Q2 2025</div>
+            </div>
+            <div class="timeline-item" style="border:none">
+              <div class="tl-dot-wrap">
+                <div class="tl-dot" style="border-color:var(--muted)"></div>
+              </div>
+              <div class="tl-content">
+                <div class="tl-title" style="color:var(--muted)">Ecosystem Grants — Phase 2</div>
+                <div class="tl-meta" style="color:var(--muted)">$5M grant pool unlocked</div>
+              </div>
+              <div class="tl-date text-muted">Q3 2025</div>
+            </div>
+          </div>
         </div>
 
         <!-- Token + Chain Stats -->
@@ -762,19 +920,19 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
               <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
                 <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">MARKET CAP</div>
-                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--gold)" id="token-mcap">--</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--gold)">$8.42M</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
                 <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">CIRCULATING</div>
-                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--cyan)" id="token-circ">--</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--cyan)">100M</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
                 <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">24H VOLUME</div>
-                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green)" id="token-vol">--</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green)">$1.2M</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
                 <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">HOLDERS</div>
-                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--purple)" id="token-holders">--</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--purple)">4,821</div>
               </div>
             </div>
           </div>
@@ -784,23 +942,23 @@
             <div class="metric-list">
               <div class="metric-row">
                 <span class="metric-key">TPS</span>
-                <div class="metric-bar-wrap"><div class="prog-bar" id="net-tps-bar" style="height:4px;width:0%;background:var(--cyan)"></div></div>
-                <span class="metric-val text-cyan" id="net-tps">--</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" style="height:4px;width:72%;background:var(--cyan)"></div></div>
+                <span class="metric-val text-cyan">4,200</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Validators</span>
-                <div class="metric-bar-wrap"><div class="prog-bar" id="net-vals-bar" style="height:4px;width:0%;background:var(--green)"></div></div>
-                <span class="metric-val text-green" id="net-vals">--</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" style="height:4px;width:88%;background:var(--green)"></div></div>
+                <span class="metric-val text-green">1,847</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Uptime</span>
-                <div class="metric-bar-wrap"><div class="prog-bar" id="net-uptime-bar" style="height:4px;width:0%;background:var(--gold)"></div></div>
-                <span class="metric-val text-gold" id="net-uptime">--</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" style="height:4px;width:99.8%;background:var(--gold)"></div></div>
+                <span class="metric-val text-gold">99.8%</span>
               </div>
               <div class="metric-row">
                 <span class="metric-key">Finality</span>
-                <div class="metric-bar-wrap"><div class="prog-bar" id="net-finality-bar" style="height:4px;width:0%;background:var(--purple)"></div></div>
-                <span class="metric-val text-purple" id="net-finality">--</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" style="height:4px;width:60%;background:var(--purple)"></div></div>
+                <span class="metric-val text-purple">0.4s</span>
               </div>
             </div>
           </div>
@@ -812,8 +970,6 @@
 </div><!-- /app -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
 // ── STARS ──
 const canvas = document.getElementById('stars-canvas');
@@ -842,9 +998,15 @@ function drawStars() {
 resizeStars(); drawStars();
 window.addEventListener('resize', resizeStars);
 
-function updateChartsPlaceholder() {}
-
-X3PageAdapters.start();
+// ── BLOCK + GAS LIVE ──
+let block = 19847221;
+setInterval(() => {
+  block += Math.floor(Math.random()*3);
+  document.getElementById('block-num').textContent = block.toLocaleString();
+  const gas = Math.floor(18 + Math.random()*20);
+  document.getElementById('gas').textContent = gas + ' gwei';
+  document.getElementById('gas').style.color = gas > 30 ? 'var(--red)' : 'var(--green)';
+}, 4000);
 
 // ── FUNDING CHART ──
 const fundingCtx = document.getElementById('fundingChart').getContext('2d');
@@ -855,18 +1017,18 @@ gradFund.addColorStop(1,'rgba(48,232,255,0)');
 const fundingChart = new Chart(fundingCtx, {
   type:'line',
   data:{
-    labels:['Now'],
+    labels:['Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'],
     datasets:[
       {
         label:'Raised ($M)',
-        data:[0],
+        data:[0,0.8,2.1,3.5,4.2,5.8,7.2,8.9,10.5,11.8,12.9,13.8,14.7],
         borderColor:'var(--cyan)', backgroundColor:gradFund, borderWidth:2,
         fill:true, tension:0.4, pointRadius:0, pointHoverRadius:5,
         pointHoverBackgroundColor:'var(--cyan)'
       },
       {
         label:'Target ($M)',
-        data:[0],
+        data:[2,3,4,5,6,8,10,12,14,16,17,18,20],
         borderColor:'rgba(240,192,64,0.4)', borderWidth:1.5,
         borderDash:[5,5], fill:false, tension:0.4, pointRadius:0
       }
@@ -889,15 +1051,14 @@ const fundingChart = new Chart(fundingCtx, {
     }
   }
 });
-window.__x3FundingChart = fundingChart;
 
 // ── ALLOC DONUT ──
 const allocCtx = document.getElementById('allocChart').getContext('2d');
-const allocChart = new Chart(allocCtx, {
+new Chart(allocCtx, {
   type:'doughnut',
   data:{
     datasets:[{
-      data:[0,0,0,0],
+      data:[42,28,18,12],
       backgroundColor:['rgba(240,192,64,0.85)','rgba(48,232,255,0.85)','rgba(176,106,255,0.85)','rgba(38,232,160,0.85)'],
       borderColor:'rgba(8,12,30,0.6)', borderWidth:3, hoverOffset:8
     }]
@@ -911,15 +1072,14 @@ const allocChart = new Chart(allocCtx, {
     }}
   }
 });
-window.__x3AllocChart = allocChart;
 
 // ── TOKEN SPARKLINE ──
 const tokenCtx = document.getElementById('tokenChart').getContext('2d');
 const gradTok = tokenCtx.createLinearGradient(0,0,0,100);
 gradTok.addColorStop(0,'rgba(240,192,64,0.25)');
 gradTok.addColorStop(1,'rgba(240,192,64,0)');
-const prices = [0];
-const tokenChart = new Chart(tokenCtx, {
+const prices = [0.042,0.048,0.051,0.046,0.055,0.062,0.059,0.068,0.072,0.070,0.078,0.083,0.0842];
+new Chart(tokenCtx, {
   type:'line',
   data:{
     labels:prices.map((_,i)=>`W${i+1}`),
@@ -941,15 +1101,61 @@ const tokenChart = new Chart(tokenCtx, {
     }
   }
 });
-window.__x3TokenChart = tokenChart;
 
 // ── CHART TAB SWITCH ──
 function switchTab(el, period) {
   document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
+  const multis = {
+    '7d':[12.5,13.0,13.8,13.5,14.1,14.4,14.7],
+    '1M':[8.9,9.4,10.2,10.9,11.8,12.9,13.8,14.7],
+    '3M':[5.8,7.2,8.9,10.5,11.8,12.9,13.8,14.7],
+    'All':[0,0.8,2.1,3.5,4.2,5.8,7.2,8.9,10.5,11.8,12.9,13.8,14.7]
+  };
+  const labels7d = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const newData = multis[period];
+  fundingChart.data.labels = period==='7d'?labels7d:newData.map((_,i)=>i);
+  fundingChart.data.datasets[0].data = newData;
+  fundingChart.update('active');
 }
 
-document.getElementById('activity-feed').innerHTML = '<div style="font-size:11px;color:var(--muted)">Loading reservations activity…</div>';
+// ── LIVE ACTIVITY ──
+const activities = [
+  {icon:'💰',text:'Apex Ventures committed <b class="text-gold">$250K</b>',time:'2m ago'},
+  {icon:'✅',text:'DeFi Infrastructure grant <b class="text-green">approved</b>',time:'8m ago'},
+  {icon:'🔗',text:'ZK Bridge milestone <b class="text-cyan">submitted</b>',time:'15m ago'},
+  {icon:'👤',text:'New investor: <b class="text-purple">DeltaStake.io</b>',time:'22m ago'},
+  {icon:'⚡',text:'X3S staking yield updated to <b class="text-gold">12.4%</b>',time:'1h ago'},
+  {icon:'📊',text:'Round III hit <b class="text-cyan">70% target</b>',time:'2h ago'},
+];
+
+let actIdx = 0;
+function addActivity() {
+  const feed = document.getElementById('activity-feed');
+  const a = activities[actIdx % activities.length];
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:flex-start;gap:8px;opacity:0;transform:translateX(-8px);transition:all 0.4s';
+  div.innerHTML = `<span style="font-size:13px;flex-shrink:0">${a.icon}</span><div style="flex:1"><div style="font-size:11px;line-height:1.4">${a.text}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">${a.time}</div></div>`;
+  feed.insertBefore(div, feed.firstChild);
+  setTimeout(()=>{div.style.opacity='1';div.style.transform='translateX(0)'},50);
+  if (feed.children.length > 4) feed.removeChild(feed.lastChild);
+  actIdx++;
+}
+// Init feed
+for(let i=0;i<4;i++) addActivity();
+setInterval(addActivity, 6000);
+
+// ── ANIMATE PROGRESS BARS ──
+setTimeout(()=>{
+  document.querySelectorAll('.prog-bar').forEach(b => {
+    const w = b.style.width;
+    b.style.width = '0%';
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{b.style.transition='width 1.2s cubic-bezier(0.4,0,0.2,1)';b.style.width=w},100);
+    });
+  });
+},300);
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

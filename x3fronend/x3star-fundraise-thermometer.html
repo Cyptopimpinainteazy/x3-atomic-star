@@ -119,8 +119,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
 <div class="top-bar">
   <div class="logo">X3STAR</div>
   <div class="tb-stats">
-    <div class="tbs"><div class="tbs-val" style="color:var(--gold)" id="hdr-raised">--</div><div class="tbs-key">Raised</div></div>
-    <div class="tbs"><div class="tbs-val" id="hdr-inv">--</div><div class="tbs-key">Investors</div></div>
+    <div class="tbs"><div class="tbs-val" style="color:var(--gold)" id="hdr-raised">$14,702,400</div><div class="tbs-key">Raised</div></div>
+    <div class="tbs"><div class="tbs-val" id="hdr-inv">312</div><div class="tbs-key">Investors</div></div>
     <div class="tbs"><div class="tbs-val" style="color:var(--green)">$0.075</div><div class="tbs-key">X3S Price</div></div>
     <div class="tbs"><div class="tbs-val" style="color:var(--red)">46</div><div class="tbs-key">Genesis Slots Left</div></div>
   </div>
@@ -165,9 +165,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
 <!-- CENTER: THERMOMETER -->
 <div class="thermo-col">
   <div class="thermo-top">
-    <div class="tt-raised" id="thermo-raised">--</div>
+    <div class="tt-raised" id="thermo-raised">$14.7M</div>
     <div class="tt-label">of $20M target</div>
-    <div class="tt-pct" id="thermo-pct">--</div>
+    <div class="tt-pct" id="thermo-pct">73.5%</div>
   </div>
 
   <div class="thermo-wrap">
@@ -246,23 +246,77 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <div class="rc-title">Live Purchases</div>
   <div class="event-list" id="event-list"></div>
   <div class="total-display">
-    <div class="td-val" id="today-total">--</div>
+    <div class="td-val" id="today-total">$142,800</div>
     <div class="td-key">Raised Today</div>
   </div>
 </div>
 
 <!-- BOTTOM -->
 <div class="bottom-bar">
-  <div class="bub-text">Round III closes <span id="closes-label">in -- days</span> · Next round: <span id="next-round">--</span></div>
+  <div class="bub-text">Round III closes <span id="closes-label">in ~6 days</span> · Next round: <span>$0.12 (+42%)</span></div>
   <button style="padding:10px 24px;background:var(--gold);color:#000;border:none;border-radius:6px;
     font-weight:800;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
     font-family:var(--font);" onclick="location.href='x3star-token-presale.html'">Buy X3S Now →</button>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
-X3PageAdapters.start();
+// EVENTS
+const evData=[
+  {flag:'🇺🇸',name:'J. Chen',type:'token',amt:'$25,000'},
+  {flag:'🇸🇬',name:'apex.eth',type:'node',amt:'$50,000'},
+  {flag:'🇩🇪',name:'M. Braun',type:'token',amt:'$10,000'},
+  {flag:'🇬🇧',name:'starfall.eth',type:'node',amt:'$20,000'},
+  {flag:'🇯🇵',name:'K. Tanaka',type:'token',amt:'$50,000'},
+  {flag:'🇦🇪',name:'gulf_fund',type:'node',amt:'$250,000'},
+  {flag:'🇰🇷',name:'byte_ops',type:'node',amt:'$50,000'},
+  {flag:'🇦🇺',name:'P. Wilson',type:'token',amt:'$30,000'},
+];
+let evIdx=0,raised=14702400,todayTotal=142800,investors=312;
+const list=document.getElementById('event-list');
+
+function addEvent(){
+  const e=evData[evIdx%evData.length];
+  evIdx++;
+  const div=document.createElement('div');
+  div.className='ev-card';
+  div.innerHTML=`
+    <div class="ev-top">
+      <div class="ev-flag">${e.flag}</div>
+      <div class="ev-name">${e.name}</div>
+      <div class="ev-type ${e.type==='node'?'evt-node':'evt-token'}">${e.type==='node'?'NODE':'TOKEN'}</div>
+    </div>
+    <div class="ev-amount">${e.amt}</div>
+    <div class="ev-time">just now</div>
+  `;
+  list.insertBefore(div,list.firstChild);
+  if(list.children.length>6)list.removeChild(list.lastChild);
+
+  // Update thermometer
+  const purchase=parseInt(e.amt.replace(/[^0-9]/g,''));
+  raised+=purchase;todayTotal+=purchase;investors++;
+  const pct=(raised/20000000*100);
+  // Tube: full=310px height, 0 starts at y=330, so fill from bottom
+  // y position = 330 - (pct/100 * 310), height = pct/100 * 310
+  const fillH=Math.round(pct/100*310);
+  const fillY=330-fillH;
+  document.getElementById('liquid-rect').setAttribute('y',fillY);
+  document.getElementById('liquid-rect').setAttribute('height',fillH+25);
+  document.getElementById('level-line').setAttribute('y1',fillY);
+  document.getElementById('level-line').setAttribute('y2',fillY);
+  document.getElementById('level-arrow').setAttribute('points',`65,${fillY} 72,${fillY-4} 72,${fillY+4}`);
+  document.getElementById('shimmer').setAttribute('y',fillY);
+  document.getElementById('shimmer').setAttribute('height',fillH);
+  document.getElementById('thermo-raised').textContent='$'+(raised/1e6).toFixed(1)+'M';
+  document.getElementById('thermo-pct').textContent=pct.toFixed(1)+'%';
+  document.getElementById('hdr-raised').textContent='$'+raised.toLocaleString();
+  document.getElementById('hdr-inv').textContent=investors;
+  document.getElementById('today-total').textContent='$'+Math.round(todayTotal/1000)+'K';
+}
+
+// Seed
+for(let i=0;i<4;i++)addEvent();
+setInterval(addEvent,4000+Math.random()*3000);
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

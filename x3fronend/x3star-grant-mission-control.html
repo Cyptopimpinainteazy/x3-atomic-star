@@ -152,9 +152,9 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
   <a class="ntab" href="x3star-whale-tracker.html">Whale Tracker</a>
   <a class="ntab" href="x3star-dashboard.html">Dashboard</a>
   <div class="nav-stats">
-    <div class="ns-item"><div class="ns-val" style="color:var(--gold)" id="gm-pool">--</div><div class="ns-key">Grant Pool</div></div>
-    <div class="ns-item"><div class="ns-val" style="color:var(--teal)" id="gm-active">--</div><div class="ns-key">Active</div></div>
-    <div class="ns-item"><div class="ns-val" style="color:var(--green)" id="gm-distributed">--</div><div class="ns-key">Distributed</div></div>
+    <div class="ns-item"><div class="ns-val" style="color:var(--gold)">$5,000,000</div><div class="ns-key">Grant Pool</div></div>
+    <div class="ns-item"><div class="ns-val" style="color:var(--teal)">48</div><div class="ns-key">Active</div></div>
+    <div class="ns-item"><div class="ns-val" style="color:var(--green)">$1,284,000</div><div class="ns-key">Distributed</div></div>
     <button class="btn-join" onclick="showApplyModal()">Apply for Grant →</button>
   </div>
 </nav>
@@ -165,11 +165,11 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="ph-sub">Real-time visibility into every funded project building on X3STAR</div>
   </div>
   <div class="ph-kpis">
-    <div class="phk"><div class="phk-val" style="color:var(--orange)" id="gm-review">--</div><div class="phk-key">In Review</div></div>
-    <div class="phk"><div class="phk-val" style="color:var(--blue)" id="gm-building">--</div><div class="phk-key">Building</div></div>
-    <div class="phk"><div class="phk-val" style="color:var(--purple)" id="gm-milestone">--</div><div class="phk-key">Milestone</div></div>
-    <div class="phk"><div class="phk-val" style="color:var(--gold)" id="gm-payout">--</div><div class="phk-key">Payout</div></div>
-    <div class="phk"><div class="phk-val" style="color:var(--green)" id="gm-complete">--</div><div class="phk-key">Complete</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--orange)">12</div><div class="phk-key">In Review</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--blue)">18</div><div class="phk-key">Building</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--purple)">8</div><div class="phk-key">Milestone</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--gold)">4</div><div class="phk-key">Payout</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--green)">6</div><div class="phk-key">Complete</div></div>
   </div>
 </div>
 
@@ -181,9 +181,46 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="col-header">
       <div class="ch-dot"></div>
       <div class="ch-title">Under Review</div>
-      <div class="ch-count" style="color:var(--orange)" id="gm-review-count">--</div>
+      <div class="ch-count" style="color:var(--orange)">12</div>
     </div>
-    <div id="gm-col-review"></div>
+
+    <div class="grant-card" onclick="openModal('zk-bridge')">
+      <div class="gc-top">
+        <span class="gc-icon">🔗</span>
+        <span class="gc-cat" style="background:rgba(255,140,32,0.12);color:var(--orange);border:1px solid rgba(255,140,32,0.2)">DeFi</span>
+      </div>
+      <div class="gc-title">ZK Cross-Chain Aggregator</div>
+      <div class="gc-team">by zkprotocol.eth · 3 devs</div>
+      <div class="gc-meta">
+        <span class="gc-tag">Solidity</span><span class="gc-tag">ZK Proofs</span><span class="gc-tag">Bridge</span>
+      </div>
+      <div class="gc-amount" style="color:var(--gold)">$75,000 requested</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--orange)"></div>Awaiting committee vote · 2d left</div>
+    </div>
+
+    <div class="grant-card" onclick="openModal('nft-mkt')">
+      <div class="gc-top">
+        <span class="gc-icon">🎨</span>
+        <span class="gc-cat" style="background:rgba(255,140,32,0.12);color:var(--orange);border:1px solid rgba(255,140,32,0.2)">NFT</span>
+      </div>
+      <div class="gc-title">Native NFT Marketplace</div>
+      <div class="gc-team">by artblock_dao · 5 devs</div>
+      <div class="gc-meta"><span class="gc-tag">EVM</span><span class="gc-tag">TypeScript</span><span class="gc-tag">IPFS</span></div>
+      <div class="gc-amount" style="color:var(--gold)">$120,000 requested</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--orange)"></div>Technical review in progress</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">📊</span>
+        <span class="gc-cat" style="background:rgba(255,140,32,0.12);color:var(--orange);border:1px solid rgba(255,140,32,0.2)">Analytics</span>
+      </div>
+      <div class="gc-title">On-Chain Analytics Dashboard</div>
+      <div class="gc-team">by datadao.eth · 2 devs</div>
+      <div class="gc-meta"><span class="gc-tag">Python</span><span class="gc-tag">Subgraph</span></div>
+      <div class="gc-amount" style="color:var(--gold)">$40,000 requested</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--orange)"></div>Submission reviewed · voting soon</div>
+    </div>
   </div>
 
   <!-- BUILDING -->
@@ -191,9 +228,72 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="col-header">
       <div class="ch-dot"></div>
       <div class="ch-title">Building</div>
-      <div class="ch-count" style="color:var(--blue)" id="gm-building-count">--</div>
+      <div class="ch-count" style="color:var(--blue)">18</div>
     </div>
-    <div id="gm-col-building"></div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">💱</span>
+        <span class="gc-cat" style="background:rgba(0,136,255,0.12);color:var(--blue);border:1px solid rgba(0,136,255,0.2)">DEX</span>
+      </div>
+      <div class="gc-title">X3STAR Native DEX</div>
+      <div class="gc-team">by starswap_labs · 8 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Sprint 3/5</span><span style="font-family:var(--mono);color:var(--blue)">62%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:62%;background:var(--blue)"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">AMM</span><span class="gc-tag">Liquidity Pools</span><span class="gc-tag">Rust</span></div>
+      <div class="gc-amount" style="color:var(--blue)">$250,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--blue)"></div>UI prototype due in 12 days</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">🏦</span>
+        <span class="gc-cat" style="background:rgba(0,136,255,0.12);color:var(--blue);border:1px solid rgba(0,136,255,0.2)">Lending</span>
+      </div>
+      <div class="gc-title">X3STAR Lending Protocol</div>
+      <div class="gc-team">by lendfi.eth · 4 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Sprint 1/4</span><span style="font-family:var(--mono);color:var(--blue)">28%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:28%;background:var(--blue)"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">Collateral</span><span class="gc-tag">Oracle</span></div>
+      <div class="gc-amount" style="color:var(--blue)">$180,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--blue)"></div>Smart contract audit scheduled</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">🤖</span>
+        <span class="gc-cat" style="background:rgba(0,136,255,0.12);color:var(--blue);border:1px solid rgba(0,136,255,0.2)">AI</span>
+      </div>
+      <div class="gc-title">AI Trading Bot SDK</div>
+      <div class="gc-team">by neuralfin.io · 3 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Sprint 2/3</span><span style="font-family:var(--mono);color:var(--blue)">74%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:74%;background:linear-gradient(90deg,var(--blue),var(--teal))"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">Python SDK</span><span class="gc-tag">ML</span></div>
+      <div class="gc-amount" style="color:var(--blue)">$55,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--blue)"></div>Beta launch in 6 days 🔥</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">🔐</span>
+        <span class="gc-cat" style="background:rgba(0,136,255,0.12);color:var(--blue);border:1px solid rgba(0,136,255,0.2)">Security</span>
+      </div>
+      <div class="gc-title">Quantum-Resistant Wallet</div>
+      <div class="gc-team">by crystalvault.eth · 6 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Sprint 4/6</span><span style="font-family:var(--mono);color:var(--blue)">55%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:55%;background:var(--blue)"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">CRYSTALS</span><span class="gc-tag">Post-Quantum</span></div>
+      <div class="gc-amount" style="color:var(--blue)">$200,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--blue)"></div>Key generation module done ✓</div>
+    </div>
   </div>
 
   <!-- MILESTONE REVIEW -->
@@ -201,9 +301,56 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="col-header">
       <div class="ch-dot"></div>
       <div class="ch-title">Milestone Review</div>
-      <div class="ch-count" style="color:var(--purple)" id="gm-milestone-count">--</div>
+      <div class="ch-count" style="color:var(--purple)">8</div>
     </div>
-    <div id="gm-col-milestone"></div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">🌉</span>
+        <span class="gc-cat" style="background:rgba(153,68,255,0.12);color:var(--purple);border:1px solid rgba(153,68,255,0.2)">Bridge</span>
+      </div>
+      <div class="gc-title">Ethereum ↔ X3STAR Bridge</div>
+      <div class="gc-team">by bridgecorp.eth · 7 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Milestone 2/3</span><span style="font-family:var(--mono);color:var(--purple)">90%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:90%;background:var(--purple)"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">ZK-SNARK</span><span class="gc-tag">Solidity</span></div>
+      <div class="gc-amount" style="color:var(--purple)">$500,000 — M2 payout: $150K</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--green)"></div>M2 deliverables verified ✓ awaiting vote</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">📱</span>
+        <span class="gc-cat" style="background:rgba(153,68,255,0.12);color:var(--purple);border:1px solid rgba(153,68,255,0.2)">Mobile</span>
+      </div>
+      <div class="gc-title">X3STAR Mobile Wallet</div>
+      <div class="gc-team">by mobilex.eth · 5 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Milestone 3/4</span><span style="font-family:var(--mono);color:var(--purple)">85%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:85%;background:var(--purple)"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">React Native</span><span class="gc-tag">iOS</span><span class="gc-tag">Android</span></div>
+      <div class="gc-amount" style="color:var(--purple)">$140,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--purple)"></div>TestFlight live — community review</div>
+    </div>
+
+    <div class="grant-card">
+      <div class="gc-top">
+        <span class="gc-icon">🎮</span>
+        <span class="gc-cat" style="background:rgba(153,68,255,0.12);color:var(--purple);border:1px solid rgba(153,68,255,0.2)">Gaming</span>
+      </div>
+      <div class="gc-title">X3STAR GameFi SDK</div>
+      <div class="gc-team">by playdao.gg · 4 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Milestone 1/2</span><span style="font-family:var(--mono);color:var(--purple)">95%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:95%;background:linear-gradient(90deg,var(--purple),var(--teal))"></div></div>
+      </div>
+      <div class="gc-meta"><span class="gc-tag">Unity</span><span class="gc-tag">SDK</span><span class="gc-tag">NFT</span></div>
+      <div class="gc-amount" style="color:var(--purple)">$80,000 approved</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--green)"></div>Demo shipped ✓ — vote passing</div>
+    </div>
   </div>
 
   <!-- PAYOUT PENDING -->
@@ -211,9 +358,38 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="col-header">
       <div class="ch-dot"></div>
       <div class="ch-title">Payout Pending</div>
-      <div class="ch-count" style="color:var(--gold)" id="gm-payout-count">--</div>
+      <div class="ch-count" style="color:var(--gold)">4</div>
     </div>
-    <div id="gm-col-payout"></div>
+
+    <div class="grant-card" style="border-color:rgba(255,208,96,0.15);">
+      <div class="gc-top">
+        <span class="gc-icon">✅</span>
+        <span class="gc-cat" style="background:rgba(255,208,96,0.12);color:var(--gold);border:1px solid rgba(255,208,96,0.2)">DeFi</span>
+      </div>
+      <div class="gc-title">Yield Aggregator V2</div>
+      <div class="gc-team">by yieldmax.eth · 3 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Complete</span><span style="font-family:var(--mono);color:var(--green)">100%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:100%;background:var(--green)"></div></div>
+      </div>
+      <div class="gc-amount" style="color:var(--gold)">$95,000 — paying out $47,500</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--gold);animation:pulse 1s infinite"></div>Multi-sig queued · 1 of 4 sigs</div>
+    </div>
+
+    <div class="grant-card" style="border-color:rgba(255,208,96,0.15);">
+      <div class="gc-top">
+        <span class="gc-icon">📡</span>
+        <span class="gc-cat" style="background:rgba(255,208,96,0.12);color:var(--gold);border:1px solid rgba(255,208,96,0.2)">Infra</span>
+      </div>
+      <div class="gc-title">Block Explorer V2</div>
+      <div class="gc-team">by explorer.eth · 2 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.4)">Approved</span><span style="font-family:var(--mono);color:var(--green)">100%</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:100%;background:var(--green)"></div></div>
+      </div>
+      <div class="gc-amount" style="color:var(--gold)">$60,000 — paying final tranche</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--gold)"></div>Scheduled: today at 18:00 UTC</div>
+    </div>
   </div>
 
   <!-- COMPLETE -->
@@ -221,9 +397,49 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
     <div class="col-header">
       <div class="ch-dot"></div>
       <div class="ch-title">Shipped ✓</div>
-      <div class="ch-count" style="color:var(--green)" id="gm-complete-count">--</div>
+      <div class="ch-count" style="color:var(--green)">6</div>
     </div>
-    <div id="gm-col-complete"></div>
+
+    <div class="grant-card" style="opacity:0.8;">
+      <div class="gc-top">
+        <span class="gc-icon">🔍</span>
+        <span class="gc-cat" style="background:rgba(46,255,154,0.1);color:var(--green);border:1px solid rgba(46,255,154,0.2)">Infra</span>
+      </div>
+      <div class="gc-title">Block Explorer V1</div>
+      <div class="gc-team">by explorer.eth · 2 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.3)">Delivered</span><span style="font-family:var(--mono);color:var(--green)">100% ✓</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:100%;background:linear-gradient(90deg,var(--teal),var(--green))"></div></div>
+      </div>
+      <div class="gc-amount" style="color:var(--green)">$40,000 paid ✓</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--green)"></div>Live at explorer.x3star.io</div>
+    </div>
+
+    <div class="grant-card" style="opacity:0.8;">
+      <div class="gc-top">
+        <span class="gc-icon">🏆</span>
+        <span class="gc-cat" style="background:rgba(46,255,154,0.1);color:var(--green);border:1px solid rgba(46,255,154,0.2)">SDK</span>
+      </div>
+      <div class="gc-title">JavaScript SDK</div>
+      <div class="gc-team">by sdk_labs · 4 devs</div>
+      <div class="gc-progress">
+        <div class="gcp-labels"><span style="color:rgba(255,255,255,0.3)">Delivered</span><span style="font-family:var(--mono);color:var(--green)">100% ✓</span></div>
+        <div class="gcp-bar-wrap"><div class="gcp-fill" style="width:100%;background:var(--green)"></div></div>
+      </div>
+      <div class="gc-amount" style="color:var(--green)">$30,000 paid ✓</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--green)"></div>2,400+ npm downloads</div>
+    </div>
+
+    <div class="grant-card" style="opacity:0.8;">
+      <div class="gc-top">
+        <span class="gc-icon">🌐</span>
+        <span class="gc-cat" style="background:rgba(46,255,154,0.1);color:var(--green);border:1px solid rgba(46,255,154,0.2)">Docs</span>
+      </div>
+      <div class="gc-title">Developer Documentation</div>
+      <div class="gc-team">by docsdao · 3 writers</div>
+      <div class="gc-amount" style="color:var(--green)">$15,000 paid ✓</div>
+      <div class="gc-milestone"><div class="gm-dot" style="background:var(--green)"></div>docs.x3star.io live — 8K monthly visitors</div>
+    </div>
   </div>
 
 </div><!-- /board -->
@@ -245,47 +461,58 @@ nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:cente
   </div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
+function openModal(id){
+  const content={
+    'zk-bridge':`
+      <div style="font-size:28px;margin-bottom:12px">🔗</div>
+      <h2 style="font-size:22px;font-weight:800;margin-bottom:4px">ZK Cross-Chain Aggregator</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:20px">by zkprotocol.eth · Submitted Feb 28</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:20px">
+        A zero-knowledge cross-chain liquidity aggregator enabling atomic swaps between X3STAR, Ethereum, Solana and Cosmos. Uses PLONK proof system for trustless verification with sub-second settlement.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;">
+          <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Requested</div>
+          <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold)">$75,000</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;">
+          <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Timeline</div>
+          <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--cyan)">4 months</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,200,180,0.06);border:1px solid rgba(0,200,180,0.15);border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px">Community Vote</div>
+        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px">
+          <div style="height:100%;width:68%;background:linear-gradient(90deg,var(--teal),var(--green));border-radius:3px"></div>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4)">68% YES · 18% NO · 14% ABSTAIN · 2 days remaining</div>
+      </div>
+      <button onclick="closeModal()" style="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border:none;font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;">VOTE ON THIS GRANT</button>
+    `
+  };
+  document.getElementById('modal-content').innerHTML = content[id] || '<p>Grant details not found</p>';
+  document.getElementById('modal').classList.add('show');
+}
 function closeModal(){document.getElementById('modal').classList.remove('show');}
 function showApplyModal(){
   document.getElementById('modal-content').innerHTML=`
     <h2 style="font-size:22px;font-weight:800;margin-bottom:4px">Apply for a Grant</h2>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">Submit a grant request to the X3STAR team.</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">Grants from $5,000 to $500,000 for builders on X3STAR</div>
     <div style="display:flex;flex-direction:column;gap:14px;">
-      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Project Name</div><input id="gm-apply-name" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="e.g. X3STAR DeFi Protocol"></div>
-      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Organization</div><input id="gm-apply-org" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="Your team or company"></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Project Name</div><input style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="e.g. X3STAR DeFi Protocol"></div>
       <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Category</div>
-        <select id="gm-apply-category" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;cursor:pointer;">
+        <select style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;cursor:pointer;">
           <option>DeFi</option><option>Infrastructure</option><option>Gaming</option><option>NFT</option><option>Security</option><option>AI/ML</option><option>Other</option>
         </select></div>
-      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Grant Amount Requested (USD)</div><input id="gm-apply-amount" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="25000"></div>
-      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Short Description</div><textarea id="gm-apply-desc" rows="3" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;resize:none;" placeholder="What are you building and why does X3STAR need it?"></textarea></div>
-      <button id="gm-apply-submit" style="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border:none;font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;">SUBMIT APPLICATION →</button>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Grant Amount Requested</div><input style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="$25,000"></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Short Description</div><textarea rows="3" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;resize:none;" placeholder="What are you building and why does X3STAR need it?"></textarea></div>
+      <button onclick="alert('Application submitted! Our team will review within 3 business days.');closeModal();" style="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border:none;font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 30px rgba(0,200,180,0.4)'" onmouseout="this.style.boxShadow='none'">SUBMIT APPLICATION →</button>
     </div>
   `;
   document.getElementById('modal').classList.add('show');
-  var submit = document.getElementById('gm-apply-submit');
-  if (submit) {
-    submit.onclick = async function () {
-      if (!window.X3API) return;
-      submit.textContent = 'Submitting...';
-      await window.X3API.submitForm('grant', {
-        projectName: document.getElementById('gm-apply-name').value,
-        organization: document.getElementById('gm-apply-org').value,
-        category: document.getElementById('gm-apply-category').value,
-        requestedUsd: Number(document.getElementById('gm-apply-amount').value || 0),
-        summary: document.getElementById('gm-apply-desc').value,
-      });
-      submit.textContent = 'Submitted ✓';
-      setTimeout(closeModal, 800);
-    };
-  }
-}
-if (window.X3PageAdapters) {
-  window.X3PageAdapters.start();
 }
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

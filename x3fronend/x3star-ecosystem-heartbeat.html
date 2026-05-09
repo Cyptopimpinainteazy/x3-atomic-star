@@ -154,10 +154,62 @@ body{background:var(--bg);color:var(--white);font-family:var(--font);
   <button class="bt-cta" onclick="location.href='x3star-token-presale.html'">Join the Ecosystem →</button>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
-X3PageAdapters.start();
+// ECG CANVAS
+const ecg=document.getElementById('ecg-canvas');
+const ectx=ecg.getContext('2d');
+function resizeECG(){ecg.width=window.innerWidth;}
+resizeECG();window.addEventListener('resize',resizeECG);
+
+const pts=[];
+for(let i=0;i<ecg.width;i++)pts.push(40);
+let beat=0;
+
+function drawECG(){
+  // Generate new point
+  beat++;
+  let newPt=40;
+  const bp=beat%120;
+  if(bp===60){newPt=5;}
+  else if(bp===62){newPt=70;}
+  else if(bp===63){newPt=2;}
+  else if(bp===64||bp===65){newPt=40;}
+  else newPt=40+(Math.random()-0.5)*3;
+  pts.push(newPt);
+  if(pts.length>ecg.width)pts.shift();
+
+  ectx.clearRect(0,0,ecg.width,80);
+  ectx.beginPath();
+  pts.forEach((p,i)=>{
+    if(i===0)ectx.moveTo(i,p);
+    else ectx.lineTo(i,p);
+  });
+  ectx.strokeStyle='rgba(0,255,106,0.7)';
+  ectx.lineWidth=1.5;
+  ectx.stroke();
+  requestAnimationFrame(drawECG);
+}
+drawECG();
+
+// LIVE NUMBER
+let total=48291840,tvl=8400000,staked=18400000;
+setInterval(()=>{
+  const delta=Math.floor(Math.random()*8000+2000);
+  total+=delta;tvl+=Math.floor(delta*0.15);staked+=Math.floor(delta*0.2);
+  document.getElementById('main-num').textContent='$'+total.toLocaleString();
+  document.getElementById('bd-tvl').textContent='$'+(tvl/1e6).toFixed(1)+'M';
+  document.getElementById('bd-staked').textContent='$'+(staked/1e6).toFixed(1)+'M';
+  document.getElementById('bd-raised').textContent='$'+(14702400/1e6).toFixed(1)+'M';
+  const bpm=Math.floor(130+Math.random()*30);
+  document.getElementById('beat-bpm').textContent=bpm+' BPM';
+},1500);
+
+function showEmbed(){
+  const code=`<!-- X3STAR Heartbeat Widget -->\n<iframe src="https://x3star.io/heartbeat" width="400" height="300" frameborder="0"></iframe>`;
+  navigator.clipboard?.writeText(code);
+  alert('Embed code copied to clipboard!\n\n'+code);
+}
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

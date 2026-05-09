@@ -275,19 +275,19 @@ select.f-input{cursor:pointer;}
         <div class="panel-title">Investment Amount</div>
         <div class="panel-sub">Choose your investment tier. Higher tiers receive better pricing and exclusive benefits.</div>
         <div class="inv-options">
-          <div class="inv-option" onclick="selectInv(this,'Community Tier')">
-            <div class="io-amount" style="color:var(--cyan)" id="kyc-tier-1-amount">--</div>
-            <div class="io-bonus" id="kyc-tier-1-bonus">--</div>
+          <div class="inv-option" onclick="selectInv(this,'$5K–$25K')">
+            <div class="io-amount" style="color:var(--cyan)">$5K</div>
+            <div class="io-bonus">+12% X3S</div>
             <div class="io-label">Community Tier</div>
           </div>
-          <div class="inv-option selected" onclick="selectInv(this,'Strategic Tier')">
-            <div class="io-amount" style="color:var(--gold)" id="kyc-tier-2-amount">--</div>
-            <div class="io-bonus" id="kyc-tier-2-bonus">--</div>
+          <div class="inv-option selected" onclick="selectInv(this,'$25K–$100K')">
+            <div class="io-amount" style="color:var(--gold)">$25K</div>
+            <div class="io-bonus">+15% X3S</div>
             <div class="io-label">Strategic Tier</div>
           </div>
-          <div class="inv-option" onclick="selectInv(this,'Institutional Tier')">
-            <div class="io-amount" style="color:var(--purple)" id="kyc-tier-3-amount">--</div>
-            <div class="io-bonus" id="kyc-tier-3-bonus">--</div>
+          <div class="inv-option" onclick="selectInv(this,'$100K+')">
+            <div class="io-amount" style="color:var(--purple)">$100K+</div>
+            <div class="io-bonus">+18% X3S</div>
             <div class="io-label">Institutional</div>
           </div>
         </div>
@@ -482,8 +482,6 @@ select.f-input{cursor:pointer;}
   </div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
 let currentStep = 1;
 function nextStep(step) {
@@ -503,7 +501,7 @@ function submitApplication() {
   document.getElementById('step5').className = 'step-item done';
   document.getElementById('step5').querySelector('.step-circle').textContent = '✓';
   document.getElementById('panel-success').classList.add('active');
-  document.getElementById('app-id').textContent = 'SUBMITTING';
+  document.getElementById('app-id').textContent = 'X3K-2025-' + String(Math.floor(Math.random()*1000+300)).padStart(5,'0');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -556,7 +554,7 @@ function showFiles(files, listId, zoneId) {
   });
   document.getElementById(zoneId).querySelector('.uz-title').textContent = '✓ File uploaded';
 }
-X3PageAdapters.start();
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

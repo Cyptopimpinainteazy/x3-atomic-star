@@ -258,19 +258,19 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
       <span class="ht-2">VALIDATOR</span>
       <span class="ht-3">NODE SPOT</span>
     </h1>
-    <p class="hero-sub">Genesis Validators are the backbone of the X3STAR network. Secure your spot today, earn live protocol APY from day one of mainnet, and gain permanent governance superpowers on the protocol.</p>
+    <p class="hero-sub">Genesis Validators are the backbone of the X3STAR network. Secure your spot today, earn 18%+ APY from day one of mainnet, and gain permanent governance superpowers on the protocol.</p>
 
     <div class="hero-stats">
       <div class="hs-item">
-        <div class="hs-val" id="hs-apy">--</div>
+        <div class="hs-val">18%</div>
         <div class="hs-key">Base APY</div>
       </div>
       <div class="hs-item">
-        <div class="hs-val" id="slots-left">--</div>
+        <div class="hs-val" id="slots-left">47</div>
         <div class="hs-key">Spots Left</div>
       </div>
       <div class="hs-item">
-        <div class="hs-val" id="hs-min-stake">--</div>
+        <div class="hs-val">$5K</div>
         <div class="hs-key">Min Stake</div>
       </div>
     </div>
@@ -291,7 +291,7 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
       <div class="slot-track">
         <div class="slot-header">
           <span class="slot-remain" id="slots-remain">47 SLOTS LEFT</span>
-          <span class="slot-total">of <span id="slots-total">--</span> total</span>
+          <span class="slot-total">of 200 total</span>
         </div>
         <div class="slot-grid" id="slot-grid"></div>
         <div class="slot-legend">
@@ -303,47 +303,47 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
 
       <!-- TIER CARDS -->
       <div class="tier-cards">
-      <div class="tier-card tc-genesis selected" onclick="selectTier(this,'genesis',0,'APY + Full governance + Priority rewards')">
+        <div class="tier-card tc-genesis selected" onclick="selectTier(this,'genesis',50000,'18% APY + Full governance + Priority rewards')">
           <div class="tc-row">
             <div>
               <div class="tc-name" style="color:var(--gold)">⬡ GENESIS NODE</div>
               <div class="tc-badge" style="background:rgba(255,215,0,0.15);color:var(--gold);border:1px solid rgba(255,215,0,0.3)">MOST REWARDS</div>
             </div>
-            <div class="tc-price" style="color:var(--gold)" id="tier-genesis-price">--</div>
+            <div class="tc-price" style="color:var(--gold)">$50K</div>
           </div>
           <div class="tc-features">
-            <span class="tc-feat" id="tier-genesis-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ 18% APY</span>
             <span class="tc-feat">✓ Full governance</span>
             <span class="tc-feat">✓ Fee sharing</span>
             <span class="tc-feat">✓ Priority blocks</span>
           </div>
         </div>
 
-      <div class="tier-card tc-star" onclick="selectTier(this,'star',0,'APY + Governance rights + Standard rewards')">
+        <div class="tier-card tc-star" onclick="selectTier(this,'star',20000,'14% APY + Governance rights + Standard rewards')">
           <div class="tc-row">
             <div>
               <div class="tc-name" style="color:var(--purple)">✦ STAR NODE</div>
               <div class="tc-badge" style="background:rgba(150,100,255,0.12);color:var(--purple);border:1px solid rgba(150,100,255,0.3)">POPULAR</div>
             </div>
-            <div class="tc-price" style="color:var(--purple)" id="tier-star-price">--</div>
+            <div class="tc-price" style="color:var(--purple)">$20K</div>
           </div>
           <div class="tc-features">
-            <span class="tc-feat" id="tier-star-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ 14% APY</span>
             <span class="tc-feat">✓ Governance</span>
             <span class="tc-feat">✓ Standard rewards</span>
           </div>
         </div>
 
-      <div class="tier-card tc-lite" onclick="selectTier(this,'lite',0,'APY + Observer rights')">
+        <div class="tier-card tc-lite" onclick="selectTier(this,'lite',5000,'10% APY + Observer rights')">
           <div class="tc-row">
             <div>
               <div class="tc-name" style="color:var(--cyan)">◎ LITE NODE</div>
               <div class="tc-badge" style="background:rgba(0,200,255,0.08);color:var(--cyan);border:1px solid rgba(0,200,255,0.25)">ENTRY LEVEL</div>
             </div>
-            <div class="tc-price" style="color:var(--cyan)" id="tier-lite-price">--</div>
+            <div class="tc-price" style="color:var(--cyan)">$5K</div>
           </div>
           <div class="tc-features">
-            <span class="tc-feat" id="tier-lite-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ 10% APY</span>
             <span class="tc-feat">✓ Observer rights</span>
           </div>
         </div>
@@ -367,7 +367,7 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
         </div>
         <div class="os-row">
           <span style="color:var(--muted)">APY</span>
-          <span id="os-apy" style="color:var(--green)">--</span>
+          <span id="os-apy" style="color:var(--green)">18%</span>
         </div>
         <div class="os-row">
           <span style="color:var(--muted)">Quantity</span>
@@ -375,11 +375,11 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
         </div>
         <div class="os-row">
           <span style="color:var(--muted)">Bonus X3S</span>
-          <span style="color:var(--cyan)" id="os-bonus">--</span>
+          <span style="color:var(--cyan)">+15% tokens</span>
         </div>
         <div class="os-row total">
           <span>Total</span>
-          <span id="os-total">--</span>
+          <span id="os-total">$50,000</span>
         </div>
       </div>
 
@@ -397,31 +397,31 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
       <div class="bc-icon">⚡</div>
       <div class="bc-title">Block Rewards</div>
       <div class="bc-text">Genesis validators receive priority block assignment, earning more rewards per epoch than post-genesis validators who join later.</div>
-      <div class="bc-val" id="benefit-apy">--</div>
+      <div class="bc-val">18% APY</div>
     </div>
     <div class="benefit-card">
       <div class="bc-icon">🗳</div>
       <div class="bc-title">Governance Power</div>
       <div class="bc-text">Full voting rights on protocol upgrades, grant allocation, fee structure, and network parameters. Your voice shapes X3STAR.</div>
-      <div class="bc-val">Priority voting</div>
+      <div class="bc-val">10× Weight</div>
     </div>
     <div class="benefit-card">
       <div class="bc-icon">💰</div>
       <div class="bc-title">Protocol Fee Share</div>
-      <div class="bc-text">Genesis validators receive a protocol fee share distributed proportionally as the network scales.</div>
-      <div class="bc-val" id="benefit-fee-share">--</div>
+      <div class="bc-text">Genesis validators receive 40% of all protocol transaction fees split proportionally — a perpetual income stream as the network scales.</div>
+      <div class="bc-val">40% Share</div>
     </div>
     <div class="benefit-card">
       <div class="bc-icon">🎁</div>
       <div class="bc-title">Token Bonus</div>
-      <div class="bc-text">Node buyers may receive a token bonus on top of their purchase; details are published per round.</div>
-      <div class="bc-val" id="benefit-bonus">--</div>
+      <div class="bc-text">Node buyers receive a 15% token bonus on top of their purchase — all vested over 12 months post-mainnet.</div>
+      <div class="bc-val">+15% X3S</div>
     </div>
     <div class="benefit-card">
       <div class="bc-icon">🛡</div>
       <div class="bc-title">Slashing Protection</div>
-      <div class="bc-text">Genesis nodes benefit from an insurance pool to protect against accidental slashing events during the early mainnet period.</div>
-      <div class="bc-val">Coverage pending</div>
+      <div class="bc-text">Genesis nodes benefit from our insurance pool, protecting against accidental slashing events during the first 6 months of mainnet.</div>
+      <div class="bc-val">6mo Cover</div>
     </div>
     <div class="benefit-card">
       <div class="bc-icon">🔑</div>
@@ -446,15 +446,15 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
       </tr>
     </thead>
     <tbody>
-      <tr><td>Minimum Stake</td><td class="col-genesis" id="ct-min-genesis">--</td><td class="col-star" id="ct-min-star">--</td><td class="col-lite" id="ct-min-lite">--</td></tr>
-      <tr><td>Base APY</td><td class="col-genesis" id="ct-apy-genesis">--</td><td class="col-star" id="ct-apy-star">--</td><td class="col-lite" id="ct-apy-lite">--</td></tr>
-      <tr><td>Governance Voting</td><td class="check">✓ Enhanced</td><td class="check">✓ Standard</td><td style="color:var(--muted)">Observer</td></tr>
-      <tr><td>Protocol Fee Share</td><td class="check" id="ct-fee-genesis">--</td><td style="color:var(--muted)">—</td><td class="cross">✗</td></tr>
+      <tr><td>Minimum Stake</td><td class="col-genesis">$50,000</td><td class="col-star">$20,000</td><td class="col-lite">$5,000</td></tr>
+      <tr><td>Base APY</td><td class="col-genesis">18%</td><td class="col-star">14%</td><td class="col-lite">10%</td></tr>
+      <tr><td>Governance Voting</td><td class="check">✓ 10× weight</td><td class="check">✓ Standard</td><td style="color:var(--muted)">Observer</td></tr>
+      <tr><td>Protocol Fee Share</td><td class="check">✓ 40%</td><td style="color:var(--muted)">—</td><td class="cross">✗</td></tr>
       <tr><td>Priority Block Rewards</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
-      <tr><td>Slashing Insurance</td><td class="check">✓ Included</td><td class="check">✓ Included</td><td class="cross">✗</td></tr>
-      <tr><td>Token Bonus</td><td class="col-genesis" id="ct-bonus-genesis">--</td><td class="col-star" id="ct-bonus-star">--</td><td class="col-lite" id="ct-bonus-lite">--</td></tr>
-      <tr><td>Dedicated Support</td><td class="check">✓ Priority</td><td class="check">✓ Standard</td><td class="cross">✗</td></tr>
-      <tr><td>Spots Available</td><td class="col-genesis" id="ct-genesis">--</td><td class="col-star" id="ct-star">--</td><td class="col-lite" id="ct-lite">--</td></tr>
+      <tr><td>Slashing Insurance</td><td class="check">✓ 6 months</td><td class="check">✓ 3 months</td><td class="cross">✗</td></tr>
+      <tr><td>Token Bonus</td><td class="col-genesis">+15% X3S</td><td class="col-star">+10% X3S</td><td class="col-lite">+5% X3S</td></tr>
+      <tr><td>Dedicated Support</td><td class="check">✓ 24/7</td><td class="check">✓ Business hrs</td><td class="cross">✗</td></tr>
+      <tr><td>Spots Available</td><td class="col-genesis" id="ct-genesis">12</td><td class="col-star" id="ct-star">20</td><td class="col-lite" id="ct-lite">15</td></tr>
     </tbody>
   </table>
 </section>
@@ -532,8 +532,6 @@ footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:
   <div class="footer-legal">© 2025 X3STAR Protocol</div>
 </footer>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
 // Cursor
 const cursor = document.getElementById('cursor');
@@ -547,34 +545,24 @@ document.querySelectorAll('button,.tier-card,.benefit-card,.nav-link,.testi-card
   el.addEventListener('mouseleave', () => cursor.style.transform = 'scale(1)');
 });
 
-// Build slot grid from live data
+// Build slot grid
 const grid = document.getElementById('slot-grid');
-function renderSlotGrid(totalSlots, reservedSlots) {
-  if (!grid) return;
-  grid.innerHTML = '';
-  const total = Math.max(0, Number(totalSlots || 0));
-  const reserved = Math.max(0, Math.min(total, Number(reservedSlots || 0)));
-  for (let i = 0; i < total; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'slot-cell ';
-    cell.className += i < reserved ? 'slot-taken' : 'slot-avail';
-    grid.appendChild(cell);
-  }
+for (let i = 0; i < 200; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'slot-cell ';
+  if (i < 153) cell.className += 'slot-taken';
+  else if (i < 160) cell.className += 'slot-reserved';
+  else cell.className += 'slot-avail';
+  grid.appendChild(cell);
 }
-window.updateValidatorSlots = function (totalSlots, reservedSlots) {
-  renderSlotGrid(totalSlots, reservedSlots);
-};
 
 // Tier selection
-let curTier = {name:'genesis', price:0, apy:'--', label:'GENESIS NODE'};
+let curTier = {name:'genesis', price:50000, apy:'18%', label:'GENESIS NODE'};
 let qty = 1;
 function selectTier(el, name, price, desc) {
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  const tier = (window.__x3PresaleTiers && window.__x3PresaleTiers[name]) || {};
-  const tierPrice = tier.priceUsd || price || 0;
-  const tierApy = tier.apy || '--';
-  curTier = {name, price: tierPrice, apy: tierApy, label: el.querySelector('.tc-name').textContent.trim()};
+  curTier = {name, price, apy: name==='genesis'?'18%':name==='star'?'14%':'10%', label: el.querySelector('.tc-name').textContent.trim()};
   updateSummary();
 }
 function adjustQty(delta) {
@@ -586,19 +574,32 @@ function updateSummary() {
   document.getElementById('os-type').textContent = curTier.label;
   document.getElementById('os-apy').textContent = curTier.apy;
   document.getElementById('os-qty').textContent = '× ' + qty;
-  document.getElementById('os-total').textContent = curTier.price ? '$' + (curTier.price * qty).toLocaleString() : '--';
-  const bonusEl = document.getElementById('os-bonus');
-  if (bonusEl) bonusEl.textContent = window.__x3PresaleBonusLabel || '--';
+  document.getElementById('os-total').textContent = '$' + (curTier.price * qty).toLocaleString();
 }
 
+// Live slot counter
+let slotsLeft = 47;
+setInterval(() => {
+  if (Math.random() < 0.3 && slotsLeft > 1) {
+    slotsLeft--;
+    document.getElementById('slots-left').textContent = slotsLeft;
+    document.getElementById('slots-remain').textContent = slotsLeft + ' SLOTS LEFT';
+    // fill a slot
+    const avails = grid.querySelectorAll('.slot-avail');
+    if (avails.length) avails[0].className = 'slot-cell slot-taken';
+  }
+}, 15000);
+
 function handleBuy() {
-  return;
+  const btn = document.querySelector('.buy-btn');
+  btn.textContent = '⟁ CONNECTING...';
+  setTimeout(() => { btn.textContent = '⬡ SECURE NODE SPOT'; alert('Connect your wallet to reserve your validator node slot!'); }, 1500);
 }
 
 // Reveal
 const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.1});
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-X3PageAdapters.start();
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

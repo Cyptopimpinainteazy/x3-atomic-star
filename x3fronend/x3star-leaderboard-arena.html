@@ -133,13 +133,13 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <div class="sh-top">
     <div class="logo">X3STAR</div>
     <div class="arena-label">Arena Leaderboard</div>
-    <div class="live-pill"><div class="lp-dot"></div>Live Rankings</div>
+    <div class="live-pill"><div class="lp-dot"></div>Season 1 — Week 11</div>
     <button class="sh-cta" onclick="location.href='x3star-token-presale.html'">Join Now →</button>
   </div>
   <div class="tabs">
-    <div class="tab active">🏆 Investors</div>
-    <div class="tab">⬡ Staking Pools</div>
-    <div class="tab">🗳 Delegates</div>
+    <div class="tab active">🏆 Referrals</div>
+    <div class="tab">⬡ Staking</div>
+    <div class="tab">🗳 Governance</div>
     <div class="tab">⚒ Validators</div>
   </div>
 </div>
@@ -148,10 +148,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
 <div class="prize-banner">
   <div class="pb-trophy">🏆</div>
   <div>
-    <div class="pb-text">Live leaderboard data for community incentives and protocol participation.</div>
-    <div class="pb-ends"><span style="color:var(--neon)" id="arena-participants">--</span> active participants tracked</div>
+    <div class="pb-text">Week 11 Prize Pool: <span>500,000 X3S ($42,100)</span> — Top 3 referrers win bonus allocation</div>
+    <div class="pb-ends">Resets in <span style="color:var(--neon)" id="prize-timer">2d 14h 32m</span> &nbsp;·&nbsp; 847 active participants this week</div>
   </div>
-  <div class="pb-timer">LIVE</div>
+  <div class="pb-timer" id="pb-cd">02:14:32:08</div>
 </div>
 
 <!-- LEADERBOARD COLUMNS -->
@@ -160,8 +160,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <!-- REFERRALS -->
   <div class="lb-col">
     <div class="col-head">
-      <div><span class="ch-emoji">💼</span><span class="ch-title">Top Investors</span></div>
-      <div class="ch-prize">Capital inflow leaders</div>
+      <div><span class="ch-emoji">🔗</span><span class="ch-title">Referrals</span></div>
+      <div class="ch-prize">🥇 150K X3S · 🥈 75K · 🥉 35K</div>
     </div>
     <div id="ref-board"></div>
   </div>
@@ -169,8 +169,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <!-- STAKING -->
   <div class="lb-col">
     <div class="col-head" style="background:rgba(0,255,136,0.03);">
-      <div><span class="ch-emoji">⬡</span><span class="ch-title" style="color:var(--green)">Staking Pools</span></div>
-      <div class="ch-prize">Ranked by TVL</div>
+      <div><span class="ch-emoji">⬡</span><span class="ch-title" style="color:var(--green)">Staking Volume</span></div>
+      <div class="ch-prize">🥇 100K X3S · 🥈 50K · 🥉 25K</div>
     </div>
     <div id="stake-board"></div>
   </div>
@@ -178,8 +178,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <!-- GOVERNANCE -->
   <div class="lb-col">
     <div class="col-head" style="background:rgba(0,200,255,0.03);">
-      <div><span class="ch-emoji">🗳</span><span class="ch-title" style="color:var(--cyan)">Delegates</span></div>
-      <div class="ch-prize">Ranked by voting power</div>
+      <div><span class="ch-emoji">🗳</span><span class="ch-title" style="color:var(--cyan)">Governance</span></div>
+      <div class="ch-prize">🥇 80K X3S · 🥈 40K · 🥉 20K</div>
     </div>
     <div id="gov-board"></div>
   </div>
@@ -188,7 +188,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   <div class="lb-col">
     <div class="col-head" style="background:rgba(255,215,0,0.03);">
       <div><span class="ch-emoji">⚒</span><span class="ch-title" style="color:var(--gold)">Validator Score</span></div>
-      <div class="ch-prize">Uptime · TPS · Stake</div>
+      <div class="ch-prize">🥇 200K X3S · 🥈 100K · 🥉 50K</div>
     </div>
     <div id="val-board"></div>
   </div>
@@ -199,10 +199,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
 <div class="my-position">
   <div class="mp-title">Your Season Stats</div>
   <div class="mp-grid">
-    <div class="mp-stat"><div class="mps-val" style="color:var(--neon)">--</div><div class="mps-key">Referral Rank</div></div>
-    <div class="mp-stat"><div class="mps-val" style="color:var(--green)">--</div><div class="mps-key">X3S Points</div></div>
-    <div class="mp-stat"><div class="mps-val" style="color:var(--cyan)">--</div><div class="mps-key">Referrals</div></div>
-    <div class="mp-stat"><div class="mps-val" style="color:var(--gold)">--</div><div class="mps-key">This Week</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--neon)">#47</div><div class="mps-key">Referral Rank</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--green)">12,400</div><div class="mps-key">X3S Points</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--cyan)">3</div><div class="mps-key">Referrals</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--gold)">+2,400</div><div class="mps-key">This Week</div></div>
   </div>
   <button class="mp-cta" onclick="location.href='x3star-affiliate.html'">Climb the Leaderboard — Get Your Referral Link →</button>
 </div>
@@ -235,10 +235,101 @@ body::before{content:'';position:fixed;inset:0;z-index:0;
   </div>
 </div>
 
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
-X3PageAdapters.start();
+const colors=['#FFD700','#C0C0C8','#CD7F32','rgba(255,255,255,0.5)'];
+const gradients=[
+  'linear-gradient(135deg,#6B2FBF,#2F0060)',
+  'linear-gradient(135deg,#0A4A8A,#001A4A)',
+  'linear-gradient(135deg,#0A5A2A,#001A0A)',
+  'linear-gradient(135deg,#5A2A0A,#1A0800)',
+  'linear-gradient(135deg,#2A0A5A,#0A0020)',
+];
+
+const refData=[
+  {name:'cryptoking.eth',flag:'👑',val:'47 refs',score:94,delta:'+2',badge:'lbb-top'},
+  {name:'apex.eth',flag:'⬡',val:'38 refs',score:80,delta:'+1',badge:''},
+  {name:'defi_degen',flag:'🌊',val:'31 refs',score:66,delta:'+4',badge:'lbb-rising'},
+  {name:'zkbuilder.eth',flag:'🔐',val:'28 refs',score:59,delta:'',badge:''},
+  {name:'starfall.eth',flag:'⭐',val:'22 refs',score:47,delta:'-1',badge:''},
+  {name:'byte_ops',flag:'💻',val:'19 refs',score:40,delta:'+3',badge:'lbb-rising'},
+  {name:'nordic_vc',flag:'❄️',val:'15 refs',score:32,delta:'',badge:''},
+  {name:'mesh_node',flag:'🔗',val:'12 refs',score:25,delta:'',badge:''},
+];
+const stakeData=[
+  {name:'quantum_fund',flag:'⚛',val:'2.4M X3S',score:100,delta:'',badge:'lbb-top'},
+  {name:'gulf_fund',flag:'🌙',val:'1.8M X3S',score:75,delta:'+5',badge:'lbb-rising'},
+  {name:'apex.eth',flag:'⬡',val:'1.2M X3S',score:50,delta:'',badge:''},
+  {name:'alpine_vc',flag:'🏔',val:'840K X3S',score:35,delta:'-2',badge:''},
+  {name:'polaris',flag:'⭐',val:'620K X3S',score:26,delta:'+1',badge:''},
+  {name:'zkbuilder.eth',flag:'🔐',val:'480K X3S',score:20,delta:'',badge:''},
+  {name:'defi_degen',flag:'🌊',val:'340K X3S',score:14,delta:'',badge:''},
+  {name:'starfall.eth',flag:'⭐',val:'220K X3S',score:9,delta:'',badge:''},
+];
+const govData=[
+  {name:'nebula_dao',flag:'🌌',val:'12 votes',score:100,delta:'',badge:'lbb-top'},
+  {name:'delta_stake',flag:'📐',val:'11 votes',score:92,delta:'+1',badge:''},
+  {name:'zkbuilder.eth',flag:'🔐',val:'9 votes',score:75,delta:'',badge:''},
+  {name:'apex.eth',flag:'⬡',val:'8 votes',score:67,delta:'',badge:''},
+  {name:'quantum_fund',flag:'⚛',val:'7 votes',score:58,delta:'-1',badge:''},
+  {name:'starfall.eth',flag:'⭐',val:'6 votes',score:50,delta:'',badge:''},
+  {name:'polaris',flag:'⭐',val:'5 votes',score:42,delta:'+2',badge:'lbb-rising'},
+  {name:'defi_degen',flag:'🌊',val:'4 votes',score:33,delta:'',badge:''},
+];
+const valData=[
+  {name:'SG-NODE-01',flag:'🇸🇬',val:'99.9% / 284 TPS',score:98,delta:'',badge:'lbb-top'},
+  {name:'US-NODE-14',flag:'🇺🇸',val:'99.8% / 298 TPS',score:96,delta:'+1',badge:''},
+  {name:'KR-NODE-06',flag:'🇰🇷',val:'99.7% / 267 TPS',score:93,delta:'',badge:''},
+  {name:'JP-NODE-02',flag:'🇯🇵',val:'99.6% / 248 TPS',score:89,delta:'-1',badge:''},
+  {name:'HK-NODE-15',flag:'🇭🇰',val:'99.5% / 231 TPS',score:86,delta:'',badge:''},
+  {name:'AE-NODE-12',flag:'🇦🇪',val:'99.4% / 231 TPS',score:84,delta:'+2',badge:'lbb-rising'},
+  {name:'CA-NODE-09',flag:'🇨🇦',val:'99.2% / 188 TPS',score:78,delta:'',badge:''},
+  {name:'IN-NODE-04',flag:'🇮🇳',val:'99.1% / 209 TPS',score:75,delta:'',badge:''},
+];
+
+function buildBoard(containerId,data,color){
+  const cont=document.getElementById(containerId);
+  data.forEach((d,i)=>{
+    const rankCls=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
+    const rankColor=i<3?colors[i]:colors[3];
+    const div=document.createElement('div');
+    div.className='lb-row '+rankCls;
+    div.innerHTML=`
+      <div class="lb-rank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+      <div class="lb-avatar" style="background:${gradients[i%gradients.length]}">${d.flag}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="lb-name">${d.name}</div>
+        <div class="lb-bar"><div class="lb-bar-fill" style="width:${d.score}%;background:${color}"></div></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="lb-val" style="color:${rankColor}">${d.val}</div>
+        ${d.delta?`<div class="lb-delta ${d.delta.startsWith('+')?'delta-up':'delta-dn'}">${d.delta}</div>`:''}
+        ${d.badge?`<div class="lb-badge ${d.badge}">${d.badge==='lbb-top'?'TOP':'↑ RISING'}</div>`:''}
+      </div>
+    `;
+    cont.appendChild(div);
+  });
+}
+
+buildBoard('ref-board',refData,'var(--neon)');
+buildBoard('stake-board',stakeData,'var(--green)');
+buildBoard('gov-board',govData,'var(--cyan)');
+buildBoard('val-board',valData,'var(--gold)');
+
+// COUNTDOWN
+const weekEnd=new Date(Date.now()+2*86400000+14*3600000+32*60000+8000);
+function updatePrizeTimer(){
+  const d=weekEnd-Date.now();
+  if(d<=0)return;
+  const days=Math.floor(d/86400000);
+  const h=Math.floor((d%86400000)/3600000);
+  const m=Math.floor((d%3600000)/60000);
+  const s=Math.floor((d%60000)/1000);
+  document.getElementById('pb-cd').textContent=
+    String(days).padStart(2,'0')+':'+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  document.getElementById('prize-timer').textContent=days+'d '+h+'h '+m+'m';
+}
+setInterval(updatePrizeTimer,1000);updatePrizeTimer();
+
 document.querySelectorAll('.tab').forEach(t=>{
   t.addEventListener('click',()=>{
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -246,5 +337,6 @@ document.querySelectorAll('.tab').forEach(t=>{
   });
 });
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>

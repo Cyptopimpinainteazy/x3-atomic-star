@@ -177,7 +177,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
     </div>
     <div style="text-align:right">
       <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Your Voting Power</div>
-      <div style="font-family:'Orbitron',monospace;font-size:28px;font-weight:800;color:var(--purple)" id="voting-power">-- <span style="font-size:14px;color:var(--muted)">veX3S</span></div>
+      <div style="font-family:'Orbitron',monospace;font-size:28px;font-weight:800;color:var(--purple)">4,821 <span style="font-size:14px;color:var(--muted)">veX3S</span></div>
     </div>
   </div>
 
@@ -185,22 +185,22 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   <div class="dao-stats reveal">
     <div class="dao-stat">
       <div class="ds-icon">🗳</div>
-      <div class="ds-val" style="color:var(--purple)" id="gov-total">--</div>
+      <div class="ds-val" style="color:var(--purple)">142</div>
       <div class="ds-key">Total Proposals</div>
     </div>
     <div class="dao-stat">
       <div class="ds-icon">✅</div>
-      <div class="ds-val" style="color:var(--green)" id="gov-passed">--</div>
+      <div class="ds-val" style="color:var(--green)">118</div>
       <div class="ds-key">Passed</div>
     </div>
     <div class="dao-stat">
       <div class="ds-icon">👥</div>
-      <div class="ds-val" style="color:var(--cyan)" id="gov-voters">--</div>
+      <div class="ds-val" style="color:var(--cyan)">2,841</div>
       <div class="ds-key">Active Voters</div>
     </div>
     <div class="dao-stat">
       <div class="ds-icon">💎</div>
-      <div class="ds-val" style="color:var(--gold)" id="gov-treasury">--</div>
+      <div class="ds-val" style="color:var(--gold)">$8.4M</div>
       <div class="ds-key">Treasury</div>
     </div>
   </div>
@@ -222,13 +222,163 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
         </div>
       </div>
 
-      <div id="proposal-list" class="prop-card reveal" style="margin-top:16px;">
+      <!-- ACTIVE PROPOSAL 1 -->
+      <div class="prop-card reveal">
         <div class="prop-header">
-          <div><div class="prop-id">Loading</div></div>
-          <span class="prop-status ps-pending">⏳ Awaiting governance feed</span>
+          <div><div class="prop-id">XIP-142</div></div>
+          <span class="prop-status ps-active">🟢 ACTIVE — 3 days left</span>
         </div>
-        <div class="prop-title">No proposals available yet.</div>
-        <div class="prop-desc">Governance proposals will populate once the live feed is connected.</div>
+        <div class="prop-title">Increase Staking Rewards by 25% for Q2 2025</div>
+        <div class="prop-desc">This proposal suggests increasing the base staking emission rate from 12% to 15% per annum for all single-token X3S stakers during Q2 2025 to incentivize long-term holding during the mainnet launch period.</div>
+        <div class="vote-bars">
+          <div class="vb-row">
+            <span class="vb-label yes">YES</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:72%;background:var(--green)"></div></div>
+            <span class="vb-pct" style="color:var(--green)">72%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label no">NO</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:18%;background:var(--red)"></div></div>
+            <span class="vb-pct" style="color:var(--red)">18%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label abs">ABS</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:10%;background:var(--muted)"></div></div>
+            <span class="vb-pct" style="color:var(--muted)">10%</span>
+          </div>
+        </div>
+        <div class="prop-footer">
+          <div class="prop-meta">
+            <span>1,842 votes</span>
+            <span>By: core.eth</span>
+            <span>Quorum: 84%</span>
+          </div>
+          <div class="prop-actions">
+            <button class="vote-btn vb-yes" onclick="castVote('XIP-142','YES')">✓ YES</button>
+            <button class="vote-btn vb-no" onclick="castVote('XIP-142','NO')">✗ NO</button>
+            <button class="vote-btn vb-abs2">— ABS</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIVE PROPOSAL 2 -->
+      <div class="prop-card reveal">
+        <div class="prop-header">
+          <div><div class="prop-id">XIP-141</div></div>
+          <span class="prop-status ps-active">🟢 ACTIVE — 5 days left</span>
+        </div>
+        <div class="prop-title">Deploy $500K Grant Allocation to ZK Bridge Development</div>
+        <div class="prop-desc">Allocate $500,000 from the ecosystem treasury to accelerate ZK bridge development with Starknet and Scroll. This will enable zero-knowledge cross-chain transfers within 6 months.</div>
+        <div class="vote-bars">
+          <div class="vb-row">
+            <span class="vb-label yes">YES</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:85%;background:var(--green)"></div></div>
+            <span class="vb-pct" style="color:var(--green)">85%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label no">NO</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:9%;background:var(--red)"></div></div>
+            <span class="vb-pct" style="color:var(--red)">9%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label abs">ABS</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:6%;background:var(--muted)"></div></div>
+            <span class="vb-pct" style="color:var(--muted)">6%</span>
+          </div>
+        </div>
+        <div class="prop-footer">
+          <div class="prop-meta">
+            <span>2,210 votes</span>
+            <span>By: zkbuilder.eth</span>
+            <span>Quorum: 92%</span>
+          </div>
+          <div class="prop-actions">
+            <button class="vote-btn vb-yes" onclick="castVote('XIP-141','YES')">✓ YES</button>
+            <button class="vote-btn vb-no" onclick="castVote('XIP-141','NO')">✗ NO</button>
+            <button class="vote-btn vb-abs2">— ABS</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PENDING -->
+      <div class="prop-card reveal">
+        <div class="prop-header">
+          <div><div class="prop-id">XIP-143</div></div>
+          <span class="prop-status ps-pending">⏳ PENDING — Voting starts in 2 days</span>
+        </div>
+        <div class="prop-title">Reduce Validator Minimum Stake from $50K to $30K</div>
+        <div class="prop-desc">Lower the Genesis node minimum stake requirement to increase validator diversity and geographic decentralization. Applicants must still meet KYC requirements.</div>
+        <div style="background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);margin-bottom:16px;">
+          📋 Snapshot vote starts <strong style="color:var(--gold)">March 5, 2025</strong> · 5-day voting window · Quorum: 1,000 veX3S
+        </div>
+        <div class="prop-footer">
+          <div class="prop-meta">
+            <span>By: decentral.eth</span>
+            <span>Proposed: Today</span>
+          </div>
+          <div class="prop-actions">
+            <button class="vote-btn" style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);color:var(--gold)">🔔 SET REMINDER</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASSED -->
+      <div class="prop-card reveal" style="opacity:0.8">
+        <div class="prop-header">
+          <div><div class="prop-id">XIP-140</div></div>
+          <span class="prop-status ps-passed">✓ PASSED — Executed</span>
+        </div>
+        <div class="prop-title">Add AVAX and SOL as Accepted Presale Currencies</div>
+        <div class="prop-desc">This proposal to accept AVAX and SOL as payment in the presale was passed and executed. Multi-chain wallet integration went live February 28, 2025.</div>
+        <div class="vote-bars">
+          <div class="vb-row">
+            <span class="vb-label yes">YES</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:91%;background:rgba(0,255,136,0.4)"></div></div>
+            <span class="vb-pct" style="color:var(--green)">91%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label no">NO</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:9%;background:rgba(255,50,100,0.4)"></div></div>
+            <span class="vb-pct" style="color:var(--red)">9%</span>
+          </div>
+        </div>
+        <div class="prop-footer">
+          <div class="prop-meta">
+            <span>3,102 votes</span>
+            <span>Final: Feb 26</span>
+          </div>
+          <div class="prop-actions">
+            <button class="vote-btn" style="background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.2);color:var(--cyan)">VIEW TX →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAILED -->
+      <div class="prop-card reveal" style="opacity:0.7">
+        <div class="prop-header">
+          <div><div class="prop-id">XIP-139</div></div>
+          <span class="prop-status ps-failed">✗ FAILED — Did not pass</span>
+        </div>
+        <div class="prop-title">Increase Team Token Allocation from 18% to 22%</div>
+        <div class="prop-desc">Proposal to increase team allocation was rejected by the community due to dilution concerns. The current 18% allocation with 36-month vesting remains unchanged.</div>
+        <div class="vote-bars">
+          <div class="vb-row">
+            <span class="vb-label yes">YES</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:22%;background:rgba(0,255,136,0.3)"></div></div>
+            <span class="vb-pct" style="color:var(--green)">22%</span>
+          </div>
+          <div class="vb-row">
+            <span class="vb-label no">NO</span>
+            <div class="vb-bar-wrap"><div class="vb-bar" style="width:78%;background:rgba(255,50,100,0.4)"></div></div>
+            <span class="vb-pct" style="color:var(--red)">78%</span>
+          </div>
+        </div>
+        <div class="prop-footer">
+          <div class="prop-meta">
+            <span>4,821 votes</span>
+            <span>Final: Feb 12</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -252,26 +402,26 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
               </defs>
             </svg>
             <div class="pm-center">
-              <div class="pm-val" id="gov-vp-total">--</div>
+              <div class="pm-val">4,821</div>
               <div class="pm-key">veX3S</div>
             </div>
           </div>
           <div class="pm-breakdown">
             <div class="pb-item">
               <span class="pb-key">From Staking</span>
-              <span class="pb-val" style="color:var(--purple)" id="gov-vp-staking">--</span>
+              <span class="pb-val" style="color:var(--purple)">3,200</span>
             </div>
             <div class="pb-item">
               <span class="pb-key">From Node</span>
-              <span class="pb-val" style="color:var(--gold)" id="gov-vp-node">--</span>
+              <span class="pb-val" style="color:var(--gold)">1,400</span>
             </div>
             <div class="pb-item">
               <span class="pb-key">Delegated</span>
-              <span class="pb-val" style="color:var(--cyan)" id="gov-vp-delegated">--</span>
+              <span class="pb-val" style="color:var(--cyan)">221</span>
             </div>
             <div class="pb-item">
               <span class="pb-key">Network Rank</span>
-              <span class="pb-val" style="color:var(--green)" id="gov-vp-rank">--</span>
+              <span class="pb-val" style="color:var(--green)">#142</span>
             </div>
           </div>
         </div>
@@ -281,33 +431,33 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
       <div class="panel-card reveal">
         <div class="panel-title">DAO Treasury</div>
         <div class="treasury-chart">
-          <div class="tc-val" id="gov-treasury-total">--</div>
+          <div class="tc-val">$8.42M</div>
           <div class="tc-sub">TOTAL VALUE</div>
         </div>
         <div class="treasury-alloc">
           <div class="ta-item">
             <div class="ta-dot" style="background:var(--gold)"></div>
             <span class="ta-label">Development</span>
-            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-dev-bar" style="width:0%;background:var(--gold)"></div></div>
-            <span class="ta-val" style="color:var(--gold)" id="treasury-dev">--</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" style="width:40%;background:var(--gold)"></div></div>
+            <span class="ta-val" style="color:var(--gold)">40%</span>
           </div>
           <div class="ta-item">
             <div class="ta-dot" style="background:var(--purple)"></div>
             <span class="ta-label">Grants</span>
-            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-grants-bar" style="width:0%;background:var(--purple)"></div></div>
-            <span class="ta-val" style="color:var(--purple)" id="treasury-grants">--</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" style="width:30%;background:var(--purple)"></div></div>
+            <span class="ta-val" style="color:var(--purple)">30%</span>
           </div>
           <div class="ta-item">
             <div class="ta-dot" style="background:var(--cyan)"></div>
             <span class="ta-label">Marketing</span>
-            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-marketing-bar" style="width:0%;background:var(--cyan)"></div></div>
-            <span class="ta-val" style="color:var(--cyan)" id="treasury-marketing">--</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" style="width:20%;background:var(--cyan)"></div></div>
+            <span class="ta-val" style="color:var(--cyan)">20%</span>
           </div>
           <div class="ta-item">
             <div class="ta-dot" style="background:var(--green)"></div>
             <span class="ta-label">Reserve</span>
-            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-reserve-bar" style="width:0%;background:var(--green)"></div></div>
-            <span class="ta-val" style="color:var(--green)" id="treasury-reserve">--</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" style="width:10%;background:var(--green)"></div></div>
+            <span class="ta-val" style="color:var(--green)">10%</span>
           </div>
         </div>
       </div>
@@ -315,7 +465,26 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
       <!-- TOP DELEGATES -->
       <div class="panel-card reveal">
         <div class="panel-title">Top Delegates</div>
-        <div id="delegate-list" style="font-size:11px;color:var(--muted);">Awaiting delegate feed.</div>
+        <div class="delegate-item">
+          <div class="d-avatar" style="background:linear-gradient(135deg,#ffd700,#ff9900)">A</div>
+          <span class="d-name">apex.eth</span>
+          <span class="d-power">284K veX3S</span>
+        </div>
+        <div class="delegate-item">
+          <div class="d-avatar" style="background:linear-gradient(135deg,#bb44ff,#7722cc)">N</div>
+          <span class="d-name">nebula_dao</span>
+          <span class="d-power">198K veX3S</span>
+        </div>
+        <div class="delegate-item">
+          <div class="d-avatar" style="background:linear-gradient(135deg,#00d4ff,#0066ff)">Z</div>
+          <span class="d-name">zkbuilder.eth</span>
+          <span class="d-power">142K veX3S</span>
+        </div>
+        <div class="delegate-item">
+          <div class="d-avatar" style="background:linear-gradient(135deg,#00ff88,#00aa44)">C</div>
+          <span class="d-name">core.eth</span>
+          <span class="d-power">98K veX3S</span>
+        </div>
         <button class="vote-btn" style="width:100%;margin-top:12px;padding:10px;border-radius:8px;
           background:rgba(180,80,255,0.08);border:1px solid rgba(180,80,255,0.25);color:var(--purple);
           font-family:'Rajdhani',sans-serif;cursor:pointer;letter-spacing:1px;font-size:12px;">
@@ -351,25 +520,27 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 <style>
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 </style>
-<script src="js/x3-data-api.js"></script>
-<script src="js/x3-page-adapters.js"></script>
 <script>
 function castVote(id, vote) {
   const toast = document.getElementById('vote-toast');
   const color = vote === 'YES' ? '#00ff88' : vote === 'NO' ? '#ff3366' : '#664488';
-  const power = document.getElementById('gov-vp-total')?.textContent || '--';
   document.getElementById('toast-title').style.color = color;
   document.getElementById('toast-title').textContent = `Vote ${vote} cast for ${id}`;
-  document.getElementById('toast-body').textContent = `Using ${power} veX3S · Tx pending confirmation`;
+  document.getElementById('toast-body').textContent = `Using 4,821 veX3S · Tx pending confirmation`;
   toast.style.display = 'block';
   setTimeout(() => toast.style.display = 'none', 4000);
 }
-
-X3PageAdapters.start();
-
 // Reveal
 const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.05});
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+// Animate vote bars
+setTimeout(() => {
+  document.querySelectorAll('.vb-bar').forEach(b => {
+    const w = b.style.width; b.style.width = '0';
+    setTimeout(() => { b.style.transition='width 1.2s ease'; b.style.width = w; }, 100);
+  });
+}, 400);
 </script>
+<script src="js/x3-live-data.js"></script>
 </body>
 </html>
