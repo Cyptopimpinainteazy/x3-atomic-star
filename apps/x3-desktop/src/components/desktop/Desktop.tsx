@@ -13,6 +13,7 @@ import Eyeball from "@/components/eyeball/Eyeball";
 import IconGrid from "@/components/icons/IconGrid";
 import { FEATURED_APP_ID } from "@/components/icons/IconGrid";
 import FeaturedAppCard from "@/components/icons/FeaturedAppCard";
+import WebsitePortalCard from "@/components/icons/WebsitePortalCard";
 import WindowManager from "@/components/desktop/WindowManager";
 import BottomNavBar from "@/components/desktop/BottomNavBar";
 import TopNavBar from "@/components/desktop/TopNavBar";
@@ -123,6 +124,13 @@ const Desktop: React.FC<DesktopProps> = ({
         <div className="absolute inset-0 flex justify-center" style={{ zIndex: 1, top: '22vh' }}>
           <div className="w-[300px] h-[300px]" style={{ pointerEvents: 'none' }}>
             <Eyeball />
+          </div>
+        </div>
+
+        {/* ── Website Portal Card (centre, below eyeball) ─── */}
+        <div className="absolute inset-0 flex justify-center items-center z-5" style={{ pointerEvents: 'none', top: '50vh' }}>
+          <div style={{ pointerEvents: 'auto' }}>
+            <WebsitePortalCard />
           </div>
         </div>
 

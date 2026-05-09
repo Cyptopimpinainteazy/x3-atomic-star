@@ -4468,7 +4468,10 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Evm, b"too-short".to_vec(), 100_000);
 
-        let receipt = d.execute_call(&caller, &call).unwrap();
+        let receipt = assert_ok(
+            d.execute_call(&caller, &call),
+            "execute_call failed",
+        );
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4480,7 +4483,10 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Svm, vec![0u8; 16], 50_000);
 
-        let receipt = d.execute_call(&caller, &call).unwrap();
+        let receipt = assert_ok(
+            d.execute_call(&caller, &call),
+            "execute_call failed",
+        );
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4838,7 +4844,10 @@ mod x3vm_2pc_integration_tests {
         let call = make_call(VmId::X3Vm, 7, [0; 4]);
         let key = CrossVmBridge::x3vm_replay_key(&call);
         assert!(!bridge.is_x3vm_call_replayed(&key));
-        bridge.admit_x3vm_call_hash(key).unwrap();
+        assert_ok(
+            bridge.admit_x3vm_call_hash(key),
+            "admit_x3vm_call_hash failed",
+        );
         assert!(bridge.is_x3vm_call_replayed(&key));
         // Second admission rejects
         let err = bridge.admit_x3vm_call_hash(key).expect_err("replay");
@@ -4853,7 +4862,10 @@ mod x3vm_2pc_integration_tests {
         let call = make_call(VmId::X3Vm, 901, [0; 4]);
         let key = CrossVmBridge::x3vm_replay_key(&call);
 
-        bridge.admit_x3vm_call_hash(key).unwrap();
+        assert_ok(
+            bridge.admit_x3vm_call_hash(key),
+            "admit_x3vm_call_hash failed",
+        );
         assert!(bridge.is_x3vm_call_replayed(&key));
         assert_eq!(bridge.x3vm_replay_map_len(), 1);
 
@@ -4866,7 +4878,10 @@ mod x3vm_2pc_integration_tests {
         assert!(!bridge.abort_x3vm_admission(&key));
 
         // Call can be admitted again after abort
-        bridge.admit_x3vm_call_hash(key).unwrap();
+        assert_ok(
+            bridge.admit_x3vm_call_hash(key),
+            "admit_x3vm_call_hash failed",
+        );
         assert!(bridge.is_x3vm_call_replayed(&key));
     }
 
