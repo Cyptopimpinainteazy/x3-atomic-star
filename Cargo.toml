@@ -22,6 +22,7 @@ members = [
     "pallets/x3-settlement-engine",
     "pallets/meme-overlord",
     "pallets/swarm",
+    "pallets/x3-wallet-pallet",
     "crates/x3-parallel-executor",
     "crates/x3-appzone-factory",
     "crates/x3-pq",
