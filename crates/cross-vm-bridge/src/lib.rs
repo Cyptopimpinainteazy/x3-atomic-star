@@ -3193,7 +3193,10 @@ mod tests {
             })
             .unwrap();
 
-        let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
+        let (results, events) = assert_ok(
+            bridge.atomic_execute(&dispatcher),
+            "atomic_execute failed",
+        );
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(bridge.completed_count(), 2);

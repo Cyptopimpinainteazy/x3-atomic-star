@@ -30,6 +30,9 @@ target_phase3_validation/
 target_strict/
 target_warning_fix/
 
+# Next.js build artifacts
+**/.next/
+
 # Coq build artifacts
 *.vo
 *.vok
