@@ -3,11 +3,13 @@
 use super::*;
 use crate::mock::*;
 use frame_support::{assert_noop, assert_ok};
+use sp_core::H256;
 use sp_runtime::traits::BadOrigin;
 
 #[test]
 fn request_randomness_works() {
     new_test_ext().execute_with(|| {
+        System::set_block_number(1);
         let seed = vec![1, 2, 3, 4];
         let max_fee = 1000;
 
@@ -23,7 +25,7 @@ fn request_randomness_works() {
 
         let request_id = requests[0];
         let request = Vrf::pending_requests(request_id).unwrap();
-        assert_eq!(request.block_number, 0);
+        assert_eq!(request.block_number, 1);
 
         System::assert_has_event(RuntimeEvent::Vrf(Event::RandomnessRequested {
             request_id,
@@ -46,8 +48,9 @@ fn request_randomness_requires_signed_origin() {
 #[test]
 fn request_randomness_insufficient_balance() {
     new_test_ext().execute_with(|| {
+        // Account 999 has no balance — fee = 100 (BaseFee) + 0 = 100, max_fee = 1000 >= 100 but no balance
         assert_noop!(
-            Vrf::request_randomness(RuntimeOrigin::signed(1), vec![], 50), // Fee would be 100
+            Vrf::request_randomness(RuntimeOrigin::signed(999), vec![], 1000), // no balance
             Error::<Test>::InsufficientBalance
         );
     });
@@ -87,6 +90,7 @@ fn request_randomness_seed_too_long() {
 #[test]
 fn fulfill_randomness_works() {
     new_test_ext().execute_with(|| {
+        System::set_block_number(1);
         // Create a request
         assert_ok!(Vrf::request_randomness(
             RuntimeOrigin::signed(1),
@@ -150,6 +154,7 @@ fn fulfill_randomness_already_fulfilled() {
 #[test]
 fn cancel_randomness_works() {
     new_test_ext().execute_with(|| {
+        System::set_block_number(1);
         // Create a request
         assert_ok!(Vrf::request_randomness(
             RuntimeOrigin::signed(1),

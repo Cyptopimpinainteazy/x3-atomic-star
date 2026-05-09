@@ -104,6 +104,7 @@ pub mod pallet {
 
     /// Request IDs per account (for iteration and limits)
     #[pallet::storage]
+    #[pallet::getter(fn account_requests)]
     pub type AccountRequests<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
@@ -241,15 +242,15 @@ pub mod pallet {
         pub fn fulfill_randomness(origin: OriginFor<T>, request_id: H256) -> DispatchResult {
             let _ = ensure_signed(origin)?; // In production, check if authorized fulfiller
 
-            // Get pending request
-            let request =
-                PendingRequests::<T>::get(request_id).ok_or(Error::<T>::RequestNotFound)?;
-
-            // Check not already fulfilled
+            // Check not already fulfilled (do this first, before checking pending)
             ensure!(
                 !FulfilledRequests::<T>::contains_key(request_id),
                 Error::<T>::RequestAlreadyFulfilled
             );
+
+            // Get pending request
+            let request =
+                PendingRequests::<T>::get(request_id).ok_or(Error::<T>::RequestNotFound)?;
 
             // Generate VRF randomness
             let vrf_provider = x3_vrf::get_vrf_provider();
@@ -298,6 +299,12 @@ pub mod pallet {
         pub fn cancel_randomness(origin: OriginFor<T>, request_id: H256) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
+            // Check not already fulfilled (do this first, before checking pending)
+            ensure!(
+                !FulfilledRequests::<T>::contains_key(request_id),
+                Error::<T>::RequestAlreadyFulfilled
+            );
+
             // Get pending request
             let request =
                 PendingRequests::<T>::get(request_id).ok_or(Error::<T>::RequestNotFound)?;
@@ -306,12 +313,6 @@ pub mod pallet {
             ensure!(
                 Self::is_request_owner(&who, request_id),
                 Error::<T>::NotRequestOwner
-            );
-
-            // Check not already fulfilled
-            ensure!(
-                !FulfilledRequests::<T>::contains_key(request_id),
-                Error::<T>::RequestAlreadyFulfilled
             );
 
             // Remove from storage

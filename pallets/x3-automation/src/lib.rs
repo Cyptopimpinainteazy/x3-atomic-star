@@ -79,6 +79,7 @@ pub mod pallet {
 
     /// Task IDs per account
     #[pallet::storage]
+    #[pallet::getter(fn account_tasks)]
     pub type AccountTasks<T: Config> = StorageMap<
         _,
         Blake2_128Concat,

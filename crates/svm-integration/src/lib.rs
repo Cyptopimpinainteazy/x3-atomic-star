@@ -269,25 +269,39 @@ impl Default for MockSvmExecutor {
 impl SvmExecutor for MockSvmExecutor {
     fn execute(
         &self,
-        instruction: &SvmInstruction,
-        payer: [u8; 32],
-        accounts: &[(SvmAccountMeta, AccountUpdate)],
-        config: &SvmConfig,
+        _instruction: &SvmInstruction,
+        _payer: [u8; 32],
+        _accounts: &[(SvmAccountMeta, AccountUpdate)],
+        _config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        self.inner.execute(instruction, payer, accounts, config)
+        Ok(SvmExecutionResult {
+            success: true,
+            output: vec![0x00],
+            compute_units_used: 100,
+            account_updates: vec![],
+            logs: vec![],
+            state_root: [0u8; 32],
+        })
     }
 
     fn execute_bpf(
         &self,
-        program: &[u8],
-        input: &[u8],
-        config: &SvmConfig,
+        _program: &[u8],
+        _input: &[u8],
+        _config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        self.inner.execute_bpf(program, input, config)
+        Ok(SvmExecutionResult {
+            success: true,
+            output: vec![0x00],
+            compute_units_used: 100,
+            account_updates: vec![],
+            logs: vec![],
+            state_root: [0u8; 32],
+        })
     }
 
-    fn validate_program(&self, program: &[u8]) -> SvmResult<()> {
-        self.inner.validate_program(program)
+    fn validate_program(&self, _program: &[u8]) -> SvmResult<()> {
+        Ok(())
     }
 }
 

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate as pallet_x3_vrf;
-use frame_support::{parameter_types, traits::Everything};
+use frame_support::{derive_impl, parameter_types};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
@@ -12,23 +12,27 @@ use sp_runtime::{
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
-// Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
-    pub enum Test
-    {
-        System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
-        Balances: pallet_balances::{Pallet, Call, Config<T>, Storage, Event<T>},
-        Vrf: pallet_x3_vrf::{Pallet, Call, Storage, Event<T>},
+    pub enum Test {
+        System: frame_system,
+        Balances: pallet_balances,
+        Vrf: pallet_x3_vrf,
     }
 );
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
     pub const SS58Prefix: u8 = 42;
+    pub const ExistentialDeposit: u128 = 1;
+    pub const MaxPendingRequests: u32 = 10;
+    pub const BaseFee: u128 = 100;
+    pub const FeePerByte: u128 = 1;
+    pub const MaxSeedLength: u32 = 100;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl system::Config for Test {
-    type BaseCallFilter = Everything;
+    type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
@@ -44,7 +48,7 @@ impl system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type Version = ();
     type PalletInfo = PalletInfo;
-    type AccountData = ();
+    type AccountData = pallet_balances::AccountData<u128>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
@@ -53,35 +57,27 @@ impl system::Config for Test {
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-parameter_types! {
-    pub const ExistentialDeposit: u64 = 1;
-}
-
 impl pallet_balances::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
-    type Balance = u64;
+    type Balance = u128;
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type ReserveIdentifier = [u8; 8];
-    type RuntimeHoldReason = ();
+    type RuntimeHoldReason = RuntimeHoldReason;
+    type RuntimeFreezeReason = RuntimeFreezeReason;
     type FreezeIdentifier = ();
     type MaxLocks = ();
     type MaxReserves = ();
-    type MaxHolds = ();
     type MaxFreezes = ();
-}
-
-parameter_types! {
-    pub const MaxPendingRequests: u32 = 10;
-    pub const BaseFee: u64 = 100;
-    pub const FeePerByte: u64 = 1;
-    pub const MaxSeedLength: u32 = 100;
+    type DoneSlashHandler = ();
 }
 
 impl Config for Test {
     type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type Balance = u128;
     type MaxPendingRequests = MaxPendingRequests;
     type BaseFee = BaseFee;
     type FeePerByte = FeePerByte;
@@ -89,13 +85,13 @@ impl Config for Test {
     type WeightInfo = ();
 }
 
-// Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();
     pallet_balances::GenesisConfig::<Test> {
-        balances: vec![(1, 1000000), (2, 1000000)],
+        balances: vec![(1, 1000000u128), (2, 1000000u128)],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();
