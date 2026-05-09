@@ -4,10 +4,10 @@
  * Updates well-known element IDs + any [data-live="<metric>"] attributes found in the page.
  *
  * Endpoints:
- *   WS mainnet : wss://rpc.atlassphere.io
- *   WS testnet : wss://testnet.atlassphere.io
- *   WS local   : ws://localhost:9944
- *   HTTP       : https://rpc.atlassphere.io   (POST JSON-RPC)
+ *   WS mainnet (via tunnel) : wss://ws.x3star.net
+ *   HTTP RPC (via tunnel)   : https://rpc.x3star.net
+ *   WS local dev            : ws://localhost:9944
+ *   HTTP local dev          : http://localhost:9933
  *
  * To override, set before loading this script:
  *   window.X3_RPC_WS  = 'wss://your-node:9944'

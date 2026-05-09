@@ -2645,6 +2645,14 @@ fn evm_address_from_slice(source: &[u8]) -> [u8; 20] {
 }
 
 #[cfg(test)]
+fn assert_ok<T, E: std::fmt::Debug>(res: Result<T, E>, msg: &str) -> T {
+    match res {
+        Ok(value) => value,
+        Err(error) => assert!(false, "{}: {:?}", msg, error),
+    }
+}
+
+#[cfg(test)]
 #[allow(deprecated)]
 mod tests {
     use super::*;
@@ -3224,16 +3232,17 @@ mod tests {
 
         // Queue 3 operations — NoOp dispatcher succeeds for all
         for i in 1u8..=3 {
-            bridge
-                .queue_operation(CrossVmOperation::TransferToEvm {
+            assert_ok(
+                bridge.queue_operation(CrossVmOperation::TransferToEvm {
                     source: vec![i; 32],
                     destination: [i; 20],
                     amount: 100,
-                })
-                .unwrap();
+                }),
+                "queue_operation failed",
+            );
         }
 
-        let (nonces, events) = bridge.prepare(&dispatcher).unwrap();
+        let (nonces, events) = assert_ok(bridge.prepare(&dispatcher), "prepare failed");
         assert_eq!(nonces.len(), 3);
         assert_eq!(bridge.prepared_count(), 3);
         let prepare_count = events
@@ -3285,8 +3294,8 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::CallSvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallSvm {
                 caller,
                 pallet_index: 0,
                 call_index: 0,
@@ -3422,7 +3431,10 @@ mod tests {
             svm_compute_reserved: 200_000,
         };
         let encoded = prepare_event.encode();
-        let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            CrossVmEvent::decode(&mut &encoded[..]),
+            "CrossVmEvent decode failed",
+        );
         assert_eq!(decoded, prepare_event);
 
         let commit_event = CrossVmEvent::CommitCompleted {
@@ -3431,7 +3443,10 @@ mod tests {
             total_gas_used: 150_000,
         };
         let encoded = commit_event.encode();
-        let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            CrossVmEvent::decode(&mut &encoded[..]),
+            "CrossVmEvent decode failed",
+        );
         assert_eq!(decoded, commit_event);
 
         let abort_event = CrossVmEvent::Aborted {
@@ -3440,7 +3455,10 @@ mod tests {
             reason: b"test abort".to_vec(),
         };
         let encoded = abort_event.encode();
-        let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            CrossVmEvent::decode(&mut &encoded[..]),
+            "CrossVmEvent decode failed",
+        );
         assert_eq!(decoded, abort_event);
 
         let cb_event = CrossVmEvent::CircuitBreakerTripped {
@@ -3448,7 +3466,10 @@ mod tests {
             max_epoch_volume: 500_000,
         };
         let encoded = cb_event.encode();
-        let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            CrossVmEvent::decode(&mut &encoded[..]),
+            "CrossVmEvent decode failed",
+        );
         assert_eq!(decoded, cb_event);
     }
 
@@ -3470,7 +3491,10 @@ mod tests {
             dest_lock_receipt: b"DEST_OK".to_vec(),
         };
         let encoded = prep.encode();
-        let decoded = PreparedOperation::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            PreparedOperation::decode(&mut &encoded[..]),
+            "PreparedOperation decode failed",
+        );
         assert_eq!(decoded.nonce, 1);
         assert_eq!(decoded.phase, TwoPhaseCommitPhase::Prepared);
     }
@@ -3484,7 +3508,10 @@ mod tests {
             TwoPhaseCommitPhase::Aborted(b"fail".to_vec()),
         ] {
             let encoded = phase.encode();
-            let decoded = TwoPhaseCommitPhase::decode(&mut &encoded[..]).unwrap();
+            let decoded = assert_ok(
+                TwoPhaseCommitPhase::decode(&mut &encoded[..]),
+                "TwoPhaseCommitPhase decode failed",
+            );
             assert_eq!(decoded, phase);
         }
     }
@@ -3805,25 +3832,30 @@ mod message_passing_tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::MessageToEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToEvm {
                 sender: vec![0x11; 32],
                 target_contract: [0x22; 20],
                 message: b"2pc evm msg".to_vec(),
                 nonce: 10,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        bridge
-            .queue_operation(CrossVmOperation::MessageToSvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToSvm {
                 sender: [0x33; 20],
                 target_program: vec![0x44; 32],
                 message: b"2pc svm msg".to_vec(),
                 nonce: 11,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
+        let (results, events) = assert_ok(
+            bridge.atomic_execute(&dispatcher),
+            "atomic_execute failed",
+        );
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.success));
 
@@ -4577,13 +4609,13 @@ mod atomic_tri_swap_tests {
         let dispatcher = NoOpDispatcher::testnet();
 
         let op = make_triswap(1_000, 2_000, 10);
-        bridge.queue_operation(op).unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
 
-        let (prepared, _evs) = bridge.prepare(&dispatcher).expect("prepare ok");
+        let (prepared, _evs) = assert_ok(bridge.prepare(&dispatcher), "prepare failed");
         assert_eq!(prepared.len(), 1, "one prepared nonce");
         assert_eq!(bridge.prepared_count(), 1);
 
-        let (results, _evs) = bridge.commit(&dispatcher).expect("commit ok");
+        let (results, _evs) = assert_ok(bridge.commit(&dispatcher), "commit failed");
         assert_eq!(results.len(), 1);
         assert!(
             results[0].success,
@@ -4660,14 +4692,14 @@ mod x3vm_2pc_integration_tests {
             caller: [0x42u8; 32],
             call: call.clone(),
         };
-        bridge.queue_operation(op).unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
         assert_eq!(bridge.pending_count(), 1);
 
-        let (nonces, _evs) = bridge.prepare(&dispatcher).unwrap();
+        let (nonces, _evs) = assert_ok(bridge.prepare(&dispatcher), "prepare failed");
         assert_eq!(nonces.len(), 1, "one prepared nonce");
         assert_eq!(bridge.prepared_count(), 1);
 
-        let (results, _evs) = bridge.commit(&dispatcher).unwrap();
+        let (results, _evs) = assert_ok(bridge.commit(&dispatcher), "commit failed");
         assert_eq!(results.len(), 1);
         assert!(
             results[0].success,
@@ -4741,18 +4773,20 @@ mod x3vm_2pc_integration_tests {
         let mut b_call = make_call(VmId::X3Vm, 2, [0; 4]);
         b_call.nonce = 999; // distinguish
 
-        bridge
-            .queue_operation(CrossVmOperation::CallX3Vm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallX3Vm {
                 caller: [0u8; 32],
                 call: a,
-            })
-            .unwrap();
-        bridge
-            .queue_operation(CrossVmOperation::CallX3Vm {
+            }),
+            "queue_operation failed",
+        );
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallX3Vm {
                 caller: [0u8; 32],
                 call: b_call,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
         assert_eq!(bridge.x3vm_replay_map_len(), 2);
     }
 
