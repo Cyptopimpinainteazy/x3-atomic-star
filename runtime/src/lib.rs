@@ -67,6 +67,16 @@ use pallet_x3_solvency;
 use pallet_x3_wallet_pallet;
 use pallet_x3_inventory;
 use pallet_x3_reservation;
+use pallet_x3_rebalance;
+use pallet_x3_partner;
+use pallet_x3_treasury_policy;
+use pallet_x3_custody;
+use pallet_x3_reconciliation;
+use pallet_x3_wrapped;
+use pallet_x3_auction;
+use pallet_x3_launchpad;
+use pallet_x3_dapp_hub;
+use pallet_x3_compute_market;
 use pallet_svm_runtime;
 
 use scale_info::TypeInfo;
@@ -337,9 +347,19 @@ construct_runtime!(
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
         X3Solvency: pallet_x3_solvency,
+        X3Rebalance: pallet_x3_rebalance,
+        X3Partner: pallet_x3_partner,
+        X3TreasuryPolicy: pallet_x3_treasury_policy,
+        X3Custody: pallet_x3_custody,
+        X3Reconciliation: pallet_x3_reconciliation,
+        X3Wrapped: pallet_x3_wrapped,
         SvmRuntime: pallet_svm_runtime,
         X3JuryAnchor: pallet_x3_jury_anchor,
         MemeOverlord: pallet_meme_overlord,
+        X3Auction: pallet_x3_auction,
+        X3Launchpad: pallet_x3_launchpad,
+        X3DappHub: pallet_x3_dapp_hub,
+        X3ComputeMarket: pallet_x3_compute_market,
     }
 );
 
@@ -394,9 +414,19 @@ construct_runtime!(
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
         X3Solvency: pallet_x3_solvency,
+        X3Rebalance: pallet_x3_rebalance,
+        X3Partner: pallet_x3_partner,
+        X3TreasuryPolicy: pallet_x3_treasury_policy,
+        X3Custody: pallet_x3_custody,
+        X3Reconciliation: pallet_x3_reconciliation,
+        X3Wrapped: pallet_x3_wrapped,
         SvmRuntime: pallet_svm_runtime,
         X3JuryAnchor: pallet_x3_jury_anchor,
         MemeOverlord: pallet_meme_overlord,
+        X3Auction: pallet_x3_auction,
+        X3Launchpad: pallet_x3_launchpad,
+        X3DappHub: pallet_x3_dapp_hub,
+        X3ComputeMarket: pallet_x3_compute_market,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -452,9 +482,19 @@ construct_runtime!(
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
         X3Solvency: pallet_x3_solvency,
+        X3Rebalance: pallet_x3_rebalance,
+        X3Partner: pallet_x3_partner,
+        X3TreasuryPolicy: pallet_x3_treasury_policy,
+        X3Custody: pallet_x3_custody,
+        X3Reconciliation: pallet_x3_reconciliation,
+        X3Wrapped: pallet_x3_wrapped,
         SvmRuntime: pallet_svm_runtime,
         X3JuryAnchor: pallet_x3_jury_anchor,
         MemeOverlord: pallet_meme_overlord,
+        X3Auction: pallet_x3_auction,
+        X3Launchpad: pallet_x3_launchpad,
+        X3DappHub: pallet_x3_dapp_hub,
+        X3ComputeMarket: pallet_x3_compute_market,
     }
 );
 
@@ -509,9 +549,19 @@ construct_runtime!(
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
         X3Solvency: pallet_x3_solvency,
+        X3Rebalance: pallet_x3_rebalance,
+        X3Partner: pallet_x3_partner,
+        X3TreasuryPolicy: pallet_x3_treasury_policy,
+        X3Custody: pallet_x3_custody,
+        X3Reconciliation: pallet_x3_reconciliation,
+        X3Wrapped: pallet_x3_wrapped,
         SvmRuntime: pallet_svm_runtime,
         X3JuryAnchor: pallet_x3_jury_anchor,
         MemeOverlord: pallet_meme_overlord,
+        X3Auction: pallet_x3_auction,
+        X3Launchpad: pallet_x3_launchpad,
+        X3DappHub: pallet_x3_dapp_hub,
+        X3ComputeMarket: pallet_x3_compute_market,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -1148,6 +1198,7 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxAgents = InvariantsDefaultMaxAgents;
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
+    type SecurityHook = x3_security_events::NoOpHook;
 }
 
 pub struct RuntimeEmergencyHaltController;
@@ -1298,6 +1349,8 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type MaxTradeLegs = MaxTradeLegs;
     type MaxCheckpoints = MaxCheckpoints;
     type MaxPendingBatchesPerAccount = MaxPendingBatchesPerAccount;
+    // TODO: wire to SwarmEventBroadcaster once the security swarm subscriber is live.
+    type SecurityHook = x3_security_events::NoOpHook;
 }
 
 #[cfg(all(feature = "std", feature = "frontier"))]
@@ -2096,7 +2149,6 @@ parameter_types! {
 }
 
 impl pallet_swarm::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type AdminOrigin = EnsureRootOrHalfCouncil;
     type SlashOrigin = EnsureRootOrHalfCouncil;
@@ -2251,6 +2303,7 @@ impl pallet_x3_slash::Config for Runtime {
     type FinalityWindow = SlashFinalityWindow;
     type ReputationDamageEnabled = SlashReputationDamageEnabled;
     type SlashRecipient = SlashTreasuryRecipient;
+    type AccountingSpine = x3_accounting_events::NoOpSpine;
 }
 
 // ===== X3 Wallet Pallet Configuration =====
@@ -2295,6 +2348,182 @@ impl pallet_x3_solvency::Config for Runtime {
     type QuoteStalenessBlocks = SolvencyQuoteStalenessBlocks;
     type ObligationTimeoutBlocks = SolvencyObligationTimeoutBlocks;
     type SnapshotRetentionBlocks = SolvencySnapshotRetentionBlocks;
+}
+
+// ===== X3 Rebalance Configuration =====
+parameter_types! {
+    pub const MaxDailyRebalanceVolume: u128 = 1_000_000_000_000_000; // 1 quadrillion (adjust per tokenomics)
+    pub const RebalanceCooldownBlocks: BlockNumber = 100; // ~20s at 200ms block time
+    pub const MaxPendingRebalances: u32 = 64;
+}
+
+impl pallet_x3_rebalance::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxDailyRebalanceVolume = MaxDailyRebalanceVolume;
+    type RebalanceCooldownBlocks = RebalanceCooldownBlocks;
+    type MaxPendingRebalances = MaxPendingRebalances;
+}
+
+// ===== X3 Partner Configuration =====
+parameter_types! {
+    pub const MaxApprovedLanesPerPartner: u32 = 64;
+    pub const MaxPartnersPerLane: u32 = 32;
+}
+
+impl pallet_x3_partner::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxApprovedLanesPerPartner = MaxApprovedLanesPerPartner;
+    type MaxPartnersPerLane = MaxPartnersPerLane;
+}
+
+// ===== X3 Treasury Policy Configuration =====
+parameter_types! {
+    pub const MaxInsuranceReserve: u128 = 100_000_000_000_000_000; // 100 quadrillion max insurance reserve
+}
+
+impl pallet_x3_treasury_policy::Config for Runtime {
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type OperatorOrigin = EnsureRootOrHalfCouncil;
+    type MaxInsuranceReserve = MaxInsuranceReserve;
+}
+
+// ===== X3 Custody Configuration =====
+parameter_types! {
+    pub const CustodyMaxSignersPerVault: u32 = 16;
+    pub const CustodyMaxVaultsPerSigner: u32 = 32;
+    pub const CustodyMaxPoliciesPerTier: u32 = 8;
+}
+
+impl pallet_x3_custody::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type OperatorOrigin = EnsureRootOrHalfCouncil;
+    type MaxSignersPerVault = CustodyMaxSignersPerVault;
+    type MaxVaultsPerSigner = CustodyMaxVaultsPerSigner;
+    type MaxPoliciesPerTier = CustodyMaxPoliciesPerTier;
+}
+
+// ===== X3 Reconciliation Configuration (Phase 5) =====
+parameter_types! {
+    /// 24-hour cycle at 6-second block time (24 * 60 * 60 / 6 = 14_400).
+    pub const ReconciliationCycleBlocks: BlockNumber = 14_400;
+    /// 1-hour halt threshold at 6-second block time (60 * 60 / 6 = 600).
+    pub const MintHaltThresholdBlocks: BlockNumber = 600;
+    /// Maximum supported remote chains tracked in reconciliation.
+    pub const ReconciliationMaxSupportedChains: u32 = 16;
+    /// Tolerance: 1 bps = 0.01 % (passes at 0.01 %, degraded at 0.1 %, halted after 1 hr).
+    pub const ReconciliationToleranceBps: u32 = 1;
+    /// Governance power divergence alert threshold: 100 bps = 1 %.
+    pub const ReconciliationGovDivergenceAlertBps: u32 = 100;
+}
+
+impl pallet_x3_reconciliation::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxSupportedChains = ReconciliationMaxSupportedChains;
+    type ReconciliationCycleBlocks = ReconciliationCycleBlocks;
+    type MintHaltThresholdBlocks = MintHaltThresholdBlocks;
+    type ToleranceBps = ReconciliationToleranceBps;
+    type GovernanceDivergenceAlertBps = ReconciliationGovDivergenceAlertBps;
+}
+
+// ===== X3 Wrapped Token Configuration =====
+parameter_types! {
+    pub const MaxChainsPerAsset: u32 = 64;
+    pub const MaxWrappedAssets: u32 = 256;
+}
+
+impl pallet_x3_wrapped::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Balance = Balance;
+    type BridgeAuthority = EnsureRootOrHalfCouncil;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxChainsPerAsset = MaxChainsPerAsset;
+    type MaxWrappedAssets = MaxWrappedAssets;
+}
+
+// ===== X3 Auction Configuration =====
+parameter_types! {
+    pub const AuctionMaxBidsPerAuction: u32 = 200;
+    pub const AuctionMaxActiveAuctions: u32 = 100;
+    pub const AuctionDepositAmount: u128 = 10 * DOLLARS;
+    pub const AuctionMinBidIncrementBps: u32 = 100; // 1 %
+}
+
+impl pallet_x3_auction::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxBidsPerAuction = AuctionMaxBidsPerAuction;
+    type MaxActiveAuctions = AuctionMaxActiveAuctions;
+    type AuctionDepositAmount = AuctionDepositAmount;
+    type MinBidIncrementBps = AuctionMinBidIncrementBps;
+    type WeightInfo = ();
+}
+
+// ===== X3 Launchpad Configuration =====
+parameter_types! {
+    pub const LaunchpadMaxActiveLaunches: u32 = 50;
+    pub const LaunchpadMaxContributorsPerLaunch: u32 = 5_000;
+    // ~10 minutes at 200ms blocks
+    pub const LaunchpadMinDurationBlocks: BlockNumber = 3_000;
+    // ~30 days at 200ms blocks
+    pub const LaunchpadMaxDurationBlocks: BlockNumber = 12_960_000;
+}
+
+impl pallet_x3_launchpad::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxActiveLaunches = LaunchpadMaxActiveLaunches;
+    type MaxContributorsPerLaunch = LaunchpadMaxContributorsPerLaunch;
+    type MinLaunchDurationBlocks = LaunchpadMinDurationBlocks;
+    type MaxLaunchDurationBlocks = LaunchpadMaxDurationBlocks;
+    type WeightInfo = ();
+}
+
+// ===== X3 dApp Hub Configuration (Phase 8) =====
+parameter_types! {
+    /// Maximum dApps a single developer may hold simultaneously.
+    pub const DappHubMaxDAppsPerDeveloper: u32 = 20;
+    /// Global registry cap.
+    pub const DappHubMaxActiveDApps: u32 = 10_000;
+    /// Registration deposit — 100 X3 tokens (tracked only; no fund transfer in scaffold).
+    pub const DappHubRegistrationDeposit: u128 = 100 * DOLLARS;
+    /// Upgrade fee to Featured placement — 1 000 X3.
+    pub const DappHubFeaturedPlacementFee: u128 = 1_000 * DOLLARS;
+    /// Upgrade fee to Premium placement — 5 000 X3.
+    pub const DappHubPremiumPlacementFee: u128 = 5_000 * DOLLARS;
+}
+
+impl pallet_x3_dapp_hub::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxDAppsPerDeveloper = DappHubMaxDAppsPerDeveloper;
+    type MaxActiveDApps = DappHubMaxActiveDApps;
+    type RegistrationDepositAmount = DappHubRegistrationDeposit;
+    type FeaturedPlacementFeeAmount = DappHubFeaturedPlacementFee;
+    type PremiumPlacementFeeAmount = DappHubPremiumPlacementFee;
+}
+
+// ===== X3 Compute Market Configuration (Phase 10) =====
+parameter_types! {
+    /// Maximum number of Active or Paused listings at any time.
+    pub const ComputeMarketMaxActiveListings: u32 = 1_000;
+    /// Maximum sessions tracked per provider.
+    pub const ComputeMarketMaxSessionsPerProvider: u32 = 64;
+    /// Default session window — ~24 hours at 200ms blocks.
+    pub const ComputeMarketSessionExpiryBlocks: BlockNumber = 7_200;
+    /// Minimum stake: 1 X3 (12 decimals).
+    pub const ComputeMarketMinStakeForProvider: u128 = 1_000_000_000_000;
+}
+
+impl pallet_x3_compute_market::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type MaxActiveListings = ComputeMarketMaxActiveListings;
+    type MaxSessionsPerProvider = ComputeMarketMaxSessionsPerProvider;
+    type SessionExpiryBlocks = ComputeMarketSessionExpiryBlocks;
+    type MinStakeForProvider = ComputeMarketMinStakeForProvider;
+    type WeightInfo = ();
 }
 
 // ===== SVM Runtime Configuration =====

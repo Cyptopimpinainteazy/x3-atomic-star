@@ -95,10 +95,23 @@ x3-packet-standard = { path = "../crates/x3-packet-standard", default-features =
 quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 # staged-pallets (now wired)
 pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
+x3-accounting-events = { path = "../crates/x3-accounting-events", default-features = false }
+x3-security-events = { path = "../crates/x3-security-events", default-features = false }
 pallet-x3-solvency = { path = "../pallets/x3-solvency", default-features = false }
 pallet-x3-wallet-pallet = { package = "pallet-x3-wallet", path = "../pallets/x3-wallet-pallet", default-features = false }
 pallet-x3-inventory = { path = "../pallets/x3-inventory", default-features = false }
 pallet-x3-reservation = { path = "../pallets/x3-reservation", default-features = false }
+pallet-x3-rebalance = { path = "../pallets/x3-rebalance", default-features = false }
+pallet-x3-partner = { path = "../pallets/x3-partner", default-features = false }
+pallet-x3-treasury-policy = { path = "../pallets/x3-treasury-policy", default-features = false }
+pallet-x3-custody = { path = "../pallets/x3-custody", default-features = false }
+pallet-x3-reconciliation = { path = "../pallets/x3-reconciliation", default-features = false }
+pallet-x3-wrapped = { path = "../pallets/x3-wrapped", default-features = false }
+pallet-x3-auction = { path = "../pallets/x3-auction", default-features = false }
+pallet-x3-launchpad = { path = "../pallets/x3-launchpad", default-features = false }
+pallet-x3-dapp-hub = { path = "../pallets/x3-dapp-hub", default-features = false }
+x3-revenue-sharing = { path = "../crates/x3-revenue-sharing", default-features = false }
+pallet-x3-compute-market = { path = "../pallets/x3-compute-market", default-features = false }
 pallet-svm-runtime = { package = "pallet-svm", path = "../pallets/svm-runtime", default-features = false }
 
 sp-api = { workspace = true, default-features = false }
@@ -189,10 +202,23 @@ std = [
 	"pallet-x3-jury-anchor/std",
 	"pallet-meme-overlord/std",
 	"pallet-x3-slash/std",
+	"x3-accounting-events/std",
+	"x3-security-events/std",
 	"pallet-x3-solvency/std",
 	"pallet-x3-wallet-pallet/std",
 	"pallet-x3-inventory/std",
 	"pallet-x3-reservation/std",
+	"pallet-x3-rebalance/std",
+	"pallet-x3-partner/std",
+	"pallet-x3-treasury-policy/std",
+	"pallet-x3-custody/std",
+	"pallet-x3-reconciliation/std",
+	"pallet-x3-wrapped/std",
+	"pallet-x3-auction/std",
+	"pallet-x3-launchpad/std",
+	"pallet-x3-dapp-hub/std",
+	"x3-revenue-sharing/std",
+	"pallet-x3-compute-market/std",
 	"pallet-svm-runtime/std",
 	"x3-asset-kernel-types/std",
 	"pallet-x3-asset-registry/std",

@@ -124,6 +124,8 @@ members = [
     "crates/x3-orchestra-control-plane",
     "crates/x3-orchestrator",
     "crates/x3-rpc",
+    # Phase 4: Unified RPC operational policy layer (health scoring + failover)
+    "crates/x3-rpc-policy",
     "crates/x3-relayer",
     "crates/x3-bridge-security-council",
     "crates/x3-finality-oracle",
@@ -139,6 +141,10 @@ members = [
         # Phase 4.5: Liquidity, Inventory, and Solvency control plane
         "pallets/x3-inventory",
         "pallets/x3-reservation",
+        "pallets/x3-solvency",
+        "pallets/x3-rebalance",
+        "pallets/x3-partner",
+        "pallets/x3-treasury-policy",
         # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
         "crates/x3-asset-kernel-types",
         "pallets/x3-asset-registry",
@@ -159,11 +165,39 @@ members = [
         "crates/x3-appzone-factory",
         "crates/x3-liquidity-core",
         "crates/x3-universal-contracts",
+        # On-chain custody map and signer separation (validator key vs. treasury key)
+        "pallets/x3-custody",
+        # Phase 3: Canonical accounting event types for the X3 revenue spine
+        "crates/x3-accounting-events",
+        # Phase 9: Canonical truth types — identity, asset, and treasury models (shared types lib)
+        "crates/x3-canonical-truth",
+        # Phase 2: Canonical security event types for the security swarm spine
+        "crates/x3-security-events",
         # ProofForge: Complete proof system for X3 blockchain (v0-v7)
         "proof-forge",
+        # Phase 1: Testnet proving harness binary
+        "proving",
         # Note: crates/dylint-determinism is intentionally NOT listed here.
     # It is a standalone workspace (has its own [workspace] and rust-toolchain.toml)
     # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.
+        # Phase 5: Supply reconciliation and governance power mapping
+        "pallets/x3-reconciliation",
+        # Phase 5: On-chain wrapped X3 token — cross-chain mint/burn + governance power
+        "pallets/x3-wrapped",
+        # Phase 6: English auction pallet
+        "pallets/x3-auction",
+        # Phase 7: Token launchpad/presale pallet
+        "pallets/x3-launchpad",
+        # Phase 8: On-chain dApp hub — listing, compliance tier, throttle, revenue share
+        "pallets/x3-dapp-hub",
+        # Phase 8: Revenue-split types crate (shared by dApp hub and marketplace)
+        "crates/x3-revenue-sharing",
+        # Phase 10: AI compute marketplace — bot rental, premium execution, swarm sessions
+        "pallets/x3-compute-market",
+        # Phase 11: Weekly chain proving cycle — onboarding pipeline types and scoring model
+        "crates/x3-chain-onboarding",
+        # Phase 12: A-tier hard metrics tracking — throughput, TVL, routes, DAU, incidents
+        "crates/x3-metrics-tracker",
 ]
 default-members = ["node"]
 resolver = "2"

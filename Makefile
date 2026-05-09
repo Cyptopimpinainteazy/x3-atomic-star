@@ -1,4 +1,4 @@
-.PHONY: bmad-generate-steps bmad-generate-workflows bmad-validate bmad-clean help testnet-verify frontier-rpc-smoke frontier-rpc-smoke-local
+.PHONY: bmad-generate-steps bmad-generate-workflows bmad-validate bmad-clean help testnet-verify frontier-rpc-smoke frontier-rpc-smoke-local x3-proof x3-proof-install
 
 # BMAD Build Automation - Phase 1 & 2
 # Purpose: Consolidation generation and validation for steps and workflows
@@ -30,6 +30,10 @@ help:
 	@echo "  Frontier RPC:"
 	@echo "    make frontier-rpc-smoke       - Run Frontier JSON-RPC smoke checks against NODE_URL"
 	@echo "    make frontier-rpc-smoke-local - Launch a fresh local dev node, run smoke checks, then stop it"
+	@echo ""
+	@echo "  ProofForge CLI:"
+	@echo "    make x3-proof                 - Run local ProofForge CLI wrapper (usage: make x3-proof ARGS='features --strict --fail-hard')"
+	@echo "    make x3-proof-install         - Install x3-proof launcher to ~/.local/bin/x3-proof"
 
 # ============================================================================
 # PHASE 1: STEP CONSOLIDATION TARGETS
@@ -136,6 +140,17 @@ frontier-rpc-smoke-local:
 		if [ $$i -eq 45 ]; then echo "Node did not become ready"; exit 1; fi; \
 	done; \
 	NODE_URL="http://127.0.0.1:9944" scripts/frontier_rpc_smoke.sh
+
+x3-proof:
+	@chmod +x bin/x3-proof
+	@bin/x3-proof $(ARGS)
+
+x3-proof-install:
+	@mkdir -p "$$HOME/.local/bin"
+	@chmod +x bin/x3-proof
+	@install -m 0755 bin/x3-proof "$$HOME/.local/bin/x3-proof"
+	@echo "Installed x3-proof -> $$HOME/.local/bin/x3-proof"
+	@echo "If needed, add to PATH: export PATH=\"$$HOME/.local/bin:$$PATH\""
 
 
 # ============================================================================

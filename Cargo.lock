@@ -7660,6 +7660,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes",
+ "http-body-util",
+ "hyper 1.9.0",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
+]
+
+[[package]]
 name = "hyper-util"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7677,9 +7693,11 @@ dependencies = [
  "percent-encoding 2.3.2",
  "pin-project-lite",
  "socket2 0.6.3",
+ "system-configuration 0.7.0",
  "tokio",
  "tower-service",
  "tracing",
+ "windows-registry",
 ]
 
 [[package]]
@@ -11735,6 +11753,7 @@ dependencies = [
  "sp-runtime",
  "sp-std 14.0.0",
  "x3-evm-integration",
+ "x3-security-events",
  "x3-svm-integration",
 ]
 
@@ -12367,6 +12386,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-auction"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-automation"
 version = "0.1.0"
 dependencies = [
@@ -12397,6 +12430,22 @@ dependencies = [
  "scale-info",
  "serde",
  "sp-api",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
+name = "pallet-x3-compute-market"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -12449,6 +12498,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-custody"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-da"
 version = "0.1.0"
 dependencies = [
@@ -12463,6 +12528,21 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+]
+
+[[package]]
+name = "pallet-x3-dapp-hub"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+ "x3-revenue-sharing",
 ]
 
 [[package]]
@@ -12515,6 +12595,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-security-events",
 ]
 
 [[package]]
@@ -12580,6 +12661,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-launchpad"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-oracle"
 version = "0.1.0"
 dependencies = [
@@ -12587,6 +12682,53 @@ dependencies = [
  "frame-support",
  "frame-system",
  "pallet-timestamp",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
+name = "pallet-x3-partner"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-inventory",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
+name = "pallet-x3-rebalance"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-inventory",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
+name = "pallet-x3-reconciliation"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
@@ -12668,6 +12810,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-accounting-events",
  "x3-proof",
  "x3-slash",
 ]
@@ -12728,6 +12871,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-treasury-policy"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-inventory",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-verifier"
 version = "0.1.0"
 dependencies = [
@@ -12776,6 +12935,21 @@ dependencies = [
  "sp-runtime",
  "sp-std 14.0.0",
  "x3-wallet",
+]
+
+[[package]]
+name = "pallet-x3-wrapped"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
 ]
 
 [[package]]
@@ -15102,7 +15276,7 @@ dependencies = [
  "http-body 0.4.6",
  "hyper 0.14.32",
  "hyper-rustls 0.24.2",
- "hyper-tls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
@@ -15138,17 +15312,22 @@ checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "encoding_rs",
  "futures-channel",
  "futures-core",
  "futures-util",
+ "h2 0.4.13",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.9.0",
  "hyper-rustls 0.27.9",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "js-sys",
  "log",
+ "mime",
+ "native-tls",
  "percent-encoding 2.3.2",
  "pin-project-lite",
  "quinn",
@@ -15159,6 +15338,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper 1.0.2",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.26.4",
  "tower 0.5.3",
  "tower-http 0.6.8",
@@ -25988,6 +26168,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-accounting-events"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-agent"
 version = "0.1.0"
 dependencies = [
@@ -26184,6 +26375,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-canonical-truth"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-chain-node"
 version = "0.1.0"
 dependencies = [
@@ -26256,6 +26458,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-chain-onboarding"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-chain-runtime"
 version = "0.1.0"
 dependencies = [
@@ -26298,18 +26510,26 @@ dependencies = [
  "pallet-x3-account-registry",
  "pallet-x3-asset-registry",
  "pallet-x3-atomic-kernel",
+ "pallet-x3-auction",
  "pallet-x3-automation",
  "pallet-x3-coin",
+ "pallet-x3-compute-market",
  "pallet-x3-consensus",
  "pallet-x3-cross-vm-router",
+ "pallet-x3-custody",
  "pallet-x3-da",
+ "pallet-x3-dapp-hub",
  "pallet-x3-dex",
  "pallet-x3-domain-registry",
  "pallet-x3-invariants",
  "pallet-x3-inventory",
  "pallet-x3-jury-anchor",
  "pallet-x3-kernel",
+ "pallet-x3-launchpad",
  "pallet-x3-oracle",
+ "pallet-x3-partner",
+ "pallet-x3-rebalance",
+ "pallet-x3-reconciliation",
  "pallet-x3-reservation",
  "pallet-x3-sequencer",
  "pallet-x3-settlement-engine",
@@ -26317,9 +26537,11 @@ dependencies = [
  "pallet-x3-solvency",
  "pallet-x3-supply-ledger",
  "pallet-x3-token-factory",
+ "pallet-x3-treasury-policy",
  "pallet-x3-verifier",
  "pallet-x3-vrf",
  "pallet-x3-wallet",
+ "pallet-x3-wrapped",
  "parity-scale-codec",
  "quantum-crypto",
  "scale-info",
@@ -26339,10 +26561,13 @@ dependencies = [
  "sp-version",
  "sp-weights",
  "substrate-wasm-builder",
+ "x3-accounting-events",
  "x3-asset-kernel-types",
  "x3-cross-vm-bridge",
  "x3-ixl",
  "x3-packet-standard",
+ "x3-revenue-sharing",
+ "x3-security-events",
  "x3-svm-integration",
 ]
 
@@ -26880,6 +27105,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-metrics-tracker"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-mir"
 version = "0.1.0"
 dependencies = [
@@ -27030,6 +27265,19 @@ name = "x3-proof-dispute"
 version = "0.1.0"
 
 [[package]]
+name = "x3-proving-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "x3-readiness"
 version = "0.1.0"
 dependencies = [
@@ -27075,6 +27323,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-revenue-sharing"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-rpc"
 version = "0.1.0"
 dependencies = [
@@ -27105,6 +27362,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-rpc-policy"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-sdk"
 version = "0.1.0"
 dependencies = [
@@ -27124,6 +27390,15 @@ dependencies = [
  "tokio-tungstenite 0.21.0",
  "tracing",
  "url 2.5.8",
+]
+
+[[package]]
+name = "x3-security-events"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-std 14.0.0",
 ]
 
 [[package]]
