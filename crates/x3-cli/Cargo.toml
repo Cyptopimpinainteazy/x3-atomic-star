@@ -70,7 +70,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 hex = "0.4"
 
 # Templating for code generation
-handlebars = "5.1"
+handlebars = "6.4"
 
 [dev-dependencies]
 tempfile = "3.8"
