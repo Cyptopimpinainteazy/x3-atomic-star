@@ -2287,7 +2287,7 @@ mod tests {
 		{
 			assert_eq!(connections[0], (conn, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// remote opens a substream, verify that peer state is updated to `Incoming`
@@ -2303,7 +2303,7 @@ mod tests {
 			assert_eq!(connections.len(), 1);
 			assert_eq!(connections[0], (conn, ConnectionState::OpenDesiredByRemote));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		assert!(std::matches!(
@@ -2344,7 +2344,7 @@ mod tests {
 			assert_eq!(connections.len(), 1);
 			assert_eq!(connections[0], (conn, ConnectionState::Closing));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -2398,7 +2398,7 @@ mod tests {
 		{
 			timer_deadline
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		};
 
 		// attempt to connect the backed-off peer and verify that the request is pending
@@ -2409,7 +2409,7 @@ mod tests {
 		{
 			assert_eq!(timer, timer_deadline);
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -2492,7 +2492,7 @@ mod tests {
 			assert!(backoff_until.is_some());
 			assert!(backoff_until.unwrap() > Instant::now());
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -2679,7 +2679,7 @@ mod tests {
 			assert_eq!(connections.len(), 1);
 			assert_eq!(connections[0], (conn, ConnectionState::OpenDesiredByRemote));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// add another connection
@@ -2698,7 +2698,7 @@ mod tests {
 			assert_eq!(connections[0], (conn, ConnectionState::OpenDesiredByRemote));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -2846,7 +2846,7 @@ mod tests {
 			assert_eq!(connections.len(), 1);
 			assert_eq!(connections[0], (conn1, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -2949,7 +2949,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Opening));
 			assert_eq!(connections[1], (conn2, ConnectionState::Opening));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// add two new substreams, one for each connection and verify that both are in open state
@@ -2967,7 +2967,7 @@ mod tests {
 			assert_eq!(connections[1].0, conn2);
 			assert!(std::matches!(connections[1].1, ConnectionState::Open(_)));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		// check peer information
@@ -2990,7 +2990,7 @@ mod tests {
 			assert_eq!(connections[0].0, conn2);
 			assert!(std::matches!(connections[0].1, ConnectionState::Open(_)));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		assert!(std::matches!(
@@ -3018,7 +3018,7 @@ mod tests {
 		if let Some(PeerState::Backoff { timer_deadline, .. }) = notif.peers.get(&(peer, set_id)) {
 			assert!(timer_deadline > &Instant::now());
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 	}
 
@@ -3058,7 +3058,7 @@ mod tests {
 			assert_eq!(connections[0].0, conn);
 			assert!(std::matches!(connections[0].1, ConnectionState::Open(_)));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif
@@ -3300,7 +3300,7 @@ mod tests {
 			*backoff_until =
 				Some(Instant::now().checked_add(std::time::Duration::from_secs(5)).unwrap());
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.on_swarm_event(FromSwarm::ConnectionClosed(
@@ -3468,7 +3468,7 @@ mod tests {
 			assert_eq!(connections[0], (conn1, ConnectionState::Opening));
 			assert_eq!(connections[1], (conn2, ConnectionState::Closed));
 		} else {
-			panic!("invalid state");
+			assert!(false, "invalid state");
 		}
 
 		notif.on_connection_handler_event(

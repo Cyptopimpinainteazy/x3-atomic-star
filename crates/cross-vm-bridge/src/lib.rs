@@ -2649,6 +2649,13 @@ fn evm_address_from_slice(source: &[u8]) -> [u8; 20] {
 mod tests {
     use super::*;
 
+    fn assert_ok<T, E: std::fmt::Debug>(res: Result<T, E>, msg: &str) -> T {
+        match res {
+            Ok(value) => value,
+            Err(error) => assert!(false, "{}: {:?}", msg, error),
+        }
+    }
+
     // =========================================================================
     // Existing tests (updated for new return types)
     // =========================================================================
@@ -2663,7 +2670,7 @@ mod tests {
             amount: 1000,
         };
 
-        let nonce = bridge.queue_operation(op).unwrap();
+        let nonce = assert_ok(bridge.queue_operation(op), "queue_operation failed");
         assert_eq!(nonce, 1);
         assert_eq!(bridge.pending_count(), 1);
     }
@@ -2678,8 +2685,8 @@ mod tests {
             amount: 500,
         };
 
-        bridge.queue_operation(op).unwrap();
-        let results = bridge.execute_pending().unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
+        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
@@ -2699,7 +2706,7 @@ mod tests {
             svm_amount: 2_000,
         };
 
-        bridge.queue_operation(op.clone()).unwrap();
+        assert_ok(bridge.queue_operation(op.clone()), "queue_operation failed");
         assert_eq!(bridge.pending_count(), 1);
 
         assert!(bridge.rollback_operation(0).is_ok());
@@ -2729,9 +2736,12 @@ mod tests {
             destination: [2u8; 20],
             amount: 1000,
         };
-        bridge.queue_operation(op).unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
 
-        let (results, events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, events) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(events.len(), 2);
@@ -2750,9 +2760,12 @@ mod tests {
             input: vec![0xDE, 0xAD],
             value: 0,
         };
-        bridge.queue_operation(op).unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
 
-        let (results, _events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _events) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(results[0].gas_used, 21_000);
@@ -2769,9 +2782,12 @@ mod tests {
             call_index: 2,
             input: vec![1, 2, 3],
         };
-        bridge.queue_operation(op).unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
 
-        let (results, _events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _events) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(results[0].gas_used, 5_000);
@@ -2781,7 +2797,10 @@ mod tests {
     fn test_vm_type_encode_decode() {
         let evm = VmType::Evm;
         let encoded = evm.encode();
-        let decoded = VmType::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            VmType::decode(&mut &encoded[..]),
+            "VmType decode failed",
+        );
         assert_eq!(decoded, VmType::Evm);
     }
 
@@ -2794,7 +2813,10 @@ mod tests {
             amount: 42,
         };
         let encoded = event.encode();
-        let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+        let decoded = assert_ok(
+            CrossVmEvent::decode(&mut &encoded[..]),
+            "CrossVmEvent decode failed",
+        );
         assert_eq!(decoded, event);
 
         let swap_event = CrossVmBridge::emit_swap_event(100, 200, 50_000);
@@ -2863,18 +2885,22 @@ mod tests {
             })
             .unwrap();
 
-        bridge
-            .queue_operation(CrossVmOperation::CallEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallEvm {
                 caller: vec![5; 32],
                 contract: [6u8; 20],
                 input: vec![0xAB],
                 value: 0,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         assert_eq!(bridge.pending_count(), 3);
 
-        let (results, events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, events) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(bridge.completed_count(), 3);
@@ -3084,7 +3110,10 @@ mod tests {
             .unwrap();
 
         // Phase 1: Prepare
-        let (nonces, prepare_events) = bridge.prepare(&dispatcher).unwrap();
+        let (nonces, prepare_events) = assert_ok(
+            bridge.prepare(&dispatcher),
+            "prepare failed",
+        );
         assert_eq!(nonces.len(), 1);
         assert_eq!(bridge.prepared_count(), 1);
         assert!(prepare_events
@@ -3092,7 +3121,10 @@ mod tests {
             .any(|e| matches!(e, CrossVmEvent::PrepareCompleted { .. })));
 
         // Phase 2: Commit
-        let (results, commit_events) = bridge.commit(&dispatcher).unwrap();
+        let (results, commit_events) = assert_ok(
+            bridge.commit(&dispatcher),
+            "commit failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(bridge.prepared_count(), 0);
@@ -3115,7 +3147,10 @@ mod tests {
             })
             .unwrap();
 
-        let (nonces, _) = bridge.prepare(&dispatcher).unwrap();
+        let (nonces, _) = assert_ok(
+            bridge.prepare(&dispatcher),
+            "prepare failed",
+        );
         assert_eq!(nonces.len(), 1);
         assert_eq!(bridge.prepared_count(), 1);
 
@@ -3224,17 +3259,21 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::CallEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::CallEvm {
                 caller,
                 contract: [0xFF; 20],
                 input: vec![],
                 value: 0,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         // Should execute without error — the address derivation is internal
-        let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert!(results[0].success);
     }
 
@@ -3252,10 +3291,14 @@ mod tests {
                 pallet_index: 0,
                 call_index: 0,
                 input: vec![],
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert!(results[0].success);
     }
 
@@ -3268,15 +3311,19 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::TransferToEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToEvm {
                 source: vec![1; 32],
                 destination: [2u8; 20],
                 amount: 1000,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         // NoOp EVM returns 21_000 gas
@@ -3288,15 +3335,19 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::TransferToSvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::TransferToSvm {
                 source: [1u8; 20],
                 destination: vec![2; 32],
                 amount: 500,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         // NoOp SVM returns 5_000 gas
@@ -3308,18 +3359,22 @@ mod tests {
         let mut bridge = CrossVmBridge::new();
         let dispatcher = NoOpDispatcher::testnet();
 
-        bridge
-            .queue_operation(CrossVmOperation::AtomicSwap {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::AtomicSwap {
                 evm_party: [0xAA; 20],
                 svm_party: vec![0xBB; 32],
                 evm_asset: [0u8; 20],
                 svm_asset: vec![0u8; 32],
                 evm_amount: 1000,
                 svm_amount: 2000,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
-        let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+        let (results, _) = assert_ok(
+            bridge.execute_with_dispatcher(&dispatcher),
+            "execute_with_dispatcher failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         // EVM (21_000) + SVM (5_000) = 26_000
@@ -3563,10 +3618,10 @@ mod message_passing_tests {
             nonce: 42,
         };
 
-        let queued_nonce = bridge.queue_operation(op).unwrap();
+        let queued_nonce = assert_ok(bridge.queue_operation(op), "queue_operation failed");
         assert_eq!(bridge.pending_count(), 1);
 
-        let results = bridge.execute_pending().unwrap();
+        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(bridge.completed_count(), 1);
@@ -3598,8 +3653,8 @@ mod message_passing_tests {
             nonce: 99,
         };
 
-        bridge.queue_operation(op).unwrap();
-        let results = bridge.execute_pending().unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
+        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
@@ -3668,8 +3723,8 @@ mod message_passing_tests {
             message: vec![0xAB; 1024],
             nonce: 3,
         };
-        bridge.queue_operation(op).unwrap();
-        let results = bridge.execute_pending().unwrap();
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
+        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
     }
@@ -3698,14 +3753,15 @@ mod message_passing_tests {
             })
             .unwrap();
 
-        let n3 = bridge
-            .queue_operation(CrossVmOperation::MessageToEvm {
+        let n3 = assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToEvm {
                 sender: vec![5u8; 32],
                 target_contract: [6u8; 20],
                 message: b"third".to_vec(),
                 nonce: 3,
-            })
-            .unwrap();
+            }),
+            "queue_operation failed",
+        );
 
         // Bridge assigns monotonically increasing nonces
         assert!(n1 < n2, "nonce ordering violated: n1={n1} n2={n2}");
@@ -3723,15 +3779,16 @@ mod message_passing_tests {
         let mut bridge = CrossVmBridge::new();
 
         // Use nonce 1
-        bridge
-            .queue_operation(CrossVmOperation::MessageToEvm {
+        assert_ok(
+            bridge.queue_operation(CrossVmOperation::MessageToEvm {
                 sender: vec![1u8; 32],
                 target_contract: [2u8; 20],
                 message: b"original".to_vec(),
                 nonce: 1,
-            })
-            .unwrap();
-        bridge.execute_pending().unwrap();
+            }),
+            "queue_operation failed",
+        );
+        assert_ok(bridge.execute_pending(), "execute_pending failed");
 
         // Internal nonces tracked: trying to queue with a *bridge-assigned* nonce
         // that was already used should be rejected by the nonce deduplication.
