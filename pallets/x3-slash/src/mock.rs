@@ -90,6 +90,7 @@ impl pallet_x3_slash::Config for Test {
     type FinalityWindow = FinalityWindow;
     type ReputationDamageEnabled = ReputationDamageEnabled;
     type SlashRecipient = SlashTreasury;
+    type AccountingSpine = x3_accounting_events::NoOpSpine;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

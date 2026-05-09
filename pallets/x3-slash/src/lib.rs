@@ -47,6 +47,9 @@ use sp_core::H256;
 use sp_runtime::traits::{Hash, SaturatedConversion, Saturating};
 use sp_std::vec::Vec;
 use x3_slash::types::SlashSeverity;
+use x3_accounting_events::{
+    AccountingEvent, AccountingSpine, FeeDestination, RevenueModule,
+};
 
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -86,6 +89,10 @@ pub mod pallet {
 
         /// Slash recipient (typically treasury).
         type SlashRecipient: Get<Self::AccountId>;
+
+        /// Canonical accounting spine — receives TreasuryInflow events on each slash.
+        /// Wire with `x3_accounting_events::NoOpSpine` until the live spine is ready.
+        type AccountingSpine: AccountingSpine<u64, u128>;
     }
 
     // ========================================================================
@@ -366,6 +373,25 @@ pub mod pallet {
             let mut bond_state = bond_state;
             bond_state.status = BondStatus::FullySlashed;
             Bonds::<T>::insert(bond_id, bond_state.clone());
+
+            // Emit canonical TreasuryInflow event to the accounting spine.
+            // The slash module has no fixed RevenueModule variant; we use Other(hash).
+            let slash_module = {
+                let mut h = [0u8; 32];
+                let src = sp_io::hashing::blake2_256(b"x3-slash");
+                h.copy_from_slice(&src);
+                RevenueModule::Other(h)
+            };
+            T::AccountingSpine::emit(AccountingEvent::fee_collected(
+                slash_module,
+                0u32, // native X3 chain
+                0u32, // native asset
+                bond_state.amount.saturated_into::<u128>(),
+                slash_amount.saturated_into::<u128>(),
+                FeeDestination::ProtocolTreasury,
+                bond_id.to_fixed_bytes(),
+                frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
+            ));
 
             // Apply reputation damage if critical
             if severity == 3 && T::ReputationDamageEnabled::get() {

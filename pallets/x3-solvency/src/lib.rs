@@ -18,6 +18,8 @@ pub mod types;
 mod mock;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod integration_tests;
 
 use types::{
     EvidenceRecord, PendingObligation, PostSubmissionContext, QuoteContext, ReservationContext,
