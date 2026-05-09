@@ -1,9 +1,10 @@
 /// Address Book — Contact management with labels and auto-complete
 /// Store frequently-used addresses with labels, search by name/tag
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct ContactInfo {
     pub id: [u8; 32],
     pub owner: [u8; 32],
@@ -16,7 +17,7 @@ pub struct ContactInfo {
     pub added_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct AddressBook {
     pub id: [u8; 32],
     pub owner: [u8; 32],

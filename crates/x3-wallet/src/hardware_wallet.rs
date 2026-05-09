@@ -1,9 +1,10 @@
 /// Hardware Wallet Integration — Ledger & Trezor support via WebUSB/WebHID
 /// Institutional-grade key management without exposing private keys to the application
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct HardwareWallet {
     pub id: [u8; 32],
     pub device_type: u8, // 0=Ledger, 1=Trezor, 2=Keystone, 3=SafePal
@@ -17,7 +18,7 @@ pub struct HardwareWallet {
     pub firmware_version: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct HardwareSigningRequest {
     pub request_id: [u8; 32],
     pub wallet_id: [u8; 32],
@@ -28,7 +29,7 @@ pub struct HardwareSigningRequest {
     pub timeout_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct HardwareSignature {
     pub signature: Vec<u8>,
     pub public_key: Vec<u8>,
@@ -37,7 +38,7 @@ pub struct HardwareSignature {
     pub recovery_id: u8,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct DeviceInfo {
     pub manufacturer: Vec<u8>,
     pub product: Vec<u8>,

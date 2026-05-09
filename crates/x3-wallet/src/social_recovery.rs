@@ -1,9 +1,10 @@
 /// Social Recovery Manager — Guardian-based account recovery (ERC-4337 model)
 /// Designate 3 guardians who can collectively recover your wallet
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct GuardianAccount {
     pub id: [u8; 32],
     pub owner: [u8; 32],
@@ -13,7 +14,7 @@ pub struct GuardianAccount {
     pub is_active: bool,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct RecoveryRequest {
     pub id: [u8; 32],
     pub account_id: [u8; 32],
@@ -24,7 +25,7 @@ pub struct RecoveryRequest {
     pub status: u8,            // 0=pending, 1=approved, 2=executed, 3=cancelled
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct GuardianApproval {
     pub guardian: [u8; 32],
     pub recovery_request_id: [u8; 32],

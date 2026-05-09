@@ -1,9 +1,10 @@
 /// Biometric Unlock — Face ID / Fingerprint authentication for wallet access
 /// Unlock wallet with biometric data, PIN fallback, session timeout
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct BiometricProfile {
     pub id: [u8; 32],
     pub owner: [u8; 32],
@@ -16,7 +17,7 @@ pub struct BiometricProfile {
     pub created_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct UnlockSession {
     pub id: [u8; 32],
     pub profile_id: [u8; 32],

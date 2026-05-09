@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![recursion_limit = "256"]
+#![recursion_limit = "1024"]
 #![allow(dead_code)]
 #![allow(clippy::manual_contains)]
 #![allow(clippy::needless_borrows_for_generic_args)]
@@ -59,6 +59,15 @@ use pallet_x3_settlement_engine;
 use pallet_x3_supply_ledger;
 use pallet_x3_token_factory;
 use pallet_x3_verifier;
+use pallet_x3_atomic_kernel;
+use pallet_x3_jury_anchor;
+use pallet_meme_overlord;
+use pallet_x3_slash;
+use pallet_x3_solvency;
+use pallet_x3_wallet_pallet;
+use pallet_x3_inventory;
+use pallet_x3_reservation;
+use pallet_svm_runtime;
 
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
@@ -321,10 +330,19 @@ construct_runtime!(
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
+        X3Consensus: pallet_x3_consensus,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Slash: pallet_x3_slash,
+        X3WalletPallet: pallet_x3_wallet_pallet,
+        X3Inventory: pallet_x3_inventory,
+        X3Reservation: pallet_x3_reservation,
+        X3Solvency: pallet_x3_solvency,
+        SvmRuntime: pallet_svm_runtime,
+        X3JuryAnchor: pallet_x3_jury_anchor,
+        MemeOverlord: pallet_meme_overlord,
     }
 );
 
-// ── dev + frontier (local devnet with sudo AND EVM stack) ────────────────────
 #[cfg(all(feature = "dev", feature = "frontier"))]
 construct_runtime!(
     pub enum Runtime {
@@ -369,12 +387,21 @@ construct_runtime!(
         X3Vrf: pallet_x3_vrf,
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
+        X3Consensus: pallet_x3_consensus,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Slash: pallet_x3_slash,
+        X3WalletPallet: pallet_x3_wallet_pallet,
+        X3Inventory: pallet_x3_inventory,
+        X3Reservation: pallet_x3_reservation,
+        X3Solvency: pallet_x3_solvency,
+        SvmRuntime: pallet_svm_runtime,
+        X3JuryAnchor: pallet_x3_jury_anchor,
+        MemeOverlord: pallet_meme_overlord,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
 );
 
-// ── production + no-frontier (RC1 default: no sudo, no EVM stack) ────────────
 #[cfg(all(not(feature = "dev"), not(feature = "frontier")))]
 construct_runtime!(
     pub enum Runtime {
@@ -419,6 +446,15 @@ construct_runtime!(
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Slash: pallet_x3_slash,
+        X3WalletPallet: pallet_x3_wallet_pallet,
+        X3Inventory: pallet_x3_inventory,
+        X3Reservation: pallet_x3_reservation,
+        X3Solvency: pallet_x3_solvency,
+        SvmRuntime: pallet_svm_runtime,
+        X3JuryAnchor: pallet_x3_jury_anchor,
+        MemeOverlord: pallet_meme_overlord,
     }
 );
 
@@ -467,6 +503,15 @@ construct_runtime!(
         X3Dex: pallet_x3_dex,
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Slash: pallet_x3_slash,
+        X3WalletPallet: pallet_x3_wallet_pallet,
+        X3Inventory: pallet_x3_inventory,
+        X3Reservation: pallet_x3_reservation,
+        X3Solvency: pallet_x3_solvency,
+        SvmRuntime: pallet_svm_runtime,
+        X3JuryAnchor: pallet_x3_jury_anchor,
+        MemeOverlord: pallet_meme_overlord,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -2147,6 +2192,154 @@ impl pallet_x3_da::Config for Runtime {
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = DaMaxShardProofs;
     type RetentionBlocks = DaRetentionBlocks;
+}
+
+// ===== Offchain transaction creation impls (required by pallet-x3-atomic-kernel) =====
+
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    type RuntimeCall = RuntimeCall;
+    type Extrinsic = UncheckedExtrinsic;
+}
+
+impl<LocalCall> frame_system::offchain::CreateBare<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_bare(call: RuntimeCall) -> UncheckedExtrinsic {
+        UncheckedExtrinsic::new_bare(call)
+    }
+}
+
+// ===== X3 Atomic Kernel Configuration =====
+parameter_types! {
+    pub const AtomicKernelMinBond: u128 = 1_000_000_000_000; // 1 X3
+    pub const AtomicKernelMaxLegsPerBundle: u32 = 32;
+    pub const AtomicKernelBundleDeadlineBlocks: u32 = 300; // ~5 minutes
+}
+
+impl pallet_x3_atomic_kernel::Config for Runtime {
+    type Currency = Balances;
+    type WeightInfo = ();
+    type MinBond = AtomicKernelMinBond;
+    type MaxLegsPerBundle = AtomicKernelMaxLegsPerBundle;
+    type BundleDeadlineBlocks = AtomicKernelBundleDeadlineBlocks;
+    type EconomicHalt = pallet_x3_supply_ledger::Pallet<Runtime>;
+}
+
+// ===== X3 Slash Configuration =====
+parameter_types! {
+    pub const SlashMinBondAmount: u128 = 10_000_000_000_000; // 10 X3
+    pub const SlashFinalityWindow: u32 = 7200; // ~24h at 12s blocks
+    pub const SlashReputationDamageEnabled: bool = true;
+}
+
+pub struct SlashTreasuryRecipient;
+impl Get<AccountId> for SlashTreasuryRecipient {
+    fn get() -> AccountId {
+        AccountId::new([0u8; 32])
+    }
+}
+
+impl pallet_x3_slash::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type SlashWeightInfo = ();
+    type Currency = Balances;
+    type MinBondAmount = SlashMinBondAmount;
+    type FinalityWindow = SlashFinalityWindow;
+    type ReputationDamageEnabled = SlashReputationDamageEnabled;
+    type SlashRecipient = SlashTreasuryRecipient;
+}
+
+// ===== X3 Wallet Pallet Configuration =====
+impl pallet_x3_wallet_pallet::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+}
+
+// ===== X3 Inventory Configuration =====
+parameter_types! {
+    pub const InventoryMaxLiquiditySources: u32 = 16;
+}
+
+impl pallet_x3_inventory::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Balance = Balance;
+    type MaxLiquiditySources = InventoryMaxLiquiditySources;
+    type WeightInfo = pallet_x3_inventory::weights::SubstrateWeight<Runtime>;
+}
+
+// ===== X3 Reservation Configuration =====
+parameter_types! {
+    pub const ReservationTtlBlocks: BlockNumber = 300;
+    pub const MaxExpirationsPerBlock: u32 = 50;
+}
+
+impl pallet_x3_reservation::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type ReservationTtlBlocks = ReservationTtlBlocks;
+    type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
+}
+
+// ===== X3 Solvency Configuration =====
+parameter_types! {
+    pub const SolvencyQuoteStalenessBlocks: u32 = 100;
+    pub const SolvencyObligationTimeoutBlocks: u32 = 600;
+    pub const SolvencySnapshotRetentionBlocks: u32 = 7200;
+}
+
+impl pallet_x3_solvency::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxChecksPerResult = ConstU32<32>;
+    type QuoteStalenessBlocks = SolvencyQuoteStalenessBlocks;
+    type ObligationTimeoutBlocks = SolvencyObligationTimeoutBlocks;
+    type SnapshotRetentionBlocks = SolvencySnapshotRetentionBlocks;
+}
+
+// ===== SVM Runtime Configuration =====
+parameter_types! {
+    pub const SvmMaxAccountDataSize: u32 = 10 * 1024; // 10 KB
+    pub const SvmMaxProgramSize: u32 = 512 * 1024;    // 512 KB
+    pub const SvmMaxComputeUnits: u64 = 1_400_000;
+}
+
+impl pallet_svm_runtime::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type MaxAccountDataSize = SvmMaxAccountDataSize;
+    type MaxProgramSize = SvmMaxProgramSize;
+    type MaxComputeUnits = SvmMaxComputeUnits;
+    type WeightInfo = ();
+}
+
+// ===== X3 Jury Anchor Configuration =====
+parameter_types! {
+    pub const JuryMaxSessionIdLength: u32 = 64;
+}
+
+impl pallet_x3_jury_anchor::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxSessionIdLength = JuryMaxSessionIdLength;
+}
+
+// ===== Meme Overlord Configuration =====
+parameter_types! {
+    pub const MemeMaxTemplateNameLength: u32 = 64;
+    pub const MemeMaxMemeDataLength: u32 = 1024;
+    pub const MemeMaxAchievements: u32 = 100;
+    pub const MemeMinProfitBps: u32 = 100; // 1%
+    pub const MemeViralThreshold: u32 = 1000;
+}
+
+impl pallet_meme_overlord::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
+    type MaxTemplateNameLength = MemeMaxTemplateNameLength;
+    type MaxMemeDataLength = MemeMaxMemeDataLength;
+    type MaxAchievements = MemeMaxAchievements;
+    type MinProfitBps = MemeMinProfitBps;
+    type ViralThreshold = MemeViralThreshold;
 }
 
 // Session trait implementations for authority-operated runtime

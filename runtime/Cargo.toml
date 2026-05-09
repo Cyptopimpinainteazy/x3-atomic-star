@@ -93,7 +93,13 @@ x3-ixl = { path = "../crates/x3-ixl", default-features = false }
 x3-packet-standard = { path = "../crates/x3-packet-standard", default-features = false }
 # Post-quantum crypto (std-only; thiserror/anyhow are not no_std — gated via "pq" feature).
 quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
-# staged-pallets (wiring in progress): svm-runtime x3-inventory x3-reservation x3-slash x3-solvency x3-wallet-pallet
+# staged-pallets (now wired)
+pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
+pallet-x3-solvency = { path = "../pallets/x3-solvency", default-features = false }
+pallet-x3-wallet-pallet = { package = "pallet-x3-wallet", path = "../pallets/x3-wallet-pallet", default-features = false }
+pallet-x3-inventory = { path = "../pallets/x3-inventory", default-features = false }
+pallet-x3-reservation = { path = "../pallets/x3-reservation", default-features = false }
+pallet-svm-runtime = { package = "pallet-svm", path = "../pallets/svm-runtime", default-features = false }
 
 sp-api = { workspace = true, default-features = false }
 sp-block-builder = { workspace = true, default-features = false }
@@ -180,6 +186,14 @@ std = [
 	"pallet-x3-sequencer/std",
 	"pallet-x3-da/std",
 	"pallet-x3-atomic-kernel/std",
+	"pallet-x3-jury-anchor/std",
+	"pallet-meme-overlord/std",
+	"pallet-x3-slash/std",
+	"pallet-x3-solvency/std",
+	"pallet-x3-wallet-pallet/std",
+	"pallet-x3-inventory/std",
+	"pallet-x3-reservation/std",
+	"pallet-svm-runtime/std",
 	"x3-asset-kernel-types/std",
 	"pallet-x3-asset-registry/std",
 	"pallet-x3-account-registry/std",

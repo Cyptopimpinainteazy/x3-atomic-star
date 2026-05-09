@@ -16,6 +16,11 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
+pub struct MockEmergencyHaltController;
+impl pallet_x3_kernel::EmergencyHaltController for MockEmergencyHaltController {
+    fn trigger() {}
+}
+
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime for testing
@@ -80,7 +85,8 @@ impl pallet_balances::Config for Test {
     type FreezeIdentifier = ();
     type MaxFreezes = ConstU32<0>;
     type RuntimeHoldReason = RuntimeHoldReason;
-    type MaxHolds = ConstU32<0>;
+    type RuntimeFreezeReason = ();
+    type DoneSlashHandler = ();
 }
 
 impl pallet_timestamp::Config for Test {
@@ -125,6 +131,9 @@ impl EvmExecutorAdapter for TradeEngineEvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -179,6 +188,9 @@ impl SvmExecutorAdapter for TradeEngineSvmAdapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -224,6 +236,9 @@ impl X3ExecutorAdapter for TradeEngineX3Adapter {
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
         })
     }
 
@@ -300,6 +315,7 @@ impl pallet_x3_kernel::Config for Test {
     type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
+    type EmergencyHaltController = MockEmergencyHaltController;
 }
 
 parameter_types! {
@@ -340,6 +356,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (2, 1_000_000_000_000_000_000u128),
             (3, 1_000_000_000_000_000_000u128),
         ],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();

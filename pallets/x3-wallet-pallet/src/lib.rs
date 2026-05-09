@@ -11,10 +11,10 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use frame_support::{pallet_prelude::*, storage::bounded_vec::BoundedVec};
+    use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
     use frame_system::ensure_root;
-    use sp_runtime::traits::Hash;
+    use sp_runtime::traits::{Hash, SaturatedConversion};
     use sp_std::vec::Vec;
     use x3_wallet::{
         HardwareWallet, MultisigWallet, GuardianAccount, TokenBalance,
@@ -34,6 +34,7 @@ pub mod pallet {
     }
 
     #[pallet::pallet]
+    #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     /// Store hardware wallets per account
@@ -178,12 +179,12 @@ pub mod pallet {
                 device_type,
                 device_model: device_model.clone(),
                 derivation_path: vec![],
-                public_key,
+                public_key: public_key.to_vec(),
                 address: [0u8; 32],
                 is_connected: true,
-                last_connected_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+                last_connected_block: frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
                 transaction_count: 0,
-                firmware_version: 1,
+                firmware_version: vec![],
             };
 
             HardwareWallets::<T>::insert((who.clone(), wallet_id_array), hardware_wallet);
@@ -200,7 +201,7 @@ pub mod pallet {
         #[pallet::weight(15_000)]
         pub fn create_multisig_wallet(
             origin: OriginFor<T>,
-            signers: BoundedVec<[u8; 32], { MAX_MULTISIG_SIGNERS as usize }>,
+            signers: Vec<[u8; 32]>,
             threshold: u32,
             timelock_delay: u64,
         ) -> DispatchResult {
@@ -216,7 +217,7 @@ pub mod pallet {
                 signers: signers.to_vec(),
                 threshold,
                 owner: [0u8; 32],
-                created_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+                created_block: frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
                 timelock_delay,
                 is_active: true,
             };
@@ -281,7 +282,7 @@ pub mod pallet {
                 is_enabled: true,
                 attempts_remaining: 5,
                 locked_until_block: 0,
-                created_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+                created_block: frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
             };
 
             BiometricProfiles::<T>::insert(who.clone(), profile);
@@ -362,7 +363,10 @@ pub mod pallet {
             Minters::<T>::remove(&who);
             Ok(())
         }
+    }
 
+    // Internal helpers (not dispatchable)
+    impl<T: Config> Pallet<T> {
         /// S1-3: Ensure caller is authorized minter
         fn ensure_minter(who: &T::AccountId) -> Result<(), Error<T>> {
             ensure!(

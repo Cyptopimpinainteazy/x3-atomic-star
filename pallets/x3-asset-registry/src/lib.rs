@@ -472,3 +472,660 @@ pub mod pallet {
     /// Re-export `RouteKey` under the pallet to reduce import churn.
     pub type RouteKeyAlias = RouteKey;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::pallet::*;
+    use crate as pallet_x3_asset_registry;
+    use frame_support::{
+        assert_noop, assert_ok, construct_runtime, parameter_types,
+        traits::{ConstU32, EnsureOrigin},
+    };
+    use frame_system as system;
+    use sp_core::H256;
+    use sp_io::TestExternalities;
+    use sp_runtime::{
+        traits::{BlakeTwo256, IdentityLookup},
+        BuildStorage, DispatchError,
+    };
+    use x3_asset_kernel_types::{
+        traits::{AssetRegistryInspect, RouteInspect},
+        AssetStatus, DomainId, RouteConfig, RouteLimits, SupplyPolicy,
+    };
+
+    // ── Mock runtime ──────────────────────────────────────────────────────
+
+    type AccountId = u64;
+    type Block = system::mocking::MockBlock<Test>;
+
+    pub const ALICE: AccountId = 1;
+
+    construct_runtime!(
+        pub enum Test {
+            System: frame_system,
+            AssetRegistry: pallet_x3_asset_registry,
+        }
+    );
+
+    parameter_types! {
+        pub const BlockHashCount: u64 = 250;
+        pub const MaxAssets: u32 = 10;
+    }
+
+    impl system::Config for Test {
+        type BaseCallFilter = frame_support::traits::Everything;
+        type BlockWeights = ();
+        type BlockLength = ();
+        type DbWeight = ();
+        type RuntimeOrigin = RuntimeOrigin;
+        type RuntimeCall = RuntimeCall;
+        type Nonce = u64;
+        type Block = Block;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type AccountId = AccountId;
+        type Lookup = IdentityLookup<AccountId>;
+        type RuntimeEvent = RuntimeEvent;
+        type BlockHashCount = BlockHashCount;
+        type Version = ();
+        type PalletInfo = PalletInfo;
+        type AccountData = ();
+        type OnNewAccount = ();
+        type OnKilledAccount = ();
+        type SystemWeightInfo = ();
+        type ExtensionsWeightInfo = ();
+        type SS58Prefix = ();
+        type OnSetCode = ();
+        type MaxConsumers = ConstU32<16>;
+        type RuntimeTask = ();
+        type SingleBlockMigrations = ();
+        type MultiBlockMigrator = ();
+        type PreInherents = ();
+        type PostInherents = ();
+        type PostTransactions = ();
+    }
+
+    // Root-only origin for RegistryOrigin and emergency.
+    pub struct RootOrigin;
+    impl EnsureOrigin<RuntimeOrigin> for RootOrigin {
+        type Success = ();
+        fn try_origin(o: RuntimeOrigin) -> Result<(), RuntimeOrigin> {
+            system::ensure_root(o).map_err(|_| RuntimeOrigin::none())
+        }
+        #[cfg(feature = "runtime-benchmarks")]
+        fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+            Ok(RuntimeOrigin::root())
+        }
+    }
+
+    impl Config for Test {
+        type RuntimeEvent = RuntimeEvent;
+        type RegistryOrigin = RootOrigin;
+        type EmergencyPauseOrigin = RootOrigin;
+        type MaxAssets = MaxAssets;
+    }
+
+    fn new_test_ext() -> TestExternalities {
+        system::GenesisConfig::<Test>::default()
+            .build_storage()
+            .unwrap()
+            .into()
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    fn usdc_eth() -> (Vec<u8>, Vec<u8>, u8, DomainId, u64, Vec<u8>, SupplyPolicy) {
+        (
+            b"USDC".to_vec(),
+            b"USD Coin".to_vec(),
+            6,
+            DomainId::Ethereum,
+            1,
+            vec![0xA0; 20],
+            SupplyPolicy::LockMint,
+        )
+    }
+
+    fn register_usdc() -> Result<(), DispatchError> {
+        let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+        Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+            .map(|_| ())
+    }
+
+    fn internal_route_cfg() -> RouteConfig {
+        RouteConfig::internal(RouteLimits::DEV_PERMISSIVE, 100)
+    }
+
+    // ── register_asset tests ───────────────────────────────────────────────
+
+    #[test]
+    fn register_asset_stores_metadata() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(register_usdc());
+            assert_eq!(AssetRegistry::total_assets(), 1);
+        });
+    }
+
+    #[test]
+    fn register_asset_status_starts_registered() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let asset_id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                    .unwrap();
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::status(&asset_id),
+                Some(AssetStatus::Registered)
+            );
+            // Not active yet — is_active must return false.
+            assert!(!<Pallet<Test> as AssetRegistryInspect>::is_active(&asset_id));
+        });
+    }
+
+    #[test]
+    fn register_asset_emits_event() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let asset_id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                    .unwrap();
+            System::assert_last_event(
+                Event::AssetRegistered {
+                    asset_id,
+                    origin_domain: DomainId::Ethereum,
+                    canonical_decimals: 6,
+                }
+                .into(),
+            );
+        });
+    }
+
+    #[test]
+    fn register_asset_fails_on_duplicate() {
+        new_test_ext().execute_with(|| {
+            assert_ok!(register_usdc());
+            // Same derivation inputs — same AssetId — must fail.
+            assert_noop!(register_usdc(), Error::<Test>::AssetAlreadyExists);
+            assert_eq!(AssetRegistry::total_assets(), 1);
+        });
+    }
+
+    #[test]
+    fn register_asset_fails_when_at_max_capacity() {
+        new_test_ext().execute_with(|| {
+            // MaxAssets = 10. Fill it up.
+            for i in 0u64..10 {
+                let chain_id = 1 + i;
+                assert_ok!(Pallet::<Test>::do_register_asset(
+                    b"TKN".to_vec(),
+                    b"Token".to_vec(),
+                    18,
+                    DomainId::Ethereum,
+                    chain_id,
+                    vec![i as u8; 20],
+                    SupplyPolicy::LockMint,
+                ));
+            }
+            assert_eq!(AssetRegistry::total_assets(), 10);
+            assert_noop!(
+                Pallet::<Test>::do_register_asset(
+                    b"OVER".to_vec(),
+                    b"Over".to_vec(),
+                    18,
+                    DomainId::Ethereum,
+                    999,
+                    vec![0xFF; 20],
+                    SupplyPolicy::LockMint,
+                ),
+                Error::<Test>::TooManyAssets
+            );
+        });
+    }
+
+    #[test]
+    fn register_asset_fails_if_symbol_too_long() {
+        new_test_ext().execute_with(|| {
+            // MaxSymbolLen = 32; send 33 bytes.
+            let long_sym = vec![b'X'; 33];
+            assert_noop!(
+                Pallet::<Test>::do_register_asset(
+                    long_sym,
+                    b"Name".to_vec(),
+                    18,
+                    DomainId::Ethereum,
+                    1,
+                    vec![0u8; 20],
+                    SupplyPolicy::LockMint,
+                ),
+                Error::<Test>::MetadataFieldTooLong
+            );
+            assert_eq!(AssetRegistry::total_assets(), 0);
+        });
+    }
+
+    #[test]
+    fn register_asset_extrinsic_requires_registry_origin() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            // Signed origin should be rejected.
+            assert!(AssetRegistry::register_asset(
+                RuntimeOrigin::signed(ALICE),
+                sym,
+                name,
+                dec,
+                dom,
+                chain,
+                addr,
+                policy,
+            )
+            .is_err());
+        });
+    }
+
+    // ── activate / pause / unpause / retire tests ─────────────────────────
+
+    #[test]
+    fn activate_makes_asset_active() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(Pallet::<Test>::do_activate_asset(&id));
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::status(&id),
+                Some(AssetStatus::Active)
+            );
+            assert!(<Pallet<Test> as AssetRegistryInspect>::is_active(&id));
+        });
+    }
+
+    #[test]
+    fn activate_emits_event() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(Pallet::<Test>::do_activate_asset(&id));
+            System::assert_last_event(
+                Event::AssetStatusChanged {
+                    asset_id: id,
+                    new_status: AssetStatus::Active,
+                }
+                .into(),
+            );
+        });
+    }
+
+    #[test]
+    fn activate_fails_for_unknown_asset() {
+        new_test_ext().execute_with(|| {
+            let fake_id = x3_asset_kernel_types::derive_asset_id(
+                DomainId::Ethereum, 1, b"\x00", b"FAKE", 18,
+            );
+            assert_noop!(
+                Pallet::<Test>::do_activate_asset(&fake_id),
+                Error::<Test>::UnknownAsset
+            );
+        });
+    }
+
+    #[test]
+    fn pause_asset_blocks_active_state() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(Pallet::<Test>::do_activate_asset(&id));
+            // Pause via extrinsic (requires root).
+            assert_ok!(AssetRegistry::pause_asset(RuntimeOrigin::root(), id));
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::status(&id),
+                Some(AssetStatus::Paused)
+            );
+            assert!(!<Pallet<Test> as AssetRegistryInspect>::is_active(&id));
+        });
+    }
+
+    #[test]
+    fn unpause_restores_active() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(Pallet::<Test>::do_activate_asset(&id));
+            assert_ok!(AssetRegistry::pause_asset(RuntimeOrigin::root(), id));
+            assert_ok!(AssetRegistry::unpause_asset(RuntimeOrigin::root(), id));
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::status(&id),
+                Some(AssetStatus::Active)
+            );
+        });
+    }
+
+    #[test]
+    fn retire_asset_makes_it_terminal() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(AssetRegistry::retire_asset(RuntimeOrigin::root(), id));
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::status(&id),
+                Some(AssetStatus::Retired)
+            );
+        });
+    }
+
+    #[test]
+    fn retired_asset_cannot_be_modified() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(AssetRegistry::retire_asset(RuntimeOrigin::root(), id));
+            // Activate after retire must fail.
+            assert_noop!(
+                Pallet::<Test>::do_activate_asset(&id),
+                Error::<Test>::AssetRetired
+            );
+            // Pause after retire must fail.
+            assert_noop!(
+                AssetRegistry::pause_asset(RuntimeOrigin::root(), id),
+                Error::<Test>::AssetRetired
+            );
+        });
+    }
+
+    // ── configure_route tests ─────────────────────────────────────────────
+
+    #[test]
+    fn configure_route_succeeds_for_active_asset() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let cfg = internal_route_cfg();
+            assert_ok!(Pallet::<Test>::do_configure_route(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                cfg,
+            ));
+            let stored = <Pallet<Test> as RouteInspect>::route(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+            );
+            assert!(stored.is_some());
+            assert!(stored.unwrap().enabled);
+        });
+    }
+
+    #[test]
+    fn configure_route_emits_event() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let cfg = internal_route_cfg();
+            assert_ok!(Pallet::<Test>::do_configure_route(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                cfg,
+            ));
+            System::assert_last_event(
+                Event::RouteConfigured {
+                    asset_id: id,
+                    source: DomainId::X3Native,
+                    destination: DomainId::X3Evm,
+                    enabled: true,
+                }
+                .into(),
+            );
+        });
+    }
+
+    #[test]
+    fn configure_route_fails_for_unknown_asset() {
+        new_test_ext().execute_with(|| {
+            let fake_id = x3_asset_kernel_types::derive_asset_id(
+                DomainId::Ethereum, 1, b"\x00", b"NONE", 18,
+            );
+            assert_noop!(
+                Pallet::<Test>::do_configure_route(
+                    &fake_id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    internal_route_cfg(),
+                ),
+                Error::<Test>::UnknownAsset
+            );
+        });
+    }
+
+    #[test]
+    fn configure_route_fails_for_self_loop() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_noop!(
+                Pallet::<Test>::do_configure_route(
+                    &id,
+                    DomainId::X3Native,
+                    DomainId::X3Native, // same → self-loop
+                    internal_route_cfg(),
+                ),
+                Error::<Test>::SelfLoopRoute
+            );
+        });
+    }
+
+    #[test]
+    fn configure_route_fails_for_invalid_limits_when_enabled() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            // enabled = true but max_amount = 0 → invalid.
+            let bad_cfg = RouteConfig {
+                enabled: true,
+                limits: RouteLimits {
+                    min_amount: 0,
+                    max_amount: 0, // invalid
+                    daily_limit: 0,
+                    per_wallet_daily_limit: 0,
+                    pending_limit: 0,
+                },
+                fee_bps: 0,
+                expiry_blocks: 100,
+                proof_tier: x3_asset_kernel_types::ProofTier::TrustedInternal,
+            };
+            assert_noop!(
+                Pallet::<Test>::do_configure_route(
+                    &id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    bad_cfg,
+                ),
+                Error::<Test>::InvalidRouteLimits
+            );
+        });
+    }
+
+    #[test]
+    fn configure_route_fails_when_daily_limit_less_than_max() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let bad_cfg = RouteConfig {
+                enabled: true,
+                limits: RouteLimits {
+                    min_amount: 0,
+                    max_amount: 1_000,
+                    daily_limit: 500, // less than max_amount → invalid
+                    per_wallet_daily_limit: 500,
+                    pending_limit: 10,
+                },
+                fee_bps: 0,
+                expiry_blocks: 100,
+                proof_tier: x3_asset_kernel_types::ProofTier::TrustedInternal,
+            };
+            assert_noop!(
+                Pallet::<Test>::do_configure_route(
+                    &id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    bad_cfg,
+                ),
+                Error::<Test>::InvalidRouteLimits
+            );
+        });
+    }
+
+    // ── set_route_enabled tests ────────────────────────────────────────────
+
+    #[test]
+    fn set_route_enabled_toggles_route() {
+        new_test_ext().execute_with(|| {
+            System::set_block_number(1);
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_ok!(Pallet::<Test>::do_configure_route(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                internal_route_cfg(),
+            ));
+            // Disable via emergency pause origin (root).
+            assert_ok!(AssetRegistry::set_route_enabled(
+                RuntimeOrigin::root(),
+                id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                false,
+            ));
+            let route = <Pallet<Test> as RouteInspect>::route(&id, DomainId::X3Native, DomainId::X3Evm).unwrap();
+            assert!(!route.enabled);
+            assert!(!<Pallet<Test> as RouteInspect>::is_route_open(&id, DomainId::X3Native, DomainId::X3Evm));
+
+            // Re-enable.
+            assert_ok!(AssetRegistry::set_route_enabled(
+                RuntimeOrigin::root(),
+                id,
+                DomainId::X3Native,
+                DomainId::X3Evm,
+                true,
+            ));
+            assert!(<Pallet<Test> as RouteInspect>::is_route_open(&id, DomainId::X3Native, DomainId::X3Evm));
+        });
+    }
+
+    #[test]
+    fn set_route_enabled_fails_for_nonexistent_route() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert_noop!(
+                AssetRegistry::set_route_enabled(
+                    RuntimeOrigin::root(),
+                    id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    false,
+                ),
+                Error::<Test>::UnknownAsset
+            );
+        });
+    }
+
+    // ── AssetRegistryInspect trait tests ──────────────────────────────────
+
+    #[test]
+    fn exists_returns_false_for_unknown() {
+        new_test_ext().execute_with(|| {
+            let fake_id = x3_asset_kernel_types::derive_asset_id(
+                DomainId::Ethereum, 1, b"\x00", b"FAKE", 6,
+            );
+            assert!(!<Pallet<Test> as AssetRegistryInspect>::exists(&fake_id));
+        });
+    }
+
+    #[test]
+    fn exists_returns_true_after_registration() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            assert!(<Pallet<Test> as AssetRegistryInspect>::exists(&id));
+        });
+    }
+
+    #[test]
+    fn supply_policy_is_stored_and_retrievable() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, _) = usdc_eth();
+            let id = Pallet::<Test>::do_register_asset(
+                sym, name, dec, dom, chain, addr, SupplyPolicy::NativeMintBurn,
+            ).unwrap();
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::supply_policy(&id),
+                Some(SupplyPolicy::NativeMintBurn)
+            );
+        });
+    }
+
+    #[test]
+    fn canonical_decimals_are_stored_and_retrievable() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, _, dom, chain, addr, policy) = usdc_eth();
+            let id =
+                Pallet::<Test>::do_register_asset(sym, name, 8, dom, chain, addr, policy).unwrap();
+            assert_eq!(
+                <Pallet<Test> as AssetRegistryInspect>::canonical_decimals(&id),
+                Some(8)
+            );
+        });
+    }
+
+    // ── AssetId determinism ────────────────────────────────────────────────
+
+    #[test]
+    fn same_inputs_produce_same_asset_id() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id1 = Pallet::<Test>::do_register_asset(
+                sym.clone(), name.clone(), dec, dom, chain, addr.clone(), policy,
+            ).unwrap();
+            // Duplicate registration fails, but the id is deterministic.
+            let computed =
+                x3_asset_kernel_types::derive_asset_id(dom, chain, &addr, &sym, dec);
+            assert_eq!(id1, computed);
+        });
+    }
+
+    #[test]
+    fn different_chains_produce_different_asset_ids() {
+        new_test_ext().execute_with(|| {
+            let id_eth = Pallet::<Test>::do_register_asset(
+                b"USDC".to_vec(), b"USD Coin".to_vec(), 6,
+                DomainId::Ethereum, 1, vec![0xA0; 20], SupplyPolicy::LockMint,
+            ).unwrap();
+            let id_base = Pallet::<Test>::do_register_asset(
+                b"USDC".to_vec(), b"USD Coin".to_vec(), 6,
+                DomainId::Base, 8453, vec![0x83; 20], SupplyPolicy::LockMint,
+            ).unwrap();
+            assert_ne!(id_eth, id_base);
+        });
+    }
+}

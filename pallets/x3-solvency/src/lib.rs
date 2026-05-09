@@ -38,7 +38,7 @@ pub mod pallet {
         BoundedVec,
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{BlakeTwo256, Hash};
+    use sp_runtime::traits::{BlakeTwo256, Hash, Saturating};
 
     // ──────────────────────────────────────────
     // Config
@@ -54,7 +54,7 @@ pub mod pallet {
 
         /// Maximum number of check-dimensions returned in a single SolvencyResult.
         #[pallet::constant]
-        type MaxChecksPerResult: Get<u32>;
+        type MaxChecksPerResult: Get<u32> + Clone + core::fmt::Debug;
 
         /// Quote is considered stale if older than this many blocks.
         #[pallet::constant]

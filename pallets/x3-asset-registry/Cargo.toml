@@ -42,3 +42,10 @@ try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
 ]
+
+[dev-dependencies]
+sp-io = { workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive"] }
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types" }

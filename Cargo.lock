@@ -12670,6 +12670,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-solvency"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-x3-inventory",
+ "pallet-x3-reservation",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "pallet-x3-supply-ledger"
 version = "0.1.0"
 dependencies = [
@@ -12738,6 +12755,23 @@ dependencies = [
  "sp-runtime",
  "sp-std 14.0.0",
  "x3-vrf",
+]
+
+[[package]]
+name = "pallet-x3-wallet"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+ "x3-wallet",
 ]
 
 [[package]]
@@ -26251,6 +26285,7 @@ dependencies = [
  "pallet-scheduler",
  "pallet-session",
  "pallet-sudo",
+ "pallet-svm",
  "pallet-swarm",
  "pallet-timestamp",
  "pallet-transaction-payment",
@@ -26267,15 +26302,20 @@ dependencies = [
  "pallet-x3-dex",
  "pallet-x3-domain-registry",
  "pallet-x3-invariants",
+ "pallet-x3-inventory",
  "pallet-x3-jury-anchor",
  "pallet-x3-kernel",
  "pallet-x3-oracle",
+ "pallet-x3-reservation",
  "pallet-x3-sequencer",
  "pallet-x3-settlement-engine",
+ "pallet-x3-slash",
+ "pallet-x3-solvency",
  "pallet-x3-supply-ledger",
  "pallet-x3-token-factory",
  "pallet-x3-verifier",
  "pallet-x3-vrf",
+ "pallet-x3-wallet",
  "parity-scale-codec",
  "quantum-crypto",
  "scale-info",
@@ -27341,6 +27381,7 @@ dependencies = [
  "hex",
  "parity-scale-codec",
  "parking_lot 0.12.5",
+ "scale-info",
  "serde",
  "sp-core",
  "sp-std 14.0.0",

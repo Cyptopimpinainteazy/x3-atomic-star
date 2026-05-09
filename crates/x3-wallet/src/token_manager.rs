@@ -1,9 +1,10 @@
 /// Token Manager — ERC-20-like token tracking and whitelist management
 /// Track balances, whitelist tokens, detect spam
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct Token {
     pub id: [u8; 32],
     pub address: [u8; 32],
@@ -16,7 +17,7 @@ pub struct Token {
     pub owner: [u8; 32],
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct TokenBalance {
     pub token_id: [u8; 32],
     pub holder: [u8; 32],
@@ -24,7 +25,7 @@ pub struct TokenBalance {
     pub last_updated_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct TokenWhitelist {
     pub id: [u8; 32],
     pub owner: [u8; 32],

@@ -12,6 +12,11 @@ use sp_runtime::{
     BuildStorage,
 };
 
+pub struct TestEmergencyHaltController;
+impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
+    fn trigger() {}
+}
+
 type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
@@ -63,8 +68,9 @@ impl pallet_balances::Config for Test {
     type WeightInfo = ();
     type FreezeIdentifier = ();
     type MaxFreezes = frame_support::traits::ConstU32<0>;
-    type MaxHolds = frame_support::traits::ConstU32<0>;
     type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = ();
+    type DoneSlashHandler = ();
 }
 
 impl pallet_timestamp::Config for Test {
@@ -111,6 +117,7 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeEvmEscrow = MockBridgeEvmEscrow;
     type BridgeSvmEscrow = MockBridgeSvmEscrow;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
+    type EmergencyHaltController = TestEmergencyHaltController;
 }
 
 impl pallet_x3_settlement_engine::Config for Test {
@@ -140,6 +147,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     pallet_balances::GenesisConfig::<Test> {
         balances: vec![(ALICE, 1_000_000), (BOB, 1_000_000)],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();

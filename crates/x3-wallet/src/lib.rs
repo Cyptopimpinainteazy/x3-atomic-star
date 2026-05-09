@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(unused, dead_code, deprecated)]
 
 // x3-wallet: Multi-featured wallet management system

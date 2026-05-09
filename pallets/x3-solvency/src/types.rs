@@ -100,7 +100,7 @@ pub struct SubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Pa
 }
 
 /// Context supplied by callers of `record_post_submission`.
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 pub struct PostSubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen>
 {
     pub reservation_id: ReservationId,
