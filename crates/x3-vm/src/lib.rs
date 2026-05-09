@@ -86,3 +86,13 @@ pub use jit_compiler::{CompiledFunction, HotPathTracker, JitCompiler, JitConfig,
 pub use verifier::{opcode_gas_cost, DecodedInstr, Verifier, VerifyOptions};
 pub use vm::{ExecutionResult, Frame, VMConfig, Value, VM};
 pub use x3_backend::bc_format::BytecodeModule;
+
+// X3VM sub-modules
+pub mod bytecode;
+pub mod events;
+pub mod gas;
+pub mod gpu;
+pub mod isolation;
+pub mod revert;
+pub mod state;
+pub mod storage;

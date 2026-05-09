@@ -692,6 +692,11 @@ impl GpuHostcalls {
         lib: &Option<Arc<Sha256Lib>>,
         args: &[Value],
     ) -> VMResult<Option<Value>> {
+        let count = args[1].as_i64()? as i32;
+        if count <= 0 {
+            return Ok(Some(Value::Bytes(vec![])));
+        }
+
         let lib = lib.as_ref().ok_or_else(|| {
             VMError::without_ip(VMErrorKind::HostcallError(
                 "GPU SHA-256 library not loaded".into(),
@@ -707,11 +712,6 @@ impl GpuHostcalls {
                 )))
             }
         };
-        let count = args[1].as_i64()? as i32;
-
-        if count <= 0 {
-            return Ok(Some(Value::Bytes(vec![])));
-        }
 
         let expected_len = count as usize * 32;
         if inputs.len() < expected_len {
@@ -739,6 +739,11 @@ impl GpuHostcalls {
         lib: &Option<Arc<Ed25519Lib>>,
         args: &[Value],
     ) -> VMResult<Option<Value>> {
+        let count = args[1].as_i64()? as i32;
+        if count <= 0 {
+            return Ok(Some(Value::Bytes(vec![])));
+        }
+
         let lib = lib.as_ref().ok_or_else(|| {
             VMError::without_ip(VMErrorKind::HostcallError(
                 "GPU Ed25519 library not loaded".into(),
@@ -754,11 +759,6 @@ impl GpuHostcalls {
                 )))
             }
         };
-        let count = args[1].as_i64()? as i32;
-
-        if count <= 0 {
-            return Ok(Some(Value::Bytes(vec![])));
-        }
 
         let expected_len = count as usize * 128;
         if sigs.len() < expected_len {
@@ -783,6 +783,12 @@ impl GpuHostcalls {
     }
 
     fn handle_poh_chain(lib: &Option<Arc<Sha256Lib>>, args: &[Value]) -> VMResult<Option<Value>> {
+        let num_chains = args[1].as_i64()? as i32;
+        let chain_length = args[2].as_i64()? as i32;
+        if num_chains <= 0 || chain_length <= 0 {
+            return Ok(Some(Value::Bytes(vec![])));
+        }
+
         let lib = lib.as_ref().ok_or_else(|| {
             VMError::without_ip(VMErrorKind::HostcallError(
                 "GPU SHA-256 library not loaded (needed for PoH)".into(),
@@ -798,12 +804,6 @@ impl GpuHostcalls {
                 )))
             }
         };
-        let num_chains = args[1].as_i64()? as i32;
-        let chain_length = args[2].as_i64()? as i32;
-
-        if num_chains <= 0 || chain_length <= 0 {
-            return Ok(Some(Value::Bytes(vec![])));
-        }
 
         let expected_len = num_chains as usize * 32;
         if seeds.len() < expected_len {

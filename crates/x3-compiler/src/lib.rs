@@ -96,3 +96,11 @@ pub use x3_opt::OptLevel as XOptLevel;
 
 // Re-export verifier types for gas analysis
 pub use x3_verifier::{FunctionGas, GasReport, SafetyRules, VerificationReport};
+
+// X3 compiler pipeline sub-modules (proof-gated feature set)
+pub mod abi;
+pub mod codegen;
+pub mod ir;
+pub mod optimizer;
+pub mod parser;
+pub mod typechecker;
