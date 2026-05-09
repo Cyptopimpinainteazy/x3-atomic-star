@@ -247,10 +247,10 @@ pub struct EvmExecutionSnapshot {
 }
 
 /// Mock EVM executor for testing (always succeeds)
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 pub struct MockEvmExecutor;
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 impl EvmExecutor for MockEvmExecutor {
     fn execute(
         &self,
@@ -326,7 +326,7 @@ impl EvmExecutor for MockEvmExecutor {
 }
 
 /// Compute state root from state changes for the mock executor.
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 fn compute_mock_state_root(changes: &[EvmStateChange]) -> [u8; 32] {
     use sp_io::hashing::blake2_256;
 

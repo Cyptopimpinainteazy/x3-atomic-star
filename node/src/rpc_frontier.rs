@@ -53,6 +53,56 @@ fn decode_address(s: &str) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned
     Ok(bytes)
 }
 
+fn parse_eth_block_param(value: Option<&serde_json::Value>, latest_block: u64) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
+    match value {
+        Some(serde_json::Value::String(s)) => {
+            if s == "latest" || s == "pending" {
+                return Ok(latest_block);
+            }
+            if s == "earliest" {
+                return Ok(0);
+            }
+            let stripped = s.strip_prefix("0x").unwrap_or(s);
+            u64::from_str_radix(stripped, 16)
+                .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid block number: {}", e), None::<()>))
+        }
+        Some(serde_json::Value::Number(n)) => n.as_u64().ok_or_else(|| {
+            jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid block number".to_string(), None::<()>)
+        }),
+        None => Ok(0),
+        _ => Err(jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            "Invalid block number type".to_string(),
+            None::<()>,
+        )),
+    }
+}
+
+fn parse_eth_log_filter_addresses(value: Option<&serde_json::Value>) -> Result<Option<Vec<[u8; 20]>>, jsonrpsee::types::ErrorObjectOwned> {
+    match value {
+        Some(serde_json::Value::String(s)) => {
+            let bytes = decode_address(s)?;
+            let mut addr = [0u8; 20];
+            addr.copy_from_slice(&bytes);
+            Ok(Some(vec![addr]))
+        }
+        Some(serde_json::Value::Array(array)) => {
+            let mut addresses = Vec::new();
+            for item in array {
+                let s = item.as_str().ok_or_else(|| {
+                    jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid address array entry".to_string(), None::<()>)
+                })?;
+                let bytes = decode_address(s)?;
+                let mut addr = [0u8; 20];
+                addr.copy_from_slice(&bytes);
+                addresses.push(addr);
+            }
+            Ok(Some(addresses))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
     let Some(raw_gas) = tx_obj.get("gas") else {
         return Ok(10_000_000);
@@ -471,30 +521,17 @@ where
     let c = client.clone();
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
-        let from_block = filter.get("fromBlock")
-            .and_then(|v| v.as_str())
-            .map(|s| {
-                let stripped = s.strip_prefix("0x").unwrap_or(s);
-                u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
-        let to_block = filter.get("toBlock")
-            .and_then(|v| v.as_str())
-            .map(|s| {
-                let stripped = s.strip_prefix("0x").unwrap_or(s);
-                u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid toBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
-        let address = filter.get("address")
-            .and_then(|v| v.as_str())
-            .map(decode_address)
-            .transpose()?;
+        let latest_block = c.info().best_number as u64;
+        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block)?;
+        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block)?;
+        let address_list = parse_eth_log_filter_addresses(filter.get("address"))?;
+        let filter_address = address_list.as_ref().and_then(|list| if list.len() == 1 { Some(list[0]) } else { None });
         // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
         // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
         let mut filter_bytes = Vec::new();
         filter_bytes.extend_from_slice(&from_block.to_le_bytes());
         filter_bytes.extend_from_slice(&to_block.to_le_bytes());
-        match address {
+        match filter_address {
             Some(addr) => {
                 filter_bytes.push(0x01); // Some tag
                 filter_bytes.extend_from_slice(&addr);
@@ -512,8 +549,13 @@ where
             .filter_map(|bytes| {
                 use codec::Decode;
                 let log = pallet_x3_kernel::ExecutionLog::decode(&mut &bytes[..]).ok()?;
-                // Filter logs based on block range
+                // Filter logs based on block range and optional address list
                 if log.block_number >= from_block && log.block_number <= to_block {
+                    if let Some(addresses) = &address_list {
+                        if !addresses.iter().any(|a| a.as_slice() == log.address.as_slice()) {
+                            return None;
+                        }
+                    }
                     Some(serde_json::json!({
                         "address": format!("0x{}", hex::encode(&log.address)),
                         "topics": log.topics.iter().map(|t| format!("0x{}", hex::encode(t.as_bytes()))).collect::<Vec<_>>(),
@@ -574,30 +616,18 @@ where
     let c = client.clone();
     module.register_method("x3_getEvmLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
-        let from_block = filter.get("fromBlock")
-            .and_then(|v| v.as_str())
-            .map(|s| {
-                let stripped = s.strip_prefix("0x").unwrap_or(s);
-                u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid fromBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
-        let to_block = filter.get("toBlock")
-            .and_then(|v| v.as_str())
-            .map(|s| {
-                let stripped = s.strip_prefix("0x").unwrap_or(s);
-                u64::from_str_radix(stripped, 16)
-                    .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Invalid toBlock: {}", e), None::<()>))
-            }).unwrap_or(Ok(0))?;
-        let address = filter.get("address")
-            .and_then(|v| v.as_str())
-            .map(decode_address)
-            .transpose()?;
+        let latest_block = c.info().best_number as u64;
+        let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block)?;
+        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block).unwrap_or(latest_block);
+        let address_list = parse_eth_log_filter_addresses(filter.get("address"))?;
+        let filter_address = address_list.as_ref().and_then(|list| if list.len() == 1 { Some(list[0]) } else { None });
+
         // Encode filter as SCALE tuple: (from_block: u64, to_block: u64, address: Option<[u8; 20]>)
         // SCALE encoding: u64 (8 bytes LE) + u64 (8 bytes LE) + Option tag (0x00/0x01) + [u8; 20] (if Some)
         let mut filter_bytes = Vec::new();
         filter_bytes.extend_from_slice(&from_block.to_le_bytes());
         filter_bytes.extend_from_slice(&to_block.to_le_bytes());
-        match address {
+        match filter_address {
             Some(addr) => {
                 filter_bytes.push(0x01); // Some tag
                 filter_bytes.extend_from_slice(&addr);
@@ -611,7 +641,19 @@ where
         let logs_bytes: Vec<Vec<u8>> = api
             .get_evm_logs(at, filter_bytes)
             .map_err(|e| jsonrpsee::types::ErrorObjectOwned::owned(-32603, format!("Runtime error: {:?}", e), None::<()>))?;
-        let logs: Vec<String> = logs_bytes.iter().map(|bytes| format!("0x{}", hex::encode(bytes))).collect();
+        let logs: Vec<String> = logs_bytes
+            .iter()
+            .filter_map(|bytes| {
+                if let Some(addresses) = &address_list {
+                    use codec::Decode;
+                    let log = pallet_x3_kernel::ExecutionLog::decode(&mut &bytes[..]).ok()?;
+                    if !addresses.iter().any(|a| a.as_slice() == log.address.as_slice()) {
+                        return None;
+                    }
+                }
+                Some(format!("0x{}", hex::encode(bytes)))
+            })
+            .collect();
         Ok(serde_json::json!({ "logs": logs }))
     })?;
 
@@ -1243,5 +1285,28 @@ mod tests {
         let tx = serde_json::json!({});
         let gas = parse_gas_limit(&tx).expect("default gas should be used");
         assert_eq!(gas, 10_000_000);
+    }
+
+    #[test]
+    fn parse_eth_block_param_handles_latest_and_hex() {
+        assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("latest".to_string())), 42).unwrap(), 42);
+        assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("pending".to_string())), 42).unwrap(), 42);
+        assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("earliest".to_string())), 42).unwrap(), 0);
+        assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("0x2a".to_string())), 42).unwrap(), 42);
+        assert_eq!(parse_eth_block_param(Some(&serde_json::Value::Number(serde_json::Number::from(123u64))), 42).unwrap(), 123);
+    }
+
+    #[test]
+    fn parse_eth_log_filter_addresses_supports_single_and_array() {
+        let single = serde_json::Value::String("0x1111111111111111111111111111111111111111".to_string());
+        let parsed_single = parse_eth_log_filter_addresses(Some(&single)).expect("should parse single address");
+        assert_eq!(parsed_single.unwrap().len(), 1);
+
+        let array = serde_json::Value::Array(vec![
+            serde_json::Value::String("0x1111111111111111111111111111111111111111".to_string()),
+            serde_json::Value::String("0x2222222222222222222222222222222222222222".to_string()),
+        ]);
+        let parsed_array = parse_eth_log_filter_addresses(Some(&array)).expect("should parse address array");
+        assert_eq!(parsed_array.unwrap().len(), 2);
     }
 }

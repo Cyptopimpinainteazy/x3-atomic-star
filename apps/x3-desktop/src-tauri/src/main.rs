@@ -24,7 +24,9 @@ const IPFS_LOCAL: &str = "http://127.0.0.1:5001";
 
 /// X3 chain node JSON-RPC endpoint (HTTP). Override with `X3_NODE_RPC` env var.
 fn node_rpc_url() -> String {
-  std::env::var("X3_NODE_RPC").unwrap_or_else(|_| "http://127.0.0.1:9944".to_string())
+  std::env::var("X3_NODE_RPC")
+    .or_else(|_| std::env::var("X3_RPC_ENDPOINT"))
+    .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string())
 }
 
 /// Perform a JSON-RPC 2.0 POST call and return the `result` field as a

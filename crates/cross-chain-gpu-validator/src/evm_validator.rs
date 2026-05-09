@@ -73,7 +73,7 @@ impl EvmHeaderValidator {
     fn validate_basic_fields(
         &self,
         block_number: u64,
-        block_hash: [u8; 32],
+        _block_hash: [u8; 32],
         state_root: [u8; 32],
         parent_hash: [u8; 32],
         gas_limit: u64,

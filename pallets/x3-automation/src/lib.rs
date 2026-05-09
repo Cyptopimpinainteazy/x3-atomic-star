@@ -28,10 +28,8 @@ pub mod pallet {
         BoundedVec,
     };
     use frame_system::pallet_prelude::*;
-    use parity_scale_codec::Encode;
-    use sp_core::H256;
     use sp_runtime::traits::{SaturatedConversion, Saturating};
-    use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
+    use x3_automation::{Action, Condition, Task, TaskId, TaskStatus};
     // Note: Would integrate with oracle pallet for price data
 
     /// Balance type alias
@@ -306,14 +304,13 @@ pub mod pallet {
     }
 }
 
-use frame_support::{ensure, pallet_prelude::DispatchResult, traits::{Currency, Get, ReservableCurrency}};
+use frame_support::{ensure, pallet_prelude::DispatchResult, traits::Get};
 use parity_scale_codec::Encode;
-use sp_std::vec::Vec;
 use sp_std::vec;
+use sp_std::vec::Vec;
 use sp_core::H256;
 use sp_runtime::{traits::SaturatedConversion, DispatchError};
 use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId};
-use pallet::BalanceOf;
 
 impl<T: pallet::Config> pallet::Pallet<T> {
     /// Generate a unique task ID
@@ -362,7 +359,7 @@ impl<T: pallet::Config> pallet::Pallet<T> {
     }
 
     /// Check if task condition is met
-    fn check_condition(task: &Task<T::AccountId, BalanceOf<T>>) -> bool {
+    fn check_condition(task: &Task<T::AccountId, pallet::BalanceOf<T>>) -> bool {
         match &task.condition {
             Condition::BlockNumber(target_block) => {
                 let current_block =
@@ -386,7 +383,7 @@ impl<T: pallet::Config> pallet::Pallet<T> {
 
     /// Execute task action
     fn execute_action(
-        task: &Task<T::AccountId, BalanceOf<T>>,
+        task: &Task<T::AccountId, pallet::BalanceOf<T>>,
     ) -> Result<ExecutionResult, DispatchError> {
         // Simplified execution - in production would dispatch to actual pallets
         match &task.action {
@@ -415,8 +412,8 @@ impl<T: pallet::Config> pallet::Pallet<T> {
 
     /// Clean up expired tasks (called by off-chain worker or governance)
     pub fn cleanup_expired_tasks() -> u32 {
-        let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
-        let mut cleaned = 0u32;
+        let _current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+        let cleaned = 0u32;
 
         // Simplified cleanup - in production would iterate all tasks
         // This is just a placeholder implementation

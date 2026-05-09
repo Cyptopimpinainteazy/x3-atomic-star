@@ -582,12 +582,16 @@ impl pallet_x3_automation::Config for Runtime {
 
 parameter_types! {
     pub const MaxValidators: u32 = 100;
+    /// Slash 10% of a validator's total balance per confirmed misbehavior.
+    pub const SlashFractionConsensus: sp_runtime::Perbill = sp_runtime::Perbill::from_percent(10);
 }
 
 impl pallet_x3_consensus::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
     type WeightInfo = pallet_x3_consensus::weights::SubstrateWeight<Runtime>;
+    type Currency = Balances;
+    type SlashFraction = SlashFractionConsensus;
 }
 
 type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
@@ -652,7 +656,7 @@ impl pallet_aura::Config for Runtime {
     type AuthorityId = sp_consensus_aura::sr25519::AuthorityId;
     type MaxAuthorities = MaxAuthorities;
     type DisabledValidators = ();
-    type AllowMultipleBlocksPerSlot = ConstBool<true>; // Enable multiple blocks per slot for higher TPS
+    type AllowMultipleBlocksPerSlot = ConstBool<false>; // Single block per slot: stable consensus for mainnet
     type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
 
@@ -673,7 +677,7 @@ impl pallet_session::Config for Runtime {
     type ValidatorIdOf = sp_runtime::traits::ConvertInto;
     type ShouldEndSession = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
     type NextSessionRotation = pallet_session::PeriodicSessions<ConstU32<600>, ConstU32<0>>;
-    type SessionManager = ();
+    type SessionManager = X3Consensus;
     type SessionHandler = <SessionKeys as sp_runtime::traits::OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
     type WeightInfo = pallet_session::weights::SubstrateWeight<Self>;
@@ -693,7 +697,7 @@ impl pallet_session::historical::Config for Runtime {
 impl pallet_offences::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
-    type OnOffenceHandler = ();
+    type OnOffenceHandler = X3Consensus;
 }
 
 impl pallet_balances::Config for Runtime {

@@ -79,14 +79,15 @@ proptest! {
         prop_assert_ne!(PacketCommitment::of(&p), PacketCommitment::of(&p2));
     }
 
-    /// Property: marking the **same** packet repeatedly is a no-op success.
-    /// Receivers may retry without poisoning the guard.
+    /// Property: once a packet is marked received, every subsequent submission
+    /// of the same sequence — same or different payload — is rejected.
+    /// On-chain effects are already applied; re-processing must never happen.
     #[test]
     fn replay_guard_idempotent_on_same_hash(p in arb_packet()) {
         let mut g = ReplayGuard::default();
         prop_assert!(g.mark_received(&p).is_ok());
-        prop_assert!(g.mark_received(&p).is_ok());
-        prop_assert!(g.mark_received(&p).is_ok());
+        prop_assert!(g.mark_received(&p).is_err());
+        prop_assert!(g.mark_received(&p).is_err());
         prop_assert_eq!(g.len(), 1);
     }
 

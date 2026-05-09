@@ -43,7 +43,7 @@ impl Default for LiveNodeConfig {
     fn default() -> Self {
         Self {
             endpoint: std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://rpc.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://rpc.x3chain.io".to_string()),
             timeout_ms: std::env::var("X3_TIMEOUT")
                 .unwrap_or_else(|_| "30000".to_string())
                 .parse()
@@ -72,6 +72,45 @@ pub struct LiveNodeDispatcher {
 }
 
 impl LiveNodeDispatcher {
+    #[cfg(feature = "std")]
+    fn http_rpc_endpoint(&self) -> String {
+        // reqwest::blocking::Client requires HTTP(S) URLs. Accept ws/wss
+        // env values and normalize them for JSON-RPC POST transport.
+        if let Some(rest) = self.config.endpoint.strip_prefix("ws://") {
+            return format!("http://{rest}");
+        }
+        if let Some(rest) = self.config.endpoint.strip_prefix("wss://") {
+            return format!("https://{rest}");
+        }
+        self.config.endpoint.clone()
+    }
+
+    #[cfg(feature = "std")]
+    fn parse_h160_env(var: &str) -> Option<[u8; 20]> {
+        let raw = std::env::var(var).ok()?;
+        let stripped = raw.trim().trim_start_matches("0x").trim_start_matches("0X");
+        let bytes = hex::decode(stripped).ok()?;
+        if bytes.len() != 20 {
+            return None;
+        }
+        let mut out = [0u8; 20];
+        out.copy_from_slice(&bytes);
+        Some(out)
+    }
+
+    #[cfg(feature = "std")]
+    fn parse_32_env(var: &str) -> Option<[u8; 32]> {
+        let raw = std::env::var(var).ok()?;
+        let stripped = raw.trim().trim_start_matches("0x").trim_start_matches("0X");
+        let bytes = hex::decode(stripped).ok()?;
+        if bytes.len() != 32 {
+            return None;
+        }
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&bytes);
+        Some(out)
+    }
+
     /// Create a new dispatcher with the given configuration
     pub fn new(config: LiveNodeConfig) -> Self {
         Self {
@@ -90,11 +129,11 @@ impl LiveNodeDispatcher {
     pub fn for_network(network: &str) -> Self {
         let endpoint = match network {
             "mainnet" => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://rpc.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://rpc.x3chain.io".to_string()),
             "testnet" => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://testnet.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://testnet.x3chain.io".to_string()),
             "local" | _ => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "ws://127.0.0.1:9944".to_string()),
+                .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string()),
         };
 
         Self::new(LiveNodeConfig {
@@ -154,7 +193,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         // The raw transaction is expected to be provided in the input parameter
         // as a hex-encoded RLP-encoded transaction
 
-        let endpoint = self.config.endpoint.clone();
+        let endpoint = self.http_rpc_endpoint();
         let hex_input = format!("0x{}", hex::encode(input));
 
         let body = serde_json::json!({
@@ -220,7 +259,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
         // Construct JSON-RPC svm_executeInstruction call
         // This matches the surface in node/src/rpc_frontier.rs
 
-        let endpoint = self.config.endpoint.clone();
+        let endpoint = self.http_rpc_endpoint();
         let hex_caller = format!("0x{}", hex::encode(caller));
         let hex_program = format!("0x{}", hex::encode(program_id));
         let hex_input_data = format!("0x{}", hex::encode(input));
@@ -333,7 +372,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     #[cfg(feature = "std")]
     fn get_evm_balance(&self, address: &[u8; 20]) -> u128 {
         // Query EVM balance via eth_getBalance RPC call using blocking client
-        let endpoint = self.config.endpoint.clone();
+        let endpoint = self.http_rpc_endpoint();
         let hex_address = format!("0x{}", hex::encode(address));
         let body = serde_json::json!({
             "jsonrpc": "2.0",
@@ -371,7 +410,7 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     #[cfg(feature = "std")]
     fn get_svm_balance(&self, pubkey: &[u8; 32]) -> u64 {
         // Query SVM balance via svm_getBalance RPC call using blocking client
-        let endpoint = self.config.endpoint.clone();
+        let endpoint = self.http_rpc_endpoint();
         let hex_pubkey = format!("0x{}", hex::encode(pubkey));
         let body = serde_json::json!({
             "jsonrpc": "2.0",
@@ -406,17 +445,39 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     }
 
     fn get_evm_bridge_escrow(&self) -> [u8; 20] {
-        // RPC plumbing not yet wired — returns zeroed address until live node integration.
-        // Callers must check for zero address before treating as a funded escrow.
-        log::warn!(target: "cross-vm-bridge", "get_evm_bridge_escrow: RPC plumbing not implemented, returning zero address");
-        [0u8; 20]
+        #[cfg(feature = "std")]
+        {
+            if let Some(addr) = Self::parse_h160_env("X3_EVM_ESCROW_ADDR") {
+                return addr;
+            }
+            log::warn!(
+                target: "cross-vm-bridge",
+                "get_evm_bridge_escrow: X3_EVM_ESCROW_ADDR not set/invalid, returning zero address"
+            );
+            [0u8; 20]
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            [0u8; 20]
+        }
     }
 
     fn get_svm_bridge_escrow(&self) -> [u8; 32] {
-        // RPC plumbing not yet wired — returns zeroed address until live node integration.
-        // Callers must check for zero address before treating as a funded escrow.
-        log::warn!(target: "cross-vm-bridge", "get_svm_bridge_escrow: RPC plumbing not implemented, returning zero address");
-        [0u8; 32]
+        #[cfg(feature = "std")]
+        {
+            if let Some(addr) = Self::parse_32_env("X3_SVM_ESCROW_ADDR") {
+                return addr;
+            }
+            log::warn!(
+                target: "cross-vm-bridge",
+                "get_svm_bridge_escrow: X3_SVM_ESCROW_ADDR not set/invalid, returning zero address"
+            );
+            [0u8; 32]
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            [0u8; 32]
+        }
     }
 }
 

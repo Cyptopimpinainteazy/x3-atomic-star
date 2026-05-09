@@ -3,7 +3,6 @@
 
 #![cfg_attr(any(not(feature = "std"), target_arch = "wasm32"), no_std)]
 
-use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 /// Error type for getrandom operations.

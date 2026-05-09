@@ -933,15 +933,15 @@ pub mod pallet {
                 let swap_via_liquidity = |_kind: x3_ixl::AssetKind,
                                           _asset_in: [u8; 32],
                                           _asset_out: [u8; 32],
-                                          amount_in: u128|
+                                          _amount_in: u128|
                  -> Result<u128, x3_ixl::IxlError> {
                     #[cfg(feature = "std")]
                     {
                         // RC-1 wiring: run LiquidityCore settlement bounds validation
                         // before exposing swap output to the IXL interpreter.
-                        x3_liquidity_core::settlement::Settlement::build(0, amount_in, amount_in)
+                        x3_liquidity_core::settlement::Settlement::build(0, _amount_in, _amount_in)
                             .map_err(|_| x3_ixl::IxlError::InvalidOperands)?;
-                        Ok(amount_in)
+                        Ok(_amount_in)
                     }
                     #[cfg(not(feature = "std"))]
                     {

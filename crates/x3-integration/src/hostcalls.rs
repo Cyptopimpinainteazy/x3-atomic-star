@@ -6,13 +6,10 @@
 //! - Cross-VM communication (EVM/SVM bridge)
 //! - Cryptographic primitives
 
-#[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
-
-use sp_core::H256;
-
 #[cfg(feature = "std")]
 use std::sync::Arc;
+#[cfg(feature = "std")]
+use sp_core::H256;
 
 /// Hostcall IDs for X3 VM
 pub mod hostcall_ids {

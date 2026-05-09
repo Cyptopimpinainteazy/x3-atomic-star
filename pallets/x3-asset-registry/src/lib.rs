@@ -24,6 +24,9 @@
 
 pub use pallet::*;
 
+#[cfg(test)]
+mod tests;
+
 #[allow(clippy::too_many_arguments)]
 #[frame_support::pallet]
 pub mod pallet {

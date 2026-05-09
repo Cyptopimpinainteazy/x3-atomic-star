@@ -13,8 +13,10 @@ pub mod registry;
 pub mod svm_validator;
 
 pub use error::ValidatorError;
+pub use evm_validator::{EvmHeaderValidator, EvmValidator};
 pub use kernels::{Keccak256Kernel, Secp256k1Kernel};
 pub use orchestrator::{AtomicSwapOrchestrator, SwapStatus};
+pub use svm_validator::{SvmHeaderValidator, SvmValidator};
 
 /// Core validator types and traits
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
