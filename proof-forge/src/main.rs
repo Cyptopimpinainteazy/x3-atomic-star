@@ -233,6 +233,10 @@ enum Commands {
         #[command(subcommand)]
         command: Option<FeaturesCommand>,
 
+        /// Strict mode (fail on any non-BUILT feature)
+        #[arg(short, long)]
+        strict: bool,
+
         /// Fail on blockers
         #[arg(long)]
         fail_hard: bool,
@@ -544,11 +548,15 @@ async fn main() -> Result<()> {
             run_gap_gate(&cli.workspace, &gate, fail_hard, cli.verbose).await?
         }
 
-        Commands::Features { command, fail_hard } => {
+        Commands::Features {
+            command,
+            strict,
+            fail_hard,
+        } => {
             match command {
                 None => {
                     // Default: run full feature gate
-                    feature_proof::run_feature_gate(&cli.workspace, fail_hard, cli.verbose)?;
+                    feature_proof::run_feature_gate(&cli.workspace, strict, fail_hard, cli.verbose)?;
                 }
                 Some(FeaturesCommand::List) => {
                     run_features_list(&cli.workspace, cli.verbose)?;

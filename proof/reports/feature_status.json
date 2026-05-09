@@ -3,9 +3,9 @@
   "total_features": 59,
   "built_count": 0,
   "partial_count": 1,
-  "missing_count": 1,
-  "unwired_count": 42,
-  "untested_count": 13,
+  "missing_count": 37,
+  "unwired_count": 12,
+  "untested_count": 7,
   "weak_count": 2,
   "stale_count": 0,
   "blocked_count": 0,
@@ -14,6 +14,9 @@
     {
       "feature_id": "x3.runtime",
       "name": "X3 Runtime Core",
+      "area": "runtime",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
       "docs_found": 0,
       "docs_missing": [
@@ -50,6 +53,9 @@
     {
       "feature_id": "x3.consensus",
       "name": "Consensus Mechanism",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -88,6 +94,9 @@
     {
       "feature_id": "x3.finality",
       "name": "Finality Gadget",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -125,13 +134,18 @@
     {
       "feature_id": "x3.validator_set",
       "name": "Validator Set Management",
-      "status": "UNTESTED",
+      "area": "staking",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/validators.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/staking/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -147,6 +161,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "1 negative tests missing",
         "proof receipt missing"
@@ -159,6 +174,9 @@
     {
       "feature_id": "x3.block_production",
       "name": "Block Production",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -196,13 +214,18 @@
     {
       "feature_id": "x3.fee_market",
       "name": "Fee Market",
-      "status": "UNTESTED",
+      "area": "transaction-payment",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/fees.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/transaction-payment/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -218,6 +241,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "1 negative tests missing",
         "proof receipt missing"
@@ -230,13 +254,18 @@
     {
       "feature_id": "x3.accounts",
       "name": "Account System",
-      "status": "UNTESTED",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/accounts.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/system/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -252,6 +281,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "1 negative tests missing",
         "proof receipt missing"
@@ -264,13 +294,18 @@
     {
       "feature_id": "x3.balances",
       "name": "Balance System",
-      "status": "UNTESTED",
+      "area": "balances",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/balances.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/balances/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -287,6 +322,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "2 negative tests missing",
         "proof receipt missing"
@@ -299,6 +335,9 @@
     {
       "feature_id": "x3.events",
       "name": "Event System",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "critical",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -336,6 +375,9 @@
     {
       "feature_id": "x3.errors",
       "name": "Error Handling System",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "critical",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -373,6 +415,9 @@
     {
       "feature_id": "x3.genesis_config",
       "name": "Genesis Configuration",
+      "area": "node",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -410,13 +455,19 @@
     {
       "feature_id": "x3.asset_kernel",
       "name": "Universal Asset Kernel",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
-      "docs_found": 1,
+      "docs_found": 0,
       "docs_missing": [
-        "docs/asset-kernel.md"
+        "docs/asset-kernel.md",
+        "pallets/x3-kernel/README.md"
       ],
-      "code_found": 2,
-      "code_missing": [],
+      "code_found": 1,
+      "code_missing": [
+        "crates/x3-asset-kernel/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [
         "canonical supply callable",
@@ -438,6 +489,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 wiring checks failed",
         "3 tests missing",
         "3 negative tests missing",
@@ -453,13 +505,18 @@
     {
       "feature_id": "x3.canonical_supply",
       "name": "Canonical Supply Tracker",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/canonical-supply.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/supply.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "supply tracker in asset kernel"
@@ -477,6 +534,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -490,13 +548,18 @@
     {
       "feature_id": "x3.asset_registry",
       "name": "Asset Registry",
-      "status": "UNTESTED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/asset-registry.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/registry.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -512,6 +575,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "1 negative tests missing",
         "proof receipt missing"
@@ -524,13 +588,18 @@
     {
       "feature_id": "x3.asset_mapping",
       "name": "Cross-VM Asset Mapping",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/asset-mapping.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/mapping.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "asset mapping in kernel"
@@ -548,6 +617,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -561,13 +631,18 @@
     {
       "feature_id": "x3.mint_burn_controller",
       "name": "Mint/Burn Controller",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/mint-burn.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/mint_burn.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "mint/burn controller in kernel"
@@ -586,6 +661,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "2 negative tests missing",
@@ -599,13 +675,18 @@
     {
       "feature_id": "x3.external_locked_accounting",
       "name": "External Locked Asset Accounting",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/external-locked.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/external_locked.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "external locked tracking in kernel"
@@ -623,6 +704,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -636,13 +718,18 @@
     {
       "feature_id": "x3.pending_transfer_accounting",
       "name": "Pending Transfer Accounting",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/pending-transfer.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/pending_transfer.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "pending transfer tracking in kernel"
@@ -660,6 +747,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -673,13 +761,18 @@
     {
       "feature_id": "x3.supply_invariant_guard",
       "name": "Supply Invariant Guard",
-      "status": "UNWIRED",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/supply-invariant.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/invariant.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "invariant guard in kernel"
@@ -697,6 +790,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -710,9 +804,14 @@
     {
       "feature_id": "x3.x3vm",
       "name": "X3VM Core",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-vm/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 1,
@@ -742,13 +841,18 @@
     {
       "feature_id": "x3.x3vm_bytecode",
       "name": "X3VM Bytecode Format",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/x3vm-bytecode.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/bytecode.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "bytecode parser in x3vm"
@@ -766,6 +870,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -779,13 +884,18 @@
     {
       "feature_id": "x3.x3vm_gas_metering",
       "name": "X3VM Gas Metering",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/x3vm-gas.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/gas.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "gas metering in x3vm"
@@ -803,6 +913,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -816,13 +927,18 @@
     {
       "feature_id": "x3.x3vm_storage",
       "name": "X3VM Storage Interface",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/x3vm-storage.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/storage.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "storage interface in x3vm"
@@ -840,6 +956,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -853,13 +970,18 @@
     {
       "feature_id": "x3.x3vm_events",
       "name": "X3VM Event Emission",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/x3vm-events.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/events.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "event emission in x3vm"
@@ -877,6 +999,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -890,13 +1013,18 @@
     {
       "feature_id": "x3.x3vm_revert",
       "name": "X3VM Revert Mechanism",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/x3vm-revert.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/revert.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "revert mechanism in x3vm"
@@ -914,6 +1042,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -927,13 +1056,18 @@
     {
       "feature_id": "x3.x3vm_cpu_gpu_parity",
       "name": "X3VM CPU/GPU Parity",
-      "status": "UNWIRED",
+      "area": "gpu",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/cpu-gpu-parity.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/gpu.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "GPU execution path exists"
@@ -951,6 +1085,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -964,9 +1099,14 @@
     {
       "feature_id": "x3.evm_adapter",
       "name": "EVM Adapter",
+      "area": "evm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/evm-integration/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 1,
@@ -996,9 +1136,14 @@
     {
       "feature_id": "x3.svm_adapter",
       "name": "SVM Adapter",
+      "area": "svm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/svm-integration/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 1,
@@ -1028,9 +1173,14 @@
     {
       "feature_id": "x3.cross_vm_router",
       "name": "Cross-VM Router",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/x3-cross-vm-router/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 1,
@@ -1061,13 +1211,18 @@
     {
       "feature_id": "x3.evm_precompiles",
       "name": "EVM Precompiles",
-      "status": "UNWIRED",
+      "area": "evm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/evm-precompiles.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/evm-integration/src/precompiles.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "precompiles in EVM adapter"
@@ -1085,6 +1240,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1098,13 +1254,18 @@
     {
       "feature_id": "x3.svm_syscalls",
       "name": "SVM Syscalls",
-      "status": "UNWIRED",
+      "area": "svm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/svm-syscalls.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/svm-integration/src/syscalls.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "syscalls in SVM adapter"
@@ -1122,6 +1283,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1135,13 +1297,18 @@
     {
       "feature_id": "x3.vm_isolation",
       "name": "VM Isolation Layer",
-      "status": "UNWIRED",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/vm-isolation.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/isolation.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "isolation layer in VM stack"
@@ -1159,6 +1326,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1172,13 +1340,18 @@
     {
       "feature_id": "x3.vm_state_transition",
       "name": "VM State Transition",
-      "status": "UNWIRED",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/vm-state-transition.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/state.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "state transition in x3vm"
@@ -1196,6 +1369,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1209,13 +1383,18 @@
     {
       "feature_id": "x3.vm_fallback",
       "name": "VM Fallback Mechanism",
-      "status": "UNWIRED",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/vm-fallback.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-cross-vm-router/src/fallback.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "fallback in cross-vm router"
@@ -1233,6 +1412,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1246,13 +1426,18 @@
     {
       "feature_id": "x3.vm_metering",
       "name": "Cross-VM Metering",
-      "status": "UNWIRED",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "docs/vm-metering.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-cross-vm-router/src/metering.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "metering in cross-vm router"
@@ -1270,6 +1455,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1283,11 +1469,18 @@
     {
       "feature_id": "x3.x3lang_parser",
       "name": "x3-lang Parser",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/parser.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/parser.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "parser in compiler"
@@ -1305,6 +1498,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1318,11 +1512,18 @@
     {
       "feature_id": "x3.x3lang_typechecker",
       "name": "x3-lang Type Checker",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/typechecker.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/typechecker.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "type checker in compiler"
@@ -1340,6 +1541,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1353,9 +1555,14 @@
     {
       "feature_id": "x3.x3lang_compiler",
       "name": "x3-lang Compiler",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 0,
@@ -1388,11 +1595,18 @@
     {
       "feature_id": "x3.x3lang_ir",
       "name": "x3-lang IR",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/ir.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/ir.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "IR in compiler"
@@ -1410,6 +1624,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1423,11 +1638,18 @@
     {
       "feature_id": "x3.x3lang_optimizer",
       "name": "x3-lang Optimizer",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "testnet",
+      "criticality": "high",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/optimizer.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/optimizer.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "optimizer in compiler"
@@ -1445,6 +1667,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1458,11 +1681,18 @@
     {
       "feature_id": "x3.x3lang_bytecode_generator",
       "name": "x3-lang Bytecode Generator",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/codegen.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/codegen.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "codegen in compiler"
@@ -1480,6 +1710,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1493,11 +1724,18 @@
     {
       "feature_id": "x3.x3lang_abi_generator",
       "name": "x3-lang ABI Generator",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/abi.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/abi.rs"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "ABI generator in compiler"
@@ -1515,6 +1753,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1528,9 +1767,14 @@
     {
       "feature_id": "x3.x3lang_stdlib",
       "name": "x3-lang Standard Library",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "critical",
       "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-stdlib/README.md"
+      ],
       "code_found": 1,
       "code_missing": [],
       "wiring_found": 0,
@@ -1563,6 +1807,9 @@
     {
       "feature_id": "x3.x3lang_contract_templates",
       "name": "x3-lang Contract Templates",
+      "area": "x3lang",
+      "required_for": "testnet",
+      "criticality": "medium",
       "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
@@ -1603,13 +1850,18 @@
     {
       "feature_id": "x3.contracts.evm_core",
       "name": "EVM Contract Core",
-      "status": "UNWIRED",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "X3-contracts/evm/README.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/contracts/core/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "EVM contracts deployable"
@@ -1627,6 +1879,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1640,6 +1893,9 @@
     {
       "feature_id": "x3.contracts.svm_core",
       "name": "SVM Program Core",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -1677,6 +1933,9 @@
     {
       "feature_id": "x3.contracts.shared_specs",
       "name": "Shared Contract Specs",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
       "status": "UNWIRED",
       "docs_found": 1,
       "docs_missing": [],
@@ -1712,6 +1971,9 @@
     {
       "feature_id": "x3.contracts.evm_svm_parity",
       "name": "EVM/SVM Parity Tests",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -1733,12 +1995,13 @@
         "parity_violation_caught"
       ],
       "receipt_exists": true,
-      "receipt_fresh": true,
+      "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
         "1 wiring checks failed",
         "2 tests missing",
-        "1 negative tests missing"
+        "1 negative tests missing",
+        "proof receipt stale"
       ],
       "next_commands": [
         "cargo test parity"
@@ -1747,13 +2010,19 @@
     {
       "feature_id": "x3.contracts.deployment",
       "name": "Contract Deployment System",
-      "status": "UNWIRED",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "X3-contracts/evm/script/README.md"
       ],
-      "code_found": 2,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/script/deploy/",
+        "X3-contracts/svm/migrations/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "deployment scripts work"
@@ -1771,6 +2040,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "2 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1784,13 +2054,18 @@
     {
       "feature_id": "x3.contracts.upgrade",
       "name": "Contract Upgrade System",
-      "status": "UNWIRED",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "X3-contracts/evm/script/upgrade.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/script/upgrade/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "upgrade scripts work"
@@ -1808,6 +2083,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1821,13 +2097,18 @@
     {
       "feature_id": "x3.contracts.event_schema",
       "name": "Contract Event Schema",
-      "status": "UNWIRED",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "X3-contracts/shared/schemas/events.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/shared/schemas/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "event schema validated"
@@ -1845,6 +2126,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1858,11 +2140,18 @@
     {
       "feature_id": "x3.contracts.security",
       "name": "Contract Security Framework",
-      "status": "UNWIRED",
-      "docs_found": 1,
-      "docs_missing": [],
-      "code_found": 1,
-      "code_missing": [],
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/evm/contracts/security/"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/contracts/security/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "security contracts deployed"
@@ -1880,6 +2169,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -1893,6 +2183,9 @@
     {
       "feature_id": "x3.bridge",
       "name": "Bridge Core",
+      "area": "bridge",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNTESTED",
       "docs_found": 0,
       "docs_missing": [
@@ -1928,6 +2221,9 @@
     {
       "feature_id": "x3.atomic_execution",
       "name": "Atomic Execution Engine",
+      "area": "atomic",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "WEAK",
       "docs_found": 0,
       "docs_missing": [
@@ -1963,13 +2259,18 @@
     {
       "feature_id": "x3.flashloan",
       "name": "Flashloan System",
-      "status": "UNTESTED",
+      "area": "flashloan",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "pallets/x3-flashloan/README.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-flashloan/src/lib.rs"
+      ],
       "wiring_found": 1,
       "wiring_missing": [],
       "tests_found": 0,
@@ -1986,6 +2287,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "2 tests missing",
         "2 negative tests missing",
         "proof receipt missing"
@@ -1998,6 +2300,9 @@
     {
       "feature_id": "x3.dex",
       "name": "DEX Core",
+      "area": "dex",
+      "required_for": "mainnet",
+      "criticality": "critical",
       "status": "PARTIAL",
       "docs_found": 0,
       "docs_missing": [
@@ -2032,6 +2337,9 @@
     {
       "feature_id": "x3.governance",
       "name": "Governance System",
+      "area": "governance",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "WEAK",
       "docs_found": 0,
       "docs_missing": [
@@ -2067,6 +2375,9 @@
     {
       "feature_id": "x3.proofforge_cli",
       "name": "ProofForge CLI",
+      "area": "proofforge",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
       "status": "UNWIRED",
       "docs_found": 0,
       "docs_missing": [
@@ -2104,13 +2415,18 @@
     {
       "feature_id": "x3.dashboard",
       "name": "Dashboard UI",
-      "status": "UNWIRED",
+      "area": "frontend",
+      "required_for": "testnet",
+      "criticality": "high",
+      "status": "MISSING",
       "docs_found": 0,
       "docs_missing": [
         "dashboard/README.md"
       ],
-      "code_found": 1,
-      "code_missing": [],
+      "code_found": 0,
+      "code_missing": [
+        "dashboard/src/"
+      ],
       "wiring_found": 0,
       "wiring_missing": [
         "dashboard accessible"
@@ -2128,6 +2444,7 @@
       "receipt_fresh": false,
       "critical_todos": 0,
       "blockers": [
+        "1 code files missing",
         "1 wiring checks failed",
         "2 tests missing",
         "1 negative tests missing",
@@ -2140,23 +2457,28 @@
     }
   ],
   "top_blockers": [
+    "x3.accounts: 1 code files missing",
     "x3.accounts: 1 negative tests missing",
     "x3.accounts: 2 tests missing",
     "x3.accounts: proof receipt missing",
+    "x3.asset_kernel: 1 code files missing",
     "x3.asset_kernel: 2 wiring checks failed",
     "x3.asset_kernel: 3 negative tests missing",
     "x3.asset_kernel: 3 tests missing",
     "x3.asset_kernel: proof receipt missing",
+    "x3.asset_mapping: 1 code files missing",
     "x3.asset_mapping: 1 negative tests missing",
     "x3.asset_mapping: 1 wiring checks failed",
     "x3.asset_mapping: 2 tests missing",
     "x3.asset_mapping: proof receipt missing",
+    "x3.asset_registry: 1 code files missing",
     "x3.asset_registry: 1 negative tests missing",
     "x3.asset_registry: 2 tests missing",
     "x3.asset_registry: proof receipt missing",
     "x3.atomic_execution: 2 negative tests missing",
     "x3.atomic_execution: 2 tests missing",
     "x3.atomic_execution: proof receipt missing",
+    "x3.balances: 1 code files missing",
     "x3.balances: 2 negative tests missing",
     "x3.balances: 2 tests missing",
     "x3.balances: proof receipt missing",
@@ -2167,6 +2489,7 @@
     "x3.bridge: 2 negative tests missing",
     "x3.bridge: 2 tests missing",
     "x3.bridge: proof receipt missing",
+    "x3.canonical_supply: 1 code files missing",
     "x3.canonical_supply: 1 negative tests missing",
     "x3.canonical_supply: 1 wiring checks failed",
     "x3.canonical_supply: 2 tests missing",
@@ -2177,18 +2500,12 @@
     "x3.consensus: proof receipt missing",
     "x3.contracts.deployment: 1 negative tests missing",
     "x3.contracts.deployment: 1 wiring checks failed",
+    "x3.contracts.deployment: 2 code files missing",
     "x3.contracts.deployment: 2 tests missing",
     "x3.contracts.deployment: proof receipt missing",
+    "x3.contracts.event_schema: 1 code files missing",
     "x3.contracts.event_schema: 1 negative tests missing",
     "x3.contracts.event_schema: 1 wiring checks failed",
-    "x3.contracts.event_schema: 2 tests missing",
-    "x3.contracts.event_schema: proof receipt missing",
-    "x3.contracts.evm_core: 1 negative tests missing",
-    "x3.contracts.evm_core: 1 wiring checks failed",
-    "x3.contracts.evm_core: 2 tests missing",
-    "x3.contracts.evm_core: proof receipt missing",
-    "x3.contracts.evm_svm_parity: 1 negative tests missing",
-    "x3.contracts.evm_svm_parity: 1 wiring checks failed",
-    "x3.contracts.evm_svm_parity: 2 tests missing"
+    "x3.contracts.event_schema: 2 tests missing"
   ]
 }

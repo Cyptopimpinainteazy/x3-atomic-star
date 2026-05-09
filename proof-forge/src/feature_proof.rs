@@ -116,6 +116,9 @@ pub struct FeatureMatrix {
 pub struct FeatureProofResult {
     pub feature_id: String,
     pub name: String,
+    pub area: String,
+    pub required_for: String,
+    pub criticality: String,
     pub status: FeatureStatus,
     pub docs_found: usize,
     pub docs_missing: Vec<String>,
@@ -411,6 +414,9 @@ impl FeatureScanner {
         Ok(FeatureProofResult {
             feature_id: feature.id.clone(),
             name: feature.name.clone(),
+            area: feature.owner_area.clone(),
+            required_for: feature.required_for.clone(),
+            criticality: feature.criticality.clone(),
             status,
             docs_found,
             docs_missing,
@@ -652,16 +658,65 @@ impl FeatureScanner {
         }
         md.push('\n');
 
+        let mut top_50_gaps: Vec<&FeatureProofResult> = report
+            .results
+            .iter()
+            .filter(|r| {
+                matches!(
+                    r.status,
+                    FeatureStatus::Missing
+                        | FeatureStatus::Partial
+                        | FeatureStatus::Unwired
+                        | FeatureStatus::Untested
+                )
+            })
+            .collect();
+        top_50_gaps.sort_by(|a, b| {
+            let ac = criticality_rank(&a.criticality);
+            let bc = criticality_rank(&b.criticality);
+            ac.cmp(&bc)
+                .then(status_rank(a.status).cmp(&status_rank(b.status)))
+                .then(a.feature_id.cmp(&b.feature_id))
+        });
+
+        md.push_str("## Top 50 Missing/Partial/Unwired/Untested Features\n");
+        md.push_str("| Feature | Area | Criticality | Status | Blockers |\n");
+        md.push_str("|---|---|---|---|---|\n");
+        for result in top_50_gaps.into_iter().take(50) {
+            let blockers = if result.blockers.is_empty() {
+                "none".to_string()
+            } else {
+                result.blockers.join(", ")
+            };
+            md.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                result.feature_id,
+                result.area,
+                result.criticality,
+                result.status.as_str(),
+                blockers
+            ));
+        }
+        md.push('\n');
+
         md.push_str("## Built Features\n");
-        md.push_str("| Feature | Status |\n");
-        md.push_str("|---|---|\n");
+        md.push_str("| Feature | Area | Status | Exact Files Proving Build |\n");
+        md.push_str("|---|---|---|---|\n");
         for result in &report.results {
             if result.status == FeatureStatus::Built {
+                let files = self.get_feature_evidence_files(&result.feature_id)?;
+                let joined = if files.is_empty() {
+                    "none".to_string()
+                } else {
+                    files.join(", ")
+                };
                 md.push_str(&format!(
-                    "| {} | {} {} |\n",
+                    "| {} | {} | {} {} | {} |\n",
                     result.feature_id,
+                    result.area,
                     result.status.emoji(),
-                    result.status.as_str()
+                    result.status.as_str(),
+                    joined
                 ));
             }
         }
@@ -697,7 +752,85 @@ impl FeatureScanner {
         }
         md.push('\n');
 
+        md.push_str("## Exact Commands Required To Prove Non-BUILT Features\n");
+        md.push_str("| Feature | Status | Next Commands |\n");
+        md.push_str("|---|---|---|\n");
+        for result in &report.results {
+            if result.status != FeatureStatus::Built {
+                let cmds = if result.next_commands.is_empty() {
+                    "none".to_string()
+                } else {
+                    result.next_commands.join(" ; ")
+                };
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    result.feature_id,
+                    result.status.as_str(),
+                    cmds
+                ));
+            }
+        }
+        md.push('\n');
+
+        md.push_str("## Exact Blockers Preventing Completion\n");
+        md.push_str("| Feature | Status | Blockers |\n");
+        md.push_str("|---|---|---|\n");
+        for result in &report.results {
+            if result.status != FeatureStatus::Built {
+                let blockers = if result.blockers.is_empty() {
+                    "none".to_string()
+                } else {
+                    result.blockers.join(" ; ")
+                };
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    result.feature_id,
+                    result.status.as_str(),
+                    blockers
+                ));
+            }
+        }
+        md.push('\n');
+
+        let mut burndown: Vec<&FeatureProofResult> = report
+            .results
+            .iter()
+            .filter(|r| r.status != FeatureStatus::Built)
+            .collect();
+        burndown.sort_by(|a, b| {
+            criticality_rank(&a.criticality)
+                .cmp(&criticality_rank(&b.criticality))
+                .then(status_rank(a.status).cmp(&status_rank(b.status)))
+                .then(a.feature_id.cmp(&b.feature_id))
+        });
+
+        md.push_str("## Burn-Down Order By Criticality\n");
+        md.push_str("| Order | Feature | Criticality | Status | Required For |\n");
+        md.push_str("|---:|---|---|---|---|\n");
+        for (idx, result) in burndown.iter().enumerate() {
+            md.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                idx + 1,
+                result.feature_id,
+                result.criticality,
+                result.status.as_str(),
+                result.required_for
+            ));
+        }
+        md.push('\n');
+
         Ok(md)
+    }
+
+    fn get_feature_evidence_files(&self, feature_id: &str) -> Result<Vec<String>> {
+        let matrix = self.load_matrix()?;
+        let files = matrix
+            .features
+            .iter()
+            .find(|f| f.id == feature_id)
+            .map(|f| f.code.clone())
+            .unwrap_or_default();
+        Ok(files)
     }
 
     /// Save report to files
@@ -717,7 +850,7 @@ impl FeatureScanner {
 }
 
 /// Run feature gate check
-pub fn run_feature_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Result<()> {
+pub fn run_feature_gate(workspace: &Path, strict: bool, fail_hard: bool, verbose: bool) -> Result<()> {
     println!("{}", "🔥 X3 FEATUREBUILTPROOF GATE".bold().red());
     println!();
 
@@ -754,13 +887,49 @@ pub fn run_feature_gate(workspace: &Path, fail_hard: bool, verbose: bool) -> Res
     println!("  - proof/reports/features_report.md");
     println!();
 
-    if fail_hard && (report.blocked_count > 0 || report.missing_count > 0) {
+    if strict && report.built_count != report.total_features {
         anyhow::bail!(
-            "Feature gate FAILED: {} blocked, {} missing",
+            "Feature gate FAILED (--strict): {} of {} features are not BUILT",
+            report.total_features - report.built_count,
+            report.total_features
+        );
+    }
+
+    if fail_hard
+        && (report.blocked_count > 0 || report.missing_count > 0 || report.revoked_count > 0)
+    {
+        anyhow::bail!(
+            "Feature gate FAILED (--fail-hard): {} blocked, {} missing, {} revoked",
             report.blocked_count,
-            report.missing_count
+            report.missing_count,
+            report.revoked_count
         );
     }
 
     Ok(())
+}
+
+fn criticality_rank(criticality: &str) -> usize {
+    match criticality.to_ascii_lowercase().as_str() {
+        "catastrophic" => 0,
+        "critical" => 1,
+        "high" => 2,
+        "medium" => 3,
+        "low" => 4,
+        _ => 5,
+    }
+}
+
+fn status_rank(status: FeatureStatus) -> usize {
+    match status {
+        FeatureStatus::Blocked => 0,
+        FeatureStatus::Missing => 1,
+        FeatureStatus::Unwired => 2,
+        FeatureStatus::Untested => 3,
+        FeatureStatus::Weak => 4,
+        FeatureStatus::Stale => 5,
+        FeatureStatus::Revoked => 6,
+        FeatureStatus::Partial => 7,
+        FeatureStatus::Built => 8,
+    }
 }
