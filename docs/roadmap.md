@@ -1,9 +1,9 @@
 # X3 Chain Roadmap
 
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)  
-**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0  
-**Commit:** `2e0c3bdac9de8b60`  
-**Last Updated:** 2026-05-02
+**Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED  
+**Current Evidence:** Mixed machine gate artifacts and unresolved proof gaps  
+**Canonical Evidence Page:** `docs/CURRENT_MAINNET_STATUS.md`  
+**Launch Path:** `docs/MAINNET_CANARY_PLAN.md`  
 
 > For post-RC-1 roadmap, see [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md)
 
@@ -11,9 +11,9 @@
 
 ## Current Position
 
-✅ **RC-1 LAUNCH GATE PASSED** — All 16/16 S0 claims verified
+⚠️ **RC-1 launch target is still planned, but launch authorization is not yet supported by current evidence.**
 
-**What's Shipped in RC-1:**
+**Planned RC-1 scope:**
 - X3Native, X3Evm, X3Svm internal domains
 - Internal cross-VM asset movement
 - Atomic bundle path (X3VM + IXL + Packet)
@@ -393,6 +393,6 @@
 
 *This roadmap is a living document that evolves based on market feedback, technical progress, and strategic opportunities. Last updated: 2026-05-02*
 
-**RC-1 Status:** ✅ GO FOR MAINNET  
+**RC-1 Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED  
 **Source:** [docs/CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md)  
 **Post-RC-1 Roadmap:** [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md)

@@ -91,7 +91,7 @@ X3 is not mainnet-ready unless all gates pass.
 - on-call handoff and escalation procedures are documented
 
 ### Documentation & Launch Support
-- launch instructions are published in `docs/MAINNET_LAUNCH_CHECKLIST.md` and `launch-gates/EXECUTION_GUIDE.md`
+- launch instructions are published in `docs/MAINNET_LAUNCH_CHECKLIST.md`, `docs/MAINNET_READINESS_CHECKLIST.md`, and `launch-gates/EXECUTION_GUIDE.md`
 - validator onboarding, bootstrap, and genesis ceremony docs are complete
 - wallet, explorer, and SDK launch readiness are tracked
 - post-launch support and post-mortem procedures are identified
@@ -99,6 +99,8 @@ X3 is not mainnet-ready unless all gates pass.
 
 ## Evidence and Coverage Links
 - `docs/MAINNET_LAUNCH_CHECKLIST.md`
+- `docs/MAINNET_READINESS_CHECKLIST.md`
+- `docs/MAINNET_CANARY_PLAN.md`
 - `launch-gates/EXECUTION_GUIDE.md`
 - `crates/x3-launch-validator/`
 - `tests_phase4/run-all.sh`

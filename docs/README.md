@@ -24,23 +24,25 @@ For the complete navigation structure, see **[master/INDEX.md](./master/INDEX.md
 
 ### Operations & Security
 
-- **[Mainnet Readiness](../00-START-HERE-MAINNET-READINESS.md)** - RC-1 launch status (GO, 100%)
-- **[Current Mainnet Status](./CURRENT_MAINNET_STATUS.md)** - Single source of truth
-- **[Security Gates](./SECURITY_GATES.md)** - Security verification gates
+- **[Mainnet Readiness](../00-START-HERE-MAINNET-READINESS.md)** - RC-1 launch status (BLOCKED / NOT VERIFIED)
+- **[Current Mainnet Status](./CURRENT_MAINNET_STATUS.md)** - Canonical evidence reconciliation page
+- **[Security Gates](./SECURITY_GATES.md)** - Proof gate architecture and artifact links
 
 ---
 
 ## 📖 About This Repository
 
 This documentation covers:
-- ✅ **Core blockchain** - 31 pallets, runtime, consensus
-- ✅ **Tri-VM system** - EVM, SVM, and native execution
-- ✅ **Development tools** - CLI, SDK, testing frameworks
-- ✅ **Deployment** - Local testnet, multi-server, production
-- ✅ **Security** - All ProofForge gates PASSED (16/16 S0 verified, 0 blockers)
+- ⚠️ **Core blockchain** - 31 pallets, runtime, consensus
+- ⚠️ **Tri-VM system** - EVM, SVM, and native execution
+- ⚠️ **Development tools** - CLI, SDK, testing frameworks
+- ⚠️ **Deployment** - Local testnet, multi-server, production
+- ⚠️ **Security** - ProofForge gate artifacts exist, but launch evidence remains inconsistent
 
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)
-**Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
+**Current Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED
+**Canonical Evidence Page:** `docs/CURRENT_MAINNET_STATUS.md`
+**Current Launch Plan:** `docs/MAINNET_CANARY_PLAN.md`
+**Latest Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
 
 ---
 

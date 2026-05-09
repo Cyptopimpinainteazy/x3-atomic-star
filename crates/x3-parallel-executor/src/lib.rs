@@ -6,7 +6,8 @@
 
 pub mod types;
 
-use sp_std::collections::btree_map::BTreeMap;
+use sp_io::hashing::blake2_256;
+use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
 use sp_std::vec::Vec;
 
 /// Parallel execution scheduler with conflict detection
@@ -47,7 +48,7 @@ impl ParallelExecutor {
         let execution_order = self.build_execution_order(&transactions, &conflicts)?;
 
         // Phase 4: Execute in parallel respecting dependencies
-        let results = self.execute_with_dependencies(execution_order)?;
+        let results = self.execute_with_dependencies(execution_order, &transactions)?;
 
         // Phase 5: Verify serial equivalence
         self.verify_serial_equivalence(&transactions, &results)?;
@@ -62,30 +63,30 @@ impl ParallelExecutor {
         conflicts: &[Conflict],
     ) -> Result<Vec<ExecutionBatch>, ExecutionError> {
         let mut batches = Vec::new();
-        let mut processed = std::collections::BTreeSet::new();
+        let mut processed = BTreeSet::new();
 
-        for (i, tx) in transactions.iter().enumerate() {
+        for i in 0..transactions.len() {
             if processed.contains(&i) {
                 continue;
             }
 
             let mut batch = Vec::new();
-            batch.push(tx.clone());
+            batch.push(i);
 
             // Add non-conflicting transactions to same batch
-            for (j, other_tx) in transactions.iter().enumerate() {
+            for j in 0..transactions.len() {
                 if i == j || processed.contains(&j) {
                     continue;
                 }
 
-                if !self.conflicts_with_batch(other_tx, &batch, conflicts) {
-                    batch.push(other_tx.clone());
+                if !self.conflicts_with_batch(j, &batch, conflicts) {
+                    batch.push(j);
                     processed.insert(j);
                 }
             }
 
             batches.push(ExecutionBatch {
-                transactions: batch,
+                transaction_indices: batch,
             });
             processed.insert(i);
         }
@@ -96,14 +97,14 @@ impl ParallelExecutor {
     /// Check if transaction conflicts with any in batch
     fn conflicts_with_batch(
         &self,
-        tx: &Transaction,
-        batch: &[Transaction],
+        tx_index: usize,
+        batch: &[usize],
         conflicts: &[Conflict],
     ) -> bool {
-        batch.iter().any(|batch_tx| {
+        batch.iter().any(|batch_index| {
             conflicts
                 .iter()
-                .any(|conflict| conflict.involves(tx.id, batch_tx.id))
+                .any(|conflict| conflict.involves(tx_index, *batch_index))
         })
     }
 
@@ -111,12 +112,13 @@ impl ParallelExecutor {
     fn execute_with_dependencies(
         &self,
         batches: Vec<ExecutionBatch>,
+        transactions: &[Transaction],
     ) -> Result<ExecutionResult, ExecutionError> {
         let mut results = ExecutionResult::new();
 
         for batch in batches {
             // Execute batch transactions in parallel
-            let batch_results = self.execute_batch(batch)?;
+            let batch_results = self.execute_batch(batch, transactions)?;
 
             // Merge results maintaining order
             for result in batch_results {
@@ -134,26 +136,60 @@ impl ParallelExecutor {
     fn execute_batch(
         &self,
         batch: ExecutionBatch,
+        transactions: &[Transaction],
     ) -> Result<Vec<TransactionResult>, ExecutionError> {
         // In parallel execution, we'd spawn tasks here
         // For now, simulate parallel execution
         batch
-            .transactions
+            .transaction_indices
             .into_iter()
-            .map(|tx| self.execute_transaction(tx))
+            .map(|index| self.execute_transaction(transactions[index].clone()))
             .collect()
     }
 
     /// Execute single transaction
     fn execute_transaction(&self, tx: Transaction) -> Result<TransactionResult, ExecutionError> {
-        // Transaction execution logic
-        // This would integrate with the IXL interpreter
+        let mut state_changes = Vec::new();
+        let mut events = Vec::new();
+
+        for instruction in tx.instructions.iter() {
+            match instruction.opcode {
+                0x01 => {
+                    events.push(Event {
+                        topic: b"read".to_vec(),
+                        data: instruction.operands.clone(),
+                    });
+                }
+                0x02 | 0x03 => {
+                    let key = Self::state_key_for_instruction(instruction);
+                    state_changes.push(StateChange {
+                        key,
+                        old_value: Vec::new(),
+                        new_value: instruction.operands.clone(),
+                    });
+                }
+                _ => {
+                    events.push(Event {
+                        topic: b"noop".to_vec(),
+                        data: instruction.operands.clone(),
+                    });
+                }
+            }
+        }
+
         Ok(TransactionResult {
             tx_id: tx.id,
             success: true,
-            state_changes: Vec::new(),
-            events: Vec::new(),
+            state_changes,
+            events,
         })
+    }
+
+    fn state_key_for_instruction(instruction: &Instruction) -> [u8; 32] {
+        let mut buffer = Vec::with_capacity(1 + instruction.operands.len());
+        buffer.push(instruction.opcode);
+        buffer.extend_from_slice(&instruction.operands);
+        blake2_256(&buffer)
     }
 
     /// Verify parallel results match serial execution
@@ -220,17 +256,18 @@ impl ConflictDetector {
         tx1_idx: usize,
         tx2_idx: usize,
     ) -> Option<Conflict> {
-        // Check for read-write conflicts
-        for write1 in &list1.writes {
-            if list2.reads.contains(write1) || list2.writes.contains(write1) {
-                return Some(Conflict::new(tx1_idx, tx2_idx, *write1));
+        if list1.conflicts_with(list2) {
+            // Pick a representative conflicting key for diagnostics.
+            for write in &list1.writes {
+                if list2.reads.contains(write) || list2.writes.contains(write) {
+                    return Some(Conflict::new(tx1_idx, tx2_idx, *write));
+                }
             }
-        }
 
-        // Check reverse direction
-        for write2 in &list2.writes {
-            if list1.reads.contains(write2) {
-                return Some(Conflict::new(tx1_idx, tx2_idx, *write2));
+            for write in &list2.writes {
+                if list1.reads.contains(write) {
+                    return Some(Conflict::new(tx1_idx, tx2_idx, *write));
+                }
             }
         }
 
@@ -247,13 +284,24 @@ impl AccessListBuilder {
     }
 
     /// Build access list for transaction
-    pub fn build_access_list(&self, _tx: &Transaction) -> AccessList {
-        // Analyze transaction instructions to determine state access
-        // This would integrate with IXL instruction analysis
-        AccessList {
-            reads: Vec::new(),  // State keys read by transaction
-            writes: Vec::new(), // State keys written by transaction
+    pub fn build_access_list(&self, tx: &Transaction) -> AccessList {
+        let mut reads = Vec::new();
+        let mut writes = Vec::new();
+
+        for instruction in tx.instructions.iter() {
+            let key = ParallelExecutor::state_key_for_instruction(instruction);
+            match instruction.opcode {
+                0x01 => reads.push(key),
+                0x02 => writes.push(key),
+                0x03 => {
+                    reads.push(key);
+                    writes.push(key);
+                }
+                _ => {}
+            }
         }
+
+        AccessList { reads, writes }
     }
 }
 
@@ -273,6 +321,29 @@ pub struct AccessList {
     pub writes: Vec<StateKey>,
 }
 
+impl AccessList {
+    pub fn conflicts_with(&self, other: &AccessList) -> bool {
+        let my_reads: BTreeSet<_> = self.reads.iter().collect();
+        let my_writes: BTreeSet<_> = self.writes.iter().collect();
+        let other_reads: BTreeSet<_> = other.reads.iter().collect();
+        let other_writes: BTreeSet<_> = other.writes.iter().collect();
+
+        for write in other_writes.iter() {
+            if my_reads.contains(write) || my_writes.contains(write) {
+                return true;
+            }
+        }
+
+        for write in my_writes.iter() {
+            if other_reads.contains(write) {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Conflict {
     pub tx1: usize,
@@ -285,15 +356,15 @@ impl Conflict {
         Self { tx1, tx2, key }
     }
 
-    pub fn involves(&self, _tx_id1: TransactionId, _tx_id2: TransactionId) -> bool {
-        // Convert indices to IDs for comparison
-        false // Simplified for now
+    pub fn involves(&self, tx_index1: usize, tx_index2: usize) -> bool {
+        self.tx1 == tx_index1 && self.tx2 == tx_index2
+            || self.tx1 == tx_index2 && self.tx2 == tx_index1
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ExecutionBatch {
-    pub transactions: Vec<Transaction>,
+    pub transaction_indices: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -320,12 +391,28 @@ impl ExecutionResult {
 
     pub fn merge(&mut self, result: TransactionResult) -> Result<(), ExecutionError> {
         self.results.push(result);
+        self.recalculate_state_hash();
         Ok(())
     }
 
     pub fn commit_batch(&mut self) -> Result<(), ExecutionError> {
-        // Update state hash based on results
         Ok(())
+    }
+
+    fn recalculate_state_hash(&mut self) {
+        let mut entropy = Vec::new();
+
+        for result in self.results.iter() {
+            entropy.extend_from_slice(&result.tx_id.to_le_bytes());
+            entropy.push(if result.success { 1 } else { 0 });
+            for state_change in result.state_changes.iter() {
+                entropy.extend_from_slice(&state_change.key);
+                entropy.extend_from_slice(&(state_change.new_value.len() as u32).to_le_bytes());
+                entropy.extend_from_slice(&state_change.new_value);
+            }
+        }
+
+        self.state_hash = blake2_256(&entropy);
     }
 
     pub fn final_state_hash(&self) -> [u8; 32] {
@@ -433,23 +520,12 @@ mod tests {
 
     #[test]
     fn test_execution_batch_creation() {
-        let transactions = vec![
-            Transaction {
-                id: 1,
-                instructions: vec![],
-            },
-            Transaction {
-                id: 2,
-                instructions: vec![],
-            },
-        ];
-
         let batch = ExecutionBatch {
-            transactions: transactions.clone(),
+            transaction_indices: vec![0, 1],
         };
-        assert_eq!(batch.transactions.len(), 2);
-        assert_eq!(batch.transactions[0].id, 1);
-        assert_eq!(batch.transactions[1].id, 2);
+        assert_eq!(batch.transaction_indices.len(), 2);
+        assert_eq!(batch.transaction_indices[0], 0);
+        assert_eq!(batch.transaction_indices[1], 1);
     }
 
     #[test]
@@ -675,9 +751,9 @@ mod tests {
     #[test]
     fn test_execution_batch_empty() {
         let batch = ExecutionBatch {
-            transactions: vec![],
+            transaction_indices: vec![],
         };
-        assert_eq!(batch.transactions.len(), 0);
+        assert_eq!(batch.transaction_indices.len(), 0);
     }
 
     #[test]

@@ -188,10 +188,10 @@ function createSiteServices(options) {
   const fetchImpl = options.fetchImpl || fetch;
 
   const benchmarkFiles = {
-    rpc: path.join(rootDir, "..", "cross-chain-gpu-validator", "benchmarks", "rpc_benchmark_report.json"),
-    live: path.join(rootDir, "..", "cross-chain-gpu-validator", "benchmarks", "live_benchmark_report.json"),
-    tps: path.join(rootDir, "..", "cross-chain-gpu-validator", "benchmarks", "tps_benchmark_results.json"),
-    crypto: path.join(rootDir, "..", "tests", "p4_benchmarks", "crypto_bench_report.json"),
+    rpc: path.join(rootDir, "..", "infra-structure", "validator", "benchmarks", "rpc_benchmark_report.json"),
+    live: path.join(rootDir, "..", "infra-structure", "validator", "benchmarks", "live_benchmark_report.json"),
+    tps: path.join(rootDir, "..", "infra-structure", "validator", "benchmarks", "tps_benchmark_results.json"),
+    crypto: path.join(rootDir, "..", "tests_core", "p4_benchmarks", "crypto_bench_report.json"),
   };
 
   async function statOrNull(filePath) {

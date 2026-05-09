@@ -1,8 +1,9 @@
 # X3 Chain Documentation Index
 
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)
-**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0
-**Commit:** `2e0c3bdac9de8b60`
+**Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED
+**Current Evidence:** Mixed machine gate artifacts and unresolved proof gaps
+**Canonical Evidence Page:** `docs/CURRENT_MAINNET_STATUS.md`
+**Current Launch Path:** `docs/MAINNET_CANARY_PLAN.md`
 
 ---
 

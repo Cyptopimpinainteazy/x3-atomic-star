@@ -222,7 +222,7 @@ Module Details:
 
 **Purpose:** Verify mainnet readiness
 
-**Status:** ✅ **GO FOR MAINNET RC-1** — 100% score achieved
+**Status:** ⚠️ MACHINE REPORT EXISTS, BUT MAINNET READINESS IS NOT AUTHORIZED
 
 **Location:** Scheduled GitHub Actions workflow
 
@@ -230,11 +230,10 @@ Module Details:
 
 **Scope:** Full production readiness verification
 
-**Results:**
-- Overall Score: **100%**
-- S0 Verified: **16/16**
-- Blockers: **0**
-- Decision: **GO**
+**Current Note:**
+- A machine-generated ProofForge report exists for commit `2e0c3bdac9de8b60`, but active gap/todo reports and stale artifact reconciliation do not support an authoritative launch decision.
+- Use `docs/CURRENT_MAINNET_STATUS.md` as the canonical evidence reconciliation page.
+- Use `docs/MAINNET_CANARY_PLAN.md` for a safe launch path and staged rollback strategy.
 
 **Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
 
@@ -255,20 +254,21 @@ Module Details:
 
 ### Current Status
 
-**Status:** ✅ GO FOR MAINNET RC-1  
-**Overall Score:** 100% (16/16 S0 verified)  
-**Commit:** `2e0c3bdac9de8b60`  
-**Date:** 2026-05-02
+**Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED  
+**Current Evidence:** Machine gate artifacts are inconsistent with active gap/todo reports  
+**Canonical Evidence Page:** `docs/CURRENT_MAINNET_STATUS.md`  
+**Current Launch Path:** `docs/MAINNET_CANARY_PLAN.md`  
 
 ```
-All ProofForge Security Gates: ✅ PASSED
-├─ S0 Blockers: 6/6 RESOLVED (S0-1 through S0-6)
-├─ S1 Blockers: 3/3 RESOLVED (S1-1, S1-2, S1-3)
+All ProofForge Security Gates: archived for reference
+├─ S0 Blockers: 6/6 RESOLVED (as of archived report)
+├─ S1 Blockers: 3/3 RESOLVED (as of archived report)
 └─ RC-1 Scope: LOCKED
 
-Launch Decision: GO
-Overall Score: 100%
-Blockers: 0
+Launch Decision: NOT AUTHORIZED BY CURRENT EVIDENCE
+Overall Score: N/A
+Blockers: ACTIVE
+```
 ```
 
 ---
@@ -607,5 +607,7 @@ Overall Score: 0.92 (was 0.94)
 ---
 
 **Last Updated:** 2026-05-02  
-**Status:** ✅ GO FOR MAINNET RC-1  
-**Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
+**Current Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED  
+**Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
+
+> This document preserves the gate architecture and archived security report, but current launch authority must be based on active evidence reconciliation in `docs/CURRENT_MAINNET_STATUS.md`.

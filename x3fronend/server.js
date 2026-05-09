@@ -45,11 +45,39 @@ function injectGlobalChrome(html) {
   return html;
 }
 
-async function serveStatic(requestUrl, response) {
-  // if we have a built React app, serve that first.
+function getSiteType(request, requestUrl) {
+  const forwardedHost = request.headers['x-forwarded-host'];
+  const hostHeader =
+    forwardedHost || request.headers.host || request.headers.Host || requestUrl.host || requestUrl.hostname || '';
+  const host = hostHeader.split(':')[0].toLowerCase();
+  if (host.endsWith('.net')) {
+    return 'legacy';
+  }
+  if (host.endsWith('.org') || host === 'localhost' || host === '127.0.0.1') {
+    return 'react';
+  }
+  return 'react';
+}
+
+async function serveStatic(request, requestUrl, response) {
+  const siteType = getSiteType(request, requestUrl);
+
   const distDir = path.join(rootDir, 'dist');
-  if (await fs.stat(distDir).catch(() => false)) {
-    // build exists
+  const hasDist = await fs.stat(distDir).catch(() => false);
+
+  // Legacy page paths should be served from the original root HTML, even when dist exists.
+  if (requestUrl.pathname === '/x3star-landing.html') {
+    const resolved = path.normalize(path.join(rootDir, 'x3star-landing.html'));
+    const file = await fs.readFile(resolved);
+    const body = Buffer.from(injectGlobalChrome(file.toString('utf8')), 'utf8');
+    response.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+    });
+    response.end(body);
+    return;
+  }
+
+  if (siteType === 'react' && hasDist) {
     const filePath = requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname;
     const resolvedDist = path.normalize(path.join(distDir, filePath));
     if (resolvedDist.startsWith(distDir)) {
@@ -62,7 +90,14 @@ async function serveStatic(requestUrl, response) {
         response.end(file);
         return;
       } catch (e) {
-        // fall through to legacy static
+        if (e.code === 'ENOENT') {
+          const indexFile = await fs.readFile(path.join(distDir, 'index.html'));
+          response.writeHead(200, {
+            'content-type': 'text/html; charset=utf-8',
+          });
+          response.end(indexFile);
+          return;
+        }
       }
     }
   }
@@ -232,7 +267,7 @@ function createServer() {
       const handled = await routeApi(request, response, requestUrl);
       if (handled) return;
     }
-    await serveStatic(requestUrl, response);
+    await serveStatic(request, requestUrl, response);
   });
 }
 

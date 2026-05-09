@@ -85,11 +85,49 @@ test("http server serves api contracts", async () => {
     const benchmarkBody = await benchmarkResponse.json();
     assert.ok(benchmarkBody.data.summary.ok >= 0);
 
-    const htmlResponse = await fetch(`http://127.0.0.1:${port}/x3star-landing.html`);
+    const htmlResponse = await fetch(`http://127.0.0.1:${port}/x3star-landing.html`, {
+      headers: { Host: "x3.net", "x-forwarded-host": "x3.net" },
+    });
     assert.equal(htmlResponse.status, 200);
     const htmlBody = await htmlResponse.text();
     assert.match(htmlBody, /x3-site-nav\.css/);
     assert.match(htmlBody, /x3-site-nav\.js/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("http server routes .org to the built React/Tauri app", async () => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  const port = server.address().port;
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/`, {
+      headers: { Host: "x3.org", "x-forwarded-host": "x3.org" },
+    });
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.match(body, /<title>X3STAR Frontend<\/title>/);
+    assert.match(body, /<div id="root"><\/div>/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("http server routes .net to legacy static HTML site", async () => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  const port = server.address().port;
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/`, {
+      headers: { Host: "x3.net", "x-forwarded-host": "x3.net" },
+    });
+    assert.equal(response.status, 200);
+    const body = await response.text();
+    assert.match(body, /<title>X3STAR — The Next-Generation Blockchain Infrastructure<\/title>/);
+    assert.match(body, /x3-site-nav\.css/);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
