@@ -31,7 +31,7 @@ const MIME_TYPES = {
 const server = http.createServer((req, res) => {
   // Normalize URL
   let pathname = decodeURIComponent(req.url);
-  if (pathname === '/') pathname = '/x3star-dashboard.html';
+  if (pathname === '/') pathname = '/x3star-index.html';
   if (!pathname.includes('.')) pathname += '.html';
 
   // Resolve file path
