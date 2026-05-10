@@ -164,7 +164,18 @@ pub async fn get_wallet_balance(chain_id: String, address: String) -> Result<Str
 }
 
 #[command]
-pub async fn submit_cross_swap(from_chain: String, to_chain: String, amount: String) -> Result<String, WalletError> {
+pub async fn submit_cross_swap(
+    wallet_address: String,
+    from_chain: String,
+    to_chain: String,
+    amount: String,
+) -> Result<String, WalletError> {
+    if wallet_address.trim().is_empty() {
+        return Err(WalletError::CryptoError(
+            "wallet_address is required to submit a cross-chain swap".to_string(),
+        ));
+    }
+
     let amount_in = amount
         .parse::<u128>()
         .map_err(|e| WalletError::CryptoError(format!("Invalid amount: {}", e)))?;
@@ -177,7 +188,7 @@ pub async fn submit_cross_swap(from_chain: String, to_chain: String, amount: Str
         "token_out": format!("0x{}", hex::encode(token_out)),
         "amount_in": amount_in.to_string(),
         "min_amount_out": amount_in.to_string(),
-        "wallet_id": format!("0x{}", hex::encode([0u8; 32])),
+        "wallet_id": wallet_address,
         "require_approval": false,
         "approval_threshold": "0",
     });
@@ -337,7 +348,18 @@ pub async fn retrieve_wallet_encrypted(wallet_id: String, master_password: Strin
         .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .retrieve_wallet(&wallet_id, &master_password)
-        .map(|(mnemonic, seed)| format!("{{\"wallet_id\": \"{}\", \"mnemonic\": \"{}\", \"seed\": \"{}\"}}", wallet_id, mnemonic, seed))
+        .map(|(mnemonic, seed)| {
+            // Build the JSON via `serde_json` so any quotes/backslashes in the
+            // wallet_id, mnemonic, or seed are escaped correctly. Using
+            // `format!()` here previously produced malformed JSON or could be
+            // exploited via injection through the user-supplied `wallet_id`.
+            serde_json::json!({
+                "wallet_id": wallet_id,
+                "mnemonic": mnemonic,
+                "seed": seed,
+            })
+            .to_string()
+        })
         .map_err(|e| format!("Failed to retrieve wallet: {}", e))
 }
 
@@ -368,7 +390,13 @@ pub async fn import_wallet_backup(backup: String) -> Result<String, String> {
         .map_err(|e| format!("Wallet store lock poisoned: {}", e))?;
     store
         .import_backup(&backup)
-        .map(|wallet_id| format!("{{\"wallet_id\": \"{}\", \"status\": \"imported\"}}", wallet_id))
+        .map(|wallet_id| {
+            serde_json::json!({
+                "wallet_id": wallet_id,
+                "status": "imported",
+            })
+            .to_string()
+        })
         .map_err(|e| format!("Failed to import wallet backup: {}", e))
 }
 

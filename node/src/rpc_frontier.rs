@@ -69,7 +69,8 @@ fn parse_eth_block_param(value: Option<&serde_json::Value>, latest_block: u64) -
         Some(serde_json::Value::Number(n)) => n.as_u64().ok_or_else(|| {
             jsonrpsee::types::ErrorObjectOwned::owned(-32603, "Invalid block number".to_string(), None::<()>)
         }),
-        None => Ok(0),
+        // Per Ethereum JSON-RPC spec, omitted block params default to "latest".
+        None => Ok(latest_block),
         _ => Err(jsonrpsee::types::ErrorObjectOwned::owned(
             -32603,
             "Invalid block number type".to_string(),
@@ -618,7 +619,7 @@ where
         let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
         let latest_block = c.info().best_number as u64;
         let from_block = parse_eth_block_param(filter.get("fromBlock"), latest_block)?;
-        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block).unwrap_or(latest_block);
+        let to_block = parse_eth_block_param(filter.get("toBlock"), latest_block)?;
         let address_list = parse_eth_log_filter_addresses(filter.get("address"))?;
         let filter_address = address_list.as_ref().and_then(|list| if list.len() == 1 { Some(list[0]) } else { None });
 
@@ -1294,6 +1295,16 @@ mod tests {
         assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("earliest".to_string())), 42).unwrap(), 0);
         assert_eq!(parse_eth_block_param(Some(&serde_json::Value::String("0x2a".to_string())), 42).unwrap(), 42);
         assert_eq!(parse_eth_block_param(Some(&serde_json::Value::Number(serde_json::Number::from(123u64))), 42).unwrap(), 123);
+    }
+
+    #[test]
+    fn parse_eth_block_param_defaults_missing_to_latest() {
+        // Per Ethereum JSON-RPC spec, both `fromBlock` and `toBlock` default to
+        // "latest" when omitted from a filter. This is what `eth_getLogs` /
+        // `x3_getEvmLogs` rely on so that a missing `toBlock` doesn't silently
+        // resolve to block 0 and return empty/stale ranges.
+        assert_eq!(parse_eth_block_param(None, 42).unwrap(), 42);
+        assert_eq!(parse_eth_block_param(None, 0).unwrap(), 0);
     }
 
     #[test]
