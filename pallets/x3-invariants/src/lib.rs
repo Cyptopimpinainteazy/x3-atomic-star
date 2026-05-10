@@ -775,6 +775,52 @@ pub mod pallet {
             }
             true
         }
+
+        /// Report a custom invariant violation from an external pallet.
+        ///
+        /// This supports cross-pallet enforcement without tight coupling to
+        /// every external runtime invariant source.
+        pub fn report_custom_invariant(
+            block: BlockNumberFor<T>,
+            invariant: InvariantKind,
+            observed: u128,
+            bound: u128,
+        ) {
+            ViolationCount::<T>::mutate(|c| *c = c.saturating_add(1));
+            Self::deposit_event(Event::InvariantViolated {
+                block,
+                invariant,
+                observed,
+                bound,
+            });
+            T::SecurityHook::emit(SecurityEvent::invariant_breach(
+                blake2_256(invariant.to_string().as_bytes()),
+                block,
+                ViolationCount::<T>::get(),
+            ));
+            if HaltOnViolation::<T>::get() {
+                Halted::<T>::put(true);
+                log::error!(
+                    target: "x3-invariants",
+                    "X3 INVARIANT VIOLATION: custom invariant {:?} observed {} bound {} (block {:?})",
+                    invariant,
+                    observed,
+                    bound,
+                    block,
+                );
+                frame_support::defensive!("x3-invariants: custom invariant violated");
+                Self::deposit_event(Event::ChainHaltRequested {
+                    block,
+                    invariant,
+                    observed,
+                    bound,
+                });
+                T::SecurityHook::emit(SecurityEvent::chain_halt_raised(
+                    block,
+                    ViolationCount::<T>::get(),
+                ));
+            }
+        }
     }
 
     // ── Counters written by other pallets ──────────────────────────────────────
@@ -850,6 +896,10 @@ pub enum InvariantKind {
     MaxProposalDepth,
     /// Custom invariant registered by an external pallet.
     Custom(u32),
+    /// Swarm capability budget exceeded.
+    CapabilityBudget,
+    /// Swarm capability kill-switch prevented execution.
+    CapabilityKillSwitch,
 }
 
 // ── InvariantReporter trait ───────────────────────────────────────────────────

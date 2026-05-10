@@ -28,6 +28,7 @@ sp-runtime = { workspace = true, default-features = false }
 sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-api = { workspace = true, default-features = false }
+pallet-x3-invariants = { path = "../x3-invariants", default-features = false }
 
 pallet-balances = { workspace = true, default-features = false }
 
@@ -50,6 +51,7 @@ std = [
     "sp-core/std",
     "sp-io/std",
     "sp-api/std",
+    "pallet-x3-invariants/std",
     "pallet-balances/std",
     "log/std",
 ]

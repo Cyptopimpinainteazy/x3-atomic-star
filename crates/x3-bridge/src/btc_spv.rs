@@ -258,7 +258,7 @@ fn combine_hashes(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
 fn bits_to_target(bits: u32) -> SpvResult<[u8; 32]> {
     // bits format: [exponent (1 byte)][mantissa (3 bytes)]
     let exponent = (bits >> 24) as u8;
-    let mantissa = bits & 0x00ffffff;
+    let mantissa = bits & 0x00ff_ffff;
 
     if exponent < 3 || exponent > 32 {
         return Err(SpvError::InvalidDifficultyRetarget);
@@ -266,10 +266,9 @@ fn bits_to_target(bits: u32) -> SpvResult<[u8; 32]> {
 
     let mut target = [0u8; 32];
     let mantissa_bytes = mantissa.to_be_bytes();
-
-    // Place mantissa in big-endian target representation.
-    // For exponent = 3, the mantissa occupies the least-significant 3 bytes.
     let shift = 32 - exponent as usize;
+
+    // Mantissa occupies three bytes. For exponent=32, it fills the first 3 bytes.
     target[shift..shift + 3].copy_from_slice(&mantissa_bytes[1..4]);
 
     Ok(target)
@@ -380,6 +379,7 @@ mod tests {
         // Example target for bits 0x207fffff
         let max_target = bits_to_target(0x207fffff).unwrap();
         assert_eq!(&max_target[0..3], &[0x7f, 0xff, 0xff]);
+        assert_eq!(&max_target[3..32], &[0u8; 29]);
 
         // Invalid exponent
         let invalid = bits_to_target(0x01000000);

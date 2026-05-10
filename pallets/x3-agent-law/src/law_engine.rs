@@ -33,10 +33,18 @@ impl PolicyEngine {
         context: &PolicyContext<T>,
     ) -> PolicyResult {
         match rule {
-            PolicyRule::CapabilityAllowed(_capabilities) => {
-                // TODO: Check if requested capability is in allowed list
-                // For now, pass (will be integrated with capability envelope)
-                PolicyResult::Pass
+            PolicyRule::CapabilityAllowed(capabilities) => {
+                if let Some(requested) = &context.requested_capability {
+                    if capabilities.iter().any(|c| c == requested) {
+                        PolicyResult::Pass
+                    } else {
+                        PolicyResult::Fail(ViolationType::CapabilityNotPermitted)
+                    }
+                } else {
+                    // No capability context available for this call.
+                    // Treat as unconstrained for non-capability actions.
+                    PolicyResult::Pass
+                }
             }
 
             PolicyRule::ReputationMinimum(min_rep) => {
@@ -103,13 +111,8 @@ pub struct PolicyContext<T: Config> {
     pub tasks_this_block: u32,
     /// Number of extrinsics from agent this epoch
     pub extrinsics_this_epoch: u32,
-    /// Other agents mentioned in this extrinsic (for collusion detection)
-    pub related_agents: Vec<T::AccountId>,
-    /// Current block number
-    pub current_block: T::BlockNumber,
-    /// Last block agent submitted an extrinsic
-    pub last_activity_block: T::BlockNumber,
-}
+        /// The requested capability for the current transaction, if identifiable.
+        pub requested_capability: Option<Vec<u8>>,
 
 #[cfg(test)]
 mod tests {

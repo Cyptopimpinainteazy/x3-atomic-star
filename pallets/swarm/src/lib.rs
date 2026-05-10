@@ -425,6 +425,22 @@ pub mod pallet {
         BudgetExceeded,
         /// Agent capability revoked or not found.
         CapabilityRevoked,
+        /// Agent budget was successfully deducted.
+        CapabilityBudgetDeducted {
+            agent: T::AccountId,
+            amount: BalanceOf<T>,
+            remaining: BalanceOf<T>,
+        },
+        /// Capability budget validation failed.
+        CapabilityBudgetExceeded {
+            agent: T::AccountId,
+            amount: BalanceOf<T>,
+            available: BalanceOf<T>,
+        },
+        /// Kill-switch prevented capability execution.
+        CapabilityKillSwitchHit {
+            agent: T::AccountId,
+        },
         /// Kill-switch activated for this agent.
         KillSwitchActive,
     }
@@ -1341,10 +1357,29 @@ pub mod pallet {
 
                 // Check budget availability
                 let available = envelope.budget.saturating_sub(envelope.spent);
-                ensure!(available >= amount, Error::<T>::BudgetExceeded);
+                if available < amount {
+                    Self::deposit_event(Event::CapabilityBudgetExceeded {
+                        agent: agent.clone(),
+                        amount,
+                        available,
+                    });
+                    InvariantsPallet::<T>::report_custom_invariant(
+                        frame_system::Pallet::<T>::block_number(),
+                        InvariantKind::CapabilityBudget,
+                        amount.saturated_into::<u128>(),
+                        available.saturated_into::<u128>(),
+                    );
+                    ensure!(available >= amount, Error::<T>::BudgetExceeded);
+                }
 
                 // Deduct from budget
                 envelope.spent = envelope.spent.saturating_add(amount);
+                let remaining = envelope.budget.saturating_sub(envelope.spent);
+                Self::deposit_event(Event::CapabilityBudgetDeducted {
+                    agent: agent.clone(),
+                    amount,
+                    remaining,
+                });
 
                 Ok(())
             })

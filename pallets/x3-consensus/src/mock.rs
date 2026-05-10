@@ -37,6 +37,7 @@ frame_support::construct_runtime!(
         Session: pallet_session,
         Aura: pallet_aura,
         Grandpa: pallet_grandpa,
+        Offences: pallet_offences,
         Consensus: crate,
     }
 );
@@ -137,6 +138,12 @@ impl pallet_grandpa::Config for Test {
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = frame_support::traits::ConstU64<0>;
     type MaxNominators = frame_support::traits::ConstU32<0>;
+}
+
+impl pallet_offences::Config for Test {
+    type RuntimeEvent = RuntimeEvent;
+    type IdentificationTuple = (u64, ());
+    type OnOffenceHandler = Consensus;
 }
 
 pub struct MockWeightInfo;

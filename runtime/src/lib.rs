@@ -84,14 +84,17 @@ use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
 use sp_api::impl_runtime_apis;
 use sp_core::{OpaqueMetadata, H256, U256};
+use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     traits::{
         AccountIdConversion, AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify,
     },
-    MultiAddress, MultiSignature, Perbill,
+    transaction_validity::{InvalidTransaction, TransactionValidityError},
+    DispatchError, MultiAddress, MultiSignature, Perbill,
 };
-use sp_session::{GetSessionNumber, GetValidatorCount};
+use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
+use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 
 #[cfg(feature = "frontier")]
@@ -115,6 +118,95 @@ pub const WASM_BINARY: Option<&[u8]> = None;
 pub const WASM_BINARY_BLOATY: Option<&[u8]> = None;
 
 /// Opaque types used by the CLI commands.
+pub struct X3EquivocationReportSystem;
+
+impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber>, MembershipProof)>
+    for X3EquivocationReportSystem
+{
+    type Longevity = ConstU64<128>;
+
+    fn publish_evidence(
+        _evidence: (EquivocationProof<Hash, BlockNumber>, MembershipProof),
+    ) -> Result<(), ()> {
+        // Allow GRANDPA to publish unsigned equivocation reports.
+        // The proof is still validated later by `check_evidence` and `process_evidence`.
+        Ok(())
+    }
+
+    fn check_evidence(
+        evidence: (EquivocationProof<Hash, BlockNumber>, MembershipProof),
+    ) -> Result<(), TransactionValidityError> {
+        let (equivocation_proof, key_owner_proof) = evidence;
+        let key = (KEY_TYPE, equivocation_proof.offender().clone());
+        let offender = pallet_session::historical::Pallet::<Runtime>::
+            check_proof(key, key_owner_proof)
+            .ok_or(InvalidTransaction::BadProof)?;
+
+        let time_slot = pallet_grandpa::TimeSlot {
+            set_id: equivocation_proof.set_id(),
+            round: equivocation_proof.round(),
+        };
+
+        if Offences::is_known_offence(&[offender], &time_slot) {
+            Err(InvalidTransaction::Stale.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn process_evidence(
+        reporter: Option<AccountId>,
+        evidence: (EquivocationProof<Hash, BlockNumber>, MembershipProof),
+    ) -> Result<(), DispatchError> {
+        let (equivocation_proof, key_owner_proof) = evidence;
+        let reporter = reporter.into_iter().collect::<Vec<_>>();
+
+        if !sp_consensus_grandpa::check_equivocation_proof(equivocation_proof.clone()) {
+            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into())
+        }
+
+        let offender = pallet_session::historical::Pallet::<Runtime>::
+            check_proof((KEY_TYPE, equivocation_proof.offender().clone()), key_owner_proof)
+            .ok_or(pallet_grandpa::Error::<Runtime>::InvalidKeyOwnershipProof)?;
+
+        let set_id = equivocation_proof.set_id();
+        let round = equivocation_proof.round();
+        let session_index = key_owner_proof.session();
+        let validator_set_count = key_owner_proof.validator_count();
+
+        let previous_set_id_session_index = if set_id != 0 {
+            Some(
+                pallet_grandpa::SetIdSession::<Runtime>::get(set_id - 1)
+                    .ok_or(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof)?,
+            )
+        } else {
+            None
+        };
+
+        let set_id_session_index = pallet_grandpa::SetIdSession::<Runtime>::
+            get(set_id)
+            .ok_or(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof)?;
+
+        if session_index > set_id_session_index
+            || previous_set_id_session_index
+                .map(|previous_index| session_index <= previous_index)
+                .unwrap_or(false)
+        {
+            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into())
+        }
+
+        let offence = pallet_grandpa::EquivocationOffence {
+            time_slot: pallet_grandpa::TimeSlot { set_id, round },
+            session_index,
+            offender,
+            validator_set_count,
+        };
+
+        Offences::report_offence(reporter, offence)
+            .map_err(|_| pallet_grandpa::Error::<Runtime>::DuplicateOffenceReport.into())
+    }
+}
+
 pub mod opaque {
     use super::*;
 
@@ -773,8 +865,8 @@ impl pallet_aura::Config for Runtime {
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type KeyOwnerProof = sp_core::Void;
-    type EquivocationReportSystem = ();
+    type KeyOwnerProof = MembershipProof;
+    type EquivocationReportSystem = X3EquivocationReportSystem;
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
@@ -808,7 +900,7 @@ impl pallet_session::historical::Config for Runtime {
 impl pallet_offences::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
-    type OnOffenceHandler = ();
+    type OnOffenceHandler = X3Consensus;
 }
 
 impl pallet_balances::Config for Runtime {
@@ -3618,20 +3710,23 @@ impl_runtime_apis! {
         }
 
         fn submit_report_equivocation_unsigned_extrinsic(
-            _equivocation_proof: sp_consensus_grandpa::EquivocationProof<
+            equivocation_proof: sp_consensus_grandpa::EquivocationProof<
                 <Block as BlockT>::Hash,
                 sp_runtime::traits::NumberFor<Block>,
             >,
-            _key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
+            key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
         ) -> Option<()> {
-            None
+            Grandpa::submit_report_equivocation_unsigned_extrinsic(
+                equivocation_proof,
+                key_owner_proof,
+            )
         }
 
         fn generate_key_ownership_proof(
-            _set_id: sp_consensus_grandpa::SetId,
-            _authority_id: sp_consensus_grandpa::AuthorityId,
+            set_id: sp_consensus_grandpa::SetId,
+            authority_id: sp_consensus_grandpa::AuthorityId,
         ) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
-            None
+            Grandpa::generate_key_ownership_proof(set_id, authority_id)
         }
     }
 

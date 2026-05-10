@@ -19,7 +19,8 @@ pub mod pallet {
     use crate::weights::WeightInfo as _;
     use frame_support::{pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::Saturating;
+    use sp_runtime::{traits::Saturating, Perbill};
+    use sp_staking::offence::OffenceDetails;
     use sp_std::vec::Vec;
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -134,6 +135,17 @@ pub mod pallet {
         pub is_active: bool,
     }
 
+    /// Trait to convert a consensus identification tuple into the underlying validator account.
+    pub trait IdentificationToAccountId<AccountId> {
+        fn validator_account(&self) -> &AccountId;
+    }
+
+    impl<AccountId, Extra> IdentificationToAccountId<AccountId> for (AccountId, Extra) {
+        fn validator_account(&self) -> &AccountId {
+            &self.0
+        }
+    }
+
     /// Consensus information snapshot. Authorities are stored as encoded bytes to keep the
     /// snapshot type stable across runtime upgrades that may change Aura/Grandpa authority types.
     #[derive(
@@ -225,39 +237,31 @@ pub mod pallet {
         ) -> DispatchResult {
             let _reporter = ensure_signed(origin)?;
 
-            // Look up the validator's current stake record.
-            let mut info = ValidatorStake::<T>::get(&validator)
-                .ok_or(Error::<T>::ValidatorNotFound)?;
-
-            // Compute slash: SlashFraction bps of the current stake.
-            let slash_bps = T::SlashFraction::get() as u128;
-            let slash_amount = info.stake.saturating_mul(slash_bps) / 10_000;
-            let min_remaining = T::MinStakeAfterSlash::get();
-
-            // Apply the slash, floored at MinStakeAfterSlash.
-            let new_stake = info.stake.saturating_sub(slash_amount).max(min_remaining);
-            let actual_slash = info.stake.saturating_sub(new_stake);
-            info.stake = new_stake;
-
-            // Deactivate the validator when it hits the minimum stake floor.
-            if new_stake <= min_remaining {
-                info.is_active = false;
-            }
-
-            ValidatorStake::<T>::insert(&validator, &info);
-
-            Self::deposit_event(Event::ValidatorSlashed { validator: validator.clone(), reason });
-            Self::deposit_event(Event::SlashApplied {
-                validator,
-                slash_amount: actual_slash,
-                new_stake,
-            });
+            let slash_fraction = Perbill::from_parts(T::SlashFraction::get().saturating_mul(100_000));
+            Self::slash_validator(&validator, reason, slash_fraction);
 
             Ok(())
         }
     }
 
-    #[pallet::hooks]
+    impl<T: Config> pallet_offences::OnOffenceHandler<T::AccountId, T::IdentificationTuple, Weight>
+        for Pallet<T>
+    where
+        T::IdentificationTuple: IdentificationToAccountId<T::AccountId> + Clone,
+    {
+        fn on_offence(
+            offenders: &[OffenceDetails<T::AccountId, T::IdentificationTuple>],
+            slash_fraction: &[Perbill],
+            _session: sp_staking::SessionIndex,
+        ) -> Weight {
+            for (offence, fraction) in offenders.iter().zip(slash_fraction.iter()) {
+                let validator = offence.offender.validator_account().clone();
+                Self::slash_validator(&validator, SlashReason::Equivocation, *fraction);
+            }
+            Weight::zero()
+        }
+    }
+
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
             // Check if we need to activate a new validator set
@@ -314,6 +318,33 @@ pub mod pallet {
         /// Check if account is a validator
         pub fn is_validator(who: &T::AccountId) -> bool {
             Validators::<T>::get().contains(who)
+        }
+
+        /// Slash a validator by a dynamic perbill fraction.
+        pub fn slash_validator(
+            validator: &T::AccountId,
+            reason: SlashReason,
+            slash_fraction: Perbill,
+        ) {
+            if let Some(mut info) = ValidatorStake::<T>::get(validator) {
+                let slash_amount = slash_fraction * info.stake;
+                let min_remaining = T::MinStakeAfterSlash::get();
+                let new_stake = info.stake.saturating_sub(slash_amount).max(min_remaining);
+                let actual_slash = info.stake.saturating_sub(new_stake);
+                info.stake = new_stake;
+
+                if new_stake <= min_remaining {
+                    info.is_active = false;
+                }
+
+                ValidatorStake::<T>::insert(validator, &info);
+                Self::deposit_event(Event::ValidatorSlashed { validator: validator.clone(), reason });
+                Self::deposit_event(Event::SlashApplied {
+                    validator: validator.clone(),
+                    slash_amount: actual_slash,
+                    new_stake,
+                });
+            }
         }
     }
 

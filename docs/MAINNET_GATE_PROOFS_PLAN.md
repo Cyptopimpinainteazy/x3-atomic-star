@@ -15,9 +15,14 @@ Current repo evidence indicates the mainnet readiness gate is blocked.
 
 Key blockers:
 - `proof/reports/gap_gate_mainnet_20260426_194429.txt` reports 113 gaps, including 24 S0 blockers.
-- Proof receipt coverage is incomplete for catastrophic claims such as bridge replay/finality, atomic rollback safety, X3VM determinism, governance proof-gated upgrades, and receipt integrity.
-- `proof/reports/features_report.md` and `proof/reports/feature_status.json` report 0 built, 37 missing, 12 unwired, 7 untested.
-- Readiness report artifacts are stale or placeholder outputs.
+- `proof/reports/features_report.md` reports:
+  - 0 built
+  - 37 missing
+  - 12 unwired
+  - 7 untested
+  - 2 weak
+- Catastrophic claims are missing proof receipts for core features including runtime, consensus, finality, validator set, asset kernel, bridge, cross-VM execution, and X3VM.
+- Several readiness artifacts are stale or remain placeholder coverage instead of fresh evidence.
 
 ## 3. Mainnet Gate Scope
 
@@ -103,6 +108,7 @@ A valid mainnet gate must prove coverage for every feature in the repo across th
    - `cargo clippy --workspace --all-targets -- -D warnings`
    - `cargo check --workspace`
    - `cargo test --workspace --lib --tests -- --test-threads=1`
+   - verify proof artifact freshness by inspecting `proof/reports/features_report.md` and `proof/reports/gap_gate_mainnet_*.txt`
 2. Re-run the mainnet gate proof pipeline:
    - `bash launch-gates/multi-node-testnet-proof.sh`
    - `bash launch-gates/verify-p0-blockers.sh`
@@ -113,6 +119,7 @@ A valid mainnet gate must prove coverage for every feature in the repo across th
    - regenerate `proof/reports/todo_gate_mainnet_*.txt`
    - regenerate `proof/reports/features_report.md`
    - refresh `reports/mainnet_rc_report.md`
+   - publish updated proof receipts under `proof/receipts/claims/`
 4. Verify canonical docs and reports are consistent:
    - `docs/CURRENT_MAINNET_STATUS.md`
    - `docs/MAINNET_READINESS_CHECKLIST.md`
@@ -120,9 +127,9 @@ A valid mainnet gate must prove coverage for every feature in the repo across th
    - `.x3/X3_MAINNET_GATES.md`
    - `reports/testnet_readiness_report.md`
 5. Close the highest-severity proof gaps first:
-   - fix S0 gaps from `gap_gate_mainnet_*.txt`
-   - generate missing proof receipts for catastrophic claims
-   - remove stale placeholder report artifacts
+   - fix S0 gaps from `proof/reports/gap_gate_mainnet_*.txt`
+   - prove and publish missing receipts for catastrophic claims
+   - remove stale or placeholder report artifacts and replace them with regenerated evidence
 
 ## 6. Feature-Level Proof Checklist
 
@@ -162,3 +169,5 @@ That artifact should include:
 ## 9. Notes
 
 This repo already contains the gate framework and a formal proof-runner path. The remaining work is not a new requirements spec — it is a disciplined, evidence-first execution run and remediation of the failing proof subjects.
+
+Current evidence shows the mainnet gate remains blocked. The path forward is to complete the missing build/test proofs, close the `proof/reports/features_report.md` blockers, and regenerate all proof receipts and gap reports from a fresh clean execution.

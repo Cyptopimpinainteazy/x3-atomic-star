@@ -94,6 +94,7 @@ where
             reputation_score,
             tasks_this_block,
             extrinsics_this_epoch,
+            requested_capability: Self::extract_requested_capability(_call),
             related_agents,
             current_block,
             last_activity_block: current_block,
@@ -170,6 +171,14 @@ impl AgentLawCheck {
             // Same epoch, return current count
             ExtrinsicCountThisEpoch::<T>::get(agent)
         }
+    }
+
+    fn extract_requested_capability<T: Config>(call: &T::Call) -> Option<Vec<u8>> {
+        // TODO: map runtime calls to agent capability labels.
+        // This currently returns `None` for generic calls and should be extended
+        // as the capability model is integrated with X3 call routing.
+        let _ = call;
+        None
     }
 }
 

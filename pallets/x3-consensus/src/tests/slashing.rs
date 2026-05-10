@@ -9,6 +9,7 @@ use crate::{
     SlashReason,
 };
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::Perbill;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -150,5 +151,22 @@ fn slash_on_nonexistent_validator_returns_error() {
 
         // Nothing should have been written.
         assert!(ValidatorStake::<Test>::get(ghost).is_none());
+    });
+}
+
+#[test]
+fn slash_validator_respects_perbill_fraction() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        let validator: u64 = 42;
+        let initial_stake: u128 = 20_000_000;
+        register(validator, initial_stake);
+
+        Consensus::slash_validator(&validator, SlashReason::Equivocation, Perbill::from_percent(25));
+
+        let info = ValidatorStake::<Test>::get(validator).expect("validator must still exist");
+        assert_eq!(info.stake, 15_000_000, "stake should be reduced by 25 %");
+        assert!(info.is_active, "validator should remain active after the slash");
     });
 }
