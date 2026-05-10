@@ -67,6 +67,7 @@ Key blockers:
 - weak randomness audit complete
 - unsafe code reviewed and justified
 - panic/unwrap audit documented in `reports/panic_unwrap_audit.md`
+- equivocation detection and slashing are wired end-to-end, not just logged
 
 #### Ops
 - testnet launch checklist complete
