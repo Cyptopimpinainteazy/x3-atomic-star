@@ -54,10 +54,10 @@ if find crates pallets -name "*equivocation*" -o -name "*slashing*" 2>/dev/null 
     
     # Check if there's a test for equivocation
     if rg -l "equivocation|double_vote" crates pallets --type rust 2>/dev/null | xargs grep -l "test" 2>/dev/null | grep -q .; then
-        if cargo test -p pallet-offences --lib 2>&1 | grep -q "test result: ok" 2>/dev/null; then
-            log_pass "CRITICAL-001: Equivocation detection tests passing"
+        if cargo test -p pallet-offences --lib 2>&1 | grep -q "test result: ok" 2>/dev/null && cargo test -p pallet-x3-consensus --lib 2>&1 | grep -q "test result: ok" 2>/dev/null; then
+            log_pass "CRITICAL-001: Equivocation detection tests passing in offences and X3 consensus"
         else
-            log_fail "CRITICAL-001: Equivocation tests exist but not passing"
+            log_fail "CRITICAL-001: Equivocation tests exist but not passing in offences or X3 consensus"
         fi
     else
         log_fail "CRITICAL-001: No equivocation detection tests found"
