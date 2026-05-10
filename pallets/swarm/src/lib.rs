@@ -1353,7 +1353,18 @@ pub mod pallet {
                     .ok_or(Error::<T>::CapabilityRevoked)?;
 
                 // Check kill-switch
-                ensure!(!envelope.killed, Error::<T>::KillSwitchActive);
+                if envelope.killed {
+                    Self::deposit_event(Event::CapabilityKillSwitchHit {
+                        agent: agent.clone(),
+                    });
+                    Self::report_capability_invariant(
+                        frame_system::Pallet::<T>::block_number(),
+                        pallet_x3_invariants::InvariantKind::CapabilityKillSwitch,
+                        1,
+                        1,
+                    );
+                    ensure!(!envelope.killed, Error::<T>::KillSwitchActive);
+                }
 
                 // Check budget availability
                 let available = envelope.budget.saturating_sub(envelope.spent);
@@ -1363,9 +1374,9 @@ pub mod pallet {
                         amount,
                         available,
                     });
-                    InvariantsPallet::<T>::report_custom_invariant(
+                    Self::report_capability_invariant(
                         frame_system::Pallet::<T>::block_number(),
-                        InvariantKind::CapabilityBudget,
+                        pallet_x3_invariants::InvariantKind::CapabilityBudget,
                         amount.saturated_into::<u128>(),
                         available.saturated_into::<u128>(),
                     );
@@ -1383,6 +1394,15 @@ pub mod pallet {
 
                 Ok(())
             })
+        }
+
+        fn report_capability_invariant(
+            block: BlockNumberFor<T>,
+            invariant: pallet_x3_invariants::InvariantKind,
+            observed: u128,
+            bound: u128,
+        ) {
+            pallet_x3_invariants::Pallet::<T>::report_custom_invariant(block, invariant, observed, bound);
         }
     }
 }

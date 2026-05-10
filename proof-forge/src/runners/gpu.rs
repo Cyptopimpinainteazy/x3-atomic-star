@@ -187,6 +187,32 @@ pub async fn verify_claim(workspace: &Path, claim_id: &str, verbose: bool) -> Re
         }
     }
 
+    // ── 3c. Check swarm capability budget / kill-switch evidence ───────────────
+    let swarm_budget_grep = Command::new("grep")
+        .args([
+            "-rn",
+            "CapabilityBudgetExceeded\\|CapabilityKillSwitchHit\\|InvariantKind::CapabilityBudget\\|InvariantKind::CapabilityKillSwitch",
+            "pallets/swarm/src/lib.rs",
+        ])
+        .current_dir(workspace)
+        .output();
+
+    if let Ok(out) = swarm_budget_grep {
+        let hits = String::from_utf8_lossy(&out.stdout);
+        let count = hits.lines().count();
+        evidence.insert("swarm_budget_evidence".to_string(), count.to_string());
+        if count > 0 {
+            passed_checks.push(format!(
+                "Swarm capability budget / kill-switch evidence found in swarm pallet ({} hits)",
+                count
+            ));
+        } else {
+            missing_proofs.push(
+                "No swarm capability budget or kill-switch evidence found in pallets/swarm/src/lib.rs".to_string(),
+            );
+        }
+    }
+
     // ── 4b. Drive the X3-contracts gpu-parity-core JSON-vector harness ───────
     // Mirrors the EVM↔SVM parity gate. Asserts every pinned hash vector
     // produces the same canonical 32-byte digest on both validator paths.

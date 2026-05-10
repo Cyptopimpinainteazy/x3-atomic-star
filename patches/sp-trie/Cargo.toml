@@ -31,9 +31,9 @@ thiserror = { version = "1.0.30", optional = true }
 tracing = { version = "0.1.29", optional = true }
 trie-db = { version = "0.28.0", default-features = false }
 trie-root = { version = "0.18.0", default-features = false }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
-sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 schnellru = { version = "0.2.1", optional = true }
 
 [dev-dependencies]
@@ -41,7 +41,7 @@ array-bytes = "6.1"
 criterion = "0.4.0"
 trie-bench = "0.37.0"
 trie-standardmap = "0.16.0"
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 
 [features]
 default = ["std"]

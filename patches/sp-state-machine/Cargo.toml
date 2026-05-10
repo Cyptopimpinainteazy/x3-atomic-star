@@ -22,10 +22,10 @@ rand = { version = "0.8.5", optional = true }
 smallvec = "1.8.0"
 thiserror = { version = "1.0.30", optional = true }
 tracing = { version = "0.1.29", optional = true }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
-sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
-sp-panic-handler = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", optional = true }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-panic-handler = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", optional = true }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-trie = { version = "22.0.0", default-features = false, path = "../sp-trie" }
 trie-db = { version = "0.28.0", default-features = false }
 
@@ -33,7 +33,7 @@ trie-db = { version = "0.28.0", default-features = false }
 array-bytes = "6.1"
 pretty_assertions = "1.2.1"
 rand = "0.8.5"
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2512" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 assert_matches = "1.5"
 
 [features]
