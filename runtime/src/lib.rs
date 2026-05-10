@@ -54,6 +54,7 @@ use pallet_x3_account_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_cross_vm_router;
 use pallet_x3_invariants;
+use pallet_x3_agent_law;
 use pallet_x3_kernel;
 use pallet_x3_settlement_engine;
 use pallet_x3_supply_ledger;
@@ -312,6 +313,7 @@ construct_runtime!(
         Preimage: pallet_preimage,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -610,6 +612,19 @@ pub type SignedExtra = (
     frame_system::CheckNonce<Runtime>,
     frame_system::CheckWeight<Runtime>,
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+    // =====================================================================
+    // X3 SECURITY GATES (SECURITY-CRITICAL ORDER - DO NOT REORDER)
+    // =====================================================================
+    // 1. CRITICAL INVARIANTS CHECKED FIRST (hard-fail gates)
+    pallet_x3_invariants::InvariantCheck,
+    // 2. POLICY ENFORCEMENT (Agent Law)
+    pallet_x3_agent_law::AgentLawCheck,
+    // 3. LONG-RANGE ATTACK VALIDATION (Capability Envelope)
+    pallet_x3_kernel::CapabilityEnvelopeCheck,
+    // 4. CROSS-VM ATOMICITY
+    pallet_x3_kernel::AtomicSettlementCheck,
+    // 5. FLASH FINALITY
+    pallet_x3_kernel::FlashFinalityExtension,
 );
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
@@ -1204,6 +1219,18 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
     type SecurityHook = x3_security_events::NoOpHook;
+}
+
+impl pallet_x3_agent_law::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type ReputationThreshold = ConstU64<100>;
+    type MaxTasksPerBlock = ConstU32<50>;
+    type CheckpointGracePeriod = ConstU32<14400>; // ~24 hours @ 6s blocks
+    type RateLimitEpochLength = ConstU32<14400>;
+    type RateLimitMaxExtrinsicsPerEpoch = ConstU32<1000>;
+    type WeightInfo = pallet_x3_agent_law::weights::SubstrateWeight;
 }
 
 pub struct RuntimeEmergencyHaltController;

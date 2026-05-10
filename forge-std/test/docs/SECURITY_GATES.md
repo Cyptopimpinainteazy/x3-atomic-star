@@ -255,18 +255,18 @@ Module Details:
 
 ### Current Status
 
-**Status:** ✅ GO FOR MAINNET RC-1  
+**Status:** ⚠️ HISTORICAL / NOT CURRENT  
 **Overall Score:** 100% (16/16 S0 verified)  
 **Commit:** `2e0c3bdac9de8b60`  
 **Date:** 2026-05-02
 
 ```
-All ProofForge Security Gates: ✅ PASSED
+All ProofForge Security Gates: ✅ PASSED (historical archive)
 ├─ S0 Blockers: 6/6 RESOLVED (S0-1 through S0-6)
 ├─ S1 Blockers: 3/3 RESOLVED (S1-1, S1-2, S1-3)
 └─ RC-1 Scope: LOCKED
 
-Launch Decision: GO
+Launch Decision: HISTORICAL GO claim — current status is blocked
 Overall Score: 100%
 Blockers: 0
 ```

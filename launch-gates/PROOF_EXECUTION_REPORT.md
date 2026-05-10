@@ -1,12 +1,15 @@
 # X3 Mainnet Proof Execution Report
 
+> **ARCHIVED COPY:** This historical report has been preserved in `docs/archive/status/PROOF_EXECUTION_REPORT.md`.
+
 **Date**: 2026-04-26  
 **Execution Time**: 11:46 AM - 11:47 AM MDT  
-**Status**: ✅ SUPERSEDED - All issues resolved (see current report)
+**Status**: ⚠️ HISTORICAL / NOT CURRENT — See current status docs for up-to-date readiness.
 
-> ⚠️ **HISTORICAL DOCUMENT** — This report documents the state as of April 26, 2026. All issues described have since been resolved.
+> ⚠️ **HISTORICAL DOCUMENT** — This report documents the state as of April 26, 2026.
 > 
-> **Current Status:** ✅ GO FOR MAINNET RC-1 (100%, 0 blockers)
+> **Current Status:** ⚠️ MAINNET READINESS BLOCKED / UNDER REVIEW (historical report only)
+> **Canonical Status:** [docs/CURRENT_MAINNET_STATUS.md](../docs/CURRENT_MAINNET_STATUS.md)
 > **Machine Report:** [reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
 
 ---

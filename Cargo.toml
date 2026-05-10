@@ -109,6 +109,8 @@ members = [
     "crates/x3-launch-validator",
     # On-chain invariant enforcement pallet (Article IV / checklist §10)
     "pallets/x3-invariants",
+    # Agent Law pallet for policy enforcement (SECURITY-CRITICAL)
+    "pallets/x3-agent-law",
     # Native oracle pallet for decentralized price feeds
     "pallets/x3-oracle",
     # VRF pallet for verifiable randomness

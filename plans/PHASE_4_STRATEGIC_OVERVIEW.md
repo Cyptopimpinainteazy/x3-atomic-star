@@ -1,8 +1,10 @@
 # Phase 4 Strategic Overview - X3 Atomic Star
 
+> **ARCHIVED COPY:** This historical summary has been preserved in `docs/archive/status/PHASE_4_STRATEGIC_OVERVIEW.md`.
+
 **Document Version:** 1.0  
 **Date:** 2026-05-03  
-**Status:** Completed (Mainnet RC-1 GO with 100% Score)  
+**Status:** Historical internal summary — not current public mainnet readiness status  
 **Project:** X3 Atomic Star
 
 ---
@@ -14,7 +16,7 @@ Phase 4 represented the final optimization push to achieve mainnet readiness for
 1. **Phase 4A-C (Mainnet Gap Closure)** - Proof-based scoring optimization from 0.92 to 0.95+
 2. **Phase 4 (Frontend Applications)** - Timeline-based roadmap for DEX, Wallet, Explorer, Governance
 
-**Current Status:** ✅ **GO FOR MAINNET RC-1** with 100% score across all 21 claims verified.
+**Current Status:** ⚠️ MAINNET READINESS BLOCKED / UNDER REVIEW (internal historical summary only). See [docs/CURRENT_MAINNET_STATUS.md](../docs/CURRENT_MAINNET_STATUS.md).
 
 ---
 

@@ -12599,6 +12599,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-agent-law"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-io 44.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-keystore 0.45.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-runtime 45.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+]
+
+[[package]]
 name = "pallet-x3-asset-registry"
 version = "0.1.0"
 dependencies = [
@@ -27601,6 +27618,7 @@ dependencies = [
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-treasury",
  "pallet-x3-account-registry",
+ "pallet-x3-agent-law",
  "pallet-x3-asset-registry",
  "pallet-x3-atomic-kernel",
  "pallet-x3-auction",

@@ -124,7 +124,7 @@ rng-rand = [
     "uuid-rng-internal-lib",
     "uuid-rng-internal-lib/rand",
 ]
-serde = ["dep:serde_core"]
+serde = ["dep:serde"]
 sha1 = ["dep:sha1_smol"]
 std = [
     "wasm-bindgen?/std",
@@ -171,9 +171,9 @@ version = "0.10"
 optional = true
 default-features = false
 
-[dependencies.serde_core]
+[dependencies.serde]
 package = "serde"
-version = "1.0.195"
+version = "1.0.228"
 optional = true
 default-features = false
 

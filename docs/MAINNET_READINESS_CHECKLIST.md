@@ -5,6 +5,8 @@ This checklist captures the minimum launch readiness work for X3 Atomic Star to 
 
 ## Related public plan
 - `docs/MAINNET_CANARY_PLAN.md` — public canary launch path and 30–90 day reveal plan
+- `docs/MAINNET_GATE_PROOFS_PLAN.md` — repository-wide mainnet gate and proofs execution plan
+- `docs/archive/status/` — historical archived status reports
 
 ## Priority 1 — Mainnet safety gate (P0)
 - [ ] Resolve all open P0 mainnet-blocker PRs before any launch announcement.

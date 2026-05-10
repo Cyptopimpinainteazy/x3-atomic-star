@@ -2,6 +2,12 @@
 
 Target: v0.4 Internal-Only Mainnet RC
 
+**Note:** This checklist is scoped to internal RC-1 build and gate readiness only. Public launch messaging should follow `docs/MAINNET_CANARY_PLAN.md`.
+
+## Related Readiness Checklist
+- `docs/MAINNET_READINESS_CHECKLIST.md` — focused mainnet readiness and public canary launch plan
+- `docs/MAINNET_CANARY_PLAN.md` — public canary launch path and 30–90 day reveal plan
+
 ## Build Gates
 
 - cargo fmt --check passes

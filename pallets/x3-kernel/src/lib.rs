@@ -985,7 +985,24 @@ pub mod pallet {
         CrossVmPreparedQueueFull,
         /// The protocol is currently paused by governance. No user operations permitted.
         ProtocolIsPaused,
+        /// Cross-VM atomicity breach: branches are not consistent.
+        CrossVmAtomicityBreach,
+        /// Settlement root mismatch: transaction state hash does not match stored root.
+        SettlementMismatch,
+        /// State inconsistency detected across VM branches.
+        StateInconsistency,
     }
+
+    /// Storage for atomic settlement roots (per transaction ID).
+    /// Used to verify all cross-VM branches settled consistently.
+    #[pallet::storage]
+    pub(super) type StoredSettlementRoots<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u64,
+        [u8; 32],
+        OptionQuery,
+    >;
 
     use frame_support::traits::StorageVersion;
 
@@ -3852,6 +3869,55 @@ pub mod pallet {
             }
 
             result_logs
+        }
+
+        /// Hard-fail enforcement of atomic cross-VM invariants.
+        /// Verifies all VM branches settled consistently or panics.
+        ///
+        /// # Arguments
+        /// - `tx_id`: Transaction ID for settlement root lookup
+        /// - `evm_state`: EVM branch final state
+        /// - `svm_state`: SVM branch final state
+        /// - `cosmos_state`: Cosmos branch final state
+        ///
+        /// # Safety
+        /// Panics (hard-fail) if atomicity invariant is violated.
+        /// This is intentional: consensus must halt rather than diverge.
+        pub fn enforce_cross_vm_atomicity(
+            tx_id: u64,
+            evm_state: &[u8],
+            svm_state: &[u8],
+            cosmos_state: &[u8],
+        ) -> DispatchResult {
+            // Verify all branches present
+            ensure!(!evm_state.is_empty(), Error::<T>::CrossVmAtomicityBreach);
+            ensure!(!svm_state.is_empty(), Error::<T>::CrossVmAtomicityBreach);
+            ensure!(!cosmos_state.is_empty(), Error::<T>::CrossVmAtomicityBreach);
+
+            // Compute hash for each branch
+            use sp_io::hashing::blake2_256;
+            let evm_hash = blake2_256(evm_state);
+            let svm_hash = blake2_256(svm_state);
+            let cosmos_hash = blake2_256(cosmos_state);
+
+            // Combine branch hashes for settlement root
+            let mut combined = Vec::new();
+            combined.extend_from_slice(&evm_hash);
+            combined.extend_from_slice(&svm_hash);
+            combined.extend_from_slice(&cosmos_hash);
+            let combined_hash = blake2_256(&combined);
+
+            // Retrieve stored settlement root
+            let stored_root = StoredSettlementRoots::<T>::get(tx_id)
+                .expect("BUG: Settlement root MUST exist for this transaction ID");
+
+            // Hard-fail if atomicity invariant violated
+            ensure!(
+                combined_hash == stored_root,
+                Error::<T>::SettlementMismatch
+            );
+
+            Ok(())
         }
     }
 

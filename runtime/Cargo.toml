@@ -56,6 +56,7 @@ fp-ethereum = { workspace = true, default-features = false, optional = true }
 pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
 pallet-x3-consensus = { path = "../pallets/x3-consensus", default-features = false }
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false }
+pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false }
 pallet-x3-account-registry = { path = "../pallets/x3-account-registry", default-features = false }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge", default-features = false }
 pallet-x3-coin = { path = "../pallets/x3-coin", default-features = false }

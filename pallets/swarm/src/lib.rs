@@ -50,6 +50,9 @@ pub use types::*;
 pub mod weights;
 pub use weights::WeightInfo;
 
+pub mod determinism;
+pub use determinism::{DeterminismTier, TaskDeterminismSpec, verify_deterministic_output};
+
 #[cfg(test)]
 mod mock;
 
@@ -258,6 +261,16 @@ pub mod pallet {
     #[pallet::getter(fn total_tasks_failed)]
     pub type TotalTasksFailed<T> = StorageValue<_, u64, ValueQuery>;
 
+    #[pallet::storage]
+    #[pallet::getter(fn agent_capabilities)]
+    pub(super) type AgentCapabilities<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        CapabilityEnvelope<BalanceOf<T>>,
+        OptionQuery,
+    >;
+
     // ========================================================================
     // Events
     // ========================================================================
@@ -408,6 +421,40 @@ pub mod pallet {
         NotDeregistering,
         /// Maximum jury voters reached.
         MaxJuryVotersReached,
+        /// Capability budget exceeded.
+        BudgetExceeded,
+        /// Agent capability revoked or not found.
+        CapabilityRevoked,
+        /// Kill-switch activated for this agent.
+        KillSwitchActive,
+    }
+
+    /// Agent capability envelope with budget tracking.
+    #[derive(Clone, Encode, Decode, Debug, TypeInfo, PartialEq, Eq)]
+    pub struct CapabilityEnvelope<Balance> {
+        /// Maximum budget for this agent
+        pub budget: Balance,
+        /// Amount already spent
+        pub spent: Balance,
+        /// Agent role/tier
+        pub role: AgentRole,
+        /// Is the kill-switch activated?
+        pub killed: bool,
+    }
+
+    /// Agent role tiers
+    #[derive(Clone, Copy, Encode, Decode, Debug, TypeInfo, PartialEq, Eq)]
+    pub enum AgentRole {
+        /// Full validator with all capabilities
+        Validator,
+        /// Gossip relay only
+        Gossiper,
+        /// Proof generation (restricted compute)
+        Prover,
+        /// Monitoring and observation only
+        Monitor,
+        /// Emergency or quarantined state (no operations)
+        Quarantined,
     }
 
     // ========================================================================
@@ -1277,6 +1324,30 @@ pub mod pallet {
                 pending_tasks: 0, // Would need iteration to count
                 active_jury_sessions: 0,
             }
+        }
+
+        /// Check agent capability budget and deduct amount if permitted.
+        /// Returns BudgetExceeded if budget insufficient, or KillSwitchActive if agent is killed.
+        pub fn check_and_deduct_capability(
+            agent: &T::AccountId,
+            amount: BalanceOf<T>,
+        ) -> DispatchResult {
+            AgentCapabilities::<T>::try_mutate(agent, |maybe_envelope| -> DispatchResult {
+                let envelope = maybe_envelope.as_mut()
+                    .ok_or(Error::<T>::CapabilityRevoked)?;
+
+                // Check kill-switch
+                ensure!(!envelope.killed, Error::<T>::KillSwitchActive);
+
+                // Check budget availability
+                let available = envelope.budget.saturating_sub(envelope.spent);
+                ensure!(available >= amount, Error::<T>::BudgetExceeded);
+
+                // Deduct from budget
+                envelope.spent = envelope.spent.saturating_add(amount);
+
+                Ok(())
+            })
         }
     }
 }

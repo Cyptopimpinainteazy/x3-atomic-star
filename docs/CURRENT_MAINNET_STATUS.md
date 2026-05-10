@@ -1,49 +1,69 @@
 # CURRENT MAINNET STATUS
 
-**Status:** ⚠️ MAINNET READINESS BLOCKED / NOT VERIFIED
+**Status:** ⚠️ MAINNET READINESS BLOCKED / UNDER REVIEW
 **Overall Score:** N/A
-**Last Verified Commit:** `2e0c3bdac9de8b60`
-**Current Evidence:** mix of machine-generated RC-1 gate outputs and active gap/todo reports
+**Last Verified Commit:** `HEAD`
+**Current Evidence:** inconsistent readiness artifacts, stale gate outputs, and a new canary-first launch posture
 
 ---
 
 ## Status Summary
-The internal RC-1 scope remains the intended launch boundary, but the current readiness evidence is not consistent enough to support a clean go/no-go decision.
+The current repo is aligned to an internal RC-1 scope, but the evidence is not yet sufficient to support a clean public mainnet readiness claim.
 
-- Some machine-generated artifacts still claim RC-1 readiness.
-- Active gap gate outputs report unresolved S0/S1 issues.
-- Placeholder readiness reports are present and must be regenerated.
-- Public readiness messaging should be based on the canary plan and gate-state reconciliation.
+- The safe launch posture is a public canary/testnet reveal, not a broad mainnet announcement.
+- Existing RC-1 gate artifacts are provisional and must be regenerated.
+- The authoritative readiness story is now the canary plan and gate-state reconciliation, supported by the mainnet proof gate plan.
+- Public messaging must defer external bridges, PQ, AI, GPU, and advanced DEX until audited.
 
 ---
 
 ## Current Facts
-- The RC-1 feature set is the current launch scope:
-  - X3Native + X3Evm + X3Svm internal domains
-  - internal cross-VM routing and atomic kernel semantics
-  - supply ledger enforcement with rollback/refund behavior
-  - spot AMM / LP lock path only
-- Bridges remain disabled-by-default until audit passage.
-- PQ, AI, GPU acceleration, and advanced DEX are explicitly deferred.
-- The proof gate infrastructure exists, but the outputs remain partially stale or contradictory.
+- The internal RC-1 launch scope is:
+  - X3Native + X3Evm + X3Svm internal execution
+  - internal cross-VM routing and atomic commit/rollback semantics
+  - supply ledger invariants, rollback/refund behavior, and a spot AMM/LP path
+- Bridges remain disabled-by-default until formal audit passage.
+- PQ, AI optimizer, GPU acceleration, and advanced DEX remain staged for post-canary phases.
+- Proof gate infrastructure exists, but the outputs are currently inconsistent and require a refresh.
 
 ---
 
 ## Current Blockers
-The following categories currently block a credible mainnet readiness claim:
+A credible readiness claim is blocked by:
 
-- Active gap gate failures in proof artifacts
-- Missing or stale catastrophic receipts for core claims
-- Placeholder readiness report outputs that have not been refreshed
-- Contradictory internal status artifacts and unresolved evidence gaps
+- stale or unresolved proof gate outputs
+- missing regenerated readiness reports
+- evidence gaps in critical receipts and blocker tracking
+- contradictory internal status artifacts across docs and reports
+
+---
+
+## Archived / historical reports
+
+The following historical launch artifacts have been moved to the docs archive:
+
+- `docs/archive/status/PROOF_EXECUTION_REPORT.md`
+- `docs/archive/status/GENESIS_CEREMONY_RUNBOOK.md`
+- `docs/archive/status/PHASE_4_STRATEGIC_OVERVIEW.md`
+
+---
+
+## Authoritative sources
+The current source of truth for readiness and launch posture is:
+
+- `docs/MAINNET_CANARY_PLAN.md`
+- `docs/MAINNET_READINESS_CHECKLIST.md`
+- `docs/MAINNET_LAUNCH_CHECKLIST.md`
+- `docs/MAINNET_GATE_PROOFS_PLAN.md`
+- `.x3/X3_MAINNET_GATES.md`
 
 ---
 
 ## Next steps
 1. Re-run the readiness pipeline and regenerate all gate artifacts.
-2. Reconcile the RC-1 report with active proof gap reports.
+2. Refresh the canary plan and readiness checklist with the latest status.
 3. Publish a single canonical readiness scoreboard.
-4. Use `docs/MAINNET_CANARY_PLAN.md`, `docs/MAINNET_READINESS_CHECKLIST.md`, and `.x3/X3_MAINNET_GATES.md` as the current sources of truth.
+4. Lock public messaging to the RC-1 canary scope and explicit deferred features.
 
 ---
 
@@ -78,43 +98,6 @@ x3-proof mainnet-rc-report --out reports/mainnet_rc_report.md
 
 *Last updated: 2026-05-09*
 *Source: manual reconciliation of active gate artifacts*
-- ✅ Cross-thread visibility (S1)
-- ✅ Governance bypass (S1)
-- ✅ Unauthorized mint (S1)
-
----
-
-## Fresh Verification Commands
-
-```bash
-# Format check
-cargo fmt --all -- --check
-
-# Compilation check
-cargo check --workspace
-
-# Run tests
-cargo test --workspace
-
-# Build binary
-cargo build --release -p x3-chain-node
-
-# Build CLI
-cargo build --release -p x3-cli
-
-# Build proof tool
-cargo build --release -p x3-proof
-
-# Run key pallet tests
-cargo test -p pallet-x3-cross-vm-router
-cargo test -p pallet-x3-supply-ledger
-cargo test -p pallet-x3-atomic-kernel
-cargo test -p x3-ixl
-cargo test -p x3-proof
-
-# Generate mainnet report
-x3-proof mainnet-rc-report --out reports/mainnet_rc_report.md
-```
 
 ---
 

@@ -13,6 +13,7 @@ use sp_std::vec::Vec;
 /// Parallel execution scheduler with conflict detection
 pub struct ParallelExecutor {
     /// Maximum concurrent transactions
+    #[allow(dead_code)]
     max_concurrent: usize,
     /// Conflict detector
     conflict_detector: ConflictDetector,
@@ -218,6 +219,7 @@ impl ParallelExecutor {
 /// Conflict detection for parallel execution
 pub struct ConflictDetector {
     /// Read-write conflict tracking
+    #[allow(dead_code)]
     rw_conflicts: BTreeMap<StateKey, Vec<TransactionId>>,
 }
 

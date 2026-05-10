@@ -1,11 +1,11 @@
 # X3 Chain Roadmap
 
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)  
-**Score:** 100% | **S0 Verified:** 16/16 | **Blockers:** 0  
+**Status:** ⚠️ MAINNET READINESS BLOCKED / UNDER REVIEW  
+**Score:** Historical internal snapshot only; not a current launch decision  
 **Commit:** `2e0c3bdac9de8b60`  
 **Last Updated:** 2026-05-02
 
-> For post-RC-1 roadmap, see [X3_MAINNET_ROADMAP.md](../X3_MAINNET_ROADMAP.md)
+> For the canonical current status and canary-first launch path, see [../docs/CURRENT_MAINNET_STATUS.md](../docs/CURRENT_MAINNET_STATUS.md) and [../docs/MAINNET_CANARY_PLAN.md](../docs/MAINNET_CANARY_PLAN.md)
 
 ---
 

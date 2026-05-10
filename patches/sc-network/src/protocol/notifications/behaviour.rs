@@ -3769,33 +3769,41 @@ mod tests {
 
 				*timer_deadline
 			} else {
-			assert!(false, "invalid state");
-			loop {
-				futures::future::poll_fn(|cx| {
-					let _ = notif.poll(cx, &mut params);
-					Poll::Ready(())
-				})
-				.await;
-
-				if let Some(PeerState::DisabledPendingEnable {
-					timer_deadline, connections, ..
-				}) = notif.peers.get(&(peer, set_id))
-				{
-					assert!(std::matches!(connections[0], (_, ConnectionState::Closing)));
-
-					if timer_deadline != &prev_instant {
-						break
-					}
-				} else {
-					assert!(false, "invalid state");
-				}
+				panic!("invalid state");
 			}
-		})
+		};
+
+		if tokio::time::timeout(
+			std::time::Duration::from_secs(5),
+			async {
+				loop {
+					futures::future::poll_fn(|cx| {
+						let _ = notif.poll(cx, &mut params);
+						Poll::Ready(())
+					})
+					.await;
+
+					if let Some(PeerState::DisabledPendingEnable {
+						timer_deadline, connections, ..
+					}) = notif.peers.get(&(peer, set_id))
+					{
+						assert!(std::matches!(connections[0], (_, ConnectionState::Closing)));
+
+						if timer_deadline != &prev_instant {
+							break
+						}
+					} else {
+						panic!("invalid state");
+					}
+				}
+			},
+		)
 		.await
 		.is_err()
 		{
 			panic!("backoff peer was not removed in time");
 		}
+	}
 	}
 
 	#[test]

@@ -1,98 +1,76 @@
 # CURRENT MAINNET STATUS
 
-**Status:** ✅ GO FOR MAINNET RC-1 (v0.4 Internal-Only)
-**Overall Score:** 100%
-**S0 Verified:** 16/16
-**Last Verified Commit:** `2e0c3bdac9de8b60`
-**Machine Report:** [launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md](../launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md)
+**Status:** ⚠️ MAINNET READINESS BLOCKED / UNDER REVIEW
+**Overall Score:** N/A
+**Last Verified Commit:** `HEAD`
+**Current Evidence:** inconsistent readiness artifacts, stale gate outputs, and a new canary-first launch posture
 
 ---
 
-## Canonical Decision
+## Status Summary
+The current repo is aligned to an internal RC-1 scope, but the evidence is not yet sufficient to support a clean public mainnet readiness claim.
 
-| Metric | Value |
-|--------|-------|
-| **Decision** | ✅ GO |
-| **Overall Score** | 100% |
-| **S0 Verified** | 16/16 |
-| **Blockers** | 0 |
-| **Receipts Valid** | 21/21 |
-| **Receipts Stale** | 0 |
+- The safe launch posture is a public canary/testnet reveal, not a broad mainnet announcement.
+- Existing RC-1 gate artifacts are provisional and must be regenerated.
+- The authoritative readiness story is now the canary plan and gate-state reconciliation.
+- Public messaging must defer external bridges, PQ, AI, GPU, and advanced DEX until audited.
 
 ---
 
-## Enabled Runtime Features
-
-- X3Native, X3Evm, X3Svm internal domains
-- Internal cross-VM asset movement
-- Supply ledger enforcement
-- Cross-VM router internal routes
-- Packet standard MVP commitment and timeout checks
-- IXL MVP receipt emission gate
-- Atomic bundle lifecycle components
-- Spot swap path only where already present in existing runtime/pallet code
-
----
-
-## Disabled Or Deferred Features
-
-- External Ethereum, Solana, BTC bridges
-- External liquidity gateway
-- Arbitrary external proof minting
-- AppZone factory
-- PQ cryptography tracks
-- GPU validator as consensus-critical path
-- AI agents with fund control authority
-- Automatic flashloan or autonomous mainnet strategy systems
+## Current Facts
+- The internal RC-1 launch scope is:
+  - X3Native + X3Evm + X3Svm internal execution
+  - internal cross-VM routing and atomic commit/rollback semantics
+  - supply ledger invariants, rollback/refund behavior, and a spot AMM/LP path
+- Bridges remain disabled-by-default until formal audit passage.
+- PQ, AI optimizer, GPU acceleration, and advanced DEX remain staged for post-canary phases.
+- Proof gate infrastructure exists, but the outputs are currently inconsistent and require a refresh.
 
 ---
 
 ## Current Blockers
+A credible readiness claim is blocked by:
 
-**None.** All gates passed as of 2026-05-02.
-
-All 9 security blockers resolved:
-- ✅ Supply invariant (S0)
-- ✅ Double mint prevention (S0)
-- ✅ Bridge replay protection (S0)
-- ✅ Finality verification (S0)
-- ✅ Atomic rollback (S0)
-- ✅ Runtime panic elimination (S0)
-- ✅ Cross-thread visibility (S1)
-- ✅ Governance bypass (S1)
-- ✅ Unauthorized mint (S1)
+- stale or unresolved proof gate outputs
+- missing regenerated readiness reports
+- evidence gaps in critical receipts and blocker tracking
+- contradictory internal status artifacts across docs and reports
 
 ---
 
-## Fresh Verification Commands
+## Authoritative sources
+The current source of truth for readiness and launch posture is:
+
+- `docs/MAINNET_CANARY_PLAN.md`
+- `docs/MAINNET_READINESS_CHECKLIST.md`
+- `docs/MAINNET_LAUNCH_CHECKLIST.md`
+- `.x3/X3_MAINNET_GATES.md`
+
+---
+
+## Next steps
+1. Re-run the readiness pipeline and regenerate all gate artifacts.
+2. Refresh the canary plan and readiness checklist with the latest status.
+3. Publish a single canonical readiness scoreboard.
+4. Lock public messaging to the RC-1 canary scope and explicit deferred features.
+
+---
+
+## Current Commands
 
 ```bash
-# Format check
 cargo fmt --all -- --check
-
-# Compilation check
 cargo check --workspace
-
-# Run tests
 cargo test --workspace
-
-# Build binary
 cargo build --release -p x3-chain-node
-
-# Build CLI
 cargo build --release -p x3-cli
-
-# Build proof tool
 cargo build --release -p x3-proof
-
-# Run key pallet tests
 cargo test -p pallet-x3-cross-vm-router
 cargo test -p pallet-x3-supply-ledger
 cargo test -p pallet-x3-atomic-kernel
 cargo test -p x3-ixl
 cargo test -p x3-proof
-
-# Generate mainnet report
+cargo run -p x3-readiness -- testnet-report --out reports/testnet_readiness_report.md
 x3-proof mainnet-rc-report --out reports/mainnet_rc_report.md
 ```
 
@@ -100,12 +78,15 @@ x3-proof mainnet-rc-report --out reports/mainnet_rc_report.md
 
 ## Launch Conditions
 
-All quality gates passed. Launch authorized.
+Launch is not authorized by the current evidence.
 
-**RC-1 Scope:** See [../MAINNET_RC1_SCOPE.md](../MAINNET_RC1_SCOPE.md)
+> **Scope note:** This report is scoped to internal v0.4 RC-1 readiness only. It does not imply public mainnet readiness for external gateways, PQ cryptography, advanced DEX, AI optimization, or GPU validator-critical paths.
+
+**RC-1 Scope:** See `MAINNET_RC1_SCOPE.md`
+
+**RC-1 Feature Debt:** See `docs/RC1_FEATURE_DEBT.md`
 
 ---
 
-*Last updated: 2026-05-02*
-*Source: ProofForge machine-generated report*
-*Commit: 2e0c3bdac9de8b60*
+*Last updated: 2026-05-09*
+*Source: manual reconciliation of active gate artifacts*

@@ -26,7 +26,9 @@ For the complete navigation structure, see **[master/INDEX.md](./master/INDEX.md
 
 - **[Mainnet Readiness](../00-START-HERE-MAINNET-READINESS.md)** - RC-1 launch status (BLOCKED / NOT VERIFIED)
 - **[Current Mainnet Status](./CURRENT_MAINNET_STATUS.md)** - Canonical evidence reconciliation page
+- **[Mainnet Gate Proofs Plan](./MAINNET_GATE_PROOFS_PLAN.md)** - repository-wide proof coverage and mainnet gate execution plan
 - **[Security Gates](./SECURITY_GATES.md)** - Proof gate architecture and artifact links
+- **[Archived Status Reports](./archive/status/)** - Historical launch artifacts and previous readiness reports
 
 ---
 
