@@ -53,13 +53,18 @@ pub mod hostcall_ids {
 ///
 /// These are *not* constructed inside this crate so we can stay lightweight.
 /// Callers (node service / integration harness) provide the real executors.
+///
+/// SVM fields are gated on the `x3-svm-integration` feature to avoid the
+/// solana-program 3.x dual solana-address conflict when building without SVM.
 #[cfg(feature = "std")]
 #[derive(Clone)]
 pub struct CrossVmContext {
     pub evm: Option<Arc<dyn x3_evm_integration::EvmExecutor + Send + Sync>>,
+    #[cfg(feature = "x3-svm-integration")]
     pub svm: Option<Arc<dyn x3_svm_integration::SvmExecutor + Send + Sync>>,
 
     pub evm_config: x3_evm_integration::EvmConfig,
+    #[cfg(feature = "x3-svm-integration")]
     pub svm_config: x3_svm_integration::SvmConfig,
 
     pub evm_caller: sp_core::H160,
@@ -71,8 +76,10 @@ impl Default for CrossVmContext {
     fn default() -> Self {
         Self {
             evm: None,
+            #[cfg(feature = "x3-svm-integration")]
             svm: None,
             evm_config: x3_evm_integration::EvmConfig::default(),
+            #[cfg(feature = "x3-svm-integration")]
             svm_config: x3_svm_integration::SvmConfig::default(),
             evm_caller: sp_core::H160::zero(),
             svm_payer: [0u8; 32],
@@ -345,6 +352,7 @@ pub fn register_substrate_hostcalls_with_cross_vm(
         }
     });
 
+    #[cfg(feature = "x3-svm-integration")]
     registry.register(SVM_CALL as u8, "svm_call", 3, {
         let ctx = Arc::clone(&ctx);
         move |args| {
@@ -416,6 +424,7 @@ mod cross_vm_tests {
 
         let ctx = CrossVmContext {
             evm: Some(Arc::new(x3_evm_integration::MockEvmExecutor)),
+            #[cfg(feature = "x3-svm-integration")]
             svm: Some(Arc::new(x3_svm_integration::MockSvmExecutor::new())),
             ..CrossVmContext::default()
         };
@@ -433,14 +442,17 @@ mod cross_vm_tests {
         );
         assert!(matches!(evm_res, Ok(Some(x3_vm::Value::Bytes(_)))));
 
-        let svm_res = registry.invoke(
-            hostcall_ids::SVM_CALL as u8,
-            &[
-                x3_vm::Value::Bytes(vec![0x79, 0x00]),
-                x3_vm::Value::Bytes(vec![0x01]),
-                x3_vm::Value::I64(200_000),
-            ],
-        );
-        assert!(matches!(svm_res, Ok(Some(x3_vm::Value::Bytes(_)))));
+        #[cfg(feature = "x3-svm-integration")]
+        {
+            let svm_res = registry.invoke(
+                hostcall_ids::SVM_CALL as u8,
+                &[
+                    x3_vm::Value::Bytes(vec![0x79, 0x00]),
+                    x3_vm::Value::Bytes(vec![0x01]),
+                    x3_vm::Value::I64(200_000),
+                ],
+            );
+            assert!(matches!(svm_res, Ok(Some(x3_vm::Value::Bytes(_)))));
+        }
     }
 }

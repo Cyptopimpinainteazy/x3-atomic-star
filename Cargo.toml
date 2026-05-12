@@ -431,6 +431,10 @@ uuid = { path = "patches/uuid" }
 memfd = { path = "patches/memfd" }
 # Fix ahash to use getrandom 0.2 instead of 0.3 (0.3 doesn't support wasm32-unknown-unknown)
 ahash = { path = "patches/ahash" }
+# Disable rustix' auto rustc_diagnostics cfg, which triggers a rustc 1.90 ICE.
+rustix = { path = "patches/rustix" }
+# Split deranged's macro-generated unchecked_neg call shape to avoid a rustc 1.90 ICE.
+deranged = { path = "patches/deranged" }
 # Stub icu_properties to avoid rustc ICE on string literal unescaping.
 # Disabled until the lockfile resolves a crate graph that actually uses it,
 # otherwise cargo warns on every workspace invocation that the patch is unused.

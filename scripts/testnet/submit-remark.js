@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 const { ApiPromise, WsProvider, Keyring } = require('@polkadot/api');
 const { cryptoWaitReady } = require('@polkadot/util-crypto');
 
@@ -14,9 +17,11 @@ async function main() {
   const signer = keyring.addFromUri(suri);
 
   return new Promise((resolve, reject) => {
+    let unsubscribe;
+
     api.tx.system
       .remark(remark)
-      .signAndSend(signer, (result) => {
+      .signAndSend(signer, async (result) => {
         if (result.dispatchError) {
           if (result.dispatchError.isModule) {
             const decoded = api.registry.findMetaError(result.dispatchError.asModule);
@@ -30,12 +35,19 @@ async function main() {
 
         if (result.status.isFinalized) {
           console.log(`remark finalized at ${result.status.asFinalized.toHex()}`);
+          if (unsubscribe) {
+            unsubscribe();
+          }
+          await api.disconnect();
           resolve();
         }
       })
-      .catch(reject)
-      .finally(async () => {
+      .then((unsub) => {
+        unsubscribe = unsub;
+      })
+      .catch(async (err) => {
         await api.disconnect();
+        reject(err);
       });
   });
 }

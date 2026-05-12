@@ -203,7 +203,8 @@ class SwapCoordinator:
                finality_block: int) -> bool:
         """Settle swap: reveal secret, verify finality cert, release bond."""
         s = self.get_session(session_id)
-        assert s.phase in (SwapPhase.PROVING, SwapPhase.LOCKED)
+        if s.phase not in (SwapPhase.PROVING, SwapPhase.LOCKED):
+            raise RuntimeError(f"Cannot settle swap in phase {s.phase.name}")
 
         # Finality cert must be anchored on-chain (strict validation fix)
         if finality_block not in self._finality_anchors:
@@ -838,7 +839,7 @@ class TestSettlementProofs:
         coord = SwapCoordinator()
         coord.anchor_finality(1, b"\x01" * 32)
         s = coord.new_session("sp1", "0xA", "SVM", 100, 500)
-        with pytest.raises(AssertionError):
+        with pytest.raises(RuntimeError):
             coord.settle("sp1", s.secret, 1)
 
     def test_settle_is_terminal(self):

@@ -11,8 +11,8 @@ RPC="${RPC_URL:-http://localhost:9944}"
 PASS=0
 FAIL=0
 
-ok()   { echo "[PASS] $1"; ((PASS++)); }
-fail() { echo "[FAIL] $1"; ((FAIL++)); }
+ok()   { echo "[PASS] $1"; ((PASS+=1)); }
+fail() { echo "[FAIL] $1"; ((FAIL+=1)); }
 rpc()  { curl -s -X POST -H "Content-Type: application/json" --data "$1" "$RPC"; }
 
 echo "=== X3 RC1 Smoke Test ==="
@@ -62,14 +62,81 @@ fi
 echo "-- External bridges disabled --"
 # ExternalBridgesEnabled storage key (twox128("X3BridgeAdapters") + twox128("ExternalBridgesEnabled"))
 STORAGE_KEY="0x$(python3 -c "
-import hashlib, struct
-def twox128(s):
-    h = hashlib.new('shake_128')
-    h.update(s.encode())
-    return h.digest(16).hex()
+MASK64 = (1 << 64) - 1
+PRIME1 = 11400714785074694791
+PRIME2 = 14029467366897019727
+PRIME3 = 1609587929392839161
+PRIME4 = 9650029242287828579
+PRIME5 = 2870177450012600261
+
+def rotl(value, bits):
+  return ((value << bits) | (value >> (64 - bits))) & MASK64
+
+def round_acc(acc, lane):
+  acc = (acc + lane * PRIME2) & MASK64
+  acc = rotl(acc, 31)
+  return (acc * PRIME1) & MASK64
+
+def merge_round(acc, val):
+  val = round_acc(0, val)
+  acc ^= val
+  return (acc * PRIME1 + PRIME4) & MASK64
+
+def avalanche(value):
+  value ^= value >> 33
+  value = (value * PRIME2) & MASK64
+  value ^= value >> 29
+  value = (value * PRIME3) & MASK64
+  value ^= value >> 32
+  return value & MASK64
+
+def xxh64(data, seed):
+  index = 0
+  length = len(data)
+  if length >= 32:
+    v1 = (seed + PRIME1 + PRIME2) & MASK64
+    v2 = (seed + PRIME2) & MASK64
+    v3 = seed & MASK64
+    v4 = (seed - PRIME1) & MASK64
+    limit = length - 32
+    while index <= limit:
+      lanes = [int.from_bytes(data[index + offset:index + offset + 8], 'little') for offset in (0, 8, 16, 24)]
+      v1 = round_acc(v1, lanes[0])
+      v2 = round_acc(v2, lanes[1])
+      v3 = round_acc(v3, lanes[2])
+      v4 = round_acc(v4, lanes[3])
+      index += 32
+    h64 = (rotl(v1, 1) + rotl(v2, 7) + rotl(v3, 12) + rotl(v4, 18)) & MASK64
+    h64 = merge_round(h64, v1)
+    h64 = merge_round(h64, v2)
+    h64 = merge_round(h64, v3)
+    h64 = merge_round(h64, v4)
+  else:
+    h64 = (seed + PRIME5) & MASK64
+  h64 = (h64 + length) & MASK64
+  while index + 8 <= length:
+    lane = int.from_bytes(data[index:index + 8], 'little')
+    lane = round_acc(0, lane)
+    h64 ^= lane
+    h64 = (rotl(h64, 27) * PRIME1 + PRIME4) & MASK64
+    index += 8
+  if index + 4 <= length:
+    h64 ^= int.from_bytes(data[index:index + 4], 'little') * PRIME1 & MASK64
+    h64 = (rotl(h64, 23) * PRIME2 + PRIME3) & MASK64
+    index += 4
+  while index < length:
+    h64 ^= data[index] * PRIME5 & MASK64
+    h64 = (rotl(h64, 11) * PRIME1) & MASK64
+    index += 1
+  return avalanche(h64)
+
+def twox128(value):
+  data = value.encode()
+  return xxh64(data, 0).to_bytes(8, 'little').hex() + xxh64(data, 1).to_bytes(8, 'little').hex()
+
 print(twox128('X3BridgeAdapters') + twox128('ExternalBridgesEnabled'))
 ")"
-VAL=$(rpc "{\"id\":6,\"jsonrpc\":\"2.0\",\"method\":\"state_getStorage\",\"params\":[\"$STORAGE_KEY\"]}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result','null'))")
+VAL=$(rpc "{\"id\":6,\"jsonrpc\":\"2.0\",\"method\":\"state_getStorage\",\"params\":[\"$STORAGE_KEY\"]}" | python3 -c "import sys,json; value=json.load(sys.stdin).get('result'); print('null' if value is None else value)")
 if [ "$VAL" = "null" ] || [ "$VAL" = "0x00" ]; then
   ok "ExternalBridgesEnabled = false (value: $VAL)"
 else

@@ -34,6 +34,9 @@ class FakeRegistry:
             return None
         return type("Record", (), record)
 
+    def get_swaps_batch(self, swap_ids: list[str]):
+        return [self.get_swap(swap_id) for swap_id in swap_ids]
+
     def update_validation(self, swap_id: str, svm_valid: bool, evm_valid: bool) -> None:
         record = self._records[swap_id]
         record["svm_validated"] = svm_valid
@@ -43,9 +46,11 @@ class FakeRegistry:
         self._records[swap_id]["status"] = status
 
     def pending_swaps(self):
-        for record in self._records.values():
-            if record["status"] == "PENDING":
-                yield record["swap_id"]
+        return [
+            record["swap_id"]
+            for record in self._records.values()
+            if record["status"] == "PENDING"
+        ]
 
 
 @dataclass(frozen=True)
@@ -63,13 +68,28 @@ class FakeValidator:
         return [self._valid for _ in transactions]
 
 
+class FakeChainRegistry:
+    def __init__(self, svm_validator: FakeValidator, evm_validator: FakeValidator) -> None:
+        self._validators = {
+            "solana": svm_validator,
+            "ethereum": evm_validator,
+        }
+
+    def validate_enabled_chains(self, chain_ids) -> bool:
+        return all(chain_id in self._validators for chain_id in chain_ids)
+
+    def get_validator(self, chain_id: str):
+        return self._validators.get(chain_id)
+
+
 def test_atomic_commit_requires_both_sides() -> None:
     registry = FakeRegistry()
     metrics = MetricsStore()
 
     svm_validator = FakeValidator(valid=True)
     evm_validator = FakeValidator(valid=True)
-    orchestrator = CrossChainOrchestrator(registry, svm_validator, evm_validator, metrics)
+    chain_registry = FakeChainRegistry(svm_validator, evm_validator)
+    orchestrator = CrossChainOrchestrator(registry, chain_registry, metrics)
 
     payload = AtomicSwapPayload(
         swap_id="swap-1",
@@ -78,7 +98,7 @@ def test_atomic_commit_requires_both_sides() -> None:
         timeout_seconds=30,
     )
 
-    orchestrator.submit_swap(payload)
+    orchestrator.submit_swap_legacy(payload)
     orchestrator.process_pending()
 
     record = registry.get_swap("swap-1")
@@ -91,7 +111,8 @@ def test_atomic_rollback_on_failure() -> None:
 
     svm_validator = FakeValidator(valid=True)
     evm_validator = FakeValidator(valid=False)
-    orchestrator = CrossChainOrchestrator(registry, svm_validator, evm_validator, metrics)
+    chain_registry = FakeChainRegistry(svm_validator, evm_validator)
+    orchestrator = CrossChainOrchestrator(registry, chain_registry, metrics)
 
     payload = AtomicSwapPayload(
         swap_id="swap-2",
@@ -100,7 +121,7 @@ def test_atomic_rollback_on_failure() -> None:
         timeout_seconds=30,
     )
 
-    orchestrator.submit_swap(payload)
+    orchestrator.submit_swap_legacy(payload)
     orchestrator.process_pending()
 
     record = registry.get_swap("swap-2")
