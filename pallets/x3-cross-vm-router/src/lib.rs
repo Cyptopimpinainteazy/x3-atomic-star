@@ -107,11 +107,18 @@ pub mod metering;
 #[frame_support::pallet]
 pub mod pallet {
     use codec::Encode;
-    use frame_support::pallet_prelude::*;
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{Currency, ExistenceRequirement},
+    };
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_runtime::traits::SaturatedConversion;
     use sp_std::{vec, vec::Vec};
+
+    /// Convenience alias for the balance type used by the configured currency.
+    pub type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
     use x3_asset_kernel_types::{
         derive_message_id,
         traits::{AssetRegistryInspect, EconomicHaltInspect, RouteInspect, SupplyLedgerWrite},
@@ -284,6 +291,19 @@ pub mod pallet {
         type VmAdapterOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
         /// Read-only economic halt gate used to block new transfer initiation.
         type EconomicHalt: EconomicHaltInspect;
+
+        /// Currency for charging the XVM routing fee in native X3 tokens.
+        type Currency: Currency<Self::AccountId>;
+
+        /// Protocol fee on every cross-VM transfer, in basis points (1/10_000).
+        /// Set to 0 to disable (no-op path).  RC-1 default: 20 (0.20 %).
+        #[pallet::constant]
+        type RoutingFeeBps: Get<u16>;
+
+        /// Account that receives collected routing fees.
+        /// Typically the on-chain treasury pallet's account id.
+        #[pallet::constant]
+        type ProtocolTreasury: Get<Self::AccountId>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
@@ -307,14 +327,18 @@ pub mod pallet {
         TransferRefunded {
             message_id: H256,
         },
-        /// External chain root registered for bridge verification (PHASE C STUB)
+        /// External chain root registered for bridge verification.
+        /// DISABLED_POST_RC1: external bridge surface is frozen at genesis;
+        /// governance must open via set_external_bridge_audit_gate + set_external_bridges_enabled.
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         BridgeRootRegistered {
             chain_id: u32,
             root_hash: H256,
             block_number: u32,
         },
-        /// Bridge paused for emergency (PHASE C STUB)
+        /// Bridge paused for emergency.
+        /// TESTNET_ONLY: emergency pause available during testnet operations.
+        /// DISABLED_POST_RC1: superseded by governance-controlled pause post-RC1.
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         BridgePaused {
             chain_id: u32,
@@ -338,6 +362,12 @@ pub mod pallet {
         IxlProofEmitted {
             message_id: H256,
             commitment: H256,
+        },
+        /// Protocol routing fee collected for a cross-VM transfer.
+        XvmRoutingFeeCollected {
+            message_id: H256,
+            asset_id: AssetId,
+            fee: BalanceOf<T>,
         },
     }
 
@@ -417,6 +447,8 @@ pub mod pallet {
         NonceBatchExhausted,
         /// New transfer initiation halted by economic safety policy.
         EconomicHaltActive,
+        /// Fee payer cannot cover the XVM routing fee (insufficient native balance).
+        RoutingFeeNotAffordable,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────
@@ -472,6 +504,7 @@ pub mod pallet {
                 recipient,
                 amount,
                 expires_at,
+                Some(who),
             )
         }
 
@@ -511,6 +544,7 @@ pub mod pallet {
                 recipient,
                 amount,
                 expires_at,
+                None, // VM adapter origin — fee not charged at this layer
             )
         }
 
@@ -541,7 +575,11 @@ pub mod pallet {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // BRIDGE ROUTER (PHASE C STUB)
+        // EXTERNAL BRIDGE ROUTER — DISABLED_POST_RC1
+        // External bridges are frozen at genesis behind a governance kill-switch.
+        // They are only available after: set_external_bridge_audit_gate(true) then
+        // set_external_bridges_enabled(true). Neither may be called by non-Root.
+        // Do NOT add external bridge calls to the critical node path.
         // ────────────────────────────────────────────────────────────────────
 
         /// Register external chain root for bridge verification
@@ -745,6 +783,7 @@ pub mod pallet {
             recipient: AccountBytes,
             amount: Balance,
             expires_at: BlockNumberFor<T>,
+            fee_payer: Option<T::AccountId>,
         ) -> DispatchResult {
             // S0-005 FIX: Wrap entire function in storage transaction to ensure
             // atomicity. If ANY operation fails (ledger debit, state machine
@@ -846,6 +885,32 @@ pub mod pallet {
                     .map_err(|_| Error::<T>::PacketBuildFailed)?;
                 let commitment = PacketCommitment::of(&packet).0;
                 PacketCommitments::<T>::insert(message_id, commitment);
+
+                // ── Protocol routing fee (best-effort, signed-origin only) ───
+                // VM-adapter calls pass `fee_payer = None` and skip this block.
+                if let Some(ref payer) = fee_payer {
+                    let fee_bps = T::RoutingFeeBps::get() as u128;
+                    if fee_bps > 0 {
+                        let fee_raw = (amount as u128)
+                            .saturating_mul(fee_bps)
+                            .saturating_div(10_000);
+                        if fee_raw > 0 {
+                            let fee: BalanceOf<T> = fee_raw.saturated_into();
+                            T::Currency::transfer(
+                                payer,
+                                &T::ProtocolTreasury::get(),
+                                fee,
+                                ExistenceRequirement::KeepAlive,
+                            )
+                            .map_err(|_| Error::<T>::RoutingFeeNotAffordable)?;
+                            Self::deposit_event(Event::XvmRoutingFeeCollected {
+                                message_id,
+                                asset_id,
+                                fee,
+                            });
+                        }
+                    }
+                }
 
                 // ── Ledger mutation (transactional) ───────────────────────────
                 // S0-005: This debit now participates in the outer storage transaction.

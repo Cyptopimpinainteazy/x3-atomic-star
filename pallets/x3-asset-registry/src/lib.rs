@@ -588,8 +588,7 @@ mod tests {
 
     fn register_usdc() -> Result<(), DispatchError> {
         let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-        Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
-            .map(|_| ())
+        Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).map(|_| ())
     }
 
     fn internal_route_cfg() -> RouteConfig {
@@ -618,7 +617,9 @@ mod tests {
                 Some(AssetStatus::Registered)
             );
             // Not active yet — is_active must return false.
-            assert!(!<Pallet<Test> as AssetRegistryInspect>::is_active(&asset_id));
+            assert!(!<Pallet<Test> as AssetRegistryInspect>::is_active(
+                &asset_id
+            ));
         });
     }
 
@@ -730,8 +731,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(Pallet::<Test>::do_activate_asset(&id));
             assert_eq!(
                 <Pallet<Test> as AssetRegistryInspect>::status(&id),
@@ -746,8 +747,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(Pallet::<Test>::do_activate_asset(&id));
             System::assert_last_event(
                 Event::AssetStatusChanged {
@@ -762,9 +763,8 @@ mod tests {
     #[test]
     fn activate_fails_for_unknown_asset() {
         new_test_ext().execute_with(|| {
-            let fake_id = x3_asset_kernel_types::derive_asset_id(
-                DomainId::Ethereum, 1, b"\x00", b"FAKE", 18,
-            );
+            let fake_id =
+                x3_asset_kernel_types::derive_asset_id(DomainId::Ethereum, 1, b"\x00", b"FAKE", 18);
             assert_noop!(
                 Pallet::<Test>::do_activate_asset(&fake_id),
                 Error::<Test>::UnknownAsset
@@ -777,8 +777,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(Pallet::<Test>::do_activate_asset(&id));
             // Pause via extrinsic (requires root).
             assert_ok!(AssetRegistry::pause_asset(RuntimeOrigin::root(), id));
@@ -794,8 +794,8 @@ mod tests {
     fn unpause_restores_active() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(Pallet::<Test>::do_activate_asset(&id));
             assert_ok!(AssetRegistry::pause_asset(RuntimeOrigin::root(), id));
             assert_ok!(AssetRegistry::unpause_asset(RuntimeOrigin::root(), id));
@@ -810,8 +810,8 @@ mod tests {
     fn retire_asset_makes_it_terminal() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(AssetRegistry::retire_asset(RuntimeOrigin::root(), id));
             assert_eq!(
                 <Pallet<Test> as AssetRegistryInspect>::status(&id),
@@ -824,8 +824,8 @@ mod tests {
     fn retired_asset_cannot_be_modified() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(AssetRegistry::retire_asset(RuntimeOrigin::root(), id));
             // Activate after retire must fail.
             assert_noop!(
@@ -847,8 +847,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             let cfg = internal_route_cfg();
             assert_ok!(Pallet::<Test>::do_configure_route(
                 &id,
@@ -856,11 +856,8 @@ mod tests {
                 DomainId::X3Evm,
                 cfg,
             ));
-            let stored = <Pallet<Test> as RouteInspect>::route(
-                &id,
-                DomainId::X3Native,
-                DomainId::X3Evm,
-            );
+            let stored =
+                <Pallet<Test> as RouteInspect>::route(&id, DomainId::X3Native, DomainId::X3Evm);
             assert!(stored.is_some());
             assert!(stored.unwrap().enabled);
         });
@@ -871,8 +868,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             let cfg = internal_route_cfg();
             assert_ok!(Pallet::<Test>::do_configure_route(
                 &id,
@@ -895,9 +892,8 @@ mod tests {
     #[test]
     fn configure_route_fails_for_unknown_asset() {
         new_test_ext().execute_with(|| {
-            let fake_id = x3_asset_kernel_types::derive_asset_id(
-                DomainId::Ethereum, 1, b"\x00", b"NONE", 18,
-            );
+            let fake_id =
+                x3_asset_kernel_types::derive_asset_id(DomainId::Ethereum, 1, b"\x00", b"NONE", 18);
             assert_noop!(
                 Pallet::<Test>::do_configure_route(
                     &fake_id,
@@ -914,8 +910,8 @@ mod tests {
     fn configure_route_fails_for_self_loop() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_noop!(
                 Pallet::<Test>::do_configure_route(
                     &id,
@@ -932,8 +928,8 @@ mod tests {
     fn configure_route_fails_for_invalid_limits_when_enabled() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             // enabled = true but max_amount = 0 → invalid.
             let bad_cfg = RouteConfig {
                 enabled: true,
@@ -964,8 +960,8 @@ mod tests {
     fn configure_route_fails_when_daily_limit_less_than_max() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             let bad_cfg = RouteConfig {
                 enabled: true,
                 limits: RouteLimits {
@@ -998,8 +994,8 @@ mod tests {
         new_test_ext().execute_with(|| {
             System::set_block_number(1);
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_ok!(Pallet::<Test>::do_configure_route(
                 &id,
                 DomainId::X3Native,
@@ -1014,9 +1010,15 @@ mod tests {
                 DomainId::X3Evm,
                 false,
             ));
-            let route = <Pallet<Test> as RouteInspect>::route(&id, DomainId::X3Native, DomainId::X3Evm).unwrap();
+            let route =
+                <Pallet<Test> as RouteInspect>::route(&id, DomainId::X3Native, DomainId::X3Evm)
+                    .unwrap();
             assert!(!route.enabled);
-            assert!(!<Pallet<Test> as RouteInspect>::is_route_open(&id, DomainId::X3Native, DomainId::X3Evm));
+            assert!(!<Pallet<Test> as RouteInspect>::is_route_open(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm
+            ));
 
             // Re-enable.
             assert_ok!(AssetRegistry::set_route_enabled(
@@ -1026,7 +1028,11 @@ mod tests {
                 DomainId::X3Evm,
                 true,
             ));
-            assert!(<Pallet<Test> as RouteInspect>::is_route_open(&id, DomainId::X3Native, DomainId::X3Evm));
+            assert!(<Pallet<Test> as RouteInspect>::is_route_open(
+                &id,
+                DomainId::X3Native,
+                DomainId::X3Evm
+            ));
         });
     }
 
@@ -1034,8 +1040,8 @@ mod tests {
     fn set_route_enabled_fails_for_nonexistent_route() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert_noop!(
                 AssetRegistry::set_route_enabled(
                     RuntimeOrigin::root(),
@@ -1054,9 +1060,8 @@ mod tests {
     #[test]
     fn exists_returns_false_for_unknown() {
         new_test_ext().execute_with(|| {
-            let fake_id = x3_asset_kernel_types::derive_asset_id(
-                DomainId::Ethereum, 1, b"\x00", b"FAKE", 6,
-            );
+            let fake_id =
+                x3_asset_kernel_types::derive_asset_id(DomainId::Ethereum, 1, b"\x00", b"FAKE", 6);
             assert!(!<Pallet<Test> as AssetRegistryInspect>::exists(&fake_id));
         });
     }
@@ -1065,8 +1070,8 @@ mod tests {
     fn exists_returns_true_after_registration() {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
-            let id =
-                Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy).unwrap();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
             assert!(<Pallet<Test> as AssetRegistryInspect>::exists(&id));
         });
     }
@@ -1076,8 +1081,15 @@ mod tests {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, _) = usdc_eth();
             let id = Pallet::<Test>::do_register_asset(
-                sym, name, dec, dom, chain, addr, SupplyPolicy::NativeMintBurn,
-            ).unwrap();
+                sym,
+                name,
+                dec,
+                dom,
+                chain,
+                addr,
+                SupplyPolicy::NativeMintBurn,
+            )
+            .unwrap();
             assert_eq!(
                 <Pallet<Test> as AssetRegistryInspect>::supply_policy(&id),
                 Some(SupplyPolicy::NativeMintBurn)
@@ -1105,11 +1117,17 @@ mod tests {
         new_test_ext().execute_with(|| {
             let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
             let id1 = Pallet::<Test>::do_register_asset(
-                sym.clone(), name.clone(), dec, dom, chain, addr.clone(), policy,
-            ).unwrap();
+                sym.clone(),
+                name.clone(),
+                dec,
+                dom,
+                chain,
+                addr.clone(),
+                policy,
+            )
+            .unwrap();
             // Duplicate registration fails, but the id is deterministic.
-            let computed =
-                x3_asset_kernel_types::derive_asset_id(dom, chain, &addr, &sym, dec);
+            let computed = x3_asset_kernel_types::derive_asset_id(dom, chain, &addr, &sym, dec);
             assert_eq!(id1, computed);
         });
     }
@@ -1118,13 +1136,25 @@ mod tests {
     fn different_chains_produce_different_asset_ids() {
         new_test_ext().execute_with(|| {
             let id_eth = Pallet::<Test>::do_register_asset(
-                b"USDC".to_vec(), b"USD Coin".to_vec(), 6,
-                DomainId::Ethereum, 1, vec![0xA0; 20], SupplyPolicy::LockMint,
-            ).unwrap();
+                b"USDC".to_vec(),
+                b"USD Coin".to_vec(),
+                6,
+                DomainId::Ethereum,
+                1,
+                vec![0xA0; 20],
+                SupplyPolicy::LockMint,
+            )
+            .unwrap();
             let id_base = Pallet::<Test>::do_register_asset(
-                b"USDC".to_vec(), b"USD Coin".to_vec(), 6,
-                DomainId::Base, 8453, vec![0x83; 20], SupplyPolicy::LockMint,
-            ).unwrap();
+                b"USDC".to_vec(),
+                b"USD Coin".to_vec(),
+                6,
+                DomainId::Base,
+                8453,
+                vec![0x83; 20],
+                SupplyPolicy::LockMint,
+            )
+            .unwrap();
             assert_ne!(id_eth, id_base);
         });
     }

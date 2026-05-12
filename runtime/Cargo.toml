@@ -132,6 +132,7 @@ sp-offchain = { workspace = true, default-features = false }
 # upstream; we patch frame-support-procedural locally if that gap manifests.
 sp-runtime = { workspace = true, default-features = false, features = ["serde"] }
 sp-session = { workspace = true, default-features = false }
+sp-staking = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 sp-transaction-pool = { workspace = true, default-features = false }
 sp-version = { workspace = true, default-features = false, features = ["serde"] }
@@ -245,6 +246,7 @@ std = [
 	"sp-offchain/std",
 	"sp-runtime/std",
 	"sp-session/std",
+	"sp-staking/std",
 	"sp-std/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",

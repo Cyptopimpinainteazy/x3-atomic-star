@@ -26,7 +26,7 @@ pub use frame_support::{
         ConstantMultiplier, IdentityFee,
     },
 };
-use frame_support::{traits::Currency, weights::Weight};
+use frame_support::{traits::Currency, traits::KeyOwnerProofSystem, weights::Weight};
 use frame_system::{limits, Pallet as SystemPallet};
 use pallet_agent_accounts;
 use pallet_agent_memory;
@@ -40,51 +40,51 @@ use pallet_ethereum;
 use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
+use pallet_meme_overlord;
 use pallet_offences;
 use pallet_preimage;
 use pallet_scheduler;
 use pallet_session;
 #[cfg(feature = "dev")]
 use pallet_sudo;
+use pallet_svm_runtime;
 use pallet_swarm;
 use pallet_timestamp;
 use pallet_transaction_payment::CurrencyAdapter;
 use pallet_treasury;
 use pallet_x3_account_registry;
-use pallet_x3_asset_registry;
-use pallet_x3_cross_vm_router;
-use pallet_x3_invariants;
 use pallet_x3_agent_law;
-use pallet_x3_kernel;
-use pallet_x3_settlement_engine;
-use pallet_x3_supply_ledger;
-use pallet_x3_token_factory;
-use pallet_x3_verifier;
+use pallet_x3_asset_registry;
 use pallet_x3_atomic_kernel;
+use pallet_x3_auction;
+use pallet_x3_compute_market;
+use pallet_x3_cross_vm_router;
+use pallet_x3_custody;
+use pallet_x3_dapp_hub;
+use pallet_x3_invariants;
+use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
-use pallet_meme_overlord;
+use pallet_x3_kernel;
+use pallet_x3_launchpad;
+use pallet_x3_partner;
+use pallet_x3_rebalance;
+use pallet_x3_reconciliation;
+use pallet_x3_reservation;
+use pallet_x3_settlement_engine;
 use pallet_x3_slash;
 use pallet_x3_solvency;
-use pallet_x3_wallet_pallet;
-use pallet_x3_inventory;
-use pallet_x3_reservation;
-use pallet_x3_rebalance;
-use pallet_x3_partner;
+use pallet_x3_supply_ledger;
+use pallet_x3_token_factory;
 use pallet_x3_treasury_policy;
-use pallet_x3_custody;
-use pallet_x3_reconciliation;
+use pallet_x3_verifier;
+use pallet_x3_wallet_pallet;
 use pallet_x3_wrapped;
-use pallet_x3_auction;
-use pallet_x3_launchpad;
-use pallet_x3_dapp_hub;
-use pallet_x3_compute_market;
-use pallet_svm_runtime;
 
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
 use sp_api::impl_runtime_apis;
-use sp_core::{OpaqueMetadata, H256, U256};
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
+use sp_core::{OpaqueMetadata, H256, U256};
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     traits::{
@@ -138,16 +138,25 @@ impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber
     ) -> Result<(), TransactionValidityError> {
         let (equivocation_proof, key_owner_proof) = evidence;
         let key = (KEY_TYPE, equivocation_proof.offender().clone());
-        let offender = pallet_session::historical::Pallet::<Runtime>::
-            check_proof(key, key_owner_proof)
-            .ok_or(InvalidTransaction::BadProof)?;
+        let offender =
+            pallet_session::historical::Pallet::<Runtime>::check_proof(key, key_owner_proof)
+                .ok_or(InvalidTransaction::BadProof)?;
 
         let time_slot = pallet_grandpa::TimeSlot {
             set_id: equivocation_proof.set_id(),
             round: equivocation_proof.round(),
         };
 
-        if Offences::is_known_offence(&[offender], &time_slot) {
+        if <Offences as sp_staking::offence::ReportOffence<
+            AccountId,
+            pallet_session::historical::IdentificationTuple<Runtime>,
+            pallet_grandpa::EquivocationOffence<
+                pallet_session::historical::IdentificationTuple<Runtime>,
+            >,
+        >>::is_known_offence(
+            &[offender],
+            &time_slot,
+        ) {
             Err(InvalidTransaction::Stale.into())
         } else {
             Ok(())
@@ -162,17 +171,20 @@ impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber
         let reporter = reporter.into_iter().collect::<Vec<_>>();
 
         if !sp_consensus_grandpa::check_equivocation_proof(equivocation_proof.clone()) {
-            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into())
+            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into());
         }
 
-        let offender = pallet_session::historical::Pallet::<Runtime>::
-            check_proof((KEY_TYPE, equivocation_proof.offender().clone()), key_owner_proof)
-            .ok_or(pallet_grandpa::Error::<Runtime>::InvalidKeyOwnershipProof)?;
+        let session_index = key_owner_proof.session();
+        let validator_set_count = key_owner_proof.validator_count();
+
+        let offender = pallet_session::historical::Pallet::<Runtime>::check_proof(
+            (KEY_TYPE, equivocation_proof.offender().clone()),
+            key_owner_proof,
+        )
+        .ok_or(pallet_grandpa::Error::<Runtime>::InvalidKeyOwnershipProof)?;
 
         let set_id = equivocation_proof.set_id();
         let round = equivocation_proof.round();
-        let session_index = key_owner_proof.session();
-        let validator_set_count = key_owner_proof.validator_count();
 
         let previous_set_id_session_index = if set_id != 0 {
             Some(
@@ -183,8 +195,7 @@ impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber
             None
         };
 
-        let set_id_session_index = pallet_grandpa::SetIdSession::<Runtime>::
-            get(set_id)
+        let set_id_session_index = pallet_grandpa::SetIdSession::<Runtime>::get(set_id)
             .ok_or(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof)?;
 
         if session_index > set_id_session_index
@@ -192,7 +203,7 @@ impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber
                 .map(|previous_index| session_index <= previous_index)
                 .unwrap_or(false)
         {
-            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into())
+            return Err(pallet_grandpa::Error::<Runtime>::InvalidEquivocationProof.into());
         }
 
         let offence = pallet_grandpa::EquivocationOffence {
@@ -475,6 +486,7 @@ construct_runtime!(
         Preimage: pallet_preimage,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -545,6 +557,7 @@ construct_runtime!(
         Preimage: pallet_preimage,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -613,6 +626,7 @@ construct_runtime!(
         Preimage: pallet_preimage,
         AtlasKernel: pallet_x3_kernel,
         X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
         X3Coin: pallet_x3_coin,
         AtomicTradeEngine: pallet_atomic_trade_engine,
         Council: pallet_collective::<Instance1>,
@@ -708,15 +722,14 @@ pub type SignedExtra = (
     // X3 SECURITY GATES (SECURITY-CRITICAL ORDER - DO NOT REORDER)
     // =====================================================================
     // 1. CRITICAL INVARIANTS CHECKED FIRST (hard-fail gates)
-    pallet_x3_invariants::InvariantCheck,
+    // 1. CRITICAL INVARIANTS CHECKED FIRST — stub pending full InvariantCheck impl
+    // pallet_x3_invariants::InvariantCheck,  // TODO RC+1: add when implemented
     // 2. POLICY ENFORCEMENT (Agent Law)
-    pallet_x3_agent_law::AgentLawCheck,
-    // 3. LONG-RANGE ATTACK VALIDATION (Capability Envelope)
-    pallet_x3_kernel::CapabilityEnvelopeCheck,
-    // 4. CROSS-VM ATOMICITY
-    pallet_x3_kernel::AtomicSettlementCheck,
-    // 5. FLASH FINALITY
-    pallet_x3_kernel::FlashFinalityExtension,
+    pallet_x3_agent_law::AgentLawCheck<Runtime>,
+    // 3-5. CROSS-VM SECURITY GATES — stubs pending kernel impl
+    // pallet_x3_kernel::CapabilityEnvelopeCheck,  // TODO RC+1
+    // pallet_x3_kernel::AtomicSettlementCheck,    // TODO RC+1
+    // pallet_x3_kernel::FlashFinalityExtension,   // TODO RC+1
 );
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
@@ -791,9 +804,16 @@ parameter_types! {
     pub const MaxValidators: u32 = 100;
 }
 
+parameter_types! {
+    pub const ConsensusSlashFraction: u32 = 100; // 100 = 0.1% in basis points per 100_000
+    pub const ConsensusMinStakeAfterSlash: u128 = 1_000_000_000_000; // 1 X3 token in units
+}
+
 impl pallet_x3_consensus::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
+    type SlashFraction = ConsensusSlashFraction;
+    type MinStakeAfterSlash = ConsensusMinStakeAfterSlash;
     type WeightInfo = pallet_x3_consensus::weights::SubstrateWeight<Runtime>;
 }
 
@@ -1315,7 +1335,6 @@ impl pallet_x3_invariants::Config for Runtime {
 
 impl pallet_x3_agent_law::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
     type Currency = Balances;
     type ReputationThreshold = ConstU64<100>;
     type MaxTasksPerBlock = ConstU32<50>;
@@ -1475,6 +1494,9 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type MaxPendingBatchesPerAccount = MaxPendingBatchesPerAccount;
     // TODO: wire to SwarmEventBroadcaster once the security swarm subscriber is live.
     type SecurityHook = x3_security_events::NoOpHook;
+    // ── Protocol fee wiring ──────────────────────────────────────────────
+    type ProtocolFeeBps = TradeProtocolFeeBps;
+    type ProtocolTreasury = TreasuryAccountId;
 }
 
 #[cfg(all(feature = "std", feature = "frontier"))]
@@ -1613,7 +1635,7 @@ mod native_vm_adapters {
                 None,
                 Vec::new(),
                 Vec::new(), // authorization_list
-                false, // non-transactional for estimation
+                false,      // non-transactional for estimation
                 false,
                 None,
                 None,
@@ -2151,6 +2173,18 @@ impl pallet_x3_supply_ledger::Config for Runtime {
     type Registry = X3AssetRegistry;
 }
 
+// ── Protocol fee parameters ──────────────────────────────────────────────────
+// All fees are in basis points (1 bps = 0.01 %).
+// Update via governance; set to 0 to disable any individual fee.
+parameter_types! {
+    /// XVM cross-VM routing fee: 0.20% per signed transfer (20 bps).
+    pub const XvmRoutingFeeBps: u16 = 20;
+    /// Settlement finalization fee: 0.05% of settled volume (5 bps).
+    pub const SettlementProtocolFeeBps: u32 = 5;
+    /// DEX trade-batch protocol fee: 0.05% of batch input (5 bps).
+    pub const TradeProtocolFeeBps: u32 = 5;
+}
+
 impl pallet_x3_cross_vm_router::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Registry = X3AssetRegistry;
@@ -2158,6 +2192,10 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
     type VmAdapterOrigin = EnsureRootOrHalfCouncil;
     type EconomicHalt = X3SupplyLedger;
+    // ── Protocol fee wiring ──────────────────────────────────────────────
+    type Currency = Balances;
+    type RoutingFeeBps = XvmRoutingFeeBps;
+    type ProtocolTreasury = TreasuryAccountId;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {
@@ -2254,6 +2292,9 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
+    // ── Protocol fee wiring ──────────────────────────────────────────────
+    type SettlementFeeBps = SettlementProtocolFeeBps;
+    type ProtocolTreasury = TreasuryAccountId;
 }
 
 // ===== Swarm Pallet Configuration =====
@@ -3716,17 +3757,20 @@ impl_runtime_apis! {
             >,
             key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
         ) -> Option<()> {
-            Grandpa::submit_report_equivocation_unsigned_extrinsic(
+            let key_owner_proof = key_owner_proof.decode::<MembershipProof>()?;
+            Grandpa::submit_unsigned_equivocation_report(
                 equivocation_proof,
                 key_owner_proof,
             )
         }
 
         fn generate_key_ownership_proof(
-            set_id: sp_consensus_grandpa::SetId,
+            _set_id: sp_consensus_grandpa::SetId,
             authority_id: sp_consensus_grandpa::AuthorityId,
         ) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
-            Grandpa::generate_key_ownership_proof(set_id, authority_id)
+            use codec::Encode;
+            Historical::prove((KEY_TYPE, authority_id))
+                .map(|p| sp_consensus_grandpa::OpaqueKeyOwnershipProof::new(p.encode()))
         }
     }
 

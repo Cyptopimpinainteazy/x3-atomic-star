@@ -265,6 +265,7 @@ sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable25
 sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-staking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
@@ -360,13 +361,26 @@ jsonrpsee = { version = "0.24.10", default-features = false, features = ["macros
 
 # Build profiles - reduce codegen-units to avoid LLVM SIGSEGV crashes in 1.85
 [profile.release]
-codegen-units = 1
+codegen-units = 16
 lto = false
 opt-level = 2
 
 [profile.release.build-override]
+opt-level = 0
+codegen-units = 16
+
+# Work around rustc 1.88 ICE (SIGSEGV) when compiling old crates at high opt
+[profile.release.package.futures]
 opt-level = 1
-codegen-units = 1
+codegen-units = 16
+
+[profile.release.package.syn]
+opt-level = 1
+codegen-units = 16
+
+[profile.release.package.rustix]
+opt-level = 1
+codegen-units = 16
 
 # [package.metadata.tarpaulin]
 # run-types = ["Tests"]

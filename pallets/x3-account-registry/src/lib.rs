@@ -204,7 +204,9 @@ pub mod pallet {
 mod tests {
     use super::pallet::*;
     use crate as pallet_x3_account_registry;
-    use frame_support::{assert_noop, assert_ok, construct_runtime, parameter_types, traits::ConstU32};
+    use frame_support::{
+        assert_noop, assert_ok, construct_runtime, parameter_types, traits::ConstU32,
+    };
     use frame_system as system;
     use sp_core::H256;
     use sp_io::TestExternalities;
@@ -457,9 +459,9 @@ mod tests {
             ));
             assert_eq!(AccountRegistry::account_count(), 1);
 
-            assert_ok!(AccountRegistry::deregister_account(
-                RuntimeOrigin::signed(ALICE)
-            ));
+            assert_ok!(AccountRegistry::deregister_account(RuntimeOrigin::signed(
+                ALICE
+            )));
 
             assert!(AccountRegistry::account_registry(ALICE).is_none());
             assert!(AccountRegistry::atlas_registry(ATLAS_ALICE).is_none());
@@ -478,9 +480,9 @@ mod tests {
                 AccountKind::Eoa,
                 b"alice".to_vec(),
             ));
-            assert_ok!(AccountRegistry::deregister_account(
-                RuntimeOrigin::signed(ALICE)
-            ));
+            assert_ok!(AccountRegistry::deregister_account(RuntimeOrigin::signed(
+                ALICE
+            )));
             System::assert_last_event(
                 Event::AccountDeregistered {
                     account: ALICE,
@@ -510,9 +512,9 @@ mod tests {
                 AccountKind::Eoa,
                 b"alice".to_vec(),
             ));
-            assert_ok!(AccountRegistry::deregister_account(
-                RuntimeOrigin::signed(ALICE)
-            ));
+            assert_ok!(AccountRegistry::deregister_account(RuntimeOrigin::signed(
+                ALICE
+            )));
             // BOB should now be able to claim ATLAS_ALICE.
             assert_ok!(AccountRegistry::register_account(
                 RuntimeOrigin::signed(BOB),
@@ -539,9 +541,9 @@ mod tests {
                 AccountKind::Eoa,
                 b"bob".to_vec(),
             ));
-            assert_ok!(AccountRegistry::deregister_account(
-                RuntimeOrigin::signed(ALICE)
-            ));
+            assert_ok!(AccountRegistry::deregister_account(RuntimeOrigin::signed(
+                ALICE
+            )));
             // BOB must be untouched.
             assert_eq!(AccountRegistry::account_registry(BOB), Some(ATLAS_BOB));
             assert_eq!(AccountRegistry::account_count(), 1);
@@ -667,9 +669,9 @@ mod tests {
                 b"alice".to_vec(),
             ));
             // Deregister ALICE.
-            assert_ok!(AccountRegistry::deregister_account(
-                RuntimeOrigin::signed(ALICE)
-            ));
+            assert_ok!(AccountRegistry::deregister_account(RuntimeOrigin::signed(
+                ALICE
+            )));
             // Re-register ALICE with ATLAS_BOB — different atlas id.
             assert_ok!(AccountRegistry::register_account(
                 RuntimeOrigin::signed(ALICE),

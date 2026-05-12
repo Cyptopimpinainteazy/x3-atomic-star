@@ -177,6 +177,16 @@ pub mod pallet {
         /// Ensures settlements cannot remain in pending state indefinitely.
         #[pallet::constant]
         type SettlementTimeoutBlocks: Get<BlockNumberFor<Self>>;
+
+        /// Protocol fee on finalized settlements, in basis points (1/10_000).
+        /// Charged from the maker's native X3 balance at finalization time.
+        /// Set to 0 to disable.  RC-1 default: 5 (0.05 %).
+        #[pallet::constant]
+        type SettlementFeeBps: Get<u32>;
+
+        /// Account that receives collected settlement fees (on-chain treasury).
+        #[pallet::constant]
+        type ProtocolTreasury: Get<<Self as frame_system::Config>::AccountId>;
     }
 
     // ============================================================================
@@ -466,6 +476,9 @@ pub mod pallet {
             settlement_time_ms: u64,
         },
 
+        /// Protocol settlement fee collected at finalization.
+        SettlementFeeCollected { intent_id: H256, fee: BalanceOf<T> },
+
         /// Settlement refunded on X3 (timeout or failure)
         /// [intent_id, reason]
         X3Refunded {
@@ -510,7 +523,9 @@ pub mod pallet {
             amount_slashed: BalanceOf<T>,
         },
 
-        /// Settlement transfer executed by relayer (PHASE C STUB)
+        /// Settlement transfer executed by relayer
+        /// TESTNET_ONLY: relayer authorization limited to governance-approved list;
+        /// full decentralized relayer set ships post-RC1.
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         SettlementExecuted {
             transfer_id: H256,
@@ -518,7 +533,9 @@ pub mod pallet {
             amount: BalanceOf<T>,
         },
 
-        /// Refund triggered for transfer that exceeded timeout (PHASE C STUB)
+        /// Refund triggered for transfer that exceeded timeout
+        /// TESTNET_ONLY: automatic refund is governance-gated; post-RC1 this is
+        /// fully autonomous and slashes the offending relayer.
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         RefundTriggered { transfer_id: H256 },
 
@@ -753,13 +770,13 @@ pub mod pallet {
                 now
             );
 
-            // Phase 1b: Stub implementation. In Phase 1c, implement full OCW:
-            // 1. Iterate PendingIntents to find intents in Finalized state
-            // 2. Check off-chain storage for settlement finalization markers
-            // 3. Extract bundle_id, receipt_root, finality_cert
-            // 4. Submit unsigned transaction to atomic-kernel::finalize_with_settlement
-            //
-            // For now, log that the OCW ran (proves the hook is wired).
+            // TESTNET_ONLY: OCW stub — logs that the hook is wired and active.
+            // DISABLED_POST_RC1: Replace with full OCW implementation:
+            //   Phase 1c plan:
+            //   1. Iterate PendingIntents for intents in Finalized state
+            //   2. Check off-chain storage for settlement finalization markers
+            //   3. Extract bundle_id, receipt_root, finality_cert
+            //   4. Submit unsigned tx: atomic-kernel::finalize_with_settlement
             log::info!(
                 target: "x3-settlement-engine",
                 "[OCW] Settlement finalization hook active at block {:?}",
@@ -1539,7 +1556,8 @@ pub mod pallet {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // SETTLEMENT EXECUTION (PHASE C STUB)
+        // SETTLEMENT EXECUTION — TESTNET_ONLY
+        // DISABLED_POST_RC1: Full decentralized relayer set + slashing ships post-RC1.
         // ────────────────────────────────────────────────────────────────────
 
         /// Execute settlement transfer from executor (bridge/settlement relay)
@@ -2120,6 +2138,27 @@ pub mod pallet {
             // Update volume statistics
             let volume = intent.asset_a.amount.saturating_add(intent.asset_b.amount);
             TotalSettledVolume::<T>::mutate(|v| *v = v.saturating_add(volume));
+
+            // ── Protocol settlement fee (best-effort, does not block finalization) ──
+            let fee_bps = T::SettlementFeeBps::get() as u128;
+            if fee_bps > 0 {
+                let fee_raw = (volume as u128)
+                    .saturating_mul(fee_bps)
+                    .saturating_div(10_000);
+                if fee_raw > 0 {
+                    let fee: BalanceOf<T> = fee_raw.saturated_into();
+                    if <T as Config>::Currency::transfer(
+                        &intent.maker,
+                        &T::ProtocolTreasury::get(),
+                        fee,
+                        frame_support::traits::ExistenceRequirement::KeepAlive,
+                    )
+                    .is_ok()
+                    {
+                        Self::deposit_event(Event::SettlementFeeCollected { intent_id, fee });
+                    }
+                }
+            }
 
             let now_secs = T::UnixTime::now().as_secs();
             Self::deposit_event(Event::X3Finalized {
