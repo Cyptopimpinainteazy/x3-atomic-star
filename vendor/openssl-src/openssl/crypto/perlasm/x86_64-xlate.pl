@@ -439,7 +439,7 @@ my %globals;
 	    my $mnemonic = $self->{opcode}->mnemonic();
 	    ($self->{asterisk})				&& ($sz="q") ||
 	    ($mnemonic =~ /^v?mov([qd])$/)		&& ($sz=$1)  ||
-	    ($mnemonic =~ /^v?pinsr([qdwb])$/)		&& ($sz=$1)  ||
+	    ($mnemofic =~ /^v?pinsr([qdwb])$/)		&& ($sz=$1)  ||
 	    ($mnemonic =~ /^vbroadcasti32x4$/)		&& ($sz="x") ||
 	    ($mnemonic =~ /^vpbroadcast([qdwb])$/)	&& ($sz=$1)  ||
 	    ($mnemonic =~ /^v(?!perm)[a-z]+[fi]128$/)	&& ($sz="x");

@@ -12,7 +12,7 @@ The current repo is aligned to an internal RC-1 scope, but the evidence is not y
 
 - The safe launch posture is a public canary/testnet reveal, not a broad mainnet announcement.
 - Existing RC-1 gate artifacts are provisional and must be regenerated.
-- `proof/reports/features_report.md` currently reports 0 built, 37 missing, 12 unwired, 7 untested, and 2 weak.
+- `proof/reports/feature_status.json` is the authoritative machine-readable readiness source and currently reports `BLOCKED` with `built_count: 0`, `missing_count: 37`, `unwired_count: 12`, and `untested_count: 7`.
 - `proof/reports/gap_gate_mainnet_20260426_194429.txt` reports 113 gaps, including 24 S0 blockers.
 - The authoritative readiness story is now the canary plan and gate-state reconciliation, supported by the mainnet proof gate plan.
 - Public messaging must defer external bridges, PQ, AI, GPU, and advanced DEX until audited.

@@ -215,7 +215,11 @@ fn record_revenue_works() {
         setup_policy(POLICY_ID);
         let id = register_and_approve(DEV);
 
-        assert_ok!(DappHub::record_revenue(RuntimeOrigin::root(), id, 1_000_000));
+        assert_ok!(DappHub::record_revenue(
+            RuntimeOrigin::root(),
+            id,
+            1_000_000
+        ));
 
         let dapp = DApps::<Test>::get(id).unwrap();
         assert_eq!(dapp.total_revenue_collected, 1_000_000);
@@ -237,7 +241,10 @@ fn record_revenue_correct_split() {
         assert_ok!(DappHub::record_revenue(RuntimeOrigin::root(), id, gross));
 
         let earnings = DeveloperEarnings::<Test>::get(DEV);
-        assert_eq!(earnings, 7_000_000, "developer must receive 70 % = 7 000 000");
+        assert_eq!(
+            earnings, 7_000_000,
+            "developer must receive 70 % = 7 000 000"
+        );
 
         let dapp = DApps::<Test>::get(id).unwrap();
         assert_eq!(dapp.total_developer_paid, 7_000_000);
@@ -319,7 +326,10 @@ fn set_revenue_policy_invalid_sum_fails() {
         use x3_revenue_sharing::{RevenueDestination, RevenueSplitEntry, RevenueSplitPolicy};
 
         fn empty() -> RevenueSplitEntry {
-            RevenueSplitEntry { destination: RevenueDestination::Treasury, share_bps: 0 }
+            RevenueSplitEntry {
+                destination: RevenueDestination::Treasury,
+                share_bps: 0,
+            }
         }
 
         // 4000 + 5000 = 9000 — one basis point short
@@ -358,7 +368,10 @@ fn set_revenue_policy_non_governance_fails() {
         use x3_revenue_sharing::{RevenueDestination, RevenueSplitEntry, RevenueSplitPolicy};
 
         fn empty() -> RevenueSplitEntry {
-            RevenueSplitEntry { destination: RevenueDestination::Treasury, share_bps: 0 }
+            RevenueSplitEntry {
+                destination: RevenueDestination::Treasury,
+                share_bps: 0,
+            }
         }
 
         let policy = RevenueSplitPolicy {
@@ -394,15 +407,26 @@ fn withdraw_earnings_works() {
         let id = register_and_approve(DEV);
 
         // Record 10 M gross → 7 M developer earnings.
-        assert_ok!(DappHub::record_revenue(RuntimeOrigin::root(), id, 10_000_000));
+        assert_ok!(DappHub::record_revenue(
+            RuntimeOrigin::root(),
+            id,
+            10_000_000
+        ));
         assert_eq!(DeveloperEarnings::<Test>::get(DEV), 7_000_000);
 
         // Withdraw 3 M.
-        assert_ok!(DappHub::withdraw_earnings(RuntimeOrigin::signed(DEV), 3_000_000));
+        assert_ok!(DappHub::withdraw_earnings(
+            RuntimeOrigin::signed(DEV),
+            3_000_000
+        ));
         assert_eq!(DeveloperEarnings::<Test>::get(DEV), 4_000_000);
 
         System::assert_last_event(
-            Event::EarningsWithdrawn { developer: DEV, amount: 3_000_000 }.into()
+            Event::EarningsWithdrawn {
+                developer: DEV,
+                amount: 3_000_000,
+            }
+            .into(),
         );
     });
 }
@@ -414,7 +438,11 @@ fn withdraw_earnings_insufficient_fails() {
         setup_policy(POLICY_ID);
         let id = register_and_approve(DEV);
 
-        assert_ok!(DappHub::record_revenue(RuntimeOrigin::root(), id, 10_000_000));
+        assert_ok!(DappHub::record_revenue(
+            RuntimeOrigin::root(),
+            id,
+            10_000_000
+        ));
         // 7 M accrued; try to withdraw 8 M → must fail.
         assert_noop!(
             DappHub::withdraw_earnings(RuntimeOrigin::signed(DEV), 8_000_000),

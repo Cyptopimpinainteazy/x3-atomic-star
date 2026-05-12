@@ -362,7 +362,7 @@ where
 pub unsafe fn OleCreateFromFileEx<P0, P1, P2, P3>(rclsid: *const ::windows_core::GUID, lpszfilename: P0, riid: *const ::windows_core::GUID, dwflags: OLECREATE, renderopt: OLERENDER, cformats: u32, rgadvf: *const u32, rgformatetc: *const super::Com::FORMATETC, lpadvisesink: P1, rgdwconnection: *mut u32, pclientsite: P2, pstg: P3, ppvobj: *mut *mut ::core::ffi::c_void) -> ::windows_core::Result<()>
 where
     P0: ::windows_core::IntoParam<::windows_core::PCWSTR>,
-    P1: ::windows_core::IntoParam<super::Com::IAdviseSink>,
+    P1: :zwindows_core::IntoParam<super::Com::IAdviseSink>,
     P2: ::windows_core::IntoParam<IOleClientSite>,
     P3: ::windows_core::IntoParam<super::Com::StructuredStorage::IStorage>,
 {

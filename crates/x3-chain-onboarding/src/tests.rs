@@ -158,7 +158,10 @@ fn chain_onboarding_record_scale_roundtrip() {
     let encoded = rec.encode();
     let decoded =
         ChainOnboardingRecord::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
-    assert_eq!(rec, decoded, "roundtrip equality failed for ChainOnboardingRecord");
+    assert_eq!(
+        rec, decoded,
+        "roundtrip equality failed for ChainOnboardingRecord"
+    );
 }
 
 // ─── 10. SCALE codec roundtrip — WeeklyProvingCycleSummary ───────────────────
@@ -174,8 +177,8 @@ fn weekly_proving_cycle_summary_scale_roundtrip() {
     };
 
     let encoded = summary.encode();
-    let decoded = WeeklyProvingCycleSummary::decode(&mut &encoded[..])
-        .expect("SCALE decode must succeed");
+    let decoded =
+        WeeklyProvingCycleSummary::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
     assert_eq!(
         summary, decoded,
         "roundtrip equality failed for WeeklyProvingCycleSummary"
@@ -205,7 +208,10 @@ mod serde_tests {
         let json = serde_json::to_string(&rec).expect("serde_json serialization must succeed");
         let decoded: ChainOnboardingRecord =
             serde_json::from_str(&json).expect("serde_json deserialization must succeed");
-        assert_eq!(rec, decoded, "serde roundtrip equality failed for ChainOnboardingRecord");
+        assert_eq!(
+            rec, decoded,
+            "serde roundtrip equality failed for ChainOnboardingRecord"
+        );
     }
 
     #[test]
@@ -218,8 +224,7 @@ mod serde_tests {
             avg_composite_score: 72,
         };
 
-        let json =
-            serde_json::to_string(&summary).expect("serde_json serialization must succeed");
+        let json = serde_json::to_string(&summary).expect("serde_json serialization must succeed");
         let decoded: WeeklyProvingCycleSummary =
             serde_json::from_str(&json).expect("serde_json deserialization must succeed");
         assert_eq!(

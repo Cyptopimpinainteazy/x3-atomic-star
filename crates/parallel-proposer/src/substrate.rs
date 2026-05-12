@@ -5,10 +5,10 @@ use futures::{channel::oneshot, future, FutureExt};
 use log::{debug, info, trace, warn};
 use rayon::prelude::*;
 use sc_block_builder::{BlockBuilderApi, BlockBuilderBuilder};
-use sp_api::CallApiAt;
 use sc_client_api::backend;
 use sc_telemetry::{telemetry, TelemetryHandle, CONSENSUS_INFO};
 use sc_transaction_pool_api::{InPoolTransaction, TransactionPool};
+use sp_api::CallApiAt;
 use sp_api::{ApiExt, ProvideRuntimeApi};
 use sp_blockchain::{ApplyExtrinsicFailed::Validity, Error::ApplyExtrinsicFailed, HeaderBackend};
 use sp_consensus::{Environment, ProofRecording, Proposal, Proposer};
@@ -153,21 +153,12 @@ where
     A: TransactionPool<Block = Block> + 'static,
     B: backend::Backend<Block> + Send + Sync + 'static,
     Block: BlockT,
-    C: CallApiAt<Block>
-        + HeaderBackend<Block>
-        + ProvideRuntimeApi<Block>
-        + Send
-        + Sync
-        + 'static,
+    C: CallApiAt<Block> + HeaderBackend<Block> + ProvideRuntimeApi<Block> + Send + Sync + 'static,
     C::Api: ApiExt<Block> + BlockBuilderApi<Block>,
     PR: ProofRecording,
 {
     type Proposal = Pin<
-        Box<
-            dyn futures::Future<
-                    Output = Result<Proposal<Block, PR::Proof>, Self::Error>,
-                > + Send,
-        >,
+        Box<dyn futures::Future<Output = Result<Proposal<Block, PR::Proof>, Self::Error>> + Send>,
     >;
     type Error = sp_blockchain::Error;
     type ProofRecording = PR;
@@ -206,12 +197,7 @@ where
     A: TransactionPool<Block = Block>,
     B: backend::Backend<Block> + Send + Sync + 'static,
     Block: BlockT,
-    C: CallApiAt<Block>
-        + HeaderBackend<Block>
-        + ProvideRuntimeApi<Block>
-        + Send
-        + Sync
-        + 'static,
+    C: CallApiAt<Block> + HeaderBackend<Block> + ProvideRuntimeApi<Block> + Send + Sync + 'static,
     C::Api: ApiExt<Block> + BlockBuilderApi<Block>,
     PR: ProofRecording,
 {
@@ -221,8 +207,7 @@ where
         inherent_digests: Digest,
         deadline: time::Instant,
         block_size_limit: Option<usize>,
-    ) -> Result<Proposal<Block, PR::Proof>, sp_blockchain::Error>
-    {
+    ) -> Result<Proposal<Block, PR::Proof>, sp_blockchain::Error> {
         let mut block_builder = BlockBuilderBuilder::new(&*self.client)
             .on_parent_block(self.parent_hash)
             .fetch_parent_block_number(&*self.client)?
@@ -235,8 +220,8 @@ where
             .await?;
 
         let (block, storage_changes, proof) = block_builder.build()?.into_inner();
-        let proof = PR::into_proof(proof)
-            .map_err(|e| sp_blockchain::Error::Application(Box::new(e)))?;
+        let proof =
+            PR::into_proof(proof).map_err(|e| sp_blockchain::Error::Application(Box::new(e)))?;
 
         info!(
             target: LOG_TARGET,
@@ -446,7 +431,8 @@ pub fn extract_tx_metadata<E: Encode>(extrinsic: &E, tx_hash: [u8; 32]) -> TxMet
         let mut sender = tx_hash;
         let mut nonce = 0u64;
 
-        if let sp_runtime::generic::Preamble::Signed(address, _signature, extra) = decoded.preamble {
+        if let sp_runtime::generic::Preamble::Signed(address, _signature, extra) = decoded.preamble
+        {
             if let Some(account) = address_to_account(address) {
                 sender.copy_from_slice(account.as_ref());
             }

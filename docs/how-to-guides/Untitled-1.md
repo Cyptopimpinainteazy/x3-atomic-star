@@ -1,5 +1,5 @@
 cargo update -p home@0.5.12 --precise 0.5.9 2>&1
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -100
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -100
 The environmental from git isn't being used for sp-externalities. The issue is sp-externalities comes from polkadot-sdk (not our local workspace), and it's using its own environmental@1.1.3.
 
 Let me check what version polkadot-sdk uses:
@@ -70,14 +70,14 @@ Edited
 Cargo.toml+2-2
 rm Cargo.lock && cargo update 2>&1 | tail -20
 cargo update -p home@0.5.12 --precise 0.5.9 2>&1
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -80
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -80
 Now a different error - use of undeclared crate or module 'std'. The issue is in the macro expansion - when the macro uses std::thread_local!, the calling crate (sp-externalities) doesn't have std in scope because the macro is expanded in the caller's context.
 
 Let me fix this properly - the macro needs to use the fully qualified path:
 
 Edited
 lib.rs+1-5
-cargo clean -p environmental && SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -80
+cargo clean -p environmental && SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -80
 Still failing. The problem is sp-externalities is compiled with no_std where ::std isn't available. The environmental crate has two paths - one for std and one for no_std. Let me look at the full macro:
 
 lib.rs
@@ -140,14 +140,14 @@ Let me try exporting thread_local from the environmental crate itself and using 
 
 Edited
 lib.rs+6-1
-cargo clean -p environmental && SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -60
+cargo clean -p environmental && SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -60
 PROGRESS! The sp-externalities now compiles with the patched environmental! We got past the thread_local issue.
 
 Now we have a new error - assert_eq_size!(usize, u32) is failing because we're on a 64-bit system. This is a check in sp-runtime-interface that expects WASM (32-bit) compilation. This only fails for native builds when WASM build is being checked.
 
 Let me see if this is a feature flag issue:
 
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node --features std 2>&1 | tail -60
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node --features std 2>&1 | tail -60
 cargo tree -p sp-runtime-interface -f '{p} [{f}]' 2>&1 | head -15
 cargo tree -p 'git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#sp-runtime-interface@17.0.0' -f '{p} [{f}]' 2>&1 | head -10
 It already has disable_target_static_assertions feature! Let me check what's enabling it without that flag:
@@ -158,7 +158,7 @@ I see - the assertion is gated on #[cfg(all(not(feature = "std"), not(feature = 
 
 Wait - the error says it's compiling sp-runtime-interface (lib). Let me check which one is failing:
 
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | grep "sp-runtime-interface"
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | grep "sp-runtime-interface"
 It's the polkadot-sdk one. Let me check if it has std feature:
 
 cargo metadata --format-version 1 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); pkg=[p for p in d['packages'] if p['name']=='sp-runtime-interface' and 'polkadot-sdk' in p['source']][0]; print('features:', list(pkg['features'].keys())[:20])" 2>&1
@@ -176,7 +176,7 @@ cargo tree --format '{p} [{f}]' 2>/dev/null | grep "sp-runtime-interface.*polkad
 cargo tree --format '{p} [{f}]' 2>/dev/null | grep "sp-runtime-interface v17.*\[" | head -10
 Interesting - only one with std. The error says polkadot-sdk. Let me try running the build again to see the full error:
 
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | grep -A20 "error\[E0512\]"
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | grep -A20 "error\[E0512\]"
 The error is in polkadot-sdk-dee0edd6eefa0594 which is a separate checkout from our substrate git dep. This is coming from Frontier! Let me check what brings in this polkadot-sdk:
 
 cargo tree -i sp-runtime-interface 2>&1 | grep -A1 "polkadot-sdk"
@@ -204,7 +204,7 @@ Edited
 Cargo.toml+6-0
 rm Cargo.lock && cargo update 2>&1 | tail -20
 cargo update -p home@0.5.12 --precise 0.5.9 2>&1
-SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -80
+SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -80
 Now we have a different problem - two versions of sp_core are being used. The polkadot-sdk version and our substrate rev are incompatible because we only patched a few packages.
 
 Let me add more packages to the patch:
@@ -212,9 +212,9 @@ Let me add more packages to the patch:
 Edited
 Cargo.toml+11-1
 rm Cargo.lock && cargo update 2>&1 | tail -20
-cargo update -p home@0.5.12 --precise 0.5.9 && SKIP_WASM_BUILD=1 cargo check -p atlas-sphere-node 2>&1 | tail -80
+cargo update -p home@0.5.12 --precise 0.5.9 && SKIP_WASM_BUILD=1 cargo check -p x3-chain-node 2>&1 | tail -80
 🎉 IT COMPILED! The build finished successfully with only warnings!
 
 Let me run a quick validation:
 
-SKIP_WASM_BUILD=1 cargo build --release -p atlas-sphere-node 2>&1 | tail -20
+SKIP_WASM_BUILD=1 cargo build --release -p x3-chain-node 2>&1 | tail -20

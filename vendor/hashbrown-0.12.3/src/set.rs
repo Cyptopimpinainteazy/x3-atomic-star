@@ -1992,8 +1992,7 @@ impl<T: fmt::Debug, S, A: Allocator + Clone> fmt::Debug for Entry<'_, T, S, A> {
 /// }
 ///
 /// assert_eq!(set.len(), 3);
-///
-/// // Existing key (take)
+////// // Existing key (take)
 /// match set.entry("c") {
 ///     Entry::Vacant(_) => unreachable!(),
 ///     Entry::Occupied(view) => {

@@ -30,7 +30,8 @@ pub use crate::{
 	types::ProtocolName,
 };
 
-pub use libp2p::{identity::Keypair, multiaddr, Multiaddr, PeerId};
+pub use libp2p::identity::Keypair;
+pub use sc_network_types::{PeerId, multiaddr::{self as multiaddr, Multiaddr}};
 
 use codec::Encode;
 use prometheus_endpoint::Registry;
@@ -180,7 +181,7 @@ impl TryFrom<String> for MultiaddrWithPeerId {
 #[derive(Debug)]
 pub enum ParseErr {
 	/// Error while parsing the multiaddress.
-	MultiaddrParse(multiaddr::Error),
+	MultiaddrParse(multiaddr::ParseError),
 	/// Multihash of the peer ID is invalid.
 	InvalidPeerId,
 	/// The peer ID is missing from the address.
@@ -207,8 +208,8 @@ impl std::error::Error for ParseErr {
 	}
 }
 
-impl From<multiaddr::Error> for ParseErr {
-	fn from(err: multiaddr::Error) -> ParseErr {
+impl From<multiaddr::ParseError> for ParseErr {
+	fn from(err: multiaddr::ParseError) -> ParseErr {
 		Self::MultiaddrParse(err)
 	}
 }

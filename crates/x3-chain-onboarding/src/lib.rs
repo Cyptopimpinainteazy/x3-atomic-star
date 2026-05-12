@@ -42,7 +42,9 @@ mod tests;
 /// Chains advance linearly through the technical, economic, liquidity, and
 /// compliance phases before reaching a terminal state of [`OnboardingPhase::Approved`]
 /// or [`OnboardingPhase::Rejected`].
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum OnboardingPhase {
     /// Phase 0: Technical infrastructure and security proof under review.
@@ -65,7 +67,9 @@ pub enum OnboardingPhase {
 ///
 /// The risk tier influences liquidity limits, insurance reserve requirements,
 /// and the frequency of ongoing review cycles.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum ChainRisk {
     /// Composite score ≥ 85 and no compliance red flags.
@@ -85,7 +89,9 @@ pub enum ChainRisk {
 /// Each field is bounded to 0–100 for the four sub-scores. The `composite_score`
 /// field must be populated by the caller using [`Self::compute_composite`]; it is
 /// stored separately so that it can be persisted and queried without recomputation.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChainOnboardingRecord {
     /// CAIP-2 numeric chain identifier.
@@ -162,9 +168,7 @@ impl ChainOnboardingRecord {
     /// checking approval.
     #[must_use]
     pub fn meets_approval_threshold(&self) -> bool {
-        self.composite_score >= 70
-            && self.compliance_score >= 80
-            && self.technical_score >= 60
+        self.composite_score >= 70 && self.compliance_score >= 80 && self.technical_score >= 60
     }
 }
 
@@ -175,7 +179,9 @@ impl ChainOnboardingRecord {
 /// The proving harness writes one of these per ISO week so that dashboards and
 /// sidecar services can track onboarding throughput without scanning individual
 /// [`ChainOnboardingRecord`]s.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct WeeklyProvingCycleSummary {
     /// ISO 8601 week number this summary covers.

@@ -10,7 +10,11 @@ use x3_automation::{Action, Condition};
 fn register_task_works() {
     new_test_ext().execute_with(|| {
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         let max_fee = 1000;
 
         assert_ok!(Automation::register_task(
@@ -29,7 +33,11 @@ fn register_task_works() {
 fn register_task_requires_signed_origin() {
     new_test_ext().execute_with(|| {
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
 
         assert_noop!(
             Automation::register_task(RuntimeOrigin::none(), condition, action, 1000),
@@ -42,7 +50,11 @@ fn register_task_requires_signed_origin() {
 fn register_task_insufficient_balance() {
     new_test_ext().execute_with(|| {
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
 
         assert_noop!(
             Automation::register_task(RuntimeOrigin::signed(999), condition, action, 50),
@@ -56,7 +68,11 @@ fn cancel_task_works() {
     new_test_ext().execute_with(|| {
         // Register a task
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             condition,
@@ -80,7 +96,11 @@ fn cancel_task_not_owner() {
     new_test_ext().execute_with(|| {
         // Register a task with account 1
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             condition,
@@ -103,7 +123,11 @@ fn execute_task_condition_not_met() {
     new_test_ext().execute_with(|| {
         // Register a task for block 100
         let condition = Condition::BlockNumber(100);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             condition,

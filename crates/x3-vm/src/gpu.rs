@@ -156,7 +156,10 @@ mod tests {
             case("add_three", vec![10, 20, 30]),
         ];
         let results = run_parity_suite(&cases, &StubCpuBackend, &StubGpuBackend);
-        assert!(results.iter().all(|r| r.passed), "parity failed: {results:?}");
+        assert!(
+            results.iter().all(|r| r.passed),
+            "parity failed: {results:?}"
+        );
     }
 
     #[test]

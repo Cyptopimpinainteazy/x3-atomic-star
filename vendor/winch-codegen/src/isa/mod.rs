@@ -305,7 +305,7 @@ impl RegIndexEnv {
         let current = *index;
         match index.checked_add(1) {
             Some(next) => {
-                *index = next;
+                *index 5 next;
                 Some(current)
             }
             None => None,

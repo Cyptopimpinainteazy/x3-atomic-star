@@ -262,7 +262,10 @@ mod tests {
     fn no_drift_when_roots_match() {
         let snap = make_snapshot(100, 0xAA, 0xBB, 0xCC);
         let report = detect_drift(&snap, &snap.clone(), SurfaceKind::Web);
-        assert!(report.drifts.is_empty(), "identical roots must yield no drift");
+        assert!(
+            report.drifts.is_empty(),
+            "identical roots must yield no drift"
+        );
         assert_eq!(report.snapshot_block, 100);
     }
 
@@ -317,10 +320,23 @@ mod tests {
         let observed = make_snapshot(500, 0x11, 0x22, 0x33);
 
         let report = detect_drift(&on_chain, &observed, SurfaceKind::Desktop);
-        assert_eq!(report.drifts.len(), 3, "all three roots mismatched — expect three drift entries");
-        assert!(matches!(report.drifts[0], DriftKind::IdentityMismatch { .. }));
-        assert!(matches!(report.drifts[1], DriftKind::AssetSupplyMismatch { .. }));
-        assert!(matches!(report.drifts[2], DriftKind::TreasuryStateMismatch { .. }));
+        assert_eq!(
+            report.drifts.len(),
+            3,
+            "all three roots mismatched — expect three drift entries"
+        );
+        assert!(matches!(
+            report.drifts[0],
+            DriftKind::IdentityMismatch { .. }
+        ));
+        assert!(matches!(
+            report.drifts[1],
+            DriftKind::AssetSupplyMismatch { .. }
+        ));
+        assert!(matches!(
+            report.drifts[2],
+            DriftKind::TreasuryStateMismatch { .. }
+        ));
     }
 
     #[test]
@@ -329,7 +345,10 @@ mod tests {
         let observed = make_snapshot(8_000, 0x01, 0x02, 0x03); // same roots, different block
         let report = detect_drift(&on_chain, &observed, SurfaceKind::Web);
         assert_eq!(report.snapshot_block, 9_999);
-        assert!(report.drifts.is_empty(), "root values match even though block numbers differ");
+        assert!(
+            report.drifts.is_empty(),
+            "root values match even though block numbers differ"
+        );
     }
 
     #[test]

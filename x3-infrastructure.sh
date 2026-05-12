@@ -12,6 +12,7 @@ NC='\033[0m'
 
 SERVICES=(
   "x3-desktop.service"
+  "x3fronend.service"
   "x3-chain-node.service"
   "cloudflared-tunnel.service"
 )
@@ -79,6 +80,19 @@ cmd_status() {
     print_ok "Tunnel (x3star.net): responding"
   else
     print_warn "Tunnel (x3star.net): not responding"
+  fi
+
+  if curl -s -I https://x3star.org 2>/dev/null | grep -q "200\|302\|404"; then
+    print_ok "Tunnel (x3star.org): responding"
+  else
+    print_warn "Tunnel (x3star.org): not responding"
+  fi
+
+  # Check HTML frontend service
+  if curl -s http://127.0.0.1:4174 -I >/dev/null 2>&1; then
+    print_ok "HTML frontend (port 4174): responding"
+  else
+    print_warn "HTML frontend (port 4174): not responding"
   fi
 
   echo ""

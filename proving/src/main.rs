@@ -114,14 +114,7 @@ async fn main() -> Result<()> {
         let rollback_correctness = r_rollback.score;
         let reconciliation_accuracy = r_recon.score;
 
-        let all_checks = vec![
-            r_quoting,
-            r_bundle,
-            r_submit,
-            r_rollback,
-            r_recon,
-            r_state,
-        ];
+        let all_checks = vec![r_quoting, r_bundle, r_submit, r_rollback, r_recon, r_state];
 
         // Determine per-chain status from metrics vs. thresholds.
         let all_failed = all_checks.iter().all(|c| !c.passed);

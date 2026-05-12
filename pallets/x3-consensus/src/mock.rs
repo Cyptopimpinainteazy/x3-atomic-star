@@ -24,7 +24,12 @@ pub struct MockSessionHandler;
 impl pallet_session::SessionHandler<u64> for MockSessionHandler {
     const KEY_TYPE_IDS: &'static [sp_runtime::KeyTypeId] = &[UintAuthorityId::ID];
     fn on_genesis_session<Ks: OpaqueKeys>(_keys: &[(u64, Ks)]) {}
-    fn on_new_session<Ks: OpaqueKeys>(_changed: bool, _validators: &[(u64, Ks)], _queued_validators: &[(u64, Ks)]) {}
+    fn on_new_session<Ks: OpaqueKeys>(
+        _changed: bool,
+        _validators: &[(u64, Ks)],
+        _queued_validators: &[(u64, Ks)],
+    ) {
+    }
     fn on_before_session_ending() {}
     fn on_disabled(_validator_index: u32) {}
 }

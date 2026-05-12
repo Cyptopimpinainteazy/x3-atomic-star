@@ -1,9 +1,9 @@
+#[cfg(not(feature = "std"))]
+use alloc::format;
 /// Trade History Persistence — Store and query user trade history for tax & performance reporting
 /// Integrates with Tauri SQLite database for persistent, queryable trade records
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::prelude::*;
-#[cfg(not(feature = "std"))]
-use alloc::format;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
 pub struct TradeRecord {

@@ -58,6 +58,7 @@
         { href: "/x3star-affiliate.html", title: "Affiliate", description: "Partner intake and referral applications." },
         { href: "/x3star-grant-hub.html", title: "Grant Hub", description: "Ecosystem grant directory and targets." },
         { href: "/x3star-grant-mission-control.html", title: "Grant Mission Control", description: "Grant submission and status surface." },
+        { href: "/funding/index.html", title: "Funding Hub", description: "Public funding portal and system operations." },
         { href: "/x3star-bounty-board.html", title: "Bounty Board", description: "Open work and contributor rewards." },
         { href: "/x3star-barter-exchange.html", title: "Barter Exchange", description: "Deal room for compute and services." },
       ],
@@ -127,9 +128,9 @@
     var shell = document.createElement("div");
     shell.className = "x3-nav-shell";
     shell.innerHTML =
-      '<nav class="x3-site-nav" aria-label="Global site navigation"><div class="x3-nav-brand"><a href="/x3star-landing.html">X3STAR.org</a><span>Site map</span></div><button class="x3-nav-toggle" type="button" aria-expanded="false">Browse</button><div class="x3-nav-rail"><a class="x3-nav-home' +
-      (current === "/x3star-landing.html" ? " is-current" : "") +
-      '" href="/x3star-landing.html">Home</a>' +
+      '<nav class="x3-site-nav" aria-label="Global site navigation"><div class="x3-nav-brand"><a href="/">X3STAR.org</a><span>Site map</span></div><button class="x3-nav-toggle" type="button" aria-expanded="false">Browse</button><div class="x3-nav-rail"><a class="x3-nav-home' +
+      (current === "/" ? " is-current" : "") +
+      '" href="/">Home</a>' +
       groups.map(function (group, index) {
         return buildGroup(group, index, current);
       }).join("") +

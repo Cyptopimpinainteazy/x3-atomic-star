@@ -898,7 +898,7 @@ impl ISettingsItem_Vtbl {
     pub const fn new<Identity: ISettingsItem_Impl, const OFFSET: isize>() -> Self {
         unsafe extern "system" fn GetName<Identity: ISettingsItem_Impl, const OFFSET: isize>(this: *mut core::ffi::c_void, name: *mut *mut core::ffi::c_void) -> windows_core::HRESULT {
             unsafe {
-                let this: &Identity = &*((this as *const *const ()).offset(OFFSET) as *const Identity);
+                let this: &I$entity = &*((this as *const *const ()).offset(OFFSET) as *const Identity);
                 match ISettingsItem_Impl::GetName(this) {
                     Ok(ok__) => {
                         name.write(core::mem::transmute(ok__));

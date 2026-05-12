@@ -31,7 +31,7 @@ use crate::{
 };
 
 use futures::{channel::oneshot, Stream};
-use libp2p::{Multiaddr, PeerId};
+use sc_network_types::{PeerId, multiaddr::Multiaddr};
 use prometheus_endpoint::Registry;
 
 use crate::service::metrics::NotificationMetrics;

@@ -46,10 +46,8 @@ use frame_system::pallet_prelude::*;
 use sp_core::H256;
 use sp_runtime::traits::{Hash, SaturatedConversion, Saturating};
 use sp_std::vec::Vec;
+use x3_accounting_events::{AccountingEvent, AccountingSpine, FeeDestination, RevenueModule};
 use x3_slash::types::SlashSeverity;
-use x3_accounting_events::{
-    AccountingEvent, AccountingSpine, FeeDestination, RevenueModule,
-};
 
 type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;

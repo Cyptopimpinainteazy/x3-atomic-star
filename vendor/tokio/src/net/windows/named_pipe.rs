@@ -621,7 +621,7 @@ impl NamedPipeServer {
     /// Waits for the pipe to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
-    /// paired with `try_write()`.
+    /// paired with `try_write()`*
     ///
     /// # Examples
     ///

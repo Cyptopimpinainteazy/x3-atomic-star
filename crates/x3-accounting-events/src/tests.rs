@@ -60,9 +60,9 @@ fn accounting_event_codec_roundtrip() {
 fn revenue_module_other_roundtrip() {
     // Simulate blake2_256("x3-future-service") — just a byte pattern here.
     let hash: [u8; 32] = [
-        0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
-        0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-        0x18, 0x19, 0x1A, 0x1B,
+        0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+        0x1A, 0x1B,
     ];
     let module = RevenueModule::Other(hash);
     let encoded = module.encode();
@@ -87,9 +87,19 @@ fn fee_collected_builder_correct_fields() {
         /* block */ 100_u32,
     );
 
-    assert_eq!(event.kind, AccountingEventKind::FeeCollected, "kind must be FeeCollected");
-    assert!(!event.is_cross_chain, "local fee_collected must not be cross-chain");
-    assert_eq!(event.dest_chain, event.source_chain, "dest_chain must equal source_chain");
+    assert_eq!(
+        event.kind,
+        AccountingEventKind::FeeCollected,
+        "kind must be FeeCollected"
+    );
+    assert!(
+        !event.is_cross_chain,
+        "local fee_collected must not be cross-chain"
+    );
+    assert_eq!(
+        event.dest_chain, event.source_chain,
+        "dest_chain must equal source_chain"
+    );
     assert!(
         event.splits.entries.is_empty(),
         "splits must be empty from the builder"
@@ -104,8 +114,8 @@ fn fee_collected_builder_correct_fields() {
 
 #[test]
 fn cross_chain_fee_builder_correct_fields() {
-    let src = 0_u32;   // native X3
-    let dst = 1_u32;   // external chain (CAIP-2 numeric 1 = Ethereum mainnet)
+    let src = 0_u32; // native X3
+    let dst = 1_u32; // external chain (CAIP-2 numeric 1 = Ethereum mainnet)
 
     let event = AccountingEvent::<u32, u128>::cross_chain_fee(
         RevenueModule::Bridge,
@@ -118,7 +128,10 @@ fn cross_chain_fee_builder_correct_fields() {
         /* block */ 200_u32,
     );
 
-    assert!(event.is_cross_chain, "cross_chain_fee must set is_cross_chain = true");
+    assert!(
+        event.is_cross_chain,
+        "cross_chain_fee must set is_cross_chain = true"
+    );
     assert_ne!(
         event.source_chain, event.dest_chain,
         "source_chain and dest_chain must differ for cross-chain events"

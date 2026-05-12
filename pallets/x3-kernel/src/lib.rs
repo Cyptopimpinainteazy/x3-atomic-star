@@ -52,13 +52,13 @@ pub mod packet_adapters;
 pub mod wasm_adapters;
 
 // Asset kernel sub-modules (supply conservation, registry, mapping, mint/burn, external locks)
-pub mod supply;
-pub mod registry;
+pub mod external_locked;
+pub mod invariant;
 pub mod mapping;
 pub mod mint_burn;
-pub mod external_locked;
 pub mod pending_transfer;
-pub mod invariant;
+pub mod registry;
+pub mod supply;
 
 pub use adapters::{
     EvmExecutorAdapter, FailingMockEvmAdapter, FailingMockSvmAdapter, FailingMockX3Adapter,
@@ -996,13 +996,8 @@ pub mod pallet {
     /// Storage for atomic settlement roots (per transaction ID).
     /// Used to verify all cross-VM branches settled consistently.
     #[pallet::storage]
-    pub(super) type StoredSettlementRoots<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        u64,
-        [u8; 32],
-        OptionQuery,
-    >;
+    pub(super) type StoredSettlementRoots<T: Config> =
+        StorageMap<_, Blake2_128Concat, u64, [u8; 32], OptionQuery>;
 
     use frame_support::traits::StorageVersion;
 
@@ -3552,7 +3547,8 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                value_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
+                value_bytes[dest_start..dest_start + len]
+                    .copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
@@ -3608,7 +3604,8 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                price_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
+                price_bytes[dest_start..dest_start + len]
+                    .copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(price_bytes)
             } else {
@@ -3632,7 +3629,8 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 8 - len;
-                gas_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
+                gas_bytes[dest_start..dest_start + len]
+                    .copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u64::from_be_bytes(gas_bytes)
             } else {
@@ -3682,7 +3680,8 @@ pub mod pallet {
                 let src_start = offset + 1;
                 let src_end = offset + 1 + len;
                 let dest_start = 16 - len;
-                value_bytes[dest_start..dest_start + len].copy_from_slice(&raw_tx[src_start..src_end]);
+                value_bytes[dest_start..dest_start + len]
+                    .copy_from_slice(&raw_tx[src_start..src_end]);
                 offset += 1 + len;
                 u128::from_be_bytes(value_bytes)
             } else {
@@ -3870,7 +3869,9 @@ pub mod pallet {
 
             result_logs
         }
+    }
 
+    impl<T: Config> KernelCrossVmDispatcher<T> {
         /// Hard-fail enforcement of atomic cross-VM invariants.
         /// Verifies all VM branches settled consistently or panics.
         ///
@@ -3912,10 +3913,7 @@ pub mod pallet {
                 .expect("BUG: Settlement root MUST exist for this transaction ID");
 
             // Hard-fail if atomicity invariant violated
-            ensure!(
-                combined_hash == stored_root,
-                Error::<T>::SettlementMismatch
-            );
+            ensure!(combined_hash == stored_root, Error::<T>::SettlementMismatch);
 
             Ok(())
         }

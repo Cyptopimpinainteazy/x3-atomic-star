@@ -137,12 +137,7 @@ fn test_deactivate_signer_blocks_authorization() {
 fn test_deactivate_signer_not_found() {
     new_test_ext().execute_with(|| {
         assert_noop!(
-            X3Custody::deactivate_signer(
-                RuntimeOrigin::root(),
-                CHAIN_ID,
-                ASSET_ID,
-                BOB,
-            ),
+            X3Custody::deactivate_signer(RuntimeOrigin::root(), CHAIN_ID, ASSET_ID, BOB,),
             Error::<Test>::SignerNotFound
         );
     });
@@ -159,8 +154,7 @@ fn test_register_validator_key_works() {
             1000_u64, // rotation_due_at block 1000
         ));
 
-        let record = ValidatorKeyRegistry::<Test>::get(ALICE)
-            .expect("record must be stored");
+        let record = ValidatorKeyRegistry::<Test>::get(ALICE).expect("record must be stored");
         assert!(record.active);
         assert_eq!(record.rotation_due_at, 1000_u64);
         assert!(matches!(record.role, KeyRole::ValidatorSigning));
@@ -206,8 +200,8 @@ fn test_rotate_validator_key_works() {
         ));
 
         // Old key deactivated
-        let old_record = ValidatorKeyRegistry::<Test>::get(ALICE)
-            .expect("old record must still exist");
+        let old_record =
+            ValidatorKeyRegistry::<Test>::get(ALICE).expect("old record must still exist");
         assert!(!old_record.active, "old key must be inactive");
         assert!(
             KeyRotationSchedule::<Test>::get(ALICE).is_none(),
@@ -215,8 +209,7 @@ fn test_rotate_validator_key_works() {
         );
 
         // New key active, inherits rotation_due_at
-        let new_record = ValidatorKeyRegistry::<Test>::get(BOB)
-            .expect("new record must be stored");
+        let new_record = ValidatorKeyRegistry::<Test>::get(BOB).expect("new record must be stored");
         assert!(new_record.active);
         assert_eq!(new_record.rotation_due_at, 5000_u64);
         assert_eq!(KeyRotationSchedule::<Test>::get(BOB), Some(5000_u64));

@@ -1,10 +1,10 @@
+use codec::{Decode, Encode};
 use flash_finality::{FlashFinalityGadget, GossipMessage, FLASH_FINALITY_PROTOCOL_ID};
 use futures::{future, prelude::*};
 use log::{debug, info, warn};
-use codec::{Decode, Encode};
 use sc_client_api::BlockchainEvents;
-use sc_network::PeerId;
 use sc_network::service::traits::NotificationService;
+use sc_network::PeerId;
 use sc_network_gossip::{
     GossipEngine, MessageIntent, Network, Syncing, ValidationResult, Validator, ValidatorContext,
 };

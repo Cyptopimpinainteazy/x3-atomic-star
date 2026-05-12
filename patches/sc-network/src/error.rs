@@ -20,7 +20,7 @@
 
 use crate::{config::TransportConfig, types::ProtocolName};
 
-use libp2p::{Multiaddr, PeerId};
+use sc_network_types::{PeerId, multiaddr::Multiaddr};
 
 use std::fmt;
 

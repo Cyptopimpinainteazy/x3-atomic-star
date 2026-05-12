@@ -22,8 +22,8 @@ fn setup_vault(id: VaultId) {
         id,
         VaultType::SettlementFloat,
         OwnerType::Protocol,
-        1,   // chain_id
-        100, // asset_id
+        1,     // chain_id
+        100,   // asset_id
         100,   // critical_min
         500,   // min_band
         1_000, // target_band
@@ -55,8 +55,8 @@ fn setup_vault_chain3(id: VaultId) {
         id,
         VaultType::SettlementFloat,
         OwnerType::Protocol,
-        3,   // chain_id
-        300, // asset_id
+        3,     // chain_id
+        300,   // asset_id
         100,   // critical_min
         500,   // min_band
         1_000, // target_band
@@ -319,7 +319,12 @@ fn execute_rebalance_step_second_step_can_breach_cap() {
             vid1,
             VaultType::SettlementFloat,
             OwnerType::Protocol,
-            4, 400, 100, 500, 2_500, 10_000,
+            4,
+            400,
+            100,
+            500,
+            2_500,
+            10_000,
         ));
 
         // vault2: target=3000, available=0.  step_amount=3000; running total=5500 > 5000.
@@ -328,7 +333,12 @@ fn execute_rebalance_step_second_step_can_breach_cap() {
             vid2,
             VaultType::SettlementFloat,
             OwnerType::Protocol,
-            5, 500, 100, 500, 3_000, 10_000,
+            5,
+            500,
+            100,
+            500,
+            3_000,
+            10_000,
         ));
 
         assert_ok!(X3Rebalance::execute_rebalance_step(
@@ -367,7 +377,11 @@ fn execute_rebalance_step_cooldown_blocks_second_call() {
 
         // Drain vault below min_band so it needs rebalancing again.
         // record_pending_out moves available → pending_out.
-        assert_ok!(X3Inventory::record_pending_out(RuntimeOrigin::root(), vid, 900));
+        assert_ok!(X3Inventory::record_pending_out(
+            RuntimeOrigin::root(),
+            vid,
+            900
+        ));
         // available_balance is now 100 < min_band 500.
 
         // Still block 1: cooldown=10 blocks; elapsed=0 → rejected.
@@ -396,7 +410,11 @@ fn execute_rebalance_step_succeeds_after_cooldown() {
         ));
 
         // Drain vault.
-        assert_ok!(X3Inventory::record_pending_out(RuntimeOrigin::root(), vid, 900));
+        assert_ok!(X3Inventory::record_pending_out(
+            RuntimeOrigin::root(),
+            vid,
+            900
+        ));
 
         // Block 11: elapsed = 10 >= cooldown of 10 → allowed.
         System::set_block_number(11);
@@ -507,11 +525,7 @@ fn execute_rebalance_step_no_rebalance_needed_when_above_min_band() {
         setup_vault(vid);
 
         // Fund vault to target_band so it is above min_band.
-        assert_ok!(X3Inventory::fund_vault(
-            RuntimeOrigin::root(),
-            vid,
-            1_000,
-        ));
+        assert_ok!(X3Inventory::fund_vault(RuntimeOrigin::root(), vid, 1_000,));
 
         assert_noop!(
             X3Rebalance::execute_rebalance_step(
@@ -572,11 +586,7 @@ fn on_initialize_suppresses_event_when_vault_recovered() {
         ));
 
         // Fund vault so it is above min_band before on_initialize fires.
-        assert_ok!(X3Inventory::fund_vault(
-            RuntimeOrigin::root(),
-            vid,
-            1_000,
-        ));
+        assert_ok!(X3Inventory::fund_vault(RuntimeOrigin::root(), vid, 1_000,));
 
         // Snapshot event count before on_initialize so we can isolate events it emits.
         let events_before = System::events().len();
@@ -601,7 +611,10 @@ fn on_initialize_suppresses_event_when_vault_recovered() {
                 }) if emitted_vid == vid
             )
         });
-        assert!(!has_triggered, "on_initialize must not emit RebalanceTriggered for a recovered vault");
+        assert!(
+            !has_triggered,
+            "on_initialize must not emit RebalanceTriggered for a recovered vault"
+        );
     });
 }
 

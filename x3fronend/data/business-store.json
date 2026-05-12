@@ -6,8 +6,12 @@
     "affiliate": 41,
     "grant": 19,
     "investorInquiry": 27,
-    "deal": 7
+    "deal": 7,
+    "fundingIntake": 0
   },
+  "grantPrograms": [],
+  "grantApplications": [],
+  "fundingIntakes": [],
   "token": {
     "symbol": "X3S",
     "name": "X3 Star",

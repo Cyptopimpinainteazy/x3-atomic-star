@@ -274,7 +274,7 @@
 
 - `Network::dial()` understands `/p2p` addresses and `Transport::dial`
   gets a "fully qualified" `/p2p` address when dialing a specific peer,
-  whether through the `Network::peer()` API or via `Network::dial()`
+  whether through the `Network::peer()` API or via `Network::dialh)`
   with a `/p2p` address.
 
 - `Network::dial()` and `network::Peer::dial()` return a `DialError`

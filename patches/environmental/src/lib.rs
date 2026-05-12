@@ -57,11 +57,11 @@ pub use local_key::LocalKey;
 #[cfg(feature = "std")]
 pub use local_key::LocalKey as StdLocalKey;
 
-// Keep a single key type across std/no_std so macro expansion and helper
-// fns agree on the same static key ABI.
+// std: genuine per-thread storage so parallel test threads each get their own
+// environmental stack. no_std: fall back to the wasm32 global-static path.
 #[doc(hidden)]
 #[cfg(feature = "std")]
-pub type GlobalLocalKey<T> = LocalKey<T>;
+pub type GlobalLocalKey<T> = ::std::thread::LocalKey<T>;
 
 #[doc(hidden)]
 #[cfg(not(feature = "std"))]
@@ -71,10 +71,17 @@ pub type GlobalLocalKey<T> = LocalKey<T>;
 #[macro_export]
 macro_rules! thread_local_impl {
 	($(#[$attr:meta])* static $name:ident: $t:ty = $init:expr) => (
+		// std: each OS thread gets its own environmental stack.
+		#[cfg(feature = "std")]
+		::std::thread_local! {
+			$(#[$attr])*
+			static $name: $t = $init;
+		}
+		// no_std (wasm32 single-threaded): keep the original global-static path.
+		#[cfg(not(feature = "std"))]
 		$(#[$attr])*
 		static $name: $crate::LocalKey<$t> = {
 			fn __init() -> $t { $init }
-
 			$crate::local_key_init!(__init)
 		};
 	);
@@ -168,9 +175,12 @@ pub fn with<T: ?Sized, R, F: FnOnce(&mut T) -> R>(
 		let last = r.borrow().last().cloned();
 		match last {
 			Some(ptr) => unsafe {
-				// safe because it's only non-zero when it's being called from using, which
-				// is holding on to the underlying reference (and not using it itself) safely.
-				Some(mutator(&mut **ptr.borrow_mut()))
+				// Read the raw pointer and immediately release the RefCell borrow so
+				// that re-entrant `with` calls from within `mutator` (e.g. substrate
+				// storage ops that re-enter the same environmental global) can also
+				// acquire the borrow without a BorrowMutError panic.
+				let raw: *mut T = *ptr.borrow();
+				Some(mutator(&mut *raw))
 			}
 			None => None,
 		}

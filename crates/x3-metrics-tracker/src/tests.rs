@@ -150,8 +150,7 @@ fn a_tier_snapshot_scale_roundtrip() {
     let snap = passing_snapshot();
 
     let encoded = snap.encode();
-    let decoded =
-        ATierSnapshot::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
+    let decoded = ATierSnapshot::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
     assert_eq!(snap, decoded, "roundtrip equality failed for ATierSnapshot");
 }
 
@@ -167,9 +166,11 @@ fn throughput_metrics_scale_roundtrip() {
     };
 
     let encoded = metrics.encode();
-    let decoded =
-        ThroughputMetrics::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
-    assert_eq!(metrics, decoded, "roundtrip equality failed for ThroughputMetrics");
+    let decoded = ThroughputMetrics::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
+    assert_eq!(
+        metrics, decoded,
+        "roundtrip equality failed for ThroughputMetrics"
+    );
 }
 
 // ─── 10. SCALE codec roundtrip — TreasuryMetrics with negative growth ─────────
@@ -185,12 +186,13 @@ fn treasury_metrics_negative_growth_scale_roundtrip() {
     };
 
     let encoded = metrics.encode();
-    let decoded =
-        TreasuryMetrics::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
-    assert_eq!(metrics, decoded, "roundtrip equality failed for TreasuryMetrics");
+    let decoded = TreasuryMetrics::decode(&mut &encoded[..]).expect("SCALE decode must succeed");
     assert_eq!(
-        decoded.growth_rate_bps_weekly,
-        -350,
+        metrics, decoded,
+        "roundtrip equality failed for TreasuryMetrics"
+    );
+    assert_eq!(
+        decoded.growth_rate_bps_weekly, -350,
         "negative growth rate must survive SCALE roundtrip"
     );
 }
@@ -204,11 +206,13 @@ mod serde_tests {
     #[test]
     fn a_tier_snapshot_serde_roundtrip() {
         let snap = passing_snapshot();
-        let json =
-            serde_json::to_string(&snap).expect("serde_json serialization must succeed");
+        let json = serde_json::to_string(&snap).expect("serde_json serialization must succeed");
         let decoded: ATierSnapshot =
             serde_json::from_str(&json).expect("serde_json deserialization must succeed");
-        assert_eq!(snap, decoded, "serde roundtrip equality failed for ATierSnapshot");
+        assert_eq!(
+            snap, decoded,
+            "serde roundtrip equality failed for ATierSnapshot"
+        );
     }
 
     #[test]
@@ -220,10 +224,12 @@ mod serde_tests {
             under_threshold_incidents_daily: 3,
             p1_incidents_monthly: 0,
         };
-        let json =
-            serde_json::to_string(&metrics).expect("serde_json serialization must succeed");
+        let json = serde_json::to_string(&metrics).expect("serde_json serialization must succeed");
         let decoded: IncidentMetrics =
             serde_json::from_str(&json).expect("serde_json deserialization must succeed");
-        assert_eq!(metrics, decoded, "serde roundtrip equality failed for IncidentMetrics");
+        assert_eq!(
+            metrics, decoded,
+            "serde roundtrip equality failed for IncidentMetrics"
+        );
     }
 }

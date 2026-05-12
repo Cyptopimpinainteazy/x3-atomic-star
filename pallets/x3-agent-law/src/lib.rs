@@ -52,17 +52,17 @@
 
 pub use pallet::*;
 
-pub mod types;
+pub mod emergency;
 pub mod law_engine;
 pub mod signed_extension;
+pub mod types;
 pub mod weights;
-pub mod emergency;
 
-pub use types::*;
+pub use emergency::{EmergencyAction, EmergencyEvent};
 pub use law_engine::*;
 pub use signed_extension::*;
+pub use types::*;
 pub use weights::WeightInfo;
-pub use emergency::{EmergencyAction, EmergencyEvent};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -70,14 +70,15 @@ pub mod pallet {
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
     use sp_runtime::DispatchError;
+    use sp_std::prelude::*;
 
-    type BalanceOf<T> =
-        <<T as Config>::Currency as frame_support::traits::Currency<<T as frame_system::Config>::AccountId>>::Balance;
+    type BalanceOf<T> = <<T as Config>::Currency as frame_support::traits::Currency<
+        <T as frame_system::Config>::AccountId,
+    >>::Balance;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        type RuntimeCall: IsType<<Self as frame_system::Config>::RuntimeCall> + Clone;
 
         /// Currency for reputation and slashing
         type Currency: frame_support::traits::Currency<Self::AccountId>
@@ -118,8 +119,13 @@ pub mod pallet {
     /// `ActivePolicies<agent_id> -> Vec<PolicyRule>`
     #[pallet::storage]
     #[pallet::getter(fn agent_policies)]
-    pub type ActivePolicies<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, BoundedVec<PolicyRule<T::AccountId>, ConstU32<16>>, ValueQuery>;
+    pub type ActivePolicies<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        BoundedVec<PolicyRule<T::AccountId>, ConstU32<16>>,
+        ValueQuery,
+    >;
 
     /// Violation count per agent (used for auto-enforcement)
     /// `ViolationCount<agent_id> -> u32`
@@ -243,13 +249,10 @@ pub mod pallet {
             // TODO: Use EnsureRoot or governance origin check
             let _ = ensure_signed(origin)?;
 
-            ensure!(
-                policies.len() <= 16,
-                Error::<T>::TooManyPolicies
-            );
+            ensure!(policies.len() <= 16, Error::<T>::TooManyPolicies);
 
-            let bounded_policies = BoundedVec::try_from(policies)
-                .map_err(|_| Error::<T>::TooManyPolicies)?;
+            let bounded_policies =
+                BoundedVec::try_from(policies).map_err(|_| Error::<T>::TooManyPolicies)?;
 
             ActivePolicies::<T>::insert(&agent, bounded_policies.clone());
             ViolationCount::<T>::insert(&agent, 0);
@@ -299,10 +302,7 @@ pub mod pallet {
         /// Remove agent from blacklist
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::remove_blacklist())]
-        pub fn remove_blacklist(
-            origin: OriginFor<T>,
-            agent: T::AccountId,
-        ) -> DispatchResult {
+        pub fn remove_blacklist(origin: OriginFor<T>, agent: T::AccountId) -> DispatchResult {
             let _ = ensure_signed(origin)?;
             Blacklist::<T>::remove(&agent);
             Ok(())

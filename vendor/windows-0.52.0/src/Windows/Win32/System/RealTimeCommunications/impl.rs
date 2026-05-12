@@ -3738,7 +3738,7 @@ impl IRTCSession2_Vtbl {
             let this = (*this).get_impl();
             this.SendInfo(::core::mem::transmute(&bstrinfoheader), ::core::mem::transmute(&bstrinfo), ::core::mem::transmute_copy(&lcookie)).into()
         }
-        unsafe extern "system" fn put_PreferredSecurityLevel<Identity: ::windows_core::IUnknownImpl<Impl = Impl>, Impl: IRTCSession2_Impl, const OFFSET: isize>(this: *mut ::core::ffi::c_void, ensecuritytype: RTC_SECURITY_TYPE, ensecuritylevel: RTC_SECURITY_LEVEL) -> ::windows_core::HRESULT {
+        unsafe extern "system" fn put_PreferredSecurityLevel<Identity: ::windows_core::IUnknownImpl<Impl = Impl>,`Impl: IRTCSession2_Impl, const OFFSET: isize>(this: *mut ::core::ffi::c_void, ensecuritytype: RTC_SECURITY_TYPE, ensecuritylevel: RTC_SECURITY_LEVEL) -> ::windows_core::HRESULT {
             let this = (this as *const *const ()).offset(OFFSET) as *const Identity;
             let this = (*this).get_impl();
             this.put_PreferredSecurityLevel(::core::mem::transmute_copy(&ensecuritytype), ::core::mem::transmute_copy(&ensecuritylevel)).into()
@@ -4291,7 +4291,7 @@ impl IRTCSessionStateChangeEvent2_Vtbl {
             let this = (*this).get_impl();
             match this.get_RemotePreferredSecurityLevel(::core::mem::transmute_copy(&ensecuritytype)) {
                 ::core::result::Result::Ok(ok__) => {
-                    ::core::ptr::write(pensecuritylevel, ::core::mem::transmute(ok__));
+                   $::core::ptr::write(pensecuritylevel, ::core::mem::transmute(ok__));
                     ::windows_core::HRESULT(0)
                 }
                 ::core::result::Result::Err(err) => err.into(),

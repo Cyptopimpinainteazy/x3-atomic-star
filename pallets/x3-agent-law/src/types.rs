@@ -1,9 +1,9 @@
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
 /// Policy violation types
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum ViolationType {
     CapabilityNotPermitted,
     ReputationBelowMinimum,
@@ -13,7 +13,7 @@ pub enum ViolationType {
 }
 
 /// Enforcement actions
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum EnforcementAction<AccountId> {
     LogOnly,
     Slash(u64),
@@ -23,10 +23,10 @@ pub enum EnforcementAction<AccountId> {
 }
 
 /// Policy rules governing agent behavior
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
-pub enum PolicyRule<AccountId: Encode + Decode + MaxEncodedLen> {
-    /// Agent can only execute these capabilities
-    CapabilityAllowed(#[codec(skip)] Vec<u8>),
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+pub enum PolicyRule<AccountId: Encode + Decode + MaxEncodedLen + DecodeWithMemTracking> {
+    /// Agent can only execute these capabilities (list of capability names as byte strings)
+    CapabilityAllowed(#[codec(skip)] Vec<Vec<u8>>),
     /// Agent must maintain minimum reputation score
     ReputationMinimum(u64),
     /// Hard cap on tasks scheduled per block
@@ -38,7 +38,7 @@ pub enum PolicyRule<AccountId: Encode + Decode + MaxEncodedLen> {
 }
 
 /// Slashing reasons
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum SlashingReason {
     InvalidProof,
     TaskGriefing,
@@ -48,7 +48,7 @@ pub enum SlashingReason {
 }
 
 /// Capability revocation reasons
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum RevocationReason {
     ReputationDropped,
     PolicyViolation,

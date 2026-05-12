@@ -176,12 +176,8 @@ pub mod pallet {
     /// Registered wrapped asset configurations keyed by `asset_id`.
     #[pallet::storage]
     #[pallet::getter(fn registered_asset)]
-    pub type RegisteredWrappedAssets<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        AssetId,
-        WrappedAssetConfig<T::Balance>,
-    >;
+    pub type RegisteredWrappedAssets<T: Config> =
+        StorageMap<_, Blake2_128Concat, AssetId, WrappedAssetConfig<T::Balance>>;
 
     /// Nonce replay-prevention map: `(chain_id, nonce) -> bool`.
     ///
@@ -234,10 +230,7 @@ pub mod pallet {
         /// A wrapped asset was resumed (minting re-enabled).
         AssetResumed { asset_id: AssetId },
         /// The bridge fee for an asset was updated.
-        BridgeFeeSet {
-            asset_id: AssetId,
-            fee_bps: u32,
-        },
+        BridgeFeeSet { asset_id: AssetId, fee_bps: u32 },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────────
@@ -319,8 +312,8 @@ pub mod pallet {
             );
 
             // --- asset validation ---
-            let config = RegisteredWrappedAssets::<T>::get(asset_id)
-                .ok_or(Error::<T>::AssetNotFound)?;
+            let config =
+                RegisteredWrappedAssets::<T>::get(asset_id).ok_or(Error::<T>::AssetNotFound)?;
             ensure!(
                 config.status == WrappedAssetStatus::Active,
                 if config.status == WrappedAssetStatus::Paused {
@@ -382,8 +375,8 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
             ensure!(amount > T::Balance::zero(), Error::<T>::InvalidAmount);
 
-            let config = RegisteredWrappedAssets::<T>::get(asset_id)
-                .ok_or(Error::<T>::AssetNotFound)?;
+            let config =
+                RegisteredWrappedAssets::<T>::get(asset_id).ok_or(Error::<T>::AssetNotFound)?;
             // Allow burning even when Paused (drain); block only Deprecated.
             ensure!(
                 config.status != WrappedAssetStatus::Deprecated,
@@ -392,7 +385,10 @@ pub mod pallet {
 
             let key = (chain_id, asset_id, who.clone());
             let current_bal = WrappedBalances::<T>::get(&key);
-            ensure!(current_bal >= amount, Error::<T>::InsufficientWrappedBalance);
+            ensure!(
+                current_bal >= amount,
+                Error::<T>::InsufficientWrappedBalance
+            );
 
             // --- apply state changes atomically ---
             let new_bal = current_bal.saturating_sub(amount);
@@ -443,10 +439,7 @@ pub mod pallet {
         /// Requires `GovernanceOrigin`.
         #[pallet::call_index(4)]
         #[pallet::weight(Weight::from_parts(8_000, 0))]
-        pub fn pause_wrapped_asset(
-            origin: OriginFor<T>,
-            asset_id: AssetId,
-        ) -> DispatchResult {
+        pub fn pause_wrapped_asset(origin: OriginFor<T>, asset_id: AssetId) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| -> DispatchResult {
                 let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::AssetNotFound)?;
@@ -462,10 +455,7 @@ pub mod pallet {
         /// Requires `GovernanceOrigin`.
         #[pallet::call_index(5)]
         #[pallet::weight(Weight::from_parts(8_000, 0))]
-        pub fn resume_wrapped_asset(
-            origin: OriginFor<T>,
-            asset_id: AssetId,
-        ) -> DispatchResult {
+        pub fn resume_wrapped_asset(origin: OriginFor<T>, asset_id: AssetId) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             RegisteredWrappedAssets::<T>::try_mutate(asset_id, |maybe_cfg| -> DispatchResult {
                 let cfg = maybe_cfg.as_mut().ok_or(Error::<T>::AssetNotFound)?;

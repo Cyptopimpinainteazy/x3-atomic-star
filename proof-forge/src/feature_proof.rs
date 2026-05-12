@@ -850,7 +850,12 @@ impl FeatureScanner {
 }
 
 /// Run feature gate check
-pub fn run_feature_gate(workspace: &Path, strict: bool, fail_hard: bool, verbose: bool) -> Result<()> {
+pub fn run_feature_gate(
+    workspace: &Path,
+    strict: bool,
+    fail_hard: bool,
+    verbose: bool,
+) -> Result<()> {
     println!("{}", "🔥 X3 FEATUREBUILTPROOF GATE".bold().red());
     println!();
 

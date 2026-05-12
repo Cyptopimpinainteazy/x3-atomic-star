@@ -59,11 +59,11 @@ use sp_runtime::traits::Block as BlockT;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock};
-use x3_vm::bridge::{BalanceProvider, CrossVmEscrow};
 use x3_cross_vm_bridge::{CrossVmDispatcher, CrossVmResult};
+use x3_vm::bridge::{BalanceProvider, CrossVmEscrow};
 
 pub use pallet_x3_kernel::StateChange;
-pub use x3_cross_vm_bridge::{CrossVmDispatcher as CrossVmDispatcherTrait};
+pub use x3_cross_vm_bridge::CrossVmDispatcher as CrossVmDispatcherTrait;
 
 struct OverlayEntry {
     current: u128,
@@ -98,7 +98,10 @@ where
         let at = self.best_hash();
         let api = self.client.runtime_api();
         match address.len() {
-            20 => api.get_evm_balance(at, address.to_vec(), 0u32).unwrap_or(None).unwrap_or(0),
+            20 => api
+                .get_evm_balance(at, address.to_vec(), 0u32)
+                .unwrap_or(None)
+                .unwrap_or(0),
             32 => api.get_svm_balance(at, address.to_vec()).unwrap_or(0) as u128,
             _ => 0,
         }
@@ -123,8 +126,10 @@ where
     pub(crate) fn credit(&self, address: &[u8], amount: u128) {
         let current = self.ensure_loaded(address);
         let mut guard = self.overlay.write().expect("overlay write");
-        guard.get_mut(address).expect("credit: address must be loaded").current =
-            current.saturating_add(amount);
+        guard
+            .get_mut(address)
+            .expect("credit: address must be loaded")
+            .current = current.saturating_add(amount);
     }
 
     pub(crate) fn debit(&self, address: &[u8], amount: u128) -> Result<(), &'static str> {
@@ -133,7 +138,10 @@ where
             return Err("insufficient balance");
         }
         let mut guard = self.overlay.write().expect("overlay write");
-        guard.get_mut(address).expect("debit: address must be loaded").current = current - amount;
+        guard
+            .get_mut(address)
+            .expect("debit: address must be loaded")
+            .current = current - amount;
         Ok(())
     }
 
@@ -192,7 +200,9 @@ pub trait EscrowPersistence: Send + Sync {
 
 impl EscrowPersistence for () {
     fn save_ticket(&self, _ticket: &[u8; 32], _entry: &EscrowPersistedEntry) {}
-    fn load_ticket(&self, _ticket: &[u8; 32]) -> Option<EscrowPersistedEntry> { None }
+    fn load_ticket(&self, _ticket: &[u8; 32]) -> Option<EscrowPersistedEntry> {
+        None
+    }
 }
 
 pub struct OffchainEscrowPersistence<O> {
@@ -201,7 +211,9 @@ pub struct OffchainEscrowPersistence<O> {
 
 impl<O> OffchainEscrowPersistence<O> {
     pub fn new(storage: O) -> Self {
-        Self { storage: Mutex::new(storage) }
+        Self {
+            storage: Mutex::new(storage),
+        }
     }
 }
 
@@ -212,7 +224,9 @@ impl<O: OffchainStorage + Send + 'static> EscrowPersistence for OffchainEscrowPe
         key[6..].copy_from_slice(ticket);
         let value = entry.encode();
         self.storage.lock().expect("offchain storage lock").set(
-            sp_core::offchain::STORAGE_PREFIX, &key, &value,
+            sp_core::offchain::STORAGE_PREFIX,
+            &key,
+            &value,
         );
     }
 
@@ -251,7 +265,11 @@ where
         balances: Arc<SubstrateClientBalanceAdapter<C, Block>>,
         persistence: P,
     ) -> Self {
-        Self { balances, tickets: RwLock::new(HashMap::new()), persistence }
+        Self {
+            balances,
+            tickets: RwLock::new(HashMap::new()),
+            persistence,
+        }
     }
 
     fn make_ticket(from: &[u8], amount: u128) -> [u8; 32] {
@@ -272,35 +290,70 @@ where
                 return Some((e.amount, e.spent, e.from.clone()));
             }
         }
-        self.persistence.load_ticket(ticket).map(|e| (e.amount, e.spent, e.from))
+        self.persistence
+            .load_ticket(ticket)
+            .map(|e| (e.amount, e.spent, e.from))
     }
 
     fn lock_internal(&self, from: &[u8], amount: u128) -> Result<[u8; 32], &'static str> {
         self.balances.debit(from, amount)?;
         let ticket = Self::make_ticket(from, amount);
-        self.persistence.save_ticket(&ticket, &EscrowPersistedEntry {
-            from: from.to_vec(), amount, spent: false,
-        });
+        self.persistence.save_ticket(
+            &ticket,
+            &EscrowPersistedEntry {
+                from: from.to_vec(),
+                amount,
+                spent: false,
+            },
+        );
         self.tickets.write().expect("ticket write").insert(
             ticket,
-            InMemoryEscrowEntry { from: from.to_vec(), amount, spent: false },
+            InMemoryEscrowEntry {
+                from: from.to_vec(),
+                amount,
+                spent: false,
+            },
         );
         Ok(ticket)
     }
 
-    fn release_internal(&self, ticket: &[u8; 32], to: &[u8], amount: u128) -> Result<(), &'static str> {
-        let (locked_amount, spent, from) = self.find_ticket(ticket).ok_or("unknown escrow ticket")?;
-        if spent { return Err("escrow ticket already spent"); }
-        if locked_amount < amount { return Err("escrow release amount exceeds locked amount"); }
+    fn release_internal(
+        &self,
+        ticket: &[u8; 32],
+        to: &[u8],
+        amount: u128,
+    ) -> Result<(), &'static str> {
+        let (locked_amount, spent, from) =
+            self.find_ticket(ticket).ok_or("unknown escrow ticket")?;
+        if spent {
+            return Err("escrow ticket already spent");
+        }
+        if locked_amount < amount {
+            return Err("escrow release amount exceeds locked amount");
+        }
         {
             let mut guard = self.tickets.write().expect("ticket write");
             if let Some(e) = guard.get_mut(ticket) {
                 e.spent = true;
             } else {
-                guard.insert(*ticket, InMemoryEscrowEntry { from: from.clone(), amount: locked_amount, spent: true });
+                guard.insert(
+                    *ticket,
+                    InMemoryEscrowEntry {
+                        from: from.clone(),
+                        amount: locked_amount,
+                        spent: true,
+                    },
+                );
             }
         }
-        self.persistence.save_ticket(ticket, &EscrowPersistedEntry { from, amount: locked_amount, spent: true });
+        self.persistence.save_ticket(
+            ticket,
+            &EscrowPersistedEntry {
+                from,
+                amount: locked_amount,
+                spent: true,
+            },
+        );
         self.balances.credit(to, amount);
         Ok(())
     }
@@ -315,7 +368,12 @@ where
     fn lock_svm(&self, from: &[u8], amount: u128) -> Result<[u8; 32], &'static str> {
         self.lock_internal(from, amount)
     }
-    fn release_evm(&self, to: &[u8; 20], ticket: &[u8; 32], amount: u128) -> Result<(), &'static str> {
+    fn release_evm(
+        &self,
+        to: &[u8; 20],
+        ticket: &[u8; 32],
+        amount: u128,
+    ) -> Result<(), &'static str> {
         self.release_internal(ticket, to.as_slice(), amount)
     }
     fn lock_evm(&self, from: &[u8; 20], amount: u128) -> Result<[u8; 32], &'static str> {
@@ -349,7 +407,10 @@ where
     C::Api: AtlasKernelRuntimeApi<Block, AccountId32, u128, u32>,
 {
     pub fn new(client: Arc<C>) -> Self {
-        Self { client, _phantom: PhantomData }
+        Self {
+            client,
+            _phantom: PhantomData,
+        }
     }
 
     fn best_hash(&self) -> Block::Hash {

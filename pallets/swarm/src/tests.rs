@@ -339,6 +339,61 @@ fn storage_queries_work() {
     });
 }
 
+#[test]
+fn check_and_deduct_capability_deducts_budget() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        AgentCapabilities::<Test>::insert(
+            ALICE,
+            CapabilityEnvelope {
+                budget: 1_000u128,
+                spent: 200u128,
+                role: AgentRole::Prover,
+                killed: false,
+            },
+        );
+
+        assert_ok!(Swarm::check_and_deduct_capability(&ALICE, 300u128));
+
+        let envelope = AgentCapabilities::<Test>::get(ALICE).unwrap();
+        assert_eq!(envelope.spent, 500u128);
+        assert_eq!(envelope.budget, 1_000u128);
+
+        System::assert_has_event(RuntimeEvent::Swarm(Event::CapabilityBudgetDeducted {
+            agent: ALICE,
+            amount: 300u128,
+            remaining: 500u128,
+        }));
+    });
+}
+
+#[test]
+fn check_and_deduct_capability_fails_when_kill_switch_hit() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        AgentCapabilities::<Test>::insert(
+            ALICE,
+            CapabilityEnvelope {
+                budget: 1_000u128,
+                spent: 100u128,
+                role: AgentRole::Prover,
+                killed: true,
+            },
+        );
+
+        assert_noop!(
+            Swarm::check_and_deduct_capability(&ALICE, 100u128),
+            Error::<Test>::KillSwitchActive
+        );
+
+        System::assert_has_event(RuntimeEvent::Swarm(Event::CapabilityKillSwitchHit {
+            agent: ALICE,
+        }));
+    });
+}
+
 // ============================================================================
 // Edge Cases
 // ============================================================================

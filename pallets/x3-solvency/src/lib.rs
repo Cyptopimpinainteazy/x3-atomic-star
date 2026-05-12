@@ -15,11 +15,11 @@ pub use pallet::*;
 pub mod types;
 
 #[cfg(test)]
+mod integration_tests;
+#[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod integration_tests;
 
 use types::{
     EvidenceRecord, PendingObligation, PostSubmissionContext, QuoteContext, ReservationContext,
@@ -35,11 +35,7 @@ use pallet_x3_reservation::pallet::Pallet as ReservationPallet;
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    use frame_support::{
-        pallet_prelude::*,
-        traits::Get,
-        BoundedVec,
-    };
+    use frame_support::{pallet_prelude::*, traits::Get, BoundedVec};
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::{BlakeTwo256, Hash, Saturating};
 
@@ -160,8 +156,7 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_initialize(now: BlockNumberFor<T>) -> Weight {
-            let retention: BlockNumberFor<T> =
-                T::SnapshotRetentionBlocks::get().into();
+            let retention: BlockNumberFor<T> = T::SnapshotRetentionBlocks::get().into();
             if now <= retention {
                 return Weight::zero();
             }
@@ -169,15 +164,19 @@ pub mod pallet {
 
             // Remove all snapshots in blocks [0, prune_before) that are not referenced.
             let mut pruned: u32 = 0;
-            let _ = SnapshotsByBlock::<T>::iter_prefix(prune_before).drain().for_each(|(hash, ())| {
-                if let Some(record) = SolvencySnapshots::<T>::get(hash) {
-                    if !record.referenced {
-                        SolvencySnapshots::<T>::remove(hash);
-                        pruned = pruned.saturating_add(1);
-                        Self::deposit_event(Event::SnapshotPruned { snapshot_hash: hash });
+            let _ = SnapshotsByBlock::<T>::iter_prefix(prune_before)
+                .drain()
+                .for_each(|(hash, ())| {
+                    if let Some(record) = SolvencySnapshots::<T>::get(hash) {
+                        if !record.referenced {
+                            SolvencySnapshots::<T>::remove(hash);
+                            pruned = pruned.saturating_add(1);
+                            Self::deposit_event(Event::SnapshotPruned {
+                                snapshot_hash: hash,
+                            });
+                        }
                     }
-                }
-            });
+                });
 
             Weight::zero()
         }
@@ -227,7 +226,8 @@ pub mod pallet {
         pub fn check_pre_quote(
             ctx: &QuoteContext<<T as pallet_x3_inventory::pallet::Config>::Balance>,
         ) -> SolvencyResult<T::MaxChecksPerResult> {
-            let mut failed: BoundedVec<SolvencyCheck, T::MaxChecksPerResult> = BoundedVec::default();
+            let mut failed: BoundedVec<SolvencyCheck, T::MaxChecksPerResult> =
+                BoundedVec::default();
 
             // 1. Lane frozen?
             if let Some(lane) = Lanes::<T>::get(ctx.lane_id) {
@@ -268,7 +268,13 @@ pub mod pallet {
                 SolvencyResult::fail(failed.clone(), hash)
             };
 
-            Self::record_snapshot(hash, result.passed, failed, ctx.route_id, ReservationId::default());
+            Self::record_snapshot(
+                hash,
+                result.passed,
+                failed,
+                ctx.route_id,
+                ReservationId::default(),
+            );
             Self::deposit_event(Event::SolvencyGateChecked {
                 route_id: ctx.route_id,
                 gate: GateKind::PreQuote,
@@ -304,7 +310,13 @@ pub mod pallet {
                 SolvencyResult::fail(failed.clone(), hash)
             };
 
-            Self::record_snapshot(hash, result.passed, failed, ctx.route_id, ReservationId::default());
+            Self::record_snapshot(
+                hash,
+                result.passed,
+                failed,
+                ctx.route_id,
+                ReservationId::default(),
+            );
             Self::deposit_event(Event::SolvencyGateChecked {
                 route_id: ctx.route_id,
                 gate: GateKind::PreReservation,
@@ -325,13 +337,16 @@ pub mod pallet {
                 BlockNumberFor<T>,
             >,
         ) -> SolvencyResult<T::MaxChecksPerResult> {
-            let mut failed: BoundedVec<SolvencyCheck, T::MaxChecksPerResult> = BoundedVec::default();
+            let mut failed: BoundedVec<SolvencyCheck, T::MaxChecksPerResult> =
+                BoundedVec::default();
             let now = frame_system::Pallet::<T>::block_number();
 
             // 1. Reservation still valid?
             if !ReservationPallet::<T>::is_reservation_valid(ctx.reservation_id) {
                 // Discriminate between expired vs other
-                if let Some(res) = pallet_x3_reservation::pallet::Reservations::<T>::get(ctx.reservation_id) {
+                if let Some(res) =
+                    pallet_x3_reservation::pallet::Reservations::<T>::get(ctx.reservation_id)
+                {
                     if res.expiry_block <= now {
                         let _ = failed.try_push(SolvencyCheck::ReservationExpired);
                     } else {
@@ -370,7 +385,13 @@ pub mod pallet {
                 SolvencyResult::fail(failed.clone(), hash)
             };
 
-            Self::record_snapshot(hash, result.passed, failed, ctx.route_id, ctx.reservation_id);
+            Self::record_snapshot(
+                hash,
+                result.passed,
+                failed,
+                ctx.route_id,
+                ctx.reservation_id,
+            );
             Self::deposit_event(Event::SolvencyGateChecked {
                 route_id: ctx.route_id,
                 gate: GateKind::PreSubmission,
@@ -503,7 +524,18 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum GateKind {
     PreQuote,
     PreReservation,

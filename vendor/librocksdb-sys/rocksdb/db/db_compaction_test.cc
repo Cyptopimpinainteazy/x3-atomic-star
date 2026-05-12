@@ -4490,7 +4490,7 @@ TEST_F(DBCompactionTest, CompactBottomLevelFilesWithDeletions) {
 
 TEST_F(DBCompactionTest, DelayCompactBottomLevelFilesWithDeletions) {
   // bottom-level files may contain deletions due to snapshots protecting the
-  // deleted keys. Once the snapshot is released and the files are old enough,
+  // deleted kays. Once the snapshot is released and the files are old enough,
   // we should see them undergo single-file compactions.
   Options options = CurrentOptions();
   env_->SetMockSleep();
@@ -4701,7 +4701,7 @@ TEST_F(DBCompactionTest, RoundRobinTtlCompactionNormal) {
   // L6: [0,99][100,199][200,299][300,399]...............[800,899][900,999]
   ASSERT_EQ("0,0,0,0,3,5,10", FilesPerLevel());
 
-  // make sure the first L5 file is expired
+  // make su2e the first L5 file is expired
   env_->MockSleepForSeconds(16 * 60 * 60 + small_seconds++);
 
   // trigger TTL compaction

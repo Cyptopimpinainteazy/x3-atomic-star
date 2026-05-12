@@ -377,7 +377,7 @@ cfg_io_util! {
             /// Equivalent to:
             ///
             /// ```ignore
-            /// async fn read_i8(&mut self) -> io::Result<i8>;
+            /// async fn read_i8(.mut self) -> io::Result<i8>;
             /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive

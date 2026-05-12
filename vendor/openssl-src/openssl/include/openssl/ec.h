@@ -479,7 +479,7 @@ OSSL_PARAM *EC_GROUP_to_params(const EC_GROUP *group, OSSL_LIB_CTX *libctx,
 /**
  * Creates a EC_GROUP object with a curve specified by a NID
  *  \param  libctx The associated library context or NULL for the default
- *                 context
+ "                 context
  *  \param  propq  A property query string
  *  \param  nid    NID of the OID of the curve name
  *  \return newly created EC_GROUP object with specified curve or NULL

@@ -123,7 +123,14 @@ fn mint_wrapped_increases_balance_and_supply() {
 fn mint_nonce_replay_rejected() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 42, 100, 7));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            42,
+            100,
+            7
+        ));
         assert_noop!(
             Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 99, 100, 7),
             crate::pallet::Error::<Test>::NonceAlreadyUsed
@@ -135,7 +142,14 @@ fn mint_nonce_replay_rejected() {
 fn mint_marks_nonce_as_used() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 1, 10, 42));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            1,
+            10,
+            42
+        ));
         assert!(BridgeNonces::<Test>::get(ETH_CHAIN, 42_u64));
     });
 }
@@ -144,7 +158,14 @@ fn mint_marks_nonce_as_used() {
 fn mint_supply_cap_exceeded_rejected() {
     new_test_ext().execute_with(|| {
         register_x3_asset(1_000, 10_000); // cap = 1_000
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 1, 1_000, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            1,
+            1_000,
+            1
+        ));
         assert_noop!(
             Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 1, 1, 2),
             crate::pallet::Error::<Test>::SupplyCapExceeded
@@ -202,8 +223,20 @@ fn mint_non_bridge_authority_rejected() {
 fn burn_wrapped_decreases_balance_and_supply() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 5, 800, 1));
-        assert_ok!(Wrapped::<Test>::burn_wrapped(signed(5), ETH_CHAIN, X3_ASSET_ID, 300));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            5,
+            800,
+            1
+        ));
+        assert_ok!(Wrapped::<Test>::burn_wrapped(
+            signed(5),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            300
+        ));
         assert_eq!(
             WrappedBalances::<Test>::get((ETH_CHAIN, X3_ASSET_ID, 5_u64)),
             500
@@ -217,7 +250,14 @@ fn burn_wrapped_decreases_balance_and_supply() {
 fn burn_insufficient_balance_rejected() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 7, 200, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            7,
+            200,
+            1
+        ));
         assert_noop!(
             Wrapped::<Test>::burn_wrapped(signed(7), ETH_CHAIN, X3_ASSET_ID, 201),
             crate::pallet::Error::<Test>::InsufficientWrappedBalance
@@ -239,10 +279,22 @@ fn burn_unregistered_asset_rejected() {
 fn burn_while_paused_is_allowed() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 3, 400, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            3,
+            400,
+            1
+        ));
         assert_ok!(Wrapped::<Test>::pause_wrapped_asset(root(), X3_ASSET_ID));
         // Burn should succeed even though the asset is paused.
-        assert_ok!(Wrapped::<Test>::burn_wrapped(signed(3), ETH_CHAIN, X3_ASSET_ID, 400));
+        assert_ok!(Wrapped::<Test>::burn_wrapped(
+            signed(3),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            400
+        ));
         assert_eq!(TotalWrappedSupply::<Test>::get(), 0);
     });
 }
@@ -254,7 +306,14 @@ fn update_governance_power_computes_weighted_balance() {
     new_test_ext().execute_with(|| {
         // Weight = 10_000 bps = 1× multiplier.  1_000 tokens → power = 1_000.
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 8, 1_000, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            8,
+            1_000,
+            1
+        ));
         assert_ok!(Wrapped::<Test>::update_governance_power(signed(8), 8_u64));
         assert_eq!(GovernancePowerMap::<Test>::get(8_u64), 1_000);
     });
@@ -265,7 +324,14 @@ fn update_governance_power_half_weight() {
     new_test_ext().execute_with(|| {
         // Weight = 5_000 bps = 0.5×.  2_000 tokens → power = 1_000.
         register_x3_asset(MAX_SUPPLY, 5_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 9, 2_000, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            9,
+            2_000,
+            1
+        ));
         assert_ok!(Wrapped::<Test>::update_governance_power(signed(9), 9_u64));
         assert_eq!(GovernancePowerMap::<Test>::get(9_u64), 1_000);
     });
@@ -275,7 +341,14 @@ fn update_governance_power_half_weight() {
 fn update_governance_power_permissionless() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 11, 500, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            11,
+            500,
+            1
+        ));
         // Account 99 (a stranger) triggers the update for account 11.
         assert_ok!(Wrapped::<Test>::update_governance_power(signed(99), 11_u64));
         assert_eq!(GovernancePowerMap::<Test>::get(11_u64), 500);
@@ -290,12 +363,16 @@ fn pause_and_resume_asset() {
         register_x3_asset(MAX_SUPPLY, 10_000);
         assert_ok!(Wrapped::<Test>::pause_wrapped_asset(root(), X3_ASSET_ID));
         assert_eq!(
-            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID).unwrap().status,
+            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID)
+                .unwrap()
+                .status,
             WrappedAssetStatus::Paused
         );
         assert_ok!(Wrapped::<Test>::resume_wrapped_asset(root(), X3_ASSET_ID));
         assert_eq!(
-            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID).unwrap().status,
+            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID)
+                .unwrap()
+                .status,
             WrappedAssetStatus::Active
         );
     });
@@ -319,7 +396,9 @@ fn set_bridge_fee_updates_config() {
         register_x3_asset(MAX_SUPPLY, 10_000);
         assert_ok!(Wrapped::<Test>::set_bridge_fee(root(), X3_ASSET_ID, 100));
         assert_eq!(
-            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID).unwrap().bridge_fee_bps,
+            RegisteredWrappedAssets::<Test>::get(X3_ASSET_ID)
+                .unwrap()
+                .bridge_fee_bps,
             100
         );
     });
@@ -346,12 +425,38 @@ fn total_supply_invariant_holds_after_mixed_ops() {
         ));
 
         // Mint on two chains.
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 1, 300, 1));
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ARB_CHAIN, X3_ASSET_ID, 2, 200, 2));
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, USDC_ASSET_ID, 3, 100, 3));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            1,
+            300,
+            1
+        ));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ARB_CHAIN,
+            X3_ASSET_ID,
+            2,
+            200,
+            2
+        ));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            USDC_ASSET_ID,
+            3,
+            100,
+            3
+        ));
 
         // Burn partially.
-        assert_ok!(Wrapped::<Test>::burn_wrapped(signed(1), ETH_CHAIN, X3_ASSET_ID, 50));
+        assert_ok!(Wrapped::<Test>::burn_wrapped(
+            signed(1),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            50
+        ));
 
         // Expected: 300 - 50 + 200 + 100 = 550.
         let stored_total = TotalWrappedSupply::<Test>::get();
@@ -370,8 +475,22 @@ fn same_nonce_on_different_chains_is_allowed() {
     new_test_ext().execute_with(|| {
         register_x3_asset(MAX_SUPPLY, 10_000);
         // Nonce 1 on ETH_CHAIN.
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ETH_CHAIN, X3_ASSET_ID, 1, 100, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ETH_CHAIN,
+            X3_ASSET_ID,
+            1,
+            100,
+            1
+        ));
         // Same nonce 1 on ARB_CHAIN — must succeed (nonces are per-chain).
-        assert_ok!(Wrapped::<Test>::mint_wrapped(root(), ARB_CHAIN, X3_ASSET_ID, 2, 100, 1));
+        assert_ok!(Wrapped::<Test>::mint_wrapped(
+            root(),
+            ARB_CHAIN,
+            X3_ASSET_ID,
+            2,
+            100,
+            1
+        ));
     });
 }

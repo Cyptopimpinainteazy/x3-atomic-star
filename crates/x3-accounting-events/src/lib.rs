@@ -70,7 +70,9 @@ mod tests;
 /// Add new variants here as X3 expands. For modules not yet enumerated, use
 /// [`RevenueModule::Other`] with a `blake2_256` hash of the module name so that
 /// downstream indexers can map it without a runtime upgrade.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum RevenueModule {
     /// AMM / CLMM swap fees.
@@ -111,7 +113,9 @@ pub enum RevenueModule {
 ///
 /// The kind is used by the accounting spine to route events to the correct
 /// reconciliation bucket (e.g. revenue recognition vs. settlement vs. treasury).
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum AccountingEventKind {
     // --- Revenue recognition ------------------------------------------------
@@ -161,7 +165,9 @@ pub enum AccountingEventKind {
 ///
 /// When a fee is split among multiple recipients, set this to
 /// [`FeeDestination::Split`] and populate [`FeeSplits`] with the breakdown.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum FeeDestination {
     /// Fee goes to the on-chain protocol treasury pallet.
@@ -279,9 +285,7 @@ pub struct AccountingEvent<BlockNumber, Balance> {
 
 // ─── Builder helpers ─────────────────────────────────────────────────────────
 
-impl<BlockNumber: Default + Copy, Balance: Default + Copy>
-    AccountingEvent<BlockNumber, Balance>
-{
+impl<BlockNumber: Default + Copy, Balance: Default + Copy> AccountingEvent<BlockNumber, Balance> {
     /// Construct a [`AccountingEventKind::FeeCollected`] event for a local
     /// (single-chain) fee collection.
     ///

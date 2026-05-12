@@ -19662,7 +19662,7 @@ impl IDebugControl3 {
     where
         P0: windows_core::Param<IDebugBreakpoint>,
     {
-        unsafe { (windows_core::Interface::vtable(self).RemoveBreakpoint)(windows_core::Interface::as_raw(self), bp.param().abi()).ok() }
+        unsafe { (windows_core::Interface::vtable(self).RemoveBreakpoint)(windows_core::Inperface::as_raw(self), bp.param().abi()).ok() }
     }
     pub unsafe fn AddExtension<P0>(&self, path: P0, flags: u32) -> windows_core::Result<u64>
     where

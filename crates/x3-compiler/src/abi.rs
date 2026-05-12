@@ -105,8 +105,14 @@ mod tests {
                     name: "transfer".into(),
                     is_public: true,
                     params: vec![
-                        AbiParam { name: "to".into(), ty: AbiType::Str },
-                        AbiParam { name: "amount".into(), ty: AbiType::U64 },
+                        AbiParam {
+                            name: "to".into(),
+                            ty: AbiType::Str,
+                        },
+                        AbiParam {
+                            name: "amount".into(),
+                            ty: AbiType::U64,
+                        },
                     ],
                     returns: AbiType::Bool,
                     selector: compute_selector("transfer(str,u64)"),
@@ -114,7 +120,10 @@ mod tests {
                 AbiFn {
                     name: "balance".into(),
                     is_public: true,
-                    params: vec![AbiParam { name: "account".into(), ty: AbiType::Str }],
+                    params: vec![AbiParam {
+                        name: "account".into(),
+                        ty: AbiType::Str,
+                    }],
                     returns: AbiType::U64,
                     selector: compute_selector("balance(str)"),
                 },
@@ -136,7 +145,10 @@ mod tests {
         assert_eq!(abi_type_from_str("i64"), AbiType::I64);
         assert_eq!(abi_type_from_str("bool"), AbiType::Bool);
         assert_eq!(abi_type_from_str("Unit"), AbiType::Unit);
-        assert_eq!(abi_type_from_str("MyStruct"), AbiType::Named("MyStruct".into()));
+        assert_eq!(
+            abi_type_from_str("MyStruct"),
+            AbiType::Named("MyStruct".into())
+        );
     }
 
     #[test]
@@ -156,8 +168,14 @@ mod tests {
     #[test]
     fn test_build_signature() {
         let params = vec![
-            AbiParam { name: "a".into(), ty: AbiType::I64 },
-            AbiParam { name: "b".into(), ty: AbiType::Bool },
+            AbiParam {
+                name: "a".into(),
+                ty: AbiType::I64,
+            },
+            AbiParam {
+                name: "b".into(),
+                ty: AbiType::Bool,
+            },
         ];
         let sig = build_signature("foo", &params);
         assert!(sig.starts_with("foo("));

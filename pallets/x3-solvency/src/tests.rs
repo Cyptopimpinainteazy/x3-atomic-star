@@ -2,16 +2,21 @@ use crate::mock::*;
 use crate::pallet::{
     EvidenceRecords, PendingObligationCount, PendingObligations, SolvencySnapshots,
 };
+use crate::types::{PostSubmissionContext, QuoteContext, ReservationContext, SubmissionContext};
 use crate::{Error, Event};
-use frame_support::{assert_ok, traits::{ConstU32, Hooks}, BoundedVec};
+use frame_support::{
+    assert_ok,
+    traits::{ConstU32, Hooks},
+    BoundedVec,
+};
 use pallet_x3_inventory::{
     pallet::Pallet as InventoryPallet,
-    types::{LaneClass, LaneId, LiquiditySourceType, OwnerType, ReservationId, ReservationStatus, RouteId, VaultId, VaultType},
+    types::{
+        LaneClass, LaneId, LiquiditySourceType, OwnerType, ReservationId, ReservationStatus,
+        RouteId, VaultId, VaultType,
+    },
 };
 use pallet_x3_reservation::pallet::{Pallet as ReservationPallet, ReservationState};
-use crate::types::{
-    PostSubmissionContext, QuoteContext, ReservationContext, SubmissionContext,
-};
 
 // ──────────────────────────────────────────
 // Helpers
@@ -49,8 +54,8 @@ fn setup_vault_and_lane(v_id: VaultId, l_id: LaneId) {
         OwnerType::Protocol,
         1u32,
         1u32,
-        0u128, // critical_min
-        50u128, // min_band
+        0u128,   // critical_min
+        50u128,  // min_band
         100u128, // target_band
         200u128, // max_band
     ));
@@ -122,13 +127,23 @@ fn pre_quote_fails_when_lane_not_found() {
             OwnerType::Protocol,
             1u32,
             1u32,
-            0u128, 50u128, 100u128, 200u128,
+            0u128,
+            50u128,
+            100u128,
+            200u128,
         ));
 
-        let ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 50u128, route_id: r_id };
+        let ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 50u128,
+            route_id: r_id,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::LaneFrozen));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::LaneFrozen));
     });
 }
 
@@ -148,7 +163,9 @@ fn pre_quote_fails_when_vault_has_insufficient_balance() {
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::InsufficientVault));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::InsufficientVault));
     });
 }
 
@@ -164,26 +181,44 @@ fn pre_quote_fails_when_unsettled_cap_breached() {
             v_id,
             VaultType::SettlementFloat,
             OwnerType::Protocol,
-            1u32, 1u32,
-            0u128, 50u128, 100u128, 200u128,
+            1u32,
+            1u32,
+            0u128,
+            50u128,
+            100u128,
+            200u128,
         ));
         assert_ok!(pallet_x3_inventory::Pallet::<Test>::fund_vault(
-            frame_system::RawOrigin::Root.into(), v_id, 1000u128,
+            frame_system::RawOrigin::Root.into(),
+            v_id,
+            1000u128,
         ));
         let allowed: BoundedVec<LiquiditySourceType, MaxLiquiditySources> =
             BoundedVec::try_from(vec![LiquiditySourceType::ProtocolFloat]).unwrap();
         assert_ok!(pallet_x3_inventory::Pallet::<Test>::register_lane(
             frame_system::RawOrigin::Root.into(),
-            l_id, 1u32, 2u32, 1u32, 2u32, LaneClass::A,
-            allowed, 5000u128, 10u128, // unsettled_cap = 10
+            l_id,
+            1u32,
+            2u32,
+            1u32,
+            2u32,
+            LaneClass::A,
+            allowed,
+            5000u128,
+            10u128, // unsettled_cap = 10
         ));
 
         let ctx = QuoteContext {
-            lane_id: l_id, vault_id: v_id, amount: 100u128, route_id: r_id,
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 100u128,
+            route_id: r_id,
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::UnsettledCapBreached));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::UnsettledCapBreached));
     });
 }
 
@@ -195,7 +230,12 @@ fn pre_quote_snapshot_is_stored() {
         let r_id = route_id(4);
         setup_vault_and_lane(v_id, l_id);
 
-        let ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 10u128, route_id: r_id };
+        let ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 10u128,
+            route_id: r_id,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
 
         let snapshot = SolvencySnapshots::<Test>::get(result.snapshot_hash);
@@ -219,7 +259,10 @@ fn pre_reservation_passes_for_new_route() {
         setup_vault_and_lane(v_id, l_id);
 
         let ctx = ReservationContext {
-            lane_id: l_id, vault_id: v_id, amount: 50u128, route_id: r_id,
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 50u128,
+            route_id: r_id,
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_reservation(&ctx);
         assert!(result.passed);
@@ -239,11 +282,16 @@ fn pre_reservation_fails_for_duplicate_route() {
         pallet_x3_reservation::pallet::ReservationsByRoute::<Test>::insert(r_id, reservation_id(6));
 
         let ctx = ReservationContext {
-            lane_id: l_id, vault_id: v_id, amount: 50u128, route_id: r_id,
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 50u128,
+            route_id: r_id,
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_reservation(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::RouteDuplicate));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::RouteDuplicate));
     });
 }
 
@@ -324,7 +372,9 @@ fn pre_submission_fails_for_stale_quote() {
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_submission(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::QuoteStale));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::QuoteStale));
     });
 }
 
@@ -361,7 +411,9 @@ fn pre_submission_fails_for_excessive_slippage() {
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_submission(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::SlippageExceeded));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::SlippageExceeded));
     });
 }
 
@@ -388,14 +440,17 @@ fn pre_submission_fails_when_pending_obligation_exists() {
 
         // Inject an existing pending obligation for this route
         use crate::types::PendingObligation;
-        PendingObligations::<Test>::insert(r_id, PendingObligation {
-            route_id: r_id,
-            reservation_id: res_id,
-            amount: 50u128,
-            timeout_block: 1000u64,
-            snapshot_hash: [0u8; 32],
-            submission_hash: [0u8; 32],
-        });
+        PendingObligations::<Test>::insert(
+            r_id,
+            PendingObligation {
+                route_id: r_id,
+                reservation_id: res_id,
+                amount: 50u128,
+                timeout_block: 1000u64,
+                snapshot_hash: [0u8; 32],
+                submission_hash: [0u8; 32],
+            },
+        );
 
         let ctx = SubmissionContext {
             reservation_id: res_id,
@@ -409,7 +464,9 @@ fn pre_submission_fails_when_pending_obligation_exists() {
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_submission(&ctx);
         assert!(!result.passed);
-        assert!(result.failed_checks.contains(&crate::types::SolvencyCheck::ReconciliationLagged));
+        assert!(result
+            .failed_checks
+            .contains(&crate::types::SolvencyCheck::ReconciliationLagged));
     });
 }
 
@@ -469,9 +526,14 @@ fn record_post_submission_errors_on_duplicate_route() {
             submission_hash: snap,
         };
 
-        assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission(ctx.clone()));
+        assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission(
+            ctx.clone()
+        ));
         let result = crate::pallet::Pallet::<Test>::record_post_submission(ctx);
-        assert!(matches!(result, Err(Error::<Test>::ObligationAlreadyExists)));
+        assert!(matches!(
+            result,
+            Err(Error::<Test>::ObligationAlreadyExists)
+        ));
     });
 }
 
@@ -485,7 +547,12 @@ fn record_post_submission_marks_snapshot_as_referenced() {
         setup_vault_and_lane(v_id, l_id);
 
         // First do a pre_quote to create a snapshot
-        let q_ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 10u128, route_id: r_id };
+        let q_ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 10u128,
+            route_id: r_id,
+        };
         let q_result = crate::pallet::Pallet::<Test>::check_pre_quote(&q_ctx);
         let snap = q_result.snapshot_hash;
 
@@ -520,7 +587,12 @@ fn old_unreferenced_snapshots_are_pruned() {
 
         // Create a snapshot at block 1
         System::set_block_number(1);
-        let ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 10u128, route_id: r_id };
+        let ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 10u128,
+            route_id: r_id,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         let snap = result.snapshot_hash;
         assert!(SolvencySnapshots::<Test>::contains_key(snap));
@@ -545,7 +617,12 @@ fn referenced_snapshots_survive_pruning() {
         setup_vault_and_lane(v_id, l_id);
 
         System::set_block_number(1);
-        let ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 10u128, route_id: r_id };
+        let ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 10u128,
+            route_id: r_id,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         let snap = result.snapshot_hash;
 
@@ -559,7 +636,9 @@ fn referenced_snapshots_survive_pruning() {
             submission_block: 1u64,
             submission_hash: snap,
         };
-        assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission(post_ctx));
+        assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission(
+            post_ctx
+        ));
 
         // Use now=1001 so prune_before=1 targets block 1 where snapshot was stored
         System::set_block_number(1001);
@@ -582,7 +661,12 @@ fn get_snapshot_returns_stored_record() {
         let r_id = route_id(16);
         setup_vault_and_lane(v_id, l_id);
 
-        let ctx = QuoteContext { lane_id: l_id, vault_id: v_id, amount: 10u128, route_id: r_id };
+        let ctx = QuoteContext {
+            lane_id: l_id,
+            vault_id: v_id,
+            amount: 10u128,
+            route_id: r_id,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
         let snap = result.snapshot_hash;
 
@@ -623,10 +707,12 @@ fn record_post_submission_extrinsic_works() {
             submission_hash: snap,
         };
 
-        assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission_extrinsic(
-            frame_system::RawOrigin::Signed(1).into(),
-            ctx,
-        ));
+        assert_ok!(
+            crate::pallet::Pallet::<Test>::record_post_submission_extrinsic(
+                frame_system::RawOrigin::Signed(1).into(),
+                ctx,
+            )
+        );
 
         assert!(PendingObligations::<Test>::contains_key(r_id));
     });

@@ -86,8 +86,8 @@ impl PolicyEngine {
 
     /// Check if agent is blacklisted
     pub fn is_blacklisted<T: Config>(
-        _blacklist_expiry: Option<T::BlockNumber>,
-        current_block: T::BlockNumber,
+        _blacklist_expiry: Option<frame_system::pallet_prelude::BlockNumberFor<T>>,
+        current_block: frame_system::pallet_prelude::BlockNumberFor<T>,
     ) -> bool {
         if let Some(expiry) = _blacklist_expiry {
             current_block < expiry
@@ -111,8 +111,15 @@ pub struct PolicyContext<T: Config> {
     pub tasks_this_block: u32,
     /// Number of extrinsics from agent this epoch
     pub extrinsics_this_epoch: u32,
-        /// The requested capability for the current transaction, if identifiable.
-        pub requested_capability: Option<Vec<u8>>,
+    /// The requested capability for the current transaction, if identifiable.
+    pub requested_capability: Option<Vec<u8>>,
+    /// Related agent accounts
+    pub related_agents: Vec<T::AccountId>,
+    /// Current block number
+    pub current_block: frame_system::pallet_prelude::BlockNumberFor<T>,
+    /// Block number of last agent activity
+    pub last_activity_block: frame_system::pallet_prelude::BlockNumberFor<T>,
+}
 
 #[cfg(test)]
 mod tests {

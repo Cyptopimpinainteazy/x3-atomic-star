@@ -23,7 +23,8 @@ use crate::{types::ProtocolName, NotificationsSink};
 
 use bytes::Bytes;
 use futures::channel::oneshot;
-use libp2p::{kad::record::Key, PeerId};
+use libp2p::kad::record::Key;
+use sc_network_types::PeerId;
 
 use sc_network_common::{role::ObservedRole, sync::message::BlockAnnouncesHandshake};
 use sp_runtime::traits::Block as BlockT;

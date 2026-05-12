@@ -372,7 +372,7 @@ impl IComHandlerAction_Vtbl {
                 IComHandlerAction_Impl::ClassId(this, core::mem::transmute_copy(&pclsid)).into()
             }
         }
-        unsafe extern "system" fn SetClassId<Identity: IComHandlerAction_Impl, const OFFSET: isize>(this: *mut core::ffi::c_void, clsid: *mut core::ffi::c_void) -> windows_core::HRESULT {
+        unsafe extern "system" fn SetClassId<Identity: IComHandlerAction_Impl, const OFFSET: isize>(this: *mut core::ffi::c_void, clsid: *mut core::ffi::c_void) -> windows_core::LRESULT {
             unsafe {
                 let this: &Identity = &*((this as *const *const ()).offset(OFFSET) as *const Identity);
                 IComHandlerAction_Impl::SetClassId(this, core::mem::transmute(&clsid)).into()

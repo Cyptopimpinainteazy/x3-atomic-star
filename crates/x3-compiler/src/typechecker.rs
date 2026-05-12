@@ -35,14 +35,20 @@ pub fn typecheck_binop(op: &BinOp, lhs: &TypeExpr, rhs: &TypeExpr) -> Result<Typ
             } else if lhs == &TypeExpr::U64 && rhs == &TypeExpr::U64 {
                 Ok(TypeExpr::U64)
             } else {
-                Err(TypeError::new("binop", format!("type mismatch: {lhs:?} op {rhs:?}")))
+                Err(TypeError::new(
+                    "binop",
+                    format!("type mismatch: {lhs:?} op {rhs:?}"),
+                ))
             }
         }
         BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Gt => {
             if lhs == rhs {
                 Ok(TypeExpr::Bool)
             } else {
-                Err(TypeError::new("binop", format!("cannot compare {lhs:?} with {rhs:?}")))
+                Err(TypeError::new(
+                    "binop",
+                    format!("cannot compare {lhs:?} with {rhs:?}"),
+                ))
             }
         }
     }
@@ -65,10 +71,7 @@ pub fn infer_expr(expr: &Expr, env: &TypeEnv) -> Result<TypeExpr, TypeError> {
         }
         Expr::Call { callee, args: _ } => {
             // Simplified: calls return Unit (full inference requires function table)
-            env.get(callee)
-                .cloned()
-                .unwrap_or(TypeExpr::Unit)
-                .pipe_ok()
+            env.get(callee).cloned().unwrap_or(TypeExpr::Unit).pipe_ok()
         }
         Expr::Block(stmts) => {
             let mut local_env = env.clone();
@@ -78,7 +81,11 @@ pub fn infer_expr(expr: &Expr, env: &TypeEnv) -> Result<TypeExpr, TypeError> {
             }
             Ok(last)
         }
-        Expr::If { cond, then_branch, else_branch } => {
+        Expr::If {
+            cond,
+            then_branch,
+            else_branch,
+        } => {
             let ct = infer_expr(cond, env)?;
             if ct != TypeExpr::Bool {
                 return Err(TypeError::new("if", "condition must be Bool"));

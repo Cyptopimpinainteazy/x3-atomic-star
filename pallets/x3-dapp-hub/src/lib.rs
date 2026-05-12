@@ -36,7 +36,9 @@ pub use x3_revenue_sharing::{
 pub type DAppId = u64;
 
 /// Complete on-chain record for a registered dApp.
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct DAppState<AccountId, BlockNumber> {
     /// Unique identifier, assigned at registration.
     pub dapp_id: DAppId,
@@ -174,7 +176,10 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// A new dApp was registered and is awaiting approval.
-        DAppRegistered { dapp_id: DAppId, developer: T::AccountId },
+        DAppRegistered {
+            dapp_id: DAppId,
+            developer: T::AccountId,
+        },
         /// A pending dApp was approved by governance.
         DAppApproved { dapp_id: DAppId },
         /// A dApp was rejected by governance.
@@ -182,7 +187,10 @@ pub mod pallet {
         /// An approved dApp was suspended by governance.
         DAppSuspended { dapp_id: DAppId },
         /// A dApp's placement tier was updated.
-        PlacementUpdated { dapp_id: DAppId, tier: PlacementTier },
+        PlacementUpdated {
+            dapp_id: DAppId,
+            tier: PlacementTier,
+        },
         /// Revenue was recorded and split according to the policy.
         RevenueRecorded {
             dapp_id: DAppId,
@@ -193,7 +201,10 @@ pub mod pallet {
         /// A revenue-split policy was stored or updated.
         RevenuePolicySet { policy_id: u32 },
         /// A developer withdrew accrued earnings.
-        EarningsWithdrawn { developer: T::AccountId, amount: u128 },
+        EarningsWithdrawn {
+            developer: T::AccountId,
+            amount: u128,
+        },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────────
@@ -246,7 +257,10 @@ pub mod pallet {
             );
 
             let total = TotalDApps::<T>::get();
-            ensure!(total < T::MaxActiveDApps::get(), Error::<T>::MaxActiveDAppsReached);
+            ensure!(
+                total < T::MaxActiveDApps::get(),
+                Error::<T>::MaxActiveDAppsReached
+            );
 
             let dev_dapps = DeveloperDApps::<T>::get(&developer);
             ensure!(
@@ -274,7 +288,8 @@ pub mod pallet {
             DApps::<T>::insert(dapp_id, &dapp);
 
             DeveloperDApps::<T>::try_mutate(&developer, |list| {
-                list.try_push(dapp_id).map_err(|_| Error::<T>::MaxDAppsReached)
+                list.try_push(dapp_id)
+                    .map_err(|_| Error::<T>::MaxDAppsReached)
             })?;
 
             TotalDApps::<T>::mutate(|c| *c = c.saturating_add(1));
@@ -410,8 +425,7 @@ pub mod pallet {
                 if let Some(d) = opt {
                     d.total_revenue_collected =
                         d.total_revenue_collected.saturating_add(gross_amount);
-                    d.total_developer_paid =
-                        d.total_developer_paid.saturating_add(developer_share);
+                    d.total_developer_paid = d.total_developer_paid.saturating_add(developer_share);
                 }
             });
 
@@ -456,11 +470,14 @@ pub mod pallet {
         pub fn withdraw_earnings(origin: OriginFor<T>, amount: u128) -> DispatchResult {
             let developer = ensure_signed(origin)?;
 
-            DeveloperEarnings::<T>::try_mutate(&developer, |earnings| -> Result<(), DispatchError> {
-                ensure!(*earnings >= amount, Error::<T>::InsufficientEarnings);
-                *earnings = earnings.saturating_sub(amount);
-                Ok(())
-            })?;
+            DeveloperEarnings::<T>::try_mutate(
+                &developer,
+                |earnings| -> Result<(), DispatchError> {
+                    ensure!(*earnings >= amount, Error::<T>::InsufficientEarnings);
+                    *earnings = earnings.saturating_sub(amount);
+                    Ok(())
+                },
+            )?;
 
             Self::deposit_event(Event::EarningsWithdrawn { developer, amount });
             Ok(())

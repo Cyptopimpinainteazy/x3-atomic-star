@@ -3097,7 +3097,7 @@ pub struct D3DDDI_NATIVEFENCEMAPPING {
     pub CurrentValueGpuVa: u64,
     pub MonitoredValueGpuVa: u64,
 }
-impl ::core::marker::Copy for D3DDDI_NATIVEFENCEMAPPING {}
+impl ::core::marker::Copy for D3DDDM_NATIVEFENCEMAPPING {}
 impl ::core::clone::Clone for D3DDDI_NATIVEFENCEMAPPING {
     fn clone(&self) -> Self {
         *self

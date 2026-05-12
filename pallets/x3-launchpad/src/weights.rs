@@ -62,11 +62,25 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 }
 
 impl WeightInfo for () {
-    fn create_launch() -> Weight { Weight::zero() }
-    fn contribute() -> Weight { Weight::zero() }
-    fn finalize_launch() -> Weight { Weight::zero() }
-    fn claim_refund() -> Weight { Weight::zero() }
-    fn claim_allocation() -> Weight { Weight::zero() }
-    fn cancel_launch() -> Weight { Weight::zero() }
-    fn withdraw_raised_funds() -> Weight { Weight::zero() }
+    fn create_launch() -> Weight {
+        Weight::zero()
+    }
+    fn contribute() -> Weight {
+        Weight::zero()
+    }
+    fn finalize_launch() -> Weight {
+        Weight::zero()
+    }
+    fn claim_refund() -> Weight {
+        Weight::zero()
+    }
+    fn claim_allocation() -> Weight {
+        Weight::zero()
+    }
+    fn cancel_launch() -> Weight {
+        Weight::zero()
+    }
+    fn withdraw_raised_funds() -> Weight {
+        Weight::zero()
+    }
 }

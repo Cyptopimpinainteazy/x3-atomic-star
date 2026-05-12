@@ -7,8 +7,7 @@
 
 use codec::{Decode, Encode};
 use frame_support::pallet_prelude::*;
-use sp_core::H256;
-use sp_io::hashing::blake2_256;
+use sp_core::{hashing::blake2_256, H256};
 use sp_runtime::traits::Zero;
 use sp_std::vec::Vec;
 
@@ -40,7 +39,9 @@ pub struct EmergencyEvent<BlockNumber, AccountId> {
     pub audit_hash: [u8; 32],
 }
 
-impl<BlockNumber: Clone + Encode, AccountId: Clone + Encode> EmergencyEvent<BlockNumber, AccountId> {
+impl<BlockNumber: Clone + Encode, AccountId: Clone + Encode>
+    EmergencyEvent<BlockNumber, AccountId>
+{
     /// Create a new emergency event with deterministic audit hash.
     /// Hash covers: action || block || account || reason
     pub fn new(
@@ -109,12 +110,7 @@ mod tests {
             reason.clone(),
         );
 
-        let event2 = EmergencyEvent::new(
-            EmergencyAction::Pause,
-            0u32,
-            0u32,
-            reason.clone(),
-        );
+        let event2 = EmergencyEvent::new(EmergencyAction::Pause, 0u32, 0u32, reason.clone());
 
         // Same inputs → same hash
         assert_eq!(event1.audit_hash, event2.audit_hash);
@@ -124,19 +120,9 @@ mod tests {
     fn emergency_event_audit_hash_changes_with_action() {
         let reason = BoundedVec::try_from(b"Test".to_vec()).unwrap();
 
-        let pause_event = EmergencyEvent::new(
-            EmergencyAction::Pause,
-            0u32,
-            0u32,
-            reason.clone(),
-        );
+        let pause_event = EmergencyEvent::new(EmergencyAction::Pause, 0u32, 0u32, reason.clone());
 
-        let kill_event = EmergencyEvent::new(
-            EmergencyAction::Kill,
-            0u32,
-            0u32,
-            reason.clone(),
-        );
+        let kill_event = EmergencyEvent::new(EmergencyAction::Kill, 0u32, 0u32, reason.clone());
 
         // Different actions → different hashes
         assert_ne!(pause_event.audit_hash, kill_event.audit_hash);
@@ -146,12 +132,7 @@ mod tests {
     fn emergency_event_verify_audit_hash() {
         let reason = BoundedVec::try_from(b"Verification test".to_vec()).unwrap();
 
-        let event = EmergencyEvent::new(
-            EmergencyAction::Quarantine,
-            42u32,
-            99u32,
-            reason,
-        );
+        let event = EmergencyEvent::new(EmergencyAction::Quarantine, 42u32, 99u32, reason);
 
         // Verification should pass
         assert!(event.verify_audit_hash());

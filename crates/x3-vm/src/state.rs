@@ -24,10 +24,7 @@ pub enum VmState {
 #[derive(Debug, PartialEq, Eq)]
 pub enum StateError {
     /// Transition is not allowed from the current state.
-    InvalidTransition {
-        from: String,
-        to: String,
-    },
+    InvalidTransition { from: String, to: String },
     /// VM is in a faulted state and cannot be reused.
     VmFaulted(String),
 }

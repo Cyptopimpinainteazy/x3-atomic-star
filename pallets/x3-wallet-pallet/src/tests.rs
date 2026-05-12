@@ -72,17 +72,12 @@ fn create_multisig_wallet_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: Vec<[u8; 32]> = vec![
-            [1u8; 32],
-            [2u8; 32],
-            [3u8; 32],
-        ]
-        ;
+        let signers: Vec<[u8; 32]> = vec![[1u8; 32], [2u8; 32], [3u8; 32]];
 
         assert_ok!(X3Wallet::create_multisig_wallet(
             RuntimeOrigin::signed(ALICE),
             signers,
-            2, // 2-of-3 threshold
+            2,    // 2-of-3 threshold
             3600, // 1 hour timelock
         ));
 
@@ -98,11 +93,7 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: Vec<[u8; 32]> = vec![
-            [1u8; 32],
-            [2u8; 32],
-        ]
-        ;
+        let signers: Vec<[u8; 32]> = vec![[1u8; 32], [2u8; 32]];
 
         // Threshold 0 is invalid
         assert_noop!(
@@ -136,7 +127,7 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
 fn transfer_tokens_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         // First mint some tokens to ALICE
@@ -165,7 +156,7 @@ fn transfer_tokens_works() {
 fn transfer_tokens_fails_with_zero_amount() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_noop!(
@@ -184,7 +175,7 @@ fn transfer_tokens_fails_with_zero_amount() {
 fn transfer_tokens_fails_with_insufficient_balance() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         // Mint 100 tokens to ALICE
@@ -229,7 +220,8 @@ fn register_biometric_works() {
         ));
 
         // Check profile was created
-        let profile = X3Wallet::get_biometric_profile(&ALICE).expect("biometric profile should exist");
+        let profile =
+            X3Wallet::get_biometric_profile(&ALICE).expect("biometric profile should exist");
         assert_eq!(profile.biometric_type, biometric_type);
         assert_eq!(profile.template_hash, template_hash);
         assert!(profile.is_enabled);
@@ -268,7 +260,7 @@ fn initiate_recovery_fails_without_guardian() {
 fn mint_tokens_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_ok!(X3Wallet::mint_tokens(
@@ -292,7 +284,7 @@ fn mint_tokens_works() {
 fn mint_tokens_accumulates() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_ok!(X3Wallet::mint_tokens(

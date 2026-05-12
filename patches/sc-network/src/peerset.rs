@@ -53,7 +53,7 @@ use std::{
 	task::{Context, Poll},
 };
 
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 
 pub const LOG_TARGET: &str = "peerset";
 

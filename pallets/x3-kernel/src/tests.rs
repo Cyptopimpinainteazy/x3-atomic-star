@@ -313,8 +313,8 @@ fn submit_evm_transaction_persists_receipt_and_transaction_metadata() {
         );
         let tx_hash = H256::from(sp_io::hashing::keccak_256(&raw_tx));
 
-        let returned_hash =
-            KernelCrossVmDispatcher::<Test>::submit_evm_transaction(raw_tx.clone()).expect("transaction should store");
+        let returned_hash = KernelCrossVmDispatcher::<Test>::submit_evm_transaction(raw_tx.clone())
+            .expect("transaction should store");
 
         assert_eq!(returned_hash, tx_hash.as_bytes().to_vec());
 
@@ -355,13 +355,15 @@ fn submit_evm_transaction_rejects_replay_without_overwriting_stored_records() {
         let raw_tx = legacy_evm_tx(to, &[0x2a], &[0x01], &[0x52, 0x08], None);
         let tx_hash = H256::from(sp_io::hashing::keccak_256(&raw_tx));
 
-        assert_ok!(KernelCrossVmDispatcher::<Test>::submit_evm_transaction(raw_tx.clone()));
+        assert_ok!(KernelCrossVmDispatcher::<Test>::submit_evm_transaction(
+            raw_tx.clone()
+        ));
         let original_receipt =
             EvmTransactionReceipts::<Test>::get(tx_hash).expect("receipt should exist");
         let original_tx = EvmTransactions::<Test>::get(tx_hash).expect("tx data should exist");
 
-        let replay_err =
-            KernelCrossVmDispatcher::<Test>::submit_evm_transaction(raw_tx).expect_err("replay must be rejected");
+        let replay_err = KernelCrossVmDispatcher::<Test>::submit_evm_transaction(raw_tx)
+            .expect_err("replay must be rejected");
         assert_eq!(replay_err, b"replay".to_vec());
 
         assert_eq!(

@@ -20,7 +20,10 @@ pub mod pallet {
     use frame_support::{pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
     use sp_runtime::{traits::Saturating, Perbill};
-    use sp_staking::offence::OffenceDetails;
+    use sp_staking::{
+        offence::{OffenceDetails, OnOffenceHandler},
+        SessionIndex,
+    };
     use sp_std::vec::Vec;
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
@@ -237,22 +240,23 @@ pub mod pallet {
         ) -> DispatchResult {
             let _reporter = ensure_signed(origin)?;
 
-            let slash_fraction = Perbill::from_parts(T::SlashFraction::get().saturating_mul(100_000));
+            let slash_fraction =
+                Perbill::from_parts(T::SlashFraction::get().saturating_mul(100_000));
             Self::slash_validator(&validator, reason, slash_fraction);
 
             Ok(())
         }
     }
 
-    impl<T: Config> pallet_offences::OnOffenceHandler<T::AccountId, T::IdentificationTuple, Weight>
-        for Pallet<T>
+    impl<T: Config + pallet_offences::Config>
+        OnOffenceHandler<T::AccountId, T::IdentificationTuple, Weight> for Pallet<T>
     where
         T::IdentificationTuple: IdentificationToAccountId<T::AccountId> + Clone,
     {
         fn on_offence(
             offenders: &[OffenceDetails<T::AccountId, T::IdentificationTuple>],
             slash_fraction: &[Perbill],
-            _session: sp_staking::SessionIndex,
+            _session: SessionIndex,
         ) -> Weight {
             for (offence, fraction) in offenders.iter().zip(slash_fraction.iter()) {
                 let validator = offence.offender.validator_account().clone();
@@ -262,6 +266,7 @@ pub mod pallet {
         }
     }
 
+    #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
             // Check if we need to activate a new validator set
@@ -338,7 +343,10 @@ pub mod pallet {
                 }
 
                 ValidatorStake::<T>::insert(validator, &info);
-                Self::deposit_event(Event::ValidatorSlashed { validator: validator.clone(), reason });
+                Self::deposit_event(Event::ValidatorSlashed {
+                    validator: validator.clone(),
+                    reason,
+                });
                 Self::deposit_event(Event::SlashApplied {
                     validator: validator.clone(),
                     slash_amount: actual_slash,

@@ -58,9 +58,14 @@ fn setup_lane(lane_id: [u8; 32]) {
 #[test]
 fn register_partner_creates_with_perfect_health() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
-        let state = Partners::<Test>::get(PARTNER_A).expect("partner must exist after registration");
+        let state =
+            Partners::<Test>::get(PARTNER_A).expect("partner must exist after registration");
 
         assert_eq!(state.partner_id, PARTNER_A);
         assert_eq!(
@@ -83,7 +88,11 @@ fn register_partner_creates_with_perfect_health() {
 #[test]
 fn register_partner_duplicate_returns_already_exists() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_noop!(
             X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT),
             Error::<Test>::PartnerAlreadyExists
@@ -98,7 +107,11 @@ fn register_partner_duplicate_returns_already_exists() {
 #[test]
 fn update_health_metrics_emits_below_threshold_when_fill_rate_is_low() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         // Worst-case fill reliability (0 bps) with other metrics at neutral.
         // fill_score        = 0
@@ -151,16 +164,20 @@ fn update_health_metrics_emits_below_threshold_when_fill_rate_is_low() {
 #[test]
 fn update_health_metrics_perfect_scores_yield_ten_thousand() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         assert_ok!(X3Partner::update_health_metrics(
             root(),
             PARTNER_A,
-            0,       // zero response time
-            10_000,  // perfect fill
-            0,       // zero rejections
-            0,       // zero stale
-            0,       // zero disputes
+            0,      // zero response time
+            10_000, // perfect fill
+            0,      // zero rejections
+            0,      // zero stale
+            0,      // zero disputes
         ));
 
         let state = Partners::<Test>::get(PARTNER_A).unwrap();
@@ -175,7 +192,11 @@ fn update_health_metrics_perfect_scores_yield_ten_thousand() {
 #[test]
 fn record_exposure_exceeding_limit_returns_error() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         // Adding exactly the limit must succeed.
         assert_ok!(X3Partner::record_exposure(
@@ -196,7 +217,11 @@ fn record_exposure_exceeding_limit_returns_error() {
 #[test]
 fn record_exposure_subtract_does_not_underflow() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         // Subtract more than current exposure (0) — must saturate at 0, not panic.
         assert_ok!(X3Partner::record_exposure(
@@ -218,7 +243,11 @@ fn record_exposure_subtract_does_not_underflow() {
 #[test]
 fn add_approved_lane_fails_for_nonexistent_lane() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         assert_noop!(
             X3Partner::add_approved_lane(root(), PARTNER_A, LANE_UNKNOWN),
@@ -231,7 +260,11 @@ fn add_approved_lane_fails_for_nonexistent_lane() {
 fn add_approved_lane_succeeds_for_existing_lane() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         assert_ok!(X3Partner::add_approved_lane(root(), PARTNER_A, LANE_1));
 
@@ -249,7 +282,11 @@ fn add_approved_lane_succeeds_for_existing_lane() {
 fn add_approved_lane_duplicate_returns_error() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_ok!(X3Partner::add_approved_lane(root(), PARTNER_A, LANE_1));
 
         assert_noop!(
@@ -266,7 +303,11 @@ fn add_approved_lane_duplicate_returns_error() {
 #[test]
 fn terminate_partner_blocks_reinstate() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         // Suspend then terminate.
         assert_ok!(X3Partner::suspend_partner(root(), PARTNER_A));
@@ -287,7 +328,11 @@ fn terminate_partner_blocks_reinstate() {
 #[test]
 fn reinstate_partner_blocked_when_health_below_threshold() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
 
         // Drive health below threshold.
         assert_ok!(X3Partner::update_health_metrics(
@@ -311,7 +356,11 @@ fn reinstate_partner_blocked_when_health_below_threshold() {
 #[test]
 fn reinstate_partner_succeeds_after_suspend_with_good_health() {
     new_test_ext().execute_with(|| {
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_ok!(X3Partner::suspend_partner(root(), PARTNER_A));
 
         // Health is still 10_000 (default), so reinstate should succeed.
@@ -337,10 +386,16 @@ fn reinstate_partner_succeeds_after_suspend_with_good_health() {
 fn is_partner_eligible_returns_true_for_valid_active_partner_on_approved_lane() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_ok!(X3Partner::add_approved_lane(root(), PARTNER_A, LANE_1));
 
-        assert!(crate::pallet::is_partner_eligible::<Test>(PARTNER_A, LANE_1));
+        assert!(crate::pallet::is_partner_eligible::<Test>(
+            PARTNER_A, LANE_1
+        ));
     });
 }
 
@@ -348,11 +403,17 @@ fn is_partner_eligible_returns_true_for_valid_active_partner_on_approved_lane() 
 fn is_partner_eligible_returns_false_for_suspended_partner() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_ok!(X3Partner::add_approved_lane(root(), PARTNER_A, LANE_1));
         assert_ok!(X3Partner::suspend_partner(root(), PARTNER_A));
 
-        assert!(!crate::pallet::is_partner_eligible::<Test>(PARTNER_A, LANE_1));
+        assert!(!crate::pallet::is_partner_eligible::<Test>(
+            PARTNER_A, LANE_1
+        ));
     });
 }
 
@@ -360,7 +421,9 @@ fn is_partner_eligible_returns_false_for_suspended_partner() {
 fn is_partner_eligible_returns_false_for_unknown_partner() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert!(!crate::pallet::is_partner_eligible::<Test>(PARTNER_B, LANE_1));
+        assert!(!crate::pallet::is_partner_eligible::<Test>(
+            PARTNER_B, LANE_1
+        ));
     });
 }
 
@@ -368,10 +431,16 @@ fn is_partner_eligible_returns_false_for_unknown_partner() {
 fn is_partner_eligible_returns_false_for_unapproved_lane() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         // Lane not approved for PARTNER_A.
 
-        assert!(!crate::pallet::is_partner_eligible::<Test>(PARTNER_A, LANE_1));
+        assert!(!crate::pallet::is_partner_eligible::<Test>(
+            PARTNER_A, LANE_1
+        ));
     });
 }
 
@@ -383,7 +452,11 @@ fn is_partner_eligible_returns_false_for_unapproved_lane() {
 fn remove_approved_lane_cleans_both_indexes() {
     new_test_ext().execute_with(|| {
         setup_lane(LANE_1);
-        assert_ok!(X3Partner::register_partner(root(), PARTNER_A, EXPOSURE_LIMIT));
+        assert_ok!(X3Partner::register_partner(
+            root(),
+            PARTNER_A,
+            EXPOSURE_LIMIT
+        ));
         assert_ok!(X3Partner::add_approved_lane(root(), PARTNER_A, LANE_1));
         assert_ok!(X3Partner::remove_approved_lane(root(), PARTNER_A, LANE_1));
 

@@ -87,7 +87,10 @@ impl InMemoryPendingStore {
     }
 
     pub fn commit(&mut self, transfer_id: TransferId) -> Result<Balance, PendingError> {
-        let t = self.transfers.get_mut(&transfer_id).ok_or(PendingError::NotFound)?;
+        let t = self
+            .transfers
+            .get_mut(&transfer_id)
+            .ok_or(PendingError::NotFound)?;
         if t.state != TransferState::Pending {
             return Err(PendingError::NotPending);
         }
@@ -98,7 +101,10 @@ impl InMemoryPendingStore {
     }
 
     pub fn abort(&mut self, transfer_id: TransferId) -> Result<Balance, PendingError> {
-        let t = self.transfers.get_mut(&transfer_id).ok_or(PendingError::NotFound)?;
+        let t = self
+            .transfers
+            .get_mut(&transfer_id)
+            .ok_or(PendingError::NotFound)?;
         if t.state != TransferState::Pending {
             return Err(PendingError::NotPending);
         }

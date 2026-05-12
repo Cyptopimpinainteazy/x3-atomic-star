@@ -161,8 +161,8 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
       - uses: Swatinem/rust-cache@v2
-       - name: Run fuzz tests (quick mode)
-         run: |
+      - name: Run fuzz tests (quick mode)
+        run: |
            # Run fuzz tests for 30 seconds each (quick CI mode)
            timeout 30 cargo fuzz run fuzz_proof_validation --release --fuzz-dir pallets/x3-atomic-kernel/fuzz || true
            timeout 30 cargo fuzz run bridge_proof_verify --release --fuzz-dir crates/x3-proof/fuzz || true

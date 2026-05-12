@@ -61,14 +61,13 @@ use libp2p::{
 	core::{upgrade, ConnectedPoint, Endpoint},
 	identify::Info as IdentifyInfo,
 	kad::record::Key as KademliaKey,
-	multiaddr,
 	ping::Failure as PingFailure,
 	swarm::{
 		AddressScore, ConnectionError, ConnectionId, ConnectionLimits, DialError, Executor,
 		ListenError, NetworkBehaviour, Swarm, SwarmBuilder, SwarmEvent, THandlerErr,
 	},
-	Multiaddr, PeerId,
 };
+use sc_network_types::{PeerId, multiaddr::{self as multiaddr, Multiaddr}};
 use log::{debug, error, info, trace, warn};
 use metrics::{Histogram, HistogramVec, MetricSources, Metrics};
 use parking_lot::Mutex;
@@ -154,7 +153,8 @@ where
 		// Private and public keys configuration.
 		let local_identity = network_config.node_key.clone().into_keypair()?;
 		let local_public = local_identity.public();
-		let local_peer_id = local_public.to_peer_id();
+		let local_peer_id_libp2p = local_public.to_peer_id();
+		let local_peer_id = PeerId::from_bytes(&local_peer_id_libp2p.to_bytes()).expect("valid peer id");
 
 		network_config.boot_nodes = network_config
 			.boot_nodes
@@ -312,7 +312,14 @@ where
 
 			let discovery_config = {
 				let mut config = DiscoveryConfig::new(local_public.to_peer_id());
-				config.with_permanent_addresses(known_addresses);
+				let lp_known_addresses: Vec<(libp2p::PeerId, libp2p::Multiaddr)> = known_addresses
+					.iter()
+					.map(|(p, a)| (
+						libp2p::PeerId::from_bytes(&p.to_bytes()).expect("valid peer id"),
+						libp2p::Multiaddr::from(a.clone()),
+					))
+					.collect();
+				config.with_permanent_addresses(lp_known_addresses);
 				config.discovery_limit(u64::from(network_config.default_peers_set.out_peers) + 15);
 				config.with_kademlia(
 					params.genesis_hash,
@@ -371,7 +378,7 @@ where
 				SwarmBuilder::with_executor(
 					transport,
 					behaviour,
-					local_peer_id,
+					local_peer_id_libp2p,
 					SpawnImpl(params.executor),
 				)
 			};
@@ -408,7 +415,7 @@ where
 
 		// Listen on multiaddresses.
 		for addr in &network_config.listen_addresses {
-			if let Err(err) = Swarm::<Behaviour<B>>::listen_on(&mut swarm, addr.clone()) {
+			if let Err(err) = Swarm::<Behaviour<B>>::listen_on(&mut swarm, libp2p::Multiaddr::from(addr.clone())) {
 				warn!(target: "sub-libp2p", "Can't listen on {} because: {:?}", addr, err)
 			}
 		}
@@ -417,7 +424,7 @@ where
 		for addr in &network_config.public_addresses {
 			Swarm::<Behaviour<B>>::add_external_address(
 				&mut swarm,
-				addr.clone(),
+				libp2p::Multiaddr::from(addr.clone()),
 				AddressScore::Infinite,
 			);
 		}
@@ -486,7 +493,9 @@ where
 
 	/// Adds an address for a node.
 	pub fn add_known_address(&mut self, peer_id: PeerId, addr: Multiaddr) {
-		self.network_service.behaviour_mut().add_known_address(peer_id, addr);
+		let lp_peer = libp2p::PeerId::from_bytes(&peer_id.to_bytes()).expect("valid peer id");
+		let lp_addr: libp2p::Multiaddr = addr.into();
+		self.network_service.behaviour_mut().add_known_address(lp_peer, lp_addr);
 	}
 
 	/// Return a `NetworkService` that can be shared through the code base and can be used to
@@ -496,15 +505,17 @@ where
 	}
 
 	/// Returns the local `PeerId`.
-	pub fn local_peer_id(&self) -> &PeerId {
-		Swarm::<Behaviour<B>>::local_peer_id(&self.network_service)
+	pub fn local_peer_id(&self) -> PeerId {
+		let lp = *Swarm::<Behaviour<B>>::local_peer_id(&self.network_service);
+		PeerId::from_bytes(&lp.to_bytes()).expect("valid peer id")
 	}
 
 	/// Returns the list of addresses we are listening on.
 	///
 	/// Does **NOT** include a trailing `/p2p/` with our `PeerId`.
-	pub fn listen_addresses(&self) -> impl Iterator<Item = &Multiaddr> {
+	pub fn listen_addresses(&self) -> impl Iterator<Item = Multiaddr> + '_ {
 		Swarm::<Behaviour<B>>::listeners(&self.network_service)
+			.map(|a| Multiaddr::from(a.clone()))
 	}
 
 	/// Get network state.
@@ -843,7 +854,7 @@ where
 
 			peers.insert(peer_id);
 
-			if !addr.is_empty() {
+			if addr.iter().next().is_some() {
 				let _ = self
 					.to_worker
 					.unbounded_send(ServiceToWorkerMsg::AddKnownAddress(peer_id, addr));
@@ -870,7 +881,7 @@ where
 				return Err("Local peer ID cannot be added as a reserved peer.".to_string())
 			}
 
-			if !addr.is_empty() {
+			if addr.iter().next().is_some() {
 				let _ = self
 					.to_worker
 					.unbounded_send(ServiceToWorkerMsg::AddKnownAddress(peer_id, addr));
@@ -1603,23 +1614,24 @@ where
 				}
 			},
 			SwarmEvent::OutgoingConnectionError { peer_id, error } => {
-				if let Some(peer_id) = peer_id {
-					trace!(
-						target: "sub-libp2p",
-						"Libp2p => Failed to reach {:?}: {}",
-						peer_id, error,
-					);
+			if let Some(peer_id_libp2p) = peer_id {
+				let peer_id = PeerId::from(peer_id_libp2p);
+				trace!(
+					target: "sub-libp2p",
+					"Libp2p => Failed to reach {:?}: {}",
+					peer_id, error,
+				);
 
-					let not_reported = !self.reported_invalid_boot_nodes.contains(&peer_id);
+				let not_reported = !self.reported_invalid_boot_nodes.contains(&peer_id);
 
-					if let Some(addresses) =
-						not_reported.then(|| self.boot_node_ids.get(&peer_id)).flatten()
-					{
-						if let DialError::WrongPeerId { obtained, endpoint } = &error {
-							if let ConnectedPoint::Dialer { address, role_override: _ } = endpoint {
-								let address_without_peer_id = parse_addr(address.clone())
-									.map_or_else(|_| address.clone(), |r| r.1);
-
+				if let Some(addresses) =
+					not_reported.then(|| self.boot_node_ids.get(&peer_id)).flatten()
+				{
+					if let DialError::WrongPeerId { obtained, endpoint } = &error {
+						if let ConnectedPoint::Dialer { address, role_override: _ } = endpoint {
+							let sn_addr = Multiaddr::from(address.clone());
+							let address_without_peer_id = parse_addr(sn_addr.clone())
+								.map_or_else(|_| sn_addr, |r| r.1);
 								// Only report for address of boot node that was added at startup of
 								// the node and not for any address that the node learned of the
 								// boot node.
@@ -1754,7 +1766,7 @@ fn ensure_addresses_consistent_with_transport<'a>(
 	if matches!(transport, TransportConfig::MemoryOnly) {
 		let addresses: Vec<_> = addresses
 			.filter(|x| {
-				x.iter().any(|y| !matches!(y, libp2p::core::multiaddr::Protocol::Memory(_)))
+				x.iter().any(|y| !matches!(y, multiaddr::Protocol::Memory(_)))
 			})
 			.cloned()
 			.collect();
@@ -1767,7 +1779,7 @@ fn ensure_addresses_consistent_with_transport<'a>(
 		}
 	} else {
 		let addresses: Vec<_> = addresses
-			.filter(|x| x.iter().any(|y| matches!(y, libp2p::core::multiaddr::Protocol::Memory(_))))
+			.filter(|x| x.iter().any(|y| matches!(y, multiaddr::Protocol::Memory(_))))
 			.cloned()
 			.collect();
 

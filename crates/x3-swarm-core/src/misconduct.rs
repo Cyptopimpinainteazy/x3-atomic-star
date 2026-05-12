@@ -70,7 +70,10 @@ pub enum Sanction {
 impl Sanction {
     /// Returns `true` if the agent is no longer permitted to act.
     pub fn is_halted(&self) -> bool {
-        matches!(self, Sanction::Quarantine | Sanction::Suspension | Sanction::Kill)
+        matches!(
+            self,
+            Sanction::Quarantine | Sanction::Suspension | Sanction::Kill
+        )
     }
 
     /// Returns `true` if the sanction is terminal.
@@ -253,30 +256,40 @@ mod tests {
     #[test]
     fn a_class_gives_warning() {
         let mut engine = MisconductEngine::new();
-        let s = engine.record(id(1), ViolationClass::A, "rate limit", 1).unwrap();
+        let s = engine
+            .record(id(1), ViolationClass::A, "rate limit", 1)
+            .unwrap();
         assert_eq!(s, Sanction::Warning);
     }
 
     #[test]
     fn b_class_gives_strike1() {
         let mut engine = MisconductEngine::new();
-        let s = engine.record(id(2), ViolationClass::B, "unauth read", 1).unwrap();
+        let s = engine
+            .record(id(2), ViolationClass::B, "unauth read", 1)
+            .unwrap();
         assert_eq!(s, Sanction::Strike1);
     }
 
     #[test]
     fn c_class_escalates_to_strike2_then_bond_slash() {
         let mut engine = MisconductEngine::new();
-        engine.record(id(3), ViolationClass::C, "bypass attempt", 1).unwrap();
+        engine
+            .record(id(3), ViolationClass::C, "bypass attempt", 1)
+            .unwrap();
         assert_eq!(engine.current_sanction(&id(3)), Sanction::Strike2);
-        let s = engine.record(id(3), ViolationClass::C, "bypass attempt 2", 2).unwrap();
+        let s = engine
+            .record(id(3), ViolationClass::C, "bypass attempt 2", 2)
+            .unwrap();
         assert_eq!(s, Sanction::BondSlash);
     }
 
     #[test]
     fn d_class_immediate_quarantine() {
         let mut engine = MisconductEngine::new();
-        let s = engine.record(id(4), ViolationClass::D, "mainnet key access", 1).unwrap();
+        let s = engine
+            .record(id(4), ViolationClass::D, "mainnet key access", 1)
+            .unwrap();
         assert_eq!(s, Sanction::Quarantine);
         assert!(engine.is_halted(&id(4)));
     }
@@ -305,7 +318,9 @@ mod tests {
         for i in 0..3 {
             let _ = engine.record(id(7), ViolationClass::D, "severe", i as u64);
         }
-        let err = engine.record(id(7), ViolationClass::A, "minor", 10).unwrap_err();
+        let err = engine
+            .record(id(7), ViolationClass::A, "minor", 10)
+            .unwrap_err();
         assert_eq!(err, MisconductError::AgentKilled(id(7)));
     }
 
@@ -313,7 +328,9 @@ mod tests {
     fn sanction_never_decreases() {
         let mut engine = MisconductEngine::new();
         // D-class first → Quarantine
-        engine.record(id(8), ViolationClass::D, "severe", 1).unwrap();
+        engine
+            .record(id(8), ViolationClass::D, "severe", 1)
+            .unwrap();
         // Subsequent A-class should not drop below Quarantine.
         let s = engine.record(id(8), ViolationClass::A, "minor", 2).unwrap();
         assert!(s >= Sanction::Quarantine);

@@ -50,9 +50,15 @@ pub trait Syscall: Send + Sync {
 /// Log message syscall (ID: 1).
 pub struct LogSyscall;
 impl Syscall for LogSyscall {
-    fn id(&self) -> SyscallId { 1 }
-    fn name(&self) -> &'static str { "sol_log" }
-    fn compute_units(&self, _: &[u8]) -> u64 { cu_cost::LOG }
+    fn id(&self) -> SyscallId {
+        1
+    }
+    fn name(&self) -> &'static str {
+        "sol_log"
+    }
+    fn compute_units(&self, _: &[u8]) -> u64 {
+        cu_cost::LOG
+    }
     fn execute(&self, input: &[u8]) -> SyscallResult {
         let _msg = String::from_utf8_lossy(input);
         Ok(vec![0]) // success
@@ -62,9 +68,15 @@ impl Syscall for LogSyscall {
 /// Get clock sysvar syscall (ID: 2).
 pub struct GetClockSyscall;
 impl Syscall for GetClockSyscall {
-    fn id(&self) -> SyscallId { 2 }
-    fn name(&self) -> &'static str { "sol_get_clock_sysvar" }
-    fn compute_units(&self, _: &[u8]) -> u64 { cu_cost::GET_CLOCK }
+    fn id(&self) -> SyscallId {
+        2
+    }
+    fn name(&self) -> &'static str {
+        "sol_get_clock_sysvar"
+    }
+    fn compute_units(&self, _: &[u8]) -> u64 {
+        cu_cost::GET_CLOCK
+    }
     fn execute(&self, _: &[u8]) -> SyscallResult {
         // Return a stub clock value: slot=1, epoch=0, unix_timestamp=1_700_000_000
         let mut out = [0u8; 40];
@@ -77,8 +89,12 @@ impl Syscall for GetClockSyscall {
 /// SHA-256 hash syscall (ID: 3).
 pub struct Sha256Syscall;
 impl Syscall for Sha256Syscall {
-    fn id(&self) -> SyscallId { 3 }
-    fn name(&self) -> &'static str { "sol_sha256" }
+    fn id(&self) -> SyscallId {
+        3
+    }
+    fn name(&self) -> &'static str {
+        "sol_sha256"
+    }
     fn compute_units(&self, input: &[u8]) -> u64 {
         cu_cost::SHA256 + (input.len() as u64 / 32) * 100
     }
@@ -94,8 +110,12 @@ impl Syscall for Sha256Syscall {
 /// Cross-VM invocation syscall (ID: 0xA0) — calls X3VM or EVM from SVM.
 pub struct CrossVmInvokeSyscall;
 impl Syscall for CrossVmInvokeSyscall {
-    fn id(&self) -> SyscallId { 0xA0 }
-    fn name(&self) -> &'static str { "x3_cross_vm_invoke" }
+    fn id(&self) -> SyscallId {
+        0xA0
+    }
+    fn name(&self) -> &'static str {
+        "x3_cross_vm_invoke"
+    }
     fn compute_units(&self, input: &[u8]) -> u64 {
         cu_cost::CROSS_VM_CALL + input.len() as u64 * 10
     }
@@ -132,12 +152,7 @@ impl SyscallTable {
     }
 
     /// Execute a syscall by ID.
-    pub fn invoke(
-        &self,
-        id: SyscallId,
-        input: &[u8],
-        compute_budget: u64,
-    ) -> SyscallResult {
+    pub fn invoke(&self, id: SyscallId, input: &[u8], compute_budget: u64) -> SyscallResult {
         let syscall = self
             .syscalls
             .get(&id)

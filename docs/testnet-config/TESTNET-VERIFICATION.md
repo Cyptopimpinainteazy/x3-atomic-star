@@ -26,6 +26,7 @@ The script exits non-zero on the first failed invariant.
 
 ```json
 {
+  "legacy_notice": "This file previously contained legacy Solana/GPU network metadata. Current verification scripts only read the `verification` block.",
   "verification": {
     "min_peers": 3,
     "peer_timeout_sec": 120,
@@ -44,6 +45,8 @@ The script exits non-zero on the first failed invariant.
   }
 }
 ```
+
+> Note: legacy Solana/GPU topology keys were intentionally removed from the canonical `docs/testnet-config/testnet-config.json` to prevent stale launch narrative drift. If a full network manifest is required for a separate workflow, supply it via `TESTNET_CONFIG` from a dedicated file outside `docs/testnet-config`.
 
 ## Precedence
 

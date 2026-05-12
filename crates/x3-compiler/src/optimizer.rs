@@ -2,7 +2,7 @@
 //!
 //! Each pass takes an IrFunction and returns a modified copy. Passes compose.
 
-use crate::ir::{BlockId, IrFunction, IrInstr, IrBinOp, Val};
+use crate::ir::{BlockId, IrBinOp, IrFunction, IrInstr, Val};
 use std::collections::{BTreeMap, HashSet};
 
 /// Run all optimization passes at the given level.
@@ -35,7 +35,10 @@ pub fn fold_constants(func: &mut IrFunction) {
                     if let (Some(&lv), Some(&rv)) = (const_map.get(lhs), const_map.get(rhs)) {
                         if let Some(result) = eval_binop(*op, lv, rv) {
                             const_map.insert(*dst, result);
-                            *instr = IrInstr::Const { dst: *dst, val: result };
+                            *instr = IrInstr::Const {
+                                dst: *dst,
+                                val: result,
+                            };
                         }
                     }
                 }
@@ -82,7 +85,11 @@ pub fn eliminate_dead_code(func: &mut IrFunction) {
             for instr in &block.instrs {
                 match instr {
                     IrInstr::Jump { target } => queue.push(*target),
-                    IrInstr::Branch { true_target, false_target, .. } => {
+                    IrInstr::Branch {
+                        true_target,
+                        false_target,
+                        ..
+                    } => {
                         queue.push(*true_target);
                         queue.push(*false_target);
                     }
@@ -113,7 +120,12 @@ pub fn algebraic_simplify(func: &mut IrFunction) {
                 let rv = const_map.get(rhs).copied();
                 match op {
                     IrBinOp::Add if rv == Some(0) => {
-                        *instr = IrInstr::BinOp { dst: *dst, op: IrBinOp::Add, lhs: *lhs, rhs: *rhs };
+                        *instr = IrInstr::BinOp {
+                            dst: *dst,
+                            op: IrBinOp::Add,
+                            lhs: *lhs,
+                            rhs: *rhs,
+                        };
                     }
                     IrBinOp::Mul if rv == Some(1) => {
                         // x * 1 = x: replace with copy (use Add with 0 as proxy)
@@ -142,7 +154,15 @@ mod tests {
         let c = f.new_val();
         f.push(entry, IrInstr::Const { dst: a, val: 10 });
         f.push(entry, IrInstr::Const { dst: b, val: 20 });
-        f.push(entry, IrInstr::BinOp { dst: c, op: IrBinOp::Add, lhs: a, rhs: b });
+        f.push(
+            entry,
+            IrInstr::BinOp {
+                dst: c,
+                op: IrBinOp::Add,
+                lhs: a,
+                rhs: b,
+            },
+        );
         f.push(entry, IrInstr::Return { val: Some(c) });
         f
     }
@@ -167,7 +187,10 @@ mod tests {
         f.push(entry, IrInstr::Nop);
         f.push(entry, IrInstr::Return { val: None });
         eliminate_dead_code(&mut f);
-        assert!(!f.blocks[&entry].instrs.iter().any(|i| matches!(i, IrInstr::Nop)));
+        assert!(!f.blocks[&entry]
+            .instrs
+            .iter()
+            .any(|i| matches!(i, IrInstr::Nop)));
     }
 
     #[test]
@@ -210,7 +233,15 @@ mod tests {
         let c = f.new_val();
         f.push(entry, IrInstr::Const { dst: a, val: 100 });
         f.push(entry, IrInstr::Const { dst: b, val: 5 });
-        f.push(entry, IrInstr::BinOp { dst: c, op: IrBinOp::Div, lhs: a, rhs: b });
+        f.push(
+            entry,
+            IrInstr::BinOp {
+                dst: c,
+                op: IrBinOp::Div,
+                lhs: a,
+                rhs: b,
+            },
+        );
         f.push(entry, IrInstr::Return { val: Some(c) });
         fold_constants(&mut f);
         assert!(f.blocks[&entry]
@@ -228,7 +259,15 @@ mod tests {
         let c = f.new_val();
         f.push(entry, IrInstr::Const { dst: a, val: 10 });
         f.push(entry, IrInstr::Const { dst: b, val: 0 });
-        f.push(entry, IrInstr::BinOp { dst: c, op: IrBinOp::Div, lhs: a, rhs: b });
+        f.push(
+            entry,
+            IrInstr::BinOp {
+                dst: c,
+                op: IrBinOp::Div,
+                lhs: a,
+                rhs: b,
+            },
+        );
         f.push(entry, IrInstr::Return { val: Some(c) });
         // Should NOT fold (div by zero)
         fold_constants(&mut f);

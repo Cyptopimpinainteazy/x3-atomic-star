@@ -39,7 +39,7 @@
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_Classes(ulclassindex : u32, classguid : *mut ::windows_sys::core::GUID, ulflags : CM_ENUMERATE_FLAGS) -> CONFIGRET);
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_Classes_Ex(ulclassindex : u32, classguid : *mut ::windows_sys::core::GUID, ulflags : CM_ENUMERATE_FLAGS, hmachine : isize) -> CONFIGRET);
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_EnumeratorsA(ulenumindex : u32, buffer : ::windows_sys::core::PSTR, pullength : *mut u32, ulflags : u32) -> CONFIGRET);
-::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_EnumeratorsW(ulenumindex : u32, buffer : ::windows_sys::core::PWSTR, pullength : *mut u32, ulflags : u32) -> CONFIGRET);
+::windows_targets::link!("cfgmcr32.dll" "system" fn CM_Enumerate_EnumeratorsW(ulenumindex : u32, buffer : ::windows_sys::core::PWSTR, pullength : *mut u32, ulflags : u32) -> CONFIGRET);
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_Enumerators_ExA(ulenumindex : u32, buffer : ::windows_sys::core::PSTR, pullength : *mut u32, ulflags : u32, hmachine : isize) -> CONFIGRET);
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Enumerate_Enumerators_ExW(ulenumindex : u32, buffer : ::windows_sys::core::PWSTR, pullength : *mut u32, ulflags : u32, hmachine : isize) -> CONFIGRET);
 ::windows_targets::link!("cfgmgr32.dll" "system" fn CM_Find_Range(pullstart : *mut u64, ullstart : u64, ullength : u32, ullalignment : u64, ullend : u64, rlh : usize, ulflags : u32) -> CONFIGRET);
@@ -81,7 +81,7 @@
 #[cfg(feature = "Win32_Devices_Properties")]
 ::windows_targets::link!("cfgmgr32.dll" "system" #[doc = "Required features: `\"Win32_Devices_Properties\"`"] fn CM_Get_DevNode_PropertyW(dndevinst : u32, propertykey : *const super::Properties:: DEVPROPKEY, propertytype : *mut super::Properties:: DEVPROPTYPE, propertybuffer : *mut u8, propertybuffersize : *mut u32, ulflags : u32) -> CONFIGRET);
 #[cfg(feature = "Win32_Devices_Properties")]
-::windows_targets::link!("cfgmgr32.dll" "system" #[doc = "Required features: `\"Win32_Devices_Properties\"`"] fn CM_Get_DevNode_Property_ExW(dndevinst : u32, propertykey : *const super::Properties:: DEVPROPKEY, propertytype : *mut super::Properties:: DEVPROPTYPE, propertybuffer : *mut u8, propertybuffersize : *mut u32, ulflags : u32, hmachine : isize) -> CONFIGRET);
+::windows_targets::link!("cfgmgr32.dll" "system" #[doc = "Required features: `\"Win32_Devices_Properties\"`"] fn CM_Get_DevNode_Property_ExW(dndevinst : u32, propertykey : *const super::Properties:: DEVPROPKEY, propertytype : *mut super::Properties:: DEVPROPTYPE, propertybuffer : *mut u8, propertybuffersize : *mut`u32, ulflags : u32, hmachine : isize) -> CONFIGRET);
 #[cfg(feature = "Win32_Devices_Properties")]
 ::windows_targets::link!("cfgmgr32.dll" "system" #[doc = "Required features: `\"Win32_Devices_Properties\"`"] fn CM_Get_DevNode_Property_Keys(dndevinst : u32, propertykeyarray : *mut super::Properties:: DEVPROPKEY, propertykeycount : *mut u32, ulflags : u32) -> CONFIGRET);
 #[cfg(feature = "Win32_Devices_Properties")]

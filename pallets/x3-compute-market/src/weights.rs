@@ -69,12 +69,28 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 }
 
 impl WeightInfo for () {
-    fn stake_as_provider() -> Weight { Weight::zero() }
-    fn create_listing() -> Weight { Weight::zero() }
-    fn pause_listing() -> Weight { Weight::zero() }
-    fn resume_listing() -> Weight { Weight::zero() }
-    fn rent_compute() -> Weight { Weight::zero() }
-    fn complete_session() -> Weight { Weight::zero() }
-    fn dispute_session() -> Weight { Weight::zero() }
-    fn resolve_dispute() -> Weight { Weight::zero() }
+    fn stake_as_provider() -> Weight {
+        Weight::zero()
+    }
+    fn create_listing() -> Weight {
+        Weight::zero()
+    }
+    fn pause_listing() -> Weight {
+        Weight::zero()
+    }
+    fn resume_listing() -> Weight {
+        Weight::zero()
+    }
+    fn rent_compute() -> Weight {
+        Weight::zero()
+    }
+    fn complete_session() -> Weight {
+        Weight::zero()
+    }
+    fn dispute_session() -> Weight {
+        Weight::zero()
+    }
+    fn resolve_dispute() -> Weight {
+        Weight::zero()
+    }
 }

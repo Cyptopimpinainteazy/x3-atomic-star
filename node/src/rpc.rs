@@ -139,85 +139,91 @@ where
 
     // Register walletDex_estimateSwap RPC method.
     let wallet_dex_estimate = wallet_dex.clone();
-    module.register_method("walletDex_estimateSwap", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
-        let request = SwapRequest {
-            token_in: decode_hex_32(
-                req.get("token_in")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing token_in"))?,
-                "token_in",
-            )?,
-            token_out: decode_hex_32(
-                req.get("token_out")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing token_out"))?,
-                "token_out",
-            )?,
-            amount_in: parse_u128_value(req.get("amount_in"), "amount_in")?,
-            min_amount_out: parse_u128_value(req.get("min_amount_out"), "min_amount_out")?,
-            wallet_id: decode_hex_32(
-                req.get("wallet_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing wallet_id"))?,
-                "wallet_id",
-            )?,
-            require_approval: req
-                .get("require_approval")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false),
-            approval_threshold: parse_u128_value(
-                req.get("approval_threshold"),
-                "approval_threshold",
-            )?,
-        };
+    module.register_method(
+        "walletDex_estimateSwap",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let request = SwapRequest {
+                token_in: decode_hex_32(
+                    req.get("token_in")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing token_in"))?,
+                    "token_in",
+                )?,
+                token_out: decode_hex_32(
+                    req.get("token_out")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing token_out"))?,
+                    "token_out",
+                )?,
+                amount_in: parse_u128_value(req.get("amount_in"), "amount_in")?,
+                min_amount_out: parse_u128_value(req.get("min_amount_out"), "min_amount_out")?,
+                wallet_id: decode_hex_32(
+                    req.get("wallet_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing wallet_id"))?,
+                    "wallet_id",
+                )?,
+                require_approval: req
+                    .get("require_approval")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                approval_threshold: parse_u128_value(
+                    req.get("approval_threshold"),
+                    "approval_threshold",
+                )?,
+            };
 
-        wallet_dex_estimate
-            .estimate_swap(request)
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-            .map_err(|e| custom_error(format!("walletDex_estimateSwap failed: {e}")))
-    })?;
+            wallet_dex_estimate
+                .estimate_swap(request)
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
+                .map_err(|e| custom_error(format!("walletDex_estimateSwap failed: {e}")))
+        },
+    )?;
 
     // Register walletDex_executeSwap RPC method.
     let wallet_dex_execute = wallet_dex.clone();
-    module.register_method("walletDex_executeSwap", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
-        let request = SwapRequest {
-            token_in: decode_hex_32(
-                req.get("token_in")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing token_in"))?,
-                "token_in",
-            )?,
-            token_out: decode_hex_32(
-                req.get("token_out")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing token_out"))?,
-                "token_out",
-            )?,
-            amount_in: parse_u128_value(req.get("amount_in"), "amount_in")?,
-            min_amount_out: parse_u128_value(req.get("min_amount_out"), "min_amount_out")?,
-            wallet_id: decode_hex_32(
-                req.get("wallet_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing wallet_id"))?,
-                "wallet_id",
-            )?,
-            require_approval: req
-                .get("require_approval")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false),
-            approval_threshold: parse_u128_value(
-                req.get("approval_threshold"),
-                "approval_threshold",
-            )?,
-        };
+    module.register_method(
+        "walletDex_executeSwap",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let request = SwapRequest {
+                token_in: decode_hex_32(
+                    req.get("token_in")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing token_in"))?,
+                    "token_in",
+                )?,
+                token_out: decode_hex_32(
+                    req.get("token_out")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing token_out"))?,
+                    "token_out",
+                )?,
+                amount_in: parse_u128_value(req.get("amount_in"), "amount_in")?,
+                min_amount_out: parse_u128_value(req.get("min_amount_out"), "min_amount_out")?,
+                wallet_id: decode_hex_32(
+                    req.get("wallet_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing wallet_id"))?,
+                    "wallet_id",
+                )?,
+                require_approval: req
+                    .get("require_approval")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                approval_threshold: parse_u128_value(
+                    req.get("approval_threshold"),
+                    "approval_threshold",
+                )?,
+            };
 
-        wallet_dex_execute
-            .execute_swap(request, vec![])
-            .map(|r| serde_json::to_value(r).unwrap_or_default())
-            .map_err(|e| custom_error(format!("walletDex_executeSwap failed: {e}")))
-    })?;
+            wallet_dex_execute
+                .execute_swap(request, vec![])
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
+                .map_err(|e| custom_error(format!("walletDex_executeSwap failed: {e}")))
+        },
+    )?;
 
     // Initialize Wallet Service RPC
     let wallet_service = Arc::new(WalletServiceRpc::<Block, FullClient>::new(client.clone()));
@@ -225,8 +231,10 @@ where
     // Register wallet service RPC methods
     module.register_method("wallet_createWallet", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::CreateWalletRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -239,8 +247,10 @@ where
 
     module.register_method("wallet_importWallet", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::ImportWalletRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -253,8 +263,10 @@ where
 
     module.register_method("wallet_backupWallet", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::BackupWalletRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -267,8 +279,10 @@ where
 
     module.register_method("wallet_getBalance", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::GetBalanceRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -281,8 +295,10 @@ where
 
     module.register_method("wallet_signTransaction", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::SignTransactionRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -295,8 +311,10 @@ where
 
     module.register_method("wallet_submitTransaction", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::SubmitTransactionRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -309,8 +327,10 @@ where
 
     module.register_method("wallet_getTransactions", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::GetTransactionsRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -323,8 +343,10 @@ where
 
     module.register_method("wallet_getWalletStatus", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::GetWalletStatusRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -337,8 +359,10 @@ where
 
     module.register_method("wallet_listWallets", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::ListWalletsRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -351,8 +375,10 @@ where
 
     module.register_method("wallet_setNetwork", {
         let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let params: serde_json::Value = params.parse()?;
             let request: x3_rpc::SetNetworkRequest = serde_json::from_value(params)
                 .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
@@ -374,126 +400,153 @@ where
     })?;
 
     // Register signing RPC methods
-    module.register_method("x3_sign_ed25519", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let (message_hex, secret_hex): (String, String) = params.parse()?;
-        let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
-            .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
-        let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
-            .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
+    module.register_method(
+        "x3_sign_ed25519",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let (message_hex, secret_hex): (String, String) = params.parse()?;
+            let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
+                .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
+            let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
+                .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
 
-        if secret.len() != 32 {
-            return Err(custom_error("Secret key must be 32 bytes"));
-        }
-
-        let mut secret_array = [0u8; 32];
-        secret_array.copy_from_slice(&secret);
-
-        let signer = Ed25519Signer::from_secret_key(&secret_array);
-        let signature = signer.sign(&message);
-
-        Ok(serde_json::Value::String(format!("0x{}", hex::encode(signature.as_bytes()))))
-    })?;
-
-    module.register_method("x3_sign_secp256k1", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let (message_hex, secret_hex): (String, String) = params.parse()?;
-        let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
-            .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
-        let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
-            .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
-
-        if secret.len() != 32 {
-            return Err(custom_error("Secret key must be 32 bytes"));
-        }
-
-        let mut secret_array = [0u8; 32];
-        secret_array.copy_from_slice(&secret);
-
-        let signer = Secp256k1Signer::from_secret_key(&secret_array)
-            .map_err(|e| custom_error(format!("Invalid secret key: {e}")))?;
-        let signature = signer.sign(&message);
-
-        Ok(serde_json::Value::String(format!("0x{}", hex::encode(signature.as_bytes()))))
-    })?;
-
-    module.register_method("x3_sign_sr25519", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let (message_hex, secret_hex): (String, String) = params.parse()?;
-        let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
-            .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
-        let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
-            .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
-
-        if secret.len() != 32 {
-            return Err(custom_error("Secret key must be 32 bytes"));
-        }
-
-        let mut secret_array = [0u8; 32];
-        secret_array.copy_from_slice(&secret);
-
-        let signer = Sr25519Signer::from_secret_key(&secret_array);
-        let signature = signer.sign(&message);
-
-        Ok(serde_json::Value::String(format!("0x{}", hex::encode(signature.as_bytes()))))
-    })?;
-
-    module.register_method("x3_verify_signature", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let (message_hex, signature_hex, public_key_hex, key_type_str): (
-            String,
-            String,
-            String,
-            String,
-        ) = params.parse()?;
-        let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
-            .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
-        let signature = hex::decode(signature_hex.strip_prefix("0x").unwrap_or(&signature_hex))
-            .map_err(|e| custom_error(format!("Invalid signature hex: {e}")))?;
-        let public_key = hex::decode(public_key_hex.strip_prefix("0x").unwrap_or(&public_key_hex))
-            .map_err(|e| custom_error(format!("Invalid public key hex: {e}")))?;
-
-        let key_type = match key_type_str.to_lowercase().as_str() {
-            "ed25519" => KeyType::Ed25519,
-            "secp256k1" => KeyType::Secp256k1,
-            "sr25519" => KeyType::Sr25519,
-            _ => {
-                return Err(custom_error(
-                    "Invalid key type. Must be ed25519, secp256k1, or sr25519",
-                ))
+            if secret.len() != 32 {
+                return Err(custom_error("Secret key must be 32 bytes"));
             }
-        };
 
-        let valid =
-            x3_common::signing::verify_signature(&signature, &message, &public_key, key_type);
+            let mut secret_array = [0u8; 32];
+            secret_array.copy_from_slice(&secret);
 
-        Ok(serde_json::Value::Bool(valid))
-    })?;
+            let signer = Ed25519Signer::from_secret_key(&secret_array);
+            let signature = signer.sign(&message);
 
-    module.register_method("x3_weight_meter", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let config: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            Ok(serde_json::Value::String(format!(
+                "0x{}",
+                hex::encode(signature.as_bytes())
+            )))
+        },
+    )?;
 
-        let max_compute_units = config
-            .get("max_compute_units")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(200_000);
-        let max_gas = config
-            .get("max_gas")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1_000_000);
+    module.register_method(
+        "x3_sign_secp256k1",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let (message_hex, secret_hex): (String, String) = params.parse()?;
+            let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
+                .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
+            let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
+                .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
 
-        let mut meter = WeightMeter::new(WeightConfig {
-            max_compute_units,
-            max_gas,
-            ..Default::default()
-        });
+            if secret.len() != 32 {
+                return Err(custom_error("Secret key must be 32 bytes"));
+            }
 
-        // Consume some compute units for demonstration
-        meter.consume_compute(1000).map_err(|e| custom_error(format!("Compute limit: {e}")))?;
+            let mut secret_array = [0u8; 32];
+            secret_array.copy_from_slice(&secret);
 
-        Ok(serde_json::json!({
-            "remaining_compute": meter.remaining_compute(),
-            "remaining_gas": meter.remaining_gas(),
-            "consumed_compute": meter.consumed_compute(),
-            "consumed_gas": meter.consumed_gas(),
-        }))
-    })?;
+            let signer = Secp256k1Signer::from_secret_key(&secret_array)
+                .map_err(|e| custom_error(format!("Invalid secret key: {e}")))?;
+            let signature = signer.sign(&message);
+
+            Ok(serde_json::Value::String(format!(
+                "0x{}",
+                hex::encode(signature.as_bytes())
+            )))
+        },
+    )?;
+
+    module.register_method(
+        "x3_sign_sr25519",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let (message_hex, secret_hex): (String, String) = params.parse()?;
+            let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
+                .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
+            let secret = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(&secret_hex))
+                .map_err(|e| custom_error(format!("Invalid secret hex: {e}")))?;
+
+            if secret.len() != 32 {
+                return Err(custom_error("Secret key must be 32 bytes"));
+            }
+
+            let mut secret_array = [0u8; 32];
+            secret_array.copy_from_slice(&secret);
+
+            let signer = Sr25519Signer::from_secret_key(&secret_array);
+            let signature = signer.sign(&message);
+
+            Ok(serde_json::Value::String(format!(
+                "0x{}",
+                hex::encode(signature.as_bytes())
+            )))
+        },
+    )?;
+
+    module.register_method(
+        "x3_verify_signature",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let (message_hex, signature_hex, public_key_hex, key_type_str): (
+                String,
+                String,
+                String,
+                String,
+            ) = params.parse()?;
+            let message = hex::decode(message_hex.strip_prefix("0x").unwrap_or(&message_hex))
+                .map_err(|e| custom_error(format!("Invalid message hex: {e}")))?;
+            let signature = hex::decode(signature_hex.strip_prefix("0x").unwrap_or(&signature_hex))
+                .map_err(|e| custom_error(format!("Invalid signature hex: {e}")))?;
+            let public_key =
+                hex::decode(public_key_hex.strip_prefix("0x").unwrap_or(&public_key_hex))
+                    .map_err(|e| custom_error(format!("Invalid public key hex: {e}")))?;
+
+            let key_type = match key_type_str.to_lowercase().as_str() {
+                "ed25519" => KeyType::Ed25519,
+                "secp256k1" => KeyType::Secp256k1,
+                "sr25519" => KeyType::Sr25519,
+                _ => {
+                    return Err(custom_error(
+                        "Invalid key type. Must be ed25519, secp256k1, or sr25519",
+                    ))
+                }
+            };
+
+            let valid =
+                x3_common::signing::verify_signature(&signature, &message, &public_key, key_type);
+
+            Ok(serde_json::Value::Bool(valid))
+        },
+    )?;
+
+    module.register_method(
+        "x3_weight_meter",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let config: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+
+            let max_compute_units = config
+                .get("max_compute_units")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(200_000);
+            let max_gas = config
+                .get("max_gas")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1_000_000);
+
+            let mut meter = WeightMeter::new(WeightConfig {
+                max_compute_units,
+                max_gas,
+                ..Default::default()
+            });
+
+            // Consume some compute units for demonstration
+            meter
+                .consume_compute(1000)
+                .map_err(|e| custom_error(format!("Compute limit: {e}")))?;
+
+            Ok(serde_json::json!({
+                "remaining_compute": meter.remaining_compute(),
+                "remaining_gas": meter.remaining_gas(),
+                "consumed_compute": meter.consumed_compute(),
+                "consumed_gas": meter.consumed_gas(),
+            }))
+        },
+    )?;
 
     // Initialize Validator RPC
     let validator_rpc = x3_rpc::create_validator_rpc(std::sync::Arc::new(()))?;

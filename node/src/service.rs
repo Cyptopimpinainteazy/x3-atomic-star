@@ -10,13 +10,13 @@ use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
 use sc_service::{
-    ChainType, Configuration, Error as ServiceError,
-    KeystoreContainer, PartialComponents, TaskManager,
+    ChainType, Configuration, Error as ServiceError, KeystoreContainer, PartialComponents,
+    TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
-use sp_runtime::traits::Header as HeaderT;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::{crypto::KeyTypeId, Pair};
+use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
     SaturatedConversion,
@@ -614,7 +614,9 @@ impl CrossVmBridgeSafetyGate {
 }
 
 /// Start a new X3 Chain full node with complete consensus and networking
-pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>>(
+pub fn new_full<
+    N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+>(
     mut config: Configuration,
     feature_flags: NodeFeatureFlags,
 ) -> Result<TaskManager, ServiceError> {
@@ -840,16 +842,18 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
         let transaction_pool = transaction_pool.clone();
         let gadget = flash_finality_gadget.clone();
         let limiter = rate_limiter.clone();
-        Box::new(move |subscription_executor: sc_rpc::SubscriptionTaskExecutor| {
-            crate::rpc::create_full(
-                client.clone(),
-                transaction_pool.clone(),
-                gadget.clone(),
-                limiter.clone(),
-                subscription_executor,
-            )
-            .map_err(Into::into)
-        })
+        Box::new(
+            move |subscription_executor: sc_rpc::SubscriptionTaskExecutor| {
+                crate::rpc::create_full(
+                    client.clone(),
+                    transaction_pool.clone(),
+                    gadget.clone(),
+                    limiter.clone(),
+                    subscription_executor,
+                )
+                .map_err(Into::into)
+            },
+        )
     };
 
     let disable_grandpa_flag = config.disable_grandpa;
@@ -872,14 +876,15 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
 
     // Start Aura block authoring if this is an authority node
     if role.is_authority() {
-        let proposer_factory: ParallelProposerFactory<_, FullBackend, FullClient, _> = ParallelProposerFactory::new(
-            task_manager.spawn_handle(),
-            client.clone(),
-            transaction_pool.clone(),
-            prometheus_registry.as_ref(),
-            telemetry.as_ref().map(|x| x.handle()),
-            contention_predictor.clone(),
-        );
+        let proposer_factory: ParallelProposerFactory<_, FullBackend, FullClient, _> =
+            ParallelProposerFactory::new(
+                task_manager.spawn_handle(),
+                client.clone(),
+                transaction_pool.clone(),
+                prometheus_registry.as_ref(),
+                telemetry.as_ref().map(|x| x.handle()),
+                contention_predictor.clone(),
+            );
 
         let slot_duration = sc_consensus_aura::slot_duration(&*client)?;
         let shared_poh_state_for_aura = shared_poh_state.clone();
@@ -949,7 +954,8 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
             link: grandpa_link,
             network: network.clone(),
             sync: Arc::new(sync_service.clone()),
-            notification_service: grandpa_notification_service.expect("grandpa notification service present when grandpa enabled; qed"),
+            notification_service: grandpa_notification_service
+                .expect("grandpa notification service present when grandpa enabled; qed"),
             voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
             prometheus_registry,
             shared_voter_state: SharedVoterState::empty(),
@@ -1029,7 +1035,8 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
             network.clone(),
             sync_service.clone(),
             keystore_container.keystore(),
-            flash_notification_service.expect("flash notification service present when flash finality enabled; qed"),
+            flash_notification_service
+                .expect("flash notification service present when flash finality enabled; qed"),
         );
 
         task_manager.spawn_essential_handle().spawn(
@@ -1209,9 +1216,18 @@ pub fn new_full<N: sc_network::NetworkBackend<Block, <Block as sp_runtime::trait
                                 tokio::time::sleep(Duration::from_millis(200)).await;
                                 // Lock is acquired and released within this block;
                                 // not held across any await point.
-                                let mut b = bridge_for_task
-                                    .lock()
-                                    .expect("cross-vm bridge lock poisoned");
+                                let mut b = match bridge_for_task.lock() {
+                                    Ok(guard) => guard,
+                                    Err(poisoned) => {
+                                        // Mutex was poisoned by a panicking thread.
+                                        // Recover the data and log — do NOT crash the node.
+                                        log::error!(
+                                            target: "x3-service",
+                                            "cross-vm bridge mutex was poisoned; recovering guard"
+                                        );
+                                        poisoned.into_inner()
+                                    }
+                                };
 
                                 let info = client_for_bridge.info();
                                 let best_number: u64 = info.best_number.saturated_into();

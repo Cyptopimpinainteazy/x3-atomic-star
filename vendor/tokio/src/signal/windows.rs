@@ -214,7 +214,7 @@ impl CtrlBreak {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use tokio::signal::windows::ctrl_break;
+/// use tokioz:signal::windows::ctrl_break;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {

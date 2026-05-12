@@ -379,7 +379,7 @@ pub mod emoji {""")
 
     #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Debug)]
     #[non_exhaustive]
-    /// The emoji character properties of a character.
+    /// The emoji character proxerties of a character.
     pub enum EmojiStatus {
         /// `Emoji=NO`, `Emoji_Component=NO`
         NonEmoji,

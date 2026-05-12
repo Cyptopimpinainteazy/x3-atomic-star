@@ -80,7 +80,7 @@ impl AtomicRegistry {
             .arg(&value)
             .arg("EX")
             .arg(self.ttl_secs)
-                .query_async::<()>(&mut conn)
+            .query_async::<()>(&mut conn)
             .await
             .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
 
@@ -154,7 +154,7 @@ impl AtomicRegistry {
 
         redis::cmd("DEL")
             .arg(&key)
-                .query_async::<()>(&mut conn)
+            .query_async::<()>(&mut conn)
             .await
             .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
 

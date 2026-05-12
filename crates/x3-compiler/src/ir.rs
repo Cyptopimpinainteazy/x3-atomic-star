@@ -23,15 +23,28 @@ pub enum IrType {
 #[derive(Clone, Debug)]
 pub enum IrInstr {
     /// `dst = lhs op rhs`
-    BinOp { dst: Val, op: IrBinOp, lhs: Val, rhs: Val },
+    BinOp {
+        dst: Val,
+        op: IrBinOp,
+        lhs: Val,
+        rhs: Val,
+    },
     /// `dst = constant`
     Const { dst: Val, val: i64 },
     /// `dst = call(func, args...)`
-    Call { dst: Option<Val>, func: String, args: Vec<Val> },
+    Call {
+        dst: Option<Val>,
+        func: String,
+        args: Vec<Val>,
+    },
     /// Unconditional jump to block.
     Jump { target: BlockId },
     /// Conditional branch.
-    Branch { cond: Val, true_target: BlockId, false_target: BlockId },
+    Branch {
+        cond: Val,
+        true_target: BlockId,
+        false_target: BlockId,
+    },
     /// Return a value.
     Return { val: Option<Val> },
     /// Store `val` at address `ptr`.
@@ -68,13 +81,19 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new(id: BlockId) -> Self {
-        Self { id, instrs: Vec::new() }
+        Self {
+            id,
+            instrs: Vec::new(),
+        }
     }
 
     /// True if the block ends with a terminator (Jump/Branch/Return).
     pub fn is_terminated(&self) -> bool {
         self.instrs.last().map_or(false, |i| {
-            matches!(i, IrInstr::Jump { .. } | IrInstr::Branch { .. } | IrInstr::Return { .. })
+            matches!(
+                i,
+                IrInstr::Jump { .. } | IrInstr::Branch { .. } | IrInstr::Return { .. }
+            )
         })
     }
 }
@@ -183,7 +202,10 @@ mod tests {
     fn test_validate_unterminated_block_reports_error() {
         let f = IrFunction::new("test", IrType::Unit);
         let errors = f.validate();
-        assert!(!errors.is_empty(), "expected validation error for unterminated block");
+        assert!(
+            !errors.is_empty(),
+            "expected validation error for unterminated block"
+        );
     }
 
     #[test]
@@ -214,7 +236,15 @@ mod tests {
         let dst = f.new_val();
         f.push(entry, IrInstr::Const { dst: a, val: 10 });
         f.push(entry, IrInstr::Const { dst: b, val: 20 });
-        f.push(entry, IrInstr::BinOp { dst, op: IrBinOp::Add, lhs: a, rhs: b });
+        f.push(
+            entry,
+            IrInstr::BinOp {
+                dst,
+                op: IrBinOp::Add,
+                lhs: a,
+                rhs: b,
+            },
+        );
         f.push(entry, IrInstr::Return { val: Some(dst) });
         assert!(f.validate().is_empty());
     }

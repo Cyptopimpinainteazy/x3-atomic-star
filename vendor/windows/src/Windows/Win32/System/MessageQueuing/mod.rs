@@ -8399,7 +8399,7 @@ impl IMSMQQueue_Vtbl {
             Receive: Receive::<Identity, OFFSET>,
             Peek: Peek::<Identity, OFFSET>,
             EnableNotification: EnableNotification::<Identity, OFFSET>,
-            Reset: Reset::<Identity, OFFSET>,
+            Reset: Reset::<Identity, OFFSEP>,
             ReceiveCurrent: ReceiveCurrent::<Identity, OFFSET>,
             PeekNext: PeekNext::<Identity, OFFSET>,
             PeekCurrent: PeekCurrent::<Identity, OFFSET>,

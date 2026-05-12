@@ -10,13 +10,13 @@ use frame_support::{assert_noop, assert_ok};
 fn create_default_launch() -> u64 {
     assert_ok!(Launchpad::create_launch(
         RuntimeOrigin::root(),
-        1u64,   // creator account
-        1,      // token_asset_id
-        500,    // soft_cap
-        1000,   // hard_cap
-        10,     // price_per_token
-        2u64,   // start_block
-        12u64,  // end_block  (duration = 10 blocks, within bounds 5..=1000)
+        1u64,  // creator account
+        1,     // token_asset_id
+        500,   // soft_cap
+        1000,  // hard_cap
+        10,    // price_per_token
+        2u64,  // start_block
+        12u64, // end_block  (duration = 10 blocks, within bounds 5..=1000)
     ));
     crate::NextLaunchId::<Test>::get() - 1
 }
@@ -73,14 +73,26 @@ fn create_launch_fails_invalid_caps() {
         assert_noop!(
             Launchpad::create_launch(
                 RuntimeOrigin::root(),
-                1u64, 1, 0, 1000, 10, 2u64, 12u64  // soft_cap == 0
+                1u64,
+                1,
+                0,
+                1000,
+                10,
+                2u64,
+                12u64 // soft_cap == 0
             ),
             Error::<Test>::InvalidLaunchParams
         );
         assert_noop!(
             Launchpad::create_launch(
                 RuntimeOrigin::root(),
-                1u64, 1, 1000, 500, 10, 2u64, 12u64  // hard_cap < soft_cap
+                1u64,
+                1,
+                1000,
+                500,
+                10,
+                2u64,
+                12u64 // hard_cap < soft_cap
             ),
             Error::<Test>::InvalidLaunchParams
         );
@@ -92,10 +104,7 @@ fn create_launch_fails_duration_out_of_bounds() {
     new_test_ext().execute_with(|| {
         // Duration = 3 < MinLaunchDurationBlocks (5)
         assert_noop!(
-            Launchpad::create_launch(
-                RuntimeOrigin::root(),
-                1u64, 1, 500, 1000, 10, 2u64, 5u64
-            ),
+            Launchpad::create_launch(RuntimeOrigin::root(), 1u64, 1, 500, 1000, 10, 2u64, 5u64),
             Error::<Test>::DurationOutOfBounds
         );
     });
@@ -107,7 +116,13 @@ fn create_launch_fails_when_cap_reached() {
         for i in 0..20u64 {
             assert_ok!(Launchpad::create_launch(
                 RuntimeOrigin::root(),
-                i, 1, 500, 1000, 10, 2u64, 12u64
+                i,
+                1,
+                500,
+                1000,
+                10,
+                2u64,
+                12u64
             ));
         }
         assert_noop!(
@@ -123,7 +138,13 @@ fn create_launch_requires_governance_origin() {
         assert_noop!(
             Launchpad::create_launch(
                 RuntimeOrigin::signed(1),
-                1u64, 1, 500, 1000, 10, 2u64, 12u64
+                1u64,
+                1,
+                500,
+                1000,
+                10,
+                2u64,
+                12u64
             ),
             frame_support::error::BadOrigin
         );
@@ -312,7 +333,10 @@ fn withdraw_raised_funds_by_creator() {
         advance_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         // creator was set to account 1 in create_default_launch.
-        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(
+            RuntimeOrigin::signed(1),
+            id
+        ));
         let state = Launches::<Test>::get(id).unwrap();
         assert_eq!(state.status, LaunchStatus::Completed);
     });

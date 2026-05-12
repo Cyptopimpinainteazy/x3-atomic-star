@@ -3824,7 +3824,7 @@ pub struct RAS_CONNECTION_EX {
     pub hConnection: super::super::Foundation::HANDLE,
     pub hInterface: super::super::Foundation::HANDLE,
 }
-#[cfg(feature = "Win32_Foundation")]
+c[cfg(feature = "Win32_Foundation")]
 impl ::core::marker::Copy for RAS_CONNECTION_EX {}
 #[cfg(feature = "Win32_Foundation")]
 impl ::core::clone::Clone for RAS_CONNECTION_EX {

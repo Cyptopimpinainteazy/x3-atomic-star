@@ -41,8 +41,8 @@ use frame_support::{assert_noop, assert_ok, BoundedVec};
 use pallet_x3_inventory::{
     pallet::{Lanes, Vaults},
     types::{
-        FreezeReason, LaneClass, LaneId, LaneStatus, LiquiditySourceType, OwnerType,
-        ReservationId, ReservationStatus, RouteId, VaultId, VaultStatus, VaultType,
+        FreezeReason, LaneClass, LaneId, LaneStatus, LiquiditySourceType, OwnerType, ReservationId,
+        ReservationStatus, RouteId, VaultId, VaultStatus, VaultType,
     },
 };
 
@@ -155,22 +155,34 @@ fn path1_pre_quote_gate_blocks_frozen_lane() {
         );
 
         // Path 1: check_pre_quote must fail because the lane is frozen.
-        let ctx = QuoteContext { lane_id: l, vault_id: v, amount: 100u128, route_id: r };
+        let ctx = QuoteContext {
+            lane_id: l,
+            vault_id: v,
+            amount: 100u128,
+            route_id: r,
+        };
         let result = crate::pallet::Pallet::<Test>::check_pre_quote(&ctx);
 
-        assert!(!result.passed, "check_pre_quote must fail for a frozen lane");
         assert!(
-            result.failed_checks.contains(&crate::types::SolvencyCheck::LaneFrozen),
+            !result.passed,
+            "check_pre_quote must fail for a frozen lane"
+        );
+        assert!(
+            result
+                .failed_checks
+                .contains(&crate::types::SolvencyCheck::LaneFrozen),
             "failed_checks must include LaneFrozen; got: {:?}",
             result.failed_checks
         );
 
-        System::assert_has_event(RuntimeEvent::X3Solvency(SolvencyEvent::SolvencyGateChecked {
-            route_id: r,
-            gate: crate::GateKind::PreQuote,
-            passed: false,
-            snapshot_hash: result.snapshot_hash,
-        }));
+        System::assert_has_event(RuntimeEvent::X3Solvency(
+            SolvencyEvent::SolvencyGateChecked {
+                route_id: r,
+                gate: crate::GateKind::PreQuote,
+                passed: false,
+                snapshot_hash: result.snapshot_hash,
+            },
+        ));
     });
 }
 
@@ -206,7 +218,12 @@ fn path2_reservation_reserves_vault_balance() {
         // Path 2: request_reservation must lock the amount in the vault.
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, amount, [0u8; 32],
+            res,
+            r,
+            v,
+            l,
+            amount,
+            [0u8; 32],
         ));
 
         // Reservation must exist with Active status.
@@ -226,7 +243,11 @@ fn path2_reservation_reserves_vault_balance() {
 
         // Vault balances must reflect the lock.
         let after = Vaults::<Test>::get(v).unwrap();
-        assert_eq!(after.available_balance, 1_000u128 - amount, "available must decrease");
+        assert_eq!(
+            after.available_balance,
+            1_000u128 - amount,
+            "available must decrease"
+        );
         assert_eq!(after.reserved_balance, amount, "reserved must increase");
 
         // ReservationCreated event must be emitted.
@@ -270,7 +291,12 @@ fn path3_pre_submission_gate_blocks_expired_reservation() {
         // Create reservation at block 1; expiry_block = 1 + 100 = 101.
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, amount, [0u8; 32],
+            res,
+            r,
+            v,
+            l,
+            amount,
+            [0u8; 32],
         ));
         let expiry = pallet_x3_reservation::pallet::Reservations::<Test>::get(res)
             .unwrap()
@@ -292,7 +318,10 @@ fn path3_pre_submission_gate_blocks_expired_reservation() {
         };
         let result = crate::pallet::Pallet::<Test>::check_pre_submission(&ctx);
 
-        assert!(!result.passed, "check_pre_submission must fail for expired reservation");
+        assert!(
+            !result.passed,
+            "check_pre_submission must fail for expired reservation"
+        );
         assert!(
             result
                 .failed_checks
@@ -301,12 +330,14 @@ fn path3_pre_submission_gate_blocks_expired_reservation() {
             result.failed_checks
         );
 
-        System::assert_has_event(RuntimeEvent::X3Solvency(SolvencyEvent::SolvencyGateChecked {
-            route_id: r,
-            gate: crate::GateKind::PreSubmission,
-            passed: false,
-            snapshot_hash: result.snapshot_hash,
-        }));
+        System::assert_has_event(RuntimeEvent::X3Solvency(
+            SolvencyEvent::SolvencyGateChecked {
+                route_id: r,
+                gate: crate::GateKind::PreSubmission,
+                passed: false,
+                snapshot_hash: result.snapshot_hash,
+            },
+        ));
     });
 }
 
@@ -334,7 +365,12 @@ fn path4_post_submission_records_pending_obligation() {
         // Create a live reservation (block 1 → expiry 101).
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, amount, [0u8; 32],
+            res,
+            r,
+            v,
+            l,
+            amount,
+            [0u8; 32],
         ));
 
         // Step A: verify the pre-submission gate passes with a fresh quote.
@@ -426,7 +462,12 @@ fn path5_settlement_releases_reservation_and_confirms_vault() {
         // ── Step 1: create reservation ─────────────────────────────────────
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, amount, [0u8; 32],
+            res,
+            r,
+            v,
+            l,
+            amount,
+            [0u8; 32],
         ));
         let v1 = Vaults::<Test>::get(v).unwrap();
         assert_eq!(v1.available_balance, 700u128);
@@ -440,9 +481,18 @@ fn path5_settlement_releases_reservation_and_confirms_vault() {
         ));
 
         let v2 = Vaults::<Test>::get(v).unwrap();
-        assert_eq!(v2.reserved_balance, 0u128, "reserved must be 0 after consume");
-        assert_eq!(v2.pending_out_balance, amount, "pending_out must equal consumed amount");
-        assert_eq!(v2.available_balance, 700u128, "available unchanged during consume");
+        assert_eq!(
+            v2.reserved_balance, 0u128,
+            "reserved must be 0 after consume"
+        );
+        assert_eq!(
+            v2.pending_out_balance, amount,
+            "pending_out must equal consumed amount"
+        );
+        assert_eq!(
+            v2.available_balance, 700u128,
+            "available unchanged during consume"
+        );
 
         // Reservation status must be Consumed.
         assert_eq!(
@@ -468,10 +518,16 @@ fn path5_settlement_releases_reservation_and_confirms_vault() {
         ));
 
         let v3 = Vaults::<Test>::get(v).unwrap();
-        assert_eq!(v3.pending_out_balance, 0u128, "pending_out must clear after settlement");
+        assert_eq!(
+            v3.pending_out_balance, 0u128,
+            "pending_out must clear after settlement"
+        );
 
         System::assert_has_event(RuntimeEvent::X3Inventory(
-            pallet_x3_inventory::pallet::Event::SettlementConfirmed { vault_id: v, amount },
+            pallet_x3_inventory::pallet::Event::SettlementConfirmed {
+                vault_id: v,
+                amount,
+            },
         ));
     });
 }
@@ -513,11 +569,19 @@ fn path6_vault_below_min_band_transitions_to_degraded() {
         // Reserve 850 → available drops to 150 (below min_band=200, above critical_min=100).
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, 850u128, [0u8; 32],
+            res,
+            r,
+            v,
+            l,
+            850u128,
+            [0u8; 32],
         ));
 
         let after = Vaults::<Test>::get(v).unwrap();
-        assert_eq!(after.available_balance, 150u128, "available must be 150 after reserving 850");
+        assert_eq!(
+            after.available_balance, 150u128,
+            "available must be 150 after reserving 850"
+        );
         assert_eq!(
             after.status,
             VaultStatus::Degraded,
@@ -576,7 +640,12 @@ fn path7_frozen_lane_rejects_all_new_reservations() {
         assert_noop!(
             pallet_x3_reservation::Pallet::<Test>::request_reservation(
                 frame_system::RawOrigin::Root.into(),
-                res, r, v, l, amount, [0u8; 32],
+                res,
+                r,
+                v,
+                l,
+                amount,
+                [0u8; 32],
             ),
             pallet_x3_reservation::pallet::Error::<Test>::LaneFrozen
         );
@@ -601,7 +670,8 @@ fn path7_frozen_lane_rejects_all_new_reservations() {
         });
         assert!(!qr.passed, "check_pre_quote must fail for frozen lane");
         assert!(
-            qr.failed_checks.contains(&crate::types::SolvencyCheck::LaneFrozen),
+            qr.failed_checks
+                .contains(&crate::types::SolvencyCheck::LaneFrozen),
             "check_pre_quote must report LaneFrozen; got: {:?}",
             qr.failed_checks
         );
@@ -613,16 +683,23 @@ fn path7_frozen_lane_rejects_all_new_reservations() {
             amount,
             route_id: r,
         });
-        assert!(!rr.passed, "check_pre_reservation must fail for frozen lane");
         assert!(
-            rr.failed_checks.contains(&crate::types::SolvencyCheck::LaneFrozen),
+            !rr.passed,
+            "check_pre_reservation must fail for frozen lane"
+        );
+        assert!(
+            rr.failed_checks
+                .contains(&crate::types::SolvencyCheck::LaneFrozen),
             "check_pre_reservation must report LaneFrozen; got: {:?}",
             rr.failed_checks
         );
 
         // Vault balances must be completely unchanged.
         let vault_after = Vaults::<Test>::get(v).unwrap();
-        assert_eq!(vault_after.available_balance, 1_000u128, "available must be unchanged");
+        assert_eq!(
+            vault_after.available_balance, 1_000u128,
+            "available must be unchanged"
+        );
         assert_eq!(vault_after.reserved_balance, 0u128, "reserved must be 0");
     });
 }
@@ -645,16 +722,28 @@ fn full_happy_path_all_seven_checkpoints() {
 
         // Checkpoint 1: indicative quote.
         let qr = crate::pallet::Pallet::<Test>::check_pre_quote(&QuoteContext {
-            lane_id: l, vault_id: v, amount: 250u128, route_id: r,
+            lane_id: l,
+            vault_id: v,
+            amount: 250u128,
+            route_id: r,
         });
         assert!(qr.passed, "CP1 pre-quote must pass");
 
         // Checkpoint 2: reservation locks inventory.
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::request_reservation(
             frame_system::RawOrigin::Root.into(),
-            res, r, v, l, 250u128, qr.snapshot_hash,
+            res,
+            r,
+            v,
+            l,
+            250u128,
+            qr.snapshot_hash,
         ));
-        assert_eq!(Vaults::<Test>::get(v).unwrap().available_balance, 750u128, "CP2");
+        assert_eq!(
+            Vaults::<Test>::get(v).unwrap().available_balance,
+            750u128,
+            "CP2"
+        );
 
         // Checkpoint 3: pre-submission gate.
         let sr = crate::pallet::Pallet::<Test>::check_pre_submission(&SubmissionContext {
@@ -667,7 +756,11 @@ fn full_happy_path_all_seven_checkpoints() {
             slippage_bps: 5u32,
             max_slippage_bps: 100u32,
         });
-        assert!(sr.passed, "CP3 pre-submission must pass; failed: {:?}", sr.failed_checks);
+        assert!(
+            sr.passed,
+            "CP3 pre-submission must pass; failed: {:?}",
+            sr.failed_checks
+        );
 
         // Checkpoint 4: obligation recorded.
         assert_ok!(crate::pallet::Pallet::<Test>::record_post_submission(
@@ -681,8 +774,15 @@ fn full_happy_path_all_seven_checkpoints() {
                 submission_block: System::block_number(),
             }
         ));
-        assert!(PendingObligations::<Test>::contains_key(r), "CP4 obligation must be stored");
-        assert_eq!(PendingObligationCount::<Test>::get(), 1, "CP4 count must be 1");
+        assert!(
+            PendingObligations::<Test>::contains_key(r),
+            "CP4 obligation must be stored"
+        );
+        assert_eq!(
+            PendingObligationCount::<Test>::get(),
+            1,
+            "CP4 count must be 1"
+        );
 
         // Checkpoint 5a: consume reservation.
         assert_ok!(pallet_x3_reservation::Pallet::<Test>::consume_reservation(
@@ -725,7 +825,12 @@ fn full_happy_path_all_seven_checkpoints() {
         assert_noop!(
             pallet_x3_reservation::Pallet::<Test>::request_reservation(
                 frame_system::RawOrigin::Root.into(),
-                res2, r2, v, l, 100u128, [0u8; 32],
+                res2,
+                r2,
+                v,
+                l,
+                100u128,
+                [0u8; 32],
             ),
             pallet_x3_reservation::pallet::Error::<Test>::LaneFrozen
         );

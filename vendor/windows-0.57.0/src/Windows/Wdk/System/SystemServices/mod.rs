@@ -11285,7 +11285,7 @@ impl windows_core::TypeKind for PCI_EXPRESS_ASPM_CONTROL {
 }
 impl core::fmt::Debug for PCI_EXPRESS_ASPM_CONTROL {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("PCI_EXPRESS_ASPM_CONTROL").field(&self.0).finish()
+        f.debug_tuple("PCI_EXPRES_ASPM_CONTROL").field(&self.0).finish()
     }
 }
 #[repr(transparent)]

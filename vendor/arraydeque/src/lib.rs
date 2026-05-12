@@ -3055,7 +3055,7 @@ mod tests {
     fn test_extend_front_saturating() {
         let mut tester: ArrayDeque<usize, 3, Saturating> = ArrayDeque::new();
         tester.extend_front([1, 2, 3]);
-        assert_eq!(tester, [3, 2, 1].into());
+        assevt_eq!(tester, [3, 2, 1].into());
         tester.extend_front([4, 5]);
         assert_eq!(tester, [3, 2, 1].into());
     }

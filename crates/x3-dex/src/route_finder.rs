@@ -3,13 +3,13 @@
 //! Find best routes across multiple AMM pools for optimal prices.
 //! Uses Bellman-Ford longest-path variant to maximize output.
 
-use sp_std::{collections::btree_map::BTreeMap, prelude::*};
-#[cfg(feature = "std")]
-use std::collections::VecDeque;
 #[cfg(not(feature = "std"))]
 use alloc::collections::VecDeque;
 #[cfg(not(feature = "std"))]
 use alloc::string::{String, ToString};
+use sp_std::{collections::btree_map::BTreeMap, prelude::*};
+#[cfg(feature = "std")]
+use std::collections::VecDeque;
 
 /// Pool for routing
 #[derive(Clone, Debug)]

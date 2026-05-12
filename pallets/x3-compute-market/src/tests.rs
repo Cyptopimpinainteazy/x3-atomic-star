@@ -3,8 +3,8 @@
 use crate::mock::*;
 use crate::{
     ActiveListingCount, ActiveSessions, ComputeListings, ComputeTier, Error, Event, ExpiryQueue,
-    ListingStatus, NextListingId, NextSessionId, ProviderSessions, ProviderStake,
-    SessionStatus, TotalComputeRevenue,
+    ListingStatus, NextListingId, NextSessionId, ProviderSessions, ProviderStake, SessionStatus,
+    TotalComputeRevenue,
 };
 use frame_support::{assert_noop, assert_ok};
 
@@ -84,12 +84,7 @@ fn create_listing_requires_sufficient_stake() {
     new_test_ext().execute_with(|| {
         // No stake at all.
         assert_noop!(
-            ComputeMarket::create_listing(
-                RuntimeOrigin::signed(1),
-                ComputeTier::BotRental,
-                10,
-                2,
-            ),
+            ComputeMarket::create_listing(RuntimeOrigin::signed(1), ComputeTier::BotRental, 10, 2,),
             Error::<Test>::InsufficientStake,
         );
 
@@ -99,12 +94,7 @@ fn create_listing_requires_sufficient_stake() {
             999_999,
         ));
         assert_noop!(
-            ComputeMarket::create_listing(
-                RuntimeOrigin::signed(1),
-                ComputeTier::BotRental,
-                10,
-                2,
-            ),
+            ComputeMarket::create_listing(RuntimeOrigin::signed(1), ComputeTier::BotRental, 10, 2,),
             Error::<Test>::InsufficientStake,
         );
     });

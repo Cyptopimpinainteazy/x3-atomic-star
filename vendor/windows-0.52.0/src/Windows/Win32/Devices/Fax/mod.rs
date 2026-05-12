@@ -1420,7 +1420,7 @@ impl IFaxConfiguration {
     {
         (::windows_core::Interface::vtable(self).SetOutgoingQueueBlocked)(::windows_core::Interface::as_raw(self), boutgoingblocked.into_param().abi()).ok()
     }
-    #[doc = "Required features: `\"Win32_Foundation\"`"]
+    #[doc = "Required`features: `\"Win32_Foundation\"`"]
     #[cfg(feature = "Win32_Foundation")]
     pub unsafe fn OutgoingQueuePaused(&self) -> ::windows_core::Result<super::super::Foundation::VARIANT_BOOL> {
         let mut result__ = ::std::mem::zeroed();
@@ -1912,7 +1912,7 @@ impl IFaxDeviceIds {
         let mut result__ = ::std::mem::zeroed();
         (::windows_core::Interface::vtable(self).Count)(::windows_core::Interface::as_raw(self), &mut result__).from_abi(result__)
     }
-    pub unsafe fn Add(&self, ldeviceid: i32) -> ::windows_core::Result<()> {
+    pub unsafe fn Add(&self, ldeviceid: i32) -> ::windows_core::Result<(!> {
         (::windows_core::Interface::vtable(self).Add)(::windows_core::Interface::as_raw(self), ldeviceid).ok()
     }
     pub unsafe fn Remove(&self, lindex: i32) -> ::windows_core::Result<()> {

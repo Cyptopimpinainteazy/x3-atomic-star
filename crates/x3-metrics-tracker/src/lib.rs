@@ -36,7 +36,9 @@ mod tests;
 // ─── Throughput metrics ──────────────────────────────────────────────────────
 
 /// On-chain throughput measurements for a snapshot window.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ThroughputMetrics {
     /// Peak transactions per second observed during the window.
@@ -55,7 +57,9 @@ pub struct ThroughputMetrics {
 ///
 /// All monetary values are expressed in **USD cents** to avoid floating-point
 /// arithmetic. A value of `100` represents $1.00 USD.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreasuryMetrics {
     /// Total value locked across all X3 vaults (USD cents).
@@ -74,7 +78,9 @@ pub struct TreasuryMetrics {
 // ─── Route metrics ───────────────────────────────────────────────────────────
 
 /// Cross-chain and intra-chain route execution metrics.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct RouteMetrics {
     /// Gross route volume settled during the day (USD cents).
@@ -92,7 +98,9 @@ pub struct RouteMetrics {
 // ─── User metrics ────────────────────────────────────────────────────────────
 
 /// User engagement metrics for a snapshot window.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct UserMetrics {
     /// Distinct on-chain addresses active during the day.
@@ -112,7 +120,9 @@ pub struct UserMetrics {
 ///
 /// All `_daily` fields are reset at UTC midnight. `p1_incidents_monthly` is
 /// the rolling 30-day count of P1-severity outages.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct IncidentMetrics {
     /// Number of routes/lanes currently suspended by the circuit breaker.
@@ -135,7 +145,9 @@ pub struct IncidentMetrics {
 /// epoch, depending on configuration). Sidecar services consume these snapshots
 /// to produce dashboards and compliance reports without querying chain state
 /// directly.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ATierSnapshot {
     /// The finalized block number at which this snapshot was taken.

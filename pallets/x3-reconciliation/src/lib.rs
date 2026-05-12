@@ -137,13 +137,8 @@ pub mod pallet {
 
     /// Per-chain wrapped supply reports: chain_id → (report).
     #[pallet::storage]
-    pub type ChainSupplyReports<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        u32,
-        ChainSupplyReport<BlockNumberFor<T>>,
-        OptionQuery,
-    >;
+    pub type ChainSupplyReports<T: Config> =
+        StorageMap<_, Blake2_128Concat, u32, ChainSupplyReport<BlockNumberFor<T>>, OptionQuery>;
 
     /// Canonical supply as declared by governance / trusted bridge validators.
     #[pallet::storage]
@@ -170,8 +165,7 @@ pub mod pallet {
 
     /// Block number of the most recent governance-power aggregation.
     #[pallet::storage]
-    pub type LastPowerReconciliation<T: Config> =
-        StorageValue<_, BlockNumberFor<T>, ValueQuery>;
+    pub type LastPowerReconciliation<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -187,10 +181,7 @@ pub mod pallet {
         /// The canonical supply was updated by governance.
         CanonicalSupplyUpdated { new_canonical: u128 },
         /// A reconciliation cycle completed.
-        ReconciliationExecuted {
-            divergence_bps: u32,
-            passed: bool,
-        },
+        ReconciliationExecuted { divergence_bps: u32, passed: bool },
         /// Minting was halted because supply divergence was not resolved in time.
         MintHaltTriggered { at_block: BlockNumberFor<T> },
         /// Governance lifted the mint halt after divergence fell within tolerance.
@@ -286,7 +277,9 @@ pub mod pallet {
         pub fn set_canonical_supply(origin: OriginFor<T>, amount: u128) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             CanonicalSupply::<T>::put(amount);
-            Self::deposit_event(Event::CanonicalSupplyUpdated { new_canonical: amount });
+            Self::deposit_event(Event::CanonicalSupplyUpdated {
+                new_canonical: amount,
+            });
             Ok(())
         }
 
@@ -345,7 +338,10 @@ pub mod pallet {
                 executed_at: now,
             };
             LastReconciliation::<T>::put(record);
-            Self::deposit_event(Event::ReconciliationExecuted { divergence_bps, passed });
+            Self::deposit_event(Event::ReconciliationExecuted {
+                divergence_bps,
+                passed,
+            });
             Ok(())
         }
 
@@ -358,7 +354,10 @@ pub mod pallet {
         pub fn lift_mint_halt(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             // Must have an active halt.
-            ensure!(MintHaltSince::<T>::get().is_some(), Error::<T>::HaltNotActive);
+            ensure!(
+                MintHaltSince::<T>::get().is_some(),
+                Error::<T>::HaltNotActive
+            );
 
             // Reject if divergence is still above tolerance.
             if let Some(record) = LastReconciliation::<T>::get() {
@@ -403,7 +402,11 @@ pub mod pallet {
                 let average = total / count;
                 let max_div_bps = GovernancePowerByChain::<T>::iter()
                     .map(|(_, p)| {
-                        let diff = if p >= average { p - average } else { average - p };
+                        let diff = if p >= average {
+                            p - average
+                        } else {
+                            average - p
+                        };
                         // basis points relative to total power.
                         (diff.saturating_mul(10_000) / total).min(u32::MAX as u128) as u32
                     })
@@ -411,7 +414,9 @@ pub mod pallet {
                     .unwrap_or(0);
 
                 if max_div_bps > T::GovernanceDivergenceAlertBps::get() {
-                    Self::deposit_event(Event::GovernancePowerDivergenceAlert { max_divergence_bps: max_div_bps });
+                    Self::deposit_event(Event::GovernancePowerDivergenceAlert {
+                        max_divergence_bps: max_div_bps,
+                    });
                 }
             }
 

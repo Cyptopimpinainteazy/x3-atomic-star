@@ -166,7 +166,9 @@ pub struct SvmState {
 
 impl SvmValidator {
     pub fn new() -> Self {
-        Self { hasher: Keccak256Kernel::new(32, false) }
+        Self {
+            hasher: Keccak256Kernel::new(32, false),
+        }
     }
 
     /// Validate that all transactions are non-empty.
@@ -200,7 +202,14 @@ impl SvmValidator {
         let valid = state.block_hash.len() == 32;
         Ok(crate::ValidationResult {
             valid,
-            error: if valid { None } else { Some(format!("block_hash length {} != 32", state.block_hash.len())) },
+            error: if valid {
+                None
+            } else {
+                Some(format!(
+                    "block_hash length {} != 32",
+                    state.block_hash.len()
+                ))
+            },
             duration_ms: start.elapsed().as_millis() as u64,
         })
     }

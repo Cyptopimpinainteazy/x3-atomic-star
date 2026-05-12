@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use libp2p::PeerId;
+use sc_network_types::PeerId;
 use log::trace;
 use parking_lot::Mutex;
 use partial_sort::PartialSort;

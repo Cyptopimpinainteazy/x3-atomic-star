@@ -49,15 +49,7 @@ pub type Balance = u128;
 ///
 /// Used as the composite map key in [`pallet::AllocationCaps`].
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    MaxEncodedLen,
-    TypeInfo,
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
 pub struct AllocationCapKey {
     pub chain_id: ChainId,
@@ -202,18 +194,36 @@ pub mod pallet {
         /// The operator-level per-action funding threshold was updated.
         OperatorThresholdSet { threshold: Balance },
         /// Capital was committed to a settlement float vault.
-        VaultFunded { vault_id: VaultId, amount: Balance, lane_class: LaneClass },
+        VaultFunded {
+            vault_id: VaultId,
+            amount: Balance,
+            lane_class: LaneClass,
+        },
         /// Committed capital was recorded as withdrawn from a settlement float vault.
-        VaultWithdrawn { vault_id: VaultId, amount: Balance, lane_class: LaneClass },
+        VaultWithdrawn {
+            vault_id: VaultId,
+            amount: Balance,
+            lane_class: LaneClass,
+        },
         /// A funding request exceeded the operator threshold and was queued for
         /// governance review.  No balance changes were applied yet.
-        GovernanceApprovalRequired { vault_id: VaultId, amount: Balance, lane_class: LaneClass },
+        GovernanceApprovalRequired {
+            vault_id: VaultId,
+            amount: Balance,
+            lane_class: LaneClass,
+        },
         /// Governance rejected a pending large funding action without applying it.
         GovernanceActionRejected { vault_id: VaultId },
         /// Funds were added to the insurance reserve.
-        InsuranceReserveDeposited { amount: Balance, new_balance: Balance },
+        InsuranceReserveDeposited {
+            amount: Balance,
+            new_balance: Balance,
+        },
         /// Funds were withdrawn from the insurance reserve.
-        InsuranceReserveWithdrawn { amount: Balance, new_balance: Balance },
+        InsuranceReserveWithdrawn {
+            amount: Balance,
+            new_balance: Balance,
+        },
     }
 
     // -----------------------------------------------------------------------
@@ -374,8 +384,7 @@ pub mod pallet {
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             let (amount, lane_class, _submitted_at) =
-                PendingGovernanceActions::<T>::take(vault_id)
-                    .ok_or(Error::<T>::NoPendingAction)?;
+                PendingGovernanceActions::<T>::take(vault_id).ok_or(Error::<T>::NoPendingAction)?;
             Self::apply_funding(vault_id, amount, lane_class);
             Ok(())
         }
@@ -388,14 +397,10 @@ pub mod pallet {
         /// Callable by: **Governance**.
         #[pallet::call_index(4)]
         #[pallet::weight(Weight::from_parts(40_000_000, 0))]
-        pub fn reject_governance_action(
-            origin: OriginFor<T>,
-            vault_id: VaultId,
-        ) -> DispatchResult {
+        pub fn reject_governance_action(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             // `take` atomically removes and returns; None indicates no pending action.
-            PendingGovernanceActions::<T>::take(vault_id)
-                .ok_or(Error::<T>::NoPendingAction)?;
+            PendingGovernanceActions::<T>::take(vault_id).ok_or(Error::<T>::NoPendingAction)?;
             Self::deposit_event(Event::GovernanceActionRejected { vault_id });
             Ok(())
         }
@@ -423,7 +428,11 @@ pub mod pallet {
             TotalDeployedSettlementFloat::<T>::mutate(|b| {
                 *b = b.saturating_sub(amount);
             });
-            Self::deposit_event(Event::VaultWithdrawn { vault_id, amount, lane_class });
+            Self::deposit_event(Event::VaultWithdrawn {
+                vault_id,
+                amount,
+                lane_class,
+            });
             Ok(())
         }
 
@@ -435,10 +444,7 @@ pub mod pallet {
         /// Callable by: **Governance**.
         #[pallet::call_index(6)]
         #[pallet::weight(Weight::from_parts(40_000_000, 0))]
-        pub fn deposit_insurance_reserve(
-            origin: OriginFor<T>,
-            amount: Balance,
-        ) -> DispatchResult {
+        pub fn deposit_insurance_reserve(origin: OriginFor<T>, amount: Balance) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             let current = InsuranceReserveBalance::<T>::get();
             let max = T::MaxInsuranceReserve::get();
@@ -449,7 +455,10 @@ pub mod pallet {
                 .filter(|&n| n <= max)
                 .ok_or(Error::<T>::InsuranceReserveAtMax)?;
             InsuranceReserveBalance::<T>::put(new_balance);
-            Self::deposit_event(Event::InsuranceReserveDeposited { amount, new_balance });
+            Self::deposit_event(Event::InsuranceReserveDeposited {
+                amount,
+                new_balance,
+            });
             Ok(())
         }
 
@@ -461,16 +470,16 @@ pub mod pallet {
         /// Callable by: **Governance**.
         #[pallet::call_index(7)]
         #[pallet::weight(Weight::from_parts(40_000_000, 0))]
-        pub fn withdraw_insurance_reserve(
-            origin: OriginFor<T>,
-            amount: Balance,
-        ) -> DispatchResult {
+        pub fn withdraw_insurance_reserve(origin: OriginFor<T>, amount: Balance) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             let current = InsuranceReserveBalance::<T>::get();
             ensure!(current >= amount, Error::<T>::InsuranceReserveInsufficient);
             let new_balance = current.saturating_sub(amount);
             InsuranceReserveBalance::<T>::put(new_balance);
-            Self::deposit_event(Event::InsuranceReserveWithdrawn { amount, new_balance });
+            Self::deposit_event(Event::InsuranceReserveWithdrawn {
+                amount,
+                new_balance,
+            });
             Ok(())
         }
     }
@@ -491,7 +500,11 @@ pub mod pallet {
             TotalDeployedSettlementFloat::<T>::mutate(|b| {
                 *b = b.saturating_add(amount);
             });
-            Self::deposit_event(Event::VaultFunded { vault_id, amount, lane_class });
+            Self::deposit_event(Event::VaultFunded {
+                vault_id,
+                amount,
+                lane_class,
+            });
         }
     }
 }

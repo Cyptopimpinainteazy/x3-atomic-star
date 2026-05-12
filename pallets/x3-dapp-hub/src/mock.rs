@@ -1,10 +1,7 @@
 //! Mock runtime for `pallet-x3-dapp-hub` tests.
 
 use crate as pallet_x3_dapp_hub;
-use frame_support::{
-    assert_ok, derive_impl, parameter_types,
-    traits::ConstU32,
-};
+use frame_support::{assert_ok, derive_impl, parameter_types, traits::ConstU32};
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
@@ -79,14 +76,20 @@ pub fn setup_policy(policy_id: u32) {
     use x3_revenue_sharing::{RevenueDestination, RevenueSplitEntry, RevenueSplitPolicy};
 
     fn empty() -> RevenueSplitEntry {
-        RevenueSplitEntry { destination: RevenueDestination::Treasury, share_bps: 0 }
+        RevenueSplitEntry {
+            destination: RevenueDestination::Treasury,
+            share_bps: 0,
+        }
     }
 
     let policy = RevenueSplitPolicy {
         policy_id,
         entries_len: 2,
         entries: [
-            RevenueSplitEntry { destination: RevenueDestination::Treasury, share_bps: 3_000 },
+            RevenueSplitEntry {
+                destination: RevenueDestination::Treasury,
+                share_bps: 3_000,
+            },
             RevenueSplitEntry {
                 destination: RevenueDestination::DeveloperAccount,
                 share_bps: 7_000,
@@ -100,7 +103,11 @@ pub fn setup_policy(policy_id: u32) {
         ],
     };
 
-    assert_ok!(DappHub::set_revenue_policy(RuntimeOrigin::root(), policy_id, policy));
+    assert_ok!(DappHub::set_revenue_policy(
+        RuntimeOrigin::root(),
+        policy_id,
+        policy
+    ));
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

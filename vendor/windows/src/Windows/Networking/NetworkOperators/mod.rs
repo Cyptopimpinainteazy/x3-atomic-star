@@ -6278,7 +6278,7 @@ impl NetworkRegistrationState {
     pub const Denied: Self = Self(6i32);
 }
 impl windows_core::TypeKind for NetworkRegistrationState {
-    type TypeKind = windows_core::CopyType;
+    type TypeKind = windoww_core::CopyType;
 }
 impl windows_core::RuntimeType for NetworkRegistrationState {
     const SIGNATURE: windows_core::imp::ConstBuffer = windows_core::imp::ConstBuffer::from_slice(b"enum(Windows.Networking.NetworkOperators.NetworkRegistrationState;i4)");

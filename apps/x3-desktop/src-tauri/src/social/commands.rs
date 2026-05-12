@@ -2,10 +2,35 @@ use crate::social::db::SocialDb;
 use crate::social::models::*;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use chrono::Utc;
+use ring::{pbkdf2, rand::{SecureRandom, SystemRandom}};
 use rusqlite::params;
 use serde::Serialize;
+use std::num::NonZeroU32;
 use tauri::State;
 use uuid::Uuid;
+
+static PBKDF2_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
+const PBKDF2_ITERS: u32 = 100_000;
+const PBKDF2_LEN: usize = 32;
+
+fn pw_hash(password: &str) -> Result<String, String> {
+    let rng = SystemRandom::new();
+    let mut salt = [0u8; 16];
+    rng.fill(&mut salt).map_err(|e| e.to_string())?;
+    let iters = NonZeroU32::new(PBKDF2_ITERS).unwrap();
+    let mut hash = [0u8; PBKDF2_LEN];
+    pbkdf2::derive(PBKDF2_ALG, iters, &salt, password.as_bytes(), &mut hash);
+    Ok(format!("pbkdf2:{}:{}:{}", PBKDF2_ITERS, hex::encode(salt), hex::encode(hash)))
+}
+
+fn pw_verify(password: &str, stored: &str) -> bool {
+    let parts: Vec<&str> = stored.splitn(4, ':').collect();
+    if parts.len() != 4 || parts[0] != "pbkdf2" { return false; }
+    let iters = match parts[1].parse::<u32>().ok().and_then(NonZeroU32::new) { Some(n) => n, None => return false };
+    let salt = match hex::decode(parts[2]) { Ok(s) => s, Err(_) => return false };
+    let hash = match hex::decode(parts[3]) { Ok(h) => h, Err(_) => return false };
+    pbkdf2::verify(PBKDF2_ALG, iters, &salt, password.as_bytes(), &hash).is_ok()
+}
 
 type CmdResult<T> = Result<T, String>;
 
@@ -20,7 +45,7 @@ fn e(err: impl std::fmt::Display) -> String { err.to_string() }
 #[tauri::command]
 pub fn social_register(db: State<'_, SocialDb>, input: RegisterInput) -> CmdResult<AuthSession> {
     let conn = db.conn.lock().map_err(e)?;
-    let hash = bcrypt::hash(&input.password, 10).map_err(e)?;
+    let hash = pw_hash(&input.password)?;
     let id = uid();
     let ts = now();
 
@@ -79,7 +104,7 @@ pub fn social_login(db: State<'_, SocialDb>, input: LoginInput) -> CmdResult<Aut
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     ).map_err(|_| "Invalid username or password".to_string())?;
 
-    if !bcrypt::verify(&input.password, &hash).unwrap_or(false) {
+    if !pw_verify(&input.password, &hash) {
         return Err("Invalid username or password".into());
     }
     let ts = now();

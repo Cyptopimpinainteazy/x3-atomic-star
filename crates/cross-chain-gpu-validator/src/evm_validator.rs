@@ -172,7 +172,9 @@ pub struct EvmStateRoot {
 
 impl EvmValidator {
     pub fn new(batch_size: usize, use_gpu: bool) -> Self {
-        Self { hasher: Keccak256Kernel::new(batch_size, use_gpu) }
+        Self {
+            hasher: Keccak256Kernel::new(batch_size, use_gpu),
+        }
     }
 
     /// Validate a single EVM state by computing a transaction root and comparing it to
@@ -207,7 +209,11 @@ impl EvmValidator {
         let duration_ms = start.elapsed().as_millis() as u64;
         Ok(crate::ValidationResult {
             valid,
-            error: if valid { None } else { Some("state root mismatch".to_string()) },
+            error: if valid {
+                None
+            } else {
+                Some("state root mismatch".to_string())
+            },
             duration_ms,
         })
     }

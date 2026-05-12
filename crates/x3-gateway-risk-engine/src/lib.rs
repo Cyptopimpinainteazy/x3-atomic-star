@@ -313,13 +313,21 @@ impl GatewayRiskEngine {
         if self.policy.max_value_usd > 0 && input.value_usd > self.policy.max_value_usd {
             return RouteRiskDecision {
                 allow_route: false,
-                reason: format!("value_usd {} exceeds limit {}", input.value_usd, self.policy.max_value_usd),
+                reason: format!(
+                    "value_usd {} exceeds limit {}",
+                    input.value_usd, self.policy.max_value_usd
+                ),
             };
         }
-        if self.policy.max_recent_failures > 0 && input.recent_failures > self.policy.max_recent_failures {
+        if self.policy.max_recent_failures > 0
+            && input.recent_failures > self.policy.max_recent_failures
+        {
             return RouteRiskDecision {
                 allow_route: false,
-                reason: format!("recent_failures {} exceeds limit {}", input.recent_failures, self.policy.max_recent_failures),
+                reason: format!(
+                    "recent_failures {} exceeds limit {}",
+                    input.recent_failures, self.policy.max_recent_failures
+                ),
             };
         }
         if !input.verifier_quorum_met {

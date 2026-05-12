@@ -22,8 +22,8 @@ codec = { package = "parity-scale-codec", version = "3.6.1", features = [
 	"derive",
 ] }
 futures = "0.3.21"
-libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 sc-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sc-network-types = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }

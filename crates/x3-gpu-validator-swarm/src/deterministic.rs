@@ -452,10 +452,7 @@ impl DeterministicEngine {
                 }
             },
             Err(e) => {
-                error!(
-                    "[Deterministic Engine] GPU execution failed: {:?}",
-                    e
-                );
+                error!("[Deterministic Engine] GPU execution failed: {:?}", e);
                 Err(SwarmError::GpuError(format!("GPU execution failed: {}", e)))
             }
         }
@@ -582,7 +579,9 @@ impl DeterministicEngine {
                 .collect();
 
             let needs_verification = match verification_level {
-                VerificationLevel::Basic | VerificationLevel::Standard | VerificationLevel::Strict => true,
+                VerificationLevel::Basic
+                | VerificationLevel::Standard
+                | VerificationLevel::Strict => true,
             };
 
             let outputs_match = if task.task_type == TaskType::Custom {
@@ -643,7 +642,9 @@ impl DeterministicEngine {
                             timestamp: chrono::Utc::now().timestamp(),
                         };
                         self.replay_records.write().push(record);
-                        self.stats.replay_verifications.fetch_add(1, Ordering::SeqCst);
+                        self.stats
+                            .replay_verifications
+                            .fetch_add(1, Ordering::SeqCst);
 
                         if gpu_outputs == replay_outputs {
                             error!(

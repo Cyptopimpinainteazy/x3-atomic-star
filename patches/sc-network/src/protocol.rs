@@ -32,8 +32,8 @@ use libp2p::{
 		behaviour::FromSwarm, ConnectionDenied, ConnectionId, NetworkBehaviour, PollParameters,
 		THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
 	},
-	Multiaddr, PeerId,
 };
+use sc_network_types::{PeerId, multiaddr::Multiaddr};
 use log::{debug, error, warn};
 
 use sc_network_common::{role::Roles, sync::message::BlockAnnouncesHandshake};
@@ -117,7 +117,7 @@ impl<B: BlockT> Protocol<B> {
 			for reserved in network_config.default_peers_set.reserved_nodes.iter() {
 				default_sets_reserved.insert(reserved.peer_id);
 
-				if !reserved.multiaddr.is_empty() {
+				if reserved.multiaddr.iter().next().is_some() {
 					known_addresses.push((reserved.peer_id, reserved.multiaddr.clone()));
 				}
 			}
@@ -140,7 +140,7 @@ impl<B: BlockT> Protocol<B> {
 			for set_cfg in &notification_protocols {
 				let mut reserved_nodes = HashSet::new();
 				for reserved in set_cfg.set_config.reserved_nodes.iter() {
-					reserved_nodes.insert(reserved.peer_id);
+						reserved_nodes.insert(reserved.peer_id);
 					known_addresses.push((reserved.peer_id, reserved.multiaddr.clone()));
 				}
 
@@ -198,8 +198,10 @@ impl<B: BlockT> Protocol<B> {
 	}
 
 	/// Returns the list of all the peers we have an open channel to.
-	pub fn open_peers(&self) -> impl Iterator<Item = &PeerId> {
-		self.behaviour.open_peers()
+	pub fn open_peers(&self) -> impl Iterator<Item = PeerId> + '_ {
+		self.behaviour
+			.open_peers()
+			.map(|p| PeerId::from_bytes(&p.to_bytes()).expect("valid peer id"))
 	}
 
 	/// Returns the number of discovered nodes that we keep in memory.
@@ -211,7 +213,8 @@ impl<B: BlockT> Protocol<B> {
 	pub fn disconnect_peer(&mut self, peer_id: &PeerId, protocol_name: ProtocolName) {
 		if let Some(position) = self.notification_protocols.iter().position(|p| *p == protocol_name)
 		{
-			self.behaviour.disconnect_peer(peer_id, crate::peerset::SetId::from(position));
+			let lp_peer = libp2p::PeerId::from_bytes(&peer_id.to_bytes()).expect("valid peer id");
+			self.behaviour.disconnect_peer(&lp_peer, crate::peerset::SetId::from(position));
 			self.peers.remove(peer_id);
 		} else {
 			warn!(target: "sub-libp2p", "disconnect_peer() with invalid protocol name")
@@ -358,9 +361,9 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 	fn handle_established_inbound_connection(
 		&mut self,
 		connection_id: ConnectionId,
-		peer: PeerId,
-		local_addr: &Multiaddr,
-		remote_addr: &Multiaddr,
+		peer: libp2p::PeerId,
+		local_addr: &libp2p::Multiaddr,
+		remote_addr: &libp2p::Multiaddr,
 	) -> Result<THandler<Self>, ConnectionDenied> {
 		self.behaviour.handle_established_inbound_connection(
 			connection_id,
@@ -373,8 +376,8 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 	fn handle_established_outbound_connection(
 		&mut self,
 		connection_id: ConnectionId,
-		peer: PeerId,
-		addr: &Multiaddr,
+		peer: libp2p::PeerId,
+		addr: &libp2p::Multiaddr,
 		role_override: Endpoint,
 	) -> Result<THandler<Self>, ConnectionDenied> {
 		self.behaviour.handle_established_outbound_connection(
@@ -388,10 +391,10 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 	fn handle_pending_outbound_connection(
 		&mut self,
 		_connection_id: ConnectionId,
-		_maybe_peer: Option<PeerId>,
-		_addresses: &[Multiaddr],
+		_maybe_peer: Option<libp2p::PeerId>,
+		_addresses: &[libp2p::Multiaddr],
 		_effective_role: Endpoint,
-	) -> Result<Vec<Multiaddr>, ConnectionDenied> {
+	) -> Result<Vec<libp2p::Multiaddr>, ConnectionDenied> {
 		// Only `Discovery::handle_pending_outbound_connection` must be returning addresses to
 		// ensure that we don't return unwanted addresses.
 		Ok(Vec::new())
@@ -403,7 +406,7 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 
 	fn on_connection_handler_event(
 		&mut self,
-		peer_id: PeerId,
+		peer_id: libp2p::PeerId,
 		connection_id: ConnectionId,
 		event: THandlerOutEvent<Self>,
 	) {
@@ -427,7 +430,8 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 						target: "sub-libp2p",
 						"`SyncingEngine` rejected stream"
 					);
-					self.behaviour.disconnect_peer(&peer, HARDCODED_PEERSETS_SYNC);
+					let lp_peer = libp2p::PeerId::from_bytes(&peer.to_bytes()).expect("valid peer id");
+					self.behaviour.disconnect_peer(&lp_peer, HARDCODED_PEERSETS_SYNC);
 				},
 			}
 		}
@@ -446,12 +450,13 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 
 		let outcome = match event {
 			NotificationsOut::CustomProtocolOpen {
-				peer_id,
+				peer_id: lp_peer_id,
 				set_id,
 				received_handshake,
 				notifications_sink,
 				negotiated_fallback,
 			} => {
+				let peer_id = PeerId::from_bytes(&lp_peer_id.to_bytes()).expect("valid peer id");
 				// Set number 0 is hardcoded the default set of peers we sync from.
 				if set_id == HARDCODED_PEERSETS_SYNC {
 					// `received_handshake` can be either a `Status` message if received from the
@@ -574,7 +579,7 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 						(Err(err), _) => {
 							debug!(target: "sync", "Failed to parse remote handshake: {}", err);
 							self.bad_handshake_substreams.insert((peer_id, set_id));
-							self.behaviour.disconnect_peer(&peer_id, set_id);
+							self.behaviour.disconnect_peer(&lp_peer_id, set_id);
 							self.peerset_handle.report_peer(peer_id, rep::BAD_MESSAGE);
 							self.peers.remove(&peer_id);
 							CustomMessageOutcome::None
@@ -582,7 +587,8 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 					}
 				}
 			},
-			NotificationsOut::CustomProtocolReplaced { peer_id, notifications_sink, set_id } =>
+			NotificationsOut::CustomProtocolReplaced { peer_id: lp_peer_id_r, notifications_sink, set_id } => {
+				let peer_id = PeerId::from_bytes(&lp_peer_id_r.to_bytes()).expect("valid peer id");
 				if self.bad_handshake_substreams.contains(&(peer_id, set_id)) {
 					CustomMessageOutcome::None
 				} else if set_id == HARDCODED_PEERSETS_SYNC {
@@ -597,8 +603,10 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 						protocol: self.notification_protocols[usize::from(set_id)].clone(),
 						notifications_sink,
 					}
-				},
-			NotificationsOut::CustomProtocolClosed { peer_id, set_id } => {
+				}
+			},
+			NotificationsOut::CustomProtocolClosed { peer_id: lp_peer_id_c, set_id } => {
+				let peer_id = PeerId::from_bytes(&lp_peer_id_c.to_bytes()).expect("valid peer id");
 				if self.bad_handshake_substreams.remove(&(peer_id, set_id)) {
 					// The substream that has just been closed had been opened with a bad
 					// handshake. The outer layers have never received an opening event about this
@@ -617,7 +625,8 @@ impl<B: BlockT> NetworkBehaviour for Protocol<B> {
 					}
 				}
 			},
-			NotificationsOut::Notification { peer_id, set_id, message } => {
+			NotificationsOut::Notification { peer_id: lp_peer_id_n, set_id, message } => {
+				let peer_id = PeerId::from_bytes(&lp_peer_id_n.to_bytes()).expect("valid peer id");
 				if self.bad_handshake_substreams.contains(&(peer_id, set_id)) {
 					CustomMessageOutcome::None
 				} else if set_id == HARDCODED_PEERSETS_SYNC {

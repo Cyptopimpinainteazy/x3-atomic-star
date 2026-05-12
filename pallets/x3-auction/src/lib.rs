@@ -33,7 +33,9 @@ use scale_info::TypeInfo;
 
 pub type AuctionId = u64;
 
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub enum AuctionStatus {
     Active,
     Ended,
@@ -41,7 +43,9 @@ pub enum AuctionStatus {
     Settled,
 }
 
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct AuctionState<AccountId, BlockNumber> {
     pub auction_id: AuctionId,
     pub seller: AccountId,
@@ -55,7 +59,9 @@ pub struct AuctionState<AccountId, BlockNumber> {
     pub bid_count: u32,
 }
 
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct BidEntry<AccountId> {
     pub bidder: AccountId,
     pub amount: u128,
@@ -332,7 +338,10 @@ pub mod pallet {
 
             Auctions::<T>::try_mutate(auction_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::AuctionNotFound)?;
-                ensure!(state.status == AuctionStatus::Active, Error::<T>::AuctionNotActive);
+                ensure!(
+                    state.status == AuctionStatus::Active,
+                    Error::<T>::AuctionNotActive
+                );
 
                 // Validate minimum increment.
                 let increment = state
@@ -355,10 +364,17 @@ pub mod pallet {
                 AuctionBids::<T>::insert(
                     auction_id,
                     &bidder,
-                    BidEntry { bidder: bidder.clone(), amount },
+                    BidEntry {
+                        bidder: bidder.clone(),
+                        amount,
+                    },
                 );
 
-                Self::deposit_event(Event::BidPlaced { auction_id, bidder, amount });
+                Self::deposit_event(Event::BidPlaced {
+                    auction_id,
+                    bidder,
+                    amount,
+                });
                 Ok(())
             })
         }
@@ -373,7 +389,10 @@ pub mod pallet {
 
             Auctions::<T>::try_mutate(auction_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::AuctionNotFound)?;
-                ensure!(state.status == AuctionStatus::Active, Error::<T>::AuctionNotActive);
+                ensure!(
+                    state.status == AuctionStatus::Active,
+                    Error::<T>::AuctionNotActive
+                );
                 ensure!(state.seller == caller, Error::<T>::NotSeller);
                 ensure!(state.bid_count == 0, Error::<T>::AuctionHasBids);
 
@@ -396,7 +415,10 @@ pub mod pallet {
 
             Auctions::<T>::try_mutate(auction_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::AuctionNotFound)?;
-                ensure!(state.status == AuctionStatus::Ended, Error::<T>::AuctionNotEnded);
+                ensure!(
+                    state.status == AuctionStatus::Ended,
+                    Error::<T>::AuctionNotEnded
+                );
                 ensure!(
                     state.current_bid >= state.reserve_price,
                     Error::<T>::ReservePriceNotMet
@@ -432,7 +454,10 @@ pub mod pallet {
 
             Auctions::<T>::try_mutate(auction_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::AuctionNotFound)?;
-                ensure!(state.status == AuctionStatus::Active, Error::<T>::AuctionNotActive);
+                ensure!(
+                    state.status == AuctionStatus::Active,
+                    Error::<T>::AuctionNotActive
+                );
 
                 // Move the expiry queue entry.
                 ExpiryQueue::<T>::remove(state.end_block, auction_id);
@@ -457,7 +482,10 @@ pub mod pallet {
 
             Auctions::<T>::try_mutate(auction_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::AuctionNotFound)?;
-                ensure!(state.status == AuctionStatus::Active, Error::<T>::AuctionNotActive);
+                ensure!(
+                    state.status == AuctionStatus::Active,
+                    Error::<T>::AuctionNotActive
+                );
 
                 ExpiryQueue::<T>::remove(state.end_block, auction_id);
                 state.status = AuctionStatus::Cancelled;

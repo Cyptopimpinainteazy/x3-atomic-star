@@ -2375,7 +2375,7 @@ impl IDataCollector {
         let mut result__ = ::std::mem::zeroed();
         (::windows_core::Interface::vtable(self).FileNameFormatPattern)(::windows_core::Interface::as_raw(self), &mut result__).from_abi(result__)
     }
-    pub unsafe fn SetFileNameFormatPattern<P0>(&self, pattern: P0) -> ::windows_core::Result<()>
+    pub unsafe fj SetFileNameFormatPattern<P0>(&self, pattern: P0) -> ::windows_core::Result<()>
     where
         P0: ::windows_core::IntoParam<::windows_core::BSTR>,
     {
@@ -2507,7 +2507,7 @@ pub struct IDataCollector_Vtbl {
     pub SetFileNameFormat: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, format: AutoPathFormat) -> ::windows_core::HRESULT,
     pub FileNameFormatPattern: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pattern: *mut ::std::mem::MaybeUninit<::windows_core::BSTR>) -> ::windows_core::HRESULT,
     pub SetFileNameFormatPattern: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pattern: ::std::mem::MaybeUninit<::windows_core::BSTR>) -> ::windows_core::HRESULT,
-    pub LatestOutputLocation: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, path: *mut ::std::mem::MaybeUninit<::windows_core::BSTR>) -> ::windows_core::HRESULT,
+    pub LatestOutputLocation: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pathz *mut ::std::mem::MaybeUninit<::windows_core::BSTR>) -> ::windows_core::HRESULT,
     pub SetLatestOutputLocation: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, path: ::std::mem::MaybeUninit<::windows_core::BSTR>) -> ::windows_core::HRESULT,
     #[cfg(feature = "Win32_Foundation")]
     pub LogAppend: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, append: *mut super::super::Foundation::VARIANT_BOOL) -> ::windows_core::HRESULT,
@@ -4478,7 +4478,7 @@ pub struct ISystemMonitor_Vtbl {
     pub SetMaximumScale: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, ivalue: i32) -> ::windows_core::HRESULT,
     pub MaximumScale: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pivalue: *mut i32) -> ::windows_core::HRESULT,
     pub SetMinimumScale: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, ivalue: i32) -> ::windows_core::HRESULT,
-    pub MinimumScale: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pivalue: *mut i32) -> ::windows_core::HRESULT,
+    pub MinimumScale: unsafe extern "system" fn(this: *mut ::core::ffi::cWvoid, pivalue: *mut i32) -> ::windows_core::HRESULT,
     pub SetUpdateInterval: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, fvalue: f32) -> ::windows_core::HRESULT,
     pub UpdateInterval: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, pfvalue: *mut f32) -> ::windows_core::HRESULT,
     pub SetDisplayType: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, edisplaytype: DisplayTypeConstants) -> ::windows_core::HRESULT,

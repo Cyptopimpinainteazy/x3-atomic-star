@@ -66,64 +66,94 @@ async function serveStatic(request, requestUrl, response) {
   const hasDist = await fs.stat(distDir).catch(() => false);
 
   // Legacy page paths should be served from the original root HTML, even when dist exists.
-  if (requestUrl.pathname === '/x3star-landing.html') {
-    const resolved = path.normalize(path.join(rootDir, 'x3star-landing.html'));
-    const file = await fs.readFile(resolved);
-    const body = Buffer.from(injectGlobalChrome(file.toString('utf8')), 'utf8');
-    response.writeHead(200, {
-      'content-type': 'text/html; charset=utf-8',
-    });
-    response.end(body);
+  if (siteType === 'react' && requestUrl.pathname === '/x3star-landing.html') {
+    response.writeHead(301, { Location: '/' });
+    response.end();
     return;
   }
 
-  if (siteType === 'react' && hasDist) {
+  if (siteType === 'react') {
     const filePath = requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname;
-    const resolvedDist = path.normalize(path.join(distDir, filePath));
-    if (resolvedDist.startsWith(distDir)) {
-      try {
-        const file = await fs.readFile(resolvedDist);
-        const ext = path.extname(resolvedDist).toLowerCase();
-        response.writeHead(200, {
-          'content-type': CONTENT_TYPES[ext] || 'application/octet-stream',
-        });
-        response.end(file);
-        return;
-      } catch (e) {
-        if (e.code === 'ENOENT') {
-          const indexFile = await fs.readFile(path.join(distDir, 'index.html'));
+    if (hasDist) {
+      const resolvedDist = path.normalize(path.join(distDir, filePath));
+      if (resolvedDist.startsWith(distDir)) {
+        try {
+          const file = await fs.readFile(resolvedDist);
+          const ext = path.extname(resolvedDist).toLowerCase();
           response.writeHead(200, {
-            'content-type': 'text/html; charset=utf-8',
+            'content-type': CONTENT_TYPES[ext] || 'application/octet-stream',
           });
-          response.end(indexFile);
+          response.end(file);
           return;
+        } catch (e) {
+          if (e.code === 'ENOENT') {
+            const indexFile = await fs.readFile(path.join(distDir, 'index.html'));
+            response.writeHead(200, {
+              'content-type': 'text/html; charset=utf-8',
+            });
+            response.end(indexFile);
+            return;
+          }
         }
       }
+    } else if (requestUrl.pathname === '/') {
+      const indexFile = await fs.readFile(path.join(rootDir, 'index.html'));
+      response.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+      });
+      response.end(indexFile);
+      return;
     }
   }
 
   // legacy behaviour (serve original html/js/css)
-  const pathname = requestUrl.pathname === '/' ? '/x3star-landing.html' : requestUrl.pathname;
-  const resolved = path.normalize(path.join(rootDir, pathname));
+  const pathname =
+    siteType === 'react'
+      ? requestUrl.pathname === '/'
+        ? '/index.html'
+        : requestUrl.pathname
+      : requestUrl.pathname === '/'
+      ? '/x3star-landing.html'
+      : requestUrl.pathname;
+  let resolved = path.normalize(path.join(rootDir, pathname));
   if (!resolved.startsWith(rootDir)) {
     json(response, 403, { error: 'Forbidden' });
     return;
   }
+  let file;
   try {
-    const file = await fs.readFile(resolved);
-    const extension = path.extname(resolved).toLowerCase();
-    let body = file;
-    if (extension === '.html') {
-      body = Buffer.from(injectGlobalChrome(file.toString('utf8')), 'utf8');
+    file = await fs.readFile(resolved);
+  } catch (error) {
+    if (error.code === 'ENOENT' && !path.extname(resolved)) {
+      const htmlCandidate = path.normalize(path.join(rootDir, pathname + '.html'));
+      const indexCandidate = path.normalize(path.join(rootDir, pathname, 'index.html'));
+      for (const candidate of [htmlCandidate, indexCandidate]) {
+        if (!candidate.startsWith(rootDir)) continue;
+        try {
+          file = await fs.readFile(candidate);
+          resolved = candidate;
+          break;
+        } catch (innerError) {
+          if (innerError.code !== 'ENOENT') throw innerError;
+        }
+      }
     }
-    response.writeHead(200, {
-      'content-type': CONTENT_TYPES[extension] || 'application/octet-stream',
-    });
-    response.end(body);
-  } catch {
-    json(response, 404, { error: 'Not found' });
+    if (!file) {
+      json(response, 404, { error: 'Not found' });
+      return;
+    }
   }
+  const extension = path.extname(resolved).toLowerCase();
+  let body = file;
+  if (extension === '.html') {
+    body = Buffer.from(injectGlobalChrome(file.toString('utf8')), 'utf8');
+  }
+  response.writeHead(200, {
+    'content-type': CONTENT_TYPES[extension] || 'application/octet-stream',
+  });
+  response.end(body);
 }
+
 
 function sse(response, handler) {
   response.writeHead(200, {
@@ -201,6 +231,64 @@ async function routeApi(request, response, requestUrl) {
     }
     if (request.method === "GET" && pathname === "/api/site/tokenomics") {
       json(response, 200, await services.getTokenomics());
+      return true;
+    }
+    if (request.method === "GET" && pathname === "/api/site/funding/programs") {
+      json(response, 200, await services.getFundingPrograms());
+      return true;
+    }
+    if (request.method === "GET" && pathname === "/api/site/funding/applications") {
+      json(response, 200, await services.getFundingApplications());
+      return true;
+    }
+    if (request.method === "GET" && pathname === "/api/site/funding/scoreboard") {
+      json(response, 200, await services.getFundingScoreboard());
+      return true;
+    }
+    if (request.method === "GET" && pathname === "/api/site/funding/intakes") {
+      json(response, 200, await services.listFundingIntakes());
+      return true;
+    }
+    if (request.method === "POST" && pathname === "/api/site/funding/applications") {
+      const payload = await readRequestBody(request);
+      json(response, 201, {
+        data: await services.createFundingApplication(payload),
+        status: "live",
+        source: "business-store",
+        lastUpdated: new Date().toISOString(),
+      });
+      return true;
+    }
+    if (request.method === "PATCH" && pathname.startsWith("/api/site/funding/applications/")) {
+      const id = pathname.split("/").pop();
+      const payload = await readRequestBody(request);
+      json(response, 200, {
+        data: await services.updateFundingApplication(id, payload),
+        status: "live",
+        source: "business-store",
+        lastUpdated: new Date().toISOString(),
+      });
+      return true;
+    }
+    if (request.method === "POST" && pathname === "/api/site/funding/intakes") {
+      const payload = await readRequestBody(request);
+      json(response, 201, {
+        data: await services.createFundingIntake(payload),
+        status: "live",
+        source: "business-store",
+        lastUpdated: new Date().toISOString(),
+      });
+      return true;
+    }
+    if (request.method === "PATCH" && pathname.startsWith("/api/site/funding/intakes/")) {
+      const id = pathname.split("/").pop();
+      const payload = await readRequestBody(request);
+      json(response, 200, {
+        data: await services.updateFundingIntake(id, payload),
+        status: "live",
+        source: "business-store",
+        lastUpdated: new Date().toISOString(),
+      });
       return true;
     }
     if (request.method === "POST" && pathname === "/api/site/reservations") {

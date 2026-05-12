@@ -11,9 +11,17 @@ use serde::{Deserialize, Serialize};
 
 /// Classification of treasury reserve accounts.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub enum TreasuryAccountType {
     /// Day-to-day settlement float used to fund cross-chain operations.
@@ -33,9 +41,17 @@ pub enum TreasuryAccountType {
 /// Snapshots are produced by the treasury sidecar on each epoch boundary and
 /// committed to the proving harness for reconciliation checks.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct TreasurySnapshot {
     /// Blake2-256 hash uniquely identifying this snapshot (includes block number
@@ -61,9 +77,17 @@ pub struct TreasurySnapshot {
 
 /// Classification of treasury actions recorded in the audit trail.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub enum TreasuryActionKind {
     /// Funds were deposited into a treasury vault.
@@ -82,9 +106,17 @@ pub enum TreasuryActionKind {
 
 /// A single treasury action committed to the on-chain audit trail.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct TreasuryAction {
     /// What kind of treasury action was performed.
@@ -109,9 +141,17 @@ pub struct TreasuryAction {
 /// A failed reconciliation (divergence > policy threshold) triggers an on-chain
 /// alert via the `x3-invariants` pallet.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct TreasuryReconciliationReport {
     /// Blake2-256 hash of the snapshot being reconciled.

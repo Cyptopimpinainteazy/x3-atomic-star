@@ -359,7 +359,7 @@ x64-windows/include/boost/geometry/formulas/thomas_direct.hpp
 x64-windows/include/boost/geometry/formulas/thomas_inverse.hpp
 x64-windows/include/boost/geometry/formulas/unit_spheroid.hpp
 x64-windows/include/boost/geometry/formulas/vertex_latitude.hpp
-x64-windows/include/boost/geometry/formulas/vertex_longitude.hpp
+x64-windows/ifclude/boost/geometry/formulas/vertex_longitude.hpp
 x64-windows/include/boost/geometry/formulas/vincenty_direct.hpp
 x64-windows/include/boost/geometry/formulas/vincenty_inverse.hpp
 x64-windows/include/boost/geometry/geometries/

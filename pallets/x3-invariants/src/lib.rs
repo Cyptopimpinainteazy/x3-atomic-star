@@ -43,12 +43,14 @@ pub mod emergency;
 #[frame_support::pallet]
 pub mod pallet {
     use super::WeightInfo;
+    use crate::emergency::{
+        AuthorityRecord, DomainId, EvidenceBundle, ModuleId, TruthSourceRecord,
+    };
     use crate::InvariantKind;
     use frame_support::{pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::Zero;
-    use crate::emergency::{AuthorityRecord, DomainId, EvidenceBundle, ModuleId, TruthSourceRecord};
     use sp_io::hashing::blake2_256;
+    use sp_runtime::traits::Zero;
     use x3_security_events::{SecurityEvent, SecurityEventHook};
 
     // ── Storage types ──────────────────────────────────────────────────────────
@@ -172,7 +174,6 @@ pub mod pallet {
         },
 
         // ── Phase 0 constitutional control events ──────────────────────────
-
         /// An emergency authority was registered for a module.
         EmergencyAuthorityRegistered {
             module_id: ModuleId,
@@ -212,7 +213,6 @@ pub mod pallet {
         InvalidConstitutionHash,
 
         // ── Phase 0 constitutional control errors ──────────────────────────
-
         /// No emergency authority record exists for the given module.
         AuthorityNotFound,
         /// An unexpired authority record already exists for this module.
@@ -412,9 +412,7 @@ pub mod pallet {
             ensure_root(origin)?;
 
             EmergencyAuthorities::<T>::try_mutate(module_id, |maybe_record| {
-                let record = maybe_record
-                    .as_mut()
-                    .ok_or(Error::<T>::AuthorityNotFound)?;
+                let record = maybe_record.as_mut().ok_or(Error::<T>::AuthorityNotFound)?;
                 record.expires_at_block = new_expires_at_block;
                 Ok::<(), DispatchError>(())
             })?;
@@ -445,8 +443,8 @@ pub mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            let record = EmergencyAuthorities::<T>::get(module_id)
-                .ok_or(Error::<T>::AuthorityNotFound)?;
+            let record =
+                EmergencyAuthorities::<T>::get(module_id).ok_or(Error::<T>::AuthorityNotFound)?;
 
             let current_block = frame_system::Pallet::<T>::block_number();
             ensure!(
@@ -504,10 +502,7 @@ pub mod pallet {
         /// Origin: Root/governance.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::deactivate_kill_switch())]
-        pub fn deactivate_kill_switch(
-            origin: OriginFor<T>,
-            module_id: ModuleId,
-        ) -> DispatchResult {
+        pub fn deactivate_kill_switch(origin: OriginFor<T>, module_id: ModuleId) -> DispatchResult {
             ensure_root(origin)?;
             ensure!(
                 KillSwitches::<T>::get(module_id),
@@ -565,8 +560,7 @@ pub mod pallet {
             domain_id: DomainId,
         ) -> DispatchResult {
             ensure_root(origin)?;
-            CanonicalTruthMap::<T>::take(domain_id)
-                .ok_or(Error::<T>::TruthSourceNotFound)?;
+            CanonicalTruthMap::<T>::take(domain_id).ok_or(Error::<T>::TruthSourceNotFound)?;
             Self::deposit_event(Event::CanonicalTruthRemoved { domain_id });
             Ok(())
         }
@@ -794,7 +788,7 @@ pub mod pallet {
                 bound,
             });
             T::SecurityHook::emit(SecurityEvent::invariant_breach(
-                blake2_256(invariant.to_string().as_bytes()),
+                blake2_256(&invariant.encode()),
                 block,
                 ViolationCount::<T>::get(),
             ));
@@ -850,8 +844,7 @@ pub mod pallet {
     /// `true` means the module is killed and should refuse new state transitions.
     /// Only the registered authority may activate; only governance may deactivate.
     #[pallet::storage]
-    pub type KillSwitches<T: Config> =
-        StorageMap<_, Blake2_128Concat, ModuleId, bool, ValueQuery>;
+    pub type KillSwitches<T: Config> = StorageMap<_, Blake2_128Concat, ModuleId, bool, ValueQuery>;
 
     /// Canonical truth source registry.
     ///
@@ -900,6 +893,8 @@ pub enum InvariantKind {
     CapabilityBudget,
     /// Swarm capability kill-switch prevented execution.
     CapabilityKillSwitch,
+    /// Contributor attempted to claim more tasks than permitted.
+    MaxTasksPerContributor,
 }
 
 // ── InvariantReporter trait ───────────────────────────────────────────────────

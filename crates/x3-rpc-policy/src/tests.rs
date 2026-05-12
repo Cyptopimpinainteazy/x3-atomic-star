@@ -94,7 +94,10 @@ fn status_score_zero_is_offline() {
 #[test]
 fn failover_triggered_by_low_score() {
     let h = score_only(FAILOVER_THRESHOLD - 1); // score = 59
-    assert!(h.should_failover(), "score < FAILOVER_THRESHOLD must trigger failover");
+    assert!(
+        h.should_failover(),
+        "score < FAILOVER_THRESHOLD must trigger failover"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -106,13 +109,16 @@ fn failover_triggered_by_low_score() {
 #[test]
 fn failover_triggered_by_excessive_block_drift() {
     let h = ProviderHealthScore {
-        score: 100,                   // perfect score
+        score: 100,                       // perfect score
         block_drift: MAX_BLOCK_DRIFT + 1, // 11 blocks → exceeds limit
         error_rate_bps: 0,
         finality_lag_blocks: 0,
         latency_ms: 0,
     };
-    assert!(h.should_failover(), "block_drift > MAX_BLOCK_DRIFT must trigger failover");
+    assert!(
+        h.should_failover(),
+        "block_drift > MAX_BLOCK_DRIFT must trigger failover"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -124,13 +130,16 @@ fn failover_triggered_by_excessive_block_drift() {
 #[test]
 fn failover_triggered_by_high_error_rate() {
     let h = ProviderHealthScore {
-        score: 100,                       // perfect score
+        score: 100,                             // perfect score
         error_rate_bps: MAX_ERROR_RATE_BPS + 1, // 501 BPS → exceeds limit
         block_drift: 0,
         finality_lag_blocks: 0,
         latency_ms: 0,
     };
-    assert!(h.should_failover(), "error_rate_bps > MAX_ERROR_RATE_BPS must trigger failover");
+    assert!(
+        h.should_failover(),
+        "error_rate_bps > MAX_ERROR_RATE_BPS must trigger failover"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -147,13 +156,16 @@ fn failover_triggered_by_high_error_rate() {
 #[test]
 fn no_failover_when_all_signals_at_or_within_bounds() {
     let h = ProviderHealthScore {
-        score: FAILOVER_THRESHOLD,       // 60 — healthy
-        block_drift: MAX_BLOCK_DRIFT,    // 10 — at limit, still OK
+        score: FAILOVER_THRESHOLD,          // 60 — healthy
+        block_drift: MAX_BLOCK_DRIFT,       // 10 — at limit, still OK
         error_rate_bps: MAX_ERROR_RATE_BPS, // 500 — at limit, still OK
         finality_lag_blocks: 0,
         latency_ms: 0,
     };
-    assert!(!h.should_failover(), "no failover expected when all signals are within bounds");
+    assert!(
+        !h.should_failover(),
+        "no failover expected when all signals are within bounds"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -167,11 +179,23 @@ fn no_failover_when_all_signals_at_or_within_bounds() {
 /// the policy document, acting as a documentation coupling guard.
 #[test]
 fn policy_constants_match_documented_values() {
-    assert_eq!(FAILOVER_THRESHOLD, 60, "FAILOVER_THRESHOLD must be 60 (§4.3)");
+    assert_eq!(
+        FAILOVER_THRESHOLD, 60,
+        "FAILOVER_THRESHOLD must be 60 (§4.3)"
+    );
     assert_eq!(FREEZE_THRESHOLD, 30, "FREEZE_THRESHOLD must be 30 (§4.3)");
-    assert_eq!(MAX_BLOCK_DRIFT, 10, "MAX_BLOCK_DRIFT must be 10 blocks (§4.4 / §6.5)");
-    assert_eq!(MAX_ERROR_RATE_BPS, 500, "MAX_ERROR_RATE_BPS must be 500 BPS = 5% (§4.4)");
-    assert_eq!(DEGRADED_BLOCK_DRIFT, 5, "DEGRADED_BLOCK_DRIFT must be 5 blocks (§6.5)");
+    assert_eq!(
+        MAX_BLOCK_DRIFT, 10,
+        "MAX_BLOCK_DRIFT must be 10 blocks (§4.4 / §6.5)"
+    );
+    assert_eq!(
+        MAX_ERROR_RATE_BPS, 500,
+        "MAX_ERROR_RATE_BPS must be 500 BPS = 5% (§4.4)"
+    );
+    assert_eq!(
+        DEGRADED_BLOCK_DRIFT, 5,
+        "DEGRADED_BLOCK_DRIFT must be 5 blocks (§6.5)"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +219,10 @@ fn provider_config_scale_round_trip() {
     let encoded = original.encode();
     let decoded = ProviderConfig::decode(&mut &encoded[..])
         .expect("ProviderConfig must decode without error");
-    assert_eq!(original, decoded, "SCALE round-trip must preserve all fields");
+    assert_eq!(
+        original, decoded,
+        "SCALE round-trip must preserve all fields"
+    );
 }
 
 // ---------------------------------------------------------------------------

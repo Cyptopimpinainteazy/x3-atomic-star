@@ -27,18 +27,18 @@
 
 pub mod asset;
 pub mod identity;
-pub mod treasury;
 /// Drift detection between on-chain canonical truth and a surface-observed snapshot.
 ///
 /// Only compiled when the `std` feature is enabled (service-side use).
 #[cfg(feature = "std")]
 pub mod sync;
+pub mod treasury;
 
 pub use asset::*;
 pub use identity::*;
-pub use treasury::*;
 #[cfg(feature = "std")]
 pub use sync::*;
+pub use treasury::*;
 
 #[cfg(test)]
 mod tests;

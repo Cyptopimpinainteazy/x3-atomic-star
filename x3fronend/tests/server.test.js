@@ -62,6 +62,71 @@ test("reservation writes update the authoritative store", async () => {
   });
 });
 
+test("funding application create and list works", async () => {
+  await withTempStore(async ({ rootDir, storePath, seedPath }) => {
+    const services = createSiteServices({ rootDir, storePath, seedPath });
+    const application = await services.createFundingApplication({
+      projectName: "Quantum Router Upgrade",
+      organization: "Nova Research",
+      contactEmail: "hello@x3atomicstar.org",
+      fundingLane: "Post-Quantum Security",
+      requestedUsd: 250000,
+      summary: "Proof-of-concept for post-quantum validator signatures.",
+    });
+    assert.equal(application.projectName, "Quantum Router Upgrade");
+    assert.equal(application.status, "submitted");
+    assert.equal(application.requestedUsd, 250000);
+
+    const applications = await services.getFundingApplications();
+    assert.equal(applications.data.applications[0].id, application.id);
+    assert.equal(applications.data.applications[0].status, "submitted");
+  });
+});
+
+test("funding intake create and list works", async () => {
+  await withTempStore(async ({ rootDir, storePath, seedPath }) => {
+    const services = createSiteServices({ rootDir, storePath, seedPath });
+    const intake = await services.createFundingIntake({
+      company: "Apex Capital",
+      contactEmail: "ops@apex.capital",
+      fundingLane: "AI Infrastructure",
+      summary: "Cloud infrastructure cost and node hosting proposal.",
+    });
+    assert.equal(intake.company, "Apex Capital");
+    assert.equal(intake.status, "submitted");
+
+    const intakes = await services.listFundingIntakes();
+    assert.equal(intakes.data.intakes[0].id, intake.id);
+    assert.equal(intakes.data.intakes[0].contactEmail, "ops@apex.capital");
+  });
+});
+
+test("funding intake update patches status and appends reviewer notes", async () => {
+  await withTempStore(async ({ rootDir, storePath, seedPath }) => {
+    const services = createSiteServices({ rootDir, storePath, seedPath });
+    const intake = await services.createFundingIntake({
+      company: "Nova Fund",
+      contactEmail: "hello@novafund.io",
+      fundingLane: "Validator Growth",
+      summary: "Strategic validator seat acquisition.",
+    });
+    assert.equal(intake.status, "submitted");
+
+    const updated = await services.updateFundingIntake(intake.id, {
+      status: "approved",
+      reviewerNotes: "Strong team, good traction.",
+    });
+    assert.equal(updated.status, "approved");
+    assert.ok(updated.reviewerNotes.includes("Strong team, good traction."));
+
+    const second = await services.updateFundingIntake(intake.id, {
+      reviewerNotes: "Follow-up: confirm node count.",
+    });
+    assert.equal(second.reviewerNotes.length, 2);
+    assert.equal(second.reviewerNotes[1], "Follow-up: confirm node count.");
+  });
+});
+
 test("http server serves api contracts", async () => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));

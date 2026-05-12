@@ -309,11 +309,7 @@ fn activate_fails_when_expired() {
         // At block 5: `5 < 5` is false, so the record is considered expired.
         System::set_block_number(5);
         assert_noop!(
-            Invariants::activate_kill_switch(
-                RuntimeOrigin::signed(account_id),
-                module_id,
-                None,
-            ),
+            Invariants::activate_kill_switch(RuntimeOrigin::signed(account_id), module_id, None,),
             Error::<Test>::AuthorityExpired
         );
     });
@@ -345,11 +341,7 @@ fn activate_fails_wrong_origin() {
 
         // Account 99 is not the registered authority; its hash won't match.
         assert_noop!(
-            Invariants::activate_kill_switch(
-                RuntimeOrigin::signed(99u64),
-                module_id,
-                None,
-            ),
+            Invariants::activate_kill_switch(RuntimeOrigin::signed(99u64), module_id, None,),
             Error::<Test>::NotTheRegisteredAuthority
         );
     });

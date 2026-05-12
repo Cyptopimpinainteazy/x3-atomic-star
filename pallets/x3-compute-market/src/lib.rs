@@ -215,13 +215,8 @@ pub mod pallet {
     /// Staked balance per provider.
     #[pallet::storage]
     #[pallet::getter(fn provider_stake)]
-    pub type ProviderStake<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId,
-        u128,
-        ValueQuery,
-    >;
+    pub type ProviderStake<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u128, ValueQuery>;
 
     /// Running total of compute revenue across all sessions.
     #[pallet::storage]
@@ -261,7 +256,10 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// A provider staked tokens to qualify for listing.
-        ProviderStaked { provider: T::AccountId, amount: u128 },
+        ProviderStaked {
+            provider: T::AccountId,
+            amount: u128,
+        },
         /// A new compute listing was created.
         ListingCreated {
             listing_id: ListingId,
@@ -271,9 +269,15 @@ pub mod pallet {
             capacity_units: u32,
         },
         /// A listing was paused by its provider.
-        ListingPaused { listing_id: ListingId, provider: T::AccountId },
+        ListingPaused {
+            listing_id: ListingId,
+            provider: T::AccountId,
+        },
         /// A listing was resumed by its provider.
-        ListingResumed { listing_id: ListingId, provider: T::AccountId },
+        ListingResumed {
+            listing_id: ListingId,
+            provider: T::AccountId,
+        },
         /// A compute session was started by a renter.
         SessionStarted {
             session_id: SessionId,
@@ -282,13 +286,23 @@ pub mod pallet {
             expiry_block: BlockNumberFor<T>,
         },
         /// A session was completed and payment calculated.
-        SessionCompleted { session_id: SessionId, provider: T::AccountId, total_paid: u128 },
+        SessionCompleted {
+            session_id: SessionId,
+            provider: T::AccountId,
+            total_paid: u128,
+        },
         /// A session expired via on_initialize without being completed.
         SessionExpired { session_id: SessionId },
         /// A renter opened a dispute on their session.
-        SessionDisputed { session_id: SessionId, renter: T::AccountId },
+        SessionDisputed {
+            session_id: SessionId,
+            renter: T::AccountId,
+        },
         /// A governance origin resolved a dispute.
-        DisputeResolved { session_id: SessionId, renter_wins: bool },
+        DisputeResolved {
+            session_id: SessionId,
+            renter_wins: bool,
+        },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────────
@@ -324,8 +338,9 @@ pub mod pallet {
             let mut reads: u64 = 1;
             let mut writes: u64 = 0;
 
-            let expired_ids: sp_std::vec::Vec<SessionId> =
-                ExpiryQueue::<T>::iter_prefix(now).map(|(id, _)| id).collect();
+            let expired_ids: sp_std::vec::Vec<SessionId> = ExpiryQueue::<T>::iter_prefix(now)
+                .map(|(id, _)| id)
+                .collect();
 
             for session_id in &expired_ids {
                 reads += 1;
@@ -333,11 +348,8 @@ pub mod pallet {
                     if session.status == SessionStatus::Active {
                         session.status = SessionStatus::Expired;
                         // Decrement listing active_sessions count.
-                        if let Some(mut listing) =
-                            ComputeListings::<T>::get(session.listing_id)
-                        {
-                            listing.active_sessions =
-                                listing.active_sessions.saturating_sub(1);
+                        if let Some(mut listing) = ComputeListings::<T>::get(session.listing_id) {
+                            listing.active_sessions = listing.active_sessions.saturating_sub(1);
                             ComputeListings::<T>::insert(session.listing_id, &listing);
                             writes += 1;
                         }
@@ -374,7 +386,10 @@ pub mod pallet {
             ProviderStake::<T>::mutate(&who, |stake| {
                 *stake = stake.saturating_add(amount);
             });
-            Self::deposit_event(Event::ProviderStaked { provider: who, amount });
+            Self::deposit_event(Event::ProviderStaked {
+                provider: who,
+                amount,
+            });
             Ok(())
         }
 
@@ -452,7 +467,10 @@ pub mod pallet {
                 Ok(())
             })?;
 
-            Self::deposit_event(Event::ListingPaused { listing_id, provider: who });
+            Self::deposit_event(Event::ListingPaused {
+                listing_id,
+                provider: who,
+            });
             Ok(())
         }
 
@@ -473,7 +491,10 @@ pub mod pallet {
                 Ok(())
             })?;
 
-            Self::deposit_event(Event::ListingResumed { listing_id, provider: who });
+            Self::deposit_event(Event::ListingResumed {
+                listing_id,
+                provider: who,
+            });
             Ok(())
         }
 
@@ -498,8 +519,7 @@ pub mod pallet {
                         (T::AccountId, ComputeTier, u128, BlockNumberFor<T>),
                         DispatchError,
                     > {
-                        let listing =
-                            maybe_listing.as_mut().ok_or(Error::<T>::ListingNotFound)?;
+                        let listing = maybe_listing.as_mut().ok_or(Error::<T>::ListingNotFound)?;
                         ensure!(
                             listing.status == ListingStatus::Active,
                             Error::<T>::ListingNotActive
@@ -508,8 +528,7 @@ pub mod pallet {
                             listing.active_sessions < listing.capacity_units,
                             Error::<T>::CapacityFull
                         );
-                        listing.active_sessions =
-                            listing.active_sessions.saturating_add(1);
+                        listing.active_sessions = listing.active_sessions.saturating_add(1);
                         let now = frame_system::Pallet::<T>::block_number();
                         let expiry = now.saturating_add(duration_blocks);
                         Ok((
@@ -573,8 +592,7 @@ pub mod pallet {
             let total_paid = ActiveSessions::<T>::try_mutate(
                 session_id,
                 |maybe_session| -> Result<u128, DispatchError> {
-                    let session =
-                        maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
+                    let session = maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
                     ensure!(
                         session.status == SessionStatus::Active,
                         Error::<T>::SessionNotActive
@@ -588,11 +606,8 @@ pub mod pallet {
                     let now = frame_system::Pallet::<T>::block_number();
                     let blocks_used = now.saturating_sub(session.start_block);
                     // BlockNumber is a u64 in the mock; saturated cast to u128.
-                    let blocks_u128 = TryInto::<u128>::try_into(blocks_used)
-                        .unwrap_or(u128::MAX);
-                    let paid = session
-                        .price_per_block
-                        .saturating_mul(blocks_u128);
+                    let blocks_u128 = TryInto::<u128>::try_into(blocks_used).unwrap_or(u128::MAX);
+                    let paid = session.price_per_block.saturating_mul(blocks_u128);
                     session.total_paid = paid;
                     session.status = SessionStatus::Completed;
                     Ok(paid)
@@ -607,10 +622,8 @@ pub mod pallet {
             // Update listing earnings and active_sessions count.
             ComputeListings::<T>::try_mutate(listing_id, |maybe_listing| -> DispatchResult {
                 if let Some(listing) = maybe_listing.as_mut() {
-                    listing.total_earned =
-                        listing.total_earned.saturating_add(total_paid);
-                    listing.active_sessions =
-                        listing.active_sessions.saturating_sub(1);
+                    listing.total_earned = listing.total_earned.saturating_add(total_paid);
+                    listing.active_sessions = listing.active_sessions.saturating_sub(1);
                 }
                 Ok(())
             })?;
@@ -635,22 +648,21 @@ pub mod pallet {
         pub fn dispute_session(origin: OriginFor<T>, session_id: SessionId) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ActiveSessions::<T>::try_mutate(
-                session_id,
-                |maybe_session| -> DispatchResult {
-                    let session =
-                        maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
-                    ensure!(
-                        session.status == SessionStatus::Active,
-                        Error::<T>::SessionNotActive
-                    );
-                    ensure!(session.renter == who, Error::<T>::NotListingOwner);
-                    session.status = SessionStatus::Disputed;
-                    Ok(())
-                },
-            )?;
+            ActiveSessions::<T>::try_mutate(session_id, |maybe_session| -> DispatchResult {
+                let session = maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
+                ensure!(
+                    session.status == SessionStatus::Active,
+                    Error::<T>::SessionNotActive
+                );
+                ensure!(session.renter == who, Error::<T>::NotListingOwner);
+                session.status = SessionStatus::Disputed;
+                Ok(())
+            })?;
 
-            Self::deposit_event(Event::SessionDisputed { session_id, renter: who });
+            Self::deposit_event(Event::SessionDisputed {
+                session_id,
+                renter: who,
+            });
             Ok(())
         }
 
@@ -670,8 +682,7 @@ pub mod pallet {
             let total_paid = ActiveSessions::<T>::try_mutate(
                 session_id,
                 |maybe_session| -> Result<u128, DispatchError> {
-                    let session =
-                        maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
+                    let session = maybe_session.as_mut().ok_or(Error::<T>::SessionNotFound)?;
                     ensure!(
                         session.status == SessionStatus::Disputed,
                         Error::<T>::SessionNotActive
@@ -685,8 +696,8 @@ pub mod pallet {
                         // Provider wins: compute full payment.
                         let now = frame_system::Pallet::<T>::block_number();
                         let blocks_used = now.saturating_sub(session.start_block);
-                        let blocks_u128 = TryInto::<u128>::try_into(blocks_used)
-                            .unwrap_or(u128::MAX);
+                        let blocks_u128 =
+                            TryInto::<u128>::try_into(blocks_used).unwrap_or(u128::MAX);
                         let paid = session.price_per_block.saturating_mul(blocks_u128);
                         session.total_paid = paid;
                         session.status = SessionStatus::Completed;
@@ -704,8 +715,7 @@ pub mod pallet {
                             if let Some(listing) = maybe_listing.as_mut() {
                                 listing.total_earned =
                                     listing.total_earned.saturating_add(total_paid);
-                                listing.active_sessions =
-                                    listing.active_sessions.saturating_sub(1);
+                                listing.active_sessions = listing.active_sessions.saturating_sub(1);
                             }
                             Ok(())
                         },
@@ -721,8 +731,7 @@ pub mod pallet {
                         session.listing_id,
                         |maybe_listing| -> DispatchResult {
                             if let Some(listing) = maybe_listing.as_mut() {
-                                listing.active_sessions =
-                                    listing.active_sessions.saturating_sub(1);
+                                listing.active_sessions = listing.active_sessions.saturating_sub(1);
                             }
                             Ok(())
                         },
@@ -730,7 +739,10 @@ pub mod pallet {
                 }
             }
 
-            Self::deposit_event(Event::DisputeResolved { session_id, renter_wins });
+            Self::deposit_event(Event::DisputeResolved {
+                session_id,
+                renter_wins,
+            });
             Ok(())
         }
     }

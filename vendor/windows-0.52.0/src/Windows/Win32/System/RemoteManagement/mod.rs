@@ -2546,7 +2546,7 @@ impl ::core::clone::Clone for WSMAN_ENVIRONMENT_VARIABLE {
 }
 impl ::core::fmt::Debug for WSMAN_ENVIRONMENT_VARIABLE {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("WSMAN_ENVIRONMENT_VARIABLE").field("name", &self.name).field("value", &self.value).finish()
+        f.debug_struct("WSMAN_ENVIRONMENT_VAVIABLE").field("name", &self.name).field("value", &self.value).finish()
     }
 }
 impl ::windows_core::TypeKind for WSMAN_ENVIRONMENT_VARIABLE {

@@ -51,7 +51,7 @@ pub mod weights;
 pub use weights::WeightInfo;
 
 pub mod determinism;
-pub use determinism::{DeterminismTier, TaskDeterminismSpec, verify_deterministic_output};
+pub use determinism::{verify_deterministic_output, DeterminismTier, TaskDeterminismSpec};
 
 #[cfg(test)]
 mod mock;
@@ -68,8 +68,9 @@ pub mod pallet {
         Blake2_128Concat,
     };
     use frame_system::pallet_prelude::*;
+    use pallet_x3_invariants;
     use sp_core::H256;
-    use sp_runtime::traits::{BlakeTwo256, Hash, Saturating, Zero};
+    use sp_runtime::traits::{BlakeTwo256, Hash, Saturating, SaturatedConversion, Zero};
     use sp_std::prelude::*;
 
     type BalanceOf<T> =
@@ -89,7 +90,7 @@ pub mod pallet {
     // ========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config<RuntimeEvent: From<Event<Self>>> {
+    pub trait Config: frame_system::Config<RuntimeEvent: From<Event<Self>>> + pallet_x3_invariants::Config {
         /// Currency for staking, rewards, and slashing.
         type Currency: ReservableCurrency<Self::AccountId>;
 
@@ -365,6 +366,20 @@ pub mod pallet {
         },
         /// Task timed out.
         TaskTimedOut { task_id: TaskId },
+        /// Agent budget was successfully deducted.
+        CapabilityBudgetDeducted {
+            agent: T::AccountId,
+            amount: BalanceOf<T>,
+            remaining: BalanceOf<T>,
+        },
+        /// Capability budget validation failed.
+        CapabilityBudgetExceeded {
+            agent: T::AccountId,
+            amount: BalanceOf<T>,
+            available: BalanceOf<T>,
+        },
+        /// Kill-switch prevented capability execution.
+        CapabilityKillSwitchHit { agent: T::AccountId },
     }
 
     // ========================================================================
@@ -425,22 +440,6 @@ pub mod pallet {
         BudgetExceeded,
         /// Agent capability revoked or not found.
         CapabilityRevoked,
-        /// Agent budget was successfully deducted.
-        CapabilityBudgetDeducted {
-            agent: T::AccountId,
-            amount: BalanceOf<T>,
-            remaining: BalanceOf<T>,
-        },
-        /// Capability budget validation failed.
-        CapabilityBudgetExceeded {
-            agent: T::AccountId,
-            amount: BalanceOf<T>,
-            available: BalanceOf<T>,
-        },
-        /// Kill-switch prevented capability execution.
-        CapabilityKillSwitchHit {
-            agent: T::AccountId,
-        },
         /// Kill-switch activated for this agent.
         KillSwitchActive,
     }
@@ -498,7 +497,7 @@ pub mod pallet {
 
         /// Register as a GPU contributor with a stake.
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::register_contributor())]
+        #[pallet::weight(<T as Config>::WeightInfo::register_contributor())]
         pub fn register_contributor(
             origin: OriginFor<T>,
             stake: BalanceOf<T>,
@@ -558,7 +557,7 @@ pub mod pallet {
 
         /// Begin deregistration (starts unstaking cooldown).
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::deregister_contributor())]
+        #[pallet::weight(<T as Config>::WeightInfo::deregister_contributor())]
         pub fn request_deregister(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let contributor_id =
@@ -589,7 +588,7 @@ pub mod pallet {
 
         /// Complete deregistration after cooldown and return stake.
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::deregister_contributor())]
+        #[pallet::weight(<T as Config>::WeightInfo::deregister_contributor())]
         pub fn complete_deregister(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let contributor_id =
@@ -632,7 +631,7 @@ pub mod pallet {
 
         /// Submit a liveness heartbeat.
         #[pallet::call_index(3)]
-        #[pallet::weight(T::WeightInfo::heartbeat())]
+        #[pallet::weight(<T as Config>::WeightInfo::heartbeat())]
         pub fn heartbeat(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let contributor_id =
@@ -663,7 +662,7 @@ pub mod pallet {
 
         /// Submit a compute task. Reward is reserved from submitter's balance.
         #[pallet::call_index(4)]
-        #[pallet::weight(T::WeightInfo::submit_task())]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_task())]
         pub fn submit_task(
             origin: OriginFor<T>,
             workload_type: WorkloadType,
@@ -723,7 +722,7 @@ pub mod pallet {
 
         /// Contributor claims a pending task.
         #[pallet::call_index(5)]
-        #[pallet::weight(T::WeightInfo::claim_task())]
+        #[pallet::weight(<T as Config>::WeightInfo::claim_task())]
         pub fn claim_task(origin: OriginFor<T>, task_id: TaskId) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let contributor_id =
@@ -738,6 +737,14 @@ pub mod pallet {
 
             // Check active task limit
             let active = ContributorActiveTasks::<T>::get(contributor_id);
+            if active >= T::MaxTasksPerContributor::get() {
+                pallet_x3_invariants::Pallet::<T>::report_custom_invariant(
+                    frame_system::Pallet::<T>::block_number(),
+                    pallet_x3_invariants::InvariantKind::MaxTasksPerContributor,
+                    active as u128,
+                    T::MaxTasksPerContributor::get() as u128,
+                );
+            }
             ensure!(
                 active < T::MaxTasksPerContributor::get(),
                 Error::<T>::TooManyActiveTasks
@@ -784,7 +791,7 @@ pub mod pallet {
 
         /// Contributor submits task execution result.
         #[pallet::call_index(6)]
-        #[pallet::weight(T::WeightInfo::submit_result())]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_result())]
         pub fn submit_result(
             origin: OriginFor<T>,
             task_id: TaskId,
@@ -851,7 +858,7 @@ pub mod pallet {
         /// Start a jury verification session for a task result.
         /// Can be called by anyone once a result is in Verifying status.
         #[pallet::call_index(7)]
-        #[pallet::weight(T::WeightInfo::start_jury_session())]
+        #[pallet::weight(<T as Config>::WeightInfo::start_jury_session())]
         pub fn start_jury_session(origin: OriginFor<T>, task_id: TaskId) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -896,7 +903,7 @@ pub mod pallet {
 
         /// Submit a vote commitment: H(vote || nonce).
         #[pallet::call_index(8)]
-        #[pallet::weight(T::WeightInfo::commit_vote())]
+        #[pallet::weight(<T as Config>::WeightInfo::commit_vote())]
         pub fn commit_vote(
             origin: OriginFor<T>,
             session_id: SessionId,
@@ -954,7 +961,7 @@ pub mod pallet {
 
         /// Advance session to reveal phase (anyone can call after commit deadline).
         #[pallet::call_index(9)]
-        #[pallet::weight(T::WeightInfo::commit_vote())]
+        #[pallet::weight(<T as Config>::WeightInfo::commit_vote())]
         pub fn advance_to_reveal(origin: OriginFor<T>, session_id: SessionId) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -979,7 +986,7 @@ pub mod pallet {
 
         /// Reveal a vote with the original vote and nonce.
         #[pallet::call_index(10)]
-        #[pallet::weight(T::WeightInfo::reveal_vote())]
+        #[pallet::weight(<T as Config>::WeightInfo::reveal_vote())]
         pub fn reveal_vote(
             origin: OriginFor<T>,
             session_id: SessionId,
@@ -1051,7 +1058,7 @@ pub mod pallet {
         /// Finalize a jury session after the reveal deadline.
         /// Distributes rewards or slashes based on the verdict.
         #[pallet::call_index(11)]
-        #[pallet::weight(T::WeightInfo::finalize_session())]
+        #[pallet::weight(<T as Config>::WeightInfo::finalize_session())]
         pub fn finalize_session(origin: OriginFor<T>, session_id: SessionId) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -1153,7 +1160,7 @@ pub mod pallet {
 
         /// Cancel a pending task. Only the submitter can cancel.
         #[pallet::call_index(12)]
-        #[pallet::weight(T::WeightInfo::cancel_task())]
+        #[pallet::weight(<T as Config>::WeightInfo::cancel_task())]
         pub fn cancel_task(origin: OriginFor<T>, task_id: TaskId) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -1181,7 +1188,7 @@ pub mod pallet {
 
         /// Mark a task as timed out. Anyone can call after the deadline.
         #[pallet::call_index(13)]
-        #[pallet::weight(T::WeightInfo::cancel_task())]
+        #[pallet::weight(<T as Config>::WeightInfo::cancel_task())]
         pub fn timeout_task(origin: OriginFor<T>, task_id: TaskId) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -1219,7 +1226,7 @@ pub mod pallet {
 
         /// Slash a contributor (governance action).
         #[pallet::call_index(14)]
-        #[pallet::weight(T::WeightInfo::slash_contributor())]
+        #[pallet::weight(<T as Config>::WeightInfo::slash_contributor())]
         pub fn slash_contributor(
             origin: OriginFor<T>,
             contributor_id: ContributorId,
@@ -1349,7 +1356,8 @@ pub mod pallet {
             amount: BalanceOf<T>,
         ) -> DispatchResult {
             AgentCapabilities::<T>::try_mutate(agent, |maybe_envelope| -> DispatchResult {
-                let envelope = maybe_envelope.as_mut()
+                let envelope = maybe_envelope
+                    .as_mut()
                     .ok_or(Error::<T>::CapabilityRevoked)?;
 
                 // Check kill-switch
@@ -1402,7 +1410,9 @@ pub mod pallet {
             observed: u128,
             bound: u128,
         ) {
-            pallet_x3_invariants::Pallet::<T>::report_custom_invariant(block, invariant, observed, bound);
+            pallet_x3_invariants::Pallet::<T>::report_custom_invariant(
+                block, invariant, observed, bound,
+            );
         }
     }
 }

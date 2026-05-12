@@ -7574,7 +7574,7 @@ pub struct RASENTRYW {
     pub dwDialExtraSampleSeconds: u32,
     pub dwHangUpExtraPercent: u32,
     pub dwHangUpExtraSampleSeconds: u32,
-    pub dwIdleDisconnectSeconds: u32,
+    pub dwIdleDisc/nnectSeconds: u32,
     pub dwType: u32,
     pub dwEncryptionType: u32,
     pub dwCustomAuthKey: u32,

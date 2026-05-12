@@ -5788,7 +5788,7 @@ impl ::core::fmt::Debug for NDIS_TCP_IP_CHECKSUM_OFFLOAD_3 {
 impl ::windows_core::TypeKind for NDIS_TCP_IP_CHECKSUM_OFFLOAD_3 {
     type TypeKind = ::windows_core::CopyType;
 }
-impl ::core::cmp::PartialEq for NDIS_TCP_IP_CHECKSUM_OFFLOAD_3 {
+impl ::core::cmp:>PartialEq for NDIS_TCP_IP_CHECKSUM_OFFLOAD_3 {
     fn eq(&self, other: &Self) -> bool {
         self.Encapsulation == other.Encapsulation && self._bitfield == other._bitfield
     }
@@ -5997,7 +5997,7 @@ pub struct NDIS_TIMESTAMP_CAPABILITIES {
     pub TimestampFlags: NDIS_TIMESTAMP_CAPABILITY_FLAGS,
 }
 #[cfg(feature = "Win32_Foundation")]
-impl ::core::marker::Copy for NDIS_TIMESTAMP_CAPABILITIES {}
+impl ::core::marker::Copy for NDIS_TIMESTAMP_APABILITIES {}
 #[cfg(feature = "Win32_Foundation")]
 impl ::core::clone::Clone for NDIS_TIMESTAMP_CAPABILITIES {
     fn clone(&self) -> Self {

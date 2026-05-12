@@ -22,6 +22,7 @@ All services are configured to start automatically on system reboot via systemd:
 ```bash
 # User-level systemd services (no sudo needed)
 ~/.config/systemd/user/x3-desktop.service
+~/.config/systemd/user/x3fronend.service
 ~/.config/systemd/user/cloudflared-tunnel.service
 ~/.config/systemd/user/x3-chain-node.service
 ```
@@ -32,9 +33,27 @@ All services are configured to start automatically on system reboot via systemd:
 2. loginctl enable-linger ensures user session persists
 3. Services start in order:
    - x3-desktop starts first (port 5173)
-   - cloudflared-tunnel starts after (waits for desktop)
+   - x3fronend starts next (port 4174)
+   - cloudflared-tunnel starts after (waits for both frontends)
    - x3-chain-node starts independently (skips if binary missing)
-4. All services auto-restart if they crash (10-30s backoff)
+4. All services auto-restart if they crash (10s backoff)
+
+### Service Unit Templates
+
+Copy or symlink the provided templates into `~/.config/systemd/user/`:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp scripts/systemd/x3-desktop.service ~/.config/systemd/user/
+cp scripts/systemd/x3fronend.service ~/.config/systemd/user/
+cp scripts/systemd/cloudflared-tunnel.service ~/.config/systemd/user/
+```
+
+Then reload user systemd units:
+
+```bash
+systemctl --user daemon-reload
+```
 
 ### Verify Auto-Start is Enabled
 
@@ -84,14 +103,31 @@ systemctl --user enable x3-desktop.service
 systemctl --user disable x3-desktop.service
 ```
 
+### Local development without Cloudflare
+
+When debugging the desktop or HTML frontend, use the direct local URLs instead of the public Cloudflare domain:
+
+- Desktop app: http://localhost:5173
+- HTML site: http://127.0.0.1:4174
+
+This avoids Cloudflare Rocket Loader and CSP-related interference during development.
+
+To start both local frontends together:
+
+```bash
+chmod +x scripts/dev-local.sh
+./scripts/dev-local.sh
+```
+
 ---
 
 ## 🔗 Tunnel Routing
 
-The cloudflared tunnel routes all traffic from x3star.net to local services:
+The cloudflared tunnel routes all traffic from x3star.net and x3star.org to local services:
 
 ```
-x3star.net:443  ──→  localhost:5173  (x3-desktop)
+x3star.net:443  ──→  localhost:4174  (x3fronend HTML site)
+x3star.org:443  ──→  localhost:5173  (x3-desktop)
 rpc.x3star.net  ──→  localhost:9933  (Substrate RPC HTTP)
 ws.x3star.net   ──→  localhost:9944  (Substrate RPC WS)
 ```
@@ -107,13 +143,19 @@ ws.x3star.net   ──→  localhost:9944  (Substrate RPC WS)
 - **Port:** 5173
 - **WorkDir:** apps/x3-desktop
 - **Memory:** 4GB max
-- **Restart:** every 10s on crash
+- **Restart:** always, 10s delay on crash
+
+### x3fronend.service
+- **Command:** `PORT=4174 npm run server`
+- **Port:** 4174
+- **WorkDir:** x3fronend
+- **Restart:** always, 10s delay on crash
 
 ### cloudflared-tunnel.service
-- **Command:** `cloudflared tunnel run atlas-sphere`
+- **Command:** `cloudflared --config ~/.cloudflared/config.yml tunnel run atlas-sphere`
 - **Tunnel ID:** 6c118620-18cf-4795-80a8-6d44d37aecaa
-- **Depends On:** x3-desktop
-- **Restart:** every 10s on crash
+- **Depends On:** x3-desktop, x3fronend
+- **Restart:** always, 10s delay on crash
 
 ### x3-chain-node.service
 - **Command:** `x3-chain-node --dev --rpc-external --ws-external`
@@ -194,6 +236,7 @@ After system reboot:
 
 **Accessed at:**
 - 🌐 https://x3star.net (Tauri desktop app)
+- 🌐 https://x3star.org (HTML site)
 - 🔗 https://rpc.x3star.net (Substrate HTTP RPC)
 - 🌊 wss://ws.x3star.net (Substrate WebSocket RPC)
 

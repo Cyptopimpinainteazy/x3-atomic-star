@@ -873,10 +873,12 @@ pub fn run() -> CliResult<()> {
             runner.run_node_until_exit(|config| async move {
                 let role = config.role.clone();
                 info!("Starting X3 Chain node as {:?}", role);
-                service::new_full::<sc_network::NetworkWorker<_, _>>(config, feature_flags).map_err(|e| {
-                    error!("X3 Chain node terminated with an error: {e}");
-                    CliError::Service(e)
-                })
+                service::new_full::<sc_network::NetworkWorker<_, _>>(config, feature_flags).map_err(
+                    |e| {
+                        error!("X3 Chain node terminated with an error: {e}");
+                        CliError::Service(e)
+                    },
+                )
             })
         }
     }

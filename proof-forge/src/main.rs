@@ -556,7 +556,12 @@ async fn main() -> Result<()> {
             match command {
                 None => {
                     // Default: run full feature gate
-                    feature_proof::run_feature_gate(&cli.workspace, strict, fail_hard, cli.verbose)?;
+                    feature_proof::run_feature_gate(
+                        &cli.workspace,
+                        strict,
+                        fail_hard,
+                        cli.verbose,
+                    )?;
                 }
                 Some(FeaturesCommand::List) => {
                     run_features_list(&cli.workspace, cli.verbose)?;

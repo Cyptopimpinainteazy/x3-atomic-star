@@ -16,6 +16,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use sc_network_types::PeerId as SntPeerId;
+
 use crate::{
 	peerset::DropReason,
 	protocol::notifications::handler::{
@@ -49,6 +51,18 @@ use std::{
 	task::{Context, Poll},
 	time::{Duration, Instant},
 };
+
+/// Convert a `libp2p::PeerId` to `sc_network_types::PeerId` via the stable byte representation.
+#[inline(always)]
+fn to_snt(p: libp2p::PeerId) -> SntPeerId {
+	SntPeerId::from_bytes(&p.to_bytes()).expect("libp2p PeerId bytes are always valid")
+}
+
+/// Convert a `sc_network_types::PeerId` to `libp2p::PeerId` via the stable byte representation.
+#[inline(always)]
+fn from_snt(p: SntPeerId) -> libp2p::PeerId {
+	libp2p::PeerId::from_bytes(&p.to_bytes()).expect("sc_network_types PeerId bytes are always valid")
+}
 
 /// Network behaviour that handles opening substreams for custom protocols with other peers.
 ///
@@ -439,7 +453,7 @@ impl Notifications {
 			// DisabledPendingEnable => Disabled.
 			PeerState::DisabledPendingEnable { connections, timer_deadline, timer: _ } => {
 				trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-				self.peerset.dropped(set_id, *peer_id, DropReason::Unknown);
+				self.peerset.dropped(set_id, to_snt(*peer_id), DropReason::Unknown);
 				*entry.into_mut() =
 					PeerState::Disabled { connections, backoff_until: Some(timer_deadline) }
 			},
@@ -449,7 +463,7 @@ impl Notifications {
 			// If relevant, the external API is instantly notified.
 			PeerState::Enabled { mut connections } => {
 				trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-				self.peerset.dropped(set_id, *peer_id, DropReason::Unknown);
+				self.peerset.dropped(set_id, to_snt(*peer_id), DropReason::Unknown);
 
 				if connections.iter().any(|(_, s)| matches!(s, ConnectionState::Open(_))) {
 					trace!(target: "sub-libp2p", "External API <= Closed({}, {:?})", peer_id, set_id);
@@ -540,7 +554,7 @@ impl Notifications {
 	pub fn reserved_peers(
 		&self,
 		set_id: crate::peerset::SetId,
-		pending_response: oneshot::Sender<Vec<PeerId>>,
+		pending_response: oneshot::Sender<Vec<SntPeerId>>,
 	) {
 		self.peerset.reserved_peers(set_id, pending_response);
 	}
@@ -855,7 +869,7 @@ impl Notifications {
 				_ => {
 					trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})",
 						incoming.peer_id, incoming.set_id);
-					self.peerset.dropped(incoming.set_id, incoming.peer_id, DropReason::Unknown);
+					self.peerset.dropped(incoming.set_id, to_snt(incoming.peer_id), DropReason::Unknown);
 				},
 			}
 			return
@@ -1193,7 +1207,7 @@ impl NetworkBehaviour for Notifications {
 
 							if connections.is_empty() {
 								trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-								self.peerset.dropped(set_id, peer_id, DropReason::Unknown);
+								self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Unknown);
 								*entry.get_mut() = PeerState::Backoff { timer, timer_deadline };
 							} else {
 								*entry.get_mut() = PeerState::DisabledPendingEnable {
@@ -1347,7 +1361,7 @@ impl NetworkBehaviour for Notifications {
 
 							if connections.is_empty() {
 								trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-								self.peerset.dropped(set_id, peer_id, DropReason::Unknown);
+								self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Unknown);
 								let ban_dur = Uniform::new(5, 10).sample(&mut rand::thread_rng());
 
 								let delay_id = self.next_delay_id;
@@ -1369,7 +1383,7 @@ impl NetworkBehaviour for Notifications {
 								matches!(s, ConnectionState::Opening | ConnectionState::Open(_))
 							}) {
 								trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-								self.peerset.dropped(set_id, peer_id, DropReason::Unknown);
+								self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Unknown);
 
 								*entry.get_mut() =
 									PeerState::Disabled { connections, backoff_until: None };
@@ -1417,7 +1431,7 @@ impl NetworkBehaviour for Notifications {
 								st @ PeerState::Requested |
 								st @ PeerState::PendingRequest { .. } => {
 									trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-									self.peerset.dropped(set_id, peer_id, DropReason::Unknown);
+									self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Unknown);
 
 									let now = Instant::now();
 									let ban_duration = match st {
@@ -1589,7 +1603,7 @@ impl NetworkBehaviour for Notifications {
 
 								trace!(target: "sub-libp2p", "PSM <= Incoming({}, {:?}, {:?}).",
 									peer_id, set_id, incoming_id);
-								self.peerset.incoming(set_id, peer_id, incoming_id);
+								self.peerset.incoming(set_id, to_snt(peer_id), incoming_id);
 								self.incoming.push(IncomingPeer {
 									peer_id,
 									set_id,
@@ -1745,7 +1759,7 @@ impl NetworkBehaviour for Notifications {
 								.any(|(_, s)| matches!(s, ConnectionState::Opening))
 							{
 								trace!(target: "sub-libp2p", "PSM <= Dropped({}, {:?})", peer_id, set_id);
-								self.peerset.dropped(set_id, peer_id, DropReason::Refused);
+								self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Refused);
 								*entry.into_mut() =
 									PeerState::Disabled { connections, backoff_until: None };
 							} else {
@@ -1919,7 +1933,7 @@ impl NetworkBehaviour for Notifications {
 							matches!(s, ConnectionState::Opening | ConnectionState::Open(_))
 						}) {
 							trace!(target: "sub-libp2p", "PSM <= Dropped({:?}, {:?})", peer_id, set_id);
-							self.peerset.dropped(set_id, peer_id, DropReason::Refused);
+							self.peerset.dropped(set_id, to_snt(peer_id), DropReason::Refused);
 
 							let ban_dur = Uniform::new(5, 10).sample(&mut rand::thread_rng());
 							*entry.into_mut() = PeerState::Disabled {
@@ -2020,10 +2034,10 @@ impl NetworkBehaviour for Notifications {
 					self.peerset_report_reject(index);
 				},
 				Poll::Ready(Some(crate::peerset::Message::Connect { peer_id, set_id, .. })) => {
-					self.peerset_report_connect(peer_id, set_id);
+					self.peerset_report_connect(from_snt(peer_id), set_id);
 				},
 				Poll::Ready(Some(crate::peerset::Message::Drop { peer_id, set_id, .. })) => {
-					self.peerset_report_disconnect(peer_id, set_id);
+					self.peerset_report_disconnect(from_snt(peer_id), set_id);
 				},
 				Poll::Ready(None) => {
 					error!(target: "sub-libp2p", "Peerset receiver stream has returned None");
@@ -3759,7 +3773,7 @@ mod tests {
 
 		notif.peerset_report_connect(peer, set_id);
 
-		let prev_instant =
+		let prev_instant = {
 			if let Some(PeerState::DisabledPendingEnable {
 				ref connections, timer_deadline, ..
 			}) = notif.peers.get(&(peer, set_id))
@@ -3803,7 +3817,6 @@ mod tests {
 		{
 			panic!("backoff peer was not removed in time");
 		}
-	}
 	}
 
 	#[test]

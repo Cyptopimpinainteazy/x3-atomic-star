@@ -37,7 +37,8 @@ pub struct PrecompileGas {
 impl PrecompileGas {
     pub fn compute(&self, input_len: usize) -> u64 {
         let words = (input_len as u64 + 31) / 32;
-        self.base.saturating_add(self.per_word.saturating_mul(words))
+        self.base
+            .saturating_add(self.per_word.saturating_mul(words))
     }
 }
 
@@ -217,7 +218,10 @@ mod tests {
     fn test_cross_vm_precompile_valid_call() {
         let reg = PrecompileRegistry::new();
         let input = [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02];
-        let result = reg.call(&x3_cross_addr(), &input, 100_000).unwrap().unwrap();
+        let result = reg
+            .call(&x3_cross_addr(), &input, 100_000)
+            .unwrap()
+            .unwrap();
         assert_eq!(result, &[0xDE, 0xAD, 0xBE, 0xEF]);
     }
 

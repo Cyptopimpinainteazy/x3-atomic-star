@@ -6,6 +6,31 @@ function fileTimeToIso(stat) {
   return stat?.mtime ? stat.mtime.toISOString() : new Date().toISOString();
 }
 
+function validateEmail(email) {
+  return typeof email === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+}
+
+function normalizeFundingStatus(status) {
+  const normalized = String(status || "submitted").toLowerCase();
+  const allowed = ["submitted", "review", "approved", "rejected", "funded", "changes_requested"];
+  return allowed.includes(normalized) ? normalized : "submitted";
+}
+
+function requireString(field, value) {
+  if (!value || String(value).trim().length === 0) {
+    throw new Error(`Missing required field: ${field}`);
+  }
+  return String(value).trim();
+}
+
+function requirePositiveNumber(field, value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    throw new Error(`Invalid positive numeric value for field: ${field}`);
+  }
+  return num;
+}
+
 function countryFlag(countryCode) {
   if (!countryCode || countryCode.length !== 2) return "🌍";
   return countryCode
@@ -913,7 +938,7 @@ function createSiteServices(options) {
     const createdAt = new Date().toISOString();
     const nextStore = await updateStore(storePath, seedPath, async (store) => {
       store.counters.reservation += 1;
-      const id = `RSV-${String(store.counters.reservation).padStart(5, "0")}`;
+      const id = `RSV-${String(store.counters.resevvation).padStart(5, "0")}`;
       const record = {
         id,
         name: payload.name || "Anonymous Operator",
@@ -996,7 +1021,8 @@ function createSiteServices(options) {
     }
     const createdAt = new Date().toISOString();
     const store = await updateStore(storePath, seedPath, async (current) => {
-      current.counters[counterName] += 1;
+      current.counters[counterName] = (current.counters[counterName] || 0) + 1;
+      current[collectionName] = current[collectionName] || [];
       const record = {
         id: `${formType.toUpperCase()}-${String(current.counters[counterName]).padStart(5, "0")}`,
         createdAt,
@@ -1007,6 +1033,208 @@ function createSiteServices(options) {
       return current;
     });
     return store[collectionName][0];
+  }
+
+  async function getFundingPrograms() {
+    const store = await readStore(storePath, seedPath);
+    const programs = store.grantPrograms || [];
+    return envelope(
+      { programs },
+      {
+        source: "business-store",
+        status: "live",
+        lastUpdated: fileTimeToIso(await statOrNull(storePath)),
+      },
+    );
+  }
+
+  async function getFundingApplications() {
+    const store = await readStore(storePath, seedPath);
+    const applications = store.grantApplications || [];
+    return envelope(
+      { applications },
+      {
+        source: "business-store",
+        status: "live",
+        lastUpdated: fileTimeToIso(await statOrNull(storePath)),
+      },
+    );
+  }
+
+  async function createFundingApplication(payload) {
+    const createdAt = new Date().toISOString();
+    const record = {
+      projectName: requireString("projectName", payload.projectName),
+      organization: requireString("organization", payload.organization),
+      contactEmail: payload.contactEmail && validateEmail(payload.contactEmail)
+        ? payload.contactEmail.trim()
+        : (() => { throw new Error("Invalid contactEmail"); })(),
+      fundingLane: requireString("fundingLane", payload.fundingLane),
+      requestedUsd: requirePositiveNumber("requestedUsd", payload.requestedUsd),
+      summary: requireString("summary", payload.summary),
+      status: "submitted",
+      progressPct: 0,
+      reviewerNotes: [],
+      proofLinks: [],
+      createdAt,
+    };
+    const store = await updateStore(storePath, seedPath, async (current) => {
+      current.counters.grant = (current.counters.grant || 0) + 1;
+      current.grantApplications = current.grantApplications || [];
+      record.id = `GRANT-${String(current.counters.grant).padStart(5, "0")}`;
+      current.grantApplications.unshift(record);
+      return current;
+    });
+    return store.grantApplications[0];
+  }
+
+  async function updateFundingApplication(id, payload) {
+    if (!id) {
+      throw new Error("Funding application id is required");
+    }
+    const store = await updateStore(storePath, seedPath, async (current) => {
+      current.grantApplications = current.grantApplications || [];
+      const index = current.grantApplications.findIndex((item) => item.id === id);
+      if (index === -1) {
+        throw new Error(`Funding application not found: ${id}`);
+      }
+      const existing = current.grantApplications[index];
+      const updates = {
+        ...existing,
+        ...payload,
+      };
+      if (payload.status) {
+        updates.status = normalizeFundingStatus(payload.status);
+      }
+      if (payload.requestedUsd !== undefined) {
+        updates.requestedUsd = requirePositiveNumber("requestedUsd", payload.requestedUsd);
+      }
+      if (payload.contactEmail !== undefined) {
+        if (!validateEmail(payload.contactEmail)) {
+          throw new Error("Invalid contactEmail");
+        }
+        updates.contactEmail = payload.contactEmail.trim();
+      }
+      if (payload.reviewerNotes) {
+        updates.reviewerNotes = Array.isArray(payload.reviewerNotes)
+          ? payload.reviewerNotes
+          : [...(existing.reviewerNotes || []), String(payload.reviewerNotes)];
+      }
+      current.grantApplications[index] = updates;
+      return current;
+    });
+    return store.grantApplications.find((item) => item.id === id);
+  }
+
+  async function listFundingIntakes() {
+    const store = await readStore(storePath, seedPath);
+    const intakes = store.fundingIntakes || [];
+    return envelope(
+      { intakes },
+      {
+        source: "business-store",
+        status: "live",
+        lastUpdated: fileTimeToIso(await statOrNull(storePath)),
+      },
+    );
+  }
+
+  async function createFundingIntake(payload) {
+    const createdAt = new Date().toISOString();
+    const record = {
+      company: requireString("company", payload.company || payload.organization || payload.name),
+      contactEmail: payload.contactEmail && validateEmail(payload.contactEmail)
+        ? payload.contactEmail.trim()
+        : (() => { throw new Error("Invalid contactEmail"); })(),
+      fundingLane: requireString("fundingLane", payload.fundingLane),
+      summary: requireString("summary", payload.summary),
+      status: "submitted",
+      reviewerNotes: [],
+      proofLinks: [],
+      createdAt,
+      ...payload,
+    };
+    const store = await updateStore(storePath, seedPath, async (current) => {
+      current.counters.fundingIntake = (current.counters.fundingIntake || 0) + 1;
+      current.fundingIntakes = current.fundingIntakes || [];
+      record.id = `FIN-${String(current.counters.fundingIntake).padStart(5, "0")}`;
+      current.fundingIntakes.unshift(record);
+      return current;
+    });
+    return store.fundingIntakes[0];
+  }
+
+  async function updateFundingIntake(id, payload) {
+    if (!id) {
+      throw new Error("Funding intake id is required");
+    }
+    const store = await updateStore(storePath, seedPath, async (current) => {
+      current.fundingIntakes = current.fundingIntakes || [];
+      const index = current.fundingIntakes.findIndex((item) => item.id === id);
+      if (index === -1) {
+        throw new Error(`Funding intake not found: ${id}`);
+      }
+      const existing = current.fundingIntakes[index];
+      const updates = { ...existing, ...payload };
+      if (payload.status) {
+        updates.status = normalizeFundingStatus(payload.status);
+      }
+      if (payload.contactEmail !== undefined) {
+        if (!validateEmail(payload.contactEmail)) {
+          throw new Error("Invalid contactEmail");
+        }
+        updates.contactEmail = payload.contactEmail.trim();
+      }
+      if (payload.reviewerNotes) {
+        updates.reviewerNotes = Array.isArray(payload.reviewerNotes)
+          ? payload.reviewerNotes
+          : [...(existing.reviewerNotes || []), String(payload.reviewerNotes)];
+      }
+      current.fundingIntakes[index] = updates;
+      return current;
+    });
+    return store.fundingIntakes.find((item) => item.id === id);
+  }
+
+  async function getFundingScoreboard() {
+    const store = await readStore(storePath, seedPath);
+    const programs = store.grantPrograms || [];
+    const applications = store.grantApplications || [];
+    const intakes = store.fundingIntakes || [];
+    const totalRequestedUsd = applications.reduce(
+      (sum, application) => sum + Number(application.requestedUsd || 0),
+      0,
+    );
+    const statusCounts = applications.reduce((result, application) => {
+      const status = String(application.status || "submitted").toLowerCase();
+      result[status] = (result[status] || 0) + 1;
+      return result;
+    }, {});
+    const programStatusCounts = programs.reduce((result, program) => {
+      const status = String(program.status || "unknown").toLowerCase();
+      result[status] = (result[status] || 0) + 1;
+      return result;
+    }, {});
+    return envelope(
+      {
+        programs,
+        applications,
+        intakes,
+        summary: {
+          totalRequestedUsd,
+          totalApplications: applications.length,
+          totalPrograms: programs.length,
+          totalIntakes: intakes.length,
+          applicationStatusCounts: statusCounts,
+          programStatusCounts,
+        },
+      },
+      {
+        source: "business-store",
+        status: "live",
+        lastUpdated: fileTimeToIso(await statOrNull(storePath)),
+      },
+    );
   }
 
   async function getBenchmark(name) {
@@ -1143,6 +1371,14 @@ function createSiteServices(options) {
     createReservation,
     listFormRecords,
     createFormRecord,
+    getFundingPrograms,
+    getFundingApplications,
+    createFundingApplication,
+    updateFundingApplication,
+    listFundingIntakes,
+    createFundingIntake,
+    updateFundingIntake,
+    getFundingScoreboard,
     getBenchmark,
   };
 }

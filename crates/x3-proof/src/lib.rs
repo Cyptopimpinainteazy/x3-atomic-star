@@ -26,12 +26,12 @@ pub mod verifier;
 pub use chain::ProofChain;
 pub use engine::ProofEngine;
 pub use engine::ProofEngineConfig;
-pub use finality_registry::{FinalityError, FinalityRecord, FinalityRegistry};
 pub use epoch::{
     EpochProof, RecursiveProofAggregator, ZkBlockProof, ZkBlockVerifier, ZkProofError,
     BLOCKS_PER_EPOCH,
 };
 pub use error::ProofError;
+pub use finality_registry::{FinalityError, FinalityRecord, FinalityRegistry};
 pub use hasher::DeterministicHasher;
 pub use types::*;
 pub use verifier::ProofVerifier;

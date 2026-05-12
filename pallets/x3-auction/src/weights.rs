@@ -55,10 +55,22 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 }
 
 impl WeightInfo for () {
-    fn create_auction() -> Weight { Weight::zero() }
-    fn place_bid() -> Weight { Weight::zero() }
-    fn cancel_auction() -> Weight { Weight::zero() }
-    fn settle_auction() -> Weight { Weight::zero() }
-    fn extend_auction() -> Weight { Weight::zero() }
-    fn force_cancel() -> Weight { Weight::zero() }
+    fn create_auction() -> Weight {
+        Weight::zero()
+    }
+    fn place_bid() -> Weight {
+        Weight::zero()
+    }
+    fn cancel_auction() -> Weight {
+        Weight::zero()
+    }
+    fn settle_auction() -> Weight {
+        Weight::zero()
+    }
+    fn extend_auction() -> Weight {
+        Weight::zero()
+    }
+    fn force_cancel() -> Weight {
+        Weight::zero()
+    }
 }

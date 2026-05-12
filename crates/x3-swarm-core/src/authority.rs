@@ -124,10 +124,22 @@ impl SwarmAuthority {
                 "Kill sanction issued. Last evidence: {}",
                 &evidence_str[..evidence_str.len().min(128)]
             );
-            self.audit.record(block, AuditCategory::AgentKilled, Some(agent_id), summary, None);
+            self.audit.record(
+                block,
+                AuditCategory::AgentKilled,
+                Some(agent_id),
+                summary,
+                None,
+            );
         } else {
             let summary = format!("Sanction advanced to {:?} (class {:?})", sanction, class);
-            self.audit.record(block, AuditCategory::ViolationRecorded, Some(agent_id), summary, None);
+            self.audit.record(
+                block,
+                AuditCategory::ViolationRecorded,
+                Some(agent_id),
+                summary,
+                None,
+            );
         }
 
         Ok(sanction)
@@ -137,10 +149,7 @@ impl SwarmAuthority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        genesis::GenesisRecord,
-        AgentKind, AgentPermissionTier,
-    };
+    use crate::{genesis::GenesisRecord, AgentKind, AgentPermissionTier};
 
     fn make_id(b: u8) -> AgentId {
         [b; 32]
@@ -172,7 +181,10 @@ mod tests {
         }
 
         let record = auth.genesis().get(&id).unwrap();
-        assert!(record.terminated, "genesis record must be terminated after Kill");
+        assert!(
+            record.terminated,
+            "genesis record must be terminated after Kill"
+        );
     }
 
     #[test]
@@ -187,7 +199,9 @@ mod tests {
 
         let entries = auth.audit().entries_for_agent(&id);
         assert!(
-            entries.iter().any(|e| e.category == AuditCategory::AgentKilled),
+            entries
+                .iter()
+                .any(|e| e.category == AuditCategory::AgentKilled),
             "audit log must contain AgentKilled entry"
         );
     }
@@ -219,11 +233,16 @@ mod tests {
 
         assert_ne!(sanction, Sanction::Kill);
         let record = auth.genesis().get(&id).unwrap();
-        assert!(!record.terminated, "agent should not be terminated on non-Kill sanction");
+        assert!(
+            !record.terminated,
+            "agent should not be terminated on non-Kill sanction"
+        );
 
         let entries = auth.audit().entries_for_agent(&id);
         assert!(
-            entries.iter().any(|e| e.category == AuditCategory::ViolationRecorded),
+            entries
+                .iter()
+                .any(|e| e.category == AuditCategory::ViolationRecorded),
             "violation audit entry expected"
         );
     }
@@ -247,6 +266,8 @@ mod tests {
 
         // No panic, no TerminationFailed error — NotFound is silently tolerated.
         let entries = auth.audit().entries_for_agent(&id);
-        assert!(entries.iter().any(|e| e.category == AuditCategory::AgentKilled));
+        assert!(entries
+            .iter()
+            .any(|e| e.category == AuditCategory::AgentKilled));
     }
 }

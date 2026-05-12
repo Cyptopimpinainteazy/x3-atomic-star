@@ -10,10 +10,10 @@ use frame_system::pallet_prelude::BlockNumberFor;
 fn create_default_auction(seller: u64) -> u64 {
     assert_ok!(Auction::create_auction(
         RuntimeOrigin::signed(seller),
-        1,          // asset_id
-        100,        // start_price
-        200,        // reserve_price
-        10u64,      // duration_blocks
+        1,     // asset_id
+        100,   // start_price
+        200,   // reserve_price
+        10u64, // duration_blocks
     ));
     crate::NextAuctionId::<Test>::get() - 1
 }

@@ -13,9 +13,17 @@ use serde::{Deserialize, Serialize};
 ///
 /// Determines how supply accounting and lock-proof requirements are applied.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub enum AssetOrigin {
     /// Natively minted on the X3 chain (e.g. ATOM3).
@@ -35,9 +43,17 @@ pub enum AssetOrigin {
 /// Implements `MaxEncodedLen` because it contains only fixed-size fields and is
 /// suitable for use as a Substrate `StorageMap` value.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct CanonicalAsset {
     /// Numeric asset identifier, unique within the X3 asset registry.
@@ -61,9 +77,17 @@ pub struct CanonicalAsset {
 /// The net circulating supply on a given chain is `minted - burned - locked`.
 /// `pending_in` and `pending_out` track in-flight bridge transfers.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct ChainSupplyEntry {
     /// CAIP-2 numeric chain identifier.
@@ -89,9 +113,17 @@ pub struct ChainSupplyEntry {
 /// The `proof_hash` is a blake2-256 digest of the lock transaction receipt,
 /// committed to the X3 chain by the bridge oracle.
 #[derive(
-    Clone, PartialEq, Eq, Debug,
-    Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
-    Serialize, Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    Serialize,
+    Deserialize,
 )]
 pub struct CanonicalLockProof {
     /// Asset identifier for the locked asset.

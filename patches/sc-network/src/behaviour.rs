@@ -290,7 +290,7 @@ impl From<CustomMessageOutcome> for BehaviourOut {
 				received_handshake,
 				notifications_sink,
 			} => BehaviourOut::NotificationStreamOpened {
-				remote,
+				remote: libp2p::PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id"),
 				protocol,
 				negotiated_fallback,
 				role: reported_roles_to_observed_role(roles),
@@ -301,11 +301,21 @@ impl From<CustomMessageOutcome> for BehaviourOut {
 				remote,
 				protocol,
 				notifications_sink,
-			} => BehaviourOut::NotificationStreamReplaced { remote, protocol, notifications_sink },
+			} => BehaviourOut::NotificationStreamReplaced {
+				remote: libp2p::PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id"),
+				protocol,
+				notifications_sink,
+			},
 			CustomMessageOutcome::NotificationStreamClosed { remote, protocol } =>
-				BehaviourOut::NotificationStreamClosed { remote, protocol },
+				BehaviourOut::NotificationStreamClosed {
+					remote: libp2p::PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id"),
+					protocol,
+				},
 			CustomMessageOutcome::NotificationsReceived { remote, messages } =>
-				BehaviourOut::NotificationsReceived { remote, messages },
+				BehaviourOut::NotificationsReceived {
+					remote: libp2p::PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id"),
+					messages,
+				},
 			CustomMessageOutcome::None => BehaviourOut::None,
 		}
 	}

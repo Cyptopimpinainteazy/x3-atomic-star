@@ -33,7 +33,7 @@ pub mod pallet {
         pallet::{Lanes, Vaults},
         types::{LaneClass, RebalanceMethod, RebalanceTrigger, VaultId},
     };
-    use sp_runtime::traits::{Saturating, SaturatedConversion, Zero};
+    use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
 
     // -----------------------------------------------------------------------
     // Type alias
@@ -377,12 +377,11 @@ pub mod pallet {
             //    LaneClass::A or LaneClass::B corridor.
             if method == RebalanceMethod::TreasuryRefill {
                 let has_ab_lane = Lanes::<T>::iter().any(|(_, lane)| {
-                    let chain_matches = lane.source_chain == vault.chain_id
-                        || lane.dest_chain == vault.chain_id;
-                    let asset_matches = lane.source_asset == vault.asset_id
-                        || lane.dest_asset == vault.asset_id;
-                    let is_ab =
-                        lane.lane_class == LaneClass::A || lane.lane_class == LaneClass::B;
+                    let chain_matches =
+                        lane.source_chain == vault.chain_id || lane.dest_chain == vault.chain_id;
+                    let asset_matches =
+                        lane.source_asset == vault.asset_id || lane.dest_asset == vault.asset_id;
+                    let is_ab = lane.lane_class == LaneClass::A || lane.lane_class == LaneClass::B;
                     chain_matches && asset_matches && is_ab
                 });
                 ensure!(!has_ab_lane, Error::<T>::TreasuryRefillNotAllowedOnABLane);

@@ -718,7 +718,7 @@ fn i64imm32_ok() {
             .expect_func_instrs([
                 Instruction::branch_table_1(0, 4_u32),
                 Instruction::i64const32(imm),
-                Instruction::branch_table_target(RegSpan::new(Reg::from(1)), BranchOffset::from(8)),
+        `       Instruction::branch_table_target(RegSpan::new(Reg::from(1)), BranchOffset::from(8)),
                 Instruction::return_i64imm32(imm),
                 Instruction::branch_table_target(RegSpan::new(Reg::from(1)), BranchOffset::from(4)),
                 Instruction::branch_table_target(RegSpan::new(Reg::from(1)), BranchOffset::from(1)),

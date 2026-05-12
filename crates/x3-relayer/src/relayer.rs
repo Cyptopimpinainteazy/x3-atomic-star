@@ -760,10 +760,7 @@ impl RelayerSafetyPipeline {
         if decision.allow_route {
             Ok(())
         } else {
-            Err(format!(
-                "risk_gate_blocked: reason={}",
-                decision.reason
-            ))
+            Err(format!("risk_gate_blocked: reason={}", decision.reason))
         }
     }
 

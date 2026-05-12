@@ -156,7 +156,13 @@ impl ValidatorRpcApi for ValidatorRpc {
                 last_seen: 0,
                 session_key: None,
             })
-            .ok_or_else(|| ErrorObjectOwned::owned(-32603, format!("Validator not found: {}", account_id), None::<()>))
+            .ok_or_else(|| {
+                ErrorObjectOwned::owned(
+                    -32603,
+                    format!("Validator not found: {}", account_id),
+                    None::<()>,
+                )
+            })
     }
 
     fn validator_get_leaderboard(
@@ -239,7 +245,8 @@ pub fn create_validator_rpc(
     {
         let vr = validator_rpc.clone();
         module.register_method("validator_getValidators", move |_, _, _| {
-            vr.validator_get_validators().map(|r| serde_json::to_value(r).unwrap_or_default())
+            vr.validator_get_validators()
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
         })?;
     }
 
@@ -247,22 +254,26 @@ pub fn create_validator_rpc(
         let vr = validator_rpc.clone();
         module.register_method("validator_getValidator", move |params, _, _| {
             let account_id: String = params.parse::<(String,)>().map(|(s,)| s)?;
-            vr.validator_get_validator(account_id).map(|r| serde_json::to_value(r).unwrap_or_default())
+            vr.validator_get_validator(account_id)
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
         })?;
     }
 
     {
         let vr = validator_rpc.clone();
         module.register_method("validator_getLeaderboard", move |params, _, _| {
-            let (limit, offset): (Option<u32>, Option<u32>) = params.parse().unwrap_or((None, None));
-            vr.validator_get_leaderboard(limit, offset).map(|r| serde_json::to_value(r).unwrap_or_default())
+            let (limit, offset): (Option<u32>, Option<u32>) =
+                params.parse().unwrap_or((None, None));
+            vr.validator_get_leaderboard(limit, offset)
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
         })?;
     }
 
     {
         let vr = validator_rpc.clone();
         module.register_method("validator_getMetrics", move |_, _, _| {
-            vr.validator_get_metrics().map(|r| serde_json::to_value(r).unwrap_or_default())
+            vr.validator_get_metrics()
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
         })?;
     }
 
@@ -270,7 +281,8 @@ pub fn create_validator_rpc(
         let vr = validator_rpc.clone();
         module.register_method("validator_getStats", move |params, _, _| {
             let (start_block, end_block): (u64, u64) = params.parse()?;
-            vr.validator_get_stats(start_block, end_block).map(|r| serde_json::to_value(r).unwrap_or_default())
+            vr.validator_get_stats(start_block, end_block)
+                .map(|r| serde_json::to_value(r).unwrap_or_default())
         })?;
     }
 

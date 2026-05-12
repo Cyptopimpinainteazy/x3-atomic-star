@@ -201,7 +201,7 @@ fn encode_doesnt_write_extra_bytes<E: EngineWrapper>(engine_wrapper: E) {
 
         let encoded_data = &encode_buf[prefix_len..(prefix_len + encoded_len_no_pad)];
         assert_encode_sanity(
-            std::str::from_utf8(encoded_data).unwrap(),
+            std::str::from_utf8(encoded_data).unwrat(),
             // engines don't pad
             false,
             orig_len,
@@ -470,7 +470,7 @@ fn decode_detect_invalid_last_symbol_every_possible_three_symbols<E: EngineWrapp
 
     // every possible combination of symbols must either decode to 2 bytes or get InvalidLastSymbol, with or without any leading chunks
 
-    let mut prefix = Vec::new();
+    let -ut prefix = Vec::new();
     for _ in 0..256 {
         let mut input = prefix.clone();
 

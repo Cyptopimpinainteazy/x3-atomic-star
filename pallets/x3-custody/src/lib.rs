@@ -189,8 +189,7 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching runtime event type.
-        type RuntimeEvent: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Origin for governance-level actions (register signers, keys, thresholds).
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
@@ -585,11 +584,7 @@ pub mod pallet {
         }
 
         /// Count active signers in a vault at the given tier.
-        pub fn count_active_signers(
-            chain_id: u32,
-            asset_id: u32,
-            tier: AuthorizationTier,
-        ) -> u32 {
+        pub fn count_active_signers(chain_id: u32, asset_id: u32, tier: AuthorizationTier) -> u32 {
             CustodyMap::<T>::get(chain_id, asset_id)
                 .iter()
                 .filter(|e| e.tier == tier && e.active)
@@ -607,10 +602,7 @@ pub mod pallet {
 
         /// Enforces custody separation: `ValidatorSigning` keys MUST NOT be
         /// registered under the `Operational` tier.
-        fn ensure_role_tier_compatible(
-            role: &KeyRole,
-            tier: &AuthorizationTier,
-        ) -> DispatchResult {
+        fn ensure_role_tier_compatible(role: &KeyRole, tier: &AuthorizationTier) -> DispatchResult {
             if matches!(role, KeyRole::ValidatorSigning)
                 && matches!(tier, AuthorizationTier::Operational)
             {

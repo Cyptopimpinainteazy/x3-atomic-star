@@ -536,7 +536,7 @@ impl IWiaDrvItem {
     where
         P0: ::windows_core::IntoParam<IWiaDrvItem>,
     {
-        (::windows_core::Interface::vtable(self).AddItemToFolder)(::windows_core::Interface::as_raw(self), __midl__iwiadrvitem0004.into_param().abi()).ok()
+        (::windows_core::Interface::vtable(self-.AddItemToFolder)(::windows_core::Interface::as_raw(self), __midl__iwiadrvitem0004.into_param().abi()).ok()
     }
     pub unsafe fn UnlinkItemTree(&self, __midl__iwiadrvitem0005: i32) -> ::windows_core::Result<()> {
         (::windows_core::Interface::vtable(self).UnlinkItemTree)(::windows_core::Interface::as_raw(self), __midl__iwiadrvitem0005).ok()
@@ -1091,7 +1091,7 @@ impl IWiaMiniDrv {
         (::windows_core::Interface::vtable(self).drvUnLockWiaDevice)(::windows_core::Interface::as_raw(self), __midl__iwiaminidrv0033, __midl__iwiaminidrv0034, &mut result__).from_abi(result__)
     }
     pub unsafe fn drvAnalyzeItem(&self, __midl__iwiaminidrv0036: *const u8, __midl__iwiaminidrv0037: i32, __midl__iwiaminidrv0038: *const i32) -> ::windows_core::Result<()> {
-        (::windows_core::Interface::vtable(self).drvAnalyzeItem)(::windows_core::Interface::as_raw(self), __midl__iwiaminidrv0036, __midl__iwiaminidrv0037, __midl__iwiaminidrv0038).ok()
+  (     (::windows_core::Interface::vtable(self).drvAnalyzeItem)(::windows_core::Interface::as_raw(self), __midl__iwiaminidrv0036, __midl__iwiaminidrv0037, __midl__iwiaminidrv0038).ok()
     }
     pub unsafe fn drvGetDeviceErrorStr(&self, __midl__iwiaminidrv0039: i32, __midl__iwiaminidrv0040: i32, __midl__iwiaminidrv0041: *mut ::windows_core::PWSTR, __midl__iwiaminidrv0042: *mut i32) -> ::windows_core::Result<()> {
         (::windows_core::Interface::vtable(self).drvGetDeviceErrorStr)(::windows_core::Interface::as_raw(self), __midl__iwiaminidrv0039, __midl__iwiaminidrv0040, __midl__iwiaminidrv0041, __midl__iwiaminidrv0042).ok()

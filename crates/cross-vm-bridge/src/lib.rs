@@ -2805,10 +2805,7 @@ mod tests {
     fn test_vm_type_encode_decode() {
         let evm = VmType::Evm;
         let encoded = evm.encode();
-        let decoded = assert_ok(
-            VmType::decode(&mut &encoded[..]),
-            "VmType decode failed",
-        );
+        let decoded = assert_ok(VmType::decode(&mut &encoded[..]), "VmType decode failed");
         assert_eq!(decoded, VmType::Evm);
     }
 
@@ -3127,10 +3124,7 @@ mod tests {
         );
 
         // Phase 1: Prepare
-        let (nonces, prepare_events) = assert_ok(
-            bridge.prepare(&dispatcher),
-            "prepare failed",
-        );
+        let (nonces, prepare_events) = assert_ok(bridge.prepare(&dispatcher), "prepare failed");
         assert_eq!(nonces.len(), 1);
         assert_eq!(bridge.prepared_count(), 1);
         assert!(prepare_events
@@ -3138,10 +3132,7 @@ mod tests {
             .any(|e| matches!(e, CrossVmEvent::PrepareCompleted { .. })));
 
         // Phase 2: Commit
-        let (results, commit_events) = assert_ok(
-            bridge.commit(&dispatcher),
-            "commit failed",
-        );
+        let (results, commit_events) = assert_ok(bridge.commit(&dispatcher), "commit failed");
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(bridge.prepared_count(), 0);
@@ -3165,10 +3156,7 @@ mod tests {
             "queue_operation failed",
         );
 
-        let (nonces, _) = assert_ok(
-            bridge.prepare(&dispatcher),
-            "prepare failed",
-        );
+        let (nonces, _) = assert_ok(bridge.prepare(&dispatcher), "prepare failed");
         assert_eq!(nonces.len(), 1);
         assert_eq!(bridge.prepared_count(), 1);
 
@@ -3205,10 +3193,8 @@ mod tests {
             "queue_operation failed",
         );
 
-        let (results, events) = assert_ok(
-            bridge.atomic_execute(&dispatcher),
-            "atomic_execute failed",
-        );
+        let (results, events) =
+            assert_ok(bridge.atomic_execute(&dispatcher), "atomic_execute failed");
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(bridge.completed_count(), 2);
@@ -3580,10 +3566,8 @@ mod integration_tests {
         assert_eq!((n1, n2, n3), (1, 2, 3));
 
         // Full atomic: prepare + commit
-        let (results, events) = assert_ok(
-            bridge.atomic_execute(&dispatcher),
-            "atomic_execute failed",
-        );
+        let (results, events) =
+            assert_ok(bridge.atomic_execute(&dispatcher), "atomic_execute failed");
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
         assert_eq!(bridge.completed_count(), 3);
@@ -3875,10 +3859,8 @@ mod message_passing_tests {
             "queue_operation failed",
         );
 
-        let (results, events) = assert_ok(
-            bridge.atomic_execute(&dispatcher),
-            "atomic_execute failed",
-        );
+        let (results, events) =
+            assert_ok(bridge.atomic_execute(&dispatcher), "atomic_execute failed");
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.success));
 
@@ -4346,14 +4328,8 @@ mod x3vm_dispatcher_tests {
         let caller = [0u8; 32];
         let call = make_call(VmId::X3Vm);
 
-        let r1 = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
-        let r2 = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let r1 = assert_ok(d.execute_x3vm_tx(&caller, &call), "execute_x3vm_tx failed");
+        let r2 = assert_ok(d.execute_x3vm_tx(&caller, &call), "execute_x3vm_tx failed");
         assert_eq!(r1.call_hash, r2.call_hash);
         assert_eq!(r1.status, r2.status);
         assert_eq!(r1.gas_used, r2.gas_used);
@@ -4368,10 +4344,7 @@ mod x3vm_dispatcher_tests {
         let caller = [0u8; 32];
         let call = make_call(VmId::X3Vm);
 
-        let receipt = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let receipt = assert_ok(d.execute_x3vm_tx(&caller, &call), "execute_x3vm_tx failed");
         let independent = call.call_hash(&H256::zero());
         assert_eq!(receipt.call_hash, independent);
     }
@@ -4411,10 +4384,7 @@ mod execute_call_routing_tests {
 
         assert_eq!(receipt.status, CrossVmStatus::Success);
         // call_hash MUST agree with the x3vm-direct path.
-        let direct = assert_ok(
-            d.execute_x3vm_tx(&caller, &call),
-            "execute_x3vm_tx failed",
-        );
+        let direct = assert_ok(d.execute_x3vm_tx(&caller, &call), "execute_x3vm_tx failed");
         assert_eq!(receipt.call_hash, direct.call_hash);
     }
 
@@ -4468,10 +4438,7 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Evm, b"too-short".to_vec(), 100_000);
 
-        let receipt = assert_ok(
-            d.execute_call(&caller, &call),
-            "execute_call failed",
-        );
+        let receipt = assert_ok(d.execute_call(&caller, &call), "execute_call failed");
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4483,10 +4450,7 @@ mod execute_call_routing_tests {
         let caller = [0u8; 32];
         let call = call_to(VmId::Svm, vec![0u8; 16], 50_000);
 
-        let receipt = assert_ok(
-            d.execute_call(&caller, &call),
-            "execute_call failed",
-        );
+        let receipt = assert_ok(d.execute_call(&caller, &call), "execute_call failed");
         assert_eq!(receipt.status, CrossVmStatus::InternalError);
         assert_eq!(receipt.gas_used, 0);
     }
@@ -4894,10 +4858,7 @@ mod x3vm_2pc_integration_tests {
             call: call.clone(),
         };
 
-        assert_ok(
-            bridge.queue_operation(op.clone()),
-            "queue_operation failed",
-        );
+        assert_ok(bridge.queue_operation(op.clone()), "queue_operation failed");
         let key = CrossVmBridge::x3vm_replay_key(&call);
         assert!(bridge.is_x3vm_call_replayed(&key));
 
@@ -4906,10 +4867,7 @@ mod x3vm_2pc_integration_tests {
         assert!(bridge.abort_x3vm_admission(&key));
 
         // Requeue must now succeed
-        assert_ok(
-            bridge.queue_operation(op),
-            "queue_operation failed",
-        );
+        assert_ok(bridge.queue_operation(op), "queue_operation failed");
         assert!(bridge.is_x3vm_call_replayed(&key));
     }
 

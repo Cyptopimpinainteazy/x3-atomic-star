@@ -34,7 +34,9 @@ use scale_info::TypeInfo;
 
 pub type LaunchId = u64;
 
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub enum LaunchStatus {
     Pending,
     Active,
@@ -44,7 +46,9 @@ pub enum LaunchStatus {
     Completed,
 }
 
-#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct LaunchState<AccountId, BlockNumber> {
     pub launch_id: LaunchId,
     pub creator: AccountId,
@@ -388,7 +392,10 @@ pub mod pallet {
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
 
                 let new_total = state
                     .total_raised
@@ -424,7 +431,10 @@ pub mod pallet {
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
                 ensure!(now > state.end_block, Error::<T>::LaunchNotEnded);
 
                 let new_status = if state.total_raised >= state.soft_cap {
@@ -456,8 +466,7 @@ pub mod pallet {
 
             let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
             ensure!(
-                state.status == LaunchStatus::Failed
-                    || state.status == LaunchStatus::Refunding,
+                state.status == LaunchStatus::Failed || state.status == LaunchStatus::Refunding,
                 Error::<T>::LaunchNotFailed
             );
 
@@ -488,8 +497,7 @@ pub mod pallet {
 
             let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
             ensure!(
-                state.status == LaunchStatus::Successful
-                    || state.status == LaunchStatus::Completed,
+                state.status == LaunchStatus::Successful || state.status == LaunchStatus::Completed,
                 Error::<T>::LaunchNotSuccessful
             );
 
@@ -529,7 +537,10 @@ pub mod pallet {
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
 
                 ExpiryQueue::<T>::remove(state.end_block, launch_id);
                 state.status = LaunchStatus::Failed;
@@ -545,10 +556,7 @@ pub mod pallet {
         /// Only the launch creator may call this.
         #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::withdraw_raised_funds())]
-        pub fn withdraw_raised_funds(
-            origin: OriginFor<T>,
-            launch_id: LaunchId,
-        ) -> DispatchResult {
+        pub fn withdraw_raised_funds(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
             let caller = ensure_signed(origin)?;
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {

@@ -64,11 +64,19 @@ pub enum SpawnError {
 impl core::fmt::Display for SpawnError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            SpawnError::DepthExceeded { kind, requested_depth, max } => write!(
+            SpawnError::DepthExceeded {
+                kind,
+                requested_depth,
+                max,
+            } => write!(
                 f,
                 "{kind:?} cannot be spawned at depth {requested_depth} (max {max})"
             ),
-            SpawnError::SpawnCapExceeded { parent_id, active, max } => write!(
+            SpawnError::SpawnCapExceeded {
+                parent_id,
+                active,
+                max,
+            } => write!(
                 f,
                 "parent {:?} already has {active} active spawns (max {max})",
                 parent_id
@@ -172,7 +180,9 @@ mod tests {
         let guard = SpawnGuard::new(&store, 10);
         // Auditor max_spawn_depth == 0; requesting depth 1 should fail.
         let lineage = vec![parent_id];
-        let err = guard.check(&parent_id, &AgentKind::Auditor, &lineage).unwrap_err();
+        let err = guard
+            .check(&parent_id, &AgentKind::Auditor, &lineage)
+            .unwrap_err();
         assert!(matches!(err, SpawnError::DepthExceeded { .. }));
     }
 
@@ -183,14 +193,18 @@ mod tests {
         let guard = SpawnGuard::new(&store, 10);
         // Integrator max_spawn_depth == 2; depth 1 should pass.
         let lineage = vec![parent_id];
-        guard.check(&parent_id, &AgentKind::Integrator, &lineage).unwrap();
+        guard
+            .check(&parent_id, &AgentKind::Integrator, &lineage)
+            .unwrap();
     }
 
     #[test]
     fn unknown_parent_rejected() {
         let store = GenesisStore::new();
         let guard = SpawnGuard::new(&store, 10);
-        let err = guard.check(&[9; 32], &AgentKind::TestBuilder, &[]).unwrap_err();
+        let err = guard
+            .check(&[9; 32], &AgentKind::TestBuilder, &[])
+            .unwrap_err();
         assert!(matches!(err, SpawnError::ParentNotFound(_)));
     }
 
@@ -200,7 +214,9 @@ mod tests {
         let mut store = store_with_parent(parent_id);
         store.terminate(&parent_id).unwrap();
         let guard = SpawnGuard::new(&store, 10);
-        let err = guard.check(&parent_id, &AgentKind::TestBuilder, &[]).unwrap_err();
+        let err = guard
+            .check(&parent_id, &AgentKind::TestBuilder, &[])
+            .unwrap_err();
         assert!(matches!(err, SpawnError::ParentInactive(_)));
     }
 

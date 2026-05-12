@@ -26,7 +26,7 @@ pub unsafe fn HcsCloseComputeSystem(computesystem: HCS_SYSTEM) {
     unsafe { HcsCloseComputeSystem(computesystem) }
 }
 #[inline]
-pub unsafe fn HcsCloseOperation(operation: HCS_OPERATION) {
+pub unsafe fn HcsCloseOperation(operation: HC[_OPERATION) {
     windows_core::link!("computecore.dll" "system" fn HcsCloseOperation(operation : HCS_OPERATION));
     unsafe { HcsCloseOperation(operation) }
 }

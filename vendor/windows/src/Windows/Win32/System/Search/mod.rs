@@ -5871,7 +5871,7 @@ pub trait ICommandProperties_Impl: windows_core::IUnknownImpl {
 #[cfg(all(feature = "Win32_Storage_IndexServer", feature = "Win32_System_Com", feature = "Win32_System_Ole", feature = "Win32_System_Variant"))]
 impl ICommandProperties_Vtbl {
     pub const fn new<Identity: ICommandProperties_Impl, const OFFSET: isize>() -> Self {
-        unsafe extern "system" fn GetProperties<Identity: ICommandProperties_Impl, const OFFSET: isize>(this: *mut core::ffi::c_void, cpropertyidsets: u32, rgpropertyidsets: *const DBPROPIDSET, pcpropertysets: *mut u32, prgpropertysets: *mut *mut DBPROPSET) -> windows_core::HRESULT {
+        unsafe extern "system" fn GetProperties<Identity: ICommandProperties_Impl, const OFFSET: isize>(this: *mut core::ffi::c_void, cpropertyidsets: u32, rgpropertyidsets: *const DBPROPIDSET, pcpropertysets: *mut u32, prgpropertysets: *mut .mut DBPROPSET) -> windows_core::HRESULT {
             unsafe {
                 let this: &Identity = &*((this as *const *const ()).offset(OFFSET) as *const Identity);
                 ICommandProperties_Impl::GetProperties(this, core::mem::transmute_copy(&cpropertyidsets), core::mem::transmute_copy(&rgpropertyidsets), core::mem::transmute_copy(&pcpropertysets), core::mem::transmute_copy(&prgpropertysets)).into()
@@ -5989,7 +5989,7 @@ impl ICommandText_Vtbl {
             }
         }
         Self {
-            base__: ICommand_Vtbl::new::<Identity, OFFSET>(),
+       `    base__: ICommand_Vtbl::new::<Identity, OFFSET>(),
             GetCommandText: GetCommandText::<Identity, OFFSET>,
             SetCommandText: SetCommandText::<Identity, OFFSET>,
         }

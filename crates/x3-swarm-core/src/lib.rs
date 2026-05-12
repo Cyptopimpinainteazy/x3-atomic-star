@@ -25,10 +25,14 @@ pub use approval::ApprovalGate;
 pub use audit::{AuditCategory, AuditEntry, AuditLog};
 pub use authority::{AuthorityError, SwarmAuthority};
 pub use events::SwarmEvent;
-pub use genesis::{AgentId, BlockHeight, GenesisError, GenesisRecord, GenesisStore, SupervisionMode};
+pub use genesis::{
+    AgentId, BlockHeight, GenesisError, GenesisRecord, GenesisStore, SupervisionMode,
+};
 pub use guard::{evaluate_path, ForbiddenPathGuard, GuardAction};
 pub use memory::SwarmMemoryEntry;
-pub use misconduct::{MisconductEngine, MisconductError, Sanction, ViolationClass, ViolationRecord};
+pub use misconduct::{
+    MisconductEngine, MisconductError, Sanction, ViolationClass, ViolationRecord,
+};
 pub use policy::{default_agent_policies, AgentPolicy, ApprovalRequirement};
 pub use report::SwarmReport;
 pub use scheduler::SwarmScheduler;

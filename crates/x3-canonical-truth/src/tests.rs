@@ -161,8 +161,7 @@ fn canonical_asset_serde_roundtrip() {
         is_active: false,
     };
     let json = serde_json::to_string(&asset).expect("serialize CanonicalAsset");
-    let decoded: CanonicalAsset =
-        serde_json::from_str(&json).expect("deserialize CanonicalAsset");
+    let decoded: CanonicalAsset = serde_json::from_str(&json).expect("deserialize CanonicalAsset");
     assert_eq!(asset, decoded, "serde JSON round-trip must be lossless");
 }
 
@@ -175,8 +174,7 @@ fn treasury_reconciliation_report_serde_roundtrip() {
         action_count_since_last: 7,
         block_number: 4_200,
     };
-    let json =
-        serde_json::to_string(&report).expect("serialize TreasuryReconciliationReport");
+    let json = serde_json::to_string(&report).expect("serialize TreasuryReconciliationReport");
     let decoded: TreasuryReconciliationReport =
         serde_json::from_str(&json).expect("deserialize TreasuryReconciliationReport");
     assert_eq!(report, decoded, "serde JSON round-trip must be lossless");
@@ -206,7 +204,10 @@ fn identity_hash_stability() {
         id_a.identity_hash, id_b.identity_hash,
         "identical inputs must produce identical identity_hash"
     );
-    assert_eq!(id_a, id_b, "structurally identical identities must be equal");
+    assert_eq!(
+        id_a, id_b,
+        "structurally identical identities must be equal"
+    );
 }
 
 #[test]
@@ -251,7 +252,10 @@ fn treasury_snapshot_fields_sum() {
         .saturating_add(snapshot.insurance_reserve_total)
         .saturating_add(snapshot.strategic_reserve_total)
         .saturating_add(snapshot.gas_reserve_total);
-    assert_eq!(total_reserves, 6_500_u128, "reserve totals must sum correctly");
+    assert_eq!(
+        total_reserves, 6_500_u128,
+        "reserve totals must sum correctly"
+    );
 
     // Deployed settlement float must not exceed the operational float it is drawn from.
     assert!(

@@ -806,7 +806,10 @@ mod tests {
 
         assert_eq!(deserialized.network, "mainnet");
         assert_eq!(deserialized.app_name, "myapp");
-        assert_eq!(deserialized.transaction_hash, "0x0102030405060708090a0b0c0d0e0f10");
+        assert_eq!(
+            deserialized.transaction_hash,
+            "0x0102030405060708090a0b0c0d0e0f10"
+        );
         assert_eq!(deserialized.block_number, 12345678);
         assert_eq!(deserialized.deployed_at, 1640995200);
     }

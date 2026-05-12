@@ -272,16 +272,8 @@ fn submit_xvm_expect_err(asset_id: AssetId, src: DomainId, dst: DomainId, amount
     let expires_at = now + 50;
 
     assert!(
-        Router::do_initiate_transfer(
-            asset_id,
-            src,
-            dst,
-            sender,
-            recipient,
-            amount,
-            expires_at,
-        )
-        .is_err(),
+        Router::do_initiate_transfer(asset_id, src, dst, sender, recipient, amount, expires_at,)
+            .is_err(),
         "expected xvm_transfer to fail on disabled domain / route",
     );
 }

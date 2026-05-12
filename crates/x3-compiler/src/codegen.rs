@@ -104,7 +104,8 @@ pub fn codegen_function(func: &IrFunction) -> Result<FunctionCode, CodegenError>
                         code.instructions.push(CodegenInstr::new(op::NOP, 0));
                     }
                     IrInstr::Jump { target } => {
-                        code.instructions.push(CodegenInstr::new(op::JUMP, target.0));
+                        code.instructions
+                            .push(CodegenInstr::new(op::JUMP, target.0));
                     }
                     IrInstr::Branch { true_target, .. } => {
                         code.instructions
@@ -146,7 +147,15 @@ mod tests {
         let c = f.new_val();
         f.push(entry, IrInstr::Const { dst: a, val: 5 });
         f.push(entry, IrInstr::Const { dst: b, val: 7 });
-        f.push(entry, IrInstr::BinOp { dst: c, op: IrBinOp::Add, lhs: a, rhs: b });
+        f.push(
+            entry,
+            IrInstr::BinOp {
+                dst: c,
+                op: IrBinOp::Add,
+                lhs: a,
+                rhs: b,
+            },
+        );
         f.push(entry, IrInstr::Return { val: Some(c) });
         f
     }

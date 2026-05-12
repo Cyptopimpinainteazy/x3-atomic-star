@@ -17,7 +17,13 @@ use sp_runtime::Perbill;
 
 /// Insert a `ValidatorInfo` with the given stake and `is_active = true`.
 fn register(who: u64, stake: u128) {
-    ValidatorStake::<Test>::insert(who, ValidatorInfo { stake, is_active: true });
+    ValidatorStake::<Test>::insert(
+        who,
+        ValidatorInfo {
+            stake,
+            is_active: true,
+        },
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +55,10 @@ fn slash_reduces_stake_by_fraction() {
 
         let info = ValidatorStake::<Test>::get(validator).expect("validator must still exist");
         assert_eq!(info.stake, 9_000_000, "stake should be reduced by 10 %");
-        assert!(info.is_active, "validator should remain active above the floor");
+        assert!(
+            info.is_active,
+            "validator should remain active above the floor"
+        );
 
         // Confirm SlashApplied event carries correct amounts.
         System::assert_has_event(
@@ -87,14 +96,20 @@ fn slash_floors_at_min_stake() {
         ));
 
         let info = ValidatorStake::<Test>::get(validator).unwrap();
-        assert_eq!(info.stake, 1_000_000, "stake must not drop below MinStakeAfterSlash");
+        assert_eq!(
+            info.stake, 1_000_000,
+            "stake must not drop below MinStakeAfterSlash"
+        );
         // `is_active` should be false because we landed exactly at the floor.
-        assert!(!info.is_active, "validator at the floor must be deactivated");
+        assert!(
+            !info.is_active,
+            "validator at the floor must be deactivated"
+        );
 
         System::assert_has_event(
             Event::SlashApplied {
                 validator,
-                slash_amount: 50_000,  // 1_050_000 - 1_000_000
+                slash_amount: 50_000, // 1_050_000 - 1_000_000
                 new_stake: 1_000_000,
             }
             .into(),
@@ -127,7 +142,10 @@ fn slash_marks_validator_inactive_at_min_stake() {
         let info = ValidatorStake::<Test>::get(validator).unwrap();
         // 1_100_000 * 10% = 110_000 slash → 990_000 naïve → clamped to 1_000_000.
         assert_eq!(info.stake, 1_000_000);
-        assert!(!info.is_active, "validator should be deactivated when stake hits the floor");
+        assert!(
+            !info.is_active,
+            "validator should be deactivated when stake hits the floor"
+        );
     });
 }
 
@@ -163,10 +181,17 @@ fn slash_validator_respects_perbill_fraction() {
         let initial_stake: u128 = 20_000_000;
         register(validator, initial_stake);
 
-        Consensus::slash_validator(&validator, SlashReason::Equivocation, Perbill::from_percent(25));
+        Consensus::slash_validator(
+            &validator,
+            SlashReason::Equivocation,
+            Perbill::from_percent(25),
+        );
 
         let info = ValidatorStake::<Test>::get(validator).expect("validator must still exist");
         assert_eq!(info.stake, 15_000_000, "stake should be reduced by 25 %");
-        assert!(info.is_active, "validator should remain active after the slash");
+        assert!(
+            info.is_active,
+            "validator should remain active after the slash"
+        );
     });
 }

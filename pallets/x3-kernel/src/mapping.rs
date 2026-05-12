@@ -97,9 +97,7 @@ impl InMemoryMappingStore {
     }
 
     pub fn get(&self, asset_id: AssetId) -> Result<&AssetMapping, MappingError> {
-        self.by_asset
-            .get(&asset_id)
-            .ok_or(MappingError::NotMapped)
+        self.by_asset.get(&asset_id).ok_or(MappingError::NotMapped)
     }
 
     pub fn resolve_evm(&self, addr: &EvmAddress) -> Option<AssetId> {
@@ -134,7 +132,10 @@ mod tests {
     fn test_double_register_rejected() {
         let mut store = InMemoryMappingStore::new();
         store.register(1, evm(1), svm(1)).unwrap();
-        assert_eq!(store.register(1, evm(2), svm(2)), Err(MappingError::AlreadyMapped));
+        assert_eq!(
+            store.register(1, evm(2), svm(2)),
+            Err(MappingError::AlreadyMapped)
+        );
     }
 
     #[test]

@@ -19,15 +19,7 @@ pub type DomainId = [u8; 32];
 /// An authority record is stored per `ModuleId`. A holder of the corresponding
 /// private key may activate the module's kill switch before `expires_at_block`.
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    MaxEncodedLen,
-    TypeInfo,
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
 pub struct AuthorityRecord<BlockNumber> {
     /// Hash of the authority key (account public key or committee ID).
@@ -48,15 +40,7 @@ pub struct AuthorityRecord<BlockNumber> {
 ///
 /// Stored in `CanonicalTruthMap`. Only one record may exist per `DomainId`.
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    MaxEncodedLen,
-    TypeInfo,
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
 pub struct TruthSourceRecord {
     /// Domain this record covers.
@@ -73,15 +57,7 @@ pub struct TruthSourceRecord {
 ///
 /// Stored in `KillSwitchEvidence` when evidence is provided with the activation call.
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Encode,
-    Decode,
-    DecodeWithMemTracking,
-    MaxEncodedLen,
-    TypeInfo,
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
 pub struct EvidenceBundle<BlockNumber> {
     /// Hash of the off-chain incident evidence document.

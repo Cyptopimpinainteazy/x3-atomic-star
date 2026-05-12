@@ -51,11 +51,8 @@ pub mod pallet {
 
     /// Current active flash loan (one at a time per block for simplicity).
     #[pallet::storage]
-    pub type ActiveLoan<T: Config> = StorageValue<
-        _,
-        FlashLoanRecord<T::AccountId, BalanceOf<T>>,
-        OptionQuery,
-    >;
+    pub type ActiveLoan<T: Config> =
+        StorageValue<_, FlashLoanRecord<T::AccountId, BalanceOf<T>>, OptionQuery>;
 
     /// Flash loan pool balance (funds available to lend).
     #[pallet::storage]
@@ -118,7 +115,10 @@ pub mod pallet {
         ) -> DispatchResult {
             let borrower = ensure_signed(origin)?;
             ensure!(amount > BalanceOf::<T>::default(), Error::<T>::ZeroAmount);
-            ensure!(ActiveLoan::<T>::get().is_none(), Error::<T>::LoanAlreadyActive);
+            ensure!(
+                ActiveLoan::<T>::get().is_none(),
+                Error::<T>::LoanAlreadyActive
+            );
 
             let pool = PoolBalance::<T>::get();
             ensure!(pool >= amount, Error::<T>::InsufficientPoolLiquidity);
@@ -134,7 +134,12 @@ pub mod pallet {
 
             // Transfer from pool account to borrower
             let pool_account = Self::pool_account();
-            T::Currency::transfer(&pool_account, &borrower, amount, ExistenceRequirement::KeepAlive)?;
+            T::Currency::transfer(
+                &pool_account,
+                &borrower,
+                amount,
+                ExistenceRequirement::KeepAlive,
+            )?;
 
             // Record active loan
             ActiveLoan::<T>::put(FlashLoanRecord {
@@ -147,7 +152,11 @@ pub mod pallet {
             // Update pool balance
             PoolBalance::<T>::mutate(|b| *b = b.saturating_sub(amount));
 
-            Self::deposit_event(Event::FlashLoanInitiated { borrower, amount, fee });
+            Self::deposit_event(Event::FlashLoanInitiated {
+                borrower,
+                amount,
+                fee,
+            });
             Ok(())
         }
 
@@ -167,7 +176,12 @@ pub mod pallet {
             ensure!(repayment >= required, Error::<T>::RepaymentInsufficient);
 
             let pool_account = Self::pool_account();
-            T::Currency::transfer(&borrower, &pool_account, repayment, ExistenceRequirement::KeepAlive)?;
+            T::Currency::transfer(
+                &borrower,
+                &pool_account,
+                repayment,
+                ExistenceRequirement::KeepAlive,
+            )?;
 
             // Mark repaid and update pool
             ActiveLoan::<T>::kill();
@@ -193,7 +207,12 @@ pub mod pallet {
             ensure!(amount > BalanceOf::<T>::default(), Error::<T>::ZeroAmount);
 
             let pool_account = Self::pool_account();
-            T::Currency::transfer(&provider, &pool_account, amount, ExistenceRequirement::KeepAlive)?;
+            T::Currency::transfer(
+                &provider,
+                &pool_account,
+                amount,
+                ExistenceRequirement::KeepAlive,
+            )?;
 
             PoolBalance::<T>::mutate(|b| *b = b.saturating_add(amount));
             Self::deposit_event(Event::LiquidityAdded { provider, amount });

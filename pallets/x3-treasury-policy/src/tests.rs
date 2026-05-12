@@ -54,9 +54,9 @@ fn setup_settlement_vault() {
         OwnerType::Treasury,
         CHAIN_ID,
         ASSET_ID,
-        0u128,       // critical_min
-        0u128,       // min_band
-        500_000u128, // target_band
+        0u128,         // critical_min
+        0u128,         // min_band
+        500_000u128,   // target_band
         2_000_000u128, // max_band
     ));
 }
@@ -84,7 +84,11 @@ fn set_cap(cap: Balance, lane: LaneClass) {
         asset_id: ASSET_ID,
         lane_class: lane,
     };
-    assert_ok!(X3TreasuryPolicy::set_allocation_cap(RuntimeOrigin::root(), key, cap));
+    assert_ok!(X3TreasuryPolicy::set_allocation_cap(
+        RuntimeOrigin::root(),
+        key,
+        cap
+    ));
 }
 
 /// Set the operator funding threshold (above which governance is required).
@@ -398,10 +402,7 @@ fn withdraw_insurance_reserve_requires_governance_origin() {
 fn deposit_insurance_reserve_requires_governance_origin() {
     new_test_ext().execute_with(|| {
         assert_noop!(
-            X3TreasuryPolicy::deposit_insurance_reserve(
-                RuntimeOrigin::signed(OPERATOR),
-                100u128
-            ),
+            X3TreasuryPolicy::deposit_insurance_reserve(RuntimeOrigin::signed(OPERATOR), 100u128),
             DispatchError::BadOrigin
         );
     });
@@ -531,8 +532,7 @@ fn withdraw_from_vault_saturates_at_zero() {
 #[test]
 fn remaining_capacity_returns_none_when_no_cap_set() {
     new_test_ext().execute_with(|| {
-        let remaining =
-            crate::remaining_capacity::<Test>(CHAIN_ID, ASSET_ID, LaneClass::A);
+        let remaining = crate::remaining_capacity::<Test>(CHAIN_ID, ASSET_ID, LaneClass::A);
         assert!(remaining.is_none());
     });
 }
@@ -553,8 +553,7 @@ fn remaining_capacity_returns_correct_value_after_funding() {
             ASSET_ID,
         ));
 
-        let remaining =
-            crate::remaining_capacity::<Test>(CHAIN_ID, ASSET_ID, LaneClass::A);
+        let remaining = crate::remaining_capacity::<Test>(CHAIN_ID, ASSET_ID, LaneClass::A);
         assert_eq!(remaining, Some(CAP - 200_000));
     });
 }
@@ -590,11 +589,7 @@ fn set_allocation_cap_requires_governance_origin() {
             lane_class: LaneClass::A,
         };
         assert_noop!(
-            X3TreasuryPolicy::set_allocation_cap(
-                RuntimeOrigin::signed(OPERATOR),
-                key,
-                500_000u128
-            ),
+            X3TreasuryPolicy::set_allocation_cap(RuntimeOrigin::signed(OPERATOR), key, 500_000u128),
             DispatchError::BadOrigin
         );
     });

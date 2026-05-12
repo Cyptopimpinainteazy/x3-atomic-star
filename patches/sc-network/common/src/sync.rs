@@ -25,7 +25,7 @@ pub mod warp;
 use crate::{role::Roles, types::ReputationChange};
 use futures::Stream;
 
-use libp2p_identity::PeerId;
+use sc_network_types::PeerId;
 
 use message::{BlockAnnounce, BlockData, BlockRequest, BlockResponse};
 use sc_consensus::{import_queue::RuntimeOrigin, IncomingBlock};

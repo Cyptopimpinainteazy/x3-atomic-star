@@ -18,7 +18,18 @@ pub type SnapshotHash = [u8; 32];
 
 /// Each value represents one dimension the solvency engine evaluated.
 /// Failed checks are surfaced in `SolvencyResult::failed_checks`.
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    MaxEncodedLen,
+    TypeInfo,
+    RuntimeDebug,
+)]
 pub enum SolvencyCheck {
     // Pre-quote / pre-reservation
     LaneFrozen,
@@ -52,14 +63,22 @@ pub struct SolvencyResult<MaxChecks: frame_support::traits::Get<u32> + Clone> {
 
 impl<MaxChecks: frame_support::traits::Get<u32> + Clone> SolvencyResult<MaxChecks> {
     pub fn pass(snapshot_hash: SnapshotHash) -> Self {
-        Self { passed: true, failed_checks: BoundedVec::default(), snapshot_hash }
+        Self {
+            passed: true,
+            failed_checks: BoundedVec::default(),
+            snapshot_hash,
+        }
     }
 
     pub fn fail(
         failed_checks: BoundedVec<SolvencyCheck, MaxChecks>,
         snapshot_hash: SnapshotHash,
     ) -> Self {
-        Self { passed: false, failed_checks, snapshot_hash }
+        Self {
+            passed: false,
+            failed_checks,
+            snapshot_hash,
+        }
     }
 }
 
@@ -87,8 +106,10 @@ pub struct ReservationContext<Balance: Parameter + MaxEncodedLen> {
 
 /// Context supplied by callers of `check_pre_submission`.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-pub struct SubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen>
-{
+pub struct SubmissionContext<
+    Balance: Parameter + MaxEncodedLen,
+    BlockNumber: Parameter + MaxEncodedLen,
+> {
     pub reservation_id: ReservationId,
     pub route_id: RouteId,
     pub vault_id: VaultId,
@@ -100,9 +121,13 @@ pub struct SubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Pa
 }
 
 /// Context supplied by callers of `record_post_submission`.
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-pub struct PostSubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen>
-{
+#[derive(
+    Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug,
+)]
+pub struct PostSubmissionContext<
+    Balance: Parameter + MaxEncodedLen,
+    BlockNumber: Parameter + MaxEncodedLen,
+> {
     pub reservation_id: ReservationId,
     pub route_id: RouteId,
     pub vault_id: VaultId,
@@ -119,7 +144,10 @@ pub struct PostSubmissionContext<Balance: Parameter + MaxEncodedLen, BlockNumber
 /// Sealed record of a solvency gate evaluation stored on-chain.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(MaxChecks))]
-pub struct SolvencySnapshotRecord<BlockNumber: Parameter + MaxEncodedLen, MaxChecks: frame_support::traits::Get<u32> + Clone> {
+pub struct SolvencySnapshotRecord<
+    BlockNumber: Parameter + MaxEncodedLen,
+    MaxChecks: frame_support::traits::Get<u32> + Clone,
+> {
     pub block_number: BlockNumber,
     pub passed: bool,
     pub failed_checks: BoundedVec<SolvencyCheck, MaxChecks>,
@@ -135,7 +163,10 @@ pub struct SolvencySnapshotRecord<BlockNumber: Parameter + MaxEncodedLen, MaxChe
 // ──────────────────────────────────────────────
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-pub struct PendingObligation<Balance: Parameter + MaxEncodedLen, BlockNumber: Parameter + MaxEncodedLen> {
+pub struct PendingObligation<
+    Balance: Parameter + MaxEncodedLen,
+    BlockNumber: Parameter + MaxEncodedLen,
+> {
     pub route_id: RouteId,
     pub reservation_id: ReservationId,
     pub amount: Balance,

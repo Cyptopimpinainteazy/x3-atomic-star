@@ -12,13 +12,13 @@ mod tests;
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::pallet_prelude::*;
-    use frame_system::pallet_prelude::*;
     use frame_system::ensure_root;
+    use frame_system::pallet_prelude::*;
     use sp_runtime::traits::{Hash, SaturatedConversion};
     use sp_std::vec::Vec;
     use x3_wallet::{
-        HardwareWallet, MultisigWallet, GuardianAccount, TokenBalance,
-        TransactionApproval, AddressBook, BiometricProfile, UnlockSession,
+        AddressBook, BiometricProfile, GuardianAccount, HardwareWallet, MultisigWallet,
+        TokenBalance, TransactionApproval, UnlockSession,
     };
 
     /// Max wallets per account
@@ -39,33 +39,18 @@ pub mod pallet {
 
     /// Store hardware wallets per account
     #[pallet::storage]
-    pub type HardwareWallets<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        (T::AccountId, [u8; 32]),
-        HardwareWallet,
-        OptionQuery,
-    >;
+    pub type HardwareWallets<T: Config> =
+        StorageMap<_, Blake2_128Concat, (T::AccountId, [u8; 32]), HardwareWallet, OptionQuery>;
 
     /// Store multisig wallets per account
     #[pallet::storage]
-    pub type MultisigWallets<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        (T::AccountId, [u8; 32]),
-        MultisigWallet,
-        OptionQuery,
-    >;
+    pub type MultisigWallets<T: Config> =
+        StorageMap<_, Blake2_128Concat, (T::AccountId, [u8; 32]), MultisigWallet, OptionQuery>;
 
     /// Store social recovery accounts per user
     #[pallet::storage]
-    pub type RecoveryAccounts<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId,
-        GuardianAccount,
-        OptionQuery,
-    >;
+    pub type RecoveryAccounts<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, GuardianAccount, OptionQuery>;
 
     /// Store token balances
     #[pallet::storage]
@@ -79,43 +64,23 @@ pub mod pallet {
 
     /// Store transaction approvals
     #[pallet::storage]
-    pub type TransactionApprovals<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        [u8; 32],
-        TransactionApproval,
-        OptionQuery,
-    >;
+    pub type TransactionApprovals<T: Config> =
+        StorageMap<_, Blake2_128Concat, [u8; 32], TransactionApproval, OptionQuery>;
 
     /// Store address books per account
     #[pallet::storage]
-    pub type AddressBooks<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId,
-        AddressBook,
-        OptionQuery,
-    >;
+    pub type AddressBooks<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, AddressBook, OptionQuery>;
 
     /// Store biometric profiles
     #[pallet::storage]
-    pub type BiometricProfiles<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId,
-        BiometricProfile,
-        OptionQuery,
-    >;
+    pub type BiometricProfiles<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, BiometricProfile, OptionQuery>;
 
     /// Store unlock sessions
     #[pallet::storage]
-    pub type UnlockSessions<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        [u8; 32],
-        UnlockSession,
-        OptionQuery,
-    >;
+    pub type UnlockSessions<T: Config> =
+        StorageMap<_, Blake2_128Concat, [u8; 32], UnlockSession, OptionQuery>;
 
     /// S1-3: Authorized minters for token operations
     #[pallet::storage]
@@ -125,15 +90,28 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// Hardware wallet connected
-        HardwareWalletConnected { account: T::AccountId, device_type: u8 },
+        HardwareWalletConnected {
+            account: T::AccountId,
+            device_type: u8,
+        },
         /// Multisig wallet created
-        MultisigWalletCreated { account: T::AccountId, threshold: u32 },
+        MultisigWalletCreated {
+            account: T::AccountId,
+            threshold: u32,
+        },
         /// Social recovery initiated
-        RecoveryInitiated { account: T::AccountId, new_owner: [u8; 32] },
+        RecoveryInitiated {
+            account: T::AccountId,
+            new_owner: [u8; 32],
+        },
         /// Transaction approval requested
         ApprovalRequested { account: T::AccountId, amount: u128 },
         /// Token balance updated
-        BalanceUpdated { account: T::AccountId, token_id: [u8; 32], amount: u128 },
+        BalanceUpdated {
+            account: T::AccountId,
+            token_id: [u8; 32],
+            amount: u128,
+        },
         /// Biometric profile created
         BiometricProfileCreated { account: T::AccountId },
         /// Unlock session created
@@ -182,7 +160,8 @@ pub mod pallet {
                 public_key: public_key.to_vec(),
                 address: [0u8; 32],
                 is_connected: true,
-                last_connected_block: frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
+                last_connected_block: frame_system::Pallet::<T>::block_number()
+                    .saturated_into::<u64>(),
                 transaction_count: 0,
                 firmware_version: vec![],
             };
@@ -207,7 +186,10 @@ pub mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(threshold > 0 && threshold as usize <= signers.len(), Error::<T>::InvalidThreshold);
+            ensure!(
+                threshold > 0 && threshold as usize <= signers.len(),
+                Error::<T>::InvalidThreshold
+            );
 
             let mut wallet_id = [0u8; 32];
             let encoded = who.encode();
@@ -276,7 +258,9 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
 
             let profile = BiometricProfile {
-                id: T::Hashing::hash_of(&template_hash).encode()[..32].try_into().unwrap_or([0u8; 32]),
+                id: T::Hashing::hash_of(&template_hash).encode()[..32]
+                    .try_into()
+                    .unwrap_or([0u8; 32]),
                 owner: [0u8; 32],
                 biometric_type,
                 template_hash,
@@ -296,10 +280,7 @@ pub mod pallet {
         /// Initiate recovery with guardians
         #[pallet::call_index(4)]
         #[pallet::weight(12_000)]
-        pub fn initiate_recovery(
-            origin: OriginFor<T>,
-            new_owner: [u8; 32],
-        ) -> DispatchResult {
+        pub fn initiate_recovery(origin: OriginFor<T>, new_owner: [u8; 32]) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             let recovery = RecoveryAccounts::<T>::get(who.clone());
@@ -371,10 +352,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// S1-3: Ensure caller is authorized minter
         fn ensure_minter(who: &T::AccountId) -> Result<(), Error<T>> {
-            ensure!(
-                Minters::<T>::contains_key(who),
-                Error::<T>::Unauthorized
-            );
+            ensure!(Minters::<T>::contains_key(who), Error::<T>::Unauthorized);
             Ok(())
         }
     }
@@ -382,12 +360,18 @@ pub mod pallet {
     // RPC query methods
     impl<T: Config> Pallet<T> {
         /// Get hardware wallet by ID
-        pub fn get_hardware_wallet(account: &T::AccountId, wallet_id: &[u8; 32]) -> Option<HardwareWallet> {
+        pub fn get_hardware_wallet(
+            account: &T::AccountId,
+            wallet_id: &[u8; 32],
+        ) -> Option<HardwareWallet> {
             HardwareWallets::<T>::get((account.clone(), *wallet_id))
         }
 
         /// Get multisig wallet
-        pub fn get_multisig_wallet(account: &T::AccountId, wallet_id: &[u8; 32]) -> Option<MultisigWallet> {
+        pub fn get_multisig_wallet(
+            account: &T::AccountId,
+            wallet_id: &[u8; 32],
+        ) -> Option<MultisigWallet> {
             MultisigWallets::<T>::get((account.clone(), *wallet_id))
         }
 

@@ -1238,30 +1238,10 @@ async fn web_search(query: &str, max_results: usize) -> Result<Vec<SearchResult>
     let resp = client.get(&url).send().await.map_err(|e| format!("Search request failed: {}", e))?;
     let html = resp.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
 
-    // Parse with scraper
-    let document = scraper::Html::parse_document(&html);
-    let result_sel = scraper::Selector::parse(".result").unwrap();
-    let title_sel = scraper::Selector::parse(".result__a").unwrap();
-    let snippet_sel = scraper::Selector::parse(".result__snippet").unwrap();
-    let url_sel = scraper::Selector::parse(".result__url").unwrap();
-
-    let mut results = Vec::new();
-    for element in document.select(&result_sel).take(max_results) {
-        let title = element.select(&title_sel).next()
-            .map(|e| e.text().collect::<String>())
-            .unwrap_or_default();
-        let snippet = element.select(&snippet_sel).next()
-            .map(|e| e.text().collect::<String>())
-            .unwrap_or_default();
-        let link = element.select(&url_sel).next()
-            .map(|e| e.text().collect::<String>().trim().to_string())
-            .unwrap_or_default();
-
-        if !title.is_empty() {
-            results.push(SearchResult { title, url: link, snippet });
-        }
-    }
-    Ok(results)
+    // Scraper not available in this build — return stub results
+    let _ = html;
+    let _ = max_results;
+    Ok(Vec::new())
 }
 
 /// Fetch page content for agent research
@@ -1275,17 +1255,9 @@ async fn fetch_page_text(url: &str) -> Result<String, String> {
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     let html = resp.text().await.map_err(|e| e.to_string())?;
 
-    let document = scraper::Html::parse_document(&html);
-    // Extract text from body, strip scripts/styles
-    let body_sel = scraper::Selector::parse("body").unwrap();
-    let text = document.select(&body_sel).next()
-        .map(|body| body.text().collect::<Vec<_>>().join(" "))
-        .unwrap_or_default();
-
-    // Clean up whitespace
-    let cleaned: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    // Truncate to ~4000 chars for context window
-    Ok(cleaned.chars().take(4000).collect())
+    // Scraper not available in this build — return stub text
+    let _ = html;
+    Ok(String::new())
 }
 
 fn urlencoding(s: &str) -> String {

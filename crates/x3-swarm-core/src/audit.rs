@@ -100,7 +100,13 @@ impl AuditLog {
                 s
             }
         };
-        let payload = payload.map(|p| if p.len() > 1024 { p[..1024].to_string() } else { p });
+        let payload = payload.map(|p| {
+            if p.len() > 1024 {
+                p[..1024].to_string()
+            } else {
+                p
+            }
+        });
 
         let id = self.next_id;
         self.entries.push(AuditEntry {
@@ -166,9 +172,27 @@ mod tests {
         let mut log = AuditLog::new();
         let agent = [1u8; 32];
         let other = [2u8; 32];
-        log.record(10, AuditCategory::GenesisCreated, Some(agent), "created", None);
-        log.record(11, AuditCategory::GenesisCreated, Some(other), "other", None);
-        log.record(12, AuditCategory::ViolationRecorded, Some(agent), "violation", None);
+        log.record(
+            10,
+            AuditCategory::GenesisCreated,
+            Some(agent),
+            "created",
+            None,
+        );
+        log.record(
+            11,
+            AuditCategory::GenesisCreated,
+            Some(other),
+            "other",
+            None,
+        );
+        log.record(
+            12,
+            AuditCategory::ViolationRecorded,
+            Some(agent),
+            "violation",
+            None,
+        );
 
         let entries = log.entries_for_agent(&agent);
         assert_eq!(entries.len(), 2);

@@ -7833,7 +7833,7 @@ impl ::core::default::Default for HIDP_BUTTON_CAPS {
     }
 }
 #[repr(C)]
-#[doc = "Required features: `\"Win32_Foundation\"`"]
+#[doc = "Required features: `\"Win32_Foundation\"`"
 #[cfg(feature = "Win32_Foundation")]
 pub union HIDP_BUTTON_CAPS_0 {
     pub Range: HIDP_BUTTON_CAPS_0_1,

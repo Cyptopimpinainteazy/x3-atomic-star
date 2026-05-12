@@ -1,7 +1,5 @@
 use crate as pallet_x3_flashloan;
-use frame_support::{
-    construct_runtime, derive_impl, parameter_types,
-};
+use frame_support::{construct_runtime, derive_impl, parameter_types};
 use sp_runtime::BuildStorage;
 
 type Block = frame_system::mocking::MockBlock<Test>;

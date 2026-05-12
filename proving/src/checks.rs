@@ -112,12 +112,7 @@ fn now_rfc3339() -> String {
 /// - The response body is not valid JSON-RPC (unless it begins with `{`,
 ///   which covers partial / streaming responses).
 /// - The response contains a top-level `"error"` field.
-async fn rpc_call(
-    client: &Client,
-    url: &str,
-    method: &str,
-    params: Value,
-) -> anyhow::Result<()> {
+async fn rpc_call(client: &Client, url: &str, method: &str, params: Value) -> anyhow::Result<()> {
     let body = json!({
         "jsonrpc": "2.0",
         "id":      1,
@@ -138,9 +133,7 @@ async fn rpc_call(
     // For large metadata responses (~2–5 MiB) the full parse is acceptable on a
     // proving harness; the timeout at the call site keeps wall time bounded.
     match serde_json::from_slice::<Value>(&bytes) {
-        Ok(v) if v.get("error").is_some() => {
-            Err(anyhow!("JSON-RPC error: {}", v["error"]))
-        }
+        Ok(v) if v.get("error").is_some() => Err(anyhow!("JSON-RPC error: {}", v["error"])),
         Ok(_) => Ok(()),
         Err(parse_err) => {
             // If the body starts with `{` it is almost certainly a valid

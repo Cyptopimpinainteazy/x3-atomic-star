@@ -1,10 +1,14 @@
 //! Tests for equivocation detection and slashing
 
 use crate::mock::*;
-use crate::{pallet::{Event, ValidatorInfo, ValidatorStake}, SlashReason};
+use crate::{
+    pallet::{Event, ValidatorInfo, ValidatorStake},
+    SlashReason,
+};
 use frame_support::assert_ok;
 use sp_runtime::Perbill;
-use sp_staking::offence::{Kind, Offence, OffenceDetails, OnOffenceHandler, SessionIndex};
+use sp_staking::offence::{Kind, Offence, OffenceDetails, OnOffenceHandler, ReportOffence};
+use sp_staking::SessionIndex;
 
 struct MockEquivocationOffence {
     offender: u64,
@@ -50,6 +54,8 @@ fn test_double_sign_detection_is_modeled_by_slash_call() {
             },
         );
 
+        System::set_block_number(1);
+
         assert_ok!(Consensus::report_misbehavior(
             RuntimeOrigin::signed(2),
             offender,
@@ -90,7 +96,10 @@ fn test_equivocation_slashing_disables_at_floor() {
 
         let info = ValidatorStake::<Test>::get(offender).expect("validator must exist");
         assert_eq!(info.stake, 1_000_000);
-        assert!(!info.is_active, "equivocation slash landing on floor must deactivate validator");
+        assert!(
+            !info.is_active,
+            "equivocation slash landing on floor must deactivate validator"
+        );
     });
 }
 

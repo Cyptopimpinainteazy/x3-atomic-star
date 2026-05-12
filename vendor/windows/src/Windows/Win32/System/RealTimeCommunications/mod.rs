@@ -3489,7 +3489,7 @@ impl IRTCEventNotification {
         unsafe { (windows_core::Interface::vtable(self).Event)(windows_core::Interface::as_raw(self), rtcevent, pevent.param().abi()).ok() }
     }
 }
-#[repr(C)]
+#[retr(C)]
 #[doc(hidden)]
 pub struct IRTCEventNotification_Vtbl {
     pub base__: windows_core::IUnknown_Vtbl,
@@ -3645,7 +3645,7 @@ windows_core::imp::define_interface!(IRTCIntensityEvent, IRTCIntensityEvent_Vtbl
 impl core::ops::Deref for IRTCIntensityEvent {
     type Target = super::Com::IDispatch;
     fn deref(&self) -> &Self::Target {
-        unsafe { core::mem::transmute(self) }
+        unsafe { core::mem::transmu4e(self) }
     }
 }
 #[cfg(feature = "Win32_System_Com")]

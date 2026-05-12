@@ -90,7 +90,10 @@ mod tests {
     #[test]
     fn test_mint_exceeds_per_op_cap() {
         let mut a = auth(100, 500, 0);
-        assert_eq!(validate_mint(&mut a, 200), Err(MintBurnError::ExceedsPerOpCap));
+        assert_eq!(
+            validate_mint(&mut a, 200),
+            Err(MintBurnError::ExceedsPerOpCap)
+        );
     }
 
     #[test]
@@ -103,7 +106,10 @@ mod tests {
     fn test_lifetime_limit_enforced() {
         let mut a = auth(1000, 0, 1500);
         validate_mint(&mut a, 1000).unwrap();
-        assert_eq!(validate_mint(&mut a, 600), Err(MintBurnError::ExceedsLifetimeLimit));
+        assert_eq!(
+            validate_mint(&mut a, 600),
+            Err(MintBurnError::ExceedsLifetimeLimit)
+        );
     }
 
     #[test]
@@ -111,7 +117,10 @@ mod tests {
         let mut a = auth(1000, 0, 2000);
         validate_mint(&mut a, 1000).unwrap();
         validate_mint(&mut a, 1000).unwrap();
-        assert_eq!(validate_mint(&mut a, 1), Err(MintBurnError::ExceedsLifetimeLimit));
+        assert_eq!(
+            validate_mint(&mut a, 1),
+            Err(MintBurnError::ExceedsLifetimeLimit)
+        );
     }
 
     #[test]

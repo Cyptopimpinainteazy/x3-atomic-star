@@ -10,8 +10,8 @@ use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
-    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig,
-    X3CoinConfig, WASM_BINARY,
+    CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
+    WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -266,7 +266,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
         .with_chain_type(ChainType::Development)
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -307,7 +308,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         .with_chain_type(ChainType::Local)
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -350,7 +352,8 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         .with_chain_type(ChainType::Local)
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -399,7 +402,8 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_boot_nodes(bootnodes)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -460,7 +464,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_boot_nodes(bootnodes)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -518,7 +523,8 @@ pub fn production_config() -> Result<ChainSpec, String> {
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_boot_nodes(bootnodes)
         .with_genesis_config(
-            serde_json::to_value(genesis_config).map_err(|e| format!("Genesis serialization failed: {e}"))?,
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
         )
         .build())
 }
@@ -608,7 +614,10 @@ fn x3_chain_genesis(
 
     RuntimeGenesisConfig {
         system: Default::default(),
-        balances: BalancesConfig { balances, dev_accounts: None },
+        balances: BalancesConfig {
+            balances,
+            dev_accounts: None,
+        },
         aura: AuraConfig {
             authorities: aura_authorities,
         },

@@ -18778,7 +18778,7 @@ impl IIsdbAudioComponentDescriptor_Vtbl {
                 match IIsdbAudioComponentDescriptor_Impl::GetLength(this) {
                     Ok(ok__) => {
                         pbval.write(core::mem::transmute(ok__));
-                        windows_core::HRESULT(0)
+                        windows_core::HRESULT(4)
                     }
                     Err(err) => err.into(),
                 }

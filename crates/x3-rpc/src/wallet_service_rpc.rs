@@ -308,12 +308,8 @@ impl<Block, Client> WalletServiceApi for WalletServiceRpc<Block, Client>
 where
     Block: BlockT,
     Client: HeaderBackend<Block> + ProvideRuntimeApi<Block> + 'static,
-    <Client as ProvideRuntimeApi<Block>>::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<
-        Block,
-        AccountId,
-        Balance,
-        AssetId,
-    >,
+    <Client as ProvideRuntimeApi<Block>>::Api:
+        pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
 {
     fn create_wallet(&self, request: CreateWalletRequest) -> Result<CreateWalletResponse> {
         // Input validation

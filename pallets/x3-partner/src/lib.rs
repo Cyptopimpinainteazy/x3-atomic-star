@@ -48,15 +48,7 @@ pub mod pallet {
     /// `Balance` is the same associated type exposed by `pallet_x3_inventory::Config`.
     /// `MaxLanes` is a runtime constant that bounds the `approved_lanes` vector.
     #[derive(
-        Clone,
-        Debug,
-        PartialEq,
-        Eq,
-        Encode,
-        Decode,
-        DecodeWithMemTracking,
-        MaxEncodedLen,
-        TypeInfo,
+        Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
     )]
     #[scale_info(skip_type_params(MaxLanes))]
     pub struct PartnerState<
@@ -581,7 +573,8 @@ pub mod pallet {
         ) -> u32 {
             let fill_score: u32 = fill_reliability_bps.min(10_000);
 
-            let rejection_score: u32 = 10_000u32.saturating_sub(rejected_reservation_bps.min(10_000));
+            let rejection_score: u32 =
+                10_000u32.saturating_sub(rejected_reservation_bps.min(10_000));
 
             let stale_score: u32 = 10_000u32.saturating_sub(stale_quote_bps.min(10_000));
 

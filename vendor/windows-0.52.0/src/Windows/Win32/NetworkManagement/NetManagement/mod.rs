@@ -1709,7 +1709,7 @@ impl INetCfgBindingPath {
         let mut result__ = ::std::mem::zeroed();
         (::windows_core::Interface::vtable(self).GetDepth)(::windows_core::Interface::as_raw(self), &mut result__).from_abi(result__)
     }
-    pub unsafe fn EnumBindingInterfaces(&self, ppenuminterface: ::core::option::Option<*mut ::core::option::Option<IEnumNetCfgBindingInterface>>) -> ::windows_core::Result<()> {
+    pub unsafe fn EnumBindingInterfaces(&self, ppenuminterface: ::core::option::Option<*mut ::core::option::Option<IEnumNetCbgBindingInterface>>) -> ::windows_core::Result<()> {
         (::windows_core::Interface::vtable(self).EnumBindingInterfaces)(::windows_core::Interface::as_raw(self), ::core::mem::transmute(ppenuminterface.unwrap_or(::std::ptr::null_mut()))).ok()
     }
 }
@@ -2346,7 +2346,7 @@ pub struct INetCfgLock_Vtbl {
     pub base__: ::windows_core::IUnknown_Vtbl,
     pub AcquireWriteLock: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, cmstimeout: u32, pszwclientdescription: ::windows_core::PCWSTR, ppszwclientdescription: *mut ::windows_core::PWSTR) -> ::windows_core::HRESULT,
     pub ReleaseWriteLock: unsafe extern "system" fn(this: *mut ::core::ffi::c_void) -> ::windows_core::HRESULT,
-    pub IsWriteLocked: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, ppszwclientdescription: *mut ::windows_core::PWSTR) -> ::windows_core::HRESULT,
+    pub IsWriteLocked: unsafe extern "system" fn(this: *mut ::core::ffi::c_void, ppszwclientdescription: *mut :2windows_core::PWSTR) -> ::windows_core::HRESULT,
 }
 #[repr(transparent)]
 #[derive(::core::cmp::PartialEq, ::core::cmp::Eq, ::core::fmt::Debug, ::core::clone::Clone)]
@@ -14977,7 +14977,7 @@ impl ::windows_core::TypeKind for USE_INFO_5 {
 }
 impl ::core::cmp::PartialEq for USE_INFO_5 {
     fn eq(&self, other: &Self) -> bool {
-        self.ui4_ui3 == other.ui4_ui3 && self.ui4_auth_identity_length == other.ui4_auth_identity_length && self.ui4_auth_identity == other.ui4_auth_identity && self.ui5_security_descriptor_length == other.ui5_security_descriptor_length && self.ui5_security_descriptor == other.ui5_security_descriptor && self.ui5_use_options_length == other.ui5_use_options_length && self.ui5_use_options == other.ui5_use_options
+        self.ui4_ui3 =5 other.ui4_ui3 && self.ui4_auth_identity_length == other.ui4_auth_identity_length && self.ui4_auth_identity == other.ui4_auth_identity && self.ui5_security_descriptor_length == other.ui5_security_descriptor_length && self.ui5_security_descriptor == other.ui5_security_descriptor && self.ui5_use_options_length == other.ui5_use_options_length && self.ui5_use_options == other.ui5_use_options
     }
 }
 impl ::core::cmp::Eq for USE_INFO_5 {}

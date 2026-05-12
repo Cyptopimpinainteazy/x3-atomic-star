@@ -55,10 +55,9 @@ impl IsolationContext {
 
     /// Read `len` bytes from memory at `offset`.
     pub fn read_memory(&self, offset: usize, len: usize) -> Result<&[u8], IsolationError> {
-        let end = offset.checked_add(len).ok_or(IsolationError::MemoryOutOfBounds {
-            offset,
-            len,
-        })?;
+        let end = offset
+            .checked_add(len)
+            .ok_or(IsolationError::MemoryOutOfBounds { offset, len })?;
         if end > self.memory.len() {
             return Err(IsolationError::MemoryOutOfBounds { offset, len });
         }
@@ -67,10 +66,12 @@ impl IsolationContext {
 
     /// Write bytes into memory at `offset`.
     pub fn write_memory(&mut self, offset: usize, data: &[u8]) -> Result<(), IsolationError> {
-        let end = offset.checked_add(data.len()).ok_or(IsolationError::MemoryOutOfBounds {
-            offset,
-            len: data.len(),
-        })?;
+        let end = offset
+            .checked_add(data.len())
+            .ok_or(IsolationError::MemoryOutOfBounds {
+                offset,
+                len: data.len(),
+            })?;
         if end > self.memory.len() {
             return Err(IsolationError::MemoryOutOfBounds {
                 offset,

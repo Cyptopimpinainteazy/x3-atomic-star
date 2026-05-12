@@ -95,7 +95,10 @@ impl VmStorage {
 
     /// Abort the current atomic window: restore from snapshot.
     pub fn rollback(&mut self) -> Result<(), StorageError> {
-        let snap = self.snapshots.pop().ok_or(StorageError::SnapshotUnderflow)?;
+        let snap = self
+            .snapshots
+            .pop()
+            .ok_or(StorageError::SnapshotUnderflow)?;
         self.data = snap;
         // Truncate journal entries since snapshot
         self.journal.clear();

@@ -14,7 +14,11 @@ mod benchmarks {
     fn register_task() {
         let caller: T::AccountId = whitelisted_caller();
         let condition = Condition::BlockNumber(1000);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         let max_fee = T::BaseRegistrationFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance
@@ -28,7 +32,11 @@ mod benchmarks {
     fn cancel_task() {
         let caller: T::AccountId = whitelisted_caller();
         let condition = Condition::BlockNumber(1000);
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         let max_fee = T::BaseRegistrationFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance
@@ -53,7 +61,11 @@ mod benchmarks {
         let caller: T::AccountId = whitelisted_caller();
         let keeper: T::AccountId = whitelisted_caller();
         let condition = Condition::BlockNumber(1); // Condition met immediately
-        let action = Action::Custom({ let mut a = [0u8; 64]; a[..3].copy_from_slice(&[1,2,3]); a });
+        let action = Action::Custom({
+            let mut a = [0u8; 64];
+            a[..3].copy_from_slice(&[1, 2, 3]);
+            a
+        });
         let max_fee = T::BaseRegistrationFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance

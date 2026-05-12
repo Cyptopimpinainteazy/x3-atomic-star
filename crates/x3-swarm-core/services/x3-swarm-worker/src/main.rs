@@ -127,7 +127,10 @@ async fn process_task(
     api_base_url: &str,
     task: TaskRecord,
 ) -> anyhow::Result<()> {
-    println!("Starting task {}: {} (agent={})", task.id, task.title, task.agent);
+    println!(
+        "Starting task {}: {} (agent={})",
+        task.id, task.title, task.agent
+    );
     post_task_action(client, api_base_url, &task.id, "start").await?;
 
     let outcome = dispatch_agent(&task).await;
@@ -135,7 +138,10 @@ async fn process_task(
     match outcome {
         Ok(()) => {
             let completed = post_task_action(client, api_base_url, &task.id, "complete").await?;
-            println!("Task {} completed with status {:?}", completed.id, completed.status);
+            println!(
+                "Task {} completed with status {:?}",
+                completed.id, completed.status
+            );
         }
         Err(ref err) => {
             eprintln!("Task {} failed: {err:#}", task.id);
@@ -168,9 +174,20 @@ fn check_permission(cmd: &str, tier: &PermissionTier) -> anyhow::Result<()> {
     // Patterns whose presence in a command string indicates a potentially
     // destructive or write-heavy operation.
     const WRITE_PATTERNS: &[&str] = &[
-        "rm ", "rm\t", "rm\n", "> /", ">> /",
-        "dd ", "mkfs", "fdisk", "parted",
-        "chmod 777", "sudo ", "curl -X POST", "curl -X PUT", "curl -X DELETE",
+        "rm ",
+        "rm\t",
+        "rm\n",
+        "> /",
+        ">> /",
+        "dd ",
+        "mkfs",
+        "fdisk",
+        "parted",
+        "chmod 777",
+        "sudo ",
+        "curl -X POST",
+        "curl -X PUT",
+        "curl -X DELETE",
     ];
     if matches!(tier, PermissionTier::ReadOnly) {
         for pat in WRITE_PATTERNS {
@@ -193,11 +210,8 @@ async fn run_command(cmd: &str) -> anyhow::Result<()> {
         .spawn()
         .with_context(|| format!("failed to spawn command: {cmd}"))?;
 
-    let result = tokio::time::timeout(
-        Duration::from_secs(COMMAND_TIMEOUT_SECS),
-        child.wait(),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(Duration::from_secs(COMMAND_TIMEOUT_SECS), child.wait()).await;
 
     match result {
         Ok(Ok(status)) if status.success() => Ok(()),
@@ -247,24 +261,27 @@ async fn dispatch_agent(task: &TaskRecord) -> anyhow::Result<()> {
             script_str,
         );
         check_permission(&cmd, &task.permission_tier)?;
-        run_command(&cmd).await.with_context(|| {
-            format!("agent wrapper script failed for task {}", task.id)
-        })?;
+        run_command(&cmd)
+            .await
+            .with_context(|| format!("agent wrapper script failed for task {}", task.id))?;
     }
 
     // --- 2. required_commands ---
     let commands = task.required_commands.as_deref().unwrap_or(&[]);
     if commands.is_empty() && agent_script(&task.agent, &swarm_scripts_dir).is_none() {
-        println!("[{}] no commands and no agent script — task is a no-op", task.agent);
+        println!(
+            "[{}] no commands and no agent script — task is a no-op",
+            task.agent
+        );
         return Ok(());
     }
 
     for cmd in commands {
         println!("[{}] $ {cmd}", task.agent);
         check_permission(cmd, &task.permission_tier)?;
-        run_command(cmd).await.with_context(|| {
-            format!("required_command failed for task {}: {cmd}", task.id)
-        })?;
+        run_command(cmd)
+            .await
+            .with_context(|| format!("required_command failed for task {}: {cmd}", task.id))?;
     }
 
     Ok(())

@@ -4288,7 +4288,7 @@ pub struct IMDFind(::windows_core::IUnknown);
 impl IMDFind {
     pub unsafe fn FindCell(&self, ulstartingordinal: usize, rgpwszmember: &[::windows_core::PCWSTR]) -> ::windows_core::Result<usize> {
         let mut result__ = ::std::mem::zeroed();
-        (::windows_core::Interface::vtable(self).FindCell)(::windows_core::Interface::as_raw(self), ulstartingordinal, rgpwszmember.len().try_into().unwrap(), ::core::mem::transmute(rgpwszmember.as_ptr()), &mut result__).from_abi(result__)
+        (::windows_core::Interface::vtable(self).FindCell)(::windows_core::Interfacez:as_raw(self), ulstartingordinal, rgpwszmember.len().try_into().unwrap(), ::core::mem::transmute(rgpwszmember.as_ptr()), &mut result__).from_abi(result__)
     }
     pub unsafe fn FindTuple(&self, ulaxisidentifier: u32, ulstartingordinal: usize, rgpwszmember: &[::windows_core::PCWSTR]) -> ::windows_core::Result<u32> {
         let mut result__ = ::std::mem::zeroed();

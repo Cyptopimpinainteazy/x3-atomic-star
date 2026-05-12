@@ -207,6 +207,16 @@ pub mod pallet {
         /// swarm of suspicious settlement behaviour.  Wire `x3_security_events::NoOpHook` in
         /// tests and runtimes that do not yet have a live security subscriber.
         type SecurityHook: x3_security_events::SecurityEventHook<BlockNumberFor<Self>>;
+
+        /// Protocol fee on every completed trade batch, in basis points (1/10_000).
+        /// Charged from the submitter's native X3 balance on the success path.
+        /// Set to 0 to disable.  RC-1 default: 5 (0.05 %).
+        #[pallet::constant]
+        type ProtocolFeeBps: Get<u32>;
+
+        /// Account that receives collected protocol trade fees (on-chain treasury).
+        #[pallet::constant]
+        type ProtocolTreasury: Get<Self::AccountId>;
     }
 
     /// Active trade batches indexed by batch_id.
@@ -352,6 +362,11 @@ pub mod pallet {
             total_input: u128,
             total_output: u128,
             gas_used: u64,
+        },
+        /// Protocol fee collected on a successful trade batch.
+        ProtocolFeeCollected {
+            who: T::AccountId,
+            fee: BalanceOf<T>,
         },
         /// A trade batch failed and was rolled back.
         TradeBatchFailed {
@@ -673,6 +688,28 @@ pub mod pallet {
 
                     let total_input: u128 = batch.legs.iter().map(|l| l.amount_in).sum();
                     TotalVolume::<T>::mutate(|v| *v = v.saturating_add(total_input));
+
+                    // ── Protocol trade fee (best-effort, does not block success) ──
+                    let fee_bps = T::ProtocolFeeBps::get() as u128;
+                    if fee_bps > 0 {
+                        let fee_raw = total_input.saturating_mul(fee_bps).saturating_div(10_000);
+                        if fee_raw > 0 {
+                            let fee: BalanceOf<T> = fee_raw.saturated_into();
+                            if <T as Config>::Currency::transfer(
+                                &who,
+                                &T::ProtocolTreasury::get(),
+                                fee,
+                                frame_support::traits::ExistenceRequirement::KeepAlive,
+                            )
+                            .is_ok()
+                            {
+                                Self::deposit_event(Event::ProtocolFeeCollected {
+                                    who: who.clone(),
+                                    fee,
+                                });
+                            }
+                        }
+                    }
 
                     // --- Settlement bridge: register completed batch ---
                     let secret_seed = (batch_id.as_bytes(), current_block.to_le_bytes());

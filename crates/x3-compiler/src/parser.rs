@@ -53,7 +53,11 @@ pub struct Token {
 /// Parse errors.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
-    UnexpectedToken { expected: String, got: String, line: u32 },
+    UnexpectedToken {
+        expected: String,
+        got: String,
+        line: u32,
+    },
     UnexpectedEof,
     InvalidLiteral(String),
 }
@@ -109,10 +113,17 @@ pub enum BinOp {
 /// A statement node.
 #[derive(Clone, Debug)]
 pub enum Stmt {
-    Let { name: String, ty: Option<TypeExpr>, value: Expr },
+    Let {
+        name: String,
+        ty: Option<TypeExpr>,
+        value: Expr,
+    },
     Return(Option<Expr>),
     Expr(Expr),
-    While { cond: Expr, body: Box<Expr> },
+    While {
+        cond: Expr,
+        body: Box<Expr>,
+    },
 }
 
 /// A function parameter.
@@ -159,7 +170,8 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             '/' if {
                 chars.next();
                 chars.peek() == Some(&'/')
-            } => {
+            } =>
+            {
                 // line comment
                 while chars.peek().map(|&c| c != '\n').unwrap_or(false) {
                     chars.next();
@@ -173,7 +185,11 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                     col += 1;
                 }
                 let n: i64 = num.parse().map_err(|_| ParseError::InvalidLiteral(num))?;
-                tokens.push(Token { kind: TokenKind::Int(n), line, col: start_col });
+                tokens.push(Token {
+                    kind: TokenKind::Int(n),
+                    line,
+                    col: start_col,
+                });
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let start_col = col;
@@ -198,10 +214,18 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                     "false" => TokenKind::Bool(false),
                     _ => TokenKind::Ident(ident),
                 };
-                tokens.push(Token { kind, line, col: start_col });
+                tokens.push(Token {
+                    kind,
+                    line,
+                    col: start_col,
+                });
             }
             '+' => {
-                tokens.push(Token { kind: TokenKind::Plus, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Plus,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
@@ -211,18 +235,34 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                 if chars.peek() == Some(&'>') {
                     chars.next();
                     col += 1;
-                    tokens.push(Token { kind: TokenKind::Arrow, line, col: col - 2 });
+                    tokens.push(Token {
+                        kind: TokenKind::Arrow,
+                        line,
+                        col: col - 2,
+                    });
                 } else {
-                    tokens.push(Token { kind: TokenKind::Minus, line, col: col - 1 });
+                    tokens.push(Token {
+                        kind: TokenKind::Minus,
+                        line,
+                        col: col - 1,
+                    });
                 }
             }
             '*' => {
-                tokens.push(Token { kind: TokenKind::Star, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Star,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             '/' => {
-                tokens.push(Token { kind: TokenKind::Slash, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Slash,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
@@ -232,9 +272,17 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                 if chars.peek() == Some(&'=') {
                     chars.next();
                     col += 1;
-                    tokens.push(Token { kind: TokenKind::EqEq, line, col: col - 2 });
+                    tokens.push(Token {
+                        kind: TokenKind::EqEq,
+                        line,
+                        col: col - 2,
+                    });
                 } else {
-                    tokens.push(Token { kind: TokenKind::Eq, line, col: col - 1 });
+                    tokens.push(Token {
+                        kind: TokenKind::Eq,
+                        line,
+                        col: col - 1,
+                    });
                 }
             }
             '!' => {
@@ -243,51 +291,91 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                 if chars.peek() == Some(&'=') {
                     chars.next();
                     col += 1;
-                    tokens.push(Token { kind: TokenKind::BangEq, line, col: col - 2 });
+                    tokens.push(Token {
+                        kind: TokenKind::BangEq,
+                        line,
+                        col: col - 2,
+                    });
                 }
             }
             '<' => {
-                tokens.push(Token { kind: TokenKind::Lt, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Lt,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             '>' => {
-                tokens.push(Token { kind: TokenKind::Gt, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Gt,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             '(' => {
-                tokens.push(Token { kind: TokenKind::LParen, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::LParen,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             ')' => {
-                tokens.push(Token { kind: TokenKind::RParen, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::RParen,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             '{' => {
-                tokens.push(Token { kind: TokenKind::LBrace, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::LBrace,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             '}' => {
-                tokens.push(Token { kind: TokenKind::RBrace, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::RBrace,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             ':' => {
-                tokens.push(Token { kind: TokenKind::Colon, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Colon,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             ',' => {
-                tokens.push(Token { kind: TokenKind::Comma, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Comma,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
             ';' => {
-                tokens.push(Token { kind: TokenKind::Semicolon, line, col });
+                tokens.push(Token {
+                    kind: TokenKind::Semicolon,
+                    line,
+                    col,
+                });
                 chars.next();
                 col += 1;
             }
@@ -297,7 +385,11 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             }
         }
     }
-    tokens.push(Token { kind: TokenKind::Eof, line, col });
+    tokens.push(Token {
+        kind: TokenKind::Eof,
+        line,
+        col,
+    });
     Ok(tokens)
 }
 

@@ -1869,7 +1869,7 @@ pub struct SIPAEVENT_SBCP_INFO_PAYLOAD_V1 {
     pub VarData: [u8; 1],
 }
 impl ::core::marker::Copy for SIPAEVENT_SBCP_INFO_PAYLOAD_V1 {}
-impl ::core::clone::Clone for SIPAEVENT_SBCP_INFO_PAYLOAD_V1 {
+impl ::core::clone::Clone for SIPAEVENT_SBCP_INFO_TAYLOAD_V1 {
     fn clone(&self) -> Self {
         *self
     }

@@ -198,6 +198,36 @@ claims:
       - X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json
       - X3-contracts/evm/contracts/flashloan/X3Flashloan.sol
       - X3-contracts/svm/programs/x3_core/src/lib.rs
+
+  x3.quantum.starshield_red_team:
+    statement: "StarShield performs an internal quantum-readiness red-team assessment for X3's own cryptographic exposure and migration readiness."
+    criticality: S1
+    tags: [quantum, red-team, readiness, security]
+    status: UNVERIFIED
+    evidence_required:
+      - crypto_inventory_report
+      - quantum_exposure_score_report
+      - pqc_migration_plan
+      - validator_key_rotation_report
+      - bridge_attestation_report
+      - quantum_readiness_report
+    evidence: []
+    blockers:
+      - "StarShield report generation not completed"
+
+  x3.quantum.pqc_migration_roadmap:
+    statement: "X3 maintains a NIST-aligned post-quantum migration roadmap for validator identity, bridge attestations, wallet signing, and governance approvals."
+    criticality: S1
+    tags: [quantum, pqc, roadmap, security]
+    status: UNVERIFIED
+    evidence_required:
+      - quantum_readiness_roadmap
+      - crypto_bill_of_materials
+      - hybrid_signature_design
+      - proofforge_claim_receipt
+    evidence: []
+    blockers:
+      - "PQC migration documentation not published"
       - formal-proofs/tla/contracts/CrossVmParity.tla
       - proof/receipts/claims/x3.contracts.evm_svm_parity.receipt.json
     blockers: []

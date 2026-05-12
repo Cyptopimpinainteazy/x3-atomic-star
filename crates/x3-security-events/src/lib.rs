@@ -43,7 +43,9 @@ use scale_info::TypeInfo;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Category of the security event.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+)]
 pub enum SecurityEventKind {
     /// An on-chain invariant check found a breach.
     InvariantBreach,

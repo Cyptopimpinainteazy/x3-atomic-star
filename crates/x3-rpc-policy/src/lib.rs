@@ -28,7 +28,9 @@ use scale_info::TypeInfo;
 /// (PublicFallback).
 ///
 /// See §3 of `docs/RPC_OPERATIONAL_POLICY.md` for the full tier definitions.
-#[derive(Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub enum ProviderTier {
     /// Tier 0: X3-owned infrastructure. No external rate limits; full custom
     /// method support; must maintain sync within 2 blocks of network tip.
@@ -50,7 +52,9 @@ pub enum ProviderTier {
 ///
 /// The failover router filters the candidate provider pool by chain family
 /// before scoring (see §5 of `docs/RPC_OPERATIONAL_POLICY.md`).
-#[derive(Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub enum ChainFamily {
     /// Substrate / Polkadot-compatible JSON-RPC endpoint (`chain_*`, `state_*`,
     /// `author_*`, and custom `x3_*` namespaces).
@@ -81,7 +85,9 @@ pub enum ChainFamily {
 /// | Block drift | 15 points |
 ///
 /// See §4.2 of `docs/RPC_OPERATIONAL_POLICY.md` for the full penalty tables.
-#[derive(Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct ProviderHealthScore {
     /// Composite health score in [0, 100].  100 is perfect; 0 means offline.
     pub score: u8,
@@ -104,7 +110,9 @@ pub struct ProviderHealthScore {
 ///
 /// The status classification maps directly to the score thresholds defined in
 /// §4.3 of `docs/RPC_OPERATIONAL_POLICY.md`.
-#[derive(Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub enum ProviderStatus {
     /// Score ≥ 60 and all signal thresholds within bounds.  Normal routing.
     Healthy,
@@ -125,7 +133,9 @@ pub enum ProviderStatus {
 /// This type is intentionally separate from [`ProviderHealthScore`] so that
 /// configuration can be stored on-chain or in genesis without carrying
 /// mutable runtime state.
-#[derive(Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen)]
+#[derive(
+    Encode, Decode, TypeInfo, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+)]
 pub struct ProviderConfig {
     /// Operational tier (Tier 0 / 1 / 2).
     pub tier: ProviderTier,
