@@ -27,8 +27,8 @@ members = [
     "crates/x3-appzone-factory",
     "crates/x3-pq",
     "crates/evm-integration",
-    "crates/svm-integration",
-    "crates/svm-counter",
+    # "crates/svm-integration",  # excluded: solana-program 3.x mixes solana-address 1.x/2.x (unfixable without upstream fix)
+    # "crates/svm-counter",       # excluded: same solana-address dual-version conflict
     "crates/cross-vm-bridge",
     "crates/external-chains",
     "crates/x3-bridge",
@@ -417,6 +417,8 @@ errno = { path = "patches/errno" }
 expander = { path = "patches/expander" }
 # Fix getrandom for wasm32-unknown-unknown (Substrate WASM runtime)
 getrandom = { path = "patches/getrandom" }
+# Fix solana-program-entrypoint 3.1.1: downgrade solana-pubkey 4.x -> 3.x so AccountInfo::new types are consistent (avoids solana-address 1.x/2.x dual-version E0308)
+solana-program-entrypoint = { path = "patches/solana-program-entrypoint" }
 # core2 0.4.0 was yanked from crates.io; pin to local copy.
 core2 = { path = "patches/core2" }
 # Patch native crates that pulled getrandom 0.3/0.4 back down to 0.2.17

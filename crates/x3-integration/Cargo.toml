@@ -15,7 +15,7 @@ x3-verifier = { path = "../x3-verifier", optional = true }
 
 # Cross-VM executor traits (real backends are provided by the caller)
 x3-evm-integration = { path = "../evm-integration", default-features = false }
-x3-svm-integration = { path = "../svm-integration", default-features = false }
+x3-svm-integration = { path = "../svm-integration", default-features = false, optional = true }
 
 # Substrate primitives
 sp-core = { workspace = true, default-features = false }
@@ -57,7 +57,7 @@ std = [
     "log/std",
     "x3-common/std",
     "x3-evm-integration/std",
-    "x3-svm-integration/std",
+    # x3-svm-integration excluded from std: solana-program 3.x dual solana-address conflict
     "x3-vm",
     "x3-compiler",
     "x3-backend",

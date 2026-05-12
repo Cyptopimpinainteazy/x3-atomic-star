@@ -11,7 +11,7 @@
 
 [package]
 edition = "2021"
-rust-version = "1.89.0"
+rust-version = "1.88.0"
 name = "solana-hash"
 version = "4.3.0"
 authors = ["Anza Maintainers <maintainers@anza.xyz>"]
