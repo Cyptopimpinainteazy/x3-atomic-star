@@ -16,6 +16,8 @@ use sp_std::vec::Vec;
 pub mod state;
 
 /// EVM precompile contracts (sha256, keccak256, x3 cross-vm precompile)
+/// Uses alloc types (String, Box<dyn>); only available in std builds.
+#[cfg(feature = "std")]
 pub mod precompiles;
 
 /// Minimal no-std EVM executor (SputnikVM) — available in both std and no-std builds

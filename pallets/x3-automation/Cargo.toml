@@ -27,7 +27,6 @@ default = ["std"]
 std = [
 	"parity-scale-codec/std",
 	"scale-info/std",
-	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
 	"pallet-balances/std",
@@ -38,6 +37,7 @@ std = [
 	"x3-automation/std",
 ]
 runtime-benchmarks = [
+	"dep:frame-benchmarking",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",

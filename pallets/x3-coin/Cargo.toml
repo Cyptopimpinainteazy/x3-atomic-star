@@ -10,16 +10,16 @@ codec = { package = "parity-scale-codec", version = "3.7", default-features = fa
   "derive",
 ] }
 scale-info = { version = "2.11", default-features = false, features = ["derive"] }
-serde = { version = "1.0", optional = true }
+serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 
-frame-support = { workspace = true }
-frame-system = { workspace = true }
-frame-benchmarking = { workspace = true, optional = true }
-sp-runtime = { workspace = true }
-sp-api = { workspace = true }
-sp-std = { workspace = true }
-sp-io = { workspace = true }
-sp-core = { workspace = true }
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+frame-benchmarking = { workspace = true, default-features = false, optional = true }
+sp-runtime = { workspace = true, default-features = false }
+sp-api = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
 
 # X3-specific dependencies
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
@@ -33,10 +33,9 @@ default = ["std"]
 std = [
   "codec/std",
   "scale-info/std",
-  "serde",
+  "serde?/std",
   "frame-support/std",
   "frame-system/std",
-  "frame-benchmarking/std",
   "sp-runtime/std",
   "sp-api/std",
   "sp-std/std",
@@ -45,6 +44,7 @@ std = [
   "pallet-x3-kernel/std",
 ]
 runtime-benchmarks = [
+  "dep:frame-benchmarking",
   "frame-benchmarking/runtime-benchmarks",
   "frame-support/runtime-benchmarks",
   "frame-system/runtime-benchmarks",

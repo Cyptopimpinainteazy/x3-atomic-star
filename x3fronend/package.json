@@ -13,7 +13,10 @@
     "smoke:playwright": "node tests/playwright-smoke.js"
   },
   "dependencies": {
+    "@polkadot/api": "^16.5.6",
+    "@polkadot/extension-dapp": "^0.63.1",
     "@tailwindcss/postcss": "^4.2.1",
+    "@tanstack/react-query": "^5.100.10",
     "clsx": "^2.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

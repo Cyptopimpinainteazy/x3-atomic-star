@@ -70,7 +70,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use pallet_x3_invariants;
     use sp_core::H256;
-    use sp_runtime::traits::{BlakeTwo256, Hash, Saturating, SaturatedConversion, Zero};
+    use sp_runtime::traits::{BlakeTwo256, Hash, SaturatedConversion, Saturating, Zero};
     use sp_std::prelude::*;
 
     type BalanceOf<T> =
@@ -90,7 +90,9 @@ pub mod pallet {
     // ========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config<RuntimeEvent: From<Event<Self>>> + pallet_x3_invariants::Config {
+    pub trait Config:
+        frame_system::Config<RuntimeEvent: From<Event<Self>>> + pallet_x3_invariants::Config
+    {
         /// Currency for staking, rewards, and slashing.
         type Currency: ReservableCurrency<Self::AccountId>;
 

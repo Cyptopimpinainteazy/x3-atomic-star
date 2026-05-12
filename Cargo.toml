@@ -413,6 +413,8 @@ errno = { path = "patches/errno" }
 # Pin ar_archive_writer to a rustc 1.85 compatible implementation.
 # NOTE: currently unused in the active dependency graph.
 # ar_archive_writer = { path = "patches/ar_archive_writer" }
+# Prevent expander from activating blake2/std which leaks into wasm32v1-none compilation via shared dep
+expander = { path = "patches/expander" }
 # Fix getrandom for wasm32-unknown-unknown (Substrate WASM runtime)
 getrandom = { path = "patches/getrandom" }
 # core2 0.4.0 was yanked from crates.io; pin to local copy.
@@ -469,12 +471,9 @@ substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint"
 # wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under
 # polkadot-sdk stable2512.
 frame-support-procedural = { path = "patches/frame-support-procedural" }
-# Enable local sc-network patches to resolve object-safety/NotificationService compatibility issues
-sc-network = { path = "patches/sc-network" }
-sc-network-common = { path = "patches/sc-network/common" }
-sc-network-light = { path = "patches/sc-network/light" }
-sc-network-sync = { path = "patches/sc-network/sync" }
-sc-network-transactions = { path = "patches/sc-network/transactions" }
+# sc-network* patches removed for RC1: the patched tree is a snapshot of an older
+# polkadot-sdk era (monolithic libp2p 0.51) and is structurally incompatible with
+# stable2512's dual libp2p/litep2p backend. Using upstream sc-network directly.
 
 [patch."https://github.com/polkadot-evm/frontier"]
 # trie-db is not in the frontier git repo so no patch needed here

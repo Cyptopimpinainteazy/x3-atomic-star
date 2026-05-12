@@ -2,6 +2,8 @@
 /// Designate 3 guardians who can collectively recover your wallet
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
+#[allow(unused_imports)]
+use sp_std::vec;
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]

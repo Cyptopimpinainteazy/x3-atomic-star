@@ -19,9 +19,7 @@ evm = { workspace = true, default-features = false }
 pallet-evm = { workspace = true, default-features = false, optional = true }
 fp-evm = { workspace = true, default-features = false, optional = true }
 
-# Ethereum types
-ethereum = { version = "0.14", default-features = false, features = ["with-codec"] }
-ethereum-types = { version = "0.14", default-features = false }
+# EVM numeric types
 primitive-types = { version = "0.12.2", default-features = false }
 
 # Serialization
@@ -41,8 +39,6 @@ std = [
     "sp-runtime/std",
     "sp-std/std",
     "sp-io/std",
-    "ethereum/std",
-    "ethereum-types/std",
     "parity-scale-codec/std",
     "scale-info/std",
     "log/std",

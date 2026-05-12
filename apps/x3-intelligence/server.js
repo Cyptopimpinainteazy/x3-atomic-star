@@ -9,7 +9,7 @@ const app = express();
 const PORT = 8001;
 
 // CORS and JSON middleware
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'https://x3.network' }));
 app.use(express.json());
 
 // GPU Validator endpoint

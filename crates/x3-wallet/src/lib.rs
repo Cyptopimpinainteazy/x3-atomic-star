@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(unused, dead_code, deprecated)]
 
+use sp_std::vec;
+
 // x3-wallet: Multi-featured wallet management system
 // Provides institutional-grade wallet security, DeFi integration, and institutional features
 

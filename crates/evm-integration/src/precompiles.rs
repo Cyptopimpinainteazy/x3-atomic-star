@@ -4,7 +4,7 @@
 //! be too expensive to implement in EVM bytecode. X3 supports the standard
 //! Ethereum precompiles plus X3-specific cross-VM precompiles.
 
-use std::collections::BTreeMap;
+use sp_std::collections::btree_map::BTreeMap;
 
 /// Precompile address (EVM addresses 0x01 through 0xFF are reserved).
 pub type PrecompileAddr = [u8; 20];

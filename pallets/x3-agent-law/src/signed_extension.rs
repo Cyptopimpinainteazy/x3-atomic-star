@@ -1,11 +1,11 @@
 use crate::{
     law_engine::{PolicyContext, PolicyEngine},
     types::PolicyResult,
-    ActivePolicies, Blacklist, Config, ExtrinsicCountThisEpoch, LastEpoch, Pallet,
-    TasksThisBlock,
+    ActivePolicies, Blacklist, Config, ExtrinsicCountThisEpoch, LastEpoch, Pallet, TasksThisBlock,
 };
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{pallet_prelude::TransactionSource, traits::Get, weights::Weight};
+use frame_system::pallet_prelude::BlockNumberFor;
 use scale_info::TypeInfo;
 use sp_runtime::{
     impl_tx_ext_default,
@@ -14,7 +14,6 @@ use sp_runtime::{
     },
     transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction},
 };
-use frame_system::pallet_prelude::BlockNumberFor;
 use sp_std::{fmt, marker::PhantomData, prelude::*};
 
 /// SignedExtension for Agent Law enforcement
@@ -155,7 +154,9 @@ impl<T: Config + Send + Sync + 'static> AgentLawCheck<T> {
         }
     }
 
-    fn extract_requested_capability(call: &<T as frame_system::Config>::RuntimeCall) -> Option<Vec<u8>> {
+    fn extract_requested_capability(
+        call: &<T as frame_system::Config>::RuntimeCall,
+    ) -> Option<Vec<u8>> {
         // TODO: map runtime calls to agent capability labels.
         // This currently returns `None` for generic calls and should be extended
         // as the capability model is integrated with X3 call routing.

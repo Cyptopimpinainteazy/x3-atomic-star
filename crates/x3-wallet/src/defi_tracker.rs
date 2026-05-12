@@ -1,6 +1,8 @@
 /// DeFi Position Tracker — Unified view of LP positions, staking, and borrows
 /// Track liquidity pool shares, staking positions, and open borrows
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+#[allow(unused_imports)]
+use sp_std::vec;
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

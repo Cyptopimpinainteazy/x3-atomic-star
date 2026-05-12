@@ -1,6 +1,7 @@
 //! Core slashing types.
 
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use x3_proof::types::{AgentIdentity, BlockHeight, Hash256, IntentId};
 
 /// Amount in base units (e.g., smallest denomination).
@@ -11,6 +12,7 @@ pub type Amount = u128;
 pub struct BondId(pub u64);
 
 /// Reason for slashing — exhaustive, deterministic.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SlashReason {
     /// Execution failed within a slashable scope.
@@ -85,6 +87,7 @@ impl SlashSeverity {
 }
 
 /// A bond posted by an agent to participate in execution.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Bond {
     /// Unique bond identifier.
@@ -119,6 +122,7 @@ pub enum BondStatus {
 }
 
 /// A slash event — the immutable record of punishment.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SlashEvent {
     /// Unique slash identifier.
@@ -140,6 +144,7 @@ pub struct SlashEvent {
 }
 
 /// Configuration for the slashing engine.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlashConfig {
     /// Minimum bond amount required for execution.
@@ -152,6 +157,7 @@ pub struct SlashConfig {
     pub expiry_grace_period: u64,
 }
 
+#[cfg(feature = "std")]
 impl Default for SlashConfig {
     fn default() -> Self {
         Self {

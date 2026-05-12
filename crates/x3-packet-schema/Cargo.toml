@@ -9,7 +9,7 @@ parity-scale-codec = { workspace = true, features = ["max-encoded-len"] }
 scale-info = { workspace = true }
 frame-support = { workspace = true }
 crc32fast = { version = "1.4", default-features = false }
-sp-core = { workspace = true, features = ["full_crypto"] }
+sp-core = { workspace = true }
 sp-io = { workspace = true }
 
 [features]

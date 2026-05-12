@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { useChainData } from '../hooks/useChainData.js';
+import { useWallet } from '../hooks/useWallet.js';
 
 /* ═══════════════════════════════════════════════════════════════════════
    X3 CHAIN DRIVE  ·  A Bruno Simon-inspired 3D portfolio experience
@@ -20,51 +23,74 @@ function makeTex(w, h, draw) {
   return t;
 }
 
-// Cyberpunk neon grid with circuit traces + glowing nodes
+// Alien bioluminescent terrain — hexagonal crystal lattice + organic veins
 function makeGroundTex() {
   return makeTex(512, 512, (ctx, W, H) => {
-    ctx.fillStyle = '#070718';
+    // Deep void base — alien planet surface
+    ctx.fillStyle = '#03030b';
     ctx.fillRect(0, 0, W, H);
-    // Major grid — cyan
-    const step = 64;
-    ctx.strokeStyle = 'rgba(0,180,255,0.22)';
-    ctx.lineWidth = 1.5;
-    for (let x = 0; x <= W; x += step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    for (let y = 0; y <= H; y += step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-    // Minor grid — purple
-    ctx.strokeStyle = 'rgba(120,50,255,0.09)';
+    // Subtle volcanic rock cracks
+    ctx.strokeStyle = 'rgba(60,20,100,0.22)';
     ctx.lineWidth = 0.6;
-    for (let x = 0; x <= W; x += 16) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    for (let y = 0; y <= H; y += 16) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-    // Circuit traces
-    const rngStep = () => (Math.floor(Math.random() * 8)) * step;
-    const dirs = [[step,0],[-step,0],[0,step],[0,-step]];
-    for (let i = 0; i < 22; i++) {
-      ctx.strokeStyle = Math.random()>0.5 ? 'rgba(0,212,255,0.20)' : 'rgba(168,85,247,0.18)';
-      ctx.lineWidth = 1;
-      let cx = rngStep(), cy = rngStep();
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      for (let s = 0; s < 5; s++) {
-        const [dx,dy] = dirs[(s + i) % 4];
-        cx = Math.max(0, Math.min(W, cx+dx));
-        cy = Math.max(0, Math.min(H, cy+dy));
-        ctx.lineTo(cx, cy);
+    for (let i = 0; i < 30; i++) {
+      let vx = Math.random() * W, vy = Math.random() * H;
+      ctx.beginPath(); ctx.moveTo(vx, vy);
+      for (let s = 0; s < 6; s++) {
+        vx = Math.max(0, Math.min(W, vx + (Math.random() - 0.5) * 55));
+        vy = Math.max(0, Math.min(H, vy + (Math.random() - 0.5) * 55));
+        ctx.lineTo(vx, vy);
       }
       ctx.stroke();
     }
-    // Glowing intersection nodes
-    for (let gx = step; gx < W; gx += step) {
-      for (let gy = step; gy < H; gy += step) {
-        if (Math.random() > 0.58) {
-          const r = Math.random() * 4 + 2.5;
-          const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 4);
-          grad.addColorStop(0, Math.random()>0.45 ? 'rgba(0,212,255,0.95)' : 'rgba(168,85,247,0.9)');
-          grad.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = grad;
-          ctx.beginPath(); ctx.arc(gx, gy, r * 4, 0, Math.PI*2); ctx.fill();
+    // Hexagonal crystal lattice (bioluminescent teal)
+    const hexR = 26;
+    const hexH = hexR * Math.sqrt(3);
+    ctx.strokeStyle = 'rgba(0,255,180,0.11)';
+    ctx.lineWidth = 0.9;
+    for (let row = -1; row < H / hexH + 2; row++) {
+      for (let col = -1; col < W / (hexR * 1.5) + 2; col++) {
+        const hcx = col * hexR * 3 + (row % 2) * hexR * 1.5;
+        const hcy = row * hexH;
+        ctx.beginPath();
+        for (let s = 0; s < 6; s++) {
+          const a = (Math.PI / 3) * s - Math.PI / 6;
+          const px = hcx + hexR * 0.86 * Math.cos(a);
+          const py = hcy + hexR * 0.86 * Math.sin(a);
+          s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
         }
+        ctx.closePath();
+        ctx.stroke();
       }
     }
+    // Organic bioluminescent veins (violet/purple)
+    ctx.strokeStyle = 'rgba(160,40,255,0.18)';
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 22; i++) {
+      let vx = Math.random() * W, vy = Math.random() * H;
+      ctx.beginPath(); ctx.moveTo(vx, vy);
+      for (let s = 0; s < 10; s++) {
+        vx = Math.max(0, Math.min(W, vx + (Math.random() - 0.5) * 70));
+        vy = Math.max(0, Math.min(H, vy + (Math.random() - 0.5) * 70));
+        ctx.lineTo(vx, vy);
+      }
+      ctx.stroke();
+    }
+    // Bioluminescent glowing crystal nodes
+    for (let i = 0; i < 100; i++) {
+      const nx = Math.random() * W, ny = Math.random() * H;
+      const nr = 0.8 + Math.random() * 2.5;
+      const cols = ['rgba(0,255,180,0.9)','rgba(0,140,255,0.85)','rgba(200,60,255,0.85)','rgba(0,230,255,0.75)','rgba(255,120,40,0.6)'];
+      const c = cols[Math.floor(Math.random() * cols.length)];
+      const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr * 7);
+      grad.addColorStop(0, c); grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(nx, ny, nr * 7, 0, Math.PI * 2); ctx.fill();
+    }
+    // Faint energy grid overlay
+    ctx.strokeStyle = 'rgba(0,60,160,0.06)';
+    ctx.lineWidth = 0.4;
+    for (let x = 0; x <= W; x += 32) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 32) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
   });
 }
 
@@ -236,7 +262,8 @@ function buildUFO(scene) {
 }
 
 /* ──────────────── World Builder ──────────────── */
-function buildWorld(scene) {
+function buildWorld(scene, chainRefs = {}) {
+  const { genesisThreeRef, valPylonArr } = chainRefs;
   const hotspots = [];
 
   // Helper: create a glowing pylon
@@ -304,6 +331,88 @@ function buildWorld(scene) {
     return g;
   }
 
+  // ── Alien city cluster builder — creates a dense district of towers around a hotspot ──
+  function buildClusterTowers(cx, cz, mainHex, altHex, count, spread) {
+    const mainC = new THREE.Color(mainHex);
+    const altC  = new THREE.Color(altHex);
+    for (let i = 0; i < count; i++) {
+      const angle  = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+      const r      = spread * (0.28 + Math.random() * 0.72);
+      const tx     = cx + Math.cos(angle) * r;
+      const tz     = cz + Math.sin(angle) * r;
+      const h      = 20 + Math.random() * 42;  // 20–62 units tall — way above ship at y=8
+      const bw     = 1.5 + Math.random() * 2.8;
+      const bd     = 1.0 + Math.random() * 2.4;
+      const tColor = Math.random() > 0.5 ? mainC : altC;
+
+      // Main tower body — alien dark material with emissive accent
+      const tower = new THREE.Mesh(
+        new THREE.BoxGeometry(bw, h, bd),
+        new THREE.MeshStandardMaterial({
+          color: 0x05050e, emissive: tColor,
+          emissiveIntensity: 0.06 + Math.random() * 0.12,
+          metalness: 0.88, roughness: 0.20,
+        })
+      );
+      tower.position.set(tx, h / 2, tz);
+      tower.castShadow = true;
+      scene.add(tower);
+
+      // Glowing window bands
+      const bandCount = Math.max(2, Math.floor(h / 7));
+      for (let b = 0; b < bandCount; b++) {
+        if (Math.random() > 0.40) {
+          const band = new THREE.Mesh(
+            new THREE.BoxGeometry(bw + 0.06, 0.22, bd + 0.06),
+            new THREE.MeshStandardMaterial({
+              color: tColor.getHex(), emissive: tColor,
+              emissiveIntensity: 1.6 + Math.random() * 1.2,
+            })
+          );
+          band.position.set(tx, b * (h / bandCount) + 1.8, tz);
+          scene.add(band);
+        }
+      }
+
+      // Tapered crystal spire on top (half of towers)
+      if (Math.random() > 0.45) {
+        const spire = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.05, bw * 0.40, h * 0.30, 4),
+          new THREE.MeshStandardMaterial({ color: tColor.getHex(), emissive: tColor, emissiveIntensity: 0.95 })
+        );
+        spire.position.set(tx, h + h * 0.15, tz);
+        scene.add(spire);
+      }
+
+      // Top point light (every 3rd tower)
+      if (i % 3 === 0) {
+        const ptl = new THREE.PointLight(tColor.getHex(), 0.75, 30);
+        ptl.position.set(tx, h + 1.5, tz);
+        scene.add(ptl);
+      }
+    }
+
+    // Hexagonal ground plaza pads
+    for (let p = 0; p < 8; p++) {
+      const pa = (p / 8) * Math.PI * 2;
+      const pr = spread * 0.28;
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.8, 1.8, 0.20, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x07070d, emissive: new THREE.Color(mainHex),
+          emissiveIntensity: 0.50, metalness: 0.7, roughness: 0.3,
+        })
+      );
+      pad.position.set(cx + Math.cos(pa) * pr, 0.10, cz + Math.sin(pa) * pr);
+      scene.add(pad);
+    }
+
+    // Central atmospheric city light
+    const cl = new THREE.PointLight(mainHex, 2.5, spread * 3.0);
+    cl.position.set(cx, 16, cz);
+    scene.add(cl);
+  }
+
   // ── Ground patches ──
   const patchColors = ['#151530', '#12122e', '#1a1a3a', '#0f0f28', '#161636'];
   for (let i = 0; i < 40; i++) {
@@ -353,7 +462,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 1: GENESIS MONUMENT  (0, 0, -12)
+  // HOTSPOT 1: GENESIS MONUMENT  (0, 0, -18)
   // ══════════════════════════════════════════
   {
     const g = new THREE.Group();
@@ -372,9 +481,11 @@ function buildWorld(scene) {
     );
     tip.position.y = 7.4;
     g.add(tip);
+    genesisThreeRef.current.tip = tip; // chain-reactive
     const ptLight = new THREE.PointLight('#00ffff', 2.0, 18);
     ptLight.position.y = 8;
     g.add(ptLight);
+    genesisThreeRef.current.ptLight = ptLight; // chain-reactive
     // Base platform steps
     for (let step = 0; step < 3; step++) {
       const s = new THREE.Mesh(
@@ -401,11 +512,11 @@ function buildWorld(scene) {
       ring.userData.rotSpeedX = 0.004 + r * 0.002;
       ring.userData.rotSpeedY = 0.007 + r * 0.003;
     }
-    g.position.set(0, 0, -12);
+    g.position.set(0, 0, -18);
     scene.add(g);
     hotspots.push({
       mesh: g,
-      pos: new THREE.Vector3(0, 0, -12),
+      pos: new THREE.Vector3(0, 0, -18),
       radius: 9,
       title: 'Genesis Block',
       emoji: '⛩',
@@ -416,7 +527,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 2: VALIDATOR FOREST  (28, 0, 0)
+  // HOTSPOT 2: VALIDATOR FOREST  (130, 0, 0)
   // ══════════════════════════════════════════
   {
     const valColors = ['#00d4ff', '#a855f7', '#22d3ee', '#818cf8', '#00ffaa'];
@@ -425,23 +536,25 @@ function buildWorld(scene) {
       const r = 4.5;
       const h = 3.5 + Math.random() * 3.5;
       const c = valColors[i % valColors.length];
-      const pylon = glowyPylon('#0f0f30', c, h, 28 + Math.cos(angle) * r, Math.sin(angle) * r);
+      const pylon = glowyPylon('#0f0f30', c, h, 130 + Math.cos(angle) * r, Math.sin(angle) * r);
       // Mark one for animation
       pylon.userData.valTower = true;
       pylon.userData.pulsePhase = i * 0.9;
+      pylon.userData.valIndex = i;
+      valPylonArr.current.push(pylon); // chain-reactive
     }
     // Center console
-    const console1 = platform(2.5, 2.5, 0.8, '#0d0d2e', 28, 0);
+    const console1 = platform(2.5, 2.5, 0.8, '#0d0d2e', 130, 0);
     const screen1 = new THREE.Mesh(
       new THREE.BoxGeometry(1.8, 1.2, 0.12),
       new THREE.MeshLambertMaterial({ color: '#00d4ff', emissive: '#00d4ff', emissiveIntensity: 0.4 })
     );
-    screen1.position.set(28, 1.4, 0);
+    screen1.position.set(130, 1.4, 0);
     screen1.castShadow = false;
     scene.add(screen1);
 
     hotspots.push({
-      pos: new THREE.Vector3(28, 0, 0),
+      pos: new THREE.Vector3(130, 0, 0),
       radius: 10,
       title: 'Validator Forest',
       emoji: '🛡',
@@ -453,7 +566,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 3: DEX ARENA  (-28, 0, 0)
+  // HOTSPOT 3: DEX ARENA  (-130, 0, 0)
   // ══════════════════════════════════════════
   {
     // Ring structure
@@ -462,7 +575,7 @@ function buildWorld(scene) {
       new THREE.MeshLambertMaterial({ color: '#1a0a2e', emissive: '#ff6600', emissiveIntensity: 0.3 })
     );
     arena.rotation.x = Math.PI / 2;
-    arena.position.set(-28, 0.5, 0);
+    arena.position.set(-130, 0.5, 0);
     arena.castShadow = true;
     scene.add(arena);
     arena.userData.spinY = 0.003;
@@ -474,7 +587,7 @@ function buildWorld(scene) {
         new THREE.CylinderGeometry(0.18, 0.25, 2.5, 8),
         new THREE.MeshLambertMaterial({ color: '#200a2e' })
       );
-      col.position.set(-28 + Math.cos(angle) * 3.5, 1.25, Math.sin(angle) * 3.5);
+      col.position.set(-130 + Math.cos(angle) * 3.5, 1.25, Math.sin(angle) * 3.5);
       col.castShadow = true;
       scene.add(col);
     }
@@ -484,16 +597,16 @@ function buildWorld(scene) {
       new THREE.IcosahedronGeometry(1.2, 1),
       new THREE.MeshLambertMaterial({ color: '#ff6600', emissive: '#ff6600', emissiveIntensity: 0.8 })
     );
-    orb.position.set(-28, 2, 0);
+    orb.position.set(-130, 2, 0);
     scene.add(orb);
     orb.userData.spinY = 0.015;
     orb.userData.bouncePhase = 0;
     const orbLight = new THREE.PointLight('#ff6600', 2, 15);
-    orbLight.position.set(-28, 2, 0);
+    orbLight.position.set(-130, 2, 0);
     scene.add(orbLight);
 
     hotspots.push({
-      pos: new THREE.Vector3(-28, 0, 0),
+      pos: new THREE.Vector3(-130, 0, 0),
       radius: 9,
       title: 'DEX Atomic Swap',
       emoji: '⬡',
@@ -505,16 +618,16 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 4: TREASURY VAULT  (0, 0, 30)
+  // HOTSPOT 4: TREASURY VAULT  (0, 0, 140)
   // ══════════════════════════════════════════
   {
     // Main vault building
-    const vaultBase = platform(8, 10, 2, '#0a0a20', 0, 30);
+    const vaultBase = platform(8, 10, 2, '#0a0a20', 0, 140);
     const vault = new THREE.Mesh(
       new THREE.BoxGeometry(6, 5, 8),
       new THREE.MeshLambertMaterial({ color: '#0d0d28', emissive: '#ffd700', emissiveIntensity: 0.06 })
     );
-    vault.position.set(0, 4.5, 30);
+    vault.position.set(0, 4.5, 140);
     vault.castShadow = true;
     scene.add(vault);
     // Columns
@@ -541,7 +654,7 @@ function buildWorld(scene) {
     scene.add(vaultLight);
 
     hotspots.push({
-      pos: new THREE.Vector3(0, 0, 30),
+      pos: new THREE.Vector3(0, 0, 140),
       radius: 10,
       title: 'Treasury Vault',
       emoji: '🏦',
@@ -553,7 +666,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 5: GRANT TOWER  (-25, 0, 22)
+  // HOTSPOT 5: GRANT TOWER  (-110, 0, -110)
   // ══════════════════════════════════════════
   {
     // Tower
@@ -562,7 +675,7 @@ function buildWorld(scene) {
         new THREE.BoxGeometry(4.5 - f * 0.25, 1.8, 4.5 - f * 0.25),
         new THREE.MeshLambertMaterial({ color: '#0a1428' })
       );
-      floor.position.set(-25, 0.9 + f * 1.8, 22);
+      floor.position.set(-110, 0.9 + f * 1.8, -110);
       floor.castShadow = true;
       floor.receiveShadow = true;
       scene.add(floor);
@@ -572,16 +685,16 @@ function buildWorld(scene) {
           new THREE.BoxGeometry(0.6, 0.5, 0.08),
           new THREE.MeshLambertMaterial({ color: '#00ff88', emissive: '#00ff88', emissiveIntensity: 0.5 })
         );
-        win.position.set(-25 + wx, 0.9 + f * 1.8, 22 + 2.3);
+        win.position.set(-110 + wx, 0.9 + f * 1.8, -107.7);
         scene.add(win);
       }
     }
     const grantLight = new THREE.PointLight('#00ff88', 1.2, 14);
-    grantLight.position.set(-25, 9, 22);
+    grantLight.position.set(-110, 9, -110);
     scene.add(grantLight);
 
     hotspots.push({
-      pos: new THREE.Vector3(-25, 0, 22),
+      pos: new THREE.Vector3(-110, 0, -110),
       radius: 9,
       title: 'Developer Grants',
       emoji: '🏗',
@@ -593,7 +706,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 6: COMPUTE CLUSTER  (25, 0, 22)
+  // HOTSPOT 6: COMPUTE CLUSTER  (110, 0, 110)
   // ══════════════════════════════════════════
   {
     // Server racks
@@ -603,7 +716,7 @@ function buildWorld(scene) {
           new THREE.BoxGeometry(0.8, 2.5, 0.4),
           new THREE.MeshLambertMaterial({ color: '#080820' })
         );
-        rack.position.set(23 + col * 1.2, 1.25, 21 + row * 1.2);
+        rack.position.set(108 + col * 1.2, 1.25, 109 + row * 1.2);
         rack.castShadow = true;
         scene.add(rack);
         // LEDs
@@ -616,17 +729,17 @@ function buildWorld(scene) {
               emissiveIntensity: 0.8,
             })
           );
-          ledMesh.position.set(23 + col * 1.2 + 0.32, 0.5 + led * 0.38, 21 + row * 1.2 + 0.24);
+          ledMesh.position.set(108 + col * 1.2 + 0.32, 0.5 + led * 0.38, 109 + row * 1.2 + 0.24);
           scene.add(ledMesh);
         }
       }
     }
     const compLight = new THREE.PointLight('#a855f7', 1.2, 14);
-    compLight.position.set(25, 4, 22);
+    compLight.position.set(110, 4, 110);
     scene.add(compLight);
 
     hotspots.push({
-      pos: new THREE.Vector3(25, 0, 22),
+      pos: new THREE.Vector3(110, 0, 110),
       radius: 9,
       title: 'Compute Marketplace',
       emoji: '🖥',
@@ -638,7 +751,7 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 7: FLASHLOAN ENGINE  (0, 0, -35)
+  // HOTSPOT 7: FLASHLOAN ENGINE  (0, 0, -150)
   // ══════════════════════════════════════════
   {
     // Cylindrical reactor
@@ -646,7 +759,7 @@ function buildWorld(scene) {
       new THREE.CylinderGeometry(2.2, 2.8, 4, 12),
       new THREE.MeshLambertMaterial({ color: '#200006', emissive: '#ff0055', emissiveIntensity: 0.15 })
     );
-    reactor.position.set(0, 2, -38);
+    reactor.position.set(0, 2, -150);
     reactor.castShadow = true;
     scene.add(reactor);
     // Rings
@@ -655,16 +768,16 @@ function buildWorld(scene) {
         new THREE.TorusGeometry(2.5 + r * 0.5, 0.12, 6, 30),
         new THREE.MeshLambertMaterial({ color: '#ff0055', emissive: '#ff0055', emissiveIntensity: 0.7 })
       );
-      ring.position.set(0, 2, -38);
+      ring.position.set(0, 2, -150);
       ring.userData.spinY = 0.012 + r * 0.005;
       scene.add(ring);
     }
     const flashLight = new THREE.PointLight('#ff0055', 2, 16);
-    flashLight.position.set(0, 4, -38);
+    flashLight.position.set(0, 4, -150);
     scene.add(flashLight);
 
     hotspots.push({
-      pos: new THREE.Vector3(0, 0, -38),
+      pos: new THREE.Vector3(0, 0, -150),
       radius: 9,
       title: 'Flashloan Engine',
       emoji: '🔥',
@@ -676,14 +789,14 @@ function buildWorld(scene) {
   }
 
   // ══════════════════════════════════════════
-  // HOTSPOT 8: WHITEPAPER LIBRARY  (30, 0, -22)
+  // HOTSPOT 8: WHITEPAPER LIBRARY  (120, 0, -110)
   // ══════════════════════════════════════════
   {
     const lib = new THREE.Mesh(
       new THREE.BoxGeometry(7, 4.5, 6),
       new THREE.MeshLambertMaterial({ color: '#0a0a1e' })
     );
-    lib.position.set(30, 2.25, -22);
+    lib.position.set(120, 2.25, -110);
     lib.castShadow = true;
     scene.add(lib);
     // Roof triangle
@@ -692,7 +805,7 @@ function buildWorld(scene) {
       new THREE.MeshLambertMaterial({ color: '#151538' })
     );
     roof.rotation.y = Math.PI / 4;
-    roof.position.set(30, 5.5, -22);
+    roof.position.set(120, 5.5, -110);
     scene.add(roof);
     // Book stacks (colorful)
     const bookColors = ['#00d4ff', '#a855f7', '#ffd700', '#00ff88', '#ff6600'];
@@ -701,13 +814,13 @@ function buildWorld(scene) {
         new THREE.BoxGeometry(0.25, 0.7 + Math.random() * 0.4, 0.4),
         new THREE.MeshLambertMaterial({ color: bookColors[i], emissive: bookColors[i], emissiveIntensity: 0.2 })
       );
-      book.position.set(28.5 + i * 0.35, 2.2, -19.5);
+      book.position.set(118.5 + i * 0.35, 2.2, -107.5);
       scene.add(book);
     }
-    sign('#e8e0c8', '#ffd700', 3.5, 0.8, 30, 1.5, -19.4, 0);
+    sign('#e8e0c8', '#ffd700', 3.5, 0.8, 120, 1.5, -107.4, 0);
 
     hotspots.push({
-      pos: new THREE.Vector3(30, 0, -22),
+      pos: new THREE.Vector3(120, 0, -110),
       radius: 9,
       title: 'Whitepaper Library',
       emoji: '📜',
@@ -721,13 +834,13 @@ function buildWorld(scene) {
   // ── Scattered decorative objects ──
   // Crystals / spires
   const crystalColors = ['#00d4ff', '#a855f7', '#00ff88', '#ffd700', '#ff6600'];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const r = 15 + Math.random() * 55;
+    const r = 20 + Math.random() * 140;
     const cx = Math.cos(angle) * r;
     const cz = Math.sin(angle) * r;
     // Avoid hotspot areas
-    const tooClose = hotspots.some(h => Math.hypot(cx - h.pos.x, cz - h.pos.z) < 6);
+    const tooClose = hotspots.some(h => Math.hypot(cx - h.pos.x, cz - h.pos.z) < 12);
     if (tooClose) continue;
     const h = 1.5 + Math.random() * 4;
     const col = crystalColors[i % crystalColors.length];
@@ -762,6 +875,17 @@ function buildWorld(scene) {
     }
   }
 
+  // ── ALIEN CITY DISTRICTS — dense building clusters around each blockchain landmark ──
+  // Each district has its own color identity and towers 20–60 units tall
+  buildClusterTowers(   0,  -18, '#00d4ff', '#a855f7', 14, 26); // GENESIS CORE — teal/violet
+  buildClusterTowers( 130,    0, '#4466ff', '#7799ee', 12, 22); // VALIDATOR DISTRICT — blue/indigo
+  buildClusterTowers(-130,    0, '#ff7700', '#ff4400', 12, 24); // ATOMIC DEX PLAZA — orange/red
+  buildClusterTowers(   0,  140, '#ffd700', '#ff9900', 12, 22); // TREASURY CITADEL — gold/amber
+  buildClusterTowers(-110, -110, '#00ff88', '#00cc66', 10, 20); // GRANT ACADEMY — emerald/green
+  buildClusterTowers( 110,  110, '#aa44ff', '#7711dd', 10, 20); // COMPUTE NEXUS — purple/violet
+  buildClusterTowers(   0, -150, '#ff0044', '#cc0033',  8, 18); // FLASHLOAN REACTOR — crimson/red
+  buildClusterTowers( 120, -110, '#ffeeaa', '#ddcc77',  8, 16); // ARCHIVE QUARTER — warm gold
+
   return hotspots;
 }
 
@@ -771,6 +895,7 @@ function buildWorld(scene) {
 export default function DriveWorld() {
   const mountRef = useRef(null);
   const minimapRef = useRef(null);
+  const mobileKeysRef = useRef({ w: false, a: false, s: false, d: false });
   const [started, setStarted] = useState(false);
   const [infoCard, setInfoCard] = useState(null);
   const [speedPct, setSpeedPct] = useState(0);
@@ -778,12 +903,33 @@ export default function DriveWorld() {
   const [enterZone, setEnterZone] = useState(null); // { title, emoji, link, color } when near navigable zone
   const enterZoneRef = useRef(null); // keep ref in sync for use inside RAF
 
+  // ── Live chain data ──
+  const chainData = useChainData();
+  const wallet    = useWallet();
+  const chainDataRef    = useRef(chainData);       // mutable ref readable in RAF without re-render
+  const blockPulseRef   = useRef({ time: -999, blockNum: 0 }); // set on each new block
+  const genesisThreeRef = useRef({});              // { ptLight, tip } — populated in scene setup
+  const valPylonArr     = useRef([]);              // validator pylon meshes — populated in scene setup
+
+  // Keep chainDataRef in sync
+  useEffect(() => { chainDataRef.current = chainData; }, [chainData]);
+
+  // Trigger Genesis pulse on each new block
+  useEffect(() => {
+    if (chainData.newBlockEvent > 0) {
+      blockPulseRef.current = { time: performance.now(), blockNum: chainData.blockNumber };
+    }
+  }, [chainData.newBlockEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!started) return;
     const container = mountRef.current;
     if (!container) return;
 
     let animId;
+    // Reset per-scene refs so HMR / strict-mode double-invoke doesn't leave stale refs
+    genesisThreeRef.current = {};
+    valPylonArr.current = [];
     const W = container.clientWidth;
     const H = container.clientHeight;
 
@@ -824,7 +970,7 @@ export default function DriveWorld() {
     camera.lookAt(0, 0, 0);
 
     // ── Lights ──
-    scene.add(new THREE.AmbientLight('#3344aa', 0.8));
+    scene.add(new THREE.AmbientLight('#3344aa', 1.8)); // boosted so GLB buildings are visible
     // Deep-space cold fill light from above
     const fillLight = new THREE.DirectionalLight('#6688cc', 0.4);
     fillLight.position.set(0, 80, 0);
@@ -996,7 +1142,7 @@ export default function DriveWorld() {
     }, undefined, (err) => console.warn('MTL load error', err));
 
     // ── Build world ──
-    const hotspots = buildWorld(scene);
+    const hotspots = buildWorld(scene, { genesisThreeRef, valPylonArr });
 
     // ── World Props: RefractionJet (NPC ship, full MTL+textures) ──
     const refjetMtl = new MTLLoader();
@@ -1009,7 +1155,7 @@ export default function DriveWorld() {
       refjetObj.load('RefractionJet_by_Dommk.obj', (obj) => {
         // OBJ is ~6 wide — scale to ~9 scene units
         obj.scale.setScalar(1.5);
-        obj.position.set(18, 8, -20);   // hovering near Validator Forest
+        obj.position.set(60, 10, -60);  // hovering between Genesis and Whitepaper Library
         obj.rotation.set(0.15, -0.8, 0.05);
         obj.traverse(c => { if (c.isMesh) c.castShadow = true; });
         scene.add(obj);
@@ -1029,13 +1175,13 @@ export default function DriveWorld() {
       });
       // portal OBJ is ~22 wide — scale to ~14 scene units
       obj.scale.setScalar(0.65);
-      obj.position.set(-35, 0, -35);    // deep space corner
+      obj.position.set(-70, 0, -70);    // NW quadrant between Genesis and Grant Tower
       obj.rotation.set(0, Math.PI * 0.25, 0);
       obj.traverse(c => { if (c.isMesh) { c.material = mat; c.castShadow = true; } });
       scene.add(obj);
       // pulsing glow light inside
       const portalGlow = new THREE.PointLight('#aa00ff', 4, 22);
-      portalGlow.position.set(-35, 5, -35);
+      portalGlow.position.set(-70, 5, -70);
       scene.add(portalGlow);
       propObjects.push(obj);
       obj.userData.portalGlow = portalGlow;
@@ -1051,7 +1197,7 @@ export default function DriveWorld() {
       });
       // cave is ~7 wide, 30 deep — scale to about 18 wide
       obj.scale.setScalar(2.5);
-      obj.position.set(38, 0, 15);      // far right of the map
+      obj.position.set(85, 0, -30);     // between Validator Forest and Whitepaper Library
       obj.rotation.set(0, Math.PI * -0.15, 0);
       obj.traverse(c => { if (c.isMesh) { c.material = rockMat; c.castShadow = true; c.receiveShadow = true; } });
       scene.add(obj);
@@ -1068,13 +1214,112 @@ export default function DriveWorld() {
       // mesh is ~1 unit but far from origin — scale up & re-center
       obj.scale.setScalar(18);
       // mesh center is ~(-29, 0.1, 9.6) — offset to bring to scene origin
-      obj.position.set(-38, 3, -18);
+      obj.position.set(-80, 3, 60);     // SW quadrant near Compute/Treasury side
       obj.traverse(c => { if (c.isMesh) { c.material = hullMat; c.castShadow = true; } });
       scene.add(obj);
     }, undefined, (e) => console.warn('spaceship obj', e));
 
     // prop objects array for animate loop
     const propObjects = [];
+
+    // ── GLB Props: Sci-fi buildings pack (low-poly city fill) ──
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/scifi-buildings/buildings.glb', (gltf) => {
+      const obj = gltf.scene;
+      obj.scale.setScalar(2);
+      obj.position.set(42, 0, 78);
+      obj.rotation.y = Math.PI * 0.25;
+      obj.traverse(c => {
+        if (c.isMesh) {
+          c.castShadow = true;
+          c.receiveShadow = true;
+          if (c.material) {
+            const m = Array.isArray(c.material) ? c.material : [c.material];
+            m.forEach(mat => {
+              // Force standard material response
+              if (mat.color) mat.color.multiplyScalar(1.8);
+              if (mat.emissive) {
+                mat.emissive.set(0x224466);
+                mat.emissiveIntensity = 0.7;
+              }
+            });
+          }
+        }
+      });
+      scene.add(obj);
+      // accent lights for building #1 (right-ahead cluster)
+      const bld1a = new THREE.PointLight(0x4488ff, 4.0, 90);
+      bld1a.position.set(42, 8, 78);
+      scene.add(bld1a);
+      const bld1b = new THREE.PointLight(0x00ffcc, 2.5, 60);
+      bld1b.position.set(42, 3, 78);
+      scene.add(bld1b);
+      // add second instance as a mirrored city block on the other side
+      const gltfLoader2 = new GLTFLoader();
+      gltfLoader2.load('/models/scifi-buildings/buildings.glb', (gltf2) => {
+        const obj2 = gltf2.scene;
+        obj2.scale.setScalar(2);
+        obj2.position.set(-48, 0, 92);
+        obj2.rotation.y = Math.PI * 0.85;
+        obj2.traverse(c => {
+          if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+        });
+        scene.add(obj2);
+        // accent lights for building #2 (left-ahead cluster)
+        const bld2a = new THREE.PointLight(0xff6600, 3.5, 90);
+        bld2a.position.set(-48, 8, 92);
+        scene.add(bld2a);
+        const bld2b = new THREE.PointLight(0xffcc00, 2.0, 60);
+        bld2b.position.set(-48, 3, 92);
+        scene.add(bld2b);
+      }, undefined, (e) => console.warn('scifi-buildings 2nd instance', e));
+    }, undefined, (e) => console.warn('scifi-buildings GLB', e));
+
+    // ── GLB Props: Sci-fi modular terminal (near Exchange/DEX hotspot) ──
+    gltfLoader.load('/models/terminal/terminal.glb', (gltf) => {
+      const obj = gltf.scene;
+      obj.scale.setScalar(1.2);
+      obj.position.set(38, 0, 48);
+      obj.rotation.y = Math.PI * -0.15;
+      obj.traverse(c => {
+        if (c.isMesh) {
+          c.castShadow = true;
+          c.receiveShadow = true;
+          if (c.material && c.material.emissive) {
+            c.material.emissiveIntensity = Math.max(c.material.emissiveIntensity || 0, 0.6);
+          }
+        }
+      });
+      scene.add(obj);
+      // cyan point light to make the terminal glow
+      const termLight = new THREE.PointLight(0x00eeff, 2.5, 40);
+      termLight.position.set(38, 3, 48);
+      scene.add(termLight);
+      obj.userData.propFloat = { t: Math.random() * Math.PI * 2, baseY: 0 };
+      propObjects.push(obj);
+    }, undefined, (e) => console.warn('terminal GLB', e));
+
+    // ── GLB Props: Sci-fi portal gate (SE corner landmark) ──
+    gltfLoader.load('/models/portal-glb/portal.glb', (gltf) => {
+      const obj = gltf.scene;
+      obj.scale.setScalar(1.0);
+      obj.position.set(65, 0, 62);
+      obj.rotation.y = Math.PI * 0.5;
+      obj.traverse(c => {
+        if (c.isMesh) {
+          c.castShadow = true;
+          c.receiveShadow = true;
+          if (c.material && c.material.emissive) {
+            c.material.emissiveIntensity = Math.max(c.material.emissiveIntensity || 0, 0.8);
+          }
+        }
+      });
+      scene.add(obj);
+      // magenta glow light inside the portal ring
+      const portalGlow = new THREE.PointLight(0xff00cc, 2.8, 55);
+      portalGlow.position.set(65, 3, 62);
+      scene.add(portalGlow);
+    }, undefined, (e) => console.warn('portal-glb', e));
 
     // ── Car physics state ──
     const car = {
@@ -1124,12 +1369,13 @@ export default function DriveWorld() {
       const elapsed = clock.elapsedTime;
 
       // ── Car physics ──
-      const fwd = keys.w ? 1 : (keys.s ? -0.55 : 0);
+      const mk = mobileKeysRef.current;
+      const fwd = (keys.w || mk.w) ? 1 : ((keys.s || mk.s) ? -0.55 : 0);
       car.speed += fwd * (fwd > 0 ? ACCEL : BRAKE) * dt;
       car.speed *= Math.pow(FRICTION, dt * 60);
       car.speed = Math.max(-MAX_SPEED * 0.55, Math.min(MAX_SPEED, car.speed));
 
-      const steerTarget = (keys.a ? 1 : (keys.d ? -1 : 0)) * MAX_STEER;
+      const steerTarget = ((keys.a || mk.a) ? 1 : ((keys.d || mk.d) ? -1 : 0)) * MAX_STEER;
       car.steer += (steerTarget - car.steer) * STEER_LERP * dt;
 
       if (Math.abs(car.speed) > 0.05) {
@@ -1141,18 +1387,16 @@ export default function DriveWorld() {
       car.x = Math.max(-BOUNDS, Math.min(BOUNDS, nx));
       car.z = Math.max(-BOUNDS, Math.min(BOUNDS, nz));
 
-      // Bounce / suspension simulation
-      car.bounce = Math.sin(elapsed * 8 + Math.abs(car.speed) * 0.5) * Math.min(Math.abs(car.speed), 4) * 0.002;
-
       // ── Update UFO mesh ──
-      // Hover bob + thrust bob
-      const hoverY = 2.8 + Math.sin(elapsed * 2.2) * 0.28 + Math.abs(car.speed) * 0.06;
+      // Cruise altitude: skim low over the city — buildings tower above
+      const hoverY = 8 + Math.sin(elapsed * 1.5) * 0.5 + Math.abs(car.speed) * 0.04;
       car.bounce = hoverY;
       carGroup.position.set(car.x, hoverY, car.z);
       carGroup.rotation.y = car.rotY;
       // Bank into turns (roll) + pitch on acceleration
-      car.tilt += (-car.steer * (car.speed / MAX_SPEED) * 0.42 - car.tilt) * 6 * dt;
-      const pitchTarget = -(car.speed / MAX_SPEED) * 0.18;
+      // More dramatic banking and nose-pitch for aerial feel
+      car.tilt += (-car.steer * (car.speed / MAX_SPEED) * 0.72 - car.tilt) * 6 * dt;
+      const pitchTarget = -(car.speed / MAX_SPEED) * 0.30;
       car.pitch = (car.pitch || 0) + (pitchTarget - (car.pitch || 0)) * 5 * dt;
       carGroup.rotation.z = car.tilt;
       carGroup.rotation.x = car.pitch;
@@ -1187,19 +1431,25 @@ export default function DriveWorld() {
         }
       });
 
-      // ── Camera follow ──
+      // ── Camera follow — aerial chase cam ──
       camRotY.val += (car.rotY - camRotY.val) * 5 * dt;
-      const camDist = 13 + Math.abs(car.speed) * 0.28;
-      const camH = 7 + Math.abs(car.speed) * 0.08;
+      const camDist = 16 + Math.abs(car.speed) * 0.22;
+      // Camera 6 units above ship — tight chase cam
+      const camH = hoverY + 6 + Math.abs(car.speed) * 0.06;
       const camTX = car.x - Math.sin(camRotY.val) * camDist;
       const camTZ = car.z - Math.cos(camRotY.val) * camDist;
       camera.position.x += (camTX - camera.position.x) * 8 * dt;
       camera.position.y += (camH - camera.position.y) * 6 * dt;
       camera.position.z += (camTZ - camera.position.z) * 8 * dt;
-      camera.lookAt(car.x, 2.8, car.z);
+      // Look at ship-level ahead — see ground rushing past below
+      camera.lookAt(
+        car.x + Math.sin(car.rotY) * 8,
+        hoverY - 2,
+        car.z + Math.cos(car.rotY) * 8
+      );
 
-      // FOV rush effect — warp-speed feel
-      camera.fov = 65 + Math.abs(car.speed / MAX_SPEED) * 22;
+      // FOV rush — wide aerial view, extra spread at speed
+      camera.fov = 72 + Math.abs(car.speed / MAX_SPEED) * 20;
       camera.updateProjectionMatrix();
 
       // ── Animated world objects ──
@@ -1218,6 +1468,38 @@ export default function DriveWorld() {
         }
       });
 
+      // ── CHAIN: Genesis Block pulse on new block ──
+      {
+        const ageMs = performance.now() - blockPulseRef.current.time;
+        const { ptLight, tip } = genesisThreeRef.current;
+        if (ageMs < 1400 && ptLight) {
+          const t   = ageMs / 1400;                  // 0 → 1
+          const amp = Math.sin(t * Math.PI);          // bell curve
+          ptLight.intensity = 2.0 + amp * 7.0;
+          if (tip) tip.material.emissiveIntensity = 2.0 + amp * 3.5;
+        } else if (ptLight) {
+          ptLight.intensity = 2.0;
+          if (tip) tip.material.emissiveIntensity = 2.0;
+        }
+      }
+
+      // ── CHAIN: Validator Forest live telemetry ──
+      {
+        const validators = chainDataRef.current.validators;
+        valPylonArr.current.forEach((pylon, i) => {
+          const val = validators?.[i];
+          if (!val || !pylon) return;
+          const topMesh = pylon.children?.[1];
+          if (topMesh?.material) {
+            const uptime = (val.uptime ?? 100) / 100;  // 0..1
+            let ei = 0.4 + uptime * 1.6;
+            // Flicker for validators with many missed blocks
+            if (val.missed > 5) ei *= 0.7 + Math.sin(elapsed * 22 + i * 1.3) * 0.3;
+            topMesh.material.emissiveIntensity = ei;
+          }
+        });
+      }
+
       // ── Hotspot detection ──
       let nearest = null;
       let nearestDist = Infinity;
@@ -1232,7 +1514,15 @@ export default function DriveWorld() {
       if (nearest !== activeHotspot) {
         activeHotspot = nearest;
         if (nearest) {
-          setInfoCard(nearest);
+          // Inject live chain stats into card body
+          const cd = chainDataRef.current;
+          const liveTag = cd.online ? '🟢 LIVE' : '🟡 MOCK';
+          if (nearest.title === 'Genesis Block') {
+            nearest.body = `Block #${cd.blockNumber.toLocaleString()} · ${cd.tps.toLocaleString()} TPS · ${liveTag}. X3 Chain launched with 1,847 genesis validators across 6 continents — the first block sealed a new Layer-1 throughput record.`;
+          } else if (nearest.title === 'Validator Forest') {
+            nearest.body = `${cd.validatorCount} active validators · ${liveTag}. BFT + PoS hybrid consensus. Each node stakes X3 tokens and earns 12–18% APR. No slashable conditions in normal operation.`;
+          }
+          setInfoCard({ ...nearest });
           setNearLabel(nearest.title);
           // Show ENTER prompt only for zones with a real navigation link
           const zone = nearest.link ? nearest : null;
@@ -1338,22 +1628,112 @@ export default function DriveWorld() {
       {/* 3D Canvas mount */}
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* ── World Map — top-center ── */}
+      {/* ── Top Navigation Bar ── */}
+      {started && (
+        <nav style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 12px',
+          background: 'rgba(3,3,12,0.80)',
+          backdropFilter: 'blur(14px)',
+          borderBottom: '1px solid rgba(0,212,255,0.10)',
+          zIndex: 9, fontFamily: 'monospace', boxSizing: 'border-box', gap: 8,
+        }}>
+          {/* Logo */}
+          <div style={{ color: '#00d4ff', fontWeight: 800, fontSize: 14, letterSpacing: 2, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            ⛓ X3
+          </div>
+          {/* Nav links — scrollable on mobile */}
+          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {[
+              { label: 'DEX',        href: '/x3star-landing.html?section=dex',   color: '#ff7700' },
+              { label: 'VALIDATORS', href: '/x3star-validator-presale.html',      color: '#4488ff' },
+              { label: 'TREASURY',   href: '/x3star-governance.html',             color: '#ffd700' },
+              { label: 'EXPLORER',   href: '/?section=explorer',                  color: '#00d4ff' },
+              { label: 'COMPUTE',    href: '/x3star-compute-marketplace.html',    color: '#aa44ff' },
+              { label: 'GRANTS',     href: '/x3star-grant-hub.html',              color: '#00ff88' },
+              { label: 'DOCS',       href: '/x3star-whitepaper.html',             color: '#ffee88' },
+            ].map(({ label, href, color }) => (
+              <a key={label} href={href}
+                style={{
+                  color, padding: '4px 8px', fontSize: 11, textDecoration: 'none',
+                  borderRadius: 4, letterSpacing: 1, whiteSpace: 'nowrap',
+                  border: '1px solid transparent', transition: 'all 0.15s', opacity: 0.8,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = color + '55'; e.currentTarget.style.background = color + '18'; e.currentTarget.style.opacity = '1'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '0.8'; }}
+              >{label}</a>
+            ))}
+          </div>
+          {/* Compact chain status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', display: 'inline-block',
+              background: chainData.online ? '#00d4ff' : '#ffaa00',
+              boxShadow: chainData.online ? '0 0 5px #00d4ff' : '0 0 5px #ffaa00',
+            }} />
+            <span style={{ color: '#445566', fontSize: 10, letterSpacing: 0.5 }}>
+              #{chainData.blockNumber.toLocaleString()}
+            </span>
+          </div>
+        </nav>
+      )}
+
+      {/* ── Chain HUD — top-right (below nav) ── */}
       {started && (
         <div style={{
-          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', top: 52, right: 16,
+          zIndex: 5, pointerEvents: 'none', userSelect: 'none',
+          fontFamily: 'monospace',
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6,
+        }}>
+          {/* Block ticker */}
+          <div style={{
+            background: 'rgba(0,8,22,0.82)', backdropFilter: 'blur(8px)',
+            border: `1px solid ${chainData.online ? '#00d4ff44' : '#ffaa0044'}`,
+            borderRadius: 8, padding: '5px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+              background: chainData.online ? '#00d4ff' : '#ffaa00',
+              boxShadow: chainData.online ? '0 0 6px #00d4ff' : '0 0 6px #ffaa00',
+              animation: chainData.online ? 'chainPulse 1s infinite' : 'none',
+              display: 'inline-block',
+            }} />
+            <span style={{ color: chainData.online ? '#00d4ff' : '#ffaa00', fontSize: 12, letterSpacing: 0.5 }}>
+              {chainData.online ? 'LIVE' : 'MOCK'}
+            </span>
+            <span style={{ color: '#445566', fontSize: 11 }}>|</span>
+            <span style={{ color: '#aabbcc', fontSize: 12 }}>
+              #{chainData.blockNumber.toLocaleString()}
+            </span>
+            <span style={{ color: '#445566', fontSize: 11 }}>|</span>
+            <span style={{ color: '#aabbcc', fontSize: 12 }}>
+              {chainData.tps.toLocaleString()} TPS
+            </span>
+          </div>
+
+          {/* Wallet connect / account */}
+          <WalletButton wallet={wallet} />
+        </div>
+      )}
+
+      {/* ── World Map — bottom-left ── */}
+      {started && (
+        <div style={{
+          position: 'absolute', bottom: 16, left: 16,
           zIndex: 4, pointerEvents: 'none', userSelect: 'none',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          paddingTop: 6,
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
         }}>
           <div style={{
             fontSize: 8, letterSpacing: 3, color: 'rgba(0,212,255,0.45)',
             fontFamily: 'monospace', marginBottom: 3, textTransform: 'uppercase',
-          }}>X3 WORLD MAP</div>
+          }}>X3 MAP</div>
           <canvas
             ref={minimapRef}
-            width={320}
-            height={170}
+            width={200}
+            height={120}
             style={{
               borderRadius: 6,
               border: '1px solid rgba(0,212,255,0.22)',
@@ -1446,10 +1826,10 @@ export default function DriveWorld() {
         </div>
       )}
 
-      {/* ── HUD (top-left) ── */}
+      {/* ── HUD (top-left, below nav) ── */}
       {started && (
         <div style={{
-          position: 'absolute', top: 20, left: 20,
+          position: 'absolute', top: 52, left: 20,
           fontFamily: "'Inter', monospace, sans-serif",
           userSelect: 'none', pointerEvents: 'none',
         }}>
@@ -1570,11 +1950,116 @@ export default function DriveWorld() {
         <InfoCard card={infoCard} onClose={() => { setInfoCard(null); setEnterZone(null); }} />
       )}
 
+      {/* ── Mobile D-pad ── shown on touch devices / always shown when started */}
+      {started && (
+        <div style={{
+          position: 'absolute', bottom: 24, right: 20, zIndex: 8,
+          userSelect: 'none', touchAction: 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        }}>
+          {/* Up */}
+          <button
+            onPointerDown={() => { mobileKeysRef.current.w = true; }}
+            onPointerUp={() => { mobileKeysRef.current.w = false; }}
+            onPointerLeave={() => { mobileKeysRef.current.w = false; }}
+            style={{
+              width: 46, height: 46, borderRadius: 10,
+              background: 'rgba(0,212,255,0.10)', border: '1px solid rgba(0,212,255,0.30)',
+              color: '#00d4ff', fontSize: 18, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'none', WebkitTapHighlightColor: 'transparent',
+            }}>▲</button>
+          {/* Middle row */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              onPointerDown={() => { mobileKeysRef.current.a = true; }}
+              onPointerUp={() => { mobileKeysRef.current.a = false; }}
+              onPointerLeave={() => { mobileKeysRef.current.a = false; }}
+              style={{
+                width: 46, height: 46, borderRadius: 10,
+                background: 'rgba(0,212,255,0.10)', border: '1px solid rgba(0,212,255,0.30)',
+                color: '#00d4ff', fontSize: 18, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                touchAction: 'none', WebkitTapHighlightColor: 'transparent',
+              }}>◄</button>
+            <div style={{ width: 46, height: 46 }} />
+            <button
+              onPointerDown={() => { mobileKeysRef.current.d = true; }}
+              onPointerUp={() => { mobileKeysRef.current.d = false; }}
+              onPointerLeave={() => { mobileKeysRef.current.d = false; }}
+              style={{
+                width: 46, height: 46, borderRadius: 10,
+                background: 'rgba(0,212,255,0.10)', border: '1px solid rgba(0,212,255,0.30)',
+                color: '#00d4ff', fontSize: 18, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                touchAction: 'none', WebkitTapHighlightColor: 'transparent',
+              }}>►</button>
+          </div>
+          {/* Down */}
+          <button
+            onPointerDown={() => { mobileKeysRef.current.s = true; }}
+            onPointerUp={() => { mobileKeysRef.current.s = false; }}
+            onPointerLeave={() => { mobileKeysRef.current.s = false; }}
+            style={{
+              width: 46, height: 46, borderRadius: 10,
+              background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.30)',
+              color: '#a855f7', fontSize: 18, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'none', WebkitTapHighlightColor: 'transparent',
+            }}>▼</button>
+        </div>
+      )}
+
       <style>{`
         @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+        @keyframes chainPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
       `}</style>
     </div>
+  );
+}
+
+/* ── Wallet Connect Button ── */
+function WalletButton({ wallet }) {
+  const { isConnected, connecting, error, connect, disconnect, shortAddress, account } = wallet;
+  const pointerEvents = 'auto'; // re-enable for this element only
+
+  if (isConnected) {
+    return (
+      <button
+        onClick={disconnect}
+        style={{
+          pointerEvents,
+          background: 'rgba(0,212,255,0.08)', border: '1px solid #00d4ff55',
+          borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 7,
+          fontFamily: 'monospace', fontSize: 12,
+        }}
+      >
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00d4ff', boxShadow: '0 0 6px #00d4ff', display: 'inline-block' }} />
+        <span style={{ color: '#00d4ff' }}>{account.meta?.name ?? shortAddress}</span>
+        <span style={{ color: '#334455', fontSize: 10 }}>({shortAddress})</span>
+        <span style={{ color: '#334455', fontSize: 10, marginLeft: 4 }}>✕</span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={connect}
+      disabled={connecting}
+      title={error ?? undefined}
+      style={{
+        pointerEvents,
+        background: connecting ? 'rgba(0,8,22,0.82)' : 'rgba(168,85,247,0.12)',
+        border: `1px solid ${error ? '#ff444455' : '#a855f744'}`,
+        borderRadius: 8, padding: '5px 14px', cursor: connecting ? 'default' : 'pointer',
+        color: error ? '#ff6666' : '#a855f7', fontFamily: 'monospace', fontSize: 12,
+        letterSpacing: 0.5, transition: 'background 0.15s',
+      }}
+    >
+      {connecting ? 'Connecting…' : error ? '⚠ No Wallet' : '⚡ Connect Wallet'}
+    </button>
   );
 }
 

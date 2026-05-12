@@ -153,10 +153,8 @@ impl OffenceReportSystem<Option<AccountId>, (EquivocationProof<Hash, BlockNumber
             pallet_grandpa::EquivocationOffence<
                 pallet_session::historical::IdentificationTuple<Runtime>,
             >,
-        >>::is_known_offence(
-            &[offender],
-            &time_slot,
-        ) {
+        >>::is_known_offence(&[offender], &time_slot)
+        {
             Err(InvalidTransaction::Stale.into())
         } else {
             Ok(())

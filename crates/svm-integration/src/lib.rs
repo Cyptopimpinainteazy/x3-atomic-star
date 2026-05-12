@@ -17,6 +17,7 @@ use sp_std::vec::Vec;
 pub mod rbpf;
 
 /// SVM syscall table: sol_log, get_clock, sha256, cross-vm invoke
+#[cfg(feature = "std")]
 pub mod syscalls;
 
 #[cfg(feature = "std")]

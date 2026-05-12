@@ -156,14 +156,14 @@ pub mod pallet {
                 id: wallet_id_array,
                 device_type,
                 device_model: device_model.clone(),
-                derivation_path: vec![],
+                derivation_path: Vec::new(),
                 public_key: public_key.to_vec(),
                 address: [0u8; 32],
                 is_connected: true,
                 last_connected_block: frame_system::Pallet::<T>::block_number()
                     .saturated_into::<u64>(),
                 transaction_count: 0,
-                firmware_version: vec![],
+                firmware_version: Vec::new(),
             };
 
             HardwareWallets::<T>::insert((who.clone(), wallet_id_array), hardware_wallet);

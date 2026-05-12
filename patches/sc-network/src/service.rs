@@ -524,7 +524,7 @@ where
 	/// everywhere about this. Please don't use this function to retrieve actual information.
 	pub fn network_state(&mut self) -> NetworkState {
 		let swarm = &mut self.network_service;
-		let open = swarm.behaviour_mut().user_protocol().open_peers().cloned().collect::<Vec<_>>();
+		let open = swarm.behaviour_mut().user_protocol().open_peers().collect::<Vec<_>>();
 		let connected_peers = {
 			let swarm = &mut *swarm;
 			open.iter()
@@ -1056,7 +1056,7 @@ impl NotificationSenderT for NotificationSender {
 				Ok(r) => Some(r),
 				Err(()) => return Err(NotificationSenderError::Closed),
 			},
-			peer_id: self.sink.peer_id(),
+			peer_id: PeerId::from_bytes(&self.sink.peer_id().to_bytes()).expect("valid peer id"),
 			protocol_name: &self.protocol_name,
 			notification_size_metric: self.notification_size_metric.clone(),
 		}))
@@ -1069,7 +1069,7 @@ pub struct NotificationSenderReady<'a> {
 	ready: Option<Ready<'a>>,
 
 	/// Target of the notification.
-	peer_id: &'a PeerId,
+	peer_id: PeerId,
 
 	/// Name of the protocol on the wire.
 	protocol_name: &'a ProtocolName,
@@ -1210,11 +1210,13 @@ where
 		self.num_connected.store(num_connected_peers, Ordering::Relaxed);
 		{
 			let external_addresses =
-				self.network_service.external_addresses().map(|r| &r.addr).cloned().collect();
+				self.network_service.external_addresses()
+					.map(|r| Multiaddr::from(r.addr.clone()))
+					.collect();
 			*self.external_addresses.lock() = external_addresses;
 
 			let listen_addresses =
-				self.network_service.listeners().map(ToOwned::to_owned).collect();
+				self.network_service.listeners().map(|a| Multiaddr::from(a.clone())).collect();
 			*self.listen_addresses.lock() = listen_addresses;
 		}
 
@@ -1290,8 +1292,11 @@ where
 				.behaviour_mut()
 				.user_protocol_mut()
 				.remove_set_reserved_peer(protocol, peer_id),
-			ServiceToWorkerMsg::AddKnownAddress(peer_id, addr) =>
-				self.network_service.behaviour_mut().add_known_address(peer_id, addr),
+			ServiceToWorkerMsg::AddKnownAddress(peer_id, addr) => {
+				let lp_peer = libp2p::PeerId::from_bytes(&peer_id.to_bytes()).expect("valid peer id");
+				let lp_addr: libp2p::Multiaddr = addr.into();
+				self.network_service.behaviour_mut().add_known_address(lp_peer, lp_addr);
+			},
 			ServiceToWorkerMsg::EventStream(sender) => self.event_streams.push(sender),
 			ServiceToWorkerMsg::Request {
 				target,
@@ -1300,8 +1305,9 @@ where
 				pending_response,
 				connect,
 			} => {
+				let lp_target = libp2p::PeerId::from_bytes(&target.to_bytes()).expect("valid peer id");
 				self.network_service.behaviour_mut().send_request(
-					&target,
+					&lp_target,
 					&protocol,
 					request,
 					pending_response,
@@ -1406,7 +1412,10 @@ where
 				},
 			SwarmEvent::Behaviour(BehaviourOut::ReputationChanges { peer, changes }) => {
 				for change in changes {
-					self.network_service.behaviour().user_protocol().report_peer(peer, change);
+					self.network_service.behaviour().user_protocol().report_peer(
+						PeerId::from_bytes(&peer.to_bytes()).expect("valid peer id"),
+						change,
+					);
 				}
 			},
 			SwarmEvent::Behaviour(BehaviourOut::PeerIdentify {
@@ -1429,10 +1438,14 @@ where
 						.behaviour_mut()
 						.add_self_reported_address_to_dht(&peer_id, &protocols, addr);
 				}
-				self.network_service.behaviour_mut().user_protocol_mut().add_known_peer(peer_id);
+				self.network_service.behaviour_mut().user_protocol_mut().add_known_peer(
+					PeerId::from_bytes(&peer_id.to_bytes()).expect("valid peer id"),
+				);
 			},
 			SwarmEvent::Behaviour(BehaviourOut::Discovered(peer_id)) => {
-				self.network_service.behaviour_mut().user_protocol_mut().add_known_peer(peer_id);
+				self.network_service.behaviour_mut().user_protocol_mut().add_known_peer(
+					PeerId::from_bytes(&peer_id.to_bytes()).expect("valid peer id"),
+				);
 			},
 			SwarmEvent::Behaviour(BehaviourOut::RandomKademliaStarted) => {
 				if let Some(metrics) = self.metrics.as_ref() {
@@ -1447,6 +1460,7 @@ where
 				role,
 				received_handshake,
 			}) => {
+				let remote = PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id");
 				if let Some(metrics) = self.metrics.as_ref() {
 					metrics
 						.notifications_streams_opened_total
@@ -1472,6 +1486,7 @@ where
 				protocol,
 				notifications_sink,
 			}) => {
+				let remote = PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id");
 				let mut peers_notifications_sinks = self.peers_notifications_sinks.lock();
 				if let Some(s) = peers_notifications_sinks.get_mut(&(remote, protocol)) {
 					*s = notifications_sink;
@@ -1505,6 +1520,7 @@ where
 				// });
 			},
 			SwarmEvent::Behaviour(BehaviourOut::NotificationStreamClosed { remote, protocol }) => {
+				let remote = PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id");
 				if let Some(metrics) = self.metrics.as_ref() {
 					metrics
 						.notifications_streams_closed_total
@@ -1520,6 +1536,7 @@ where
 				}
 			},
 			SwarmEvent::Behaviour(BehaviourOut::NotificationsReceived { remote, messages }) => {
+				let remote = PeerId::from_bytes(&remote.to_bytes()).expect("valid peer id");
 				if let Some(metrics) = self.metrics.as_ref() {
 					for (protocol, message) in &messages {
 						metrics
@@ -1615,7 +1632,7 @@ where
 			},
 			SwarmEvent::OutgoingConnectionError { peer_id, error } => {
 			if let Some(peer_id_libp2p) = peer_id {
-				let peer_id = PeerId::from(peer_id_libp2p);
+				let peer_id = PeerId::from_bytes(&peer_id_libp2p.to_bytes()).expect("valid peer id");
 				trace!(
 					target: "sub-libp2p",
 					"Libp2p => Failed to reach {:?}: {}",

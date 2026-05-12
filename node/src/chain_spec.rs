@@ -652,6 +652,8 @@ fn x3_chain_genesis(
         depin_marketplace: Default::default(),
         private_execution: Default::default(),
         x3_invariants: Default::default(),
+        x3_dapp_hub: Default::default(),
+        x3_flash_loan: Default::default(),
     }
 }
 

@@ -1,6 +1,8 @@
 /// Transaction Signer — Multi-signature transaction approval engine
 /// Sign, approve, and execute transactions with flexible approval workflows
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+#[allow(unused_imports)]
+use sp_std::vec;
 use sp_std::vec::Vec;
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]

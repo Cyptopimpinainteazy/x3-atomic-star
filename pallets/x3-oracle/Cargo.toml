@@ -25,7 +25,6 @@ default = ["std"]
 std = [
 	"parity-scale-codec/std",
 	"scale-info/std",
-	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
 	"pallet-timestamp/std",
@@ -35,6 +34,7 @@ std = [
 	"sp-std/std",
 ]
 runtime-benchmarks = [
+	"dep:frame-benchmarking",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",

@@ -23,7 +23,9 @@ pub enum EnforcementAction<AccountId> {
 }
 
 /// Policy rules governing agent behavior
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub enum PolicyRule<AccountId: Encode + Decode + MaxEncodedLen + DecodeWithMemTracking> {
     /// Agent can only execute these capabilities (list of capability names as byte strings)
     CapabilityAllowed(#[codec(skip)] Vec<Vec<u8>>),

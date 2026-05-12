@@ -17,7 +17,7 @@ log = { workspace = true }
 
 # X3 crates
 x3-slash = { path = "../../crates/x3-slash", default-features = false }
-x3-proof = { path = "../../crates/x3-proof", default-features = false }
+x3-proof = { path = "../../crates/x3-proof", default-features = false, optional = true }
 x3-accounting-events = { path = "../../crates/x3-accounting-events", default-features = false }
 
 # Staking integration
@@ -40,7 +40,7 @@ std = [
     "scale-info/std",
     "log/std",
     "x3-slash/std",
-    "x3-proof/std",
+    "x3-proof?/std",
     "x3-accounting-events/std",
     "pallet-staking/std",
     "pallet-balances/std",

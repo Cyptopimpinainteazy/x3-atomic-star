@@ -30,7 +30,7 @@ ed25519-dalek = { version = "2", default-features = false }
 jsonrpsee = { version = "0.22", features = ["http-client"], optional = true }
 hex = { version = "0.4", optional = true }
 reqwest = { version = "0.11", features = ["blocking", "json"], optional = true }
-serde_json = { version = "1", optional = true }
+serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
 
 [features]
 default = ["std"]
@@ -44,9 +44,10 @@ std = [
     "sp-runtime/std",
     "sp-std/std",
     "jsonrpsee/http-client",
-    "hex",
-    "reqwest",
-    "serde_json",
+    "dep:hex",
+    "dep:reqwest",
+    "dep:serde_json",
+    "serde_json?/std",
 ]
 
 [lib]
