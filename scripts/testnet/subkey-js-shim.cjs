@@ -5,11 +5,16 @@ const { createRequire } = require('module');
 const requireFromRepo = createRequire(`${process.cwd()}/package.json`);
 
 function loadPackage(name) {
+  const originalWorkspace = process.env.X3_ORIGINAL_WORKSPACE || '/home/lojak/Desktop/X3_ATOMIC_STAR';
   const paths = [
     `${process.cwd()}/x3fronend/node_modules`,
     `${process.cwd()}/packages/blockchain-connector/node_modules`,
     `${process.cwd()}/packages/atomic-swap-sdk/node_modules`,
     `${process.cwd()}/packages/ts-sdk/node_modules`,
+    `${originalWorkspace}/x3fronend/node_modules`,
+    `${originalWorkspace}/packages/blockchain-connector/node_modules`,
+    `${originalWorkspace}/packages/atomic-swap-sdk/node_modules`,
+    `${originalWorkspace}/packages/ts-sdk/node_modules`,
   ];
 
   return requireFromRepo(require.resolve(name, { paths }));

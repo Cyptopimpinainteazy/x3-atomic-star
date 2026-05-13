@@ -14,7 +14,7 @@ name = "x3-chain-node"
 path = "src/main.rs"
 
 [dependencies]
-x3-chain-runtime = { path = "../runtime", features = ["std", "frontier", "native-real-vm-adapters"] }
+x3-chain-runtime = { path = "../runtime", features = ["std", "native-real-vm-adapters"] }
 pallet-x3-kernel = { path = "../pallets/x3-kernel", features = ["std"] }
 pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", features = ["std"] }
 pallet-evolution-core = { path = "../pallets/evolution-core", features = ["std"] }

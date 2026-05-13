@@ -104,17 +104,16 @@ where
         pallet_transaction_payment_rpc::TransactionPaymentApiServer::into_rpc(tx_payment_rpc),
     )?;
 
-    // Merge Frontier ETH-compatible JSON-RPC endpoints.
-    let frontier_module = crate::rpc_frontier::create_frontier_rpc(client.clone())?;
-    module.merge(frontier_module)?;
+    #[cfg(feature = "frontier")]
+    {
+        // Merge Frontier ETH-compatible JSON-RPC endpoints.
+        let frontier_module = crate::rpc_frontier::create_frontier_rpc(client.clone())?;
+        module.merge(frontier_module)?;
 
-    // Merge SVM-compatible JSON-RPC endpoints.
-    let svm_module = crate::rpc_frontier::create_svm_rpc(client.clone())?;
-    module.merge(svm_module)?;
-
-    // Merge chain RPC for WebSocket subscriptions (chain_subscribeNewHeads, etc.)
-    let chain_rpc = sc_rpc::chain::new_full(client.clone(), subscription_executor.clone());
-    module.merge(chain_rpc.into_rpc())?;
+        // Merge SVM-compatible JSON-RPC endpoints.
+        let svm_module = crate::rpc_frontier::create_svm_rpc(client.clone())?;
+        module.merge(svm_module)?;
+    }
 
     // Initialize DEX RPC integration.
     let wallet_dex = Arc::new(WalletDexRpc::<Block, FullClient>::new(client.clone()));
