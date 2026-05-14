@@ -90,5 +90,6 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
+pallet-balances = { workspace = true, features = ["std"] }
 pallet-x3-asset-registry = { path = "../x3-asset-registry" }
 pallet-x3-supply-ledger = { path = "../x3-supply-ledger" }

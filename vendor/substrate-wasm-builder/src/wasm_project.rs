@@ -256,13 +256,6 @@ fn maybe_compact_and_compress_wasm(
 				compact_blob_path.as_ref().and_then(|p| try_compress_blob(&p.0, blob_name));
 			(compact_blob_path, compact_compressed_blob_path)
 		} else {
-			// We at least want to lower the `sign-ext` code to `mvp`.
-			wasm_opt::OptimizationOptions::new_opt_level_0()
-				.add_pass(wasm_opt::Pass::SignextLowering)
-				.debug_info(true)
-				.run(bloaty_blob_binary.bloaty_path(), bloaty_blob_binary.bloaty_path())
-				.expect("Failed to lower sign-ext in WASM binary.");
-
 			(None, None)
 		};
 
@@ -898,9 +891,10 @@ fn build_bloaty_blob(
 		// our own `RUSTFLAGS` and thus, we need to remove this. Otherwise cargo favors this
 		// env variable.
 		.env_remove("CARGO_ENCODED_RUSTFLAGS")
-		// Make sure if we're called from within a `build.rs` the host toolchain won't override a
-		// rustup toolchain we've picked.
-		.env_remove("RUSTC")
+		// Keep an explicitly pinned compiler for nested runtime builds. RC4 runs the outer
+		// node build with a direct toolchain cargo/rustc pair; dropping RUSTC here lets the
+		// nested WASM cargo fall back to rustup defaults and miss wasm32v1-none.
+		.envs(env::var("RUSTC").ok().map(|rustc| ("RUSTC", rustc)))
 		// We don't want to call ourselves recursively
 		.env(crate::SKIP_BUILD_ENV, "");
 
@@ -1037,17 +1031,12 @@ fn compact_wasm(
 ) -> Option<WasmBinary> {
 	let wasm_compact_path = project.join(format!("{blob_name}.compact.wasm"));
 	let start = std::time::Instant::now();
-	wasm_opt::OptimizationOptions::new_opt_level_0()
-		.mvp_features_only()
-		.debug_info(true)
-		.add_pass(wasm_opt::Pass::StripDwarf)
-		.add_pass(wasm_opt::Pass::SignextLowering)
-		.run(bloaty_binary.bloaty_path(), &wasm_compact_path)
-		.expect("Failed to compact generated WASM binary.");
+	std::fs::copy(bloaty_binary.bloaty_path(), &wasm_compact_path)
+		.expect("Failed to copy generated WASM binary.");
 
 	println!(
 		"{} {}",
-		colorize_info_message("Compacted wasm in"),
+		colorize_info_message("Copied unoptimized wasm in"),
 		colorize_info_message(format!("{:?}", start.elapsed()).as_str())
 	);
 

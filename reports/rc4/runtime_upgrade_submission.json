@@ -1,0 +1,13 @@
+{
+  "blocker": "live setCode/governance upgrade extrinsic rejected; WASM payload 6802200 bytes exceeds old runtime block length cap 5242880 bytes (preimage max 4194304 bytes); see /home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/runtime_upgrade_submission.json",
+  "error": "RpcError: 1010: Invalid Transaction: Transaction would exhaust the block limits\n    at checkError (/home/lojak/Desktop/X3_ATOMIC_STAR/packages/blockchain-connector/node_modules/@polkadot/rpc-provider/cjs/coder/index.js:30:11)\n    at RpcCoder.decodeResponse (/home/lojak/Desktop/X3_ATOMIC_STAR/packages/blockchain-connector/node_modules/@polkadot/rpc-provider/cjs/coder/index.js:45:5)\n    at WsProvider.value (/home/lojak/Desktop/X3_ATOMIC_STAR/packages/blockchain-connector/node_modules/@polkadot/rpc-provider/cjs/ws/index.js:247:90)\n    at WebSocket.value (/home/lojak/Desktop/X3_ATOMIC_STAR/packages/blockchain-connector/node_modules/@polkadot/rpc-provider/cjs/ws/index.js:230:153)\n    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:845:20)\n    at WebSocket.dispatchEvent (node:internal/event_target:778:26)\n    at fireEvent (node:internal/deps/undici/undici:11855:14)\n    at websocketMessageReceived (node:internal/deps/undici/undici:11877:7)\n    at ByteParser.run (node:internal/deps/undici/undici:12499:19)\n    at ByteParser._write (node:internal/deps/undici/undici:12392:14)",
+  "payloadAnalysis": {
+    "fitsOldRuntimeBlockLength": false,
+    "fitsOldRuntimePreimageMaxSize": false,
+    "oldRuntimeBlockLengthCapBytes": 5242880,
+    "oldRuntimePreimageMaxSizeBytes": 4194304,
+    "wasmFile": "/home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm",
+    "wasmSizeBytes": 6802200
+  },
+  "status": "failed"
+}

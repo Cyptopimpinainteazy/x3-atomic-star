@@ -419,6 +419,21 @@ pub mod pallet {
             Self::deposit_event(Event::TransfersResumed);
             Ok(())
         }
+
+        /// Governance halt switch for new transfer flow.
+        /// Refund operations remain allowed while halted to avoid stranding funds.
+        #[pallet::call_index(4)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn halt_transfers(origin: OriginFor<T>) -> DispatchResult {
+            T::SupplyGovernance::ensure_origin(origin)?;
+            TransferHalted::<T>::put(true);
+            let block_number = Self::block_number_to_u32(<frame_system::Pallet<T>>::block_number());
+            Self::deposit_event(Event::TransfersHalted {
+                block_number,
+                violated_assets: Vec::new(),
+            });
+            Ok(())
+        }
     }
 
     impl<T: Config> Pallet<T> {

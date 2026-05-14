@@ -1,0 +1,1 @@
+1c660e0a51d89d1f5a6c4729f9c14a32bb7637391e59f6e155ee60bfe423d9e4  /home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm

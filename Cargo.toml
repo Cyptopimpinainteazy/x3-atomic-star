@@ -420,6 +420,8 @@ expander = { path = "patches/expander" }
 getrandom = { path = "patches/getrandom" }
 # Fix solana-program-entrypoint 3.1.1: downgrade solana-pubkey 4.x -> 3.x so AccountInfo::new types are consistent (avoids solana-address 1.x/2.x dual-version E0308)
 solana-program-entrypoint = { path = "patches/solana-program-entrypoint" }
+# Fix solana-address 1.0.0 ownership error in syscalls.rs for RC3 validation builds.
+solana-address = { path = "patches/solana-address" }
 # core2 0.4.0 was yanked from crates.io; pin to local copy.
 core2 = { path = "patches/core2" }
 # Patch native crates that pulled getrandom 0.3/0.4 back down to 0.2.17
@@ -472,6 +474,7 @@ sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 
 # Patch polkadot-sdk with local modifications for prometheus fix and executor bulk-memory support
 [patch."https://github.com/paritytech/polkadot-sdk"]
+substrate-wasm-builder = { path = "vendor/substrate-wasm-builder" }
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
 # X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
 # that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std

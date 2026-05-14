@@ -2,6 +2,7 @@ use codec::Encode;
 use sc_service::GenericChainSpec;
 use sc_service::{ChainSpec as ServiceChainSpec, ChainType};
 use serde::Deserialize;
+use serde_json::Value;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::crypto::Ss58Codec;
@@ -190,6 +191,165 @@ fn assert_no_seed_accounts(endowed_accounts: &[AccountId]) -> Result<(), String>
     Ok(())
 }
 
+fn is_live_chain_type(value: &Value) -> bool {
+    value
+        .get("chainType")
+        .and_then(Value::as_str)
+        .map(|kind| kind.eq_ignore_ascii_case("live"))
+        .unwrap_or(false)
+}
+
+fn json_array_len(value: &Value, path: &[&str]) -> usize {
+    let mut cursor = value;
+    for key in path {
+        let Some(next) = cursor.get(*key) else {
+            return 0;
+        };
+        cursor = next;
+    }
+    cursor.as_array().map(|items| items.len()).unwrap_or(0)
+}
+
+fn forbidden_seed_account_ids() -> Vec<String> {
+    [
+        "Alice",
+        "Bob",
+        "Charlie",
+        "Dave",
+        "Eve",
+        "Ferdie",
+        "AtlasFoundation",
+        "AtlasEcosystem",
+        "AtlasCommunity",
+        "TestnetFaucet",
+        "TestnetAlice",
+        "TestnetBob",
+        "TestnetCharlie",
+        "TestnetDave",
+        "TreasuryFoundation",
+        "CommunityFund",
+        "DevelopmentAllocation",
+    ]
+    .iter()
+    .filter_map(|seed| get_account_id_from_seed::<sr25519::Public>(seed).ok())
+    .map(|account| account.to_ss58check())
+    .collect()
+}
+
+fn array_contains_forbidden_seed(value: &Value, path: &[&str]) -> bool {
+    let forbidden = forbidden_seed_account_ids();
+    let mut cursor = value;
+    for key in path {
+        let Some(next) = cursor.get(*key) else {
+            return false;
+        };
+        cursor = next;
+    }
+    cursor
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|account| forbidden.iter().any(|seed| seed == account))
+        })
+        .unwrap_or(false)
+}
+
+fn is_zero_evm_escrow(value: &Value) -> bool {
+    value
+        .get("genesis")
+        .and_then(|v| v.get("runtimeGenesis"))
+        .and_then(|v| v.get("config"))
+        .and_then(|v| v.get("atlasKernel"))
+        .and_then(|v| v.get("evmEscrow"))
+        .and_then(Value::as_str)
+        .map(|address| {
+            let trimmed = address.trim().trim_start_matches("0x").trim_start_matches("0X");
+            !trimmed.is_empty() && trimmed.chars().all(|c| c == '0')
+        })
+        .unwrap_or(true)
+}
+
+fn is_zero_svm_escrow(value: &Value) -> bool {
+    let Some(items) = value
+        .get("genesis")
+        .and_then(|v| v.get("runtimeGenesis"))
+        .and_then(|v| v.get("config"))
+        .and_then(|v| v.get("atlasKernel"))
+        .and_then(|v| v.get("svmEscrow"))
+        .and_then(Value::as_array)
+    else {
+        return true;
+    };
+
+    items.len() != 32 || !items.iter().any(|entry| entry.as_u64().unwrap_or_default() != 0)
+}
+
+fn validate_live_json_chain_spec_value(value: &Value) -> Result<(), String> {
+    if !is_live_chain_type(value) {
+        return Ok(());
+    }
+
+    if json_array_len(value, &["genesis", "runtimeGenesis", "config", "aura", "authorities"])
+        == 0
+    {
+        return Err("Live chain spec requires at least one Aura authority".to_string());
+    }
+    if json_array_len(
+        value,
+        &["genesis", "runtimeGenesis", "config", "grandpa", "authorities"],
+    ) == 0
+    {
+        return Err("Live chain spec requires at least one Grandpa authority".to_string());
+    }
+    if json_array_len(value, &["genesis", "runtimeGenesis", "config", "council", "members"])
+        == 0
+    {
+        return Err("Live chain spec requires at least one council member".to_string());
+    }
+    if json_array_len(
+        value,
+        &["genesis", "runtimeGenesis", "config", "treasury", "initialSigners"],
+    ) == 0
+    {
+        return Err("Live chain spec requires at least one treasury signer".to_string());
+    }
+    if json_array_len(value, &["bootNodes"]) == 0 {
+        return Err("Live chain spec requires at least one bootnode".to_string());
+    }
+    if is_zero_evm_escrow(value) {
+        return Err("Live chain spec requires non-zero EVM escrow address".to_string());
+    }
+    if is_zero_svm_escrow(value) {
+        return Err("Live chain spec requires non-zero SVM escrow address".to_string());
+    }
+    if array_contains_forbidden_seed(
+        value,
+        &["genesis", "runtimeGenesis", "config", "council", "members"],
+    ) {
+        return Err(
+            "Live chain spec council members must not use known development seed accounts"
+                .to_string(),
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_live_json_chain_spec_file(path: &PathBuf) -> Result<(), String> {
+    let raw = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read chain spec file {}: {}", path.display(), e))?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("Invalid chain spec JSON in {}: {}", path.display(), e))?;
+    validate_live_json_chain_spec_value(&value)
+}
+
+pub fn load_json_spec(path: PathBuf) -> Result<ChainSpec, String> {
+    validate_live_json_chain_spec_file(&path)?;
+    ChainSpec::from_json_file(path).map_err(|e| e.to_string())
+}
+
 /// Load the named `ChainSpec` via the supplied identifier string.
 ///
 /// Chain specs can be loaded by:
@@ -229,7 +389,7 @@ pub fn load_spec(id: &str) -> Result<Box<dyn ServiceChainSpec>, String> {
         "staging" => Ok(Box::new(staging_config()?)),
         "testnet" => Ok(Box::new(testnet_config()?)),
         "production" => Ok(Box::new(production_config()?)),
-        path => Ok(Box::new(ChainSpec::from_json_file(PathBuf::from(path))?)),
+        path => Ok(Box::new(load_json_spec(PathBuf::from(path))?)),
     }
 }
 

@@ -1,0 +1,7 @@
+{
+    "represented_supply_equals_canonical_supply": "NOT_RUN",
+    "pending_supply_zero": "NOT_RUN",
+    "external_bridges_disabled": "PASS",
+    "blocks_after_upgrade": "FAIL",
+    "finality_after_upgrade": "FAIL"
+}

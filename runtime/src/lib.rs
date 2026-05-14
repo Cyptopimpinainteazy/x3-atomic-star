@@ -269,8 +269,8 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     spec_name: create_runtime_str!("x3-chain"),
     impl_name: create_runtime_str!("x3-chain"),
     authoring_version: 1,
-    // v9: added 6 missing AtlasKernelApi trait methods + 3 receipt/log runtime API methods
-    spec_version: 9,
+    // v10: RC4 runtime upgrade rehearsal marker. No storage migration.
+    spec_version: 10,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -1057,7 +1057,7 @@ pub struct SubstrateProofVerifier;
 impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVerifier {
     fn verify_proof(
         _origin: &AccountId,
-        _operation: &x3_cross_vm_bridge::CrossVmOperation,
+        operation: &x3_cross_vm_bridge::CrossVmOperation,
         proof: &pallet_x3_kernel::CrossChainProof,
     ) -> Result<(), frame_support::sp_runtime::DispatchError> {
         use codec::Encode;
@@ -1124,6 +1124,8 @@ impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVeri
             Ok(())
         }
 
+        let operation_hash = sp_io::hashing::blake2_256(&operation.encode());
+
         let authorities = pallet_x3_kernel::Authorities::<Runtime>::get();
         let authority_keys: sp_std::collections::btree_set::BTreeSet<[u8; 32]> = authorities
             .into_iter()
@@ -1151,6 +1153,11 @@ impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVeri
                 }
 
                 let event_hash = &bytes[0..32];
+                if event_hash != operation_hash.as_ref() {
+                    return Err(frame_support::sp_runtime::DispatchError::Other(
+                        "LockProof: proof not bound to operation",
+                    ));
+                }
                 let sig_count = bytes[32] as usize;
                 if sig_count == 0 {
                     return Err(frame_support::sp_runtime::DispatchError::Other(
@@ -1281,7 +1288,8 @@ impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVeri
                 )?;
 
                 let mut msg =
-                    sp_std::vec::Vec::with_capacity(32 + 8 + 8 + merkle_proof_bytes.len());
+                    sp_std::vec::Vec::with_capacity(32 + 32 + 8 + 8 + merkle_proof_bytes.len());
+                msg.extend_from_slice(&operation_hash);
                 msg.extend_from_slice(&state_root);
                 msg.extend_from_slice(&finalized_block.to_le_bytes());
                 msg.extend_from_slice(&execution_index.to_le_bytes());
@@ -4168,5 +4176,103 @@ mod vm_adapter_tests {
             // In WASM, adapters should be mocks
             // This test ensures no_std compatibility
         }
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod cross_chain_proof_verifier_tests {
+    use super::*;
+    use codec::Encode;
+    use frame_support::BoundedVec;
+    use pallet_x3_kernel::CrossChainProof;
+    use sp_core::{sr25519, Pair};
+
+    fn authority_pair() -> sr25519::Pair {
+        sr25519::Pair::from_seed(&[7u8; 32])
+    }
+
+    fn seeded_authority() -> AccountId {
+        authority_pair().public().into()
+    }
+
+    fn set_single_authority() {
+        let authorities = BoundedVec::try_from(vec![seeded_authority()]).unwrap();
+        pallet_x3_kernel::Authorities::<Runtime>::put(authorities);
+    }
+
+    fn make_operation(amount: u128) -> CrossVmOperation {
+        CrossVmOperation::TransferToEvm {
+            source: vec![0x11; 32],
+            destination: [0x22; 20],
+            amount,
+        }
+    }
+
+    fn lock_proof_for(operation: &CrossVmOperation) -> CrossChainProof {
+        let pair = authority_pair();
+        let op_hash = sp_io::hashing::blake2_256(&operation.encode());
+        let signature = pair.sign(&op_hash);
+        let mut bytes = Vec::with_capacity(33 + 32 + 64);
+        bytes.extend_from_slice(&op_hash);
+        bytes.push(1);
+        bytes.extend_from_slice(pair.public().as_ref());
+        bytes.extend_from_slice(signature.as_ref());
+        CrossChainProof::LockProof(bytes)
+    }
+
+    fn merkle_receipt_for(operation: &CrossVmOperation) -> CrossChainProof {
+        let pair = authority_pair();
+        let op_hash = sp_io::hashing::blake2_256(&operation.encode());
+
+        let state_root = [0x33u8; 32];
+        let finalized_block = 42u64;
+        let execution_index = 7u64;
+        let merkle_proof_bytes = vec![0xAA, 0xBB, 0xCC];
+
+        let mut msg = Vec::with_capacity(32 + 32 + 8 + 8 + merkle_proof_bytes.len());
+        msg.extend_from_slice(&op_hash);
+        msg.extend_from_slice(&state_root);
+        msg.extend_from_slice(&finalized_block.to_le_bytes());
+        msg.extend_from_slice(&execution_index.to_le_bytes());
+        msg.extend_from_slice(&merkle_proof_bytes);
+        let settlement_hash = sp_io::hashing::sha2_256(&msg);
+        let signature = pair.sign(&settlement_hash);
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&state_root);
+        bytes.extend_from_slice(&finalized_block.to_le_bytes());
+        bytes.extend_from_slice(&execution_index.to_le_bytes());
+        bytes.extend_from_slice(&(merkle_proof_bytes.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&merkle_proof_bytes);
+        bytes.push(1);
+        bytes.extend_from_slice(pair.public().as_ref());
+        bytes.extend_from_slice(signature.as_ref());
+        CrossChainProof::MerkleReceipt(bytes)
+    }
+
+    #[test]
+    fn lock_proof_rejects_mismatched_operation() {
+        set_single_authority();
+        let origin = seeded_authority();
+        let proof = lock_proof_for(&make_operation(10));
+
+        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+        assert!(ok.is_ok());
+
+        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+        assert!(matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation"));
+    }
+
+    #[test]
+    fn merkle_receipt_rejects_mismatched_operation() {
+        set_single_authority();
+        let origin = seeded_authority();
+        let proof = merkle_receipt_for(&make_operation(10));
+
+        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+        assert!(ok.is_ok());
+
+        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+        assert!(err.is_err());
     }
 }

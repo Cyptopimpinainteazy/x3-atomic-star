@@ -226,3 +226,37 @@ fn governance_can_resume_after_recovery() {
         ));
     });
 }
+
+#[test]
+fn governance_can_halt_transfers_while_preserving_refunds() {
+    new_test_ext().execute_with(|| {
+        let id = asset(1);
+        let mut ledger = valid_ledger(1_000);
+        ledger.native_supply = 900;
+        ledger.pending_supply = 100;
+        pallet_x3_supply_ledger::Ledgers::<Test>::insert(id, ledger);
+
+        assert_ok!(Ledger::halt_transfers(RuntimeOrigin::root()));
+        assert!(pallet_x3_supply_ledger::TransferHalted::<Test>::get());
+
+        let debit_res = <Ledger as SupplyLedgerWrite>::debit_source_to_pending(
+            &id,
+            DomainId::X3Native,
+            10,
+        );
+        assert_eq!(
+            debit_res,
+            Err(pallet_x3_supply_ledger::Error::<Test>::TransfersHalted.into())
+        );
+
+        assert_ok!(<Ledger as SupplyLedgerWrite>::refund_pending_to_source(
+            &id,
+            DomainId::X3Native,
+            100,
+        ));
+
+        let out = pallet_x3_supply_ledger::Ledgers::<Test>::get(id).unwrap();
+        assert_eq!(out.pending_supply, 0);
+        assert_eq!(out.native_supply, 1_000);
+    });
+}

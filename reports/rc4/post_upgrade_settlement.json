@@ -1,0 +1,5 @@
+{
+    "test": "test_x3_native_evm_svm_roundtrip_preserves_supply",
+    "result": "NOT_RUN",
+    "reason": "not run because live runtime upgrade did not pass"
+}

@@ -29,6 +29,7 @@ type Block = frame_system::mocking::MockBlock<Test>;
 construct_runtime!(
     pub enum Test {
         System: frame_system,
+        Balances: pallet_balances,
         Registry: pallet_x3_asset_registry,
         Ledger: pallet_x3_supply_ledger,
         Router: pallet_x3_cross_vm_router,
@@ -58,13 +59,30 @@ impl frame_system::Config for Test {
     type BlockHashCount = BlockHashCount;
     type Version = ();
     type PalletInfo = PalletInfo;
-    type AccountData = ();
+    type AccountData = pallet_balances::AccountData<u128>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
     type SS58Prefix = SS58Prefix;
     type OnSetCode = ();
     type MaxConsumers = ConstU32<16>;
+}
+
+impl pallet_balances::Config for Test {
+    type MaxLocks = ConstU32<50>;
+    type MaxReserves = ConstU32<50>;
+    type ReserveIdentifier = [u8; 8];
+    type Balance = u128;
+    type RuntimeEvent = RuntimeEvent;
+    type DustRemoval = ();
+    type ExistentialDeposit = frame_support::traits::ConstU128<1>;
+    type AccountStore = System;
+    type WeightInfo = ();
+    type FreezeIdentifier = ();
+    type MaxFreezes = ConstU32<0>;
+    type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = ();
+    type DoneSlashHandler = ();
 }
 
 // Root-or-signed passthrough: any signed origin counts as governance in tests.
@@ -101,6 +119,8 @@ impl EnsureOrigin<RuntimeOrigin> for RootOnly {
 
 parameter_types! {
     pub const MaxAssets: u32 = 64;
+    pub const RoutingFeeBps: u16 = 0;
+    pub const ProtocolTreasury: u64 = 99;
 }
 
 impl pallet_x3_asset_registry::Config for Test {
@@ -123,6 +143,9 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type ExternalExecutorOrigin = RootOrAny;
     type VmAdapterOrigin = RootOnly;
     type EconomicHalt = Ledger;
+    type Currency = Balances;
+    type RoutingFeeBps = RoutingFeeBps;
+    type ProtocolTreasury = ProtocolTreasury;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {
