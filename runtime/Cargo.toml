@@ -121,6 +121,7 @@ sp-block-builder = { workspace = true, default-features = false }
 sp-consensus-aura = { workspace = true, default-features = false, features = ["serde"] }
 sp-consensus-grandpa = { workspace = true, default-features = false, features = ["serde"] }
 sp-core = { workspace = true, default-features = false, features = ["serde"] }
+sp-genesis-builder = { workspace = true, default-features = false }
 sp-inherents = { workspace = true, default-features = false }
 sp-offchain = { workspace = true, default-features = false }
 # Canonical solochain template pattern (polkadot-sdk stable2512):
@@ -242,6 +243,7 @@ std = [
 	"sp-consensus-aura/std",
 	"sp-consensus-grandpa/std",
 	"sp-core/std",
+	"sp-genesis-builder/std",
 	"sp-inherents/std",
 	"sp-offchain/std",
 	"sp-runtime/std",

@@ -260,6 +260,7 @@ pallet-transaction-payment = { git = "https://github.com/paritytech/polkadot-sdk
 pallet-collective = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 pallet-sudo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-genesis-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
