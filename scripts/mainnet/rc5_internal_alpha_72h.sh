@@ -15,6 +15,8 @@ LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs/rc5}"
 BINARY="${BINARY:-$ROOT_DIR/target/release/x3-chain-node}"
 RAW_SPEC="${RAW_SPEC:-$ROOT_DIR/chain-specs/x3-rc5-local3-raw.json}"
 
+RC5_BASE_DIR="${RC5_BASE_DIR:-$ROOT_DIR/.rc5-runtime/rc5}"
+
 ATTACH_EXISTING="${ATTACH_EXISTING:-0}"
 VALIDATOR_COUNT="${VALIDATOR_COUNT:-3}"
 
@@ -28,12 +30,17 @@ DURATION_SECONDS="${DURATION_SECONDS:-259200}"
 SNAPSHOT_INTERVAL_SECONDS="${SNAPSHOT_INTERVAL_SECONDS:-60}"
 SETTLEMENT_INTERVAL_CYCLES="${SETTLEMENT_INTERVAL_CYCLES:-10}"
 RESTART_DRILL_CYCLE="${RESTART_DRILL_CYCLE:-3}"
+RESTART_DRILL_TRIGGER_CYCLE="${RESTART_DRILL_TRIGGER_CYCLE:-$RESTART_DRILL_CYCLE}"
 FINALITY_WAIT_SECONDS="${FINALITY_WAIT_SECONDS:-120}"
 BLOCK_WAIT_SECONDS="${BLOCK_WAIT_SECONDS:-120}"
 SYNC_WAIT_SECONDS="${SYNC_WAIT_SECONDS:-120}"
 
 RUN_SETTLEMENT_SMOKE="${RUN_SETTLEMENT_SMOKE:-1}"
 WASM_EXECUTION="${WASM_EXECUTION:-compiled}"
+
+if (( DURATION_SECONDS < RESTART_DRILL_CYCLE * SNAPSHOT_INTERVAL_SECONDS )); then
+  RESTART_DRILL_TRIGGER_CYCLE=1
+fi
 
 RC5_STRICT_ARTIFACTS="${RC5_STRICT_ARTIFACTS:-1}"
 RC5_FORCE_CLEAN_BUILD="${RC5_FORCE_CLEAN_BUILD:-1}"
@@ -59,9 +66,9 @@ REPORT_FILE="$OUT_DIR/rc5_internal_alpha_72h_report.md"
 ALICE_PID=""
 BOB_PID=""
 CHARLIE_PID=""
-ALICE_BASE="/tmp/x3-rc5-alice"
-BOB_BASE="/tmp/x3-rc5-bob"
-CHARLIE_BASE="/tmp/x3-rc5-charlie"
+ALICE_BASE="$RC5_BASE_DIR/alice"
+BOB_BASE="$RC5_BASE_DIR/bob"
+CHARLIE_BASE="$RC5_BASE_DIR/charlie"
 
 START_BLOCK=0
 END_BLOCK=0
@@ -488,6 +495,12 @@ def storage_get(url, key):
     except Exception:
         return None
 
+
+def bridge_enabled(router_raw):
+  if router_raw in (None, 'null', '0x00', '0x0'):
+    return False
+  return router_raw in ('0x01', '0x1', True, 'true')
+
 def storage_get_keys(url, prefix):
     payload = json.dumps({'id': 1, 'jsonrpc': '2.0', 'method': 'state_getKeys', 'params': [prefix]})
     try:
@@ -582,12 +595,16 @@ for field in ('pending_supply', 'represented_supply', 'canonical_supply', 'exter
     else:
         snapshot[field]['source'] = 'state_call'
 
-storage_key = '0x' + twox128('X3BridgeAdapters') + twox128('ExternalBridgesEnabled')
-bridge_value = storage_get(url, storage_key)
+router_storage_key = '0x' + twox128('X3CrossVmRouter') + twox128('ExternalBridgesEnabled')
+legacy_storage_key = '0x' + twox128('X3BridgeAdapters') + twox128('ExternalBridgesEnabled')
+bridge_value = storage_get(url, router_storage_key)
+legacy_bridge_value = storage_get(url, legacy_storage_key)
 snapshot['external_bridges'] = {
-    'storage_key': storage_key,
+    'storage_key': router_storage_key,
+    'legacy_storage_key': legacy_storage_key,
     'raw': bridge_value,
-    'enabled': bridge_value not in (None, '0x00'),
+    'legacy_raw': legacy_bridge_value,
+    'enabled': bridge_enabled(bridge_value),
 }
 
 print(json.dumps(snapshot))
@@ -740,7 +757,7 @@ run_settlement_smoke() {
   represented_ok="$($JQ_BIN -r '((.represented_supply.decoded // null) == (.canonical_supply.decoded // null))' <<<"$snapshot")"
   pending_ok="$($JQ_BIN -r '((.pending_supply.decoded // -1) == 0)' <<<"$snapshot")"
   external_locked_ok="$($JQ_BIN -r '((.external_locked_supply.decoded // -1) == 0)' <<<"$snapshot")"
-  bridges_disabled="$($JQ_BIN -r '((.external_bridges.enabled // true) | not)' <<<"$snapshot")"
+  bridges_disabled="$($JQ_BIN -r '(.external_bridges.enabled == true | not)' <<<"$snapshot")"
 
   if [[ "$represented_ok" != "true" || "$pending_ok" != "true" || "$external_locked_ok" != "true" || "$bridges_disabled" != "true" ]]; then
     INVARIANT_FAILS=$((INVARIANT_FAILS + 1))
@@ -976,7 +993,7 @@ PY
   # 8 external bridges disabled.
   local init_snapshot
   init_snapshot="$(collect_supply_snapshot "$ALICE_RPC")"
-  if [[ "$($JQ_BIN -r '((.external_bridges.enabled // true) | not)' <<<"$init_snapshot")" == "true" ]]; then
+  if [[ "$($JQ_BIN -r '(.external_bridges.enabled == true | not)' <<<"$init_snapshot")" == "true" ]]; then
     BRIDGES_DISABLED_PASS=1
   fi
 
@@ -1008,20 +1025,26 @@ PY
       --arg ts "$ts" --argjson latest "$block" --argjson finalized "$fin_num" --arg hash "$fin_hash" \
       '{timestamp:$ts, latest_block:$latest, finalized_block:$finalized, finalized_hash:$hash}')"
 
-    local snapshot rep_ok pend_ok ext_ok bridge_ok
+    local snapshot rep_ok pend_ok ext_ok bridge_ok bridge_raw bridge_legacy_raw
     snapshot="$(collect_supply_snapshot "$ALICE_RPC")"
     rep_ok="$($JQ_BIN -r '((.represented_supply.decoded // null) == (.canonical_supply.decoded // null))' <<<"$snapshot")"
     pend_ok="$($JQ_BIN -r '((.pending_supply.decoded // -1) == 0)' <<<"$snapshot")"
     ext_ok="$($JQ_BIN -r '((.external_locked_supply.decoded // -1) == 0)' <<<"$snapshot")"
-    bridge_ok="$($JQ_BIN -r '((.external_bridges.enabled // true) | not)' <<<"$snapshot")"
+    bridge_ok="$($JQ_BIN -r '(.external_bridges.enabled == true | not)' <<<"$snapshot")"
+    bridge_raw="$($JQ_BIN -r '(.external_bridges.raw // "null")' <<<"$snapshot")"
+    bridge_legacy_raw="$($JQ_BIN -r '(.external_bridges.legacy_raw // "null")' <<<"$snapshot")"
 
     if [[ "$rep_ok" != "true" || "$pend_ok" != "true" || "$ext_ok" != "true" || "$bridge_ok" != "true" ]]; then
       INVARIANT_FAILS=$((INVARIANT_FAILS + 1))
     fi
 
+    if (( peer_count >= 2 )); then
+      PEER_MIN_PASS=1
+    fi
+
     append_jsonl "$INVARIANT_FILE" "$($JQ_BIN -cn \
-      --arg ts "$ts" --argjson cycle "$cycles" --argjson rep "$rep_ok" --argjson pend "$pend_ok" --argjson ext "$ext_ok" --argjson bridges "$bridge_ok" \
-      '{timestamp:$ts, cycle:$cycle, checks:{represented_equals_canonical:$rep, pending_zero:$pend, external_locked_zero:$ext, external_bridges_disabled:$bridges}}')"
+      --arg ts "$ts" --argjson cycle "$cycles" --argjson rep "$rep_ok" --argjson pend "$pend_ok" --argjson ext "$ext_ok" --argjson bridges "$bridge_ok" --arg bridge_raw "$bridge_raw" --arg bridge_legacy_raw "$bridge_legacy_raw" \
+      '{timestamp:$ts, cycle:$cycle, checks:{represented_equals_canonical:$rep, pending_zero:$pend, external_locked_zero:$ext, external_bridges_disabled:$bridges}, external_bridges:{raw:$bridge_raw, legacy_raw:$bridge_legacy_raw}}')"
 
     snapshot_resource "$ts"
 
@@ -1029,11 +1052,19 @@ PY
       run_settlement_smoke "$cycles" "$ts"
     fi
 
-    if (( RESTART_DRILL_DONE == 0 && cycles >= RESTART_DRILL_CYCLE )); then
+    if (( RESTART_DRILL_DONE == 0 && cycles >= RESTART_DRILL_TRIGGER_CYCLE )); then
       run_restart_drill "$ts"
     fi
 
-    sleep "$SNAPSHOT_INTERVAL_SECONDS"
+    local now_ts sleep_seconds
+    now_ts=$(date +%s)
+    sleep_seconds=$(( end_deadline - now_ts ))
+    if (( sleep_seconds > SNAPSHOT_INTERVAL_SECONDS )); then
+      sleep_seconds=$SNAPSHOT_INTERVAL_SECONDS
+    fi
+    if (( sleep_seconds > 0 )); then
+      sleep "$sleep_seconds"
+    fi
   done
 
   END_BLOCK="$(get_block_number "$ALICE_RPC")"
@@ -1095,35 +1126,60 @@ PY
     fi
   fi
 
-  "$JQ_BIN" -cn \
-    --arg verdict "$overall" \
-    --arg short "$short_status" \
-    --arg run72 "$run72_status" \
-    --argjson duration "$DURATION_SECONDS" \
-    --arg start "$(date -u -d "@$START_TS" +%Y-%m-%dT%H:%M:%SZ)" \
-    --arg end "$(date -u -d "@$END_TS" +%Y-%m-%dT%H:%M:%SZ)" \
-    --argjson start_block "$START_BLOCK" \
-    --argjson end_block "$END_BLOCK" \
-    --arg start_finalized "$START_FINALIZED" \
-    --arg end_finalized "$END_FINALIZED" \
-    --argjson restart_done "$RESTART_DRILL_DONE" \
-    --argjson restart_pass "$RESTART_DRILL_PASS" \
-    --argjson settlement_fails "$SETTLEMENT_FAILS" \
-    --argjson invariant_fails "$INVARIANT_FAILS" \
-    --argjson panic "$PANIC_FLAG" \
-    --argjson dbcorrupt "$DB_CORRUPTION_FLAG" \
-    --argjson bridges_disabled_initial "$BRIDGES_DISABLED_PASS" \
-    --argjson blockers "$blockers" \
-    '{
-      verdict:$verdict,
-      RC5_SHORT_SHAKEDOWN:$short,
-      RC5_72H:$run72,
-      duration_seconds:$duration,
-      run_window:{start:$start,end:$end},
-      liveness:{start_block:$start_block,end_block:$end_block,start_finalized:$start_finalized,end_finalized:$end_finalized},
-      checks:{restart_drill_done:$restart_done,restart_drill_pass:$restart_pass,settlement_failures:$settlement_fails,invariant_failures:$invariant_fails,panic_flag:$panic,db_corruption_flag:$dbcorrupt,bridges_disabled_initial:$bridges_disabled_initial},
-      blockers:$blockers
-    }' > "$SUMMARY_FILE"
+  BLOCKERS_JSON="$blockers" \
+    START_TS_ISO="$(date -u -d "@$START_TS" +%Y-%m-%dT%H:%M:%SZ)" \
+    END_TS_ISO="$(date -u -d "@$END_TS" +%Y-%m-%dT%H:%M:%SZ)" \
+    SUMMARY_FILE="$SUMMARY_FILE" \
+    OVERALL="$overall" \
+    SHORT_STATUS="$short_status" \
+    RUN72_STATUS="$run72_status" \
+    DURATION_SECONDS="$DURATION_SECONDS" \
+    START_BLOCK="$START_BLOCK" \
+    END_BLOCK="$END_BLOCK" \
+    START_FINALIZED="$START_FINALIZED" \
+    END_FINALIZED="$END_FINALIZED" \
+    RESTART_DRILL_DONE="$RESTART_DRILL_DONE" \
+    RESTART_DRILL_PASS="$RESTART_DRILL_PASS" \
+    SETTLEMENT_FAILS="$SETTLEMENT_FAILS" \
+    INVARIANT_FAILS="$INVARIANT_FAILS" \
+    PANIC_FLAG="$PANIC_FLAG" \
+    DB_CORRUPTION_FLAG="$DB_CORRUPTION_FLAG" \
+    BRIDGES_DISABLED_PASS="$BRIDGES_DISABLED_PASS" \
+    python3 - <<'PY'
+import json
+import os
+
+summary = {
+    "verdict": os.environ["OVERALL"],
+    "RC5_SHORT_SHAKEDOWN": os.environ["SHORT_STATUS"],
+    "RC5_72H": os.environ["RUN72_STATUS"],
+    "duration_seconds": int(os.environ["DURATION_SECONDS"]),
+    "run_window": {
+        "start": os.environ["START_TS_ISO"],
+        "end": os.environ["END_TS_ISO"],
+    },
+    "liveness": {
+        "start_block": int(os.environ["START_BLOCK"]),
+        "end_block": int(os.environ["END_BLOCK"]),
+        "start_finalized": os.environ["START_FINALIZED"],
+        "end_finalized": os.environ["END_FINALIZED"],
+    },
+    "checks": {
+        "restart_drill_done": int(os.environ["RESTART_DRILL_DONE"]),
+        "restart_drill_pass": int(os.environ["RESTART_DRILL_PASS"]),
+        "settlement_failures": int(os.environ["SETTLEMENT_FAILS"]),
+        "invariant_failures": int(os.environ["INVARIANT_FAILS"]),
+        "panic_flag": int(os.environ["PANIC_FLAG"]),
+        "db_corruption_flag": int(os.environ["DB_CORRUPTION_FLAG"]),
+        "bridges_disabled_initial": int(os.environ["BRIDGES_DISABLED_PASS"]),
+    },
+    "blockers": json.loads(os.environ.get("BLOCKERS_JSON", "[]")),
+}
+
+with open(os.environ["SUMMARY_FILE"], "w", encoding="utf-8") as handle:
+    json.dump(summary, handle, indent=2)
+    handle.write("\n")
+PY
 
   write_report "$overall" "$short_status" "$run72_status" "$blockers"
 
