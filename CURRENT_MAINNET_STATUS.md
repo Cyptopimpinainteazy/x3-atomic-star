@@ -137,3 +137,11 @@ Required gates:
 - `cargo test -p pallet-x3-settlement-engine`
 - `cargo test -p pallet-x3-atomic-kernel`
 - `cargo clippy --workspace --all-targets -- -D warnings`
+
+RC4 runtime upgrade rehearsal is now a true PASS. Automation, report, and evidence files are all consistent. Blocker resolved as of 2026-05-15T03:16Z.
+
+- Script exits 0 only on PASS, 1 on any failure
+- Blocker diagnosis is always written if failing
+- run_exit.txt and report both show PASS
+
+Ready to proceed to RC5.

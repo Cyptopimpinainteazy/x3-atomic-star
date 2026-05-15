@@ -15,7 +15,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
 # Runtime
-x3-chain-runtime = { path = "../../runtime", features = ["std", "native-real-vm-adapters"] }
+x3-chain-runtime = { path = "../../runtime", features = ["std", "frontier"] }
 pallet-x3-kernel = { path = "../../pallets/x3-kernel", features = ["std"] }
 
 # Substrate RPC infrastructure

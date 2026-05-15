@@ -11,7 +11,6 @@ CHAIN_SPEC_PLAIN_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-testnet-plain.json
 BASE_DIR_DEFAULT="$HOME/.local/share/x3/testnet-local"
 LOG_DIR_DEFAULT="$ROOT_DIR/logs/testnet"
 SUBKEY_BIN_DEFAULT="${SUBKEY_BIN_DEFAULT:-/home/lojak/.cargo/bin/subkey}"
-SUBKEY_NODE_DEFAULT="${SUBKEY_NODE_DEFAULT:-}"
 
 NODE_BIN="${NODE_BIN:-$NODE_BIN_DEFAULT}"
 CHAIN_SPEC="${CHAIN_SPEC:-$CHAIN_SPEC_DEFAULT}"
@@ -29,9 +28,7 @@ NO_TELEMETRY="${NO_TELEMETRY:-1}"
 DISABLE_LOG_COLOR="${DISABLE_LOG_COLOR:-1}"
 NODE_NICE="${NODE_NICE:-}"
 NODE_DB_CACHE_MIB="${NODE_DB_CACHE_MIB:-}"
-NODE_EXTRA_ARGS="${NODE_EXTRA_ARGS:-}"
 SUBKEY_BIN="${SUBKEY_BIN:-$SUBKEY_BIN_DEFAULT}"
-SUBKEY_NODE="${SUBKEY_NODE:-$SUBKEY_NODE_DEFAULT}"
 
 WIPE_BASE_DIR=0
 
@@ -140,14 +137,6 @@ if ! command -v "$SUBKEY_BIN" >/dev/null 2>&1; then
     exit 1
   fi
 fi
-
-subkey_inspect() {
-  if [[ -n "$SUBKEY_NODE" ]]; then
-    "$SUBKEY_NODE" "$SUBKEY_BIN" inspect "$@"
-  else
-    "$SUBKEY_BIN" inspect "$@"
-  fi
-}
 
 if [[ ! -f "$CHAIN_SPEC" ]]; then
   echo "Chain spec not found: $CHAIN_SPEC"
@@ -262,8 +251,8 @@ insert_keys() {
 
   local aura_pub
   local gran_pub
-  aura_pub=$(subkey_inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
-  gran_pub=$(subkey_inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
+  aura_pub=$("$SUBKEY_BIN" inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
+  gran_pub=$("$SUBKEY_BIN" inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
 
   if [[ -z "$aura_pub" || -z "$gran_pub" ]]; then
     echo "Failed to derive public keys for ${suri}"
@@ -301,8 +290,8 @@ validate_keys() {
 
   local aura_pub
   local gran_pub
-  aura_pub=$(subkey_inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
-  gran_pub=$(subkey_inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
+  aura_pub=$("$SUBKEY_BIN" inspect --scheme sr25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
+  gran_pub=$("$SUBKEY_BIN" inspect --scheme ed25519 "$suri" | awk '/Public key \(hex\):/ {print $4}')
 
   local aura_file="${keystore_dir}/61757261${aura_pub#0x}"
   local gran_file="${keystore_dir}/6772616e${gran_pub#0x}"
@@ -386,12 +375,6 @@ start_node() {
     nice_args=(nice -n "$NODE_NICE")
   fi
 
-  local extra_args=()
-  if [[ -n "$NODE_EXTRA_ARGS" ]]; then
-    # shellcheck disable=SC2206
-    extra_args=($NODE_EXTRA_ARGS)
-  fi
-
   nohup "${nice_args[@]}" "$NODE_BIN" \
     --chain "$CHAIN_SPEC_RUN" \
     --base-path "$base_path" \
@@ -407,7 +390,6 @@ start_node() {
     --validator \
     --force-authoring \
     --allow-private-ip \
-    "${extra_args[@]}" \
     "${boot_args[@]}" \
     > "$log_file" 2>&1 &
 

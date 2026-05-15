@@ -134,27 +134,6 @@ All of these MUST pass via `cargo test -p pallet-x3-cross-vm-router`:
 
 ---
 
-## Sign-off
-
-| Phase | Verified By | Date | Commit Hash |
-|-------|-------------|------|-------------|
-| 0 — Prerequisites | | | |
-| 1 — Binary | | | |
-| 2 — Dev Node | | | |
-| 3 — Testnet | | | |
-| 4 — Cross-VM Proofs | | | |
-| 5 — Supply Invariant | | | |
-| 6 — Security | | | |
-| 7 — CI Gates | | | |
-| 8 — Scope Freeze | | | |
-| 9 — Docs | | | |
-| 10 — Public Testnet | | | |
-| 11 — External Audit | | | |
-| 12 — Launch Hardening | | | |
-| 13 — Genesis Ceremony | | | |
-
----
-
 ## PHASE 11 — External Security Audit
 
 > Required before ANY value-bearing mainnet launch. No exceptions.
@@ -374,4 +353,11 @@ All of these MUST pass via `cargo test -p pallet-x3-cross-vm-router`:
 - [ ] `reports/phase10_ai_swarm_gate.md` shows `phase10_ai_swarm_gate: PASS`
 
 ---
+
+## PHASE 11 — RC4 Runtime Upgrade Rehearsal
+
+> Required before ANY value-bearing mainnet launch. No exceptions.
+
+- [x] RC4 runtime upgrade rehearsal: PASS (automation, report, and evidence all consistent)
+- [ ] RC5: Not started
 

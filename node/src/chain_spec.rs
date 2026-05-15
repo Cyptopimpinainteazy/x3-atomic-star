@@ -7,9 +7,7 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::crypto::Ss58Codec;
 use sp_core::{sr25519, Pair, Public, H160};
-#[cfg(feature = "frontier")]
-use sp_runtime::traits::BlakeTwo256;
-use sp_runtime::traits::{IdentifyAccount, Verify};
+use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
@@ -27,7 +25,6 @@ const ENDOWMENT: u128 = 1_000_000 * X3;
 type AccountPublic = <Signature as Verify>::Signer;
 
 // EVM callers funded in dev/local chains through their mapped Substrate accounts.
-#[cfg(feature = "frontier")]
 const DEV_EVM_CALLERS: [[u8; 20]; 2] = [
     [
         0xd4, 0x35, 0x93, 0xc7, 0x15, 0xfd, 0xd3, 0x1c, 0x61, 0x14, 0x1a, 0xbd, 0x04, 0xa9, 0x9f,
@@ -39,7 +36,6 @@ const DEV_EVM_CALLERS: [[u8; 20]; 2] = [
     ],
 ];
 
-#[cfg(feature = "frontier")]
 fn dev_evm_endowed_accounts() -> Vec<AccountId> {
     DEV_EVM_CALLERS
         .iter()
@@ -50,11 +46,6 @@ fn dev_evm_endowed_accounts() -> Vec<AccountId> {
             >>::into_account_id(evm_addr)
         })
         .collect()
-}
-
-#[cfg(not(feature = "frontier"))]
-fn dev_evm_endowed_accounts() -> Vec<AccountId> {
-    Vec::new()
 }
 
 #[derive(Debug, Deserialize)]
@@ -804,7 +795,6 @@ fn x3_chain_genesis(
             members: council_members,
             phantom: Default::default(),
         },
-        #[cfg(feature = "frontier")]
         evm: Default::default(),
         governance: Default::default(),
         treasury: TreasuryConfig {
@@ -816,7 +806,6 @@ fn x3_chain_genesis(
             liquidity_allocations: Vec::new(),
         },
         session: Default::default(),
-        #[cfg(feature = "frontier")]
         ethereum: Default::default(),
         evolution_core: Default::default(),
         x3_verifier: Default::default(),
