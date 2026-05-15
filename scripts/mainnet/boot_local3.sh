@@ -1,20 +1,48 @@
 #!/usr/bin/env bash
 # Boot a 3-validator local X3 testnet (Alice / Bob / Charlie)
 # Usage: ./scripts/mainnet/boot_local3.sh
-# Requires: target/release/x3-chain-node binary and chain-specs/x3-local3-raw.json
+# Requires: target/release/x3-chain-node binary
 set -euo pipefail
 
 BINARY="./target/release/x3-chain-node"
-RAW_SPEC="./chain-specs/x3-local3-raw.json"
+PLAIN_SPEC="./chain-specs/x3-rc5-local3-plain.json"
+RAW_SPEC="./chain-specs/x3-rc5-local3-raw.json"
 LOG_DIR="./logs/local3"
+REGENERATE_CHAIN_SPEC="${REGENERATE_CHAIN_SPEC:-1}"
+
+capture_build_spec_json() {
+  local out_file="$1"
+  shift
+  "$BINARY" build-spec "$@" \
+    | awk 'BEGIN{emit=0} /^[[:space:]]*\{/ {emit=1} emit {print}' > "$out_file"
+
+  if [ ! -s "$out_file" ]; then
+    return 1
+  fi
+  jq -e 'type == "object"' "$out_file" >/dev/null 2>&1
+}
 
 if [ ! -f "$BINARY" ]; then
   echo "ERROR: $BINARY not found. Run 'cargo build --release -p x3-chain-node' first."
   exit 1
 fi
-if [ ! -f "$RAW_SPEC" ]; then
-  echo "ERROR: $RAW_SPEC not found. Generate chain specs first."
-  exit 1
+if [ "$REGENERATE_CHAIN_SPEC" = "1" ]; then
+  mkdir -p ./chain-specs
+  if ! capture_build_spec_json "$PLAIN_SPEC" --chain local3; then
+    echo "ERROR: failed to generate valid plain local3 chain spec"
+    exit 1
+  fi
+  if ! capture_build_spec_json "$RAW_SPEC" --chain "$PLAIN_SPEC" --raw; then
+    echo "ERROR: failed to generate valid raw local3 chain spec"
+    exit 1
+  fi
+elif [ ! -f "$RAW_SPEC" ]; then
+  if [ -f "./chain-specs/x3-local3-raw.json" ]; then
+    RAW_SPEC="./chain-specs/x3-local3-raw.json"
+  else
+    echo "ERROR: $RAW_SPEC not found. Generate chain specs first."
+    exit 1
+  fi
 fi
 
 mkdir -p "$LOG_DIR"
