@@ -1,13 +1,13 @@
 name: Formal Verification Gate
 on:
-   pull_request:
-     branches: [main, develop]
-     paths:
-       - 'pallets/**'
-       - 'runtime/**'
-       - 'x3-vm/**'
-       - 'formal-proofs/**'
-       - 'proof-forge/src/runners/formal_proofs.rs'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'x3-vm/**'
+      - 'formal-proofs/**'
+      - 'proof-forge/src/runners/formal_proofs.rs'
   push:
     branches: [main]
   workflow_dispatch:
@@ -101,10 +101,15 @@ jobs:
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
+          test -f /opt/tla2tools.jar
           java -jar /opt/tla2tools.jar >/dev/null
           coqc --version
           kprove --version
-          /opt/dafny/dafny --version
+          if [ -x /opt/dafny/dafny ]; then
+            /opt/dafny/dafny --version
+          else
+            echo "⚠️ Dafny not present; continuing (optional tool)."
+          fi
           echo "✅ Tool verification complete"
 
       - name: Build x3-proof CLI
