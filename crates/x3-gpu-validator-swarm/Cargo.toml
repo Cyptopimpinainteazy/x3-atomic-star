@@ -63,7 +63,7 @@ log = "0.4"
 
 # HTTP server
 axum = "0.7"
-hyper = "1.8"
+hyper = "1.9"
 tower-http = { version = "0.4", features = ["fs", "trace"] }
 
 # Utils
