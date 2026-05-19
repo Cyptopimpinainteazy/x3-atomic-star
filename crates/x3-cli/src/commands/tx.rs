@@ -6,6 +6,7 @@ use clap::{Args, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 use x3_sdk::{AtlasClient, ComitBuilder};
+use x3_universal_contracts::submit_payload::build_intent_submit_args;
 
 #[derive(Args)]
 pub struct TxArgs {
@@ -26,6 +27,9 @@ pub enum TxCommands {
 
     /// Submit atomic Comit transaction
     Comit(ComitTxArgs),
+
+    /// Submit x3-intent plan (decoded payload + hash)
+    Intent(IntentTxArgs),
 }
 
 #[derive(Args)]
@@ -114,13 +118,96 @@ pub struct ComitTxArgs {
     pub dry_run: bool,
 }
 
+#[derive(Args)]
+pub struct IntentTxArgs {
+    /// Path to a source file that compiles to X3 IR execution plan
+    pub source: PathBuf,
+
+    /// Intent bond amount
+    #[arg(long)]
+    pub bond: u128,
+
+    /// Intent nonce
+    #[arg(long)]
+    pub nonce: u64,
+
+    /// Path to keyfile
+    #[arg(short, long)]
+    pub keyfile: Option<PathBuf>,
+
+    /// Network
+    #[arg(short, long)]
+    pub network: Option<String>,
+
+    /// Dry run (build args but do not submit)
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 pub async fn execute(args: TxArgs) -> Result<()> {
     match args.command {
         TxCommands::Send(a) => execute_send(a).await,
         TxCommands::Evm(a) => execute_evm(a).await,
         TxCommands::Svm(a) => execute_svm(a).await,
         TxCommands::Comit(a) => execute_comit(a).await,
+        TxCommands::Intent(a) => execute_intent(a).await,
     }
+}
+
+async fn execute_intent(args: IntentTxArgs) -> Result<()> {
+    let endpoint = get_endpoint(args.network.as_deref());
+
+    let keyfile = args
+        .keyfile
+        .or_else(default_keyfile)
+        .ok_or_else(|| CliError::Config("No keyfile specified".into()))?;
+
+    let seed = load_seed(&keyfile)?;
+    let signer = x3_sdk::Sr25519Signer::from_seed(&seed);
+
+    let client = AtlasClient::connect(&endpoint).await?;
+    let client = client.with_signer(signer);
+
+    let source = std::fs::read_to_string(&args.source)
+        .map_err(|e| CliError::Config(format!("Failed to read source file: {}", e)))?;
+
+    let program = x3_lang::parse_program(&source)
+        .map_err(|e| CliError::Config(format!("Failed to parse source: {}", e)))?;
+    x3_lang::typecheck_program(&program)
+        .map_err(|e| CliError::Config(format!("Type checking failed: {}", e)))?;
+    x3_lang::verify_atomic_guards(&program)
+        .map_err(|e| CliError::Config(format!("Atomic guard verification failed: {}", e)))?;
+    let plan = x3_lang::compile_to_x3ir(&program)
+        .map_err(|e| CliError::Config(format!("Failed to compile to X3 IR: {}", e)))?;
+
+    // Always derive submit args from the canonical helper to keep hash/payload binding exact.
+    let submit_args = build_intent_submit_args(&plan)
+        .map_err(|e| CliError::Config(format!("Failed to build intent submit args: {}", e)))?;
+
+    println!("{} Built intent submit payload", "→".blue());
+    println!("  Source: {}", args.source.display());
+    println!("  Bond: {}", args.bond);
+    println!("  Nonce: {}", args.nonce);
+    println!("  Plan hash: 0x{}", hex::encode(submit_args.plan_hash));
+    println!(
+        "  Decoded instructions: {}",
+        submit_args.decoded_plan.instructions.len()
+    );
+
+    if args.dry_run {
+        println!("{} Dry run - not submitting", "→".blue());
+        return Ok(());
+    }
+
+    let rpc_result = client
+        .submit_intent_plan(&plan, args.bond, args.nonce)
+        .await?;
+
+    println!();
+    println!("{} Intent submitted!", "✓".green());
+    println!("  RPC result: {}", rpc_result);
+
+    Ok(())
 }
 
 async fn execute_send(args: SendArgs) -> Result<()> {

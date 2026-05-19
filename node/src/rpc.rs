@@ -4,10 +4,11 @@
 //! Merges substrate system RPCs, transaction-payment RPCs, chain RPCs,
 //! and the Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
 
+use codec::Decode;
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
+use pallet_x3_intent::types::DecodedPlanPayload;
 use sc_client_api::BlockBackend;
-use sc_rpc::chain::ChainApiServer;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
@@ -50,6 +51,12 @@ fn decode_hex_32(value: &str, label: &str) -> Result<[u8; 32], JsonRpseeError> {
     Ok(array)
 }
 
+/// Decode hex string with "0x" prefix into raw bytes.
+fn decode_hex_bytes(value: &str, label: &str) -> Result<Vec<u8>, JsonRpseeError> {
+    let stripped = value.strip_prefix("0x").unwrap_or(value);
+    hex::decode(stripped).map_err(|e| custom_error(format!("{label} decode failed: {e}")))
+}
+
 /// Parse u128 value from JSON.
 fn parse_u128_value(
     value: Option<&serde_json::Value>,
@@ -83,8 +90,6 @@ where
     FullClient: BlockBackend<Block>,
     <FullClient as ProvideRuntimeApi<Block>>::Api: BlockBuilder<Block>,
     <FullClient as ProvideRuntimeApi<Block>>::Api:
-        substrate_frame_rpc_system::AccountNonceApi<Block, x3_chain_runtime::AccountId, u32>,
-    <FullClient as ProvideRuntimeApi<Block>>::Api:
         pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<
             Block,
             x3_chain_runtime::Balance,
@@ -93,11 +98,6 @@ where
         pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
 {
     let mut module = RpcModule::new(());
-
-    let system_rpc = substrate_frame_rpc_system::System::new(client.clone(), pool);
-    module.merge(substrate_frame_rpc_system::SystemApiServer::into_rpc(
-        system_rpc,
-    ))?;
 
     let tx_payment_rpc = pallet_transaction_payment_rpc::TransactionPayment::new(client.clone());
     module.merge(
@@ -111,10 +111,6 @@ where
     // Merge SVM-compatible JSON-RPC endpoints.
     let svm_module = crate::rpc_frontier::create_svm_rpc(client.clone())?;
     module.merge(svm_module)?;
-
-    // Merge chain RPC for WebSocket subscriptions (chain_subscribeNewHeads, etc.)
-    let chain_rpc = sc_rpc::chain::new_full(client.clone(), subscription_executor.clone());
-    module.merge(chain_rpc.into_rpc())?;
 
     // Initialize DEX RPC integration.
     let wallet_dex = Arc::new(WalletDexRpc::<Block, FullClient>::new(client.clone()));
@@ -396,6 +392,74 @@ where
                 .get_networks()
                 .map(|r| serde_json::to_value(r).unwrap_or_default())
                 .map_err(|e| custom_error(format!("wallet_getNetworks failed: {e}")))
+        }
+    })?;
+
+    // atlasIntent_submitIntent validates submit payload and plan-hash binding for
+    // pallet-x3-intent submission requests. Signed extrinsic assembly remains
+    // external to this node RPC module.
+    module.register_method("atlasIntent_submitIntent", {
+        move |params: jsonrpsee::types::Params<'_>,
+              _,
+              _|
+              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+
+            let plan_hash = decode_hex_32(
+                req.get("plan_hash")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing plan_hash"))?,
+                "plan_hash",
+            )?;
+
+            let bond = parse_u128_value(req.get("bond"), "bond")?;
+            let nonce = req
+                .get("nonce")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing nonce"))?;
+
+            let decoded_plan_bytes = decode_hex_bytes(
+                req.get("decoded_plan")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing decoded_plan"))?,
+                "decoded_plan",
+            )?;
+
+            let decoded_plan = DecodedPlanPayload::decode(&mut &decoded_plan_bytes[..])
+                .map_err(|e| custom_error(format!("decoded_plan SCALE decode failed: {e}")))?;
+
+            if decoded_plan.instructions.is_empty() {
+                return Err(custom_error(
+                    "decoded_plan must contain at least one instruction",
+                ));
+            }
+
+            let payload_hash = sp_core::blake2_256(&decoded_plan_bytes);
+            if payload_hash != plan_hash {
+                return Err(custom_error(
+                    "plan_hash does not match decoded_plan payload hash",
+                ));
+            }
+
+            let request_id_hash = sp_core::blake2_256(
+                format!(
+                    "intent:{}:{}:{}:{}",
+                    hex::encode(plan_hash),
+                    bond,
+                    nonce,
+                    decoded_plan.instructions.len()
+                )
+                .as_bytes(),
+            );
+
+            Ok(serde_json::json!({
+                "status": "accepted",
+                "request_id": format!("0x{}", hex::encode(request_id_hash)),
+                "plan_hash": format!("0x{}", hex::encode(plan_hash)),
+                "bond": bond.to_string(),
+                "nonce": nonce,
+                "decoded_instruction_count": decoded_plan.instructions.len(),
+            }))
         }
     })?;
 

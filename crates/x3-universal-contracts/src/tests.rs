@@ -7,6 +7,15 @@ mod tests {
     use crate::error::UcError;
     use crate::intents::IntentBuilder;
     use crate::sdk::UniversalContract;
+    use crate::submit_payload::build_intent_submit_args;
+    use pallet_x3_intent::types::{DecodedCompensationPolicy, DecodedInstruction};
+    use parity_scale_codec::Encode;
+    use x3_ir::{
+        compensation::{CompensationAction, CompensationPolicy},
+        intent_dag::IntentDag,
+        security::{BridgeSecurityPolicy, GpuTrustPolicy},
+        X3ExecutionPlan, X3Instruction,
+    };
 
     // ===== Action::validate() tests =====
 
@@ -279,6 +288,59 @@ mod tests {
             .bond(100); // Slashable requires non-zero bond
         let intent = builder.build();
         assert!(intent.is_ok());
+    }
+
+    #[test]
+    fn test_submit_payload_builder_derives_compensation_and_hash() {
+        let plan = X3ExecutionPlan {
+            id: "intent-1".to_string(),
+            atomic: true,
+            intent_dag: IntentDag::default(),
+            bridge_security: BridgeSecurityPolicy::default(),
+            gpu_trust: GpuTrustPolicy::default(),
+            instructions: vec![
+                X3Instruction::Timeout { timeout_blocks: 32 },
+                X3Instruction::Compensate {
+                    action: CompensationAction {
+                        policy: CompensationPolicy::InsuranceSlash,
+                        asset: "canonical".to_string(),
+                        amount: 10,
+                        beneficiary: "alice".to_string(),
+                        reason: "timeout".to_string(),
+                    },
+                },
+            ],
+        };
+
+        let submit_args = build_intent_submit_args(&plan).expect("submit args");
+
+        let has_compensate = submit_args.decoded_plan.instructions.iter().any(|ins| {
+            matches!(
+                ins,
+                DecodedInstruction::Compensate {
+                    policy: DecodedCompensationPolicy::InsuranceSlash
+                }
+            )
+        });
+        assert!(has_compensate);
+
+        let expected_hash = sp_core::blake2_256(&submit_args.decoded_plan.encode());
+        assert_eq!(submit_args.plan_hash, expected_hash);
+    }
+
+    #[test]
+    fn test_submit_payload_builder_rejects_missing_compensate() {
+        let plan = X3ExecutionPlan {
+            id: "intent-2".to_string(),
+            atomic: true,
+            intent_dag: IntentDag::default(),
+            bridge_security: BridgeSecurityPolicy::default(),
+            gpu_trust: GpuTrustPolicy::default(),
+            instructions: vec![X3Instruction::Timeout { timeout_blocks: 8 }],
+        };
+
+        let err = build_intent_submit_args(&plan).unwrap_err();
+        assert!(matches!(err, UcError::MissingCompensateInstruction));
     }
 
     // ===== UniversalContract tests =====
