@@ -16,11 +16,13 @@ path = "src/main.rs"
 [features]
 default = []
 full = ["sdk"]
-sdk = ["x3-sdk"]
+sdk = ["x3-sdk", "x3-lang", "x3-universal-contracts"]
 
 [dependencies]
 # SDK (optional - only needed for deploy, simulate, tx, account commands)
 x3-sdk = { path = "../x3-sdk", optional = true }
+x3-lang = { path = "../x3-lang", optional = true }
+x3-universal-contracts = { path = "../x3-universal-contracts", optional = true }
 
 # X3 Compiler
 x3-compiler = { path = "../x3-compiler" }
@@ -68,6 +70,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # Hex encoding
 hex = "0.4"
+parity-scale-codec = { workspace = true }
 
 # Templating for code generation
 handlebars = "5.1"

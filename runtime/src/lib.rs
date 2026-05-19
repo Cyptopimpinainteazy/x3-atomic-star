@@ -61,6 +61,7 @@ use pallet_x3_compute_market;
 use pallet_x3_cross_vm_router;
 use pallet_x3_custody;
 use pallet_x3_dapp_hub;
+use pallet_x3_intent;
 use pallet_x3_invariants;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
@@ -445,6 +446,7 @@ construct_runtime!(
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Intent: pallet_x3_intent,
         X3Slash: pallet_x3_slash,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
@@ -515,6 +517,7 @@ construct_runtime!(
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Intent: pallet_x3_intent,
         X3Slash: pallet_x3_slash,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
@@ -585,6 +588,7 @@ construct_runtime!(
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Intent: pallet_x3_intent,
         X3Slash: pallet_x3_slash,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
@@ -654,6 +658,7 @@ construct_runtime!(
         X3Automation: pallet_x3_automation,
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Intent: pallet_x3_intent,
         X3Slash: pallet_x3_slash,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
@@ -2229,6 +2234,7 @@ parameter_types! {
 
 impl pallet_x3_account_registry::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_x3_account_registry::weights::SubstrateWeight<Runtime>;
     type AtlasId = AtlasId;
     type MaxNameLength = MaxAccountNameLength;
 }
@@ -2452,6 +2458,23 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
     type EconomicHalt = pallet_x3_supply_ledger::Pallet<Runtime>;
 }
 
+// ===== X3 Intent Configuration =====
+parameter_types! {
+    pub const IntentMinBond: u128 = 500_000_000_000; // 0.5 X3 tokens
+    pub const IntentFinalizationDelay: u32 = 100; // ~20 minutes at 12-second blocks
+    pub const IntentRateLimitWindow: u32 = 50; // ~10 minutes at 12-second blocks
+    pub const IntentFraudChallengeWindow: u32 = 200; // ~40 minutes at 12-second blocks
+}
+
+impl pallet_x3_intent::Config for Runtime {
+    type Currency = Balances;
+    type MinBond = IntentMinBond;
+    type FinalizationDelay = IntentFinalizationDelay;
+    type RateLimitWindow = IntentRateLimitWindow;
+    type FraudChallengeWindow = IntentFraudChallengeWindow;
+    type WeightInfo = pallet_x3_intent::weights::SubstrateWeight<Runtime>;
+}
+
 // ===== X3 Slash Configuration =====
 parameter_types! {
     pub const SlashMinBondAmount: u128 = 10_000_000_000_000; // 10 X3
@@ -2480,6 +2503,7 @@ impl pallet_x3_slash::Config for Runtime {
 // ===== X3 Wallet Pallet Configuration =====
 impl pallet_x3_wallet_pallet::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_x3_wallet_pallet::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Inventory Configuration =====
@@ -4260,7 +4284,9 @@ mod cross_chain_proof_verifier_tests {
         assert!(ok.is_ok());
 
         let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation"));
+        assert!(
+            matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation")
+        );
     }
 
     #[test]

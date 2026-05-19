@@ -69,12 +69,7 @@ pub mod pallet {
     use super::*;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use sp_runtime::DispatchError;
     use sp_std::prelude::*;
-
-    type BalanceOf<T> = <<T as Config>::Currency as frame_support::traits::Currency<
-        <T as frame_system::Config>::AccountId,
-    >>::Balance;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -315,7 +310,7 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn on_initialize(block: BlockNumberFor<T>) -> Weight {
+        fn on_initialize(_block: BlockNumberFor<T>) -> Weight {
             // Clean up old TasksThisBlock entries (previous block)
             // In production, use a circular buffer or off-chain indexing
             Weight::zero()

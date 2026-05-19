@@ -10,6 +10,9 @@ keywords = ["blockchain", "substrate", "evm", "svm", "sdk"]
 categories = ["cryptography::cryptocurrencies", "api-bindings"]
 
 [dependencies]
+x3-ir = { package = "x3-ir-intent", path = "../x3-ir" }
+x3-universal-contracts = { path = "../x3-universal-contracts" }
+
 # Substrate / Polkadot SDK (from workspace)
 sp-core = { workspace = true, default-features = false, features = ["std"] }
 sp-runtime = { workspace = true, default-features = false, features = ["std"] }
@@ -32,7 +35,7 @@ thiserror = { workspace = true }
 anyhow = "1.0"
 
 # HTTP client (for RPC)
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 
 # WebSocket (for subscriptions)
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }

@@ -2,6 +2,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
+pub mod weights;
+pub use weights::WeightInfo;
 
 #[cfg(test)]
 mod mock;
@@ -11,6 +13,7 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
+    use crate::WeightInfo;
     use frame_support::pallet_prelude::*;
     use frame_system::ensure_root;
     use frame_system::pallet_prelude::*;
@@ -18,7 +21,7 @@ pub mod pallet {
     use sp_std::vec::Vec;
     use x3_wallet::{
         AddressBook, BiometricProfile, GuardianAccount, HardwareWallet, MultisigWallet,
-        TokenBalance, TransactionApproval, UnlockSession,
+        TransactionApproval, UnlockSession,
     };
 
     /// Max wallets per account
@@ -31,6 +34,9 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+        /// Weight information for extrinsics.
+        type WeightInfo: WeightInfo;
     }
 
     #[pallet::pallet]
@@ -140,7 +146,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         /// Register a new hardware wallet
         #[pallet::call_index(0)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::register_hardware_wallet())]
         pub fn register_hardware_wallet(
             origin: OriginFor<T>,
             device_type: u8,
@@ -177,7 +183,7 @@ pub mod pallet {
 
         /// Create a multisig wallet
         #[pallet::call_index(1)]
-        #[pallet::weight(15_000)]
+        #[pallet::weight(T::WeightInfo::create_multisig_wallet())]
         pub fn create_multisig_wallet(
             origin: OriginFor<T>,
             signers: Vec<[u8; 32]>,
@@ -217,7 +223,7 @@ pub mod pallet {
 
         /// Transfer tokens (with approval checks)
         #[pallet::call_index(2)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::transfer_tokens())]
         pub fn transfer_tokens(
             origin: OriginFor<T>,
             token_id: [u8; 32],
@@ -248,7 +254,7 @@ pub mod pallet {
 
         /// Register biometric profile
         #[pallet::call_index(3)]
-        #[pallet::weight(8_000)]
+        #[pallet::weight(T::WeightInfo::register_biometric())]
         pub fn register_biometric(
             origin: OriginFor<T>,
             biometric_type: u8,
@@ -279,7 +285,7 @@ pub mod pallet {
 
         /// Initiate recovery with guardians
         #[pallet::call_index(4)]
-        #[pallet::weight(12_000)]
+        #[pallet::weight(T::WeightInfo::initiate_recovery())]
         pub fn initiate_recovery(origin: OriginFor<T>, new_owner: [u8; 32]) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -302,7 +308,7 @@ pub mod pallet {
         /// is now restricted to the root origin (governance / sudo) and the
         /// balance update uses `checked_add` to reject overflow.
         #[pallet::call_index(5)]
-        #[pallet::weight(5_000)]
+        #[pallet::weight(T::WeightInfo::mint_tokens())]
         pub fn mint_tokens(
             origin: OriginFor<T>,
             token_id: [u8; 32],
@@ -331,7 +337,7 @@ pub mod pallet {
 
         /// S1-3: Add authorized minter
         #[pallet::call_index(6)]
-        #[pallet::weight(5_000)]
+        #[pallet::weight(T::WeightInfo::add_minter())]
         pub fn add_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
             ensure_root(origin)?;
             Minters::<T>::insert(&who, ());
@@ -340,7 +346,7 @@ pub mod pallet {
 
         /// S1-3: Remove authorized minter
         #[pallet::call_index(7)]
-        #[pallet::weight(5_000)]
+        #[pallet::weight(T::WeightInfo::remove_minter())]
         pub fn remove_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
             ensure_root(origin)?;
             Minters::<T>::remove(&who);

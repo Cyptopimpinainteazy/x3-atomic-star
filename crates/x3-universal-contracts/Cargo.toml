@@ -13,10 +13,13 @@ description = "X3 Universal Contracts SDK — developer-facing facade over x3-in
 x3-intent = { path = "../x3-intent" }
 x3-ixl = { path = "../x3-ixl" }
 x3-packet-standard = { path = "../x3-packet-standard" }
+x3-ir = { package = "x3-ir-intent", path = "../x3-ir" }
+pallet-x3-intent = { path = "../../pallets/x3-intent" }
 x3-proof = { path = "../x3-proof" }
 x3-fees = { path = "../x3-fees" }
 x3-slash = { path = "../x3-slash" }
 sp-core = { workspace = true, default-features = false }
+parity-scale-codec = { workspace = true, features = ["derive"] }
 
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"

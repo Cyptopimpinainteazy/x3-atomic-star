@@ -19,6 +19,7 @@ pallet-x3-kernel = { path = "../pallets/x3-kernel", features = ["std"] }
 pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", features = ["std"] }
 pallet-evolution-core = { path = "../pallets/evolution-core", features = ["std"] }
 pallet-x3-verifier = { path = "../pallets/x3-verifier", features = ["std"] }
+pallet-x3-intent = { path = "../pallets/x3-intent", features = ["std"] }
 pallet-x3-domain-registry = { path = "../pallets/x3-domain-registry", features = ["std"] }
 flash-finality = { package = "x3-flash-finality", path = "../crates/flash-finality" }
 poh-generator = { package = "x3-poh-generator", path = "../crates/poh-generator" }
