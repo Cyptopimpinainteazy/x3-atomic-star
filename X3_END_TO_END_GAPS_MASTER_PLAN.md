@@ -49,6 +49,194 @@ This file adds the missing end-to-end program for:
 - Research swarm, capital scouting, ecosystem intelligence, and founder-media support systems.
 - Local and cloud execution routing across CPU, GPU, trusted operators, and sandboxed tools.
 
+## Verification corrections and enforcement updates
+
+This section converts recent verification feedback into explicit requirements. These are release gates, not optional guidance.
+
+### V1. Delivery scope integrity (process gate)
+
+If the stated objective is chain throughput, finality, atomic hub behavior, or consensus correctness, then desktop-only diffs cannot be marked as complete.
+
+Required separation:
+
+- Chain deliverable must touch node/runtime/consensus/pool/execution paths.
+- Desktop deliverable must be scoped as UX/control-plane only.
+- If scope changes midstream, rename the task and rewrite acceptance criteria before merge.
+
+Required completion evidence for any "phase complete" claim:
+
+- before/after benchmark evidence,
+- test evidence,
+- diff touching the claimed subsystem.
+
+### V2. Registry drift prevention for app IDs
+
+Unregistered IDs in nav/panel wiring are release bugs.
+
+Enforcement:
+
+- `DEFAULT_APPLICATIONS` is the single source of truth for app IDs.
+- `panelRegistry` and nav shortcuts must reference only registered IDs.
+- Add a dev-startup assertion that every `BottomNavBar` target resolves to `DEFAULT_APPLICATIONS`.
+- Startup must fail fast on registry drift with a clear error.
+
+### V3. Desktop shell and CSP hardening (security gate)
+
+Broad shell execution plus permissive CSP is a critical risk.
+
+Minimum hardening bar:
+
+- replace broad shell permissions with strict allowlisted commands (exact binary and exact args),
+- remove `unsafe-eval` if at all feasible,
+- minimize wildcard origins in `connect-src`, `frame-src`, and `img-src`,
+- add CI policy checks blocking new shell privilege expansion or reintroduction of unsafe CSP directives without explicit approval.
+
+### V4. Finality model completeness for Flash Finality
+
+Flash Finality work is incomplete without an explicit protocol model.
+
+Must define:
+
+- fork-choice behavior before finalization,
+- equivocation safety rules,
+- view-change and timeout behavior under leader failure,
+- network asynchrony assumptions and liveness conditions.
+
+No implementation should be considered production-candidate without explicit safety/liveness specification and adversarial tests.
+
+### V5. PoH commitment contract
+
+PoH in header requires bounded, verifiable commitments.
+
+Must define:
+
+- digest/commitment format,
+- tick cadence and skipped-slot behavior,
+- tx-order mix-in proof contract,
+- verification cost bounds enforced in runtime/import path.
+
+### V6. Parallel execution correctness model
+
+ML-guided scheduling is optimization only, never correctness.
+
+Required model:
+
+- formal conflict definition across state domains,
+- hard conflict detection path,
+- deterministic fallback (serial or deterministic re-exec) on conflict,
+- repeatable multi-node determinism tests.
+
+### V7. Atomic kernel execution authority model
+
+`finalize_atomic_bundle` requires explicit authorized execution responsibility and anti-griefing economics.
+
+Must define:
+
+- permitted submitter set,
+- deposits/bonds per bundle,
+- invalid-proof and spam slashing rules,
+- fee and refund semantics for failed paths.
+
+### V8. PoAE evidence realism
+
+Runtime iteration over validator lists is not a signing protocol.
+
+PoAE must be derived from:
+
+- finality certificate output, or
+- explicit validator-signed certificate with aggregation and anti-equivocation rules.
+
+### V9. Cross-chain latency claims
+
+Claims must distinguish:
+
+- intent finality on X3,
+- external settlement finality on destination chain.
+
+Do not present sub-second global settlement as a protocol guarantee for external L1s.
+
+### V10. Transaction pool throughput model
+
+Pool tuning must include sender and nonce policy, not only size limits.
+
+Required controls:
+
+- per-sender queue policy,
+- max in-flight per sender,
+- eviction policy (fee/age),
+- sender-side nonce guidance in client SDK/tooling.
+
+### V11. Test matrix as release gate
+
+Each major phase must pass a defined matrix:
+
+- pool stress/rejection distribution,
+- deterministic proposer checks under randomized transaction sets,
+- finality safety/liveness under partitions and equivocations,
+- PoAE verification fixtures,
+- atomic rollback invariants and replay checks.
+
+### V12. Buildable plan format requirement
+
+Every phase must carry:
+
+- definition of done,
+- files expected to change,
+- benchmark deltas,
+- required tests,
+- runtime upgrade and compatibility notes (`spec_version`, migration impact),
+- rollback and kill-switch behavior.
+
+### V13. Immediate focus order
+
+If only three items can be fixed first, prioritize:
+
+1. finality gadget specification and view-change safety,
+2. parallel execution deterministic conflict model and fallback,
+3. desktop shell/CSP hardening.
+
+These are existential safety gates; other work is secondary until these are explicit and tested.
+
+## CI automation mapping for V1-V13
+
+This mapping converts the verification gates above into machine-checkable CI checks. A phase cannot be marked complete unless all required checks for its scope pass and required artifacts are attached.
+
+| Gate | CI check name | Command or check | Required artifact(s) | Fail condition |
+|---|---|---|---|---|
+| V1 | `scope-integrity` | Diff path classifier over changed files | `reports/verify/scope_integrity.json` | Chain milestone PR has no chain-path changes or scope label mismatch |
+| V2 | `app-registry-integrity` | App ID cross-check (`DEFAULT_APPLICATIONS` vs panel/nav refs) | `reports/verify/app_registry_integrity.txt` | Any nav/panel ID missing from canonical registry |
+| V3 | `desktop-security-policy` | CSP and shell permission lint | `reports/verify/desktop_security_policy.txt` | `unsafe-*` reintroduced without approval marker or shell allowlist expanded |
+| V4 | `finality-spec-gate` | Presence + schema validation of finality spec docs and tests | `docs/specs/finality_model.md`, `reports/verify/finality_spec_gate.txt` | Missing fork-choice/view-change safety model or missing adversarial test evidence |
+| V5 | `poh-commitment-gate` | PoH digest/verification contract check + bounded-cost proof tests | `docs/specs/poh_commitment.md`, `reports/verify/poh_commitment_gate.txt` | Missing format/tick/skip-slot rules or unbounded verification path |
+| V6 | `parallel-determinism-gate` | Determinism replay tests with conflict fallback assertions | `reports/verify/parallel_determinism_gate.txt` | Nondeterministic state merge or missing canonical fallback path |
+| V7 | `atomic-kernel-authority-gate` | Ensure finalize actor model + bond/slash rules are enforced | `reports/verify/atomic_kernel_authority_gate.txt` | Finalize path callable without declared actor economics and anti-grief protections |
+| V8 | `poae-evidence-gate` | Verify PoAE evidence source (finality cert or signed cert) | `reports/verify/poae_evidence_gate.txt` | Runtime-only synthetic validator signing path used as production evidence |
+| V9 | `latency-claim-gate` | Docs claim linter for intent vs settlement latency split | `reports/verify/latency_claim_gate.txt` | Global sub-second settlement claims on external L1s |
+| V10 | `txpool-policy-gate` | Pool config + nonce policy check | `reports/verify/txpool_policy_gate.txt` | Missing per-sender queue/inflight/eviction guidance and implementation hooks |
+| V11 | `phase-test-matrix-gate` | Required matrix command bundle execution | `reports/verify/phase_test_matrix_gate.txt` | Any required matrix item missing or failing |
+| V12 | `phase-dod-gate` | Validate per-phase DoD block in planning artifact | `reports/verify/phase_dod_gate.txt` | Missing files touched, bench delta, tests, compat/rollback notes |
+| V13 | `existential-priority-gate` | Ensure top-3 existential fixes are tracked as blocking items | `reports/verify/existential_priority_gate.txt` | Finality spec, parallel determinism, or desktop hardening not in active blocking set |
+
+### Required CI command bundle (baseline)
+
+At minimum, CI for chain-facing phases should execute:
+
+- `cargo check --manifest-path node/Cargo.toml`
+- `cargo test --manifest-path crates/x3-readiness-report/Cargo.toml`
+- `cargo test --manifest-path pallets/x3-supply-ledger/Cargo.toml --tests`
+
+For full-chain promotions, also execute:
+
+- `cargo check --workspace --all-targets`
+
+If the full workspace check fails for known dependency graph conflicts, the run must be marked `PARTIAL_PASS` with explicit blocker evidence and owner assignment; no silent green conversion is allowed.
+
+### CI evidence policy
+
+- Every gate check writes a text artifact in `reports/verify/`.
+- Every release/promotion PR must link the artifact bundle in its checklist.
+- Any gate bypass requires a named approver and expiration window in the PR description.
+
 ## Section 1: Missing chain/runtime law
 
 This section covers the protocol rules that still need to be written down and enforced so that the chain, cross-VM kernel, and swarm all operate under the same safety model.
