@@ -68,7 +68,7 @@ x3-orchestra-control-plane = { path = "../x3-orchestra-control-plane" }
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.9"
-wiremock = "0.5"
+wiremock = "0.6"
 httpmock = "0.7"
 reqwest = { version = "0.11", features = ["json"] }
 tokio-postgres = "0.7"
