@@ -131,12 +131,9 @@ All items below must be `PASS` before Stage 4 may begin. All prior criteria rema
 | Automated surface incident rate | < 1 policy violation per 1000 automated actions | not started |
 | Kill switch exercise | Public-facing automation kill switch tested and restored in < 5m | not started |
 | Content policy violation rate | < 0.1% of published items flagged | not started |
-| Outbound policy compliance | 100% of outbound actions have valid approval records | not started |
 
 ### Policy compiler
 
-| Metric | Gate | Current status |
-|---|---|---|
 | Policy compiler live | Publishing gate enforces all Tier 0 and Tier 1 rules automatically | planned |
 | Do-not-contact register enforced | Implemented | planned |
 

@@ -1356,6 +1356,7 @@ impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltControlle
     fn trigger() {
         pallet_x3_invariants::Halted::<Runtime>::put(true);
         pallet_x3_supply_ledger::TransferHalted::<Runtime>::put(true);
+        pallet_x3_kernel::ProtocolPaused::<Runtime>::put(true);
     }
 }
 
@@ -1460,6 +1461,136 @@ impl pallet_atomic_trade_engine::SettlementBridge<AccountId> for RuntimeSettleme
         )?;
 
         Ok(expected_intent_id)
+    }
+}
+
+#[cfg(test)]
+mod emergency_halt_integration_tests {
+    use super::*;
+    use frame_support::{assert_noop, assert_ok};
+    use sp_core::H256;
+    use x3_asset_kernel_types::traits::SupplyLedgerWrite;
+    use x3_asset_kernel_types::{AssetId, DomainId, SupplyLedger};
+
+    fn new_runtime_ext() -> sp_io::TestExternalities {
+        let storage = frame_system::GenesisConfig::<Runtime>::default()
+            .build_storage()
+            .expect("runtime storage should build");
+        let mut ext = sp_io::TestExternalities::new(storage);
+        ext.execute_with(|| frame_system::Pallet::<Runtime>::set_block_number(1));
+        ext
+    }
+
+    fn seeded_asset(asset: AssetId, canonical: u128) {
+        pallet_x3_supply_ledger::Ledgers::<Runtime>::insert(
+            asset,
+            SupplyLedger {
+                canonical_supply: canonical,
+                native_supply: canonical,
+                evm_supply: 0,
+                svm_supply: 0,
+                external_locked_supply: 0,
+                pending_supply: 0,
+            },
+        );
+    }
+
+    #[test]
+    fn runtime_emergency_halt_sets_all_halt_flags() {
+        new_runtime_ext().execute_with(|| {
+            assert!(!pallet_x3_invariants::Halted::<Runtime>::get());
+            assert!(!pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+            assert!(!pallet_x3_kernel::ProtocolPaused::<Runtime>::get());
+
+            RuntimeEmergencyHaltController::trigger();
+
+            assert!(pallet_x3_invariants::Halted::<Runtime>::get());
+            assert!(pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+            assert!(pallet_x3_kernel::ProtocolPaused::<Runtime>::get());
+        });
+    }
+
+    #[test]
+    fn runtime_emergency_halt_blocks_kernel_and_supply_ledger_economic_paths() {
+        new_runtime_ext().execute_with(|| {
+            let asset = H256::repeat_byte(0xAB);
+            seeded_asset(asset, 1_000);
+
+            RuntimeEmergencyHaltController::trigger();
+
+            // Supply-ledger transfer path blocked (covers router swap/transfer legs).
+            let transfer_res = <pallet_x3_supply_ledger::Pallet<Runtime> as SupplyLedgerWrite>::debit_source_to_pending(
+                &asset,
+                DomainId::X3Native,
+                10,
+            );
+            assert_eq!(
+                transfer_res,
+                Err(pallet_x3_supply_ledger::Error::<Runtime>::TransfersHalted.into())
+            );
+
+            // Governance mint and burn also blocked under emergency halt.
+            assert_eq!(
+                pallet_x3_supply_ledger::Pallet::<Runtime>::mint_canonical(
+                    RuntimeOrigin::root(),
+                    asset,
+                    DomainId::X3Native,
+                    10,
+                    0,
+                ),
+                Err(pallet_x3_supply_ledger::Error::<Runtime>::TransfersHalted.into())
+            );
+
+            assert_eq!(
+                pallet_x3_supply_ledger::Pallet::<Runtime>::burn_canonical(
+                    RuntimeOrigin::root(),
+                    asset,
+                    DomainId::X3Native,
+                    10,
+                ),
+                Err(pallet_x3_supply_ledger::Error::<Runtime>::TransfersHalted.into())
+            );
+
+            // Kernel COMIT submission path blocked by protocol pause flag.
+            let comit_id = H256::from_low_u64_be(9001);
+            let fee: Balance = 1_000;
+            let prepare_root = pallet_x3_kernel::Pallet::<Runtime>::compute_prepare_root(
+                comit_id,
+                &[1, 2, 3],
+                &[4, 5],
+                0,
+                fee,
+            );
+
+            assert_noop!(
+                pallet_x3_kernel::Pallet::<Runtime>::submit_comit(
+                    RuntimeOrigin::signed(1),
+                    comit_id,
+                    vec![1, 2, 3],
+                    vec![4, 5],
+                    0,
+                    fee,
+                    prepare_root,
+                ),
+                pallet_x3_kernel::Error::<Runtime>::ProtocolIsPaused
+            );
+
+            // Refund path remains available while halted (avoid stranded funds).
+            pallet_x3_supply_ledger::Ledgers::<Runtime>::mutate(asset, |maybe| {
+                if let Some(ledger) = maybe.as_mut() {
+                    ledger.native_supply = 990;
+                    ledger.pending_supply = 10;
+                }
+            });
+
+            assert_ok!(
+                <pallet_x3_supply_ledger::Pallet<Runtime> as SupplyLedgerWrite>::refund_pending_to_source(
+                    &asset,
+                    DomainId::X3Native,
+                    10,
+                )
+            );
+        });
     }
 }
 
@@ -4260,7 +4391,9 @@ mod cross_chain_proof_verifier_tests {
         assert!(ok.is_ok());
 
         let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation"));
+        assert!(
+            matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation")
+        );
     }
 
     #[test]

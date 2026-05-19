@@ -187,6 +187,11 @@ mod tests {
         r.halt_functional = ReadinessCheck::pass("ok");
         r.permissions_enforced = ReadinessCheck::pass("ok");
         r.balance_reconciliation = ReadinessCheck::pass("ok");
+        r.ixl_bundle_gate = ReadinessCheck::pass("ok");
+        r.packet_lifecycle_gate = ReadinessCheck::pass("ok");
+        r.liquidity_core_gate = ReadinessCheck::pass("ok");
+        r.external_bridges_disabled = ReadinessCheck::pass("ok");
+        r.kernel_invariant_gate = ReadinessCheck::pass("ok");
         r.recompute_overall();
         assert!(r.is_ready());
         assert_eq!(r.readiness_percentage(), 100);

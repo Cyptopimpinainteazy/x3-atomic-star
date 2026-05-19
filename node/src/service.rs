@@ -209,7 +209,12 @@ impl GpuSidecarHealthMonitor {
     }
 }
 /// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
-pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
+/// The proof-size host function is required by frame-executive (stable2512+) for
+/// PoV weight tracking. Without it the runtime WASM fails with VersionInvalid.
+pub type Executor = sc_executor::WasmExecutor<(
+    sp_io::SubstrateHostFunctions,
+    cumulus_primitives_proof_size_hostfunction::storage_proof_size::HostFunctions,
+)>;
 
 /// Full client type alias
 pub type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
@@ -357,7 +362,10 @@ pub fn new_partial(
         .transpose()?;
 
     // Create executor
-    let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
+    let executor = sc_service::new_wasm_executor::<(
+        sp_io::SubstrateHostFunctions,
+        cumulus_primitives_proof_size_hostfunction::storage_proof_size::HostFunctions,
+    )>(&config.executor);
 
     // Build partial components
     let (client, backend, keystore_container, task_manager) =
@@ -580,6 +588,9 @@ impl CrossVmBridgeSafetyGate {
                     payload: result.output.clone(),
                     source_chain: 0,
                     destination_chain: 0,
+                        finalized_height: 0,
+                        observed_height: 0,
+                        max_proof_age: 1_024,
                 })
                 .map_err(|err| format!("verification_error: {err}"))?;
 

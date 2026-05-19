@@ -4,7 +4,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-/home/lojak/Desktop/X3_ATOMIC_STAR}"
+# Resolve workspace from script location if not explicitly set
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE="${WORKSPACE:-$( dirname "$SCRIPT_DIR" )}"
 SCRIPTS_DIR="$WORKSPACE/scripts"
 LOG_DIR="/tmp/x3-testnet-logs"
 

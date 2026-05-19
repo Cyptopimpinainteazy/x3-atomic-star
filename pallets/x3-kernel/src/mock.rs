@@ -52,6 +52,7 @@ pub struct TestEmergencyHaltController;
 impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {
         EMERGENCY_HALT_TRIGGERED.store(true, Ordering::SeqCst);
+        crate::ProtocolPaused::<Test>::put(true);
     }
 }
 

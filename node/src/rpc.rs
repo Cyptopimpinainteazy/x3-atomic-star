@@ -7,7 +7,6 @@
 use codec::Decode;
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
-use pallet_x3_intent::types::DecodedPlanPayload;
 use sc_client_api::BlockBackend;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
@@ -15,6 +14,13 @@ use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use std::sync::{Arc, Mutex};
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
+
+/// Decoded execution plan payload — SCALE-encoded over the wire.
+#[derive(codec::Decode)]
+struct DecodedPlanPayload {
+    /// Ordered list of serialized instruction blobs.
+    pub instructions: Vec<Vec<u8>>,
+}
 use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
 use x3_common::{
     signing::{Ed25519Signer, KeyType, Secp256k1Signer, Signer, Sr25519Signer},

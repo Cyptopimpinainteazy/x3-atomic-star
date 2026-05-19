@@ -2571,6 +2571,31 @@ fn test_emergency_halt_triggers_runtime_halt_controller() {
     });
 }
 
+#[test]
+fn test_emergency_halt_blocks_economic_submit_path() {
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(9_999);
+        let fee: Balance = 100;
+        let prepare_root = compute_prepare_root(comit_id, &vec![0xAA], &vec![0xBB], 0, fee);
+
+        assert_ok!(AtlasKernel::emergency_halt(RuntimeOrigin::root()));
+        assert!(crate::ProtocolPaused::<Test>::get());
+
+        assert_noop!(
+            AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                comit_id,
+                vec![0xAA],
+                vec![0xBB],
+                0,
+                fee,
+                prepare_root,
+            ),
+            crate::Error::<Test>::ProtocolIsPaused
+        );
+    });
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 0.3: MINT/BURN PERMISSIONS VERIFICATION
 // Purpose: Verify authorization controls for sensitive operations
