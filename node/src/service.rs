@@ -588,9 +588,6 @@ impl CrossVmBridgeSafetyGate {
                     payload: result.output.clone(),
                     source_chain: 0,
                     destination_chain: 0,
-                        finalized_height: 0,
-                        observed_height: 0,
-                        max_proof_age: 1_024,
                 })
                 .map_err(|err| format!("verification_error: {err}"))?;
 
