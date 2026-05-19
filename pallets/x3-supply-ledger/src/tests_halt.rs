@@ -1,6 +1,6 @@
 use crate as pallet_x3_supply_ledger;
 use frame_support::{
-    assert_ok, construct_runtime, derive_impl, parameter_types,
+    assert_noop, assert_ok, construct_runtime, derive_impl, parameter_types,
     traits::{ConstU32, EnsureOrigin, Hooks},
 };
 use frame_system as system;
@@ -258,5 +258,77 @@ fn governance_can_halt_transfers_while_preserving_refunds() {
         let out = pallet_x3_supply_ledger::Ledgers::<Test>::get(id).unwrap();
         assert_eq!(out.pending_supply, 0);
         assert_eq!(out.native_supply, 1_000);
+    });
+}
+
+#[test]
+fn mint_canonical_requires_governance_origin() {
+    new_test_ext().execute_with(|| {
+        let id = asset(7);
+
+        assert_noop!(
+            Ledger::mint_canonical(RuntimeOrigin::signed(42), id, DomainId::X3Native, 100, 0),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn burn_canonical_requires_governance_origin() {
+    new_test_ext().execute_with(|| {
+        let id = asset(8);
+        pallet_x3_supply_ledger::Ledgers::<Test>::insert(id, valid_ledger(1_000));
+
+        assert_noop!(
+            Ledger::burn_canonical(RuntimeOrigin::signed(7), id, DomainId::X3Native, 100),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn emergency_halt_blocks_mint_and_burn_paths() {
+    new_test_ext().execute_with(|| {
+        let id = asset(9);
+        pallet_x3_supply_ledger::Ledgers::<Test>::insert(id, valid_ledger(2_000));
+
+        pallet_x3_supply_ledger::TransferHalted::<Test>::put(true);
+
+        assert_eq!(
+            Ledger::mint_canonical(RuntimeOrigin::root(), id, DomainId::X3Native, 100, 0),
+            Err(pallet_x3_supply_ledger::Error::<Test>::TransfersHalted.into())
+        );
+
+        assert_eq!(
+            Ledger::burn_canonical(RuntimeOrigin::root(), id, DomainId::X3Native, 100),
+            Err(pallet_x3_supply_ledger::Error::<Test>::TransfersHalted.into())
+        );
+    });
+}
+
+#[test]
+fn direct_mint_burn_helpers_respect_halt_flag() {
+    new_test_ext().execute_with(|| {
+        let id = asset(10);
+        pallet_x3_supply_ledger::Ledgers::<Test>::insert(id, valid_ledger(2_000));
+        pallet_x3_supply_ledger::TransferHalted::<Test>::put(true);
+
+        assert_eq!(
+            <Ledger as x3_asset_kernel_types::traits::SupplyLedgerGovern>::do_mint_canonical(
+                &id,
+                DomainId::X3Native,
+                50
+            ),
+            Err(pallet_x3_supply_ledger::Error::<Test>::TransfersHalted.into())
+        );
+
+        assert_eq!(
+            <Ledger as x3_asset_kernel_types::traits::SupplyLedgerGovern>::do_burn_canonical(
+                &id,
+                DomainId::X3Native,
+                50
+            ),
+            Err(pallet_x3_supply_ledger::Error::<Test>::TransfersHalted.into())
+        );
     });
 }

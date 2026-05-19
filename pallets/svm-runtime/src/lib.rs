@@ -28,6 +28,8 @@
 //! - Programs can be upgraded by their upgrade authority
 //! - Program execution is metered by compute units
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 pub use pallet::*;
 pub mod weights;
 pub use weights::WeightInfo;

@@ -7,12 +7,8 @@ use crate::comit::ComitBuilder;
 use crate::error::{AtlasError, Result};
 use crate::rpc::{HttpRpcClient, WsRpcClient};
 use crate::types::{AccountInfo, AssetMetadata, BlockHeader, ComitPayload, ComitResult};
-use codec::Encode;
-use serde::Serialize;
 use sp_core::{crypto::Pair, sr25519, H256};
 use std::sync::Arc;
-use x3_ir::X3ExecutionPlan;
-use x3_universal_contracts::submit_payload::build_intent_submit_args;
 
 // ============================================================================
 // Client Configuration
@@ -138,14 +134,6 @@ pub struct AtlasClient {
     http: HttpRpcClient,
     ws: Option<WsRpcClient>,
     signer: Option<Arc<dyn Signer>>,
-}
-
-#[derive(Debug, Serialize)]
-struct SubmitIntentParams {
-    plan_hash: String,
-    bond: u128,
-    nonce: u64,
-    decoded_plan: String,
 }
 
 impl AtlasClient {
@@ -353,48 +341,6 @@ impl AtlasClient {
         };
 
         self.http.request("atlasKernel_submitComit", params).await
-    }
-
-    /// Submit an x3-intent extrinsic through the RPC gateway.
-    ///
-    /// `decoded_plan_scale` must be SCALE-encoded `DecodedPlanPayload` bytes.
-    /// The endpoint is expected to decode and route this to
-    /// `pallet_x3_intent::Call::submit_intent`.
-    pub async fn submit_intent(
-        &self,
-        plan_hash: [u8; 32],
-        bond: u128,
-        nonce: u64,
-        decoded_plan_scale: Vec<u8>,
-    ) -> Result<serde_json::Value> {
-        let params = SubmitIntentParams {
-            plan_hash: format!("0x{}", hex::encode(plan_hash)),
-            bond,
-            nonce,
-            decoded_plan: format!("0x{}", hex::encode(decoded_plan_scale)),
-        };
-
-        self.http.request("atlasIntent_submitIntent", params).await
-    }
-
-    /// Submit an x3-intent plan by deriving canonical submit args from decoded
-    /// X3 IR. This ensures payload/hash binding is generated consistently.
-    pub async fn submit_intent_plan(
-        &self,
-        plan: &X3ExecutionPlan,
-        bond: u128,
-        nonce: u64,
-    ) -> Result<serde_json::Value> {
-        let submit_args = build_intent_submit_args(plan)
-            .map_err(|e| AtlasError::Encoding(format!("intent submit args build failed: {e}")))?;
-
-        self.submit_intent(
-            submit_args.plan_hash,
-            bond,
-            nonce,
-            submit_args.decoded_plan.encode(),
-        )
-        .await
     }
 
     // =========================================================================

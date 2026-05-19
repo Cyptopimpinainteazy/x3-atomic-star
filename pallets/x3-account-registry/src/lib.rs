@@ -8,12 +8,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
-pub mod weights;
-pub use weights::WeightInfo;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use crate::WeightInfo;
     use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
@@ -25,9 +22,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
-        /// Weight information for extrinsics.
-        type WeightInfo: WeightInfo;
 
         type AtlasId: Parameter + Member + Default + Copy + MaxEncodedLen;
 
@@ -118,7 +112,7 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::register_account())]
+        #[pallet::weight(10_000)]
         pub fn register_account(
             origin: OriginFor<T>,
             atlas_id: T::AtlasId,
@@ -153,7 +147,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::deregister_account())]
+        #[pallet::weight(10_000)]
         pub fn deregister_account(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let atlas_id = AccountRegistry::<T>::take(&who).ok_or(Error::<T>::NotRegistered)?;
@@ -170,7 +164,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::anchor_nonce())]
+        #[pallet::weight(10_000)]
         pub fn anchor_nonce(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(
@@ -282,7 +276,6 @@ mod tests {
 
     impl Config for Test {
         type RuntimeEvent = RuntimeEvent;
-        type WeightInfo = crate::weights::SubstrateWeight<Test>;
         type AtlasId = AtlasId;
         type MaxNameLength = MaxNameLength;
     }

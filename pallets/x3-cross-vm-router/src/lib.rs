@@ -1005,8 +1005,6 @@ pub mod pallet {
                                           _asset_out: [u8; 32],
                                           amount_in: u128|
                  -> Result<u128, x3_ixl::IxlError> {
-                    #[cfg(not(feature = "std"))]
-                    let _ = amount_in;
                     #[cfg(feature = "std")]
                     {
                         // RC-1 wiring: run LiquidityCore settlement bounds validation

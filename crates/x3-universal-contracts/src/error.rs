@@ -24,10 +24,4 @@ pub enum UcError {
 
     #[error("packet error: {0}")]
     PacketError(String),
-
-    #[error("decoded plan is missing a Compensate instruction")]
-    MissingCompensateInstruction,
-
-    #[error("decoded plan exceeds max instruction bound ({0})")]
-    DecodedPlanTooLarge(usize),
 }

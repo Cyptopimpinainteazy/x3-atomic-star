@@ -1871,3 +1871,19 @@ fn amount_below_route_min_rejected() {
         );
     });
 }
+
+#[test]
+fn router_source_does_not_directly_mutate_supply_ledger_storage() {
+    // Regression guard: router must use SupplyLedgerWrite trait calls and must
+    // not directly reference supply-ledger storage internals.
+    let source = include_str!("lib.rs");
+
+    assert!(
+        !source.contains("pallet_x3_supply_ledger::Ledgers"),
+        "router must not directly access supply-ledger Ledgers storage"
+    );
+    assert!(
+        !source.contains("Ledgers::<"),
+        "router must not directly reference Ledgers::<...>; use SupplyLedgerWrite"
+    );
+}

@@ -30,7 +30,6 @@ pub mod compiler;
 pub mod error;
 pub mod intents;
 pub mod sdk;
-pub mod submit_payload;
 
 #[cfg(test)]
 mod tests;

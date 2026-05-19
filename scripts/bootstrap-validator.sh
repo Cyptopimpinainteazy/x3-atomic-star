@@ -2,17 +2,18 @@
 # Standalone Validator Bootstrap Script
 # Starts a single X3 validator node with proper configuration and logging
 
-set -e
+set -euo pipefail
 
 # Configuration
-WORKSPACE="${WORKSPACE:-/home/lojak/Desktop/X3_ATOMIC_STAR}"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE="${WORKSPACE:-$( dirname "$SCRIPT_DIR" )}"
 VALIDATOR_NUM="${1:-1}"
 BASE_PORT="${2:-30333}"
 RPC_PORT=$((9933 + VALIDATOR_NUM - 1))
-WS_PORT=$((9944 + VALIDATOR_NUM - 1))
 VALIDATOR_NAME="X3-Validator-$VALIDATOR_NUM"
 BASE_PATH="/tmp/x3-validator-$VALIDATOR_NUM"
 LOG_FILE="/tmp/x3-testnet-logs/validator$VALIDATOR_NUM.log"
+CHAIN_SPEC="${X3_VALIDATOR_CHAIN_SPEC:-dev}"
 
 # Enhanced logging
 log_info() { echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
@@ -47,20 +48,21 @@ log_info "Setting up validator at: $BASE_PATH"
 rm -rf "$BASE_PATH"
 mkdir -p "$BASE_PATH"
 
-# Generate chain specification if needed
-CHAIN_SPEC="$WORKSPACE/chain-spec.json"
-if [ ! -f "$CHAIN_SPEC" ]; then
-  log_info "Creating chain specification..."
-  "$NODE_BINARY" build-spec --disable-default-bootnode > "$CHAIN_SPEC" 2>&1 || {
-    log_error "Failed to build chain specification"
-    exit 1
-  }
-  log_success "Chain specification created"
+if [[ "$CHAIN_SPEC" != "dev" ]] && [[ ! -f "$CHAIN_SPEC" ]]; then
+  log_error "Configured chain spec file not found: $CHAIN_SPEC"
+  exit 1
 fi
 
 # Prepare keys if needed (for authorities)
 log_info "Preparing keys for validator..."
 mkdir -p "$BASE_PATH/chains/x3-chain/keystore"
+
+# Generate a stable per-validator node key for libp2p identity.
+NODE_KEY_FILE="$BASE_PATH/node-key.hex"
+if [[ ! -f "$NODE_KEY_FILE" ]]; then
+  openssl rand -hex 32 > "$NODE_KEY_FILE"
+fi
+NODE_KEY="$(tr -d '\n\r' < "$NODE_KEY_FILE")"
 
 # Start validator
 log_info "Starting $VALIDATOR_NAME..."
@@ -69,7 +71,6 @@ log_info "  - Name: $VALIDATOR_NAME"
 log_info "  - Base Path: $BASE_PATH"
 log_info "  - P2P Port: $BASE_PORT"
 log_info "  - RPC Port: $RPC_PORT"
-log_info "  - WS Port: $WS_PORT"
 log_info "  - Log File: $LOG_FILE"
 echo
 
@@ -83,10 +84,9 @@ echo
   echo "  --chain=$CHAIN_SPEC"
   echo "  --port=$BASE_PORT"
   echo "  --rpc-port=$RPC_PORT"
-  echo "  --ws-port=$WS_PORT"
   echo "  --rpc-external"
-  echo "  --ws-external"
   echo "  --rpc-methods=Unsafe"
+  echo "  --node-key=<redacted>"
   echo ""
   
   "$NODE_BINARY" \
@@ -96,10 +96,9 @@ echo
     --chain="$CHAIN_SPEC" \
     --port="$BASE_PORT" \
     --rpc-port="$RPC_PORT" \
-    --ws-port="$WS_PORT" \
     --rpc-external \
-    --ws-external \
     --rpc-methods=Unsafe \
+    --node-key "$NODE_KEY" \
     2>&1
   
   echo "=== Validator $VALIDATOR_NUM Exited: $(date) ==="
@@ -146,7 +145,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Validator: $VALIDATOR_NAME (PID: $VALIDATOR_PID)"
 echo "P2P Port: $BASE_PORT"
 echo "RPC: http://127.0.0.1:$RPC_PORT"
-echo "WebSocket: ws://127.0.0.1:$WS_PORT"
 echo "Log File: $LOG_FILE"
 echo ""
 echo "Monitor with:"

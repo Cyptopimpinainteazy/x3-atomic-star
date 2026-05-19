@@ -368,6 +368,7 @@ pub mod pallet {
             amount: Balance,
             nonce: u64,
         ) -> DispatchResult {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             // Verify governance permission
             T::SupplyGovernance::ensure_origin(origin.clone())?;
 
@@ -393,6 +394,7 @@ pub mod pallet {
             domain: DomainId,
             amount: Balance,
         ) -> DispatchResult {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             T::SupplyGovernance::ensure_origin(origin)?;
             Self::do_burn_canonical(&asset_id, domain, amount)
         }
@@ -444,6 +446,7 @@ pub mod pallet {
             domain: DomainId,
             amount: Balance,
         ) -> DispatchResult {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             ensure!(T::Registry::exists(asset_id), Error::<T>::UnknownAsset);
             Ledgers::<T>::try_mutate(*asset_id, |maybe| -> DispatchResult {
                 let ledger = maybe.get_or_insert_with(SupplyLedger::default);
@@ -472,6 +475,7 @@ pub mod pallet {
             domain: DomainId,
             amount: Balance,
         ) -> DispatchResult {
+            ensure!(!TransferHalted::<T>::get(), Error::<T>::TransfersHalted);
             Ledgers::<T>::try_mutate(*asset_id, |maybe| -> DispatchResult {
                 let ledger = maybe.as_mut().ok_or(Error::<T>::UnknownAsset)?;
                 Self::sub_from_domain(ledger, domain, amount)?;

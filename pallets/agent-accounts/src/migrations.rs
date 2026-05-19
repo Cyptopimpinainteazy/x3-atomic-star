@@ -1,4 +1,5 @@
 //! Runtime storage migrations for `pallet-agent-accounts`.
+#![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
 use frame_support::weights::Weight;

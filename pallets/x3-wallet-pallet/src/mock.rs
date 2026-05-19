@@ -51,7 +51,6 @@ impl frame_system::Config for Test {
 
 impl pallet_x3_wallet::Config for Test {
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = pallet_x3_wallet::weights::SubstrateWeight<Test>;
 }
 
 /// Build genesis storage for tests with ALICE pre-authorized as a minter.
