@@ -7875,7 +7875,7 @@ dependencies = [
  "quote",
  "regex",
  "syn 2.0.117",
- "toml 0.5.11",
+ "toml 0.9.6",
  "trybuild",
  "walkdir",
 ]
@@ -8630,7 +8630,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 0.9.6",
  "walkdir",
 ]
 
@@ -25407,7 +25407,7 @@ dependencies = [
  "sp-std 14.0.0",
  "tempfile",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 0.9.6",
 ]
 
 [[package]]
@@ -25798,7 +25798,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
- "toml 0.8.23",
+ "toml 0.9.6",
  "tracing",
  "tracing-subscriber",
  "walkdir",
@@ -26182,7 +26182,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
- "toml 0.8.23",
+ "toml 0.9.6",
  "tower-http 0.4.4",
  "tracing",
  "tracing-subscriber",
@@ -26490,7 +26490,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
- "toml 0.8.23",
+ "toml 0.9.6",
 ]
 
 [[package]]
@@ -26650,7 +26650,7 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-test",
- "toml 0.8.23",
+ "toml 0.9.6",
  "tower 0.4.13",
  "tower-http 0.4.4",
  "tracing",
