@@ -42,7 +42,7 @@ hex = "0.4"
 
 # Time and scheduling
 chrono = { version = "0.4", features = ["serde"], optional = true }
-tokio-cron-scheduler = { version = "0.9", optional = true }
+tokio-cron-scheduler = { version = "0.15", optional = true }
 
 # Cross-chain messaging
 libp2p = { version = "0.50", features = ["tcp", "quic", "noise"], optional = true }
