@@ -26754,7 +26754,7 @@ dependencies = [
  "chrono",
  "futures 0.3.32",
  "libp2p 0.53.2",
- "lru 0.12.5",
+ "lru 0.16.4",
  "mockall 0.12.1",
  "multihash 0.18.1",
  "parking_lot 0.12.5",
