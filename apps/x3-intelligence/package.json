@@ -15,12 +15,12 @@
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^4.22.1",
+    "express": "^4.22.2",
     "express-session": "^1.18.1",
     "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
+    "react-router-dom": "^7.17.0",
     "recharts": "^3.7.0"
   },
   "devDependencies": {
@@ -40,7 +40,7 @@
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.3",
     "vite": "^6.1.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.8"
   },
   "overrides": {
     "path-to-regexp": "^0.1.10"
