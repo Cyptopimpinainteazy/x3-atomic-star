@@ -28,12 +28,12 @@ bincode = "1.3"
 
 # Crypto
 aes-gcm = "0.10"
-curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
+curve25519-dalek = { version = "5.0.0", features = ["rand_core"] }
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 sha2 = "0.10"
 blake3 = "1.5"
-rand = "0.8"
+rand = "0.10"
 
 # Metrics & logging
 tracing = "0.1"
