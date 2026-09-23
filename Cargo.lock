@@ -8758,6 +8758,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak-hash"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fba6b43ea4db600de48a9611dfaa0dc190710defdf5203e21f084504de77787"
+dependencies = [
+ "primitive-types 0.14.0",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "keystream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14075,6 +14085,17 @@ dependencies = [
  "impl-rlp 0.4.0",
  "impl-serde 0.5.0",
  "scale-info",
+ "uint 0.10.1",
+]
+
+[[package]]
+name = "primitive-types"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "721a1da530b5a2633218dc9f75713394c983c352be88d2d7c9ee85e2c4c21794"
+dependencies = [
+ "fixed-hash",
+ "impl-codec 0.7.1",
  "uint 0.10.1",
 ]
 
@@ -22707,7 +22728,7 @@ dependencies = [
  "hex",
  "impl-serde 0.5.0",
  "jsonrpsee",
- "keccak-hash",
+ "keccak-hash 0.11.0",
  "parity-scale-codec",
  "primitive-types 0.13.1",
  "scale-bits",
@@ -22781,7 +22802,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "hex",
  "impl-serde 0.5.0",
- "keccak-hash",
+ "keccak-hash 0.11.0",
  "parity-scale-codec",
  "primitive-types 0.13.1",
  "scale-bits",
@@ -22956,7 +22977,7 @@ dependencies = [
  "crypto_secretbox",
  "hex",
  "hmac 0.12.1",
- "keccak-hash",
+ "keccak-hash 0.11.0",
  "parity-scale-codec",
  "pbkdf2 0.12.2",
  "regex",
@@ -26223,7 +26244,7 @@ version = "0.1.0"
 dependencies = [
  "blake2 0.10.6",
  "ed25519-dalek 2.2.0",
- "keccak-hash",
+ "keccak-hash 0.12.0",
  "secp256k1 0.28.2",
  "sha2 0.10.9",
  "thiserror 1.0.69",
@@ -27245,7 +27266,7 @@ dependencies = [
  "humantime-serde",
  "hyper 1.11.1",
  "hyper-util",
- "keccak-hash",
+ "keccak-hash 0.12.0",
  "log",
  "num_cpus",
  "once_cell",
