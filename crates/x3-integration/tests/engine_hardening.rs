@@ -235,6 +235,12 @@ fn float_arithmetic_is_refused_on_chain() {
         &module(&[(0, 16, 0)], &[], code),
         X3Error::ForbiddenOnChain(0x30),
     );
+    let mut code = binary(0x34, 2, 0, 1); // ModF: the same policy, the same refusal
+    code.extend(ret(2));
+    refused_by_both(
+        &module(&[(0, 16, 0)], &[], code),
+        X3Error::ForbiddenOnChain(0x34),
+    );
 }
 
 #[test]

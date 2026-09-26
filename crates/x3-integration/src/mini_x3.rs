@@ -1270,7 +1270,7 @@ fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
         0x00 | 0x06 | 0x07 | 0xF3 => 1,
         0x05 | 0x19..=0x1B => 2,
         0x11 | 0x18 | 0x25 | 0x35 | 0x53 | 0x5A | 0x90..=0x92 => 3,
-        0x20..=0x24 | 0x30..=0x33 | 0x40..=0x4B | 0x50..=0x52 | 0x54..=0x56 | 0x58 | 0x59 => 4,
+        0x20..=0x24 | 0x30..=0x34 | 0x40..=0x4B | 0x50..=0x52 | 0x54..=0x56 | 0x58 | 0x59 => 4,
         0x01 => 5,
         0x02 | 0x03 | 0x10 | 0x12 | 0x13 | 0xF2 => 6,
         0x04 => {
@@ -1283,7 +1283,6 @@ fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
         0x14..=0x17
         | 0x26
         | 0x27
-        | 0x34
         | 0x60..=0x68
         | 0x70..=0x75
         | 0x80..=0x85
@@ -1379,9 +1378,11 @@ fn verify_code(module: &MiniModule) -> Result<(), X3Error> {
                     return Err(X3Error::GlobalOutOfBounds);
                 }
             }
-            // AddF, SubF, MulF, DivF: forbidden on chain, as `x3-vm`'s `VerifyOptions::on_chain`
-            // forbids them.
-            0x30..=0x33 => return Err(X3Error::ForbiddenOnChain(op)),
+            // AddF, SubF, MulF, DivF, ModF: forbidden on chain, as `x3-vm`'s
+            // `VerifyOptions::on_chain` forbids them. ModF was refused as unimplemented instead,
+            // so the engines gave different reasons for one policy (the `compile_and_run` fuzz
+            // target, on a program taking `%` of floats).
+            0x30..=0x34 => return Err(X3Error::ForbiddenOnChain(op)),
             _ => {}
         }
         ip += len;
