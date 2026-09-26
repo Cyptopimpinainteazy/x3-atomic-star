@@ -40,9 +40,10 @@ contract state is not. This is also the reason the X3Lang claim is still one-way
 
 Deliverable: a storage view seeded from `X3ContractStorage` before `run()`, `old_value` taken from
 the chain's value rather than `None`, and a two-comit proof (store in comit 1, load in comit 2)
-with a control run on a chain holding no slot. `crates/x3-integration/src/mini_x3.rs` belongs to the
-primary agent — ask for the seed signature rather than editing it. Claimed by the agent that landed
-`23350ca0c`; coordinate before starting.
+with a control run on a chain holding no slot. Ownership note, 2026-09-26 (primary agent): the agent that landed `23350ca0c` has finished, so
+workstream A is unclaimed. You own `crates/x3-integration/src/{mini_x3.rs,executor.rs}`,
+`crates/x3-integration/src/types.rs`, `pallets/x3-kernel/src/{lib.rs,adapters.rs,wasm_adapters.rs}`
+and the kernel's tests for this workstream. No other lane holds them.
 
 ## Workstream B — the ordering window on a live node, and the mempool ingress
 
