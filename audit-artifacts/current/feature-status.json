@@ -3294,11 +3294,13 @@
         "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
         "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
         "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
-        "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond"
+        "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
+        "The DEX batch router is a second, different ordering path and is *not* fair ordering: it now refuses a batch whose vector disagrees with its own `sequence` fields (`swaps_are_in_sequence_order`, called from both `create_batch_swap` and `execute_batch_swap`), which closes TICKET-142 \u2014 the test named `liquidation_frontrun_eliminated_by_fair_ordering` was asserting `50 > 0` on two hardcoded locals while the router read `sequence` nowhere. Enforcing the declared order is not the same as ordering fairly, and nothing in `crates/x3-dex` calls the commit-reveal lane"
       ],
       "name": "Fair transaction ordering",
       "paths": [
-        "crates/x3-swap-router/src/mev_protection"
+        "crates/x3-swap-router/src/mev_protection",
+        "crates/x3-dex/src/batch_swap_router.rs"
       ],
       "priority": "P1",
       "source": "master",
@@ -4480,7 +4482,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "a1fd5b83fb5bfc6b560ea1fed523617bd2456b9d4007f1c0187910c92599eaed",
+    "source_digest": "d1b496d8287c996e2f77b87136768789f9781bceec920f8ce6f7b329cf6d394d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4492,7 +4494,7 @@
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "9826f462233412ef81edbe43a7b3da03944948158134fe0769cbd4239e638120",
+      "feature-matrix/mev-privacy.toml": "9b96c62a59f418119b6879393c23637405417c23a421661baeac3634f3f2fce7",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"

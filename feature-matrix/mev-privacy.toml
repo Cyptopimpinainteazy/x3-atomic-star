@@ -150,7 +150,10 @@ id = "X3-MEV-008"
 name = "Fair transaction ordering"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["crates/x3-swap-router/src/mev_protection"]
+paths = [
+  "crates/x3-swap-router/src/mev_protection",
+  "crates/x3-dex/src/batch_swap_router.rs",
+]
 implemented = 45
 tested = 40
 mainnet_ready = 10
@@ -163,6 +166,7 @@ blockers = [
   "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
   "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
   "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
+  "The DEX batch router is a second, different ordering path and is *not* fair ordering: it now refuses a batch whose vector disagrees with its own `sequence` fields (`swaps_are_in_sequence_order`, called from both `create_batch_swap` and `execute_batch_swap`), which closes TICKET-142 — the test named `liquidation_frontrun_eliminated_by_fair_ordering` was asserting `50 > 0` on two hardcoded locals while the router read `sequence` nowhere. Enforcing the declared order is not the same as ordering fairly, and nothing in `crates/x3-dex` calls the commit-reveal lane",
 ]
 required_tests = [
   "a_closed_window_settles_in_canonical_key_order",
@@ -186,6 +190,9 @@ required_tests = [
   "a_beacon_installed_while_the_window_is_open_is_refused",
   "a_beacon_reorders_and_the_order_stays_recomputable_from_the_settlement",
   "an_oversized_reveal_is_refused",
+  "a_front_runner_cannot_reorder_the_batch_by_handing_it_over_differently",
+  "the_refusal_happens_before_any_output_is_accepted",
+  "a_batch_in_the_order_it_declares_executes",
   "a_window_beyond_its_capacity_is_refused",
   "settling_before_the_window_closes_is_refused",
   "settling_twice_is_refused",
@@ -194,6 +201,7 @@ required_tests = [
 ]
 test_evidence = [
   "note: cargo test -p x3-swap-router --lib fair_ordering -> 26 passed, 0 failed, 12 filtered out (re-run by the primary agent 2026-09-26 on commit e2879257c)",
+  "note: cargo test -p x3-dex -> 216 passed, 0 failed, 0 ignored with the batch-order enforcement in place; deleting the execute-side check makes the_refusal_happens_before_any_output_is_accepted fail with `assertion left == right failed: a batch carrying one order while declaring another must be refused` (TICKET-142)",
   "note: cargo test -p x3-swap-router -> 38 passed in the lib target and 25 passed in prop_swap_math, 0 doc-tests; cargo clippy -p x3-swap-router --all-targets -- -D warnings -> exit 0",
   "note: break-it-first controls, disabling one rule at a time - order by arrival block makes reveals_landing_at_different_blocks_still_order_by_key FAIL with the exact reversed sequence; reveal after the deadline, sender binding and hash binding each turn their tests red; restored, green",
   ".ai/runlogs/round4-mev008-fair-ordering-20260926.txt",

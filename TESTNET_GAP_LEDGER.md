@@ -899,6 +899,39 @@ Not closed by this ticket, and not claimed: there is still no block view, no tra
 account view, no search, no indexer for history and no hosted deployment. `X3-OPS-009` is 55/70/25
 for that reason.
 
+**TICKET-142 — a test named for fair ordering was asserting `50 > 0`. CLOSED 2026-09-26.**
+`crates/x3-dex/src/tests/attack_liquidation_frontrun.rs` held one test,
+`liquidation_frontrun_eliminated_by_fair_ordering`, whose entire check was
+`assert!(first_bonus > second_bonus)` over two hardcoded locals (`50u64` and `0u64`). It built a
+two-swap batch, executed it, and then compared the literals — so it would have passed with the
+router ordering by arrival, by reverse arrival, or by nothing, which is what it did: measured
+2026-09-26, `BatchSwapRouter::execute_batch_swap` summed the caller's `actual_outputs` in vector
+order and never read `SwapInstruction::sequence`. The test's name was the claim, and the name was
+unearned.
+
+Closed in two parts, both narrower than the old name and honest about it:
+
+* the router now enforces the order it declares. `swaps_are_in_sequence_order` is called by
+  `create_batch_swap` *and* by `execute_batch_swap` — the latter because `BatchSwap`'s fields are
+  public and the type is `Decode`, so a batch can arrive without going through `create`. A batch
+  whose vector disagrees with its own `sequence` fields is refused with
+  `"Batch swaps are not in sequence order"` before any output is accepted, and a refused batch
+  keeps `status = 0` and `total_output = 0`.
+* the file now asserts three things instead: a batch in the order it declares executes
+  (`a_batch_in_the_order_it_declares_executes`); a hand-reordered batch is refused
+  (`a_front_runner_cannot_reorder_the_batch_by_handing_it_over_differently`); and the refusal
+  happens before the output checks, so nobody buys execution by paying every minimum
+  (`the_refusal_happens_before_any_output_is_accepted`).
+
+Measured load-bearing: deleting the `execute_batch_swap`-side call makes
+`the_refusal_happens_before_any_output_is_accepted` fail with
+`assertion left == right failed: a batch carrying one order while declaring another must be
+refused`; restoring it returns the suite to `216 passed; 0 failed` (`cargo test -p x3-dex`).
+
+Not closed and not claimed: this router still has no *fair* ordering. Ordering by a secret nobody
+can grind is the commit-reveal window in `crates/x3-swap-router/src/mev_protection/fair_ordering.rs`,
+and nothing in this crate calls it.
+
 ## TICKET-139 — the claim scanner now reads the surfaces people actually read — 2026-09-26
 
 **CLOSED.** `scripts/ci/check-claims-hygiene.py` scans `docs/**`, `production/public/**`,
