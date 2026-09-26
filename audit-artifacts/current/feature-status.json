@@ -3253,7 +3253,7 @@
       "mainnet_ready": 40,
       "missing_work": [
         "The pallet now runs an ordering window on chain, so this is no longer 'private execution and nothing else': `open_ordering_window` / `commit_ordering` / `reveal_ordering` / `install_ordering_beacon` / `settle_ordering_window` drive the `CommitRevealLane` from `crates/x3-order-window` (the same algorithm its 26 crate tests verify), the settled order is stored as the *recomputable* canonical order and the dispatchable asserts the published sequence equals `settlement.canonical_order()`, and bonds are reserved on commit, released on reveal and `slash_reserved` for the unrevealed set with a fail-closed check that the whole amount moved. Measured 2026-09-26 (primary agent, independently of the lane's author): `cargo test -p pallet-private-execution` -> 34 passed, 0 failed; `cargo check -p x3-chain-runtime --features std` -> exit 0, so the `Config` addition type-checks in the runtime; `local-ci --live --only local-node-smoke` -> PASS and `--only local-network-smoke` -> PASS at 0d903e8b1, so a chain boots, authors, finalizes and agrees on its canonical hash with this wiring compiled in.",
-        "No complete formal MEV threat model, and 'MEV-proof' is still not claimable: the beacon extrinsic exists but nothing supplies a beacon, so the placement hole the lane documents is open (a participant that can grind its own nonce chooses where its own commitment lands); the weights for the five new extrinsics are hand-sized rather than benchmarked; nothing has run on a live node; and reveal/settle are deliberately not gated on the `Enabled` switch or the validator quorum (gating them would freeze bonds the chain already took) \u2014 so disabling private execution does not stop an open window from settling, which is a policy the operator should confirm rather than discover."
+        "No complete formal MEV threat model, and 'MEV-proof' is still not claimable. The placement hole is closed as far as a chain can close it, as of `fd95445d3`: `install_ordering_beacon` no longer takes a value, it is permissionless, and the beacon is the hash of the block right after the window closed \u2014 a block that does not exist while anyone can still commit \u2014 with settlement deriving it independently and refusing a stored value that is not the chain's. What remains is producer bias (the producer of that one block can influence its hash; equivocating is slashable but the beacon is only as unbiased as that producer); the weights for the five new extrinsics are hand-sized rather than benchmarked; nothing has run on a live node; and reveal/settle are deliberately not gated on the `Enabled` switch or the validator quorum (gating them would freeze bonds the chain already took) \u2014 so disabling private execution does not stop an open window from settling, which is a policy the operator should confirm rather than discover."
       ],
       "name": "MEV-resistant architecture",
       "paths": [
@@ -3317,7 +3317,7 @@
       "missing_work": [
         "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
         "Half of that is closed and half is not. `pallets/private-execution` now calls the lane directly (`crates/x3-order-window`, the no_std crate the algorithm moved into), opens windows, takes commits and reveals, settles into the stored canonical order, and moves bonds; `cargo test -p pallet-private-execution` -> 34 passed. What still has no caller is `crates/x3-swap-router` itself: the router's own execution path does not read `OrderingSettlements`, so a swap batch and an ordering window can disagree about who went first",
-        "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
+        "Beacon provenance is now the chain's, not a caller's: since `fd95445d3` the beacon is `BlockHash(close_block + 1)` \u2014 a future block's hash, derived at install and re-derived at settle, with `install_ordering_beacon` taking no value and needing no privilege. The residual is producer bias on that one block (a VRF or threshold signature would remove it; a GRANDPA producer cannot re-roll quietly, since two blocks at one height is slashable equivocation)",
         "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
         "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
         "The DEX batch router is a second, different ordering path and is *not* fair ordering: it now refuses a batch whose vector disagrees with its own `sequence` fields (`swaps_are_in_sequence_order`, called from both `create_batch_swap` and `execute_batch_swap`), which closes TICKET-142 \u2014 the test named `liquidation_frontrun_eliminated_by_fair_ordering` was asserting `50 > 0` on two hardcoded locals while the router read `sequence` nowhere. Enforcing the declared order is not the same as ordering fairly, and nothing in `crates/x3-dex` calls the commit-reveal lane"
@@ -4509,7 +4509,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "c9f16fb4c9ed5aba8f2ec548f75528219faf5ecd35930995d2c3ae48b7fcbe00",
+    "source_digest": "64fb9e7fd5c3fbe593094efc28f159e6e0e7dcc597839a90a6da9e608bf18e62",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4521,7 +4521,7 @@
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "79eb01e87289ba78ab79c606100a4a07a9f0ff67cb7a90bc55026160d4743c89",
-      "feature-matrix/mev-privacy.toml": "784e072d33ac9df5c8561cfc9669bf55e850b85ecc1f5d0d79234fac9716e937",
+      "feature-matrix/mev-privacy.toml": "29466c3ded767ece03538855f22155feebae49612b1a64081c60193ac7a2b9e1",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
