@@ -2440,19 +2440,19 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 14,
+      "composite": 38,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable"
+        "note: WGPU backend currently KernelUnavailable; the CPU reference and the parity contract are real as of 241e9d033"
       ],
       "id": "X3-GPU-007",
-      "implemented": 20,
+      "implemented": 50,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
-        "No verified accelerator kernel in current backend"
+        "A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it returned. What is still missing is the accelerator itself \u2014 this host has no compute device, the WGPU backend reports `KernelUnavailable`, and no GPU kernel has been run for this primitive. No GPU batching throughput has been measured anywhere in this repository."
       ],
       "name": "GPU Keccak256 batching",
       "paths": [
@@ -2460,28 +2460,28 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 14,
+      "composite": 38,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable"
+        "note: WGPU backend currently KernelUnavailable; the RFC 8032 vector and the parity contract are real as of 241e9d033"
       ],
       "id": "X3-GPU-008",
-      "implemented": 20,
+      "implemented": 50,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
-        "No verified accelerator kernel"
+        "An `ed25519_with_parity` wrapper and its CPU reference exist as of `241e9d033`, and the reference is pinned to the RFC 8032 test vector (`cpu_reference_matches_the_rfc8032_ed25519_test_vector`); a divergent accelerator answer is refused. What is still missing is the accelerator: no compute device on this host, no GPU kernel executed for this primitive, and no signature-throughput measurement. AGENTS.md \u00a718's rule (a GPU and the canonical verifier must agree; disagreement fails closed) is now the code path, but the accelerated half has never run."
       ],
       "name": "GPU ed25519 verification",
       "paths": [
@@ -2489,28 +2489,28 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 14,
+      "composite": 37,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: Honest audit says no production GPU secp256k1 kernel"
+        "note: Honest audit says no production GPU secp256k1 kernel; the CPU reference and parity contract are real as of 241e9d033, the kernel is not"
       ],
       "id": "X3-GPU-009",
-      "implemented": 20,
+      "implemented": 45,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
-        "WGPU backend reports KernelUnavailable; old GPU crate simulates CPU"
+        "A `secp256k1_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with a divergent answer refused. What is still missing is the accelerator \u2014 the WGPU backend reports `KernelUnavailable`, this host has no compute device, and no GPU kernel has run for this primitive. Nothing on a chain calls this path yet either, so the parity contract currently protects a caller that does not exist."
       ],
       "name": "GPU secp256k1 verification",
       "paths": [
@@ -2521,8 +2521,8 @@
       "state": "STUB",
       "state_rule": "implemented >= 20",
       "subsystem": "gpu_performance",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2705,19 +2705,19 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 14,
+      "composite": 38,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable"
+        "note: WGPU backend currently KernelUnavailable; the CPU reference and parity contract are real as of 241e9d033"
       ],
       "id": "X3-GPU-016",
-      "implemented": 20,
+      "implemented": 50,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
-        "No verified accelerator kernel"
+        "A `blake2b256_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with divergence refused. What is still missing is the accelerator: no compute device, no kernel run, no throughput measurement."
       ],
       "name": "GPU Blake2b batching",
       "paths": [
@@ -2725,28 +2725,28 @@
       ],
       "priority": "P2",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 14,
+      "composite": 38,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable"
+        "note: WGPU backend currently KernelUnavailable; the CPU reference and parity contract are real as of 241e9d033"
       ],
       "id": "X3-GPU-017",
-      "implemented": 20,
+      "implemented": 50,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
-        "No verified accelerator kernel"
+        "A `merkle_root_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with divergence refused \u2014 so a tree root is no longer accepted merely because an accelerator returned one. What is still missing is the accelerator: no compute device, no kernel run, and no measurement of root computation at scale."
       ],
       "name": "GPU Merkle-root acceleration",
       "paths": [
@@ -2754,11 +2754,11 @@
       ],
       "priority": "P2",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 10,
-      "tests": "tested score 10% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4513,7 +4513,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "8a36932dd8c4c40318f6d0ca0a3b66ac7cd37a544823260ce055f388f4dc837a",
+    "source_digest": "860ff7e273e7c2e7a5c2953f340ebdcfd92f1f931e3074721f14cd6f1f0b622e",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4523,7 +4523,7 @@
       "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
-      "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
+      "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
       "feature-matrix/language-trading.toml": "79eb01e87289ba78ab79c606100a4a07a9f0ff67cb7a90bc55026160d4743c89",
       "feature-matrix/mev-privacy.toml": "a8f6d82dcb345408fc6ffbde70dacefde8dc3686625110979b5e30d26b2f85e3",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
@@ -4972,8 +4972,8 @@
       "FUNCTIONAL BUT UNHARDENED": 57,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 66,
-      "STUB": 8
+      "PARTIAL": 70,
+      "STUB": 4
     },
     "matrix_features": 146,
     "registry_features": 21,

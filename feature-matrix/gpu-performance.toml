@@ -104,15 +104,28 @@ name = "GPU Keccak256 batching"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+implemented = 50
+tested = 60
+mainnet_ready = 15
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No verified accelerator kernel in current backend"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+blockers = [
+  "A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it returned. What is still missing is the accelerator itself — this host has no compute device, the WGPU backend reports `KernelUnavailable`, and no GPU kernel has been run for this primitive. No GPU batching throughput has been measured anywhere in this repository.",
+]
+required_tests = [
+  "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
+  "the_parity_wrapper_passes_through_a_backend_that_agrees",
+  "an_absent_device_refuses_every_primitive_instead_of_answering",
+  "strict_unavailable_backend_fails_closed",
+]
+test_evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
+  "note: the parity wrapper compares every primitive's accelerated answer against the CPU reference and refuses a divergent one; with no device, every primitive is refused rather than answered, so \"no device\" is not a pass",
+]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable; the CPU reference and the parity contract are real as of 241e9d033"]
 
 [[feature]]
 id = "X3-GPU-008"
@@ -120,15 +133,28 @@ name = "GPU ed25519 verification"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+implemented = 50
+tested = 60
+mainnet_ready = 15
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No verified accelerator kernel"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+blockers = [
+  "An `ed25519_with_parity` wrapper and its CPU reference exist as of `241e9d033`, and the reference is pinned to the RFC 8032 test vector (`cpu_reference_matches_the_rfc8032_ed25519_test_vector`); a divergent accelerator answer is refused. What is still missing is the accelerator: no compute device on this host, no GPU kernel executed for this primitive, and no signature-throughput measurement. AGENTS.md §18's rule (a GPU and the canonical verifier must agree; disagreement fails closed) is now the code path, but the accelerated half has never run.",
+]
+required_tests = [
+  "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
+  "the_parity_wrapper_passes_through_a_backend_that_agrees",
+  "an_absent_device_refuses_every_primitive_instead_of_answering",
+  "cpu_reference_matches_the_rfc8032_ed25519_test_vector",
+]
+test_evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
+  "note: the CPU reference is a published test vector, not a self-comparison; the wrapper refuses a divergent backend and refuses every primitive when no device is present",
+]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable; the RFC 8032 vector and the parity contract are real as of 241e9d033"]
 
 [[feature]]
 id = "X3-GPU-009"
@@ -136,15 +162,27 @@ name = "GPU secp256k1 verification"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+implemented = 45
+tested = 60
+mainnet_ready = 15
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["WGPU backend reports KernelUnavailable; old GPU crate simulates CPU"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: Honest audit says no production GPU secp256k1 kernel"]
+blockers = [
+  "A `secp256k1_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with a divergent answer refused. What is still missing is the accelerator — the WGPU backend reports `KernelUnavailable`, this host has no compute device, and no GPU kernel has run for this primitive. Nothing on a chain calls this path yet either, so the parity contract currently protects a caller that does not exist.",
+]
+required_tests = [
+  "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
+  "the_parity_wrapper_passes_through_a_backend_that_agrees",
+  "an_absent_device_refuses_every_primitive_instead_of_answering",
+]
+test_evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
+  "note: divergence is refused through the trait, so an accelerator cannot answer with a wrong verification result; with no device every primitive is refused rather than answered",
+]
+evidence = ["crates/x3-accel/src/lib.rs", "note: Honest audit says no production GPU secp256k1 kernel; the CPU reference and parity contract are real as of 241e9d033, the kernel is not"]
 
 [[feature]]
 id = "X3-GPU-010"
@@ -258,15 +296,26 @@ name = "GPU Blake2b batching"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+implemented = 50
+tested = 60
+mainnet_ready = 15
 priority = "P2"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No verified accelerator kernel"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+blockers = [
+  "A `blake2b256_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with divergence refused. What is still missing is the accelerator: no compute device, no kernel run, no throughput measurement.",
+]
+required_tests = [
+  "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
+  "the_parity_wrapper_passes_through_a_backend_that_agrees",
+  "an_absent_device_refuses_every_primitive_instead_of_answering",
+]
+test_evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
+]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable; the CPU reference and parity contract are real as of 241e9d033"]
 
 [[feature]]
 id = "X3-GPU-017"
@@ -274,12 +323,23 @@ name = "GPU Merkle-root acceleration"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+implemented = 50
+tested = 60
+mainnet_ready = 15
 priority = "P2"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No verified accelerator kernel"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+blockers = [
+  "A `merkle_root_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with divergence refused — so a tree root is no longer accepted merely because an accelerator returned one. What is still missing is the accelerator: no compute device, no kernel run, and no measurement of root computation at scale.",
+]
+required_tests = [
+  "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
+  "the_parity_wrapper_passes_through_a_backend_that_agrees",
+  "an_absent_device_refuses_every_primitive_instead_of_answering",
+]
+test_evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
+]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable; the CPU reference and parity contract are real as of 241e9d033"]
