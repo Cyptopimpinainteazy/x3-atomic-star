@@ -113,3 +113,39 @@ execution path, each with a break-it-first control. Own: `x3-lang/compiler/**`, 
   workstream C.
 * The seven physical servers, the 72-hour soak, public testnet hosting and the live runtime upgrade:
   external blockers, unchanged.
+
+---
+
+## Workstream D — the encrypted mempool has no ingress a chain can use (X3-MEV-007, P0-adjacent)
+
+`crates/private-mempool` holds real threshold crypto: Ristretto Shamir split/combine
+(`src/threshold.rs`), committee ECDH + HKDF + AES-256-GCM (`src/encryption.rs`), 29 tests. It is
+**std-only** (tokio, chrono, parking_lot, `rand` with its default `std`), so `pallet-private-execution`
+— which is where a private submission actually lands — cannot link it. The pallet's
+`submit_private_transaction` therefore stores whatever bytes it is handed: no committee-key check
+beyond "a key is set", no epoch binding, no shape validation. A submission encrypted to an old DKG
+epoch is accepted and can never be decrypted by the current committee.
+
+Deliverable, in two steps (do step 1 first and commit it; step 2 in the same commit only if it is
+clean):
+
+1. **Extract the crypto core into a `no_std` crate** (`crates/x3-threshold-core`), exactly the way
+   `crates/x3-order-window` was extracted from `x3-swap-router` on 2026-09-26: move the shared types
+   (`ThresholdPublicKey`, `EncryptedTransaction`, `DecryptionShare`) and the deterministic
+   validation/decryption maths (point decompression, share combination, HKDF+AES-GCM decrypt) into
+   it, and have `crates/private-mempool` re-export them so there is still one definition — not a
+   copy. RNG-dependent encryption may stay behind a feature. Prove it builds for the runtime:
+   `cargo check -p x3-threshold-core --no-default-features --target wasm32-unknown-unknown`.
+2. **Validate at the pallet's door.** `pallets/private-execution::submit_private_transaction`
+   should refuse, by name: a payload that is not a well-formed encrypted transaction; an ephemeral
+   key that is not a valid Ristretto point; a nonce of the wrong length; an empty/oversized
+   ciphertext; and — the one that matters — a payload whose DKG epoch is not the pallet's current
+   `DkgEpoch`. Store the validated epoch with the record so the committee can tell which key opens
+   it. Tests for each refusal plus a positive case; break-it-first control for the epoch check.
+
+Own: `crates/x3-threshold-core/**`, `crates/private-mempool/src/{lib.rs,encryption.rs,threshold.rs}`
+(not `queue.rs`), `pallets/private-execution/src/**`. Do **not** touch `crates/x3-accel/**`,
+`crates/x3-integration/**`, `pallets/x3-kernel/**` or `runtime/src/lib.rs` — other lanes hold them.
+
+Commands: `cargo test -p x3-threshold-core -p private-mempool`, `cargo test -p pallet-private-execution`,
+clippy `-D warnings` on all three, `cargo fmt --all -- --check`, and the two `no_std`/wasm checks.

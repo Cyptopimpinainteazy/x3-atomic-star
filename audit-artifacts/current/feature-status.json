@@ -3210,31 +3210,35 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 41,
+      "composite": 60,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
-        "note: Trading Core v1 gap list"
+        "x3-lang/vm/src/executor.rs",
+        "note: Trading Core v1 gap list; re-measured 2026-09-26 because the recorded blocker no longer described the tree"
       ],
       "id": "X3-MEV-005",
-      "implemented": 55,
+      "implemented": 75,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 35,
+      "mainnet_ready": 40,
       "missing_work": [
-        "Hardening branch must enforce gas and capability versions"
+        "Re-measured 2026-09-26: the row's blocker (\"Hardening branch must enforce gas and capability versions\") is stale, and the score understated what is there. The VM charges gas per instruction from one table (`gas_cost_for_opcode` plus `gas_surcharge` for payload bytes and operands), refuses before deducting (`state.gas < cost` -> `OutOfGas`), and its costs are the same table the compiler estimates with \u2014 `the_estimate_weighs_the_instructions_with_the_table_the_vm_charges_from`. The compiled policy's gas ceiling is enforced at commit, not merely parsed: `gas_ceiling_within_policy_still_commits`, `gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine`, `gas_ceiling_is_enforced_at_commit_even_with_no_other_guard_operations`. The compiled policy *version* is checked against the host's before any host call begins: `compiled_policy_version_mismatch_is_rejected_before_host_transaction`. Property coverage exists: `prop_gas_never_exceeds_initial`, `prop_out_of_gas_deterministic`, plus `pow_gas_is_consumed` and `pow_gas_scales_with_exponent`.",
+        "What that does not establish, and why mainnet readiness stays at 40. The ceiling is a *policy refusal*, not a bound on work: a program over its cap still executes to the commit point and is then rejected, so the work is bounded by the gas budget the host hands the VM, not by the program's declared ceiling (`VM::new(bytecode, config, gas)` \u2014 the budget is a constructor argument). Nothing in the tree measures the gas table against a real venue workload, so 'the estimate' and 'the charge' agree with each other, not with the cost of anything in production.",
+        "No live-network run: the ceilings and the version gate have never been exercised by a program submitted to a running validator set, and the `x3c` CLI's `receipt execute` derives its capability manifest from the same policy it is meant to check, so that fixture path cannot fail its own check (recorded on X3-MEV-002)."
       ],
       "name": "Gas / economic execution limits",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/compiler",
+        "x3-lang/vm"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 30,
-      "tests": "tested score 30% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4509,7 +4513,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "64fb9e7fd5c3fbe593094efc28f159e6e0e7dcc597839a90a6da9e608bf18e62",
+    "source_digest": "8a36932dd8c4c40318f6d0ca0a3b66ac7cd37a544823260ce055f388f4dc837a",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4521,7 +4525,7 @@
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "79eb01e87289ba78ab79c606100a4a07a9f0ff67cb7a90bc55026160d4743c89",
-      "feature-matrix/mev-privacy.toml": "29466c3ded767ece03538855f22155feebae49612b1a64081c60193ac7a2b9e1",
+      "feature-matrix/mev-privacy.toml": "a8f6d82dcb345408fc6ffbde70dacefde8dc3686625110979b5e30d26b2f85e3",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"

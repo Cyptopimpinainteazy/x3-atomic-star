@@ -145,16 +145,37 @@ id = "X3-MEV-005"
 name = "Gas / economic execution limits"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 55
-tested = 30
-mainnet_ready = 35
+paths = ["x3-lang/compiler", "x3-lang/vm"]
+implemented = 75
+tested = 70
+mainnet_ready = 40
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Hardening branch must enforce gas and capability versions"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap list"]
+blockers = [
+  "Re-measured 2026-09-26: the row's blocker (\"Hardening branch must enforce gas and capability versions\") is stale, and the score understated what is there. The VM charges gas per instruction from one table (`gas_cost_for_opcode` plus `gas_surcharge` for payload bytes and operands), refuses before deducting (`state.gas < cost` -> `OutOfGas`), and its costs are the same table the compiler estimates with — `the_estimate_weighs_the_instructions_with_the_table_the_vm_charges_from`. The compiled policy's gas ceiling is enforced at commit, not merely parsed: `gas_ceiling_within_policy_still_commits`, `gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine`, `gas_ceiling_is_enforced_at_commit_even_with_no_other_guard_operations`. The compiled policy *version* is checked against the host's before any host call begins: `compiled_policy_version_mismatch_is_rejected_before_host_transaction`. Property coverage exists: `prop_gas_never_exceeds_initial`, `prop_out_of_gas_deterministic`, plus `pow_gas_is_consumed` and `pow_gas_scales_with_exponent`.",
+  "What that does not establish, and why mainnet readiness stays at 40. The ceiling is a *policy refusal*, not a bound on work: a program over its cap still executes to the commit point and is then rejected, so the work is bounded by the gas budget the host hands the VM, not by the program's declared ceiling (`VM::new(bytecode, config, gas)` — the budget is a constructor argument). Nothing in the tree measures the gas table against a real venue workload, so 'the estimate' and 'the charge' agree with each other, not with the cost of anything in production.",
+  "No live-network run: the ceilings and the version gate have never been exercised by a program submitted to a running validator set, and the `x3c` CLI's `receipt execute` derives its capability manifest from the same policy it is meant to check, so that fixture path cannot fail its own check (recorded on X3-MEV-002).",
+]
+required_tests = [
+  "gas_ceiling_within_policy_still_commits",
+  "gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine",
+  "gas_ceiling_is_enforced_at_commit_even_with_no_other_guard_operations",
+  "compiled_policy_version_mismatch_is_rejected_before_host_transaction",
+  "prop_gas_never_exceeds_initial",
+  "prop_out_of_gas_deterministic",
+  "pow_gas_is_consumed",
+  "the_estimate_weighs_the_instructions_with_the_table_the_vm_charges_from",
+]
+test_evidence = [
+  "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/vm/tests/property_tests.rs",
+  "x3-lang/compiler/tests/test_cost.rs",
+  "note: `cargo test --manifest-path x3-lang/Cargo.toml -p x3-lang-vm --test trading_execution` -> 68 passed, 0 failed, including the three gas-ceiling cases and the policy-version case; `-p x3-lang-vm --test property_tests` -> 9 passed; `-p x3-lang-compiler --test test_cost` -> 3 passed",
+  "note: x3-lang/vm/src/executor.rs charges per instruction before executing it (`if vm.state.gas < cost { return Err(ExecError::OutOfGas) }` then `vm.state.gas -= cost`), so an over-budget program stops rather than overrunning",
+]
+evidence = ["x3-lang/compiler", "x3-lang/vm/src/executor.rs", "note: Trading Core v1 gap list; re-measured 2026-09-26 because the recorded blocker no longer described the tree"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/tests/trading_execution.rs (price-impact and MEV ceilings, fail-closed)
