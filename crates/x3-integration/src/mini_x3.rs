@@ -49,6 +49,26 @@ pub enum X3Error {
     /// malformed rather than truncated, and the module must not be executed.
     InvalidConstTag(u8),
     InvalidOpcode(u8),
+    /// A defined opcode that this interpreter has no implementation for.
+    ///
+    /// The distinction from [`X3Error::InvalidOpcode`] is the point: `InvalidOpcode` means the byte
+    /// is not an opcode at all, while this means the byte *is* one — the parser, the verifier and
+    /// the compiler all agree on its encoding — and the runtime still cannot execute it. Refusing
+    /// by name is the only honest answer; answering a placeholder would put a fabricated value into
+    /// consensus state. The `std` VM refuses the same bytes with
+    /// `x3_vm::VMErrorKind::UnimplementedOpcode` (`crates/x3-vm/src/vm.rs`).
+    UnsupportedOpcode(u8),
+    /// `AtomicCommit` with no window open.
+    AtomicEndWithoutBegin,
+    /// `AtomicRollback` with no window open.
+    AtomicRollbackWithoutBegin,
+    /// An atomic window rolled back: the window's writes are undone and the execution stops, which
+    /// is what `crates/x3-vm` does (`VMErrorKind::AtomicAborted`).
+    AtomicAborted,
+    /// More atomic windows were opened than [`MAX_ATOMIC_DEPTH`] allows. Each open window holds a
+    /// copy of the module's globals, so an unbounded nesting in a loop is a memory amplification a
+    /// hostile program could ask for; the limit refuses it instead.
+    AtomicDepthExceeded,
     DivisionByZero,
     GasExhausted,
     StackOverflow,
@@ -396,11 +416,19 @@ struct CallFrame {
 const MAX_REGS: usize = 256;
 const MAX_DEPTH: usize = 64;
 
+/// Deepest nesting of atomic windows the runtime interpreter will track.
+///
+/// Every open window holds a copy of the module's globals, so this bounds the memory a program can
+/// make the interpreter hold on the chain's behalf.
+const MAX_ATOMIC_DEPTH: usize = 32;
+
 struct Vm<'m> {
     module: &'m MiniModule,
     regs: Vec<MiniValue>,
     call_stack: Vec<CallFrame>,
     globals: Vec<MiniValue>,
+    /// Globals as they were at each open `AtomicBegin`, innermost last.
+    atomic_snapshots: Vec<Vec<MiniValue>>,
     gas_used: u64,
     /// Instructions executed, counted next to gas rather than inferred from it.
     instructions_executed: u64,
@@ -432,6 +460,7 @@ impl<'m> Vm<'m> {
             regs: vec![MiniValue::Unit; MAX_REGS],
             call_stack: Vec::with_capacity(MAX_DEPTH),
             globals,
+            atomic_snapshots: Vec::new(),
             gas_used: 0,
             instructions_executed: 0,
             gas_limit,
@@ -1091,57 +1120,21 @@ impl<'m> Vm<'m> {
                 Ok(Step::Continue(ip + 3))
             }
 
-            // -------- Array / Context / Atomic / Agent / Intrinsics (return defaults) --------
-            // These opcodes decode their operands and skip the right number of bytes.
-            // In the WASM no-std context, cross-VM intrinsics and GPU ops are no-ops.
-            0x70 => {
-                self.r8(ip + 1)?;
-                self.r16(ip + 2)?;
-                Ok(Step::Continue(ip + 4))
-            } // NewArray
-            0x71 => {
-                let (d, _) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)?);
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 3))
-            }
-            0x72 | 0x73 => {
-                self.r8(ip + 1)?;
-                self.r8(ip + 2)?;
-                Ok(Step::Continue(ip + 3))
-            }
-            0x74 => {
-                let n = self.r16(ip + 2)? as usize;
-                Ok(Step::Continue(ip + 4 + n))
-            } // NewTuple: [op][dst][count][regs...]
-            0x75 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r16(ip + 3)?;
-                set!(d, MiniValue::Unit);
-                Ok(Step::Continue(ip + 5))
-            }
+            // -------- Aggregates: refused --------
+            //
+            // `LoadIndex`/`StoreIndex`/`LoadField`/`StoreField` and the array/tuple opcodes used to
+            // answer `I64(0)`/`Unit` and skip their operands. That is a fabricated value in
+            // consensus state: a program reading `array[0]` got `0`, one storing into an array
+            // changed nothing and reported success, and `ArrayLen` answered `0` for any array. The
+            // interpreter has no aggregate representation, so the only honest answer is a refusal
+            // that names the opcode.
+            0x14 | 0x15 | 0x16 | 0x17 | 0x70..=0x75 => Err(X3Error::UnsupportedOpcode(op)),
 
-            // Context ops — return zero / unit
-            0x80 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Bytes(sp_std::vec![0u8;20]));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_sender -> zero addr
-            0x81 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_block_height
-            0x82 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_timestamp
-            0x83 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_value
+            // -------- Context reads --------
+            // `ctx_gas` is real — the interpreter knows its own budget. The rest have no source of
+            // truth in the runtime: nothing hands `mini_x3` a sender, a block height, a timestamp,
+            // a value or the chain id, so answering one invents it. `0x85` used to answer a
+            // hard-coded `3375`, which is a magic constant pretending to be chain identity.
             0x84 => {
                 let d = self.r8(ip + 1)? as usize;
                 set!(
@@ -1150,49 +1143,58 @@ impl<'m> Vm<'m> {
                 );
                 Ok(Step::Continue(ip + 2))
             } // ctx_gas
-            0x85 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(3375));
-                Ok(Step::Continue(ip + 2))
-            } // chain_id
+            0x80..=0x83 | 0x85 => Err(X3Error::UnsupportedOpcode(op)),
 
-            // Atomic ops — tracked but no real isolation here (single-threaded WASM)
-            0x90..=0x92 => {
-                self.r16(ip + 1)?;
+            // -------- Atomic windows --------
+            //
+            // These were skipped while claiming to be tracked, so an atomic block that failed still
+            // committed whatever it had written. The only state this interpreter can revert is the
+            // module's globals, and it now does exactly that, mirroring `crates/x3-vm/src/vm.rs`:
+            // begin snapshots, commit discards, rollback restores and aborts the execution.
+            0x90 => {
+                self.r16(ip + 1)?; // the window id, validated like the `std` VM validates it
+                if self.atomic_snapshots.len() >= MAX_ATOMIC_DEPTH {
+                    return Err(X3Error::AtomicDepthExceeded);
+                }
+                self.atomic_snapshots.push(self.globals.clone());
                 Ok(Step::Continue(ip + 3))
+            }
+            0x91 => {
+                self.r16(ip + 1)?;
+                if self.atomic_snapshots.pop().is_none() {
+                    return Err(X3Error::AtomicEndWithoutBegin);
+                }
+                Ok(Step::Continue(ip + 3))
+            }
+            0x92 => {
+                self.r16(ip + 1)?;
+                match self.atomic_snapshots.pop() {
+                    Some(snapshot) => self.globals = snapshot,
+                    None => return Err(X3Error::AtomicRollbackWithoutBegin),
+                }
+                Err(X3Error::AtomicAborted)
             }
             0x93 => {
                 let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Bool(false));
+                set!(d, MiniValue::Bool(!self.atomic_snapshots.is_empty()));
                 Ok(Step::Continue(ip + 2))
             }
 
-            // Agent / emit — skipped
-            0xA0 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Unit);
-                Ok(Step::Continue(ip + 2))
-            }
-            0xA1 => {
-                // agent_init: [op][agent:u8][field_count:u16][...]
-                let _a = self.r8(ip + 1)?;
-                let n = self.r16(ip + 2)? as usize;
-                Ok(Step::Continue(ip + 4 + n * 3))
-            }
-            0xA2 => {
-                // emit: [op][event_id:u32][argc:u16][args...]
-                let argc = self.r16(ip + 5)? as usize;
-                Ok(Step::Continue(ip + 7 + argc))
-            }
+            // -------- Agents and events: refused --------
+            // There is no agent registry in the runtime interpreter, and no event sink: `0xA0` used
+            // to answer `Unit` (an invented identity) and `0xA2` dropped the event while reporting
+            // success. A dropped event is lost evidence, so it is refused instead.
+            0xA0..=0xA2 => Err(X3Error::UnsupportedOpcode(op)),
 
-            // VM intrinsics — all return zero/unit
-            0xB0..=0xB9 | 0xC0..=0xC7 | 0xD0..=0xD7 => {
-                // All EVM / SVM / GPU ops take dst+src operands; return zero and skip sensibly.
-                // Simplification: read dst, skip 4 more bytes, return I64(0).
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 6))
-            }
+            // -------- Cross-VM and GPU intrinsics: refused --------
+            //
+            // `AGENTS.md` §18 — an accelerator must never be accepted merely because it returned —
+            // and §5 — uncertainty must not become success. These arms answered `I64(0)` and
+            // skipped six bytes, which was also the wrong width for most of them (`EvmSstore` is
+            // three bytes, `SvmCreateAccount` seven), so a program that contained one could have
+            // the *next* instruction decoded from the middle of its operands. No host for any of
+            // these exists in the runtime build; each is refused by name.
+            0xB0..=0xB9 | 0xC0..=0xC7 | 0xD0..=0xD7 => Err(X3Error::UnsupportedOpcode(op)),
 
             // Debug ops
             0xF0 | 0xF1 => {
@@ -1209,22 +1211,6 @@ impl<'m> Vm<'m> {
                 Ok(Step::Continue(ip + 6))
             }
             0xF3 => Err(X3Error::UserPanic), // Panic
-
-            // LoadIndex / StoreIndex / LoadField / StoreField — arrays not implemented in mini
-            0x14 | 0x15 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r8(ip + 3)?;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 4))
-            }
-            0x16 | 0x17 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r16(ip + 3)?;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 5))
-            }
 
             // ModF (0x34)
             0x34 => {

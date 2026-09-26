@@ -1174,3 +1174,39 @@ stored and never spent, and a re-registration resets it); the recovery owner is 
 address in the recovery record, so what is recovered is the right to manage a guardian set — no
 `T::AccountId`, balance or `HardwareWallets` entry follows it; a pending request never expires and
 only the recovery owner can cancel it; and neither path has had an independent security review.
+
+**TICKET-148 — the on-chain interpreter answered 44 opcodes it could not execute. CLOSED
+2026-09-26.** `crates/x3-integration::mini_x3` is the interpreter a block runs: `node/src/service.rs`
+builds `sc_service::new_wasm_executor`, so the runtime's `x3-x3-integration/std` feature is off in
+the wasm build and `X3VmAdapter` reaches the `no_std` arm. It held arms that decoded their operands,
+wrote a placeholder and continued — `LoadIndex`/`StoreIndex`/`LoadField`/`StoreField` and the whole
+array/tuple family answered `I64(0)`/`Unit`, every context read returned a zero (`CtxChainId`
+returned a hard-coded `3375`), `Emit` dropped the event, the atomic family was skipped so a failed
+window still committed, and every EVM/SVM/GPU intrinsic returned `I64(0)` after skipping six bytes —
+the wrong width for most of them, which could desynchronise the instruction stream. That is
+`AGENTS.md` §5, §4 and §18 at once. All 44 now refuse with `X3Error::UnsupportedOpcode(byte)`;
+the atomic window is implemented for real over the module's globals (the only state this interpreter
+has) and bounded by `MAX_ATOMIC_DEPTH = 32`. Proof:
+`.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`; tests
+`crates/x3-integration/tests/mini_x3_fail_closed.rs` (5) and
+`crates/x3-integration/tests/interpreter_agreement.rs` (3). Break-it-first measured on both halves
+of the table: 18 of 44 red with the aggregate/context/agent arms restored, 26 of 44 red with the
+intrinsic arm restored.
+
+## TICKET-149 — the two interpreters still disagree about aggregates and slot storage — 2026-09-26
+
+Found while closing TICKET-148. The fail-open class is gone, but the engines are not the same
+engine:
+
+* `crates/x3-vm` has no arm for the aggregate family, `inc`/`dec`, `mod_f`, the numeric conversions,
+  `ctx_gas` or `atomic_check`, all of which the runtime interpreter now executes. A program using
+  one runs on chain and fails off-chain.
+* `crates/x3-vm` implements `evm_sstore`/`evm_sload` against its journaled storage; the runtime
+  interpreter refuses both, so a contract can carry a slot between calls off chain and cannot carry
+  one on chain at all. `interpreter_agreement.rs::slot_storage_is_implemented_off_chain_and_refused_on_chain`
+  asserts both halves on one artifact.
+* The verifier admits all of these at intake, so the refusal happens at execution rather than at
+  validation.
+
+Closing this means one implementation, or a generated conformance table the two are checked against
+in both directions: every opcode the compiler can emit, in both engines, with the verdict recorded.

@@ -3052,7 +3052,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 66,
+      "composite": 67,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/src/mini_x3.rs",
@@ -3065,7 +3065,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 45,
       "missing_work": [
-        "Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) \u2014 the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009)."
+        "Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) \u2014 the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009). Added 2026-09-26 (TICKET-148, CLOSED): the envelope's second reader is also a second *interpreter*, and it was answering 44 opcodes it had no implementation for (see the test_evidence note and `.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`). That class is closed - nothing is fabricated any more - but the two interpreters still disagree about aggregates, `inc`/`dec`, `mod_f`, the numeric conversions, `ctx_gas` and slot storage, and the verifier still admits every one of these at intake rather than refusing them at validation. TICKET-149 records that remaining divergence."
       ],
       "name": "Versioned runtime bytecode envelope",
       "paths": [
@@ -3076,8 +3076,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 80,
-      "tests": "tested score 80% (no named test list on this row)"
+      "tested": 84,
+      "tests": "tested score 84% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3187,7 +3187,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 40,
       "missing_work": [
-        "Storage is now reachable and journaled, but the writes still do not land in chain state. `evm_sstore`/`evm_sload` (0xB4/0xB3) execute in the interpreter as of this measurement, so a contract can carry a value between calls and an atomic window's rollback abandons only the window's writes - but `X3Executor::execute` (`crates/x3-integration/src/executor.rs`) returns `state_changes: vec![]` with the comment \"Hostcall state change collection deferred to runtime integration\", and `drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests. A slot a program writes is therefore durable within one VM instance and invisible to everyone else (TICKET-147).",
+        "Storage is now reachable and journaled, but the writes still do not land in chain state. `evm_sstore`/`evm_sload` (0xB4/0xB3) execute in the *std* interpreter `crates/x3-vm` as of this measurement, so a contract can carry a value between calls **off chain** - but the interpreter a block actually runs is `crates/x3-integration::mini_x3` (the node builds `sc_service::new_wasm_executor`, so the runtime's std feature is off in wasm), and it refuses both opcodes, so on chain a contract cannot carry a value between calls at all. Both halves are asserted on one artifact by `interpreter_agreement.rs::slot_storage_is_implemented_off_chain_and_refused_on_chain` (measured 2026-09-26); the std interpreter's own tests are `evm_store_and_load_round_trip_every_value_kind` and `evm_slot_keys_are_disjoint_from_global_keys`. In the std interpreter and an atomic window's rollback abandons only the window's writes - but `X3Executor::execute` (`crates/x3-integration/src/executor.rs`) returns `state_changes: vec![]` with the comment \"Hostcall state change collection deferred to runtime integration\", and `drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests. A slot a program writes is therefore durable within one VM instance and invisible to everyone else (TICKET-147).",
         "The receipt's `state_changes` channel cannot carry contract storage as it stands. `pallet-x3-kernel`'s `apply_canonical_ledger_update_v2` decodes every entry as (address -> account, key -> asset id, value -> balance) and counts anything else in `DecodeFailureCount`, so routing slot writes through it would inflate a monitoring counter rather than persist a byte (TICKET-147). X3VM contract storage needs its own typed channel before it can be claimed on chain.",
         "The guarantee is proven at the VM level only. No node or validator network has executed a store, and the rollback is exercised by unit tests in `crates/x3-vm` rather than by a live chain, so this is not yet mainnet evidence.",
         "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution - a contract that is stated in the trait's docs and enforced nowhere."
@@ -4509,7 +4509,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5edc8aac46488ede38dfbf2f369e57b8b78601be72c0a4c0b57c431390b06bd4",
+    "source_digest": "c9f16fb4c9ed5aba8f2ec548f75528219faf5ecd35930995d2c3ae48b7fcbe00",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4520,8 +4520,8 @@
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
-      "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "a3f4ad3aac36f5c611fbcf5767d840bc37b4e2514455defd371ed382556ab8dc",
+      "feature-matrix/language-trading.toml": "79eb01e87289ba78ab79c606100a4a07a9f0ff67cb7a90bc55026160d4743c89",
+      "feature-matrix/mev-privacy.toml": "784e072d33ac9df5c8561cfc9669bf55e850b85ecc1f5d0d79234fac9716e937",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
