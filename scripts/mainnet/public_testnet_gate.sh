@@ -414,6 +414,22 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # GATE 14: Explorer or dashboard reachable
 # ─────────────────────────────────────────────────────────────────────────────
+# The chain's own finalized head, read over JSON-RPC by this gate. Empty if the RPC does not
+# answer or does not speak `chain_getFinalizedHead`/`chain_getHeader` — in which case criterion
+# 14 cannot cross-check the explorer and says so instead of pretending.
+chain_finalized_head() {
+    local hash header
+    hash="$(curl -sf -m 5 -H 'content-type: application/json' \
+        -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead","params":[]}' \
+        "$RPC_URL" 2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)"
+    [[ -z "$hash" ]] && return 0
+    header="$(curl -sf -m 5 -H 'content-type: application/json' \
+        -d "$(jq -nc --arg h "$hash" '{jsonrpc:"2.0",id:1,method:"chain_getHeader",params:[$h]}')" \
+        "$RPC_URL" 2>/dev/null | jq -r '.result.number // empty' 2>/dev/null || true)"
+    [[ -z "$header" ]] && return 0
+    printf '%d' "$header" 2>/dev/null || true
+}
+
 echo "→ [Gate 14] Explorer/dashboard reachable..."
 EXPLORER_URLS=()
 if [[ -n "${X3_EXPLORER_URL:-}" ]]; then
@@ -436,6 +452,10 @@ else
 fi
 explorer_ok=false
 EXPLORER_REACHED=""
+EXPLORER_BODY=""
+# Why the criterion refused, in the report row itself: a FAIL that names neither endpoint nor
+# number makes the operator go and re-run the gate by hand to find out what it saw.
+EXPLORER_NOTE=""
 for url in "${EXPLORER_URLS[@]}"; do
     # Something answering on the port is not an explorer. This used to accept *any* HTTP
     # service on 3000/3001/8080 — the wallet app's own `next dev -p 3001` satisfied it — which
@@ -450,12 +470,38 @@ for url in "${EXPLORER_URLS[@]}"; do
         info "Explorer found at $url ($(wc -c <<<"$body" | tr -d '[:space:]') bytes, identifies itself as the X3 Chain Explorer)"
         explorer_ok=true
         EXPLORER_REACHED="$url"
+        EXPLORER_BODY="$body"
         break
     fi
     info "$url answered but does not identify itself as the X3 explorer"
 done
 if $explorer_ok; then
-    pass "explorer_or_dashboard"
+    CHAIN_FINALIZED="$(chain_finalized_head)"
+    # What the page says its own head is. This is the attribute the explorer renders, so a page
+    # that shows no chain data at all cannot satisfy the criterion when a chain is available.
+    # Read the digits *inside the quotes*. A plain `grep -oE '[0-9]+'` over the attribute also
+    # matches the `3` in `x3-explorer`, which made this comparison read "3\n4242" and fail a
+    # correct explorer (measured 2026-09-26 by the drill's matching phase).
+    EXPLORER_SHOWN="$(grep -oE 'data-x3-explorer-height="[0-9]+"' <<<"$EXPLORER_BODY" \
+        | sed -E 's/.*="([0-9]+)".*/\1/' | head -1 || true)"
+    if [[ -n "$CHAIN_FINALIZED" ]]; then
+        if [[ -z "$EXPLORER_SHOWN" ]]; then
+            EXPLORER_NOTE=" — it shows no finalized head while $RPC_URL reports #$CHAIN_FINALIZED (serving a title is not exploring)"
+            fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED shows no finalized head (no data-x3-explorer-height in the page) while $RPC_URL reports #$CHAIN_FINALIZED — serving a title is not exploring"
+        elif [[ "$EXPLORER_SHOWN" != "$CHAIN_FINALIZED" ]]; then
+            EXPLORER_NOTE=" — it shows #$EXPLORER_SHOWN while $RPC_URL reports #$CHAIN_FINALIZED"
+            fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED shows finalized head #$EXPLORER_SHOWN but $RPC_URL reports #$CHAIN_FINALIZED — they are reading different chains, or one is stale"
+        else
+            info "the explorer's shown head matches the chain this gate reads (#$CHAIN_FINALIZED)"
+            pass "explorer_or_dashboard"
+        fi
+    elif grep -q 'data-x3-explorer-error="rpc-unreachable"' <<<"$EXPLORER_BODY"; then
+        info "no finalized head available from $RPC_URL, and the explorer states that explicitly rather than showing a number"
+        pass "explorer_or_dashboard"
+    else
+        EXPLORER_NOTE=" — it shows neither a finalized head nor an unreachable-chain marker, and $RPC_URL did not answer"
+        fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED neither shows a finalized head nor states that the chain is unreachable, and $RPC_URL did not answer — a page with neither is not an explorer"
+    fi
 else
     # Check if dashboard app exists and has a build script
     if [[ -d "$ROOT_DIR/apps/dashboard" ]] || [[ -d "$ROOT_DIR/apps/explorer" ]]; then
@@ -514,7 +560,7 @@ fi
     # Name the explorer this criterion actually reached: "PASS" over a port range is the
     # shape of claim that let an earlier run read as green while nothing served a block
     # explorer. `X3_EXPLORER_URL` pins it when the operator has one deployed.
-    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN}${EXPLORER_REACHED:+ (reached \`$EXPLORER_REACHED\`, body identifies as the X3 Chain Explorer)} |"
+    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN}${EXPLORER_REACHED:+ (reached \`$EXPLORER_REACHED\`${EXPLORER_SHOWN:+, showing finalized head #$EXPLORER_SHOWN}, body identifies as the X3 Chain Explorer)}${EXPLORER_NOTE} |"
     echo "| 15 | Production chain spec | ${RESULTS[production_chain_spec]:-NOT_RUN} |"
     echo ""
     # Only name the drills that are actually blocking. This section used to print

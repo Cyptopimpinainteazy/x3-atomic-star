@@ -3555,23 +3555,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 26,
+      "composite": 47,
       "confidence": "high",
       "evidence": [
         "docs/X3_NEXT_TASKS.md",
         "apps/explorer/app/page.tsx",
         "scripts/testnet/explorer-gate-drill.sh",
-        "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the app serves and identifies itself, the page is a stub, and the launch criterion now names whichever explorer it reached"
+        "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the served page reads the finalized head from a JSON-RPC endpoint, refuses to display a height it could not read, and the launch criterion pins the URL, names it, records the height it checked, and cross-checks that height against the chain the gate itself can see (see TESTNET_GAP_LEDGER.md, TICKET-140)"
       ],
       "id": "X3-OPS-009",
-      "implemented": 30,
+      "implemented": 55,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 15,
+      "mainnet_ready": 25,
       "missing_work": [
-        "Re-measured 2026-09-26: the thing that satisfies the launch gate's explorer criterion is a stub. `apps/explorer/app/page.tsx` is 8 lines and renders a heading \u2014 it holds no RPC client, no block, no transaction, no account view. There is no `@polkadot/api` call site under `app/` at all, so the page cannot be showing chain data, and nothing in the tree tests that it ever does. The real content lives in `apps/explorer/x3-chain-explorer.html` (175 lines of static markup), which the Next app does not serve.",
-        "The criterion is therefore about *serving*, not *exploring*: `scripts/mainnet/public_testnet_gate.sh` requires the body to identify as the X3 Chain Explorer (so a random HTTP server cannot satisfy it \u2014 proven both ways by `scripts/testnet/explorer-gate-drill.sh`), but a page that only titles itself passes. Cross-checking the displayed head against the chain's own `chain_getHeader` is the change that would make it mean 'explorer' (TICKET-140).",
-        "Nothing is deployed: no hosted explorer, no DNS, no TLS, and no indexer. The page queries nothing, so 'no indexer' is currently moot \u2014 but a real explorer needs one for history, since a public RPC will not serve arbitrary historical ranges."
+        "The page reads and shows exactly one thing: the finalized head. `apps/explorer/app/page.tsx` calls `chain_getFinalizedHead` + `chain_getHeader` over JSON-RPC (`X3_EXPLORER_RPC`, falling back to `X3_RPC_URL`) and renders the number, the hash, the endpoint and the time it read them; if the endpoint does not answer it renders no height at all and says so (fail closed). There is still no block view, no transaction view, no account view, no search and no pagination \u2014 for a block explorer that is most of the feature, and none of it is claimed here.",
+        "No indexer and no history: the page asks the node for the current head only. A public RPC will not serve arbitrary historical ranges, so block/transaction/account pages need an indexer that does not exist yet. The 175 lines of static markup in `apps/explorer/x3-chain-explorer.html` are still not served by the app.",
+        "Nothing is deployed: no hosted explorer, no DNS, no TLS, no monitoring, and no independent operator. The criterion that keeps this honest now cross-checks a displayed head against the chain's own `chain_getHeader` (measured: an explorer showing #4242 while the gate reads #9999 is refused, and the row names both numbers), but only when the gate can reach a chain."
       ],
       "name": "Block explorer",
       "paths": [
@@ -3583,11 +3583,11 @@
       ],
       "priority": "P2",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 40,
-      "tests": "tested score 40% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4472,7 +4472,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "38affc20d80cb77219deeda9f710dc5644fa5be953ea826bea6f1ba5f5a297cd",
+    "source_digest": "a471d21334594a2aa298234e9946eb36cefe515c95d1c7ac7105d3797511258a",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4485,7 +4485,7 @@
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "de7f6eae7a90e1c5aa6db0efc2027ec23035ec38ac0bccbec7b340c4c372c87e",
+      "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
@@ -4925,8 +4925,8 @@
       "FUNCTIONAL BUT UNHARDENED": 57,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 62,
-      "STUB": 9
+      "PARTIAL": 63,
+      "STUB": 8
     },
     "matrix_features": 146,
     "registry_features": 21,

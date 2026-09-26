@@ -173,28 +173,28 @@ paths = [
   "scripts/mainnet/public_testnet_gate.sh",
   "scripts/testnet/explorer-gate-drill.sh",
 ]
-implemented = 30
-tested = 40
-mainnet_ready = 15
+implemented = 55
+tested = 70
+mainnet_ready = 25
 priority = "P2"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "Re-measured 2026-09-26: the thing that satisfies the launch gate's explorer criterion is a stub. `apps/explorer/app/page.tsx` is 8 lines and renders a heading — it holds no RPC client, no block, no transaction, no account view. There is no `@polkadot/api` call site under `app/` at all, so the page cannot be showing chain data, and nothing in the tree tests that it ever does. The real content lives in `apps/explorer/x3-chain-explorer.html` (175 lines of static markup), which the Next app does not serve.",
-  "The criterion is therefore about *serving*, not *exploring*: `scripts/mainnet/public_testnet_gate.sh` requires the body to identify as the X3 Chain Explorer (so a random HTTP server cannot satisfy it — proven both ways by `scripts/testnet/explorer-gate-drill.sh`), but a page that only titles itself passes. Cross-checking the displayed head against the chain's own `chain_getHeader` is the change that would make it mean 'explorer' (TICKET-140).",
-  "Nothing is deployed: no hosted explorer, no DNS, no TLS, and no indexer. The page queries nothing, so 'no indexer' is currently moot — but a real explorer needs one for history, since a public RPC will not serve arbitrary historical ranges.",
+  "The page reads and shows exactly one thing: the finalized head. `apps/explorer/app/page.tsx` calls `chain_getFinalizedHead` + `chain_getHeader` over JSON-RPC (`X3_EXPLORER_RPC`, falling back to `X3_RPC_URL`) and renders the number, the hash, the endpoint and the time it read them; if the endpoint does not answer it renders no height at all and says so (fail closed). There is still no block view, no transaction view, no account view, no search and no pagination — for a block explorer that is most of the feature, and none of it is claimed here.",
+  "No indexer and no history: the page asks the node for the current head only. A public RPC will not serve arbitrary historical ranges, so block/transaction/account pages need an indexer that does not exist yet. The 175 lines of static markup in `apps/explorer/x3-chain-explorer.html` are still not served by the app.",
+  "Nothing is deployed: no hosted explorer, no DNS, no TLS, no monitoring, and no independent operator. The criterion that keeps this honest now cross-checks a displayed head against the chain's own `chain_getHeader` (measured: an explorer showing #4242 while the gate reads #9999 is refused, and the row names both numbers), but only when the gate can reach a chain.",
 ]
 test_evidence = [
   "scripts/testnet/explorer-gate-drill.sh",
-  "note: `bash scripts/testnet/explorer-gate-drill.sh` -> PASS. Decoy (plain `python3 -m http.server` pinned via `X3_EXPLORER_URL`) is refused: `| 14 | Explorer/dashboard | FAIL |` with `answered but does not identify itself as the X3 Explorer`; the real `apps/explorer` is accepted and named: `| 14 | Explorer/dashboard | PASS (reached http://127.0.0.1:3410, body identifies as the X3 Chain Explorer) |`. Both gate outputs and reports are copied to `.ai/runlogs/explorer-gate-drill-<utc>/`.",
-  "note: the drill is load-bearing in the direction that matters: before `X3_EXPLORER_URL` was honoured as a pin, the decoy phase FAILED the drill because a leftover `next start -p 3010` on another default port satisfied criterion 14 — that is how the criterion used to be satisfiable by anything on the port list.",
+  "note: `bash scripts/testnet/explorer-gate-drill.sh` -> PASS, four phases. Decoy (plain `python3 -m http.server` pinned via `X3_EXPLORER_URL`): `| 14 | Explorer/dashboard | FAIL |` with `answered but does not identify itself as the X3 explorer`. Matching (apps/explorer and the gate reading the same stub RPC reporting finalized head #4242): `| 14 | Explorer/dashboard | PASS (reached http://127.0.0.1:3410, showing finalized head #4242, body identifies as the X3 Chain Explorer) |`. Mismatch (explorer on #4242, gate pointed at a stub reporting #9999): `| 14 | ... | FAIL ... — it shows #4242 while http://127.0.0.1:3412 reports #9999 |`. No chain (explorer pointed at an endpoint nothing answers on): PASS, with the drill requiring the page to contain `data-x3-explorer-error=\"rpc-unreachable\"` and to contain no height. All four gate runs and reports are copied to `.ai/runlogs/explorer-gate-drill-<utc>/`.",
+  "note: the drill is load-bearing in every direction it claims: before `X3_EXPLORER_URL` was honoured as a pin, the decoy phase FAILED the drill (a leftover `next start -p 3010` satisfied criterion 14 on another port); and the matching phase FAILED the first time it ran, because the gate's own height extractor read the `3` in `x3-explorer` as well as the height and compared `3` against `4242`.",
 ]
 evidence = [
   "docs/X3_NEXT_TASKS.md",
   "apps/explorer/app/page.tsx",
   "scripts/testnet/explorer-gate-drill.sh",
-  "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the app serves and identifies itself, the page is a stub, and the launch criterion now names whichever explorer it reached",
+  "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the served page reads the finalized head from a JSON-RPC endpoint, refuses to display a height it could not read, and the launch criterion pins the URL, names it, records the height it checked, and cross-checks that height against the chain the gate itself can see (see TESTNET_GAP_LEDGER.md, TICKET-140)",
 ]
 
 [[feature]]

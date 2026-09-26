@@ -870,6 +870,35 @@ or an evidence record; add the claim surfaces to the scanner and fix what it fin
 evidence records to a skip list with the reason written down. A surface list nobody revisits is how
 this gap happened the first time.
 
+**TICKET-140 — the explorer criterion should check chain data, not a page title. CLOSED
+2026-09-26.** `X3-OPS-009`'s page (`apps/explorer/app/page.tsx`) was eight lines: a heading and
+the sentence "Block explorer for X3 Chain". It satisfied the launch gate's criterion 14, because
+that criterion only required the served body to identify itself as the explorer — so a stub
+passed, and an operator could open a "testnet" on it. Closed in two halves:
+
+* the page reads the chain. It calls `chain_getFinalizedHead` and `chain_getHeader` over JSON-RPC
+  (`X3_EXPLORER_RPC`, falling back to `X3_RPC_URL`), renders the finalized number, hash, endpoint
+  and read time, and — when the endpoint does not answer or answers with something that is not a
+  head — renders no height at all and says the chain is unreachable. The markers the gate keys on
+  are `data-x3-explorer="chain-head"`, `data-x3-explorer-height="<n>"` and
+  `data-x3-explorer-error="rpc-unreachable"`.
+* the criterion cross-checks. `scripts/mainnet/public_testnet_gate.sh` reads the finalized head
+  itself and requires the explorer's number to equal it; when it cannot read a chain it requires
+  the page's explicit unreachable marker instead, so a page that says nothing fails either way.
+  The report row names the URL, the number it checked, and on a mismatch both numbers.
+
+`scripts/testnet/explorer-gate-drill.sh` proves it in four directions against a stub JSON-RPC and
+the real app: decoy page → FAIL; explorer and gate reading the same chain (#4242) → PASS, named,
+head recorded; explorer on #4242 while the gate reads #9999 → FAIL naming both; explorer with an
+unreachable endpoint → PASS only because it renders no height and says so. Two of those four
+phases failed when first written, and both were real defects rather than test noise: the pinned
+`X3_EXPLORER_URL` was not a pin (a leftover `next start -p 3010` satisfied the criterion), and the
+gate's height extractor read the `3` in `x3-explorer` as a height, failing a correct explorer.
+
+Not closed by this ticket, and not claimed: there is still no block view, no transaction view, no
+account view, no search, no indexer for history and no hosted deployment. `X3-OPS-009` is 55/70/25
+for that reason.
+
 ## TICKET-139 — the claim scanner now reads the surfaces people actually read — 2026-09-26
 
 **CLOSED.** `scripts/ci/check-claims-hygiene.py` scans `docs/**`, `production/public/**`,
