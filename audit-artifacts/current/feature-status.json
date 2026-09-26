@@ -3383,7 +3383,7 @@
         "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
         "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
         "**2026-09-26 \u2014 the gate runs, and it reads the chain's own numbers.** It was run against a real seven-validator testnet network (on this one host): 14 of 15 criteria PASS and the 15th is a SKIP. Reaching that took three real defects out of the way, each measured: gate 1 counted `peers + 1` and called it a validator count (`GrandpaApi_grandpa_authorities` is a hex SCALE blob and `jq length` on it is a parse error, so the code fell through to the fallback \u2014 it reported `found 6, need 7` on a seven-authority chain with one validator stopped), gates 10 and 11 issued `cargo test -p X name1 name2`, which is `error: unexpected argument` (one positional filter only \u2014 both criteria could never pass, whatever the tests did), and gate 5 looked for treasury/faucet fields no real spec has. Gate 6 (72-hour stability) is the SKIP: `X3_TESTNET_HOURS=0` is the CI form and the timer cannot be answered on this box. The verdict now says `PASS with skipped criteria` and names it, where it used to claim all criteria were met.",
-        "**2026-09-26 \u2014 criterion 14 is environment-dependent, and on this box it is what fails.** `explorer_or_dashboard` passes only if something is actually serving on 3000, 3001 or 8080. `apps/dashboard` and `apps/explorer` exist in the tree and nothing serves them here, so a healthy seven-validator network still ends in `public_testnet_gate: FAIL` on that one criterion (re-run 2026-09-26: 13 PASS, gate 6 SKIP, gate 14 FAIL). The recorded 14-of-15 run had a dev server up at the time, and the criterion is weak enough that any process on those ports satisfies it \u2014 the wallet app's own `next dev -p 3001` counts as an explorer. A launch gate should name the explorer it reached, not a port range.",
+        "**2026-09-26 \u2014 criterion 14 now pins, names and proves itself, and the drill for it found a live hole.** `X3_EXPLORER_URL` is a *pin*, not a first-try hint: with the URL only prepended to the default list, `scripts/testnet/explorer-gate-drill.sh`'s decoy phase (a plain `python3 -m http.server` on its own pinned port) failed \u2014 because a leftover `next start -p 3010` from an earlier manual run satisfied the criterion on a different port. With the pin honoured, the drill proves both directions on this tree: decoy -> `| 14 | Explorer/dashboard | FAIL |` plus `answered but does not identify itself as the X3 explorer`; `apps/explorer` -> `| 14 | Explorer/dashboard | PASS (reached http://127.0.0.1:3410, body identifies as the X3 Chain Explorer) |`. The report names the explorer, and the drill leaves both reports under `.ai/runlogs/explorer-gate-drill-*`. What is still weak, measured in the same pass: the body that satisfies the identity check is an eight-line stub page (see X3-OPS-009), so this criterion now says *an explorer is serving*, not *an explorer is showing chain data*.",
         "The gate is still RPC-only: it cannot see whether the network is *independently* operated, and it has only ever run against loopback networks on one host. Hosting, DNS, TLS and monitoring remain unprovisioned."
       ],
       "name": "Public testnet gate",
@@ -3549,31 +3549,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 22,
+      "composite": 26,
       "confidence": "high",
       "evidence": [
         "docs/X3_NEXT_TASKS.md",
-        "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low"
+        "apps/explorer/app/page.tsx",
+        "scripts/testnet/explorer-gate-drill.sh",
+        "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the app serves and identifies itself, the page is a stub, and the launch criterion now names whichever explorer it reached"
       ],
       "id": "X3-OPS-009",
       "implemented": 30,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 20,
+      "mainnet_ready": 15,
       "missing_work": [
-        "No finished production explorer proven"
+        "Re-measured 2026-09-26: the thing that satisfies the launch gate's explorer criterion is a stub. `apps/explorer/app/page.tsx` is 8 lines and renders a heading \u2014 it holds no RPC client, no block, no transaction, no account view. There is no `@polkadot/api` call site under `app/` at all, so the page cannot be showing chain data, and nothing in the tree tests that it ever does. The real content lives in `apps/explorer/x3-chain-explorer.html` (175 lines of static markup), which the Next app does not serve.",
+        "The criterion is therefore about *serving*, not *exploring*: `scripts/mainnet/public_testnet_gate.sh` requires the body to identify as the X3 Chain Explorer (so a random HTTP server cannot satisfy it \u2014 proven both ways by `scripts/testnet/explorer-gate-drill.sh`), but a page that only titles itself passes. Cross-checking the displayed head against the chain's own `chain_getHeader` is the change that would make it mean 'explorer' (TICKET-140).",
+        "Nothing is deployed: no hosted explorer, no DNS, no TLS, and no indexer. The page queries nothing, so 'no indexer' is currently moot \u2014 but a real explorer needs one for history, since a public RPC will not serve arbitrary historical ranges."
       ],
       "name": "Block explorer",
       "paths": [
-        "docs/X3_NEXT_TASKS.md"
+        "docs/X3_NEXT_TASKS.md",
+        "apps/explorer/app/page.tsx",
+        "apps/explorer/x3-chain-explorer.html",
+        "scripts/mainnet/public_testnet_gate.sh",
+        "scripts/testnet/explorer-gate-drill.sh"
       ],
       "priority": "P2",
       "source": "master",
       "state": "STUB",
       "state_rule": "implemented >= 20",
       "subsystem": "operations_user_tools",
-      "tested": 15,
-      "tests": "tested score 15% (no named test list on this row)"
+      "tested": 40,
+      "tests": "tested score 40% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4458,7 +4466,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "2e61042d9e1bb6c41df34d78eca46d473666d9df621bd49eb10b24018ff69dcc",
+    "source_digest": "73c41952912639ba4189939a60f252660efd22f5f3e50f53ae6ab815957e5774",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4471,7 +4479,7 @@
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
       "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
-      "feature-matrix/operations-user-tools.toml": "7234ed3bbc554956fa01831ae4cd2d05f18e094ac0407228dd6eccb5794a64c7",
+      "feature-matrix/operations-user-tools.toml": "de7f6eae7a90e1c5aa6db0efc2027ec23035ec38ac0bccbec7b340c4c372c87e",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }

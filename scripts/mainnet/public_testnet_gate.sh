@@ -19,6 +19,9 @@
 #   X3_VALIDATOR_COUNT — expected minimum validator count (default: 7)
 #   X3_TESTNET_HOURS   — hours of stable block production to require (default: 72)
 #                        Set to 0 to skip the 72-hour timer check (for CI).
+#   X3_EXPLORER_URL    — where the X3 explorer actually is. Tried before the default ports, and
+#                        the report names the URL criterion 14 passed against, so a launch
+#                        decision never rests on "something was listening on 3000".
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -412,12 +415,27 @@ fi
 # GATE 14: Explorer or dashboard reachable
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 14] Explorer/dashboard reachable..."
-EXPLORER_URLS=(
-    "http://localhost:3000"
-    "http://localhost:3001"
-    "http://localhost:8080"
-)
+EXPLORER_URLS=()
+if [[ -n "${X3_EXPLORER_URL:-}" ]]; then
+    # Pinned means pinned. Measured 2026-09-26: with `X3_EXPLORER_URL` only *prepended* to the
+    # list, `scripts/testnet/explorer-gate-drill.sh` served a decoy page on its pinned port and
+    # criterion 14 still passed — on a leftover `next start -p 3010` from an earlier manual run.
+    # A negative control cannot mean anything if the criterion keeps looking elsewhere, and an
+    # operator who names their explorer is stating a fact they want checked, not a preference.
+    EXPLORER_URLS=("$X3_EXPLORER_URL")
+else
+    # No pinned URL: fall back to the conventional dev ports, and name whichever answers.
+    # This is a developer convenience, not a launch configuration — the report prints the URL
+    # criterion 14 reached so nobody has to guess which process satisfied it.
+    EXPLORER_URLS=(
+        "http://localhost:3000"
+        "http://localhost:3001"
+        "http://localhost:3010"
+        "http://localhost:8080"
+    )
+fi
 explorer_ok=false
+EXPLORER_REACHED=""
 for url in "${EXPLORER_URLS[@]}"; do
     # Something answering on the port is not an explorer. This used to accept *any* HTTP
     # service on 3000/3001/8080 — the wallet app's own `next dev -p 3001` satisfied it — which
@@ -431,6 +449,7 @@ for url in "${EXPLORER_URLS[@]}"; do
     if grep -qiE "X3 Chain Explorer|X3 Chain Block Explorer|Block explorer for X3" <<<"$body"; then
         info "Explorer found at $url ($(wc -c <<<"$body" | tr -d '[:space:]') bytes, identifies itself as the X3 Chain Explorer)"
         explorer_ok=true
+        EXPLORER_REACHED="$url"
         break
     fi
     info "$url answered but does not identify itself as the X3 explorer"
@@ -492,7 +511,10 @@ fi
     echo "| 11 | Refund drill | ${RESULTS[refund_drill]:-NOT_RUN} |"
     echo "| 12 | Indexer/RPC/API smoke | ${RESULTS[indexer_rpc_api_smoke]:-NOT_RUN} |"
     echo "| 13 | Wallet/SDK transfers | ${RESULTS[wallet_sdk_transfer_tests]:-NOT_RUN} |"
-    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN} |"
+    # Name the explorer this criterion actually reached: "PASS" over a port range is the
+    # shape of claim that let an earlier run read as green while nothing served a block
+    # explorer. `X3_EXPLORER_URL` pins it when the operator has one deployed.
+    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN}${EXPLORER_REACHED:+ (reached \`$EXPLORER_REACHED\`, body identifies as the X3 Chain Explorer)} |"
     echo "| 15 | Production chain spec | ${RESULTS[production_chain_spec]:-NOT_RUN} |"
     echo ""
     # Only name the drills that are actually blocking. This section used to print

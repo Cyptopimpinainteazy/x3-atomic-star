@@ -64,7 +64,7 @@ blockers = [
   "No hosting, DNS, TLS or monitoring is provisioned, so the gate has nothing to point at; its default is `http://localhost:9933`",
   "The gate is RPC-only: it cannot see whether the network is *independently* operated, which is the property a public testnet exists to demonstrate",
   "**2026-09-26 — the gate runs, and it reads the chain's own numbers.** It was run against a real seven-validator testnet network (on this one host): 14 of 15 criteria PASS and the 15th is a SKIP. Reaching that took three real defects out of the way, each measured: gate 1 counted `peers + 1` and called it a validator count (`GrandpaApi_grandpa_authorities` is a hex SCALE blob and `jq length` on it is a parse error, so the code fell through to the fallback — it reported `found 6, need 7` on a seven-authority chain with one validator stopped), gates 10 and 11 issued `cargo test -p X name1 name2`, which is `error: unexpected argument` (one positional filter only — both criteria could never pass, whatever the tests did), and gate 5 looked for treasury/faucet fields no real spec has. Gate 6 (72-hour stability) is the SKIP: `X3_TESTNET_HOURS=0` is the CI form and the timer cannot be answered on this box. The verdict now says `PASS with skipped criteria` and names it, where it used to claim all criteria were met.",
-  "**2026-09-26 — criterion 14 is environment-dependent, and on this box it is what fails.** `explorer_or_dashboard` passes only if something is actually serving on 3000, 3001 or 8080. `apps/dashboard` and `apps/explorer` exist in the tree and nothing serves them here, so a healthy seven-validator network still ends in `public_testnet_gate: FAIL` on that one criterion (re-run 2026-09-26: 13 PASS, gate 6 SKIP, gate 14 FAIL). The recorded 14-of-15 run had a dev server up at the time, and the criterion is weak enough that any process on those ports satisfies it — the wallet app's own `next dev -p 3001` counts as an explorer. A launch gate should name the explorer it reached, not a port range.",
+  "**2026-09-26 — criterion 14 now pins, names and proves itself, and the drill for it found a live hole.** `X3_EXPLORER_URL` is a *pin*, not a first-try hint: with the URL only prepended to the default list, `scripts/testnet/explorer-gate-drill.sh`'s decoy phase (a plain `python3 -m http.server` on its own pinned port) failed — because a leftover `next start -p 3010` from an earlier manual run satisfied the criterion on a different port. With the pin honoured, the drill proves both directions on this tree: decoy -> `| 14 | Explorer/dashboard | FAIL |` plus `answered but does not identify itself as the X3 explorer`; `apps/explorer` -> `| 14 | Explorer/dashboard | PASS (reached http://127.0.0.1:3410, body identifies as the X3 Chain Explorer) |`. The report names the explorer, and the drill leaves both reports under `.ai/runlogs/explorer-gate-drill-*`. What is still weak, measured in the same pass: the body that satisfies the identity check is an eight-line stub page (see X3-OPS-009), so this criterion now says *an explorer is serving*, not *an explorer is showing chain data*.",
   "The gate is still RPC-only: it cannot see whether the network is *independently* operated, and it has only ever run against loopback networks on one host. Hosting, DNS, TLS and monitoring remain unprovisioned.",
 ]
 evidence = ["scripts/mainnet/public_testnet_gate.sh", "scripts/testnet/testnet-ceremony.py", "scripts/local-ci.sh", "docs/reports/PUBLIC_TESTNET_LAUNCH.md", "note: two runnable gates — the 25.6 kB RPC gate (system_health, GRANDPA authorities, bridge storage, block height over `--rpc-base-url`) and the ceremony verifier (genesis hash, spec sha256, runtime version, authority set, peer ids, finality; seen to reject a tampered manifest) — plus a spec builder that takes published `PUBLIC_BOOTNODES` and a bootnode identity tool, so the operator path up to 'point the gate at a hosted endpoint' is written down and exercised; `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` PASS 290s"]
@@ -166,16 +166,36 @@ id = "X3-OPS-009"
 name = "Block explorer"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["docs/X3_NEXT_TASKS.md"]
+paths = [
+  "docs/X3_NEXT_TASKS.md",
+  "apps/explorer/app/page.tsx",
+  "apps/explorer/x3-chain-explorer.html",
+  "scripts/mainnet/public_testnet_gate.sh",
+  "scripts/testnet/explorer-gate-drill.sh",
+]
 implemented = 30
-tested = 15
-mainnet_ready = 20
+tested = 40
+mainnet_ready = 15
 priority = "P2"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No finished production explorer proven"]
-evidence = ["docs/X3_NEXT_TASKS.md", "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low"]
+blockers = [
+  "Re-measured 2026-09-26: the thing that satisfies the launch gate's explorer criterion is a stub. `apps/explorer/app/page.tsx` is 8 lines and renders a heading — it holds no RPC client, no block, no transaction, no account view. There is no `@polkadot/api` call site under `app/` at all, so the page cannot be showing chain data, and nothing in the tree tests that it ever does. The real content lives in `apps/explorer/x3-chain-explorer.html` (175 lines of static markup), which the Next app does not serve.",
+  "The criterion is therefore about *serving*, not *exploring*: `scripts/mainnet/public_testnet_gate.sh` requires the body to identify as the X3 Chain Explorer (so a random HTTP server cannot satisfy it — proven both ways by `scripts/testnet/explorer-gate-drill.sh`), but a page that only titles itself passes. Cross-checking the displayed head against the chain's own `chain_getHeader` is the change that would make it mean 'explorer' (TICKET-140).",
+  "Nothing is deployed: no hosted explorer, no DNS, no TLS, and no indexer. The page queries nothing, so 'no indexer' is currently moot — but a real explorer needs one for history, since a public RPC will not serve arbitrary historical ranges.",
+]
+test_evidence = [
+  "scripts/testnet/explorer-gate-drill.sh",
+  "note: `bash scripts/testnet/explorer-gate-drill.sh` -> PASS. Decoy (plain `python3 -m http.server` pinned via `X3_EXPLORER_URL`) is refused: `| 14 | Explorer/dashboard | FAIL |` with `answered but does not identify itself as the X3 Explorer`; the real `apps/explorer` is accepted and named: `| 14 | Explorer/dashboard | PASS (reached http://127.0.0.1:3410, body identifies as the X3 Chain Explorer) |`. Both gate outputs and reports are copied to `.ai/runlogs/explorer-gate-drill-<utc>/`.",
+  "note: the drill is load-bearing in the direction that matters: before `X3_EXPLORER_URL` was honoured as a pin, the decoy phase FAILED the drill because a leftover `next start -p 3010` on another default port satisfied criterion 14 — that is how the criterion used to be satisfiable by anything on the port list.",
+]
+evidence = [
+  "docs/X3_NEXT_TASKS.md",
+  "apps/explorer/app/page.tsx",
+  "scripts/testnet/explorer-gate-drill.sh",
+  "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low. Measured 2026-09-26: the app serves and identifies itself, the page is a stub, and the launch criterion now names whichever explorer it reached",
+]
 
 [[feature]]
 id = "X3-OPS-010"

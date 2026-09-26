@@ -590,6 +590,17 @@ GATES_FAST=(
   "test verification router:cargo test -p x3-verification-router"
   # The opt-in permissive path that the plumbing tests use.
   "test verification router test-verifier:cargo test -p x3-verification-router --features test-verifier"
+  # Criterion 14 is the one public-testnet criterion that depends on something outside the
+  # chain, and it has now been wrong in both directions on this box: it passed while nothing
+  # served a block explorer (any HTTP service on 3000/3001/8080 satisfied it, including the
+  # wallet app's own `next dev -p 3001`), and it then failed on a healthy seven-validator
+  # network because nothing starts `apps/explorer`. The drill serves a decoy page on a pinned
+  # port and requires criterion 14 to refuse it, then serves the real explorer and requires
+  # criterion 14 to pass *and name the URL it reached*. Measured 2026-09-26: the drill's first
+  # run failed its own decoy phase, because `X3_EXPLORER_URL` was only tried first and a
+  # leftover `next start -p 3010` satisfied the criterion on another port — which is why the
+  # URL is a pin now. It needs no chain: the other fourteen criteria are expected to fail.
+  "explorer gate drill:bash scripts/testnet/explorer-gate-drill.sh"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).
