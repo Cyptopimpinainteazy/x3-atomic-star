@@ -17,21 +17,46 @@ blockers = ["Needs threat model covering relayers, finality delays, and ordering
 evidence = ["crates/cross-vm-coordinator", "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; no on-master evidence found for this capability, so it is recorded as research until TICKET-101 measures it
+# Re-measured 2026-09-26 (round 4, workstream C) on commit c85dba7f1 of
+# feat/x3-prelaunch-economics-x3lang-cutover (not merged to master): an atomic-trade policy that
+# requires private submission now lowers into the same `ModeCheck` the strategy path emits, and
+# the IR verifier refuses the policy when that gate is absent or follows the trade. The
+# 2026-09-22 provenance note (closed PR #135) is superseded by this block, which is TICKET-101's
+# re-measurement for this row.
 id = "X3-MEV-002"
 name = "Private transaction submission controls"
 subsystem = "mev_privacy"
-source = "research"
-paths = ["x3-lang/compiler"]
-implemented = 45
-tested = 20
+source = "master"
+paths = ["x3-lang/compiler", "x3-lang/vm"]
+implemented = 55
+tested = 40
 mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Trading Core hardening still requires private-submission enforcement"]
-evidence = ["x3-lang/compiler", "note: One of verified Trading Core v1 gaps"]
+blockers = [
+  "The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reaches the chain cannot demand private submission at all",
+  "No runtime in this repository sets `allow_private_submission = true` and no private channel is wired to the VM, so the demand is now enforced but never satisfiable on chain",
+]
+required_tests = [
+  "a_trading_program_that_requires_private_submission_carries_the_mode_check",
+  "a_required_private_submission_reaches_the_artifact_as_a_mode_check",
+  "a_private_trading_policy_without_a_mode_check_is_refused",
+  "a_mode_check_before_the_trade_satisfies_the_binding",
+  "a_mode_check_after_the_trade_does_not_satisfy_the_binding",
+  "mainnet_rejects_unattested_private_submission_policy",
+  "a_compiled_trading_program_that_requires_private_submission_is_refused_without_a_channel",
+  "the_same_trading_program_runs_where_the_channel_exists",
+  "a_trading_program_that_does_not_demand_privacy_is_not_gated",
+  "compiled_private_submission_requirement_is_enforced",
+]
+test_evidence = [
+  "note: cargo test --manifest-path x3-lang/Cargo.toml --workspace -> exit 0, 1327 passed, 0 failed, 0 ignored across 102 test binaries (measured 2026-09-26 on c85dba7f1)",
+  "note: cargo clippy --manifest-path x3-lang/Cargo.toml --workspace --all-targets -- -D warnings -> exit 0; cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check -> exit 0",
+  "note: break-it-first control - with the lowering change disabled, x3-lang/examples/trading_core_v1.x3 (whose policy requires private submission) ran to Ok(()) under a VM config whose private-submission flag is false, and the three IR-verifier tests failed; restored, all pass",
+]
+evidence = ["x3-lang/compiler", "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM; it is still absent from the chain-intake compiler"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/trading_semantic.rs (max_price_impact policy), x3-lang/vm/tests/trading_execution.rs
@@ -124,14 +149,53 @@ evidence = ["note: No sufficient master evidence found"]
 id = "X3-MEV-008"
 name = "Fair transaction ordering"
 subsystem = "mev_privacy"
-source = "research"
-paths = []
-implemented = 15
-tested = 5
-mainnet_ready = 5
+source = "master"
+paths = ["crates/x3-swap-router/src/mev_protection"]
+implemented = 45
+tested = 40
+mainnet_ready = 10
 priority = "P1"
 confidence = "high"
 launch_scope = "research"
 claim_risk = false
-blockers = ["No production fair-ordering protocol identified"]
-evidence = ["note: No strong master evidence for fair ordering"]
+blockers = [
+  "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
+  "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
+  "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
+  "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
+]
+required_tests = [
+  "a_closed_window_settles_in_canonical_key_order",
+  "the_sequence_does_not_depend_on_arrival_order",
+  "the_sequence_is_the_key_order_and_not_the_arrival_order",
+  "the_reveal_block_within_the_window_does_not_change_the_sequence",
+  "reveals_landing_at_different_blocks_still_order_by_key",
+  "a_reveal_without_a_commit_is_refused",
+  "a_reveal_after_the_window_closes_is_refused_and_never_ordered",
+  "a_reveal_before_the_window_opens_is_refused",
+  "a_reveal_that_does_not_hash_to_its_commit_is_refused",
+  "a_second_reveal_of_the_same_commitment_is_refused",
+  "a_reveal_from_a_different_sender_is_refused",
+  "an_attacker_cannot_substitute_its_payload_for_a_victims_commitment",
+  "a_commitment_that_never_reveals_is_excluded_and_its_bond_reported",
+  "a_commit_outside_the_window_is_refused",
+  "a_bond_below_the_minimum_is_refused",
+  "one_sender_may_not_commit_twice_in_a_window",
+  "the_same_commit_hash_from_two_senders_is_refused",
+  "an_inverted_window_is_refused",
+  "a_beacon_installed_while_the_window_is_open_is_refused",
+  "a_beacon_reorders_and_the_order_stays_recomputable_from_the_settlement",
+  "an_oversized_reveal_is_refused",
+  "a_window_beyond_its_capacity_is_refused",
+  "settling_before_the_window_closes_is_refused",
+  "settling_twice_is_refused",
+  "a_settled_window_accepts_no_further_commits_or_reveals",
+  "the_commitment_hash_binds_sender_plaintext_and_nonce",
+]
+test_evidence = [
+  "note: cargo test -p x3-swap-router --lib fair_ordering -> 26 passed, 0 failed, 12 filtered out (re-run by the primary agent 2026-09-26 on commit e2879257c)",
+  "note: cargo test -p x3-swap-router -> 38 passed in the lib target and 25 passed in prop_swap_math, 0 doc-tests; cargo clippy -p x3-swap-router --all-targets -- -D warnings -> exit 0",
+  "note: break-it-first controls, disabling one rule at a time - order by arrival block makes reveals_landing_at_different_blocks_still_order_by_key FAIL with the exact reversed sequence; reveal after the deadline, sender binding and hash binding each turn their tests red; restored, green",
+  ".ai/runlogs/round4-mev008-fair-ordering-20260926.txt",
+]
+evidence = ["crates/x3-swap-router/src/mev_protection", "note: Measured 2026-09-26 (round 4, workstream B) on e2879257c - a deterministic commit-reveal lane replaces the pre-existing MEVProtector, which returned `(min + max) / 2` as a random delay, filled tx hashes with `H256::zero()` and no consumer ever reached; the row stays research-scoped because nothing consumes the crate"]

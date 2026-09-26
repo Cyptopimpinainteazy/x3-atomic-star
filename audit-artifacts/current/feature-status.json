@@ -3104,31 +3104,33 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 31,
+      "composite": 39,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
-        "note: One of verified Trading Core v1 gaps"
+        "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM; it is still absent from the chain-intake compiler"
       ],
       "id": "X3-MEV-002",
-      "implemented": 45,
+      "implemented": 55,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 25,
       "missing_work": [
-        "Trading Core hardening still requires private-submission enforcement"
+        "The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reaches the chain cannot demand private submission at all",
+        "No runtime in this repository sets `allow_private_submission = true` and no private channel is wired to the VM, so the demand is now enforced but never satisfiable on chain"
       ],
       "name": "Private transaction submission controls",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/compiler",
+        "x3-lang/vm"
       ],
       "priority": "P0",
-      "source": "research",
-      "state": "NOT INTEGRATED",
-      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "source": "master",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 20,
-      "tests": "tested score 20% (no named test list on this row)"
+      "tested": 40,
+      "tests": "tested score 40% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3277,28 +3279,34 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 8,
+      "composite": 30,
       "confidence": "high",
       "evidence": [
-        "note: No strong master evidence for fair ordering"
+        "crates/x3-swap-router/src/mev_protection",
+        "note: Measured 2026-09-26 (round 4, workstream B) on e2879257c - a deterministic commit-reveal lane replaces the pre-existing MEVProtector, which returned `(min + max) / 2` as a random delay, filled tx hashes with `H256::zero()` and no consumer ever reached; the row stays research-scoped because nothing consumes the crate"
       ],
       "id": "X3-MEV-008",
-      "implemented": 15,
+      "implemented": 45,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 5,
+      "mainnet_ready": 10,
       "missing_work": [
-        "No production fair-ordering protocol identified"
+        "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
+        "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
+        "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
+        "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond"
       ],
       "name": "Fair transaction ordering",
-      "paths": [],
+      "paths": [
+        "crates/x3-swap-router/src/mev_protection"
+      ],
       "priority": "P1",
-      "source": "research",
-      "state": "NOT INTEGRATED",
-      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
       "subsystem": "mev_privacy",
-      "tested": 5,
-      "tests": "tested score 5% (no named test list on this row)"
+      "tested": 40,
+      "tests": "tested score 40% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4472,7 +4480,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "a471d21334594a2aa298234e9946eb36cefe515c95d1c7ac7105d3797511258a",
+    "source_digest": "a1fd5b83fb5bfc6b560ea1fed523617bd2456b9d4007f1c0187910c92599eaed",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4484,7 +4492,7 @@
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "bfec478daeb0034d7064e0a1d59b6d4a5b94f50eadbf1e89ceda8d25076614bf",
+      "feature-matrix/mev-privacy.toml": "9826f462233412ef81edbe43a7b3da03944948158134fe0769cbd4239e638120",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -4923,10 +4931,10 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 57,
-      "NOT INTEGRATED": 8,
+      "NOT INTEGRATED": 6,
       "NOT STARTED": 0,
-      "PARTIAL": 63,
-      "STUB": 8
+      "PARTIAL": 64,
+      "STUB": 9
     },
     "matrix_features": 146,
     "registry_features": 21,
