@@ -10,6 +10,10 @@ use sp_core::H256;
 
 use crate::error::{X3IntegrationError, X3Result};
 use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
+// The `std` path names the type to build each entry from the VM's journal. The `no_std` path takes
+// an already-typed `res.storage_writes` from `mini_x3`, so the import is only needed under `std`.
+#[cfg(feature = "std")]
+use crate::types::X3StorageWrite;
 
 #[cfg(feature = "std")]
 use x3_vm::{BytecodeModule, VMConfig, Verifier, VerifyOptions, VM};
@@ -157,12 +161,30 @@ impl X3Executor {
                     None => vec![],
                 };
 
+                // Drain the slot journal into the receipt's storage channel.
+                //
+                // This is the only place an X3VM slot write becomes visible to the chain: the VM's
+                // `VmStorage` is in-memory and is dropped when this function returns. A write that
+                // an atomic window rolled back is already gone from the journal (`VmStorage::rollback`
+                // truncates it to the snapshot's length), so a reverted window reports no change
+                // rather than a half-applied one.
+                let storage_writes = vm
+                    .drain_storage_journal()
+                    .into_iter()
+                    .map(|write| X3StorageWrite {
+                        key: H256::from(write.key),
+                        old_value: write.old_value,
+                        new_value: write.new_value,
+                    })
+                    .collect();
+
                 Ok(X3ExecutionReceipt {
                     success: true,
                     gas_used,
                     return_data,
                     logs: vec![], // Hostcall log collection deferred to runtime integration
                     state_changes: vec![], // Hostcall state change collection deferred to runtime integration
+                    storage_writes,
                     function_index: 0,
                     // The VM counts these; the field used to say counting needed instrumentation it
                     // already had, so every receipt reported zero instructions (TICKET-130).
@@ -184,6 +206,10 @@ impl X3Executor {
                     return_data: format!("{:?}", vm_err).into_bytes(),
                     logs: vec![],
                     state_changes: vec![],
+                    // Fail closed: a failed execution's partial writes must never be applied, so a
+                    // failure reports no slot writes even though the VM journaled some before it
+                    // failed. `journal` is deliberately not drained here.
+                    storage_writes: vec![],
                     function_index: 0,
                     // The VM counts these; the field used to say counting needed instrumentation it
                     // already had, so every receipt reported zero instructions (TICKET-130).
@@ -208,6 +234,12 @@ impl X3Executor {
                 return_data: res.return_val.to_bytes(),
                 logs: vec![],
                 state_changes: vec![],
+                // The no_std interpreter journals its slot writes now, in the same key and payload
+                // encoding `crates/x3-vm` uses (`mini_x3::evm_slot_key`), so this is the line that
+                // carries a write made by a program running on a *block* to the kernel. Reporting
+                // `vec![]` here would leave the channel unreachable from the chain's own execution
+                // path, which is the one caller that matters.
+                storage_writes: res.storage_writes,
                 function_index: 0,
                 instructions_executed: res.instructions_executed,
             }),
@@ -217,6 +249,7 @@ impl X3Executor {
                 return_data: b"gas exhausted".to_vec(),
                 logs: vec![],
                 state_changes: vec![],
+                storage_writes: vec![],
                 function_index: 0,
                 // Not a stand-in: this interpreter charges exactly one gas per instruction
                 // (`mini_x3::Vm::run`), so at exhaustion the count is the limit. The field used to

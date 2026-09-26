@@ -90,3 +90,7 @@ proptest = "1.4"
 # pulls the compiler in, and the kernel never compiles source — it executes artifacts. The route test
 # below needs it to produce the artifact the production adapter is then driven with (X3-LANG-004).
 x3-x3-integration = { path = "../../crates/x3-integration", default-features = false, features = ["std", "compile"] }
+# Envelope writer for hand-assembled X3BC fixtures. The X3VM slot-channel test needs a module whose
+# `main` performs a real `evm_sstore`, which the `.x3` compiler cannot emit yet, so the test builds
+# the module with the writer the compiler itself uses rather than embedding opaque bytes.
+x3-backend = { path = "../../crates/x3-backend" }

@@ -140,7 +140,11 @@ use x3_cross_vm_bridge::{
     CrossVmStatus, VmId,
 };
 
-pub const EXECUTION_RECEIPT_VERSION: u32 = 1;
+/// Schema version of the stored `ExecutionReceipt`.
+///
+/// 1 -> 2: added the typed `storage_writes` channel (X3VM slot writes), which the balance-shaped
+/// `state_changes` field could not carry without being decoded as (account, asset, balance).
+pub const EXECUTION_RECEIPT_VERSION: u32 = 2;
 
 /// Represents a Comit transaction submitted to the X3 Kernel.
 #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
@@ -202,6 +206,13 @@ pub struct ExecutionReceipt {
     pub logs: Vec<ExecutionLog>,
     /// State changes resulting from execution.
     pub state_changes: Vec<StateChange>,
+    /// X3VM storage-slot writes drained from the execution journal.
+    ///
+    /// Deliberately separate from `state_changes`, which the kernel decodes as balance changes
+    /// (`address` -> account, `key` -> asset id, `value` -> balance). A slot write pushed through
+    /// that field is not a balance and must not be counted as one; these entries are applied to
+    /// `X3ContractStorage` instead.
+    pub storage_writes: Vec<StorageWrite>,
     /// Protocol version emitted by the executor implementation.
     pub protocol_version: u32,
     /// Ordered migration markers applied before this receipt was produced.
@@ -238,6 +249,22 @@ pub struct StateChange {
     pub key: H256,
     /// New value at the storage slot.
     pub value: H256,
+}
+
+/// A single X3VM storage-slot write carried by an execution receipt.
+///
+/// `old_value` is the value the slot held in the executing VM's view before the write (`None` = the
+/// slot was empty in that view); `new_value` is the value after the write (`None` = the slot was
+/// cleared). A successful execution's journal has already dropped any write an atomic window rolled
+/// back, and a failed execution carries no writes at all.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+pub struct StorageWrite {
+    /// 32-byte storage slot key.
+    pub key: H256,
+    /// Value in the slot before the write (`None` = the slot was empty).
+    pub old_value: Option<[u8; 32]>,
+    /// Value after the write (`None` = the slot was cleared).
+    pub new_value: Option<[u8; 32]>,
 }
 
 /// Unified state representation for the X3 Chain.
@@ -682,6 +709,19 @@ pub mod pallet {
     pub type X3ExecutionReceipts<T: Config> =
         StorageMap<_, Blake2_128Concat, H256, ExecutionReceipt, OptionQuery>;
 
+    /// X3VM contract storage, keyed by the 32-byte slot key.
+    ///
+    /// This is the chain-visible destination for the `storage_writes` channel of an X3 execution
+    /// receipt. It is a distinct keyspace from `CanonicalLedger` on purpose: `CanonicalLedger` is
+    /// balance-shaped and keyed by (account, asset id), and decoding a slot write as a balance is
+    /// exactly the corruption this channel exists to prevent. Before this map existed,
+    /// `drain_storage_journal` had no caller, so a contract's slot survived only inside the
+    /// in-memory VM that wrote it and was gone when execution returned.
+    #[pallet::storage]
+    #[pallet::getter(fn x3_contract_slot)]
+    pub type X3ContractStorage<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, [u8; 32], OptionQuery>;
+
     /// EVM transactions keyed by transaction hash (keccak256 of raw tx).
     /// Stores full transaction data (including gas and input) for RPC compatibility.
     /// This is separate from receipts to allow querying transaction metadata without
@@ -898,6 +938,12 @@ pub mod pallet {
             comit_id: H256,
             changes_applied: u32,
         },
+        /// X3VM contract slots were written from an execution receipt's storage channel.
+        ///
+        /// Emitted only when at least one slot changed, so a verifier can tell an execution that
+        /// touched storage from one that did not. The applied values live in `X3ContractStorage`;
+        /// this event is the index, not the record.
+        X3StorageUpdated { comit_id: H256, writes_applied: u32 },
         /// Cross-VM bridge operation was executed.
         CrossVmOperationExecuted {
             comit_id: H256,
@@ -1009,6 +1055,11 @@ pub mod pallet {
         InvalidSymbolFormat,
         /// Too many state changes in execution receipts.
         TooManyStateChanges,
+        /// An execution receipt carried more X3VM storage writes than the kernel will apply.
+        TooManyStorageWrites,
+        /// A failed execution reported storage writes. Partial writes from a failed execution must
+        /// never reach chain state, so a receipt in this shape is refused rather than trusted.
+        StorageWritesOnFailedExecution,
         /// Arithmetic overflow in fee calculation.
         FeeOverflow,
         /// Comit ID has already been submitted.
@@ -1661,11 +1712,15 @@ pub mod pallet {
         /// are rolled back. Runtime VM adapters MUST be transactional to guarantee rollback
         /// for VM state as well.
         #[pallet::call_index(9)]
-        // `submit_comit_v2`'s benchmark predates the X3 receipt write below, so that write is
-        // declared here rather than absorbed silently: an undeclared storage write is exactly the
-        // under-count that lets a block be built past its own limit.
+        // `submit_comit_v2`'s benchmark predates two storage writes added below: the persisted X3
+        // execution receipt (`X3ExecutionReceipts`) and this comit's X3VM slot writes
+        // (`X3ContractStorage`). One write each is declared here rather than absorbed silently: an
+        // undeclared storage write is exactly the under-count that lets a block be built past its
+        // own limit. The slot count is bounded by `MAX_STATE_CHANGES`; pricing each one against
+        // `DbWeight` (as `CanonicalLedger` updates are not, today) is recorded as a remaining
+        // weight-precision gap rather than claimed here.
         #[pallet::weight(
-            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))
+            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(T::DbWeight::get().writes(2))
         )]
         pub fn submit_comit_v2(
             origin: OriginFor<T>,
@@ -1938,6 +1993,17 @@ pub mod pallet {
                 Self::deposit_event(Event::CanonicalLedgerUpdated {
                     comit_id,
                     changes_applied,
+                });
+            }
+
+            // The X3VM slots are a separate channel from the balance-shaped ledger update above:
+            // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
+            let writes_applied = Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref())?;
+
+            if writes_applied > 0 {
+                Self::deposit_event(Event::X3StorageUpdated {
+                    comit_id,
+                    writes_applied,
                 });
             }
 
@@ -2755,6 +2821,7 @@ pub mod pallet {
                 return_data: result.output,
                 logs: Vec::new(),
                 state_changes: bridge_state_changes,
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -3390,6 +3457,57 @@ pub mod pallet {
             Ok(changes_applied)
         }
 
+        /// Apply an X3 execution receipt's slot writes to `X3ContractStorage`.
+        ///
+        /// This is the destination for the receipt's typed `storage_writes` channel. It is kept out
+        /// of `apply_canonical_ledger_update_v2` on purpose: that function decodes every entry as an
+        /// (account, asset, balance) triple for `CanonicalLedger`, and a slot write is none of those.
+        /// Routing slots through it would both corrupt the ledger and inflate `DecodeFailureCount`.
+        ///
+        /// Fail-closed rules:
+        /// * a failed execution reports no writes, and a receipt that claims writes on a failure is
+        ///   refused by name rather than applied;
+        /// * the write count is bounded by the same `MAX_STATE_CHANGES` limit the balance channel
+        ///   uses, so a receipt cannot make the block pay unbounded storage cost.
+        // `pub(crate)` only so the pallet's own tests can drive the refusal paths that a
+        // well-behaved adapter never produces. It is not part of the pallet's public API; the only
+        // production caller is `submit_comit_v2`.
+        pub(crate) fn apply_x3_storage_writes(
+            _comit_id: H256,
+            x3_receipt: Option<&ExecutionReceipt>,
+        ) -> Result<u32, DispatchError> {
+            let receipt = match x3_receipt {
+                Some(receipt) => receipt,
+                None => return Ok(0),
+            };
+
+            if !receipt.success {
+                if !receipt.storage_writes.is_empty() {
+                    return Err(Error::<T>::StorageWritesOnFailedExecution.into());
+                }
+                return Ok(0);
+            }
+
+            if receipt.storage_writes.len() > Self::MAX_STATE_CHANGES {
+                return Err(Error::<T>::TooManyStorageWrites.into());
+            }
+
+            let mut writes_applied = 0u32;
+            for write in receipt.storage_writes.iter() {
+                match write.new_value {
+                    Some(value) => {
+                        X3ContractStorage::<T>::insert(write.key, value);
+                    }
+                    None => {
+                        X3ContractStorage::<T>::remove(write.key);
+                    }
+                }
+                writes_applied = writes_applied.saturating_add(1);
+            }
+
+            Ok(writes_applied)
+        }
+
         /// Execute dual-VM transactions and return the unified state
         #[allow(dead_code)]
         fn do_execute_dual_tx(
@@ -3404,6 +3522,7 @@ pub mod pallet {
                 return_data: Vec::new(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -3419,6 +3538,7 @@ pub mod pallet {
                 return_data: Vec::new(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,

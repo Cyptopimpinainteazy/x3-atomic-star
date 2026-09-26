@@ -52,6 +52,7 @@ impl EvmExecutorAdapter for WasmEvmAdapter {
             return_data: res.output,
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -168,6 +169,7 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
                     return_data: res.output,
                     logs: Vec::new(),
                     state_changes,
+                    storage_writes: Vec::new(),
                     protocol_version: 1,
                     migration_history: Vec::new(),
                     compatibility_flags: 0,
@@ -219,6 +221,20 @@ impl X3ExecutorAdapter for WasmX3Adapter {
                 return_data: rec.return_data,
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                // Carry the executor's slot channel through unchanged. In a `no_std` build the
+                // interpreter (`mini_x3`) has no slot storage and reports none; in a `std` build
+                // these are the writes the VM journaled, and they must not be dropped on the way
+                // to the pallet or a contract's state would silently vanish between execution and
+                // the receipt the chain stores.
+                storage_writes: rec
+                    .storage_writes
+                    .into_iter()
+                    .map(|write| crate::StorageWrite {
+                        key: write.key,
+                        old_value: write.old_value,
+                        new_value: write.new_value,
+                    })
+                    .collect(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,

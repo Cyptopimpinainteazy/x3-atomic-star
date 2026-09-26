@@ -2158,6 +2158,125 @@ fn decode_failure_counter_tracks_failures() {
     });
 }
 
+/// Build a receipt in the shape the X3 adapter produces: a typed `storage_writes` channel and no
+/// balance-shaped `state_changes`.
+fn x3_receipt_with_writes(
+    success: bool,
+    writes: Vec<crate::StorageWrite>,
+) -> crate::ExecutionReceipt {
+    crate::ExecutionReceipt {
+        version: crate::EXECUTION_RECEIPT_VERSION,
+        success,
+        gas_used: 1_000,
+        return_data: Vec::new(),
+        logs: Vec::new(),
+        state_changes: Vec::new(),
+        storage_writes: writes,
+        protocol_version: 1,
+        migration_history: Vec::new(),
+        compatibility_flags: 0,
+        from: Vec::new(),
+        to: Vec::new(),
+        value: 0,
+    }
+}
+
+fn storage_write(key: H256, value: [u8; 32]) -> crate::StorageWrite {
+    crate::StorageWrite {
+        key,
+        old_value: None,
+        new_value: Some(value),
+    }
+}
+
+/// A stored X3 receipt's slot writes land in `X3ContractStorage`, and the balance decoder never
+/// sees them.
+///
+/// This is the pallet-level half of the channel; the end-to-end half (a real adapter producing such
+/// a receipt from a real `evm_sstore`) is `tests/x3_storage_channel.rs`.
+#[test]
+fn x3_storage_writes_land_in_contract_storage_not_the_balance_ledger() {
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(9001);
+        let slot = H256::from_low_u64_be(0x51);
+        let value = [0xABu8; 32];
+        let receipt = x3_receipt_with_writes(true, vec![storage_write(slot, value)]);
+
+        // The receipt is persisted first, exactly as `submit_comit_v2` does for an accepted comit.
+        crate::X3ExecutionReceipts::<Test>::insert(comit_id, receipt.clone());
+        assert_eq!(
+            crate::X3ExecutionReceipts::<Test>::get(comit_id)
+                .expect("the receipt is stored")
+                .storage_writes
+                .len(),
+            1
+        );
+
+        let decode_failures_before = crate::DecodeFailureCount::<Test>::get();
+        let ledger_before = CanonicalLedger::<Test>::get(ALICE, 0u32);
+
+        let applied = AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt))
+            .expect("a well-formed successful receipt applies");
+        assert_eq!(applied, 1);
+        assert_eq!(
+            crate::X3ContractStorage::<Test>::get(slot),
+            Some(value),
+            "the slot must be readable from chain storage"
+        );
+
+        // The slot write is *not* a balance change: it must not touch the ledger nor the aggregate
+        // decode-failure counter that watches the balance-shaped channel.
+        assert_eq!(CanonicalLedger::<Test>::get(ALICE, 0u32), ledger_before);
+        assert_eq!(
+            crate::DecodeFailureCount::<Test>::get(),
+            decode_failures_before,
+            "a slot write must not be decoded as a balance change"
+        );
+    });
+}
+
+/// A receipt that claims writes on a failed execution is refused by name, not applied.
+#[test]
+fn x3_storage_writes_are_refused_on_a_failed_receipt() {
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(9002);
+        let slot = H256::from_low_u64_be(0x52);
+        // A failed execution's partial writes must never reach chain state; if an adapter reports
+        // them anyway, the kernel refuses rather than trusting the claim.
+        let receipt = x3_receipt_with_writes(false, vec![storage_write(slot, [0xCDu8; 32])]);
+
+        assert_eq!(
+            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt)),
+            Err(AtlasError::StorageWritesOnFailedExecution.into())
+        );
+        assert_eq!(crate::X3ContractStorage::<Test>::get(slot), None);
+    });
+}
+
+/// An oversized write set is refused by name rather than applied, so a receipt cannot force
+/// unbounded storage cost. The bound is the same one the balance channel uses.
+#[test]
+fn x3_storage_writes_are_refused_past_the_bound() {
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(9003);
+        // `MAX_STATE_CHANGES` is the pallet's bound for the balance channel; the slot channel reuses
+        // it, so one write past it must be refused.
+        let too_many: Vec<crate::StorageWrite> = (0..=1_000u64)
+            .map(|i| storage_write(H256::from_low_u64_be(i + 1), [0x01u8; 32]))
+            .collect();
+        let receipt = x3_receipt_with_writes(true, too_many);
+
+        assert_eq!(
+            AtlasKernel::apply_x3_storage_writes(comit_id, Some(&receipt)),
+            Err(AtlasError::TooManyStorageWrites.into())
+        );
+        assert_eq!(
+            crate::X3ContractStorage::<Test>::get(H256::from_low_u64_be(1)),
+            None
+        );
+    });
+}
+
 // ============================================================================
 // Timestamp Tests (M-6)
 // ============================================================================

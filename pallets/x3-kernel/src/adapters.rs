@@ -71,6 +71,7 @@ impl EvmExecutorAdapter for MockEvmAdapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -105,6 +106,7 @@ impl EvmExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -146,6 +148,7 @@ impl SvmExecutorAdapter for MockSvmAdapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -182,6 +185,7 @@ impl EvmExecutorAdapter for FailingMockEvmAdapter {
                 return_data: b"revert".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -222,6 +226,7 @@ impl SvmExecutorAdapter for FailingMockSvmAdapter {
                 return_data: b"program error".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -251,6 +256,7 @@ impl SvmExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -288,6 +294,7 @@ impl X3ExecutorAdapter for MockX3Adapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -336,6 +343,7 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
                 return_data: b"x3 fault".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -371,6 +379,7 @@ impl X3ExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -458,6 +467,7 @@ pub mod real_adapters {
                         value: canonical_balance_value(update.lamports as u128),
                     })
                     .collect(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -525,6 +535,18 @@ pub mod real_adapters {
                         address: vec![0u8; 32], // X3 module address
                         key: change.key,
                         value: H256::from_slice(change.new_value.get(..32).unwrap_or(&[0u8; 32])),
+                    })
+                    .collect(),
+                // The typed slot channel: `key`/`old`/`new` are carried through verbatim so the
+                // kernel can apply them to `X3ContractStorage`. Nothing is fabricated here, and a
+                // failed execution's receipt already carries no writes (`X3Executor::execute`).
+                storage_writes: receipt
+                    .storage_writes
+                    .into_iter()
+                    .map(|write| crate::StorageWrite {
+                        key: write.key,
+                        old_value: write.old_value,
+                        new_value: write.new_value,
                     })
                     .collect(),
                 protocol_version: 1,

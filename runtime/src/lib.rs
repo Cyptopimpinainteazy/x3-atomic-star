@@ -1864,7 +1864,7 @@ mod native_vm_adapters {
                 let state_changes =
                     collect_evm_balance_changes(source, None, &info.logs, &pre_balances);
                 return Ok(ExecutionReceipt {
-                    version: 1,
+                    version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
                     success,
                     gas_used: info.used_gas.standard.unique_saturated_into(),
                     return_data: info.value.as_bytes().to_vec(),
@@ -1880,6 +1880,7 @@ mod native_vm_adapters {
                         })
                         .collect(),
                     state_changes,
+                    storage_writes: Vec::new(),
                     protocol_version: 1,
                     migration_history: Vec::new(),
                     compatibility_flags: 0,
@@ -1976,7 +1977,7 @@ mod native_vm_adapters {
         let success = matches!(info.exit_reason, ExitReason::Succeed(_));
         let state_changes = collect_evm_balance_changes(source, target, &info.logs, pre_balances);
         ExecutionReceipt {
-            version: 1,
+            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success,
             gas_used: info.used_gas.standard.unique_saturated_into(),
             return_data: info.value,
@@ -1992,6 +1993,7 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -2089,7 +2091,7 @@ mod native_vm_adapters {
             })
             .collect();
         ExecutionReceipt {
-            version: 1,
+            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success: result.success,
             gas_used: result.compute_units_used,
             return_data: result.output,
@@ -2105,6 +2107,7 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -3761,6 +3764,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3795,6 +3799,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3829,6 +3834,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3855,6 +3861,7 @@ impl_runtime_apis! {
                         return_data: b"EVM runner call failed".to_vec(),
                         logs: Vec::new(),
                         state_changes: Vec::new(),
+                        storage_writes: Vec::new(),
                         protocol_version: 1,
                         migration_history: Vec::new(),
                         compatibility_flags: 0,

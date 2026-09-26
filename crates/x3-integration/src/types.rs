@@ -20,10 +20,34 @@ pub struct X3ExecutionReceipt {
     pub logs: Vec<X3ExecutionLog>,
     /// State changes produced
     pub state_changes: Vec<X3StateChange>,
+    /// Storage writes drained from the VM's slot journal.
+    ///
+    /// This is a *typed* channel, separate from `state_changes` on purpose. `state_changes` is
+    /// hostcall-shaped and the kernel decodes each entry as an (account, asset, balance) triple, so
+    /// a 32-byte slot write pushed through it would be read as a balance change. These entries
+    /// carry the exact slot and the old/new slot values the VM journaled, and the kernel applies
+    /// them to its own contract-storage keyspace instead of the balance ledger.
+    pub storage_writes: Vec<X3StorageWrite>,
     /// Function that was called
     pub function_index: u32,
     /// Number of instructions executed
     pub instructions_executed: u64,
+}
+
+/// A single X3VM storage-slot write drained from the execution journal.
+///
+/// `old_value` is the slot's value as the VM saw it at the moment of the write (`None` = the slot
+/// was empty in this execution's view); `new_value` is the value after the write (`None` = the slot
+/// was cleared). A failed execution reports no writes, and a write abandoned by a reverted atomic
+/// window is not journaled at all, so every entry here is a write that actually survived execution.
+#[derive(Clone, Debug, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, PartialEq, Eq)]
+pub struct X3StorageWrite {
+    /// 32-byte storage slot key.
+    pub key: H256,
+    /// Value in the slot before the write (`None` = the slot was empty).
+    pub old_value: Option<[u8; 32]>,
+    /// Value after the write (`None` = the slot was cleared).
+    pub new_value: Option<[u8; 32]>,
 }
 
 /// Log entry from X3 execution

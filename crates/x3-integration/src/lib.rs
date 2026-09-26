@@ -67,7 +67,7 @@ pub mod compiler_bridge;
 
 pub use error::{X3IntegrationError, X3Result};
 pub use executor::{X3Executor, X3ExecutorConfig};
-pub use types::{X3ExecutionReceipt, X3StateChange};
+pub use types::{X3ExecutionReceipt, X3StateChange, X3StorageWrite};
 
 #[cfg(feature = "std")]
 pub use hostcalls::SubstrateHostcalls;
