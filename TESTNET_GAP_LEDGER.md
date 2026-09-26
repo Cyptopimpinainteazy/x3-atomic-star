@@ -1210,3 +1210,93 @@ engine:
 
 Closing this means one implementation, or a generated conformance table the two are checked against
 in both directions: every opcode the compiler can emit, in both engines, with the verdict recorded.
+
+## TICKET-150 — the receipt replay was described but not run, and the floors and ceilings were the receipt's own — 2026-09-26
+
+Found by reading what `x3c replay` actually calls. Both `x3c replay` and `x3c receipt verify` printed
+that they had checked the receipt's economic replay; neither called `verify_receipt_economics`.
+`verify_receipt` re-derives the hash and the accounting invariants and deliberately stops there, so a
+receipt whose reported figures contradicted the policy it carried was reported as verified — in
+`receipt verify`'s case under the words "hash + economic invariants". Four holes sat behind that,
+each reachable with a receipt that is internally consistent and re-hashed, so the hash check has
+nothing to say about any of them:
+
+* `AssertMinNetProfit { settlement_asset, minimum }` was recorded as *present* (`saw_profit_guard`)
+  and never read. A receipt netting 2,000,000 USDC against its own stated floor of 5,000,000
+  replayed cleanly, and a floor stated in an asset the receipt never touched was not read at all.
+  The policy-level `minimum_net_profit` / `minimum_net_profit_asset` was not read either.
+* `max_slippage_bps` bounds a quantity no receipt carried. The swap path records each leg's realized
+  slippage in its quote window now (receipt format version 3), computed by the same helper that
+  enforces the ceiling, and replay re-derives it. A window without the figure — a format-2 receipt —
+  is refused by name rather than read as "no slippage".
+* `max_flash_fee_bps` was enforced on repay and never re-checked at replay. The principal and fee are
+  already in the receipt, so the ratio is re-derived from them.
+* Replay never compared the receipt's operation sequence to the artifact. The artifact hash proves
+  which artifact a receipt *claims*, not that the sequence inside it is what that artifact compiles,
+  and the economics read the ceilings out of the receipt's own operations. A receipt re-hashed with
+  a 900 bps ceiling against an artifact compiling 30 passed every check the command made.
+
+`verify_receipt_economics` gained typed refusals (`ProfitBelowCompiledFloor`,
+`ProfitFloorWithoutAsset`, `MissingRealizedSlippage`, `SlippageExceeded`, `FeeCeilingExceeded`) and
+`basis_points_of` became the one place the fee/slippage ratio is computed, so the figure execution
+enforces and the figure a receipt carries cannot drift. The dead `deltas` accumulator in the replay
+is gone: `accrue_cost` already nets costs into `net_deltas`, and the accumulator was never read,
+inviting a reader to believe costs were counted twice.
+
+Break-it-first, measured on both halves. With the floor check removed,
+`receipt_below_its_compiled_profit_floor_fails_economic_replay` and
+`profit_floor_in_an_asset_the_receipt_never_touched_fails_economic_replay` fail. With the
+artifact-binding loop removed, `cli_replay_refuses_a_receipt_whose_policy_is_not_the_artifacts` fails
+and the CLI prints `x3c replay: ok — CrossDexArb replays against /tmp/cli_forge_weaker_policy.x3b` for
+the forged receipt. Both controls were restored before the commit.
+
+Verified: `cargo test --workspace` in `x3-lang` (vm 165 — receipts 20, execution 68, properties 14;
+x3-tools cli 71 + cli_integration 9), `cargo fmt --all -- --check`, `cargo clippy --workspace
+--all-targets`.
+
+Still open on the row, and named there rather than hidden: the finality references and the host
+inputs the phase asks about are not carried by either artifact or receipt, and the state the
+`state_commitment` commits to is not part of a receipt, so a replay cannot check the balances behind
+it. The three fees the execution path also enforces — `max_gas`, the oracle-deviation ceiling and
+`max_cumulative_loss` — are re-derived for the ceilings that appear in a receipt and not for the
+per-run cost the host reports; that is the remaining half of "correct risk checks".
+
+## TICKET-151 — the capability checks had no caller that could disagree — 2026-09-26
+
+Found while reading what `x3c receipt execute` hands the VM. The rule is implemented:
+`TradingVm::execute_atomic` calls `validate_compiled_policy` before the first host call, and it is
+the real check the row describes — the policy's chain against the host's, its policy version against
+the host's, `require_private_submission` against the host's capabilities, and then a per-operation
+capability check (a borrow's provider, a swap's venue, a bridge's adapter). What the command did was
+make every one of those clauses unfalsifiable: it built the host manifest **out of the artifact it
+was checking**.
+
+```
+chain: policy.chain.clone(),
+version: format!("trading-policy-v{}", policy.policy_version),
+private_submission: policy.require_private_submission,
+providers / venues / bridges: collected from the operations
+```
+
+Measured on that version: `x3c receipt execute /tmp/trade.x3 --chain base --provider aave_v3 --venue
+uniswap_v3 --venue sushiswap` printed `trade 'CrossDexArb' committed, receipt verified` — a program
+compiled for `ethereum` and requiring private submission, run by an operator who declared a different
+chain and no private lane. Nothing failed, because the host agreed with the program by construction.
+`CapabilityChainMismatch`, `CapabilityVersionMismatch`, `PrivateSubmissionRequired` and
+`UnknownCapability` could not fire through this command at all.
+
+The host is now declared by the caller: `--chain` (required — a default would answer the question the
+flag exists to ask), `--private-submission`, and repeatable `--provider` / `--venue` / `--bridge`.
+The fixture host's policy version is a constant of the host (`FIXTURE_HOST_POLICY_VERSION`), not a
+copy of the artifact's, so the version clause has a referent too. Four refusals are exercised by name
+through the CLI (chain, venue, provider, private lane), plus one test that the declaration is required
+and one that a host declaring what it offers still runs the program. Break-it-first: with the two
+manifest lines reverted to the artifact's values the chain test's forgery runs green as shown above;
+restored, it refuses with `compiled policy chain 'ethereum' does not match host chain 'base'`.
+
+Verified: `cargo test -p x3-tools` (cli 77, cli_integration 9), `cargo fmt --all -- --check`, `cargo
+clippy --workspace --all-targets`.
+
+Still open on the row: a **live upgrade** — an old artifact executed against a newer VM on a running
+chain — is what the envelope's version bounds exist for and is not exercised by any test here. That
+needs the seven-node network and a runtime upgrade, not a unit test.

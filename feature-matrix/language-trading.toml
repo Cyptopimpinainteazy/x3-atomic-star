@@ -180,16 +180,40 @@ id = "X3-LANG-005"
 name = "Chain/capability version enforcement"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 65
-tested = 65
-mainnet_ready = 30
+paths = [
+  "x3-lang/compiler",
+  "x3-lang/vm/src/trading.rs",
+  "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/crates/x3-tools/src/bin/x3c.rs",
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+]
+implemented = 80
+tested = 80
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Re-measured 2026-09-24: the gates exist and refuse by name with tests — the compiled-policy version is checked against the host's before any host call (CapabilityVersionMismatch, and the test asserts the host transaction never began), unknown economic-object versions fail closed (UnsupportedVersion { object, version }), capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability), and the envelope's version/min-version are enforced by both readers (X3-LANG-010). What is not exercised is a live upgrade: an old artifact against a newer VM on a running chain"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
+blockers = [
+  "Re-measured 2026-09-26 (TICKET-151). The rule the row is about — a compiled policy is checked against the host before any host call (CapabilityChainMismatch, CapabilityVersionMismatch, PrivateSubmissionRequired), an economic object's version fails closed (UnsupportedVersion { object, version }), and capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability) — is implemented and enforced in `TradingVm::execute_atomic` before the first host call. What the row did *not* have was a caller whose host could disagree: `x3c receipt execute` built the manifest out of the artifact it was checking (`chain: policy.chain`, `private_submission: policy.require_private_submission`, providers/venues/bridges collected off the operations, and `version` formatted from the artifact's own `policy_version`), so through that command none of the refusals could fire. Measured: `receipt execute --chain base` against a program compiled for ethereum, with no private lane and no venues declared, reported `trade 'CrossDexArb' committed, receipt verified`.",
+  "The host is declared now (--chain required, --private-submission, repeatable --provider/--venue/--bridge; the fixture host's policy version is its own constant), and the refusals are exercised through the CLI by name. Still not exercised: a live upgrade — an old artifact against a newer VM on a running chain — which is what the envelope's version bounds exist for and which needs the seven-node network and a runtime upgrade rather than a unit test.",
+  "The envelope's version/min-version enforcement and its reader parity belong to X3-LANG-010; this row cites it rather than duplicating it.",
+]
+required_tests = [
+  "cli_receipt_execute_refuses_a_host_on_another_chain",
+  "cli_receipt_execute_refuses_a_venue_the_host_does_not_offer",
+  "cli_receipt_execute_refuses_a_policy_needing_a_lane_the_host_lacks",
+  "cli_receipt_execute_refuses_a_provider_the_host_does_not_offer",
+  "cli_receipt_execute_requires_the_host_chain_to_be_named",
+  "cli_receipt_execute_runs_against_a_host_that_declares_what_it_offers",
+  "production_rejects_fixture_capabilities",
+]
+test_evidence = [
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+  "note: six tests, green: four refusals by name (chain, venue, provider, private lane), one that the declaration is required rather than defaulted, one that a host declaring what it offers still runs the program. cargo test -p x3-tools -> cli 77 passed (was 71), cli_integration 9 passed; cargo clippy --workspace --all-targets clean",
+  "note: break-it-first measured - with the manifest's chain and private-submission fields reverted to the artifact's own policy values, a receipt execute run declaring chain base against a program compiled for ethereum prints 'trade CrossDexArb committed, receipt verified'; restored, it refuses with 'compiled policy chain ethereum does not match host chain base'",
+]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7", "note: TICKET-151 in TESTNET_GAP_LEDGER.md"]
 
 [[feature]]
 # Re-measured 2026-09-24 (TICKET-131): the connection this row calls incomplete now has evidence.
