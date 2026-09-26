@@ -3253,28 +3253,34 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 2,
+      "composite": 30,
       "confidence": "high",
       "evidence": [
-        "note: No sufficient master evidence found"
+        "crates/private-mempool",
+        "note: Measured 2026-09-26 (round 4, workstream A) - real Ristretto threshold crypto with adversarial coverage over a freshly generated committee per case, reached by one crate that no runtime path consumes"
       ],
       "id": "X3-MEV-007",
-      "implemented": 5,
+      "implemented": 45,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 0,
+      "mainnet_ready": 10,
       "missing_work": [
-        "Not implemented as a verified production feature"
+        "Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and there is no ingress (no extrinsic, no node mempool, no relayer) that puts a transaction into it - the crate is measured unit by unit and drives nothing on chain",
+        "No DLEQ proof accompanies a partial decryption: `compute_decryption_share` returns an empty `proof`, so a malicious validator's bogus partial is caught only by the AEAD tag after interpolation. Fail-closed, but unattributed - the combiner learns that something was wrong, not which validator lied",
+        "The DKG epoch is now stated by configuration (`ConfidentialGpuConfig::dkg_epoch`) rather than driven by a ceremony or an epoch transition in this tree, so the binding is enforced while the lifecycle it binds to is never exercised end to end",
+        "No live or cross-node test: every case here is unit or component level, against committees generated in-process"
       ],
       "name": "Encrypted mempool / threshold encryption",
-      "paths": [],
+      "paths": [
+        "crates/private-mempool"
+      ],
       "priority": "P1",
-      "source": "research",
-      "state": "NOT INTEGRATED",
-      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "source": "master",
+      "state": "STUB",
+      "state_rule": "implemented >= 20",
       "subsystem": "mev_privacy",
-      "tested": 0,
-      "tests": "tested score 0% (no named test list on this row)"
+      "tested": 40,
+      "tests": "tested score 40% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4482,7 +4488,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "d1b496d8287c996e2f77b87136768789f9781bceec920f8ce6f7b329cf6d394d",
+    "source_digest": "ca16ade14c483d7915701da58af6be22c4baf5eaad1259b71e408d42cf582e20",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4494,7 +4500,7 @@
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "9b96c62a59f418119b6879393c23637405417c23a421661baeac3634f3f2fce7",
+      "feature-matrix/mev-privacy.toml": "4dcc8d89f8dba461502aa3a846fb065fc6e48ca616d23f65cd301cdb2dca2453",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -4933,10 +4939,10 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 57,
-      "NOT INTEGRATED": 6,
+      "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
       "PARTIAL": 64,
-      "STUB": 9
+      "STUB": 10
     },
     "matrix_features": 146,
     "registry_features": 21,

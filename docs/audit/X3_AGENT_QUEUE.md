@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `d1b496d8287c996e…` — the artifacts move when
+Source digest: `ca16ade14c483d79…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -152,7 +152,7 @@ fails when they do not match.
 | MTX-X3-MEV-004 | mev_privacy | Transactional host rollback: Rollback semantics not yet fully proven | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 25% (no named test list on this row) | open |
 | MTX-X3-MEV-005 | mev_privacy | Gas / economic execution limits: Hardening branch must enforce gas and capability versions | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 30% (no named test list on this row) | open |
 | MTX-X3-MEV-006 | mev_privacy | MEV-resistant architecture: No complete formal MEV threat model; do not claim MEV-proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 25% (no named test list on this row) | open |
-| MTX-X3-MEV-007 | mev_privacy | Encrypted mempool / threshold encryption: Not implemented as a verified production feature | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 0% (no named test list on this row) | open |
+| MTX-X3-MEV-007 | mev_privacy | Encrypted mempool / threshold encryption: Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and the… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | STUB · tested score 40% (no named test list on this row) | open |
 | MTX-X3-MEV-008 | mev_privacy | Fair transaction ordering: No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet; Beacon provenance is an off-chain assumption: a beacon is refused only while par… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | STUB · tested score 40% (no named test list on this row) | open |
 | MTX-X3-OPS-001 | operations_user_tools | Genesis ceremony tooling: The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists; The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, an… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
 | MTX-X3-OPS-002 | operations_user_tools | Snapshot / restore tooling: **CLOSED 2026-09-26 — there is a live restore proof, and it is load-bearing.** This row asked for "live restore drills and integrity verification"; the only restore test round-tripped a text file through a tarball, which passes just as well… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 60% (no named test list on this row) | open |

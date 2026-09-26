@@ -130,20 +130,54 @@ blockers = ["No complete formal MEV threat model; do not claim MEV-proof"]
 evidence = ["pallets/private-execution", "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"]
 
 [[feature]]
+# Re-measured 2026-09-26 (round 4, workstream A) on commit dd22bddfd of
+# feat/x3-prelaunch-economics-x3lang-cutover: the crate is real — Ristretto Shamir
+# split, Lagrange combination in the exponent, committee-ECDH + HKDF-SHA256 +
+# AES-256-GCM — and a decryption share now carries the DKG ceremony it was minted
+# under, refused by name when it does not match. The old "research / no evidence"
+# line was stale; it was right about the missing wiring, which the blockers keep.
 id = "X3-MEV-007"
 name = "Encrypted mempool / threshold encryption"
 subsystem = "mev_privacy"
-source = "research"
-paths = []
-implemented = 5
-tested = 0
-mainnet_ready = 0
+source = "master"
+paths = ["crates/private-mempool"]
+implemented = 45
+tested = 40
+mainnet_ready = 10
 priority = "P1"
 confidence = "high"
 launch_scope = "research"
 claim_risk = false
-blockers = ["Not implemented as a verified production feature"]
-evidence = ["note: No sufficient master evidence found"]
+blockers = [
+  "Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and there is no ingress (no extrinsic, no node mempool, no relayer) that puts a transaction into it - the crate is measured unit by unit and drives nothing on chain",
+  "No DLEQ proof accompanies a partial decryption: `compute_decryption_share` returns an empty `proof`, so a malicious validator's bogus partial is caught only by the AEAD tag after interpolation. Fail-closed, but unattributed - the combiner learns that something was wrong, not which validator lied",
+  "The DKG epoch is now stated by configuration (`ConfidentialGpuConfig::dkg_epoch`) rather than driven by a ceremony or an epoch transition in this tree, so the binding is enforced while the lifecycle it binds to is never exercised end to end",
+  "No live or cross-node test: every case here is unit or component level, against committees generated in-process",
+]
+required_tests = [
+  "any_threshold_subset_reconstructs_the_same_secret",
+  "below_threshold_does_not_reconstruct_the_secret",
+  "t_shares_decrypt_and_one_short_never_does_over_fresh_committees",
+  "combine_shares_refuses_fewer_shares_than_the_declared_threshold",
+  "combine_shares_rejects_a_zero_validator_index",
+  "combine_shares_rejects_duplicate_validator_indices",
+  "a_share_labelled_with_an_index_outside_the_committee_fails_closed",
+  "a_share_that_is_not_a_point_is_refused",
+  "a_tampered_ciphertext_is_refused",
+  "a_tampered_nonce_is_refused",
+  "a_swapped_nonce_between_two_transactions_is_refused",
+  "a_swapped_ephemeral_key_between_two_transactions_is_refused",
+  "rejects_the_identity_element_as_a_committee_group_key",
+  "a_share_from_a_different_dkg_epoch_is_refused_with_a_typed_error",
+  "the_epoch_label_is_not_the_security_boundary",
+]
+test_evidence = [
+  "note: cargo test -p private-mempool -> 29 passed, 0 failed, 0 ignored (19 before this lane's ten tests)",
+  "note: cargo test -p confidential-gpu -> 10 passed, 0 failed; cargo clippy -p private-mempool -p confidential-gpu --all-targets -- -D warnings -> exit 0; cargo fmt --all -- --check -> exit 0",
+  "note: break-it-first control - disabling the epoch check in the combiner turns a_share_from_a_different_dkg_epoch_is_refused_with_a_typed_error red, and confidential-gpu's a_share_from_another_ceremony_is_refused_by_name red; restored, both suites are green",
+  "note: reachability measured 2026-09-26 - cargo tree -i private-mempool --workspace returns confidential-gpu alone, nothing in runtime/ or node/ depends on confidential-gpu, and the mempool type has no caller in the tree",
+]
+evidence = ["crates/private-mempool", "note: Measured 2026-09-26 (round 4, workstream A) - real Ristretto threshold crypto with adversarial coverage over a freshly generated committee per case, reached by one crate that no runtime path consumes"]
 
 [[feature]]
 id = "X3-MEV-008"
