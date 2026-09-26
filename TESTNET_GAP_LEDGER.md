@@ -869,3 +869,49 @@ nodes, 1000 TPS" - unverified), `.audit/CLAIMS_INVENTORY_AND_TRACKER.md` (an unv
 or an evidence record; add the claim surfaces to the scanner and fix what it finds, and add the
 evidence records to a skip list with the reason written down. A surface list nobody revisits is how
 this gap happened the first time.
+
+## TICKET-139 — the claim scanner now reads the surfaces people actually read — 2026-09-26
+
+**CLOSED.** `scripts/ci/check-claims-hygiene.py` scans `docs/**`, `production/public/**`,
+`.planning/**`, root markdown and the CRM. Every path this ticket named is *decided in the file*:
+
+| path | decision | reason (written in the scanner) |
+| --- | --- | --- |
+| `docs/**` | claim surface | the documentation a person reads as a statement of what X3 does |
+| `production/public/**` | claim surface | the published site — a stranger reads it before deciding we are real |
+| `.planning/**` | claim surface | roadmap/sprint plans carry dated `Complete`/`Live` rows |
+| `benchmarks/`, `.audit/`, `infra-structure/`, `tests_phase4/`, `tests_core/`, `tools/` | evidence record | each is declared in `EVIDENCE_RECORDS` with its reason and still listed as a surface, so deleting an entry re-enables scanning |
+
+It found 41 real claims. The worst were a `P4_IMPLEMENTATION_GUIDE.md` whose every success
+criterion was ticked `[x]` for a GPU system with no `.cu`/`.ptx`, no artifact and no benchmark; the
+public site's `zero-fee flashloans` / `sub-200ms finality` hero copy; and `.planning/README.md`'s
+dated `Testnet Live | Public testnet running 100+ nodes, 1000 TPS` row for a testnet the same ledger
+records as undeployed. All 41 now state the honest state, a target, or a measurement.
+
+Two new rule sets came with it, both because the widened surfaces turned up lines that look like
+claims and are not: an unchecked `- [ ]` box is a plan item (a checked `[x]` stays a claim), and
+`acceptance`/`requirement`/`criteria`/`threshold`/`goal`/`objective`/`must`/`versus`/`expected`
+mark a bound or a projection rather than a result.
+
+**Measured, all four controls on this box:**
+
+```
+OK   - 5498 file(s) scanned, 476 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
+FAIL - production/public probe `<p>Sub-200ms finality at 100,000 TPS.</p>`  (new surface IS scanned)
+OK   - the same file with `- [ ] 1,000 TPS demonstrated`                    (a plan item is not a claim)
+FAIL - the same file with `- [x] 1,000 TPS demonstrated`                    (a ticked box is a claim)
+FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive   (the skip list is load-bearing)
+```
+
+**TICKET-140 — decide the `apps/**` surfaces the scanner still does not read.** Measured
+2026-09-26: `apps/inferstructor-dashboard/src/components/RegisterPage.tsx` carries 5 unqualified
+figures, `apps/x3-studio/electron/main.ts` 4, `apps/dashboard/src/panels/docs/AnalyticsReportingPanel.tsx`
+2. Only `apps/*/src-tauri/src/crm` is a surface today. Acceptance: for each app, either declare the
+path a claim surface and fix what it finds, or record it in `EVIDENCE_RECORDS` with the reason.
+
+**TICKET-141 — the public pages still say `Now live on testnet`.** Every page under
+`production/public/` carries the hero tag `Now live on testnet`, and the same ledger records that
+nothing is deployed and all local evidence is loopback. No scanner rule matches a bare liveness
+phrase, so TICKET-139's widening did not touch it. Acceptance: decide what the pages may claim
+about deployment state, fix the copy, and add the rule (a liveness tag with no deployment is the
+same class of claim as the retracted MEV one).

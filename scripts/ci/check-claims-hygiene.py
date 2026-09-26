@@ -25,6 +25,24 @@ Two rule sets, because the two kinds of claim behave differently:
                 when the line itself qualifies the number (target, research, unverified,
                 not measured, placeholder, ...).
 
+Widened 2026-09-26 (TICKET-139). The surface list used to be root markdown, `docs/testnet-config`
+and the CRM; the ledger measured ~150 unqualified figures outside it. Each of those paths is now
+decided, one way or the other, and the decision is in this file:
+
+  * claim surface  — a document or page a person reads *as a statement of what X3 does*:
+                     `docs/**`, `production/public/**` (the public site HTML), `.planning/**`.
+  * evidence record — a path whose job is to *quote* claims or measurements, so scanning it is
+                     scanning the registry rather than the surface: see EVIDENCE_RECORDS below,
+                     each with the reason written down. They are still declared as surfaces, so
+                     deleting an entry re-enables scanning and the gate can fail — the skip list
+                     is load-bearing, not decorative.
+
+The qualification rules grew with it, because a requirement or a plan is not a claim:
+an unchecked markdown box (`- [ ]`) is a plan item, and `acceptance`/`requirement`/`criteria`/
+`threshold`/`goal`/`objective`/`must`/`versus` mark a line as a bound to meet or a comparison
+rather than a result to report. A *checked* box (`- [x]`) is still scanned — that is what makes
+a proposal's completed checklist a claim.
+
     scripts/ci/check-claims-hygiene.py            # check
     scripts/ci/check-claims-hygiene.py --list     # print every claim surface scanned
 
@@ -67,9 +85,37 @@ SKIP_DIRS = {
 # quietly sweep every document in the repository.
 SURFACES = [
     ("*.md",),
-    ("docs", "testnet-config", "**"),
+    # The whole documentation tree a person reads. `docs/testnet-config` used to be named
+    # here on its own; `docs/**` covers it and the operator/roadmap docs beside it.
+    ("docs", "**"),
+    # The published site. These are the pages a stranger reads before deciding we are real,
+    # which makes them the most expensive place in the repository to be wrong.
+    ("production", "public", "**"),
+    # Roadmap and sprint plans: they carry dated "Complete"/"Live" rows, which are claims.
+    (".planning", "**"),
+    # Declared so that EVIDENCE_RECORDS is load-bearing: these paths *are* walked, and every
+    # one of them is excluded by name below with its reason. Delete a reason and the gate
+    # starts scanning the path again.
+    ("benchmarks", "**"),
+    (".audit", "**"),
+    ("infra-structure", "**"),
+    ("tests_phase4", "**"),
+    ("tests_core", "**"),
+    ("tools", "**"),
     ("apps", "*", "src-tauri", "src", "crm", "**"),
 ]
+
+# Paths that are evidence records rather than claim surfaces. Every entry needs a reason,
+# and `--list` prints them, because "a surface list nobody revisits" is how the gap that
+# produced this list happened the first time.
+EVIDENCE_RECORDS = {
+    "benchmarks/": "an archive of measured TPS runs: the figures are the measurement, not a claim",
+    ".audit/": "a claims inventory that exists to quote claims (same class as docs/audit)",
+    "infra-structure/": "a standalone validator/dashboard package copied in for reference; its UI copy and benchmark docs are not X3 claim surfaces",
+    "tests_phase4/": "test code and fixtures, not a surface a person reads a claim from",
+    "tests_core/": "test code and fixtures, not a surface a person reads a claim from",
+    "tools/": "developer tooling and its own test fixtures, not a claim surface",
+}
 
 # Phrases that are false in every context: the capability does not exist, so no qualifier
 # rescues them (`feature-matrix/mev-privacy.toml` scores the whole MEV family at 2-52%).
@@ -106,15 +152,26 @@ NUMERIC = [
 
 # A number is a claim only when nothing on the line marks it as not-yet-true. `claim` is in
 # this list so that a sentence *about* a claim (the registry, a ticket, a report) is not one.
+# The second group covers what the widened surfaces turned up: a bound to meet
+# (`acceptance`, `requirement`, `criteria`, `threshold`, `must`) or a comparison against
+# another system (`versus`, `vs`) is not a statement that X3 achieved the number.
 QUALIFIER = re.compile(
     r"\b(?:not|no|never|without|avoid|do not|don't|none|target|targets|targeted|planned|planning|"
     r"roadmap|under development|research|experimental|unverified|unproven|unreachable|dead|disabled|"
     r"blocked|ticket|todo|placeholder|aspirational|intended|proposed|proposal|aim|would|could|"
     r"claim|claims|claiming|report|reports|matrix|row|score|measured|verify|verification|test|tests|"
     r"gate|check|scan|fail|fails|refuses|refused|removed|removes|renamed|rename|baseline|honest|"
-    r"inject|injects|injected|injection|simulate|simulated|withdrawn|dropped)\b",
+    r"inject|injects|injected|injection|simulate|simulated|withdrawn|dropped)\b"
+    r"|\b(?:acceptance|accept|require|requires|required|requirement|requirements|criteria|"
+    r"criterion|threshold|must|goal|goals|objective|objectives|versus|vs|slo|budget|parity|"
+    r"expect|expected|projected|projection|estimate|estimated)\b",
     re.I,
 )
+
+# An unchecked markdown box is a plan item — "- [ ] 1,000 TPS demonstrated" states an
+# intention, not a result. A *checked* box is the opposite and stays scanned, which is what
+# makes a proposal's finished checklist a claim (`P4_IMPLEMENTATION_GUIDE.md`).
+UNCHECKED_TASK = re.compile(r"^\s*[-*+]\s+\[\s*\]")
 
 TEXT_SUFFIXES = {".md", ".rs", ".ts", ".tsx", ".js", ".jsx", ".py", ".sh", ".toml", ".json", ".txt", ".html"}
 
@@ -156,13 +213,21 @@ def is_surface(rel: str) -> bool:
     return any(_matches(parts, pattern) for pattern in SURFACES)
 
 
+def is_evidence_record(rel: str) -> bool:
+    """A declared record of claims/measurements, excluded from scanning by name."""
+    return any(rel.startswith(prefix) for prefix in EVIDENCE_RECORDS)
+
+
 def scan_line(rel: str, lineno: int, line: str, surface: bool, absolute_only: bool) -> list[str]:
     hits = []
     qualified = bool(QUALIFIER.search(line))
+    # An unchecked plan item suppresses the numeric rule only: a phrase that is false in
+    # every context is still false when it is written in a plan.
+    numeric_qualified = qualified or bool(UNCHECKED_TASK.match(line))
     for pattern, why in ABSOLUTE:
         if pattern.search(line) and not qualified:
             hits.append(f"{rel}:{lineno}: ABSOLUTE ({why}): {line.strip()[:160]}")
-    if surface and not absolute_only and not qualified:
+    if surface and not absolute_only and not numeric_qualified:
         for pattern, why in NUMERIC:
             if pattern.search(line):
                 hits.append(f"{rel}:{lineno}: unqualified {why}: {line.strip()[:160]}")
@@ -177,17 +242,28 @@ def main() -> int:
 
     files = tracked_files()
     surfaces = [str(f) for f in files if is_surface(str(f))]
+    declared = [s for s in surfaces if not is_evidence_record(s)]
+    records = [s for s in surfaces if is_evidence_record(s)]
 
     if args.list:
-        print(f"claim surfaces ({len(surfaces)}):")
-        for s in surfaces:
+        print(f"claim surfaces ({len(declared)}):")
+        for s in declared:
             print(f"  {s}")
+        print()
+        print(f"evidence records, declared and excluded ({len(records)} file(s)):")
+        for prefix, reason in sorted(EVIDENCE_RECORDS.items()):
+            matched = sum(1 for s in records if s.startswith(prefix))
+            print(f"  {prefix}  ({matched} file(s)) - {reason}")
         return 0
 
     scanned = 0
     hits: list[str] = []
     for rel in files:
         rel_s = str(rel)
+        # A declared evidence record is a place that quotes claims rather than makes them;
+        # it is named in EVIDENCE_RECORDS with a reason, and `--list` prints the list.
+        if is_evidence_record(rel_s):
+            continue
         surface = is_surface(rel_s)
         # ABSOLUTE patterns are cheap and unambiguous, so they are checked tree-wide;
         # NUMERIC patterns only on a declared surface.
@@ -211,7 +287,10 @@ def main() -> int:
         print("unverified/research), or record it in the audit registry instead of the surface.")
         return 1
 
-    print(f"claims-hygiene: OK - {scanned} file(s) scanned, {len(surfaces)} claim surface(s), no unqualified claim")
+    print(
+        f"claims-hygiene: OK - {scanned} file(s) scanned, {len(declared)} claim surface(s), "
+        f"{len(records)} declared evidence record(s) excluded, no unqualified claim"
+    )
     return 0
 
 

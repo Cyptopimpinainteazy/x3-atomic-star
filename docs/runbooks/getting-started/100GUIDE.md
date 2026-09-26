@@ -382,7 +382,7 @@ This system transforms hardware from a capital constraint into a competitive adv
 - [x] **One-click validator setup** — `x3_operator` Python tool exists. Make it a GUI wizard in the Tauri app. Click → install → stake → live.
 - [x] **Validator performance leaderboard** — ranked by: uptime, blocks produced, GPU benchmark score, MEV share returned.
 - [x] **Automated validator alert system** — email/push notification when your validator misses a block, gets slashed, or needs an update. *ValidatorAlertsPanel tracks 5+ alert types with configurable rules.*
-- [x] **Geographic distribution map** — `WorldMonitorPanel` shows validator positions on a globe. Make it real-time with actual IP geolocation. *GeoDistributionPanel shows 5 validators across 4 regions with interactive SVG map.*
+- [x] **Geographic distribution map** — `WorldMonitorPanel` shows validator positions on a globe. Make it real-time with actual IP geolocation. *GeoDistributionPanel renders a static SVG map with placeholder validator positions; no live geolocation.*
 - [ ] **Hardware requirement calculator** — input your hardware spec, get estimated TPS capacity and revenue projection.
 - [x] **Validator staking pooling** — users who can't afford minimum stake delegate to a pool operator. Pool distributes rewards proportionally.
 

@@ -72,7 +72,7 @@ Running a geographically diverse testnet is the only practical way to uncover la
    - Slashing triggers
 2. Adversarial Scenarios
    - Kill a validator mid-block
-   - Add 300ms latency
+   - Add a 300ms latency target
    - Drop 20% packets
    - Restart during finality
 3. Load Testing

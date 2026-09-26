@@ -62,7 +62,7 @@
 | Item | Status | Evidence |
 |---|---|---|
 | Node boots deterministically | ✅ | `scripts/run-srtool.sh` + `launch-gates/evidence/substrate/srtool-installed-*.sha256` |
-| Aura producing blocks | ✅ | `.testnet-audit/run1/dev-node.log`; 110.6 TPS verified |
+| Aura producing blocks | ✅ | 110.6 TPS measured on a single dev node; `.testnet-audit/run1/dev-node.log` |
 | GRANDPA finality | ⚠️ | 7/7 finalization **loopback only**; multi-host proof is W3 work in `MAINNET_GAMEPLAN.md` |
 | Graceful shutdown | ✅ | `node/src/service.rs:111` has `shutdown_tx` via `tokio::sync::mpsc::unbounded_channel`; service wiring at L118–126; exit codes documented (see `snapshot-restore.sh` exit code 2 = "validator not stopped, refusing backup on live node") |
 

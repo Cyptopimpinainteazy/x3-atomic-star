@@ -192,8 +192,8 @@ PROPOSAL = {
             "network_capacity": "limited by CPU validators"
         },
         "with_p4": {
-            "validator_tps": "100,000+ (250x improvement)",
-            "signature_verifications_per_sec": "500,000+ (25x improvement)",
+            "validator_tps": "100,000+ (target; 250x over the 400 baseline)",
+            "signature_verifications_per_sec": "500,000+ (target; 25x)",
             "consensus_finality": "Same (algorithm unchanged)",
             "network_capacity": "GPU-bound instead of CPU-bound",
             "cost_per_tx": "Drastically reduced (per tx bottleneck eliminated)"
@@ -227,7 +227,7 @@ PROPOSAL = {
         "week_2_cont": {
             "days": "11-14",
             "task": "Integration, testing, benchmarking",
-            "deliverable": "Full integration with Solana validator, 100k TPS benchmark",
+            "deliverable": "Full integration with Solana validator; 100k TPS benchmark (target)",
             "effort_hours": 24
         }
     },
@@ -251,17 +251,17 @@ PROPOSAL = {
     },
     "success_criteria": {
         "minimum": {
-            "signature_verification_throughput": "100,000+ sig/sec (5x improvement)",
+            "signature_verification_throughput": "100,000+ sig/sec (target; 5x)",
             "no_regression": "Validator still produces valid blocks on testnet",
             "latency_acceptable": "<100ms overhead from GPU batching"
         },
         "target": {
-            "signature_verification_throughput": "500,000+ sig/sec (25x improvement)",
-            "validator_tps": "50,000+ TPS (125x improvement)",
+            "signature_verification_throughput": "500,000+ sig/sec (target; 25x)",
+            "validator_tps": "50,000+ TPS (target; 125x)",
             "cost_improvement": "3-5x cheaper to run validator"
         },
         "stretch": {
-            "validator_tps": "100,000+ TPS (250x improvement)",
+            "validator_tps": "100,000+ TPS (target; 250x)",
             "full_solana_network": "Adoption by 10+ validators",
             "ecosystem_standard": "GPU acceleration becomes norm for validators"
         }
@@ -300,13 +300,13 @@ PROPOSAL = {
     
     ## Components
     - SolanaSignatureVerifier: Ed25519 batch verification on GPU (25x faster)
-    - SolanaPoHAccelerator: SHA256 chain computation on GPU (15x faster)
-    - SolanaTransactionValidator: Parallel account validation on GPU (10x faster)
+    - SolanaPoHAccelerator: SHA256 chain computation on GPU (target: 15x)
+    - SolanaTransactionValidator: Parallel account validation on GPU (target: 10x)
     
     ## Benchmarks
     - Signature verification: 18k→500k sig/sec
     - Transaction validation: 10k→100k tx/sec
-    - Validator TPS: 400→100,000 TPS
+    - Validator TPS (target): 400 → 100,000 TPS
     
     ## Testing
     - Unit tests against test vectors

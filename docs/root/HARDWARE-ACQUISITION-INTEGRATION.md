@@ -154,8 +154,9 @@ Subject: Research Partnership: GPU-Accelerated Blockchain Infrastructure
 
 Dear [NAME],
 
-We're building X3, a cross-chain blockchain infrastructure that uses GPU acceleration 
-for deterministic execution and fast consensus (300ms finality, 100K TPS).
+We're building X3, a cross-chain blockchain infrastructure that uses GPU acceleration
+for deterministic execution and fast consensus (300ms finality and 100K TPS are targets,
+not measurements we can show yet).
 
 Your [GPU model] is perfect for our stack. We're exploring partnership options:
 
@@ -292,7 +293,7 @@ What's your typical GPU inflow? Let's discuss a pilot arrangement.
 ### Phase 2: Negotiations (Week 3-8)
 1. For each positive response, move to "in_discussion"
 2. Gather requirements: What hardware condition? What timeline? What volume?
-3. Negotiate: Use ROI calculator to model what you can afford ($0-$1000/GPU)
+3. Negotiate: Use the ROI calculator to model what you can afford (budget $0-$1000 per card)
 4. Create campaign in UI for each source
 
 ### Phase 3: Deal Closure (Week 9-12)

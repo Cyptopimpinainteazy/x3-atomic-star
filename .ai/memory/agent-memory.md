@@ -8411,3 +8411,59 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
   `T::EvmAdapter::validate` / `T::SvmAdapter::validate` accept, then re-attest the runtime in the same
   commit. Note that another session (`xxxstar-main-2d`, branch `fix/x3lang-finish`) is mid-flight on the
   compiler stack and **does** change wasm runtime bytes — coordinate before re-attesting.
+
+## 2026-09-26 — TICKET-139 closed: the claim scanner now reads the surfaces people read
+
+### What closed
+- **TICKET-139.** `scripts/ci/check-claims-hygiene.py` scanned root markdown, `docs/testnet-config` and
+  the CRM; the ledger measured ~150 unqualified figures outside that list. The surface list is now
+  `docs/**`, `production/public/**`, `.planning/**`, root markdown and the CRM, and every path the
+  ticket named is decided *in the file*: `benchmarks/`, `.audit/`, `infra-structure/`, `tests_phase4/`,
+  `tests_core/`, `tools/` are declared `EVIDENCE_RECORDS` with a reason each — and are *also* declared as
+  surfaces, so deleting an entry re-enables scanning and the gate can fail. `--list` prints the list,
+  the reasons and a per-prefix file count.
+- It found 41 claims, all corrected. The worst: `docs/openspec/changes/p4-solana-gpu-acceleration/
+  P4_IMPLEMENTATION_GUIDE.md` had **every** success criterion ticked `[x]` ("100,000+ TPS on mainnet",
+  "500,000 Ed25519 sig/sec") for a GPU system with no `.cu`/`.ptx`, no artifact and no benchmark;
+  `production/public/x3-{ecosystem,validators}.html` sold "zero-fee flashloans", "sub-200ms finality"
+  and "200ms finality vs ETH's 60s"; `.planning/README.md` carried a dated `Testnet Live | Public
+  testnet running 100+ nodes, 1000 TPS` row for a testnet this ledger records as undeployed.
+- Two new rule classes came with the widened surfaces, because they turned up lines that look like
+  claims and are not: an unchecked `- [ ]` box is a plan item (a checked `[x]` stays a claim), and
+  `acceptance`/`require(d)`/`requirement(s)`/`criteria`/`criterion`/`threshold`/`must`/`goal(s)`/
+  `objective(s)`/`versus`/`vs`/`expected`/`projected`/`projection`/`estimate(d)` mark a bound or a
+  projection rather than a result.
+
+### Facts worth not re-deriving
+- The scanner reads **tracked** files only (`git ls-files`). A probe in a new surface must be
+  `git add -N`'d or it is invisible — that is how the "new surface is scanned" control is run.
+- `git ls-files` + reading every text file takes ~65-70 s on this tree; budget for it, do not read it as
+  a hang. 5498 files scanned / 476 claim surfaces / 520 evidence records is today's shape.
+- The `claims hygiene` gate output string is recorded as test evidence in
+  `feature-matrix/claims-hygiene.toml`; changing the output line means the registry is stale until it
+  moves. `feature matrix check` and `check-readiness-consistency.sh` both pass after the update.
+
+### Negative controls measured (reproduce these, not the prose)
+```
+OK   - 5498 file(s) scanned, 476 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
+FAIL - production/public probe `<p>Sub-200ms finality at 100,000 TPS.</p>`   (new surface IS scanned)
+OK   - same file, `- [ ] 1,000 TPS demonstrated`                             (a plan item is not a claim)
+FAIL - same file, `- [x] 1,000 TPS demonstrated`                             (a ticked box is a claim)
+FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (the skip list is load-bearing)
+```
+
+### Dead ends to avoid
+- Do not exempt `docs/openspec/**` as a "proposal record" to avoid fixing it: its checklist *did* tick
+  results, which is exactly the class the gate exists for. The honest fix is the unchecked box plus the
+  note that nothing builds it.
+- `benchmarks/tps-archive-2026-02/README.md` is honest and self-qualifying (it records ~575 TPS
+  single-host and 30.6 TPS on 7 validators, and says what the numbers are *not*). Do not "fix" it; it is
+  the evidence that makes `VALIDATION_INDEX.md`'s old "1,000 TPS ✅ Achieved" line false.
+
+### Next task seed
+- `X3-LANG-004` is still the top locally-actionable item (EVM/SVM payload convention for
+  `submit_comit_v2`, then one runtime re-attestation in the same commit) — but `crates/x3-integration`
+  and `pallets/x3-kernel` are runtime-affecting, so check `ps`/`git log` for the compiler-stack session
+  before starting. The next scanner-shaped item, if the compiler stack is busy, is TICKET-140
+  (`apps/**` surfaces) or TICKET-141 (`Now live on testnet` on the public pages) — both in
+  TESTNET_GAP_LEDGER.md, both non-runtime.

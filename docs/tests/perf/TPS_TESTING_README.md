@@ -49,7 +49,7 @@ docker-compose -f tests/perf/docker-compose.tps.yml down
 
 ### Components
 
-#### 1. TPS Tracker (Rust Crate)
+#### TPS Tracker (Rust Crate)
 **Location:** `crates/tps-tracker/`
 
 Polls the X3 Chain RPC endpoint and collects:

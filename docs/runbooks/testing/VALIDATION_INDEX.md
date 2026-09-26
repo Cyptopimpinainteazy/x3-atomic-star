@@ -53,7 +53,7 @@
   - ✅ Error handling coverage (100%)
   - ✅ Documentation metrics (100% coverage)
   - ✅ Structural validation matrices
-  - ✅ Performance benchmarks (1,000 TPS validated)
+  - ⚠️ Performance benchmarks (1,000 TPS is a target, not demonstrated: the highest recorded chain-level figure is ~575 TPS single-host and 30.6 TPS on a 7-validator network, benchmarks/tps-archive-2026-02/README.md)
   - ✅ Security assessment (input validation, access control, etc.)
   - ✅ Final validation verdict (READY FOR DEPLOYMENT)
 
@@ -202,7 +202,7 @@ Priority Task 4 (CLI + Docs):       2,279 lines ✅
 | Test Coverage | 80% | 95%+ | ✅ Excellent |
 | Code Review | Passes | Passes | ✅ Approved |
 | Security Audit | Ready | Ready | ✅ Passed |
-| Performance | 1K TPS | Validated | ✅ Achieved |
+| Performance | 1K TPS | Not demonstrated | ⚠️ Pending |
 | Overall Quality Score | 90/100 | 98/100 | ✅ Excellent |
 
 ---
