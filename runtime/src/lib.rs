@@ -2788,10 +2788,15 @@ parameter_types! {
     pub const MinOrderingBond: Balance = 10 * DOLLARS;
     /// Commitments one ordering window accepts. Bounds both the storage a window
     /// can occupy and the work settling it does.
-    pub const MaxOrderingCommits: u32 = 1024;
+    ///
+    /// Bounded by what a *settle* can be charged: settling replays the window, and a weight that
+    /// exceeds the block budget is a window that can be committed into and never settled — measured
+    /// on local3 on 2026-09-26, where the previous 1024 (with a 1 MiB byte ceiling) put the settle
+    /// extrinsic over the block limit and the pool refused it outright.
+    pub const MaxOrderingCommits: u32 = 256;
     /// Total revealed plaintext one ordering window may hold. Settling reads all
     /// of it in one transaction, so this is what keeps every window settlable.
-    pub const MaxOrderingWindowBytes: u32 = 1_048_576;
+    pub const MaxOrderingWindowBytes: u32 = 262_144;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]

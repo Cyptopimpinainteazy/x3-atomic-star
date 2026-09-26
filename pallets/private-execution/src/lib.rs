@@ -1234,7 +1234,10 @@ pub mod pallet {
         /// chain does not depend on one account staying up to settle. Unrevealed
         /// commitments forfeit their bonds here.
         #[pallet::call_index(11)]
-        #[pallet::weight(T::WeightInfo::settle_ordering_window(T::MaxOrderingCommits::get()))]
+        // Charged for what the window actually holds, not for its capacity: a two-commit window
+        // must not cost what a full one costs, or the settle is refused by the pool and the bonds
+        // it holds can never be released (measured on local3, 2026-09-26).
+        #[pallet::weight(Pallet::<T>::settle_ordering_weight(*window_id))]
         pub fn settle_ordering_window(origin: OriginFor<T>, window_id: u64) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -1477,6 +1480,19 @@ pub mod pallet {
             }
 
             Ok(settlement)
+        }
+
+        /// The weight a settle of `window_id` is charged: its recorded commitments and revealed
+        /// bytes, or the configured capacity when the window does not exist yet (the dispatch then
+        /// fails with `OrderingWindowNotFound`, so the charge only has to be non-zero).
+        fn settle_ordering_weight(window_id: u64) -> Weight {
+            match OrderingWindows::<T>::get(window_id) {
+                Some(record) => T::WeightInfo::settle_ordering_window(
+                    record.commitment_count,
+                    record.revealed_bytes,
+                ),
+                None => T::WeightInfo::settle_ordering_window(T::MaxOrderingCommits::get(), 0),
+            }
         }
 
         /// The block whose hash is a window's ordering beacon: the one right after it closed.

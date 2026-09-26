@@ -654,6 +654,19 @@ GATES_LIVE=(
   # Pointing X3_UPGRADE_WASM at the blob the chain already runs makes it FAIL, which is
   # how the "the version changed" check is known to be able to say no.
   "runtime upgrade through governance:bash scripts/mainnet/runtime_upgrade_rehearsal.sh"
+  # The commit-reveal ordering window, on a live three-validator chain. X3-MEV-006 and X3-MEV-008
+  # carried "no live-node run" for two rounds, and the reason was not scheduling: window open and
+  # commit required private execution *and* the confidential-validator quorum, while this runtime
+  # refuses every attestation by policy (`AttestationVerifier = RefuseAllAttestations`), so that
+  # quorum can never be met and no window could ever be opened. `c917917d6` gave the lane its own
+  # switch; this gate turns it on with a council motion, drives the whole lifecycle, and then makes
+  # the driver recompute the canonical order from the stored beacon and require the chain's settled
+  # order to equal it. Measured: the first live run found a real defect — the settle weight was
+  # charged for the window's *capacity* (1 MiB + 1024 commitments), which exceeds the block budget,
+  # so the settle extrinsic was refused by the pool and a window could be committed into and never
+  # settled. It is charged for the window's actual contents now, and the runtime caps were reduced
+  # so even a full window fits.
+  "ordering window on a live chain:bash scripts/drills/ordering_window_live.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1128,6 +1141,7 @@ SERIAL_GATES=(
   "public testnet gate across seven validators"
   "snapshot restore across a live chain"
   "runtime upgrade through governance"
+  "ordering window on a live chain"
   "load soak across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"

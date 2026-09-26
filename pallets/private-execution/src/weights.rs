@@ -25,8 +25,12 @@ pub trait WeightInfo {
     fn commit_ordering() -> Weight;
     fn reveal_ordering() -> Weight;
     /// Settling replays the whole window through the ordering lane, so its cost
-    /// is a function of the window capacity rather than a constant.
-    fn settle_ordering_window(commitments: u32) -> Weight;
+    /// is a function of what the window actually holds: the commitments it took
+    /// and the plaintext it revealed. Charging the *capacity* made a two-commit
+    /// window cost as much as a full one — measured on local3, that exceeded the
+    /// block's weight budget and the settle extrinsic was refused by the pool, so
+    /// a window could be committed into and never settled.
+    fn settle_ordering_window(commitments: u32, revealed_bytes: u32) -> Weight;
     fn install_ordering_beacon() -> Weight;
 }
 
@@ -94,11 +98,11 @@ impl<T: crate::Config> WeightInfo for SubstrateWeight<T> {
     /// configured plaintext budget, plus the fixed cost of building and settling
     /// the lane. Settling reads every commitment and every reveal, so both the
     /// capacity and the window's byte ceiling set the size of the proof.
-    fn settle_ordering_window(commitments: u32) -> Weight {
+    fn settle_ordering_window(commitments: u32, revealed_bytes: u32) -> Weight {
         let per_commitment = T::DbWeight::get()
             .reads(2_u64)
             .saturating_add(T::DbWeight::get().writes(1_u64));
-        let proof_size = (T::MaxOrderingWindowBytes::get() as u64)
+        let proof_size = (revealed_bytes as u64)
             .saturating_add(4_096)
             .saturating_add((commitments as u64).saturating_mul(256));
         Weight::from_parts(60_000_000, proof_size)
@@ -143,11 +147,11 @@ impl WeightInfo for () {
     fn reveal_ordering() -> Weight {
         Weight::from_parts(24_000_000, 512).saturating_add(RocksDbWeight::get().reads_writes(4, 2))
     }
-    fn settle_ordering_window(commitments: u32) -> Weight {
+    fn settle_ordering_window(commitments: u32, revealed_bytes: u32) -> Weight {
         let per_commitment = RocksDbWeight::get()
             .reads(2_u64)
             .saturating_add(RocksDbWeight::get().writes(1_u64));
-        let proof_size = (crate::MAX_ORDERING_WINDOW_PLAINTEXT_BYTES as u64)
+        let proof_size = (revealed_bytes as u64)
             .saturating_add(4_096)
             .saturating_add((commitments as u64).saturating_mul(256));
         Weight::from_parts(60_000_000, proof_size)
