@@ -481,6 +481,14 @@ pub mod pallet {
         OrderingBeaconWhileOpen,
         /// This window already has an ordering beacon.
         OrderingBeaconAlreadySet,
+        /// The window's beacon block has no hash yet, or the chain reports none.
+        ///
+        /// A refusal, not a fallback: a beacon of zero is a value an attacker can assume, and
+        /// settling without the chain's own beacon would let the installer's timing decide the
+        /// order — which is the hole this beacon exists to close.
+        OrderingBeaconUnavailable,
+        /// The stored beacon is not the one this window's close block produces.
+        OrderingBeaconMismatch,
         /// The reserved bond was not exactly the amount the commitment posted.
         OrderingBondNotReserved,
         /// The unrevealed bond could not be removed in full.
@@ -1059,7 +1067,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Install the ordering beacon for a closed window (admin only).
+        /// Install the ordering beacon for a closed window.
         ///
         /// The beacon is what closes the placement hole a commit–reveal lane has
         /// on its own: with no beacon the order key is the commit hash, so a
@@ -1067,14 +1075,17 @@ pub mod pallet {
         /// commitment lands. Installing it is refused while the window is open,
         /// because a value participants could still commit against would not be a
         /// beacon.
+        ///
+        /// The value is **derived from the chain**, not supplied: it is the hash of the block right
+        /// after the window closed. Until 2026-09-26 this extrinsic took a caller-supplied `beacon`
+        /// and was admin-gated, which left the same hole in a different place — whoever could call
+        /// it chose the value every order key is folded with. Deriving it removes the choice, and
+        /// the call is permissionless for the same reason settlement is: nothing it does depends on
+        /// who asks.
         #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::install_ordering_beacon())]
-        pub fn install_ordering_beacon(
-            origin: OriginFor<T>,
-            window_id: u64,
-            beacon: sp_core::H256,
-        ) -> DispatchResult {
-            T::AdminOrigin::ensure_origin(origin)?;
+        pub fn install_ordering_beacon(origin: OriginFor<T>, window_id: u64) -> DispatchResult {
+            ensure_signed(origin)?;
 
             let record =
                 OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
@@ -1089,6 +1100,7 @@ pub mod pallet {
                 Error::<T>::OrderingBeaconAlreadySet
             );
 
+            let beacon = Self::derive_ordering_beacon(window_id)?;
             OrderingWindows::<T>::mutate(window_id, |maybe| {
                 if let Some(record) = maybe.as_mut() {
                     record.beacon = Some(beacon);
@@ -1119,6 +1131,23 @@ pub mod pallet {
                 now > record.close_block,
                 Error::<T>::OrderingWindowStillOpen
             );
+
+            // The beacon is the chain's, and settlement does not depend on someone having called
+            // the installer: derive it here, take it if the window has none, and refuse if a stored
+            // value is not the one this close block produces. That makes the order a function of
+            // the commitment set *and* a block hash no participant could see while committing.
+            let beacon = Self::derive_ordering_beacon(window_id)?;
+            if let Some(stored) = record.beacon {
+                ensure!(stored == beacon, Error::<T>::OrderingBeaconMismatch);
+            } else {
+                OrderingWindows::<T>::mutate(window_id, |maybe| {
+                    if let Some(record) = maybe.as_mut() {
+                        record.beacon = Some(beacon);
+                    }
+                });
+            }
+            let mut record = record;
+            record.beacon = Some(beacon);
 
             let settlement = Self::settle_ordering_lane(window_id, &record, now)?;
 
@@ -1333,6 +1362,39 @@ pub mod pallet {
             }
 
             Ok(settlement)
+        }
+
+        /// The block whose hash is a window's ordering beacon: the one right after it closed.
+        ///
+        /// Fixed by the window's own `close_block`, so neither the installer nor whoever settles
+        /// chooses it, and it does not exist while participants can still commit.
+        fn ordering_beacon_block(record: &OrderingWindowRecord<T>) -> u64 {
+            record.close_block.saturating_add(1)
+        }
+
+        /// The chain's beacon for `window_id`, or a refusal.
+        ///
+        /// Zero means the chain reports no hash for that block — too early, or pruned. That is a
+        /// refusal rather than a fallback: a zero beacon is a constant an attacker can assume, and
+        /// folding a value the caller could pick is exactly the hole the beacon closes.
+        fn derive_ordering_beacon(
+            window_id: u64,
+        ) -> Result<sp_core::H256, sp_runtime::DispatchError> {
+            let record =
+                OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
+            // `BlockHash` is keyed by the runtime's block number type; the window stores blocks as
+            // `u64` (the lane's type), so convert rather than reinterpret.
+            let beacon_block: BlockNumberFor<T> =
+                Self::ordering_beacon_block(&record).saturated_into();
+            let block_hash = <frame_system::Pallet<T>>::block_hash(beacon_block);
+            let encoded = block_hash.encode();
+            ensure!(encoded.len() == 32, Error::<T>::OrderingBeaconUnavailable);
+            let beacon = sp_core::H256::from_slice(&encoded);
+            ensure!(
+                beacon != sp_core::H256::zero(),
+                Error::<T>::OrderingBeaconUnavailable
+            );
+            Ok(beacon)
         }
 
         /// Map a lane refusal onto the pallet's named error.

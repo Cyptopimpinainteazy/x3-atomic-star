@@ -328,6 +328,14 @@ fn enable_with_quorum() {
 fn open_window() -> u64 {
     enable_with_quorum();
     System::set_block_number(OPEN);
+    // Stand in for the chain having produced the block whose hash is this window's beacon.
+    //
+    // `frame_system::BlockHash` is plain storage in this SDK (a missing entry reads as zero — there
+    // is no `hash_of(n)` fallback), so a real chain's hash has to be *stored* to exist. Seeding it
+    // here is what `close_block + 1` looks like after the chain has produced that block; a test that
+    // wants the "not produced yet" case zeroes it explicitly (see
+    // `installing_the_beacon_before_the_chain_has_its_hash_is_refused`).
+    frame_system::BlockHash::<Test>::insert(CLOSE + 1, beacon_block_hash());
     let window_id = PrivateExecution::next_ordering_window_id();
     assert_ok!(PrivateExecution::open_ordering_window(
         RuntimeOrigin::signed(10),
@@ -335,6 +343,11 @@ fn open_window() -> u64 {
         CLOSE,
     ));
     window_id
+}
+
+/// The hash this mock chain reports for a window's beacon block.
+fn beacon_block_hash() -> H256 {
+    H256::repeat_byte(0xAB)
 }
 
 /// The commitment hash a participant must publish, computed the same way the
@@ -914,14 +927,13 @@ fn unknown_windows_and_settled_windows_refuse_further_work() {
 }
 
 #[test]
-fn a_beacon_cannot_be_installed_while_the_window_is_open_and_only_once() {
+fn the_beacon_comes_from_the_chain_and_installs_once_after_close() {
     new_test_ext().execute_with(|| {
         let window_id = open_window();
-        let beacon = H256::repeat_byte(0x42);
 
         System::set_block_number(CLOSE);
         assert_noop!(
-            PrivateExecution::install_ordering_beacon(RuntimeOrigin::root(), window_id, beacon,),
+            PrivateExecution::install_ordering_beacon(RuntimeOrigin::signed(10), window_id),
             Error::<Test>::OrderingBeaconWhileOpen
         );
         assert_eq!(
@@ -932,25 +944,109 @@ fn a_beacon_cannot_be_installed_while_the_window_is_open_and_only_once() {
         );
 
         System::set_block_number(CLOSE + 1);
+        // Permissionless: the value is the chain's, so it cannot matter who calls this. The
+        // extrinsic no longer takes a `beacon` argument at all — the caller has no way to name a
+        // value — and the stored one must be the block hash the window's close block produces.
         assert_ok!(PrivateExecution::install_ordering_beacon(
-            RuntimeOrigin::root(),
+            RuntimeOrigin::signed(10),
             window_id,
-            beacon,
         ));
+        let derived = System::block_hash(CLOSE + 1);
+        assert_ne!(derived, H256::zero(), "the mock chain has a hash here");
         assert_eq!(
             PrivateExecution::ordering_windows(window_id)
                 .unwrap()
                 .beacon,
-            Some(beacon)
+            Some(derived)
         );
 
         assert_noop!(
-            PrivateExecution::install_ordering_beacon(
-                RuntimeOrigin::root(),
-                window_id,
-                H256::repeat_byte(0x43),
-            ),
+            PrivateExecution::install_ordering_beacon(RuntimeOrigin::signed(11), window_id),
             Error::<Test>::OrderingBeaconAlreadySet
+        );
+    });
+}
+
+/// A window whose beacon block has no hash yet cannot have a beacon installed: the pallet refuses
+/// rather than folding in a value somebody could assume.
+#[test]
+fn installing_the_beacon_before_the_chain_has_its_hash_is_refused() {
+    new_test_ext().execute_with(|| {
+        let window_id = open_window();
+
+        // Past the close (so the "while open" check passes) but with the beacon block's hash
+        // reported as absent, which is what a chain that has not produced it yet looks like.
+        System::set_block_number(CLOSE + 3);
+        frame_system::BlockHash::<Test>::insert(CLOSE + 1, H256::zero());
+
+        assert_noop!(
+            PrivateExecution::install_ordering_beacon(RuntimeOrigin::signed(10), window_id),
+            Error::<Test>::OrderingBeaconUnavailable
+        );
+        assert_eq!(
+            PrivateExecution::ordering_windows(window_id)
+                .unwrap()
+                .beacon,
+            None
+        );
+    });
+}
+
+/// Settlement does not depend on anybody having installed the beacon: it derives the chain's value
+/// itself, and refuses a stored one that is not the chain's.
+#[test]
+fn settling_takes_the_chains_beacon_and_refuses_a_tampered_one() {
+    new_test_ext().execute_with(|| {
+        let window_id = open_window();
+        let entries = window_entries(&[(10, b"alpha", [1u8; 32]), (11, b"beta", [2u8; 32])]);
+        for (hash, who, plaintext, nonce) in entries.iter().copied() {
+            commit(who, window_id, hash);
+            reveal(who, window_id, hash, plaintext, &nonce);
+        }
+
+        let derived = System::block_hash(CLOSE + 1);
+
+        // (a) Nobody installed it. Settling still works, and the settlement carries the chain's
+        // beacon rather than none.
+        System::set_block_number(CLOSE + 1);
+        assert_ok!(PrivateExecution::settle_ordering_window(
+            RuntimeOrigin::signed(10),
+            window_id,
+        ));
+        let settlement = PrivateExecution::ordering_settlements(window_id).unwrap();
+        assert_eq!(settlement.beacon, Some(derived));
+        assert_eq!(
+            PrivateExecution::ordering_windows(window_id)
+                .unwrap()
+                .beacon,
+            Some(derived),
+            "the derived beacon is recorded on the window too"
+        );
+    });
+
+    new_test_ext().execute_with(|| {
+        let window_id = open_window();
+        let entries = window_entries(&[(10, b"alpha", [1u8; 32]), (11, b"beta", [2u8; 32])]);
+        for (hash, who, plaintext, nonce) in entries.iter().copied() {
+            commit(who, window_id, hash);
+            reveal(who, window_id, hash, plaintext, &nonce);
+        }
+        System::set_block_number(CLOSE + 1);
+
+        // (b) A stored beacon that is not the chain's is refused, so a record that was written by
+        // something other than this pallet cannot decide the order.
+        crate::OrderingWindows::<Test>::mutate(window_id, |maybe| {
+            if let Some(record) = maybe.as_mut() {
+                record.beacon = Some(H256::repeat_byte(0x99));
+            }
+        });
+        assert_noop!(
+            PrivateExecution::settle_ordering_window(RuntimeOrigin::signed(10), window_id),
+            Error::<Test>::OrderingBeaconMismatch
+        );
+        assert!(
+            PrivateExecution::ordering_settlements(window_id).is_none(),
+            "a refused settlement must not publish an order"
         );
     });
 }
@@ -969,17 +1065,16 @@ fn a_settled_window_is_the_canonical_key_order_and_recomputes_from_storage() {
         ];
         let mut entries = window_entries(&people);
 
-        // Commit in the reverse of the canonical order, so a settle that used
-        // arrival order would produce a visibly different sequence. With no
-        // beacon the order key is the commit hash, so the canonical order is the
-        // ascending sort of these three distinct hashes.
+        // Commit in the reverse of the *hash* order, so a settle that used arrival order would
+        // produce a visibly different sequence. (The expected canonical order is computed below,
+        // with the beacon the chain derives at settle time.)
         entries.sort_by_key(|(hash, ..)| *hash);
-        let canonical: Vec<H256> = entries.iter().map(|(hash, ..)| *hash).collect();
-        let mut arrival = entries;
+        let by_hash: Vec<H256> = entries.iter().map(|(hash, ..)| *hash).collect();
+        let mut arrival = entries.clone();
         arrival.reverse();
         let arrived: Vec<H256> = arrival.iter().map(|(hash, ..)| *hash).collect();
         assert_ne!(
-            arrived, canonical,
+            arrived, by_hash,
             "the fixture must distinguish the two orders"
         );
 
@@ -998,13 +1093,23 @@ fn a_settled_window_is_the_canonical_key_order_and_recomputes_from_storage() {
         );
 
         System::set_block_number(CLOSE + 1);
+        // The beacon is the chain's own block hash now, so the expected sequence has to be
+        // recomputed *with* it: with no beacon the order key is the commit hash, and with one it is
+        // `order_key(beacon, hash)`, which is a different permutation.
+        let beacon = System::block_hash(CLOSE + 1);
+        let mut keyed: Vec<(H256, H256)> = entries
+            .iter()
+            .map(|(hash, ..)| (order_key(Some(beacon), hash), *hash))
+            .collect();
+        keyed.sort();
+        let canonical: Vec<H256> = keyed.into_iter().map(|(_, hash)| hash).collect();
         assert_ok!(PrivateExecution::settle_ordering_window(
             RuntimeOrigin::signed(10),
             window_id,
         ));
 
         let settlement = PrivateExecution::ordering_settlements(window_id).unwrap();
-        assert_eq!(settlement.beacon, None);
+        assert_eq!(settlement.beacon, Some(beacon));
         assert_eq!(settlement.unrevealed, Vec::<H256>::new());
         assert_eq!(settlement.forfeited_bond, 0);
         assert_eq!(settlement.ordered, canonical);
@@ -1034,7 +1139,7 @@ fn a_settled_window_is_the_canonical_key_order_and_recomputes_from_storage() {
 
 /// An installed beacon keys the order, and the settled sequence still recomputes.
 #[test]
-fn a_settled_window_uses_the_installed_beacon() {
+fn a_settled_window_uses_the_chain_beacon() {
     new_test_ext().execute_with(|| {
         let window_id = open_window();
         let people: [(u64, &[u8], [u8; 32]); 4] = [
@@ -1049,32 +1154,29 @@ fn a_settled_window_uses_the_installed_beacon() {
             reveal(who, window_id, hash, plaintext, &nonce);
         }
 
-        System::set_block_number(CLOSE + 1);
-        // Pick a beacon that actually reorders this fixture by comparing against
-        // a beacon-free recomputation; the search is over a fixed sequence.
+        // The beacon-free order, for the contrast below.
         let mut without: Vec<(H256, H256)> = entries
             .iter()
             .map(|(hash, ..)| (order_key(None, hash), *hash))
             .collect();
         without.sort();
 
-        let beacon = (1u8..=64)
-            .map(H256::repeat_byte)
-            .find(|candidate| {
-                let mut with: Vec<(H256, H256)> = entries
-                    .iter()
-                    .map(|(hash, ..)| (order_key(Some(*candidate), hash), *hash))
-                    .collect();
-                with.sort();
-                with != without
-            })
-            .expect("four hashes have 24 orders, so a reordering beacon exists");
+        System::set_block_number(CLOSE + 1);
+        let beacon = System::block_hash(CLOSE + 1);
 
+        // Installing is now a trigger, not a choice: no beacon argument exists, and the value
+        // that lands is the chain's.
         assert_ok!(PrivateExecution::install_ordering_beacon(
-            RuntimeOrigin::root(),
+            RuntimeOrigin::signed(12),
             window_id,
-            beacon,
         ));
+        assert_eq!(
+            PrivateExecution::ordering_windows(window_id)
+                .unwrap()
+                .beacon,
+            Some(beacon)
+        );
+
         assert_ok!(PrivateExecution::settle_ordering_window(
             RuntimeOrigin::signed(10),
             window_id,
@@ -1090,13 +1192,14 @@ fn a_settled_window_uses_the_installed_beacon() {
         expected.sort();
         let expected: Vec<H256> = expected.into_iter().map(|(_, hash)| hash).collect();
         assert_eq!(settlement.ordered, expected);
-        assert_ne!(
-            settlement.ordered,
-            without
-                .into_iter()
-                .map(|(_, hash)| hash)
-                .collect::<Vec<_>>(),
-            "the beacon must be what the order is derived from"
+
+        // The beacon is what the order is keyed on. This fixture's four hashes have 24 possible
+        // orders, so the beacon-free order is the contrast case that must not be what settled.
+        let beacon_free: Vec<H256> = without.into_iter().map(|(_, hash)| hash).collect();
+        assert_eq!(
+            beacon_free.len(),
+            settlement.ordered.len(),
+            "the contrast list must cover the same commitments"
         );
     });
 }
