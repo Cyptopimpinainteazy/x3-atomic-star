@@ -190,45 +190,104 @@ fn atomic_check_reports_the_window_it_is_in() {
     );
 }
 
-/// A rollback restores what the window changed. The observable state here is the module's global,
-/// so the test writes one inside the window, rolls back, and reads it outside.
+/// A rollback restores what the window changed and ends the execution, exactly as the `std` VM
+/// does.
+///
+/// The abort makes the restored global unobservable *from this program*, so a test that only
+/// asserted the error would pass with no snapshot at all. Two things make it non-vacuous: the same
+/// artifact with the rollback replaced by a commit reads back the value the window wrote, so the
+/// write the window had to undo is real; and the engine that tools run (`x3-vm`) has to abort on
+/// the same bytes, so the two interpreters cannot drift apart here.
 #[test]
-fn a_rollback_restores_the_global_the_window_changed() {
-    let mut module = BytecodeModule::new();
-    let init = module
-        .const_pool
-        .add_integer(11)
-        .expect("the writer must accept an integer constant");
-    module.globals.push(x3_backend::bc_format::GlobalEntry {
-        name: "g".to_string(),
-        type_tag: 1,
-        mutable: true,
-        init_const: init,
-    });
-    module.functions.push(FunctionEntry {
-        name: "main".to_string(),
-        entry_point: 0,
-        param_count: 0,
-        local_count: 16,
-        max_stack: 16,
-        return_type_tag: 1,
-    });
-    module.code = vec![
-        0x90, 0x00, 0x00, // AtomicBegin 0
-        0x18, 0x01, 99, // LoadImm r1, 99
-        0x13, 0x00, 0x00, 0x00, 0x00, 0x01, // StoreGlobal 0 <- r1
-        0x92, 0x00, 0x00, // AtomicRollback 0
-        0x12, 0x00, 0x00, 0x00, 0x00, 0x00, // LoadGlobal r0 <- 0
-        0x05, 0x00, // Ret r0
-    ];
-    let bytes = module.to_bytes();
+fn a_rollback_aborts_and_both_engines_abort_with_it() {
+    // This module needs a global to write, so it cannot use `module_with_code` (which builds a
+    // module with no globals); the envelope is otherwise the same.
+    let build = |code: &[u8]| -> Vec<u8> {
+        let mut module = BytecodeModule::new();
+        let init = module
+            .const_pool
+            .add_integer(11)
+            .expect("the writer must accept an integer constant");
+        module.globals.push(x3_backend::bc_format::GlobalEntry {
+            name: "g".to_string(),
+            type_tag: 1,
+            mutable: true,
+            init_const: init,
+        });
+        module.functions.push(FunctionEntry {
+            name: "main".to_string(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 16,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = code.to_vec();
+        module.to_bytes()
+    };
+    // The body is built twice: once ending the window with a rollback, once with a commit.
+    let body = |window_end: u8| -> Vec<u8> {
+        vec![
+            0x90, 0x00, 0x00, // AtomicBegin 0
+            0x18, 0x01, 99, // LoadImm r1, 99
+            0x13, 0x00, 0x00, 0x00, 0x00, 0x01, // StoreGlobal 0 <- r1
+            window_end, 0x00, 0x00, // AtomicRollback / AtomicCommit 0
+            0x12, 0x00, 0x00, 0x00, 0x00, 0x00, // LoadGlobal r0 <- 0
+            0x05, 0x00, // Ret r0
+        ]
+    };
 
-    // The rollback ends the execution, exactly as the `std` VM's `AtomicAborted` does, so the
-    // interpreter is asked with the rollback removed to read the global back.
-    let outcome = execute_x3bc(&bytes, 100_000);
+    let rollback = build(&body(0x92));
     assert_eq!(
-        outcome.unwrap_err(),
+        execute_x3bc(&rollback, 100_000).unwrap_err(),
         X3Error::AtomicAborted,
         "an atomic rollback aborts the execution; it does not continue past the window"
+    );
+
+    // The engine a block runs and the engine tools run must agree on that.
+    let mut vm = x3_vm::VM::from_bytes(&rollback).expect("the std VM loads the same artifact");
+    let error = vm
+        .call_function(0, &[])
+        .expect_err("the std VM must abort on a rollback too");
+    assert!(
+        matches!(error.kind, x3_vm::VMErrorKind::AtomicAborted),
+        "the std VM's rollback must be AtomicAborted, got {:?}",
+        error.kind
+    );
+
+    // Control: with the window committed instead of rolled back, the write survives and is
+    // observable. Without this, the test would pass against an interpreter that reverted nothing.
+    let committed = build(&body(0x91));
+    let result = execute_x3bc(&committed, 100_000).expect("a committed window runs to the end");
+    assert_eq!(
+        result.return_val,
+        MiniValue::I64(99),
+        "the store inside the window must be real"
+    );
+}
+
+/// The window depth is bounded, so a program cannot make the interpreter hold an unbounded number
+/// of globals copies. `MAX_ATOMIC_DEPTH` is the advertised limit, and both sides of it are
+/// asserted: the deepest legal nesting runs, one window more is refused by name. A limit that is
+/// only enforced in the code and never on either side of its boundary is a number, not a bound.
+#[test]
+fn nesting_more_windows_than_the_limit_is_refused() {
+    let nested = |depth: usize| -> Vec<u8> {
+        let mut code = Vec::new();
+        for _ in 0..depth {
+            code.extend_from_slice(&[0x90, 0x00, 0x00]); // AtomicBegin 0
+        }
+        code.push(0x06); // RetVoid
+        module_with_code(&code)
+    };
+
+    assert!(
+        execute_x3bc(&nested(32), 1_000_000).is_ok(),
+        "the deepest legal nesting must still run"
+    );
+    assert_eq!(
+        execute_x3bc(&nested(33), 1_000_000).unwrap_err(),
+        X3Error::AtomicDepthExceeded,
+        "one window past the limit must be refused, not tracked"
     );
 }
