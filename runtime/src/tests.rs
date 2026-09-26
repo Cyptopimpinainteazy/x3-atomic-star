@@ -68,6 +68,61 @@ fn settlement_intent_creation_is_wired_through_the_runtime() {
     });
 }
 
+/// A window the chain can open must also be a window it can *settle*, in one block, as one
+/// transaction.
+///
+/// This is the invariant a live run found the hard way: the ordering lane could be opened,
+/// committed into and revealed on a three-validator chain, and then the settle was refused by the
+/// transaction pool with `Invalid Transaction: Transaction would exhaust the block limits` — a
+/// window whose bonds can never be released. The pool rejects a transaction whose declared weight
+/// does not fit the block, and the settle weight is a function of what the window holds, so the
+/// capacity and the byte ceiling the runtime configures have to be settlable in one transaction.
+/// A test at the pallet level cannot see this: it needs the runtime's own `BlockWeights`.
+#[test]
+fn a_full_ordering_window_is_settlable_in_one_block() {
+    use frame_support::weights::Weight;
+    use pallet_private_execution::WeightInfo;
+
+    let weights = BlockWeights::get();
+    let normal = weights.get(dispatch_class_normal());
+    let limit: Weight = normal
+        .max_total
+        .expect("with_sensible_defaults sets a max_total for the normal class");
+
+    // The worst case the runtime allows: every commitment slot taken and the whole plaintext budget
+    // revealed. If this does not fit, the runtime has configured a window it can never settle.
+    let worst = <Runtime as pallet_private_execution::Config>::WeightInfo::settle_ordering_window(
+        <Runtime as pallet_private_execution::Config>::MaxOrderingCommits::get(),
+        <Runtime as pallet_private_execution::Config>::MaxOrderingWindowBytes::get(),
+    );
+
+    assert!(
+        worst.all_lte(limit),
+        "settling a full ordering window weighs {worst:?}, which does not fit the normal class's \
+         {limit:?}: the pool would refuse every settle and the window's bonds could never be \
+         released. Lower MaxOrderingCommits/MaxOrderingWindowBytes, or price the settle."
+    );
+
+    // The control, and the reason this test exists: the capacity this runtime *used* to configure
+    // (1024 commitments and a 1 MiB plaintext ceiling) does not fit, which is the failure a live
+    // three-validator run hit — the window opened, was committed into and revealed, and every
+    // settle was refused by the pool with `Invalid Transaction: Transaction would exhaust the
+    // block limits`. If that configuration is ever restored, this test says so before a drill does.
+    let previously_configured =
+        <() as WeightInfo>::settle_ordering_window(1024, 1_048_576);
+    assert!(
+        !previously_configured.all_lte(limit),
+        "1024 commitments and 1 MiB of revealed plaintext weigh {previously_configured:?}, which \
+         is inside the normal class's {limit:?} — either this test's arithmetic is wrong or the \
+         block budget grew, and the live drill's failure needs re-deriving before that number is \
+         trusted."
+    );
+}
+
+fn dispatch_class_normal() -> frame_support::dispatch::DispatchClass {
+    frame_support::dispatch::DispatchClass::Normal
+}
+
 /// Settlement intents are per-account, so an unsigned origin must be refused
 /// rather than attributed to some default account.
 #[test]

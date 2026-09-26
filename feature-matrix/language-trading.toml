@@ -233,9 +233,9 @@ paths = [
   "node/tests/x3vm_live_lifecycle.rs",
   "node/tests/x3lang_network_receipt.rs",
 ]
-implemented = 75
-tested = 80
-mainnet_ready = 45
+implemented = 82
+tested = 85
+mainnet_ready = 48
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -244,6 +244,7 @@ blockers = [
   "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
   "What that still does not establish: no node or validator network has finalized a program whose *state* is then read from a second node. The live multi-validator test covers a receipt over a simple program; the state-carrying one runs against the pallet's mock runtime. The two halves are each proven and not yet joined on a live chain.",
   "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
+  "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. Still not joined: no validator network has finalized a state-carrying program and read its state from a second node, and the `.x3` *language* still cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip is proven with hand-assembled X3BC rather than compiled source.",
 ]
 required_tests = [
   "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
@@ -251,13 +252,19 @@ required_tests = [
   "a_store_reaches_chain_storage_through_the_receipt",
   "a_reverted_atomic_window_writes_no_chain_state",
   "a_failed_execution_does_not_report_the_writes_it_journaled",
+  "a_second_comit_reads_the_slot_the_first_one_wrote",
+  "a_comit_reads_zero_from_a_slot_the_chain_never_wrote",
+  "an_x3_execution_is_refused_when_the_slot_map_exceeds_the_priced_bound",
+  "both_engines_read_the_seeded_slot_and_report_it_as_the_old_value",
   "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
 ]
 test_evidence = [
   "crates/x3-integration/tests/compiler_bridge.rs",
   "node/tests/x3lang_network_receipt.rs",
   "pallets/x3-kernel/tests/x3_storage_channel.rs",
-  "note: the live half is the `X3Lang across validators` gate (three validators, submitter Alice, observer Charlie, identical receipt bytes at the same finalized block); the kernel half was re-run by the primary agent - cargo test -p pallet-x3-kernel --test x3_storage_channel -> 6 passed, 0 failed, including a_store_reaches_chain_storage_through_the_receipt",
+  "note: the live half is the `X3Lang across validators` gate (three validators, submitter Alice, observer Charlie, identical receipt bytes at the same finalized block); the kernel half was re-run by the primary agent - cargo test -p pallet-x3-kernel --test x3_storage_channel -> 9 passed, 0 failed (6 before), including a_second_comit_reads_the_slot_the_first_one_wrote",
+  "note: the read path is measured load-bearing - passing an empty slot view at the comit call site in `pallets/x3-kernel/src/lib.rs` reddens a_second_comit_reads_the_slot_the_first_one_wrote with `left: [0; 8] right: [7, 0, 0, 0, 0, 0, 0, 0]`; restoring returns 9/9",
+  "note: engine parity - cargo test -p x3-x3-integration --test interpreter_agreement -> 4 passed, including both_engines_read_the_seeded_slot_and_report_it_as_the_old_value, which requires both engines to report the same seeded old_value and each to report `None` without the seed",
   "note: the corpus test runs each fixture on both engines and requires the same value",
 ]
 evidence = [
