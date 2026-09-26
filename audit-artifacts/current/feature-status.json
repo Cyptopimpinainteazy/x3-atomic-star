@@ -3166,31 +3166,36 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 36,
+      "composite": 42,
       "confidence": "high",
       "evidence": [
-        "x3-lang/compiler",
-        "note: Trading Core v1 hardening item"
+        "crates/x3-vm/src/storage.rs",
+        "x3-lang/vm/src/trading.rs",
+        "note: Trading Core v1 hardening item; the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs and the rollback semantics are now proven at the storage level"
       ],
       "id": "X3-MEV-004",
-      "implemented": 50,
+      "implemented": 55,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Rollback semantics not yet fully proven"
+        "Re-measured 2026-09-26 on the *production* path (`crates/x3-vm`, which is what `pallet-x3-kernel` runs through `X3VmAdapter` \u2014 the row's own path, `x3-lang/compiler`, is not what the chain executes). The atomic window's rollback was not transactional: `VmStorage::rollback` restored the data map from its snapshot and then called `journal.clear()`, so every write recorded *before* the window was dropped from the journal too. Measured: write A, snapshot, write B, rollback -> `data = {A}` but an empty journal, and the journal is documented as the write delta for cross-VM sync. Fixed: the snapshot now records the journal length and rollback truncates to it, so a reverted window abandons only its own writes. Four tests, one break-it-first control (restoring `journal.clear()` reddens three of them).",
+        "The journal still has no writer, so nothing on a chain exercises the guarantee. `crates/x3-vm/src/vm.rs` mutates `self.storage` only through `snapshot`/`commit`/`rollback`; there is no instruction in the interpreter that writes a key. `EvmSstore`/`EvmSload` exist in the ISA and the verifier (operands `slot:u8 val:u8`, 5000 gas) but hit the interpreter's `_` arm and return `UnimplementedOpcode`. Until a store is interpreted (or a hostcall writes storage), X3VM contracts cannot persist state at all, and the atomic rollback over storage can only be proven at the unit level (TICKET-145).",
+        "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution \u2014 a contract that is stated in the trait's docs and enforced nowhere."
       ],
       "name": "Transactional host rollback",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/compiler",
+        "x3-lang/vm",
+        "crates/x3-vm/src/storage.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 45,
+      "tests": "tested score 45% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4489,7 +4494,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "ae80eb5e182b975cee561fc03f580944255352524cf9681f69a69aeafdd06194",
+    "source_digest": "3442c00172b31da6b0cf83b078a4af866166aa6f038bc3016f4eb2f971c13385",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4501,7 +4506,7 @@
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "85ac796e2a183e54c78da70abb28f6198bd8a15e5ad61d6914ce7f0aced32de6",
+      "feature-matrix/mev-privacy.toml": "972ae7bcc545d9065140faaa3812f75cda1f535e413000dab8b607e6a4b0f6ed",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"

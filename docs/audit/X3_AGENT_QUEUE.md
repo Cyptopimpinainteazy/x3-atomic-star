@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `ae80eb5e182b975c…` — the artifacts move when
+Source digest: `3442c00172b31da6…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -149,7 +149,7 @@ fails when they do not match.
 | MTX-X3-MEV-001 | mev_privacy | Cross-domain MEV protection: Needs threat model covering relayers, finality delays, and ordering | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 18% (no named test list on this row) | open |
 | MTX-X3-MEV-002 | mev_privacy | Private transaction submission controls: The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 40% (no named test list on this row) | open |
 | MTX-X3-MEV-003 | mev_privacy | Costs-before-profit evaluation: Measured on master 2026-09-22: the compiler carries a `max_price_impact` policy (`x3-lang/compiler/src/trading_semantic.rs`, `trading_lowering.rs`) and the VM enforces price-impact and MEV-leakage ceilings against host-reported measurements… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 45% (no named test list on this row) | open |
-| MTX-X3-MEV-004 | mev_privacy | Transactional host rollback: Rollback semantics not yet fully proven | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 25% (no named test list on this row) | open |
+| MTX-X3-MEV-004 | mev_privacy | Transactional host rollback: Re-measured 2026-09-26 on the *production* path (`crates/x3-vm`, which is what `pallet-x3-kernel` runs through `X3VmAdapter` — the row's own path, `x3-lang/compiler`, is not what the chain executes). The atomic window's rollback was not tra… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 45% (no named test list on this row) | open |
 | MTX-X3-MEV-005 | mev_privacy | Gas / economic execution limits: Hardening branch must enforce gas and capability versions | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 30% (no named test list on this row) | open |
 | MTX-X3-MEV-006 | mev_privacy | MEV-resistant architecture: No complete formal MEV threat model; do not claim MEV-proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | STUB · tested score 25% (no named test list on this row) | open |
 | MTX-X3-MEV-007 | mev_privacy | Encrypted mempool / threshold encryption: Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and the… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | STUB · tested score 40% (no named test list on this row) | open |

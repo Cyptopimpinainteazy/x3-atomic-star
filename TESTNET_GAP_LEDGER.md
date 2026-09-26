@@ -1051,3 +1051,45 @@ ingress, has a threshold of committee members decrypt it under the DKG epoch the
 executes it and checks the receipt — with the ordering lane deciding the order inside that same
 path, or an explicit record of which link is still missing and why. A unit test cannot satisfy this;
 the path is the point.
+**TICKET-145 — the production rollback dropped pre-window writes, and the journal has no writer.
+CLOSED (the first half) and OPEN (the second), 2026-09-26.**
+
+`X3-MEV-004` ("Transactional host rollback", P0, 50/25/30) cites `x3-lang/compiler`, but the chain
+does not run that compiler: `pallet-x3-kernel` executes X3BC through `crates/x3-vm`, and that is
+where the atomic window lives (`AtomicBegin` / `AtomicCommit` / `AtomicRollback`, with
+`AtomicAborted` as the aborted-scope error). Measured on 2026-09-26, its rollback was not
+transactional:
+
+```rust
+pub fn rollback(&mut self) -> Result<(), StorageError> {
+    let snap = self.snapshots.pop()...;
+    self.data = snap;
+    self.journal.clear();   // <- drops every write recorded BEFORE the window too
+    Ok(())
+}
+```
+
+Write `A`, snapshot, write `B`, roll back: `data = {A}` and an **empty** journal — while the journal
+is documented as "all writes since last flush", used for cross-VM delta sync. Whoever applies that
+delta loses `A`. Nested windows make it worse: an inner rollback wipes the outer window's writes as
+well.
+
+**Closed:** the snapshot now records `journal.len()` and the rollback truncates to it, so a reverted
+window abandons only its own writes. Four tests, and the control is measured: restoring
+`journal.clear()` makes
+`test_rollback_keeps_the_journal_of_writes_that_predate_the_window`,
+`test_nested_rollback_truncates_the_journal_to_the_inner_window` and
+`test_rollback_of_the_outer_window_abandons_a_committed_inner_window` fail; truncating returns the
+storage suite to 15/15. `cargo test -p x3-vm` is 154 passed.
+
+**Still open:** the journal cannot be populated from a program. `crates/x3-vm/src/vm.rs` touches
+`self.storage` only through `snapshot`/`commit`/`rollback` — no instruction writes a key.
+`EvmSstore`/`EvmSload` are in the ISA and the verifier (operands `slot:u8 val:u8`, 5000 gas) but hit
+the interpreter's `_` arm and return `UnimplementedOpcode`. So X3VM contracts cannot persist state
+at all today, which also means the atomic rollback over storage is proven only at the unit level.
+Acceptance: interpret a store opcode (or give a hostcall a storage write) with gas charged, then an
+end-to-end test that a rolled-back window leaves the store as it was *and* the applied delta without
+it. A second, related gap: `TradingHost::begin_transaction`/`commit_transaction`/
+`rollback_transaction` (`x3-lang/vm/src/trading.rs`) have no caller outside that crate's tests, and
+the language VM's `ATOMIC_ROLLBACK` restores VM state without invoking any host hook — safe only
+under an unwritten contract that hosts never apply effects during execution.
