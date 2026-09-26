@@ -38,12 +38,33 @@ name = "Agent kill-switch concept"
 subsystem = "agents_experimental"
 source = "master"
 paths = ["crates/x3-swarm-core"]
-implemented = 30
-tested = 10
-mainnet_ready = 15
+implemented = 70
+tested = 75
+mainnet_ready = 35
 priority = "P3"
 confidence = "high"
 launch_scope = "dev_tooling"
 claim_risk = false
-blockers = ["Previously claimed tests were fictional and removed"]
-evidence = ["crates/x3-swarm-core", "note: FEATURE_REGISTRY explicitly records missing kill-switch test"]
+blockers = [
+  "Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child — but the scheduler's only route to work was `next_task(AgentKind)`, which compared the agent's class and never asked the authority anything. Measured: with `Sanction::Kill` on record and a pending task queued, the killed agent was handed the task. Closed: `SwarmAuthority::may_dispatch` (no genesis record / terminated / expired / quarantined / suspended / killed -> `DispatchRefusal`) is now called by `SwarmScheduler::next_task_for`, which is the only public route to a task; `next_task` is gone, so a caller cannot bypass it. An unregistered agent is refused too — the dispatcher fails closed on an identity it cannot check rather than reading 'no record' as 'no violations'.",
+  "The crate is still not on the deployed path: `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, and its own service (`crates/x3-swarm-core/services/x3-swarm-api`) does not call the scheduler at all. A kill switch that stops a dispatch nothing performs is enforced but not yet load-bearing in production — that is the same gap as REG-x3_swarm_core-1, not something this change closes.",
+  "Sanctions escalate only; there is no governance reset path, so an agent that reaches Kill is permanently gone. That is intentional per AGENT_LAW §3, but it has never been exercised on a live multi-agent run, and there is still no race-condition or partition-tolerance testing for the control plane.",
+]
+required_tests = [
+  "a_killed_agent_is_not_handed_work",
+  "an_unregistered_agent_is_not_handed_work",
+  "a_quarantined_agent_is_refused_and_the_task_stays_pending",
+  "a_killed_agent_is_refused_even_though_a_task_waits",
+  "swarm_kill_switch_stops_agents",
+  "swarm_agent_can_receive_task",
+]
+test_evidence = [
+  "crates/x3-swarm-core/src/scheduler.rs",
+  "crates/x3-swarm-core/tests/agent_lifecycle.rs",
+  "note: the `test x3-swarm-core` gate runs `cargo test --locked --all-targets` for the crate; measured 83 passed (62 lib + 6 agent_lifecycle + 15 guard_tests), 0 failed, 0 ignored",
+  "note: measured load-bearing - deleting the `may_dispatch` call from `next_task_for` makes `a_killed_agent_is_not_handed_work` fail with the killed agent receiving task T-KILL, and restoring the call returns it to green",
+]
+evidence = [
+  "crates/x3-swarm-core",
+  "note: FEATURE_REGISTRY records the history - four required_tests were removed by CRITICAL-TOK-1 in 2026-09-06 because none existed as real test functions; they exist now, and the dispatch-refusal pair is added alongside them",
+]

@@ -23,7 +23,7 @@ pub mod task;
 pub use agent::{AgentKind, AgentPermissionTier};
 pub use approval::ApprovalGate;
 pub use audit::{AuditCategory, AuditEntry, AuditLog};
-pub use authority::{AuthorityError, SwarmAuthority};
+pub use authority::{AuthorityError, DispatchRefusal, SwarmAuthority};
 pub use events::SwarmEvent;
 pub use genesis::{
     AgentId, BlockHeight, GenesisError, GenesisRecord, GenesisStore, SupervisionMode,

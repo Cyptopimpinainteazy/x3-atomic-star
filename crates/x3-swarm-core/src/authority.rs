@@ -50,6 +50,52 @@ pub struct SwarmAuthority {
     audit: AuditLog,
 }
 
+/// Why an agent may not be given new work.
+///
+/// Every variant is a refusal, never a pass: the dispatcher asks this before it
+/// hands out a task, so an agent the authority cannot vouch for gets nothing.
+/// Measured 2026-09-26: the sanction ladder (`MisconductEngine::is_halted`) was
+/// complete and tested, but nothing on the scheduling path consulted it — a
+/// `Kill`'d agent was still handed the next `Pending` task, because
+/// `SwarmScheduler::next_task` only compared `AgentKind`. This type is what the
+/// dispatch path refuses with now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DispatchRefusal {
+    /// No genesis record for this id: an unregistered agent cannot act.
+    UnknownAgent(AgentId),
+    /// The genesis record is terminated (the kill path, or operator termination).
+    Terminated(AgentId),
+    /// The record's authorisation expired at or before `now`.
+    Expired {
+        agent_id: AgentId,
+        expiry_block: BlockHeight,
+    },
+    /// The misconduct ladder has halted the agent (quarantine / suspension / kill).
+    Halted {
+        agent_id: AgentId,
+        sanction: Sanction,
+    },
+    /// The authority cleared the agent, but it has no pending task.
+    NoTask,
+}
+
+impl core::fmt::Display for DispatchRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            DispatchRefusal::UnknownAgent(id) => write!(f, "agent {id:?} has no genesis record"),
+            DispatchRefusal::Terminated(id) => write!(f, "agent {id:?} is terminated"),
+            DispatchRefusal::Expired {
+                agent_id,
+                expiry_block,
+            } => write!(f, "agent {agent_id:?} expired at block {expiry_block}"),
+            DispatchRefusal::Halted { agent_id, sanction } => {
+                write!(f, "agent {agent_id:?} is halted: {sanction:?}")
+            }
+            DispatchRefusal::NoTask => write!(f, "no pending task for this agent"),
+        }
+    }
+}
+
 impl SwarmAuthority {
     pub fn new() -> Self {
         Self::default()
@@ -73,6 +119,54 @@ impl SwarmAuthority {
     /// Access the misconduct engine (for direct queries).
     pub fn misconduct(&self) -> &MisconductEngine {
         &self.misconduct
+    }
+
+    /// May this agent be given new work at block `now`?
+    ///
+    /// This is the dispatcher's only route to a task
+    /// ([`crate::scheduler::SwarmScheduler::next_task_for`]) and it is
+    /// deliberately fail-closed: every condition it cannot prove is a refusal.
+    ///
+    /// * no genesis record -> [`DispatchRefusal::UnknownAgent`]
+    /// * `terminated` -> [`DispatchRefusal::Terminated`]
+    /// * `expiry_block <= now` -> [`DispatchRefusal::Expired`]
+    /// * quarantine / suspension / kill -> [`DispatchRefusal::Halted`]
+    ///
+    /// A `Warning`, `Strike1`, `Strike2` or `BondSlash` does **not** refuse:
+    /// those are recorded against the agent, and the ladder only takes away the
+    /// ability to act at quarantine.
+    pub fn may_dispatch(
+        &self,
+        agent_id: &AgentId,
+        now: BlockHeight,
+    ) -> Result<(), DispatchRefusal> {
+        let record = self
+            .genesis
+            .get(agent_id)
+            .ok_or(DispatchRefusal::UnknownAgent(*agent_id))?;
+
+        if record.terminated {
+            return Err(DispatchRefusal::Terminated(*agent_id));
+        }
+
+        if let Some(expiry_block) = record.expiry_block {
+            if record.is_expired(now) {
+                return Err(DispatchRefusal::Expired {
+                    agent_id: *agent_id,
+                    expiry_block,
+                });
+            }
+        }
+
+        let sanction = self.misconduct.current_sanction(agent_id);
+        if sanction.is_halted() {
+            return Err(DispatchRefusal::Halted {
+                agent_id: *agent_id,
+                sanction,
+            });
+        }
+
+        Ok(())
     }
 
     /// Record a violation for `agent_id` and enforce the resulting sanction.
