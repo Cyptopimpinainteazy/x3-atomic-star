@@ -26921,6 +26921,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-order-window"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-packet-schema"
 version = "0.1.0"
 dependencies = [
@@ -27302,6 +27312,7 @@ dependencies = [
  "sp-core",
  "sp-std 14.0.0",
  "tokio",
+ "x3-order-window",
 ]
 
 [[package]]

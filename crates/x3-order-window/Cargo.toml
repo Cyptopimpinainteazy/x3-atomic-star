@@ -1,0 +1,23 @@
+[package]
+name = "x3-order-window"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "no_std commit-reveal ordering window: the fair-ordering lane the runtime can enforce"
+license.workspace = true
+publish = false
+
+[dependencies]
+# No `std` feature on any of them: this crate has to compile inside a runtime pallet, which cannot
+# link a std-only dependency graph. `serde` is required (the window types derive it) but built with
+# `default-features = false` + `alloc`, which is what a no_std build needs.
+sp-core = { workspace = true, default-features = false, features = ["serde"] }
+sp-std = { workspace = true, default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+
+[features]
+default = ["std"]
+std = ["sp-core/std", "sp-std/std", "serde/std"]
+
+[dev-dependencies]
+serde_json = "1"

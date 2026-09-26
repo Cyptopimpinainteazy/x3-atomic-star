@@ -125,6 +125,7 @@ members = [
     "crates/x3-accounting-events",
     "crates/x3-accel",
     "crates/x3-accel-wgpu",
+    "crates/x3-order-window",
     "crates/x3-asset-kernel-types",
     "crates/x3-atomic-trade",
     "crates/x3-atomic-swap",

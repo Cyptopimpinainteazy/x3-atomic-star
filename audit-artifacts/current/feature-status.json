@@ -3305,6 +3305,7 @@
       ],
       "name": "Fair transaction ordering",
       "paths": [
+        "crates/x3-order-window",
         "crates/x3-swap-router/src/mev_protection",
         "crates/x3-dex/src/batch_swap_router.rs"
       ],
@@ -4488,7 +4489,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "ca16ade14c483d7915701da58af6be22c4baf5eaad1259b71e408d42cf582e20",
+    "source_digest": "ae80eb5e182b975cee561fc03f580944255352524cf9681f69a69aeafdd06194",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
@@ -4500,7 +4501,7 @@
       "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "4dcc8d89f8dba461502aa3a846fb065fc6e48ca616d23f65cd301cdb2dca2453",
+      "feature-matrix/mev-privacy.toml": "85ac796e2a183e54c78da70abb28f6198bd8a15e5ad61d6914ce7f0aced32de6",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"

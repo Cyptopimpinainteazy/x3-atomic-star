@@ -185,6 +185,7 @@ name = "Fair transaction ordering"
 subsystem = "mev_privacy"
 source = "master"
 paths = [
+  "crates/x3-order-window",
   "crates/x3-swap-router/src/mev_protection",
   "crates/x3-dex/src/batch_swap_router.rs",
 ]
