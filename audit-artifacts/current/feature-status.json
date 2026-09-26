@@ -2944,32 +2944,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 44,
+      "composite": 64,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
-        "note: Trading Core v1 gap #4"
+        "note: Trading Core v1 gap #4",
+        "note: Trading Core v1 gap #10",
+        "note: TICKET-147 in TESTNET_GAP_LEDGER.md"
       ],
       "id": "X3-LANG-006",
-      "implemented": 55,
+      "implemented": 75,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 45,
       "missing_work": [
-        "Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes"
+        "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
+        "What that still does not establish: no node or validator network has finalized a program whose *state* is then read from a second node. The live multi-validator test covers a receipt over a simple program; the state-carrying one runs against the pallet's mock runtime. The two halves are each proven and not yet joined on a live chain.",
+        "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit."
       ],
       "name": "Decoded bytecode \u2192 TradingVm execution",
       "paths": [
         "crates/x3-integration",
-        "crates/x3-vm"
+        "crates/x3-vm",
+        "pallets/x3-kernel",
+        "node/tests/x3vm_live_lifecycle.rs",
+        "node/tests/x3lang_network_receipt.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3136,6 +3143,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 25,
       "missing_work": [
+        "**Superseded 2026-09-26 \u2014 the two entries below describe the tree before `6a3358041`/`23350ca0c`, and both of their central claims are now false; they are kept so the history is readable.** Both interpreters implement `evm_sstore`/`evm_sload` \u2014 `mini_x3`, the one a block runs, uses the same key derivation and the same tagged payload as `crates/x3-vm`, and `interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key byte for key byte \u2014 and the writes do land in chain state: the kernel applies them to its own `X3ContractStorage` keyspace through the typed `storage_writes` channel instead of the balance decoder, so `DecodeFailureCount` stays 0 for a storage-writing comit. What is still open is the *read*, not the write: nothing seeds a program's slots from chain state before it runs, so a second comit's `evm_sload` sees the interpreter's empty store rather than the slot the chain persisted; the per-slot weight is under-declared; and no node or validator network has run any of it.",
         "The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reaches the chain cannot demand private submission at all",
         "No runtime in this repository sets `allow_private_submission = true` and no private channel is wired to the VM, so the demand is now enforced but never satisfiable on chain"
       ],
@@ -3186,7 +3194,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 68,
       "confidence": "high",
       "evidence": [
         "crates/x3-vm/src/storage.rs",
@@ -3195,10 +3203,10 @@
         "note: Re-measured 2026-09-26 (round 5) - the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs; `evm_sstore`/`evm_sload` are interpreted over a slot keyspace disjoint from the global keyspace (`evm_slot_keys_are_disjoint_from_global_keys`), priced at the verifier's own figures (200/5000), and the rollback is now proven through the opcode path and at the storage level"
       ],
       "id": "X3-MEV-004",
-      "implemented": 70,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 40,
+      "mainnet_ready": 45,
       "missing_work": [
         "Storage is now reachable and journaled, but the writes still do not land in chain state. `evm_sstore`/`evm_sload` (0xB4/0xB3) execute in the *std* interpreter `crates/x3-vm` as of this measurement, so a contract can carry a value between calls **off chain** - but the interpreter a block actually runs is `crates/x3-integration::mini_x3` (the node builds `sc_service::new_wasm_executor`, so the runtime's std feature is off in wasm), and it refuses both opcodes, so on chain a contract cannot carry a value between calls at all. Both halves are asserted on one artifact by `interpreter_agreement.rs::slot_storage_is_implemented_off_chain_and_refused_on_chain` (measured 2026-09-26); the std interpreter's own tests are `evm_store_and_load_round_trip_every_value_kind` and `evm_slot_keys_are_disjoint_from_global_keys`. In the std interpreter and an atomic window's rollback abandons only the window's writes - but `X3Executor::execute` (`crates/x3-integration/src/executor.rs`) returns `state_changes: vec![]` with the comment \"Hostcall state change collection deferred to runtime integration\", and `drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests. A slot a program writes is therefore durable within one VM instance and invisible to everyone else (TICKET-147).",
         "The receipt's `state_changes` channel cannot carry contract storage as it stands. `pallet-x3-kernel`'s `apply_canonical_ledger_update_v2` decodes every entry as (address -> account, key -> asset id, value -> balance) and counts anything else in `DecodeFailureCount`, so routing slot writes through it would inflate a monitoring counter rather than persist a byte (TICKET-147). X3VM contract storage needs its own typed channel before it can be claimed on chain.",
@@ -3210,15 +3218,21 @@
         "x3-lang/compiler",
         "x3-lang/vm",
         "crates/x3-vm/src/storage.rs",
-        "crates/x3-vm/src/vm.rs"
+        "crates/x3-vm/src/vm.rs",
+        "crates/x3-integration/src/mini_x3.rs",
+        "crates/x3-integration/src/executor.rs",
+        "crates/x3-integration/src/types.rs",
+        "crates/x3-integration/tests/interpreter_agreement.rs",
+        "pallets/x3-kernel/src/lib.rs",
+        "pallets/x3-kernel/tests/x3_storage_channel.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 65,
-      "tests": "tested score 65% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4528,7 +4542,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5e7efd0d330f01691422fdbb290bb629962f55526ca32b0bc25423dba7b6904d",
+    "source_digest": "fede54ad2769c370243f5b831260db77bb34025bf651b130a710383bcfedaff1",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4539,8 +4553,8 @@
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "cc1c338421dcaa20356e9496e581f0b07923a61e014f75ae326667fc6f290b3d",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
-      "feature-matrix/language-trading.toml": "5fbcecc0cdc8edec6122c24c4fafc8e5258df0a999a21720c693955af124bc3f",
-      "feature-matrix/mev-privacy.toml": "dfb9d12c403eeb395e4c152cbb801adaeb4348e91bc6741f486006d7dde04095",
+      "feature-matrix/language-trading.toml": "e8c51ee458e82b253e34e2b67f9c0e24b1b29146af333b387b19e557df19add3",
+      "feature-matrix/mev-privacy.toml": "15bf21a04c9d3d7351348a30c10506c18d92d58d8e5dc35741a0167e2e408a3f",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"

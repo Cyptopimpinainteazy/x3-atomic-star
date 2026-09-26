@@ -226,24 +226,46 @@ id = "X3-LANG-006"
 name = "Decoded bytecode → TradingVm execution"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration", "crates/x3-vm"]
-implemented = 55
-tested = 60
-mainnet_ready = 25
+paths = [
+  "crates/x3-integration",
+  "crates/x3-vm",
+  "pallets/x3-kernel",
+  "node/tests/x3vm_live_lifecycle.rs",
+  "node/tests/x3lang_network_receipt.rs",
+]
+implemented = 75
+tested = 80
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes"]
+blockers = [
+  "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
+  "What that still does not establish: no node or validator network has finalized a program whose *state* is then read from a second node. The live multi-validator test covers a receipt over a simple program; the state-carrying one runs against the pallet's mock runtime. The two halves are each proven and not yet joined on a live chain.",
+  "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
+]
 required_tests = [
-  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
+  "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
   "compile_encode_decode_execute_receipt_end_to_end",
+  "a_store_reaches_chain_storage_through_the_receipt",
+  "a_reverted_atomic_window_writes_no_chain_state",
+  "a_failed_execution_does_not_report_the_writes_it_journaled",
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
 ]
 test_evidence = [
   "crates/x3-integration/tests/compiler_bridge.rs",
+  "node/tests/x3lang_network_receipt.rs",
+  "pallets/x3-kernel/tests/x3_storage_channel.rs",
+  "note: the live half is the `X3Lang across validators` gate (three validators, submitter Alice, observer Charlie, identical receipt bytes at the same finalized block); the kernel half was re-run by the primary agent - cargo test -p pallet-x3-kernel --test x3_storage_channel -> 6 passed, 0 failed, including a_store_reaches_chain_storage_through_the_receipt",
   "note: the corpus test runs each fixture on both engines and requires the same value",
 ]
-evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
+evidence = [
+  "crates/x3-integration/tests/compiler_bridge.rs",
+  "note: Trading Core v1 gap #4",
+  "note: Trading Core v1 gap #10",
+  "note: TICKET-147 in TESTNET_GAP_LEDGER.md",
+]
 
 [[feature]]
 # Re-measured 2026-09-24 (TICKET-134): the verifier this row says is needed exists —

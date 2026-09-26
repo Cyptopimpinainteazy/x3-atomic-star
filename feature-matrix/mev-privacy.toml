@@ -36,6 +36,7 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
+  "**Superseded 2026-09-26 — the two entries below describe the tree before `6a3358041`/`23350ca0c`, and both of their central claims are now false; they are kept so the history is readable.** Both interpreters implement `evm_sstore`/`evm_sload` — `mini_x3`, the one a block runs, uses the same key derivation and the same tagged payload as `crates/x3-vm`, and `interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key byte for key byte — and the writes do land in chain state: the kernel applies them to its own `X3ContractStorage` keyspace through the typed `storage_writes` channel instead of the balance decoder, so `DecodeFailureCount` stays 0 for a storage-writing comit. What is still open is the *read*, not the write: nothing seeds a program's slots from chain state before it runs, so a second comit's `evm_sload` sees the interpreter's empty store rather than the slot the chain persisted; the per-slot weight is under-declared; and no node or validator network has run any of it.",
   "The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reaches the chain cannot demand private submission at all",
   "No runtime in this repository sets `allow_private_submission = true` and no private channel is wired to the VM, so the demand is now enforced but never satisfiable on chain",
 ]
@@ -92,10 +93,16 @@ paths = [
   "x3-lang/vm",
   "crates/x3-vm/src/storage.rs",
   "crates/x3-vm/src/vm.rs",
+  "crates/x3-integration/src/mini_x3.rs",
+  "crates/x3-integration/src/executor.rs",
+  "crates/x3-integration/src/types.rs",
+  "crates/x3-integration/tests/interpreter_agreement.rs",
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-kernel/tests/x3_storage_channel.rs",
 ]
-implemented = 70
-tested = 65
-mainnet_ready = 40
+implemented = 85
+tested = 80
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
@@ -124,6 +131,20 @@ required_tests = [
   "evm_store_journals_the_write_for_cross_vm_sync",
   "evm_storage_is_charged_the_verifier_table_cost",
   "evm_slot_keys_are_disjoint_from_global_keys",
+  "a_committed_window_keeps_the_slot_it_wrote",
+  "a_rolled_back_window_restores_the_slot_it_wrote",
+  "a_slot_written_on_chain_is_reported_as_a_write_the_receipt_can_carry",
+  "an_unwritten_slot_reads_as_zero_and_a_read_is_not_a_write",
+  "a_store_of_a_value_a_slot_cannot_carry_is_refused",
+  "a_rollback_aborts_and_both_engines_abort_with_it",
+  "nesting_more_windows_than_the_limit_is_refused",
+  "the_on_chain_interpreter_refuses_every_instruction_it_cannot_execute",
+  "slot_storage_is_implemented_by_both_engines_and_names_the_same_slot",
+  "neither_interpreter_executes_an_opcode_the_other_one_refuses",
+  "a_store_reaches_chain_storage_through_the_receipt",
+  "a_reverted_atomic_window_writes_no_chain_state",
+  "a_failed_execution_does_not_report_the_writes_it_journaled",
+  "a_balance_shaped_change_still_reaches_the_ledger",
 ]
 test_evidence = [
   "crates/x3-vm/src/storage.rs",
@@ -131,6 +152,9 @@ test_evidence = [
   "note: measured load-bearing (storage) - restoring `journal.clear()` in `VmStorage::rollback` makes test_rollback_keeps_the_journal_of_writes_that_predate_the_window, test_nested_rollback_truncates_the_journal_to_the_inner_window and test_rollback_of_the_outer_window_abandons_a_committed_inner_window FAIL; truncating to the snapshot's journal length returns all 15 storage tests to green",
   "note: measured load-bearing (opcodes) - guarding the two new interpreter arms off (`Opcode::EvmSload if false`, `Opcode::EvmSstore if false`, so both fall through to the `_` arm that returned `UnimplementedOpcode` before this change) reddens 10 of the 11 new tests with `UnimplementedOpcode(180)`; restored, `cargo test -p x3-vm --lib evm_` -> 15 passed, 0 failed",
   "note: fail-closed coverage - an unknown payload tag, a payload shorter than its declared kind, a negative slot and a non-integer slot each return a typed error (`CorruptStorageSlot`/`InvalidStorageSlot`) instead of a value, and a 31-byte payload is refused (`UnencodableStorageValue`) rather than truncated into a 32-byte slot",
+  "note: re-measured 2026-09-26 on the chain path - `cargo test -p x3-x3-integration --features std` -> 17 + 6 + 5 + 3 + 3 + 9 passed, 0 failed; `cargo test -p pallet-x3-kernel --test x3_storage_channel` -> 6 passed, including `a_store_reaches_chain_storage_through_the_receipt`, which drives a real `evm_sstore` module through the production `X3VmAdapter` and the real `submit_comit_v2` and reads the slot back out of `X3ContractStorage`; `cargo check -p x3-x3-integration --no-default-features` (the runtime build) ok",
+  "note: measured load-bearing on the chain path - dropping the journaling from `mini_x3`'s `EvmSstore` arm reddens three tests in three binaries (`a_slot_written_on_chain_is_reported_as_a_write_the_receipt_can_carry`, `slot_storage_is_implemented_by_both_engines_and_names_the_same_slot`, `a_committed_window_keeps_the_slot_it_wrote`), and replacing the kernel's apply with a no-op reddens `a_store_reaches_chain_storage_through_the_receipt`; restored, all green again",
+  "note: chain-level - `bash scripts/local-ci.sh --cross --only 'x3lang-across-validators'` -> PASS (343s) with this change in the tree, so the refusals the on-chain interpreter now makes do not stop a real `.x3` program from compiling, executing, finalizing and reporting a receipt",
 ]
 evidence = [
   "crates/x3-vm/src/storage.rs",
@@ -229,16 +253,23 @@ id = "X3-MEV-007"
 name = "Encrypted mempool / threshold encryption"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["crates/private-mempool", "crates/x3-threshold-core", "crates/confidential-gpu"]
-implemented = 45
-tested = 40
-mainnet_ready = 10
+paths = [
+  "crates/private-mempool",
+  "crates/x3-threshold-core",
+  "crates/confidential-gpu",
+  "pallets/private-execution",
+]
+implemented = 65
+tested = 65
+mainnet_ready = 25
 priority = "P1"
 confidence = "high"
 launch_scope = "research"
 claim_risk = false
 blockers = [
+  "**2026-09-26 — there is an ingress now, and it validates.** The scheme moved to `crates/x3-threshold-core` (`no_std` + `alloc`, SCALE codecs) so a runtime pallet can link it, and `pallets/private-execution::submit_private_transaction` — which used to store whatever bytes it was handed and escrow the premium — now decodes the payload as an `EncryptedTransaction`, requires `tx_hash` to be the id inside it, derives the committee key from the pallet's own `CommitteePublicKey`/`DkgEpoch`/`MinConfidentialQuorum`, and refuses by name: `InvalidEncryptedPayload`, `EncryptedPayloadHashMismatch`, `EncryptedPayloadEpochMismatch`, `CommitteeKeyUnusable`. An accepted submission records the epoch in `PrivateTxEpoch` and stores the canonical re-encoding of the record that was validated, so the bytes the chain holds are the bytes it checked. Measured: the pallet suite went 34 -> 41 tests; deleting the validation call reddens `a_payload_for_a_stale_committee_epoch_is_refused` and `a_committee_key_that_is_not_a_point_is_refused`. It also closes the "no ingress" half of the old blocker: `submit_private_transaction` is the node-reachable extrinsic.",
   "Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and there is no ingress (no extrinsic, no node mempool, no relayer) that puts a transaction into it - the crate is measured unit by unit and drives nothing on chain",
+  "What is still missing on chain: nothing decrypts. The pallet can refuse a bad submission and record which epoch can open a good one, but no committee job collects shares, no execution path consumes the pending record, and `commit_encrypted_state_diff` still takes an opaque diff from a signed validator without checking it against the payload. The 2026-09-26 change is the door, not the room: a validated submission now sits in `PrivateTransactions` exactly as before, waiting for a consumer that does not exist",
   "No DLEQ proof accompanies a partial decryption: `compute_decryption_share` returns an empty `proof`, so a malicious validator's bogus partial is caught only by the AEAD tag after interpolation. Fail-closed, but unattributed - the combiner learns that something was wrong, not which validator lied",
   "The DKG epoch is now stated by configuration (`ConfidentialGpuConfig::dkg_epoch`) rather than driven by a ceremony or an epoch transition in this tree, so the binding is enforced while the lifecycle it binds to is never exercised end to end",
   "No live or cross-node test: every case here is unit or component level, against committees generated in-process",
@@ -259,9 +290,16 @@ required_tests = [
   "rejects_the_identity_element_as_a_committee_group_key",
   "a_share_from_a_different_dkg_epoch_is_refused_with_a_typed_error",
   "the_epoch_label_is_not_the_security_boundary",
+  "a_well_formed_submission_for_this_committee_is_accepted",
+  "a_submission_for_another_epoch_is_refused_by_name",
+  "a_submission_whose_id_is_not_its_ciphertext_hash_is_refused",
+  "an_opaque_payload_is_refused_at_the_door",
+  "a_payload_for_a_stale_committee_epoch_is_refused",
+  "an_accepted_submission_records_its_epoch",
 ]
 test_evidence = [
   "note: cargo test -p private-mempool -> 29 passed, 0 failed, 0 ignored (19 before this lane's ten tests)",
+  "note: the pallet door - cargo test -p pallet-private-execution -> 41 passed, 0 failed (34 before this change); the seven new cases are listed in required_tests, and the control is measured: removing the `validate_encrypted_transaction` call makes a_payload_for_a_stale_committee_epoch_is_refused and a_committee_key_that_is_not_a_point_is_refused fail",
   "note: 2026-09-26 the scheme moved to crates/x3-threshold-core (`no_std` + alloc, SCALE codecs, so a runtime pallet can link it) and private-mempool re-exports it - one definition, one set of tests, 29 before and after (22 moved, 7 new validation tests). Measured for the runtime target: cargo check -p x3-threshold-core --no-default-features -> ok and --target wasm32-unknown-unknown -> ok. Deleting the epoch comparison makes a_submission_for_another_epoch_is_refused_by_name fail",
   "note: cargo test -p confidential-gpu -> 10 passed, 0 failed; cargo clippy -p private-mempool -p confidential-gpu --all-targets -- -D warnings -> exit 0; cargo fmt --all -- --check -> exit 0",
   "note: break-it-first control - disabling the epoch check in the combiner turns a_share_from_a_different_dkg_epoch_is_refused_with_a_typed_error red, and confidential-gpu's a_share_from_another_ceremony_is_refused_by_name red; restored, both suites are green",
