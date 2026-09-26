@@ -28,6 +28,9 @@ sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 log = { workspace = true, default-features = false }
+# The commit–reveal ordering lane, `no_std`, so the chain can enforce the same
+# algorithm the lane's own tests verify instead of a second implementation of it.
+x3-order-window = { path = "../../crates/x3-order-window", default-features = false }
 
 [dev-dependencies]
 sp-io = { workspace = true }
@@ -46,6 +49,7 @@ std = [
     "sp-runtime/std",
     "serde/std",
     "log/std",
+    "x3-order-window/std",
     "frame-benchmarking?/std",
 ]
 runtime-benchmarks = [

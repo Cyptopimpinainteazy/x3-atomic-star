@@ -20,6 +20,17 @@ pub const MAX_STATE_DIFF_LEN: u32 = 524_288; // 512 KB
 /// Maximum length for ZK proof.
 pub const MAX_ZK_PROOF_LEN: u32 = 65_536; // 64 KB
 
+/// Default ceiling on the total revealed plaintext one ordering window may hold.
+///
+/// A window is settled in one transaction that reads every reveal, so an
+/// unbounded window is a window nobody can settle — and a window that cannot
+/// settle is a window whose bonds can never be resolved. Capping the total is
+/// what makes "settle always fits in a block" a property of the pallet rather
+/// than of the participants' goodwill. Runtimes configure the exact value with
+/// `Config::MaxOrderingWindowBytes`; this is the shipped default, and the weight
+/// for settling is sized from the configured value.
+pub const MAX_ORDERING_WINDOW_PLAINTEXT_BYTES: u32 = 1_048_576; // 1 MiB
+
 /// Enclave attestation status.
 #[derive(
     Clone,
@@ -157,3 +168,87 @@ pub struct EncryptedDiff {
 
 // NOTE: EncryptedDiff uses concrete types (u32 for block number) since it's stored
 // in a BoundedVec and needs to be T-independent. In production, parameterize properly.
+
+// ──────────────────────────────────────────────────────────────
+// Commit–reveal ordering window (X3-MEV-006 / X3-MEV-008)
+// ──────────────────────────────────────────────────────────────
+//
+// The algorithm itself lives in `x3-order-window`; these are only the records the
+// chain persists so a window's state survives restarts and so a third party can
+// recompute the canonical order from storage. Balances are stored as `u128` for the
+// same reason `PrivateTxRecord::fee_paid` is: these records are not generic over
+// `T::Currency`.
+
+/// One commit–reveal ordering window.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+#[scale_info(skip_type_params(T))]
+pub struct OrderingWindowRecord<T: frame_system::Config> {
+    /// Account that opened the window.
+    pub opened_by: T::AccountId,
+    /// First block a commit or reveal may land in (inclusive).
+    pub open_block: u64,
+    /// Last block a commit or reveal may land in (inclusive); also the deadline.
+    pub close_block: u64,
+    /// Bond every commitment in this window must post, fixed at open time.
+    pub minimum_bond: u128,
+    /// Block the window was opened in.
+    pub opened_at: BlockNumberFor<T>,
+    /// Ordering beacon, installable only after `close_block`. `None` means the
+    /// order key is the commit hash itself.
+    pub beacon: Option<sp_core::H256>,
+    /// Whether the window has produced its one canonical order.
+    pub settled: bool,
+    /// Commitments recorded so far, bounded by `MaxOrderingCommits`.
+    pub commitment_count: u32,
+    /// Reveals accepted so far.
+    pub reveal_count: u32,
+    /// Total revealed plaintext bytes, bounded by `MaxOrderingWindowBytes`.
+    pub revealed_bytes: u32,
+}
+
+/// One commitment recorded against a window.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+#[scale_info(skip_type_params(T))]
+pub struct OrderingCommitment<T: frame_system::Config> {
+    /// The account that posted the bond and that alone may reveal.
+    pub sender: T::AccountId,
+    /// Bond reserved for this commitment.
+    pub bond: u128,
+    /// Block the commitment landed in.
+    pub committed_at_block: u64,
+}
+
+/// One reveal accepted against a window.
+///
+/// The plaintext is kept because a settlement that ordered transactions without
+/// being able to hand them on would order nothing. It is bounded by
+/// `x3_order_window::MAX_PLAINTEXT_BYTES` at reveal time.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+pub struct OrderingReveal {
+    /// Revealed payload.
+    pub plaintext: Vec<u8>,
+    /// Reveal nonce, bound into the commitment hash.
+    pub nonce: [u8; 32],
+    /// Block the reveal landed in.
+    pub revealed_at_block: u64,
+}
+
+/// The single canonical order for a settled window, and what did not make it in.
+///
+/// Stored rather than merely emitted: `ordered` is the sequence a verifier can
+/// recompute from `beacon` and the committed hashes via
+/// `x3_order_window::order_key`, and `unrevealed` names the bonds that were
+/// forfeited.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+pub struct OrderingSettlementRecord {
+    /// Beacon the order keys were computed with, or `None`.
+    pub beacon: Option<sp_core::H256>,
+    /// Commit hashes in canonical order (position `i` is `ordered[i]`).
+    pub ordered: Vec<sp_core::H256>,
+    /// Commit hashes that never revealed, in commit-hash order.
+    pub unrevealed: Vec<sp_core::H256>,
+    /// Total bond forfeited from the unrevealed set.
+    pub forfeited_bond: u128,
+    /// Block the window was settled in.
+    pub settled_at_block: u64,
+}

@@ -78,11 +78,16 @@ pub mod pallet {
         Blake2_128Concat, PalletId,
     };
     use frame_system::pallet_prelude::*;
+    use parity_scale_codec::Encode;
     use sp_runtime::{
-        traits::{AccountIdConversion, SaturatedConversion, Saturating},
+        traits::{AccountIdConversion, SaturatedConversion, Saturating, Zero},
         Perbill,
     };
     use sp_std::prelude::*;
+    use x3_order_window::{
+        commitment_hash, order_key, CommitRevealLane, FairOrderError, OrderingWindow,
+        MAX_PLAINTEXT_BYTES,
+    };
 
     type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -164,6 +169,30 @@ pub mod pallet {
         #[pallet::constant]
         type PrivateStakerShareBps: Get<u16>;
 
+        /// Minimum bond a commitment to an ordering window must post.
+        ///
+        /// A commitment that never reveals forfeits this, so the bond is what
+        /// makes "commit and then stay silent to grief the window" cost
+        /// something. Fixed into a window when it opens, so the terms a
+        /// participant committed under cannot move under it.
+        #[pallet::constant]
+        type MinOrderingBond: Get<BalanceOf<Self>>;
+
+        /// Largest number of commitments one ordering window accepts.
+        ///
+        /// Bounds both the storage a window can occupy and the work
+        /// `settle_ordering_window` does, which is why the settle weight is a
+        /// function of this value rather than a constant.
+        #[pallet::constant]
+        type MaxOrderingCommits: Get<u32>;
+
+        /// Ceiling on the total revealed plaintext one ordering window may hold.
+        ///
+        /// Bounds what settling a window has to read, so a window can never be
+        /// grown past what fits in a block — which would strand every bond in it.
+        #[pallet::constant]
+        type MaxOrderingWindowBytes: Get<u32>;
+
         /// Weight info.
         type WeightInfo: WeightInfo;
     }
@@ -227,6 +256,70 @@ pub mod pallet {
     pub type Enabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
     // ──────────────────────────────────────────────────────────────
+    // Commit–reveal ordering window storage (X3-MEV-006 / X3-MEV-008)
+    // ──────────────────────────────────────────────────────────────
+
+    /// Id that the next opened ordering window will receive.
+    #[pallet::storage]
+    #[pallet::getter(fn next_ordering_window_id)]
+    pub type NextOrderingWindowId<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+    /// Windows by id.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_windows)]
+    pub type OrderingWindows<T: Config> =
+        StorageMap<_, Blake2_128Concat, u64, OrderingWindowRecord<T>, OptionQuery>;
+
+    /// Commitments by `(window id, commit hash)`.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_commits)]
+    pub type OrderingCommits<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u64,
+        Blake2_128Concat,
+        sp_core::H256,
+        OrderingCommitment<T>,
+        OptionQuery,
+    >;
+
+    /// The one commitment each account may place per window, by `(window id, account)`.
+    ///
+    /// This is the authoritative "one commitment per sender per window" check: the
+    /// lane also refuses a second commitment from the same 20-byte label, but the
+    /// account is what can actually be slashed, so the account is what is keyed.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_commit_by_sender)]
+    pub type OrderingCommitBySender<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u64,
+        Blake2_128Concat,
+        T::AccountId,
+        sp_core::H256,
+        OptionQuery,
+    >;
+
+    /// Reveals by `(window id, commit hash)`.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_reveals)]
+    pub type OrderingReveals<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u64,
+        Blake2_128Concat,
+        sp_core::H256,
+        OrderingReveal,
+        OptionQuery,
+    >;
+
+    /// Settled canonical order per window id.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_settlements)]
+    pub type OrderingSettlements<T: Config> =
+        StorageMap<_, Blake2_128Concat, u64, OrderingSettlementRecord, OptionQuery>;
+
+    // ──────────────────────────────────────────────────────────────
     // Events
     // ──────────────────────────────────────────────────────────────
 
@@ -273,6 +366,44 @@ pub mod pallet {
         },
         /// Private execution enabled/disabled.
         PrivateExecutionToggled { enabled: bool },
+        /// A commit–reveal ordering window was opened.
+        OrderingWindowOpened {
+            window_id: u64,
+            open_block: u64,
+            close_block: u64,
+            minimum_bond: BalanceOf<T>,
+        },
+        /// A commitment was recorded against an ordering window.
+        OrderingCommitted {
+            window_id: u64,
+            sender: T::AccountId,
+            commit_hash: sp_core::H256,
+            bond: BalanceOf<T>,
+        },
+        /// A commitment was revealed and its bond released.
+        OrderingRevealed {
+            window_id: u64,
+            sender: T::AccountId,
+            commit_hash: sp_core::H256,
+        },
+        /// An ordering beacon was installed for a closed window.
+        OrderingBeaconInstalled {
+            window_id: u64,
+            beacon: sp_core::H256,
+        },
+        /// A window settled into its one canonical order.
+        ///
+        /// `order_digest` is `blake2_256` over the SCALE encoding of the stored
+        /// canonical order, so a verifier can check that the order it recomputed
+        /// is the one the chain recorded without the event carrying the whole
+        /// sequence.
+        OrderingWindowSettled {
+            window_id: u64,
+            ordered: u32,
+            unrevealed: u32,
+            forfeited_bond: BalanceOf<T>,
+            order_digest: sp_core::H256,
+        },
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -313,6 +444,53 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Insufficient balance for premium fee.
         InsufficientBalance,
+        // ── Commit–reveal ordering window ────────────────────────────
+        /// The ordering window's close block precedes its open block.
+        OrderingWindowInverted,
+        /// The ordering window's close block has already passed.
+        OrderingWindowAlreadyClosed,
+        /// No ordering window exists with that id.
+        OrderingWindowNotFound,
+        /// The current block is outside the ordering window.
+        OrderingWindowNotOpen,
+        /// The ordering window is still open and cannot settle yet.
+        OrderingWindowStillOpen,
+        /// The ordering window has already settled; there is one order per window.
+        OrderingWindowSettled,
+        /// The posted bond is below the window's minimum.
+        OrderingBondBelowMinimum,
+        /// This account already committed in this window.
+        OrderingAlreadyCommitted,
+        /// This commit hash is already recorded in this window.
+        OrderingCommitAlreadyUsed,
+        /// The window already holds its maximum number of commitments.
+        OrderingWindowFull,
+        /// The reveal names a commit hash this window never recorded.
+        OrderingUnknownCommitment,
+        /// The reveal came from an account that does not own the commitment.
+        OrderingNotYourCommitment,
+        /// The revealed payload and nonce do not hash to the committed hash.
+        OrderingRevealMismatch,
+        /// This commitment was already revealed.
+        OrderingAlreadyRevealed,
+        /// The revealed plaintext is above the lane's size limit.
+        OrderingPlaintextTooLarge,
+        /// The reveal would take the window above its total plaintext budget.
+        OrderingWindowBytesExceeded,
+        /// An ordering beacon cannot be installed while the window is open.
+        OrderingBeaconWhileOpen,
+        /// This window already has an ordering beacon.
+        OrderingBeaconAlreadySet,
+        /// The reserved bond was not exactly the amount the commitment posted.
+        OrderingBondNotReserved,
+        /// The unrevealed bond could not be removed in full.
+        OrderingBondNotForfeitable,
+        /// Stored window state was refused by the lane when replayed.
+        ///
+        /// A window that the chain accepted a commitment into must replay. This
+        /// error means storage and the lane disagree, which is a fail-closed
+        /// condition, never a success.
+        OrderingWindowStateCorrupt,
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -646,6 +824,352 @@ pub mod pallet {
             Self::deposit_event(Event::PrivateExecutionToggled { enabled });
             Ok(())
         }
+
+        // ────────────────────────────────────────────────────────────
+        // Commit–reveal ordering window (X3-MEV-006 / X3-MEV-008)
+        // ────────────────────────────────────────────────────────────
+
+        /// Open a commit–reveal ordering window.
+        ///
+        /// A window fixes the block range a commit and its reveal must both land
+        /// inside, and the bond every commitment must post. Opening requires the
+        /// same guards private submission does (`Enabled` and the confidential
+        /// quorum), because a window is new exposure: it is opened by anyone, and
+        /// its participants' payloads are handed on in the canonical order at
+        /// settle. Reveals and settles deliberately do *not* carry those guards —
+        /// see [`Pallet::reveal_ordering`].
+        #[pallet::call_index(7)]
+        #[pallet::weight(T::WeightInfo::open_ordering_window())]
+        pub fn open_ordering_window(
+            origin: OriginFor<T>,
+            open_block: u64,
+            close_block: u64,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            Self::ensure_ordering_accepts_new_commitments()?;
+
+            let window = OrderingWindow::new(open_block, close_block)
+                .map_err(|_| Error::<T>::OrderingWindowInverted)?;
+
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            // A window that has already closed can accept nothing, so opening one
+            // would be a promise the chain cannot keep. Refuse rather than record.
+            ensure!(
+                now <= window.close_block,
+                Error::<T>::OrderingWindowAlreadyClosed
+            );
+
+            let minimum_bond: BalanceOf<T> = T::MinOrderingBond::get();
+            let window_id = NextOrderingWindowId::<T>::get();
+            NextOrderingWindowId::<T>::put(window_id.saturating_add(1));
+
+            OrderingWindows::<T>::insert(
+                window_id,
+                OrderingWindowRecord::<T> {
+                    opened_by: who,
+                    open_block: window.open_block,
+                    close_block: window.close_block,
+                    minimum_bond: minimum_bond.saturated_into(),
+                    opened_at: <frame_system::Pallet<T>>::block_number(),
+                    beacon: None,
+                    settled: false,
+                    commitment_count: 0,
+                    reveal_count: 0,
+                    revealed_bytes: 0,
+                },
+            );
+
+            Self::deposit_event(Event::OrderingWindowOpened {
+                window_id,
+                open_block: window.open_block,
+                close_block: window.close_block,
+                minimum_bond,
+            });
+
+            Ok(())
+        }
+
+        /// Commit to an ordering window, reserving `bond`.
+        ///
+        /// The caller must have computed
+        /// `x3_order_window::commitment_hash(<its ordering label>, plaintext, nonce)`;
+        /// the plaintext stays off-chain until the reveal, which is the point of
+        /// the lane. The bond is reserved here and released on reveal, or
+        /// forfeited at settle if the commitment never reveals.
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::commit_ordering())]
+        pub fn commit_ordering(
+            origin: OriginFor<T>,
+            window_id: u64,
+            commit_hash: sp_core::H256,
+            bond: BalanceOf<T>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            Self::ensure_ordering_accepts_new_commitments()?;
+
+            let record =
+                OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
+            ensure!(!record.settled, Error::<T>::OrderingWindowSettled);
+
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            ensure!(
+                now >= record.open_block && now <= record.close_block,
+                Error::<T>::OrderingWindowNotOpen
+            );
+
+            let minimum_bond: BalanceOf<T> = record.minimum_bond.saturated_into();
+            ensure!(bond >= minimum_bond, Error::<T>::OrderingBondBelowMinimum);
+
+            ensure!(
+                record.commitment_count < T::MaxOrderingCommits::get(),
+                Error::<T>::OrderingWindowFull
+            );
+            ensure!(
+                !OrderingCommitBySender::<T>::contains_key(window_id, &who),
+                Error::<T>::OrderingAlreadyCommitted
+            );
+            ensure!(
+                !OrderingCommits::<T>::contains_key(window_id, commit_hash),
+                Error::<T>::OrderingCommitAlreadyUsed
+            );
+
+            // Reserve before recording: a commitment the chain cannot back with a
+            // held bond must not exist, because the bond is the only thing that
+            // makes a silent commit cost anything.
+            T::Currency::reserve(&who, bond)?;
+
+            OrderingCommits::<T>::insert(
+                window_id,
+                commit_hash,
+                OrderingCommitment::<T> {
+                    sender: who.clone(),
+                    bond: bond.saturated_into(),
+                    committed_at_block: now,
+                },
+            );
+            OrderingCommitBySender::<T>::insert(window_id, &who, commit_hash);
+            OrderingWindows::<T>::mutate(window_id, |maybe| {
+                if let Some(record) = maybe.as_mut() {
+                    record.commitment_count = record.commitment_count.saturating_add(1);
+                }
+            });
+
+            Self::deposit_event(Event::OrderingCommitted {
+                window_id,
+                sender: who,
+                commit_hash,
+                bond,
+            });
+
+            Ok(())
+        }
+
+        /// Reveal a commitment, releasing its bond.
+        ///
+        /// Deliberately *not* gated on `Enabled` or the confidential quorum, even
+        /// though commits are: a gate on reveal would let a quorum drop, or an
+        /// admin toggling the switch off, strand bonds that committed while both
+        /// guards held. Refusing to close out an existing window is the one
+        /// failure mode a gate here would create, so reveal and settle stay
+        /// open and only the checks that protect the window itself apply.
+        #[pallet::call_index(9)]
+        #[pallet::weight(T::WeightInfo::reveal_ordering())]
+        pub fn reveal_ordering(
+            origin: OriginFor<T>,
+            window_id: u64,
+            commit_hash: sp_core::H256,
+            plaintext: Vec<u8>,
+            nonce: [u8; 32],
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            let record =
+                OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
+            ensure!(!record.settled, Error::<T>::OrderingWindowSettled);
+
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            ensure!(
+                now >= record.open_block && now <= record.close_block,
+                Error::<T>::OrderingWindowNotOpen
+            );
+
+            ensure!(
+                plaintext.len() <= MAX_PLAINTEXT_BYTES,
+                Error::<T>::OrderingPlaintextTooLarge
+            );
+            let reveal_len = plaintext.len() as u32;
+            // Bound the window's total, not just each reveal: settle reads all of
+            // them in one transaction, so an unbounded total is a window that can
+            // never be settled and bonds that can never be resolved.
+            ensure!(
+                record.revealed_bytes.saturating_add(reveal_len)
+                    <= T::MaxOrderingWindowBytes::get(),
+                Error::<T>::OrderingWindowBytesExceeded
+            );
+
+            let commitment = OrderingCommits::<T>::get(window_id, commit_hash)
+                .ok_or(Error::<T>::OrderingUnknownCommitment)?;
+            ensure!(
+                commitment.sender == who,
+                Error::<T>::OrderingNotYourCommitment
+            );
+            ensure!(
+                !OrderingReveals::<T>::contains_key(window_id, commit_hash),
+                Error::<T>::OrderingAlreadyRevealed
+            );
+
+            // The reveal must reproduce the commitment, label included, so a
+            // commitment lifted from the mempool cannot be revealed by anyone
+            // else and a substituted payload cannot be swapped in.
+            ensure!(
+                commitment_hash(Self::ordering_sender_label(&who), &plaintext, &nonce)
+                    == commit_hash,
+                Error::<T>::OrderingRevealMismatch
+            );
+
+            let bond: BalanceOf<T> = commitment.bond.saturated_into();
+            // `unreserve` returns the amount it could *not* release, so a
+            // commitment whose reserve is smaller than the bond it recorded is
+            // a fail-closed condition rather than a partial release.
+            let not_released = T::Currency::unreserve(&who, bond);
+            ensure!(not_released.is_zero(), Error::<T>::OrderingBondNotReserved);
+
+            OrderingReveals::<T>::insert(
+                window_id,
+                commit_hash,
+                OrderingReveal {
+                    plaintext,
+                    nonce,
+                    revealed_at_block: now,
+                },
+            );
+            OrderingWindows::<T>::mutate(window_id, |maybe| {
+                if let Some(record) = maybe.as_mut() {
+                    record.reveal_count = record.reveal_count.saturating_add(1);
+                    record.revealed_bytes = record.revealed_bytes.saturating_add(reveal_len);
+                }
+            });
+
+            Self::deposit_event(Event::OrderingRevealed {
+                window_id,
+                sender: who,
+                commit_hash,
+            });
+
+            Ok(())
+        }
+
+        /// Install the ordering beacon for a closed window (admin only).
+        ///
+        /// The beacon is what closes the placement hole a commit–reveal lane has
+        /// on its own: with no beacon the order key is the commit hash, so a
+        /// participant that can try many nonces can choose where its own
+        /// commitment lands. Installing it is refused while the window is open,
+        /// because a value participants could still commit against would not be a
+        /// beacon.
+        #[pallet::call_index(10)]
+        #[pallet::weight(T::WeightInfo::install_ordering_beacon())]
+        pub fn install_ordering_beacon(
+            origin: OriginFor<T>,
+            window_id: u64,
+            beacon: sp_core::H256,
+        ) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)?;
+
+            let record =
+                OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
+            ensure!(!record.settled, Error::<T>::OrderingWindowSettled);
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            ensure!(
+                now > record.close_block,
+                Error::<T>::OrderingBeaconWhileOpen
+            );
+            ensure!(
+                record.beacon.is_none(),
+                Error::<T>::OrderingBeaconAlreadySet
+            );
+
+            OrderingWindows::<T>::mutate(window_id, |maybe| {
+                if let Some(record) = maybe.as_mut() {
+                    record.beacon = Some(beacon);
+                }
+            });
+
+            Self::deposit_event(Event::OrderingBeaconInstalled { window_id, beacon });
+            Ok(())
+        }
+
+        /// Settle a closed window into its canonical order.
+        ///
+        /// Permissionless: the outcome is a pure function of the closed
+        /// commitment set in storage, so the caller cannot influence it and the
+        /// chain does not depend on one account staying up to settle. Unrevealed
+        /// commitments forfeit their bonds here.
+        #[pallet::call_index(11)]
+        #[pallet::weight(T::WeightInfo::settle_ordering_window(T::MaxOrderingCommits::get()))]
+        pub fn settle_ordering_window(origin: OriginFor<T>, window_id: u64) -> DispatchResult {
+            ensure_signed(origin)?;
+
+            let record =
+                OrderingWindows::<T>::get(window_id).ok_or(Error::<T>::OrderingWindowNotFound)?;
+            ensure!(!record.settled, Error::<T>::OrderingWindowSettled);
+
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            ensure!(
+                now > record.close_block,
+                Error::<T>::OrderingWindowStillOpen
+            );
+
+            let settlement = Self::settle_ordering_lane(window_id, &record, now)?;
+
+            // Forfeit the bonds of commitments that never revealed. The lane only
+            // reports them (it does not move a bond); applying it is this
+            // pallet's job, and it happens before the window is marked settled so
+            // a partial application cannot leave a settled window holding bonds.
+            let mut forfeited: BalanceOf<T> = 0u32.into();
+            let mut unrevealed_hashes: Vec<sp_core::H256> =
+                Vec::with_capacity(settlement.unrevealed.len());
+            for commitment in &settlement.unrevealed {
+                let sender = OrderingCommits::<T>::get(window_id, commitment.commit_hash)
+                    .ok_or(Error::<T>::OrderingWindowStateCorrupt)?
+                    .sender;
+                let bond: BalanceOf<T> = commitment.bond.saturated_into();
+                let (imbalance, remaining) = T::Currency::slash_reserved(&sender, bond);
+                ensure!(remaining.is_zero(), Error::<T>::OrderingBondNotForfeitable);
+                T::BurnDestination::on_unbalanced(imbalance);
+                forfeited = forfeited.saturating_add(bond);
+                unrevealed_hashes.push(commitment.commit_hash);
+            }
+
+            let ordered = settlement.canonical_order();
+            let digest = sp_core::H256::from(sp_core::hashing::blake2_256(&ordered.encode()));
+
+            OrderingSettlements::<T>::insert(
+                window_id,
+                OrderingSettlementRecord {
+                    beacon: settlement.beacon,
+                    ordered,
+                    unrevealed: unrevealed_hashes,
+                    forfeited_bond: forfeited.saturated_into(),
+                    settled_at_block: now,
+                },
+            );
+            OrderingWindows::<T>::mutate(window_id, |maybe| {
+                if let Some(record) = maybe.as_mut() {
+                    record.settled = true;
+                }
+            });
+
+            Self::deposit_event(Event::OrderingWindowSettled {
+                window_id,
+                ordered: settlement.order.len() as u32,
+                unrevealed: settlement.unrevealed.len() as u32,
+                forfeited_bond: forfeited,
+                order_digest: digest,
+            });
+
+            Ok(())
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -711,6 +1235,156 @@ pub mod pallet {
             });
 
             Ok(())
+        }
+
+        // ── Commit–reveal ordering window helpers ────────────────────
+
+        /// Guards for operations that add new exposure to an ordering window.
+        ///
+        /// These mirror `submit_private_transaction`: private execution must be
+        /// on and there must be enough confidential validators to run it. They
+        /// gate *opening* a window and *committing* to one. They deliberately do
+        /// not gate revealing or settling — see `reveal_ordering`.
+        fn ensure_ordering_accepts_new_commitments() -> DispatchResult {
+            ensure!(Enabled::<T>::get(), Error::<T>::PrivateExecutionDisabled);
+            ensure!(
+                ConfidentialValidatorCount::<T>::get() >= T::MinConfidentialQuorum::get(),
+                Error::<T>::InsufficientQuorum
+            );
+            Ok(())
+        }
+
+        /// The 20-byte label a commitment hash binds for `who`.
+        ///
+        /// The lane is keyed and hashed on `H160`, while the chain's account is
+        /// generic. This is a domain-separated, deterministic truncation of the
+        /// SCALE-encoded account — a label for the hash, not an address, and not
+        /// an authority: the account that may reveal is the one recorded in
+        /// `OrderingCommits`, checked by equality before the label is used.
+        pub fn ordering_sender_label(who: &T::AccountId) -> sp_core::H160 {
+            let digest = sp_core::hashing::blake2_256(&who.encode());
+            sp_core::H160::from_slice(&digest[..20])
+        }
+
+        /// Rebuild the lane from storage and settle it.
+        ///
+        /// The window is replayed through the same `CommitRevealLane` its own
+        /// tests exercise, rather than a second ordering rule written here: the
+        /// chain's order and the tested order are one algorithm. Every step that
+        /// the chain accepted at commit/reveal time must be accepted again; if it
+        /// is not, storage and the lane disagree and this fails closed with
+        /// `OrderingWindowStateCorrupt` instead of settling something else.
+        fn settle_ordering_lane(
+            window_id: u64,
+            record: &OrderingWindowRecord<T>,
+            now: u64,
+        ) -> Result<x3_order_window::WindowSettlement, sp_runtime::DispatchError> {
+            let window = OrderingWindow::new(record.open_block, record.close_block)
+                .map_err(|_| Error::<T>::OrderingWindowInverted)?;
+            let mut lane = CommitRevealLane::new(window, record.minimum_bond);
+
+            for (commit_hash, commitment) in OrderingCommits::<T>::iter_prefix(window_id) {
+                lane.commit(
+                    Self::ordering_sender_label(&commitment.sender),
+                    commit_hash,
+                    commitment.bond,
+                    commitment.committed_at_block,
+                )
+                .map_err(Self::map_fair_order_error)?;
+            }
+
+            for (commit_hash, reveal) in OrderingReveals::<T>::iter_prefix(window_id) {
+                let commitment = OrderingCommits::<T>::get(window_id, commit_hash)
+                    .ok_or(Error::<T>::OrderingWindowStateCorrupt)?;
+                lane.reveal(
+                    Self::ordering_sender_label(&commitment.sender),
+                    commit_hash,
+                    &reveal.plaintext,
+                    &reveal.nonce,
+                    reveal.revealed_at_block,
+                )
+                .map_err(Self::map_fair_order_error)?;
+            }
+
+            if let Some(beacon) = record.beacon {
+                lane.install_beacon(beacon, now)
+                    .map_err(Self::map_fair_order_error)?;
+            }
+
+            let settlement = lane.settle(now).map_err(Self::map_fair_order_error)?;
+
+            // The settlement's published sequence and its recomputable canonical
+            // order are the same by construction; assert it rather than trust it,
+            // so a future change to the lane cannot quietly diverge the two.
+            let published: Vec<sp_core::H256> = settlement
+                .order
+                .iter()
+                .map(|entry| entry.commit_hash)
+                .collect();
+            ensure!(
+                published == settlement.canonical_order(),
+                Error::<T>::OrderingWindowStateCorrupt
+            );
+            for entry in &settlement.order {
+                ensure!(
+                    entry.order_key == order_key(settlement.beacon, &entry.commit_hash),
+                    Error::<T>::OrderingWindowStateCorrupt
+                );
+            }
+
+            Ok(settlement)
+        }
+
+        /// Map a lane refusal onto the pallet's named error.
+        ///
+        /// Mostly diagnostic: the pre-checks in each dispatchable refuse the
+        /// caller-facing cases by name before the lane is consulted. A refusal
+        /// here that the pre-checks already allow means the replay disagrees with
+        /// the state the chain recorded, which is a corruption signal rather than
+        /// a user error.
+        fn map_fair_order_error(error: FairOrderError) -> sp_runtime::DispatchError {
+            match error {
+                FairOrderError::InvertedWindow { .. } => Error::<T>::OrderingWindowInverted.into(),
+                FairOrderError::CommitBeforeWindow { .. }
+                | FairOrderError::CommitAfterWindowClosed { .. }
+                | FairOrderError::RevealBeforeWindow { .. }
+                | FairOrderError::RevealAfterWindowClosed { .. } => {
+                    Error::<T>::OrderingWindowNotOpen.into()
+                }
+                FairOrderError::BondBelowMinimum { .. } => {
+                    Error::<T>::OrderingBondBelowMinimum.into()
+                }
+                FairOrderError::DuplicateCommit { .. } => {
+                    Error::<T>::OrderingAlreadyCommitted.into()
+                }
+                FairOrderError::DuplicateCommitHash { .. } => {
+                    Error::<T>::OrderingCommitAlreadyUsed.into()
+                }
+                FairOrderError::WindowFull { .. } => Error::<T>::OrderingWindowFull.into(),
+                FairOrderError::RevealWithoutCommit { .. } => {
+                    Error::<T>::OrderingUnknownCommitment.into()
+                }
+                FairOrderError::RevealSenderMismatch { .. } => {
+                    Error::<T>::OrderingNotYourCommitment.into()
+                }
+                FairOrderError::RevealHashMismatch { .. } => {
+                    Error::<T>::OrderingRevealMismatch.into()
+                }
+                FairOrderError::DuplicateReveal { .. } => {
+                    Error::<T>::OrderingAlreadyRevealed.into()
+                }
+                FairOrderError::WindowStillOpen { .. } => {
+                    Error::<T>::OrderingWindowStillOpen.into()
+                }
+                FairOrderError::WindowSettled => Error::<T>::OrderingWindowSettled.into(),
+                FairOrderError::BeaconWhileWindowOpen { .. } => {
+                    Error::<T>::OrderingBeaconWhileOpen.into()
+                }
+                FairOrderError::DuplicateBeacon => Error::<T>::OrderingBeaconAlreadySet.into(),
+                FairOrderError::PlaintextTooLarge { .. } => {
+                    Error::<T>::OrderingPlaintextTooLarge.into()
+                }
+            }
         }
     }
 }

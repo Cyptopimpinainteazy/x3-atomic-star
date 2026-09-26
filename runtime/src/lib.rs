@@ -2770,6 +2770,15 @@ parameter_types! {
     pub const ConfidentialValidatorShareBps: u16 = 6000;  // 60% to validators
     pub const PrivateBurnShareBps: u16 = 2500;            // 25% burn
     pub const PrivateStakerShareBps: u16 = 1500;          // 15% to stakers
+    /// Bond a commitment to an ordering window must post. A commitment that never
+    /// reveals forfeits it, so this is what a silent commit costs.
+    pub const MinOrderingBond: Balance = 10 * DOLLARS;
+    /// Commitments one ordering window accepts. Bounds both the storage a window
+    /// can occupy and the work settling it does.
+    pub const MaxOrderingCommits: u32 = 1024;
+    /// Total revealed plaintext one ordering window may hold. Settling reads all
+    /// of it in one transaction, so this is what keeps every window settlable.
+    pub const MaxOrderingWindowBytes: u32 = 1_048_576;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -2793,6 +2802,9 @@ impl pallet_private_execution::Config for Runtime {
     type ConfidentialValidatorShareBps = ConfidentialValidatorShareBps;
     type PrivateBurnShareBps = PrivateBurnShareBps;
     type PrivateStakerShareBps = PrivateStakerShareBps;
+    type MinOrderingBond = MinOrderingBond;
+    type MaxOrderingCommits = MaxOrderingCommits;
+    type MaxOrderingWindowBytes = MaxOrderingWindowBytes;
     type WeightInfo = ();
 }
 
