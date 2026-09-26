@@ -81,3 +81,27 @@ round 6's workstream D for the exact deliverable.
 
 `X3-GPU-001` and any GPU measurement (no compute device on this box), the seven physical servers,
 the 72-hour soak, public testnet hosting and the live runtime upgrade: external blockers, unchanged.
+
+### Workstream B — exact ABI, recorded 2026-09-26 by the primary agent
+
+The lane was unreachable on this runtime until `c917917d6`: window open/commit required the
+confidential-validator quorum, and `AttestationVerifier = RefuseAllAttestations` means that quorum
+can never be met on a chain running this runtime. It now has its own switch, default off.
+
+* `PrivateExecution.set_ordering_windows_enabled(origin, enabled: bool)` — `AdminOrigin =
+  EnsureRootOrHalfCouncil`; `scripts/mainnet/runtime_upgrade_governance_driver.cjs` shows the council
+  motion path this chain permits.
+* `open_ordering_window(origin, open_block: u64, close_block: u64)`
+* `commit_ordering(origin, window_id: u64, commit_hash: H256, bond: Balance)`
+* `reveal_ordering(origin, window_id: u64, commit_hash: H256, plaintext: Vec<u8>, nonce: [u8;32])`
+* `settle_ordering_window(origin, window_id: u64)`; `install_ordering_beacon(origin, window_id)` is
+  permissionless and optional (settle derives the beacon from `BlockHash(close_block + 1)`).
+* The accepted commit hash is `commitment_hash(sender_label, plaintext, nonce)` with
+  `sender_label = H160(blake2_256(SCALE_encode(AccountId32))[..20])` (`blake2AsU8a` in
+  `@polkadot/util-crypto`; an `AccountId32` encodes as its 32 bytes). A wrong label is refused, and
+  that refusal is worth asserting once.
+* Bond >= the runtime's `MinOrderingBond` (10 DOLLARS). Settle requires `now > close_block` **and**
+  the beacon block's hash, so advance at least two blocks past `close_block`.
+* Read back `orderingSettlements(window_id)` and `orderingWindows(window_id)`, and assert the
+  settled order equals the ascending sort of `orderKey(beacon, hash)` recomputed in the driver —
+  not just that the chain returned something.
