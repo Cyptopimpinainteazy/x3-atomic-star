@@ -2798,32 +2798,38 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 54,
+      "composite": 73,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
-        "note: Trading Core v1 gap #9"
+        "note: Trading Core v1 gap #9",
+        "note: TICKET-150 in TESTNET_GAP_LEDGER.md"
       ],
       "id": "X3-LANG-002",
-      "implemented": 70,
+      "implemented": 85,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 55,
       "missing_work": [
-        "`x3c replay` re-checks the receipt's own economic figures (operation sequence, per-asset deltas, balances, costs, debt lifecycle, profit against the outcome) and refuses a receipt that is about another artifact, naming both hashes; it names what the pair cannot decide \u2014 the risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality references and the host inputs \u2014 which is what keeps this row short of COMPLETE"
+        "Re-measured 2026-09-26 (TICKET-150). The previous note described checks the command did not run: `cmd_replay` called `verify_receipt` \u2014 the hash and the accounting invariants \u2014 while printing that the economics had been checked, and `receipt verify` promised \"hash + economic invariants\" in its own text without calling `verify_receipt_economics` either. Both now run the economic replay, and `replay` first binds the receipt's operation sequence to the artifact's compiled program (`decode_trading_program`), which is what makes the floors and ceilings inside it the artifact's rather than figures the receipt chose: a receipt re-hashed with a 900 bps ceiling against an artifact compiling 30 used to replay as ok.",
+        "The floors and ceilings are now re-derived from the receipt's own figures: `AssertMinNetProfit` and the policy's `minimum_net_profit` are enforced against the delta of the asset each is denominated in (`ProfitBelowCompiledFloor`, `ProfitFloorWithoutAsset`), `max_slippage_bps` against each leg's recorded realized slippage (receipt format 3; a missing figure is refused, not read as zero), `max_flash_fee_bps` against each debt's principal and fee, and the pre-existing quote-freshness, price-impact, MEV-leakage and cost-kind checks stay. `basis_points_of` is now the single place the fee and slippage ratios are computed, so the figure execution enforces and the figure a receipt carries cannot drift.",
+        "What a receipt and an artifact still cannot decide, and what the command prints as unchecked rather than passing over: the finality references, the host inputs (a receipt records what happened, not what was asked), and the balances behind the `state_commitment` (a receipt carries the commitment, not the state it commits to). The per-run cost the host reports is re-derived only for the ceilings the receipt carries, so the `max_gas` and oracle-deviation halves of \"correct risk checks\" remain unreproducible from the pair."
       ],
       "name": "Economic replay validation in receipts",
       "paths": [
         "x3-lang/vm/src/trading.rs",
-        "x3-lang/crates/x3-tools/src/bin/x3c.rs"
+        "x3-lang/vm/tests/trading_receipts.rs",
+        "x3-lang/vm/tests/trading_execution.rs",
+        "x3-lang/crates/x3-tools/src/bin/x3c.rs",
+        "x3-lang/crates/x3-tools/tests/cli.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4513,7 +4519,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "860ff7e273e7c2e7a5c2953f340ebdcfd92f1f931e3074721f14cd6f1f0b622e",
+    "source_digest": "7bb3a0516f10ee3db140dc9407b525854951c211140c7e8d3b2c435f8fd12680",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4524,7 +4530,7 @@
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
-      "feature-matrix/language-trading.toml": "79eb01e87289ba78ab79c606100a4a07a9f0ff67cb7a90bc55026160d4743c89",
+      "feature-matrix/language-trading.toml": "198e36f14c0840e7f7aa1f58f1fa1f31a52f64d42f67802b97d1a7e7b9e228ae",
       "feature-matrix/mev-privacy.toml": "a8f6d82dcb345408fc6ffbde70dacefde8dc3686625110979b5e30d26b2f85e3",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
