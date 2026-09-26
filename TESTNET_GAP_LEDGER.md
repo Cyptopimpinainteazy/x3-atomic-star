@@ -932,6 +932,18 @@ Not closed and not claimed: this router still has no *fair* ordering. Ordering b
 can grind is the commit-reveal window in `crates/x3-swap-router/src/mev_protection/fair_ordering.rs`,
 and nothing in this crate calls it.
 
+**TICKET-143 — the DEX settlement bridge has six tests and no caller.** Found while working the
+ordering rows, not fixed: `crates/x3-dex/src/settlement_bridge.rs` (520 lines, 6 unit tests) is
+declared and re-exported (`pub use settlement_bridge::{LimitOrderSettlementBridge,
+OrderSettlementIntent, SettlementStatus}`) but nothing outside the crate names
+`LimitOrderSettlementBridge` — `rg` over the tree outside that file returns no other hit. Its own
+doc comment is honest about the gap ("Actual on-chain submission requires runtime integration via
+extrinsic... documents the mapping for implementation in node/src/rpc.rs"), and five of its doc
+examples are marked ```ignore```, so nothing here is passing as a test that is not one. What is
+missing is the caller: the mapping is written, the extrusion to
+`pallet-x3-settlement-engine` is not. Acceptance: either a real submission path with a test that
+fails when the mapping is wrong, or delete the bridge and the claim that the DEX settles on chain.
+
 ## TICKET-139 — the claim scanner now reads the surfaces people actually read — 2026-09-26
 
 **CLOSED.** `scripts/ci/check-claims-hygiene.py` scans `docs/**`, `production/public/**`,
@@ -1013,25 +1025,3 @@ and the built bundle `production/public/assets/index-*.js` falls back to fabrica
 numbers (42 validators, "99.8%" uptime) when its API call fails. Both point at a deployment
 state the ledger says does not exist, but a dead CTA and a baked bundle are TICKET-140-shaped
 (a surface the scanner still does not read), not rule-shaped.
-
-## TICKET-142 — a test whose name is its only claim — 2026-09-26
-
-**OPEN.** `crates/x3-dex/src/tests/attack_liquidation_frontrun.rs::liquidation_frontrun_eliminated_by_fair_ordering`
-asserts `first_bonus > second_bonus` on two locals the test itself declares four lines above it:
-
-```
-    let first_bonus = 50u64;
-    let second_bonus = 0u64;
-    assert!(first_bonus > second_bonus);   // "Fair-ordering invariant: first sequenced liquidation gets the bonus edge"
-```
-
-Nothing about ordering is exercised. `BatchSwapRouter::execute_batch_swap` is handed two instructions and
-two amounts, and the assertion holds on any implementation of it, including one that orders strictly by
-arrival — which is what the crate does today. The test's *name* asserts the property, so the name is the
-claim and the claim is unearned. Found while measuring `X3-MEV-008` (round 4, workstream B) against
-`crates/x3-swap-router/src/mev_protection/fair_ordering.rs`; filed rather than fixed because `crates/x3-dex`
-was outside that workstream's ownership, and no agent has claimed it since.
-
-Acceptance: either drive a batch through the ordering lane and assert the *executed sequence* (so the test
-fails when the lane orders by arrival), or delete the test and the claim its name carries. A test that
-cannot fail is a claim surface, and this one sits in the family the matrix scores as MEV protection.
