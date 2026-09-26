@@ -3239,7 +3239,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 46,
+      "composite": 48,
       "confidence": "high",
       "evidence": [
         "pallets/private-execution",
@@ -3250,9 +3250,9 @@
       "implemented": 60,
       "launch_scope": "guarded",
       "live_tested": "GUARDED_TESTNET",
-      "mainnet_ready": 35,
+      "mainnet_ready": 40,
       "missing_work": [
-        "The pallet now runs an ordering window on chain, so this is no longer 'private execution and nothing else': `open_ordering_window` / `commit_ordering` / `reveal_ordering` / `install_ordering_beacon` / `settle_ordering_window` drive the `CommitRevealLane` from `crates/x3-order-window` (the same algorithm its 26 crate tests verify), the settled order is stored as the *recomputable* canonical order and the dispatchable asserts the published sequence equals `settlement.canonical_order()`, and bonds are reserved on commit, released on reveal and `slash_reserved` for the unrevealed set with a fail-closed check that the whole amount moved. Measured: 22 new pallet tests, 34 in the pallet's suite, and `cargo check -p x3-chain-runtime` compiles the wiring into every runtime variant.",
+        "The pallet now runs an ordering window on chain, so this is no longer 'private execution and nothing else': `open_ordering_window` / `commit_ordering` / `reveal_ordering` / `install_ordering_beacon` / `settle_ordering_window` drive the `CommitRevealLane` from `crates/x3-order-window` (the same algorithm its 26 crate tests verify), the settled order is stored as the *recomputable* canonical order and the dispatchable asserts the published sequence equals `settlement.canonical_order()`, and bonds are reserved on commit, released on reveal and `slash_reserved` for the unrevealed set with a fail-closed check that the whole amount moved. Measured 2026-09-26 (primary agent, independently of the lane's author): `cargo test -p pallet-private-execution` -> 34 passed, 0 failed; `cargo check -p x3-chain-runtime --features std` -> exit 0, so the `Config` addition type-checks in the runtime; `local-ci --live --only local-node-smoke` -> PASS and `--only local-network-smoke` -> PASS at 0d903e8b1, so a chain boots, authors, finalizes and agrees on its canonical hash with this wiring compiled in.",
         "No complete formal MEV threat model, and 'MEV-proof' is still not claimable: the beacon extrinsic exists but nothing supplies a beacon, so the placement hole the lane documents is open (a participant that can grind its own nonce chooses where its own commitment lands); the weights for the five new extrinsics are hand-sized rather than benchmarked; nothing has run on a live node; and reveal/settle are deliberately not gated on the `Enabled` switch or the validator quorum (gating them would freeze bonds the chain already took) \u2014 so disabling private execution does not stop an open window from settling, which is a policy the operator should confirm rather than discover."
       ],
       "name": "MEV-resistant architecture",
@@ -4509,7 +4509,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "bbfee065d57e607bb85d3c87423b7d604eacabc201263919b8f330a0defde996",
+    "source_digest": "5edc8aac46488ede38dfbf2f369e57b8b78601be72c0a4c0b57c431390b06bd4",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4521,7 +4521,7 @@
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "7e1bde644f08ac57ac06955726f0891f267965cf3ff13e91cb31bce8aad882a4",
+      "feature-matrix/mev-privacy.toml": "a3f4ad3aac36f5c611fbcf5767d840bc37b4e2514455defd371ed382556ab8dc",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
