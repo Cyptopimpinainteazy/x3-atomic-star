@@ -131,6 +131,7 @@ impl pallet_x3_kernel::Config for Test {
     type EvmAdapter = pallet_x3_kernel::MockEvmAdapter;
     type SvmAdapter = pallet_x3_kernel::MockSvmAdapter;
     type X3Adapter = pallet_x3_kernel::MockX3Adapter;
+    type MaxX3StorageSlots = ConstU32<256>;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;

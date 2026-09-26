@@ -165,6 +165,7 @@ impl pallet_x3_kernel::Config for StorageTest {
     type SvmAdapter = MockSvmAdapter;
     // The production X3 adapter: the component under test.
     type X3Adapter = X3VmAdapter;
+    type MaxX3StorageSlots = ConstU32<256>;
     type GovernanceOrigin = frame_system::EnsureRoot<AccountId>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;
@@ -178,6 +179,11 @@ impl pallet_x3_kernel::Config for StorageTest {
 }
 
 const ALICE: AccountId = 1;
+/// Extra funded, authorized submitters, so a test can make more than one comit in one block: the
+/// prepare root binds the nonce and `submit_v2` uses nonce 0, so a second submission from the same
+/// account is an `InvalidNonce`, not a second comit.
+const BOB: AccountId = 2;
+const CHARLIE: AccountId = 3;
 const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 
 fn new_test_ext() -> TestExternalities {
@@ -185,7 +191,11 @@ fn new_test_ext() -> TestExternalities {
         .build_storage()
         .expect("system genesis");
     pallet_balances::GenesisConfig::<StorageTest> {
-        balances: vec![(ALICE, INITIAL_BALANCE)],
+        balances: vec![
+            (ALICE, INITIAL_BALANCE),
+            (BOB, INITIAL_BALANCE),
+            (CHARLIE, INITIAL_BALANCE),
+        ],
         dev_accounts: None,
     }
     .assimilate_storage(&mut storage)
@@ -193,7 +203,7 @@ fn new_test_ext() -> TestExternalities {
     pallet_x3_kernel::GenesisConfig::<StorageTest> {
         assets: Vec::new(),
         authorities: vec![ALICE],
-        authorized_accounts: vec![ALICE],
+        authorized_accounts: vec![ALICE, BOB, CHARLIE],
         evm_escrow: H160::repeat_byte(0xE3),
         svm_escrow: [0x53; 32],
     }
@@ -228,6 +238,15 @@ fn store_seven_in_slot_zero() -> Vec<u8> {
         0x18, 0x02, 0x07, // LoadImm r2, 7  (value)
         0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
         0x06, // RetVoid
+    ])
+}
+
+/// `main() { return sload(slot: 0); }` — the read half of the same channel.
+fn load_slot_zero() -> Vec<u8> {
+    module_with_code(vec![
+        0x18, 0x01, 0x00, // LoadImm r1, 0 (slot)
+        0xB3, 0x00, 0x01, // EvmSload dst=r0 slot=r1
+        0x05, 0x00, // Ret r0
     ])
 }
 
@@ -291,12 +310,21 @@ fn submit_v2(
     evm_payload: Vec<u8>,
     x3_payload: Vec<u8>,
 ) -> Result<(), DispatchError> {
+    submit_v2_from(ALICE, comit_id, evm_payload, x3_payload)
+}
+
+fn submit_v2_from(
+    who: AccountId,
+    comit_id: H256,
+    evm_payload: Vec<u8>,
+    x3_payload: Vec<u8>,
+) -> Result<(), DispatchError> {
     let nonce = 0u64;
     let fee: Balance = 1_000;
     let prepare_root =
         Kernel::compute_prepare_root_v2(comit_id, &evm_payload, &[], &x3_payload, nonce, fee);
     Kernel::submit_comit_v2(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(who),
         comit_id,
         evm_payload,
         Vec::new(),
@@ -356,6 +384,135 @@ fn a_store_reaches_chain_storage_through_the_receipt() {
             pallet_x3_kernel::DecodeFailureCount::<StorageTest>::get(),
             0,
             "a storage-writing comit must not be decoded as a balance change"
+        );
+    });
+}
+/// The read half of the channel: a *second* comit must see what the first one persisted.
+///
+/// Before the kernel read its own slot map into the execution, `X3ContractStorage` was written and
+/// never read back: `X3VmAdapter::execute` took no storage, so the interpreter started from an empty
+/// view and `evm_sload` answered EVM's zero for a slot the chain had held a value in since the
+/// previous comit. Contract state was write-only. The control below is the same program on a chain
+/// that never wrote the slot, so a pass here cannot come from the opcode returning a constant.
+#[test]
+fn a_second_comit_reads_the_slot_the_first_one_wrote() {
+    new_test_ext().execute_with(|| {
+        let writer = H256::from_low_u64_be(0x5021);
+        let reader = H256::from_low_u64_be(0x5022);
+
+        submit_v2(writer, Vec::new(), store_seven_in_slot_zero())
+            .expect("the writing comit is accepted");
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(0)),
+            Some(encoded_i64_payload(7)),
+            "the first comit persisted slot 0"
+        );
+
+        let load = load_slot_zero();
+
+        // The adapter contract itself: the same module, handed the chain's slot, returns it...
+        let with_slot =
+            X3VmAdapter::execute_with_slots(&load, 5_000_000, &[(evm_slot_key(0), encoded_i64_payload(7))])
+                .expect("the adapter executes the load");
+        assert!(with_slot.success);
+        assert_eq!(with_slot.return_data, 7i64.to_le_bytes().to_vec());
+
+        // ...and handed nothing, returns EVM's zero. This is the assertion that makes the kernel's
+        // wiring load-bearing rather than incidental.
+        let without_slot = X3VmAdapter::execute_with_slots(&load, 5_000_000, &[])
+            .expect("the adapter executes the load");
+        assert_eq!(without_slot.return_data, 0i64.to_le_bytes().to_vec());
+
+        // Now through the chain: the reading comit is a separate submission whose only input is the
+        // program, and its receipt must carry the value the *first* comit stored.
+        submit_v2_from(BOB, reader, Vec::new(), load).expect("the reading comit is accepted");
+        let receipt = Kernel::x3_execution_receipt(reader).expect("the receipt is stored");
+        assert!(receipt.success);
+        assert_eq!(
+            receipt.return_data,
+            7i64.to_le_bytes().to_vec(),
+            "the chain's own slot must reach the program, not the interpreter's empty default"
+        );
+
+        // A read is not a write: the comit must not have added a slot write to its receipt or
+        // touched the slot map.
+        assert!(
+            receipt.storage_writes.is_empty(),
+            "reading chain state must not be reported as a state change"
+        );
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(0)),
+            Some(encoded_i64_payload(7)),
+            "the read must leave the slot as the writer left it"
+        );
+        assert_eq!(
+            pallet_x3_kernel::DecodeFailureCount::<StorageTest>::get(),
+            0,
+            "a slot read must not be decoded as a balance change"
+        );
+    });
+}
+
+#[test]
+fn a_comit_reads_zero_from_a_slot_the_chain_never_wrote() {
+    new_test_ext().execute_with(|| {
+        let reader = H256::from_low_u64_be(0x5023);
+        assert_eq!(Kernel::x3_contract_slot(evm_slot_key(0)), None);
+
+        submit_v2(reader, Vec::new(), load_slot_zero()).expect("the reading comit is accepted");
+
+        let receipt = Kernel::x3_execution_receipt(reader).expect("the receipt is stored");
+        assert_eq!(
+            receipt.return_data,
+            0i64.to_le_bytes().to_vec(),
+            "a slot the chain never wrote reads as EVM's zero"
+        );
+    });
+}
+
+/// The bound on the storage view, and the refusal it produces.
+///
+/// The slot map is unbounded and every entry is a database read the block pays for, so
+/// `submit_comit_v2` prices `MaxX3StorageSlots` reads and the view refuses past it. A partial view
+/// would be worse than a refusal: a slot missing from it is indistinguishable from a slot that was
+/// never written, which is the one answer a program must not be given about state the chain holds.
+#[test]
+fn an_x3_execution_is_refused_when_the_slot_map_exceeds_the_priced_bound() {
+    new_test_ext().execute_with(|| {
+        let limit = <StorageTest as pallet_x3_kernel::Config>::MaxX3StorageSlots::get();
+        for i in 0..limit {
+            let mut key = [0u8; 32];
+            key[..8].copy_from_slice(&EVM_SLOT_DOMAIN.to_le_bytes());
+            key[8..16].copy_from_slice(&(1_000_000 + i as u64).to_le_bytes());
+            pallet_x3_kernel::X3ContractStorage::<StorageTest>::insert(
+                H256::from(key),
+                encoded_i64_payload(i as i64),
+            );
+        }
+
+        // The view now holds exactly the limit, which is still readable...
+        let comit_ok = H256::from_low_u64_be(0x5024);
+        submit_v2(comit_ok, Vec::new(), load_slot_zero())
+            .expect("a view at the limit is still served");
+
+        // ...and one entry more is refused by name, before anything runs.
+        let mut key = [0u8; 32];
+        key[..8].copy_from_slice(&EVM_SLOT_DOMAIN.to_le_bytes());
+        key[8..16].copy_from_slice(&2_000_000u64.to_le_bytes());
+        pallet_x3_kernel::X3ContractStorage::<StorageTest>::insert(
+            H256::from(key),
+            encoded_i64_payload(0),
+        );
+
+        let comit_refused = H256::from_low_u64_be(0x5025);
+        assert_eq!(
+            submit_v2_from(BOB, comit_refused, Vec::new(), load_slot_zero()).unwrap_err(),
+            pallet_x3_kernel::Error::<StorageTest>::X3StorageViewTooLarge.into(),
+            "past the priced bound the execution is refused, not run against a partial view"
+        );
+        assert!(
+            Kernel::x3_execution_receipt(comit_refused).is_none(),
+            "a refused execution must leave no receipt behind"
         );
     });
 }

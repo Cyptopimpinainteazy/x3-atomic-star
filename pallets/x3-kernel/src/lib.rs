@@ -589,6 +589,15 @@ pub mod pallet {
         /// Implement X3ExecutorAdapter trait for X3 bytecode execution
         type X3Adapter: X3ExecutorAdapter;
 
+        /// Most X3VM contract slots one X3 execution may be handed.
+        ///
+        /// `X3ContractStorage` is unbounded and every entry is a database read the block pays for,
+        /// so an execution's view of it is bounded and priced (see `submit_comit_v2`'s weight).
+        /// Exceeding this refuses the execution (`X3StorageViewTooLarge`) instead of running the
+        /// program against a partial view it cannot tell from an empty slot.
+        #[pallet::constant]
+        type MaxX3StorageSlots: Get<u32>;
+
         /// Cross-chain proof verification hook.
         type CrossChainProofVerifier: CrossChainProofVerifier<Self::AccountId>;
 
@@ -1057,6 +1066,13 @@ pub mod pallet {
         TooManyStateChanges,
         /// An execution receipt carried more X3VM storage writes than the kernel will apply.
         TooManyStorageWrites,
+        /// The chain holds more X3VM contract slots than the kernel will load into one execution.
+        ///
+        /// Reading the slot map is work the block pays for, so the read is bounded. Exceeding the
+        /// bound refuses the execution rather than handing the program a *partial* view: a slot
+        /// missing from a partial view is indistinguishable from a slot that was never written, and
+        /// that is the one answer a program must not be given about state the chain holds.
+        X3StorageViewTooLarge,
         /// A failed execution reported storage writes. Partial writes from a failed execution must
         /// never reach chain state, so a receipt in this shape is refused rather than trusted.
         StorageWritesOnFailedExecution,
@@ -1719,8 +1735,17 @@ pub mod pallet {
         // own limit. The slot count is bounded by `MAX_STATE_CHANGES`; pricing each one against
         // `DbWeight` (as `CanonicalLedger` updates are not, today) is recorded as a remaining
         // weight-precision gap rather than claimed here.
+        //
+        // 3: an X3 execution is handed the chain's contract slots before it runs, which is a read
+        // per slot. The read is bounded by `MaxX3StorageSlots`, so the bound is priced here even
+        // for a comit with no X3 payload at all — an over-charge on the empty case rather than an
+        // under-charge on the one that reads the map.
         #[pallet::weight(
-            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(T::DbWeight::get().writes(2))
+            <T as Config>::WeightInfo::submit_comit_v2()
+                .saturating_add(T::DbWeight::get().writes(2))
+                .saturating_add(
+                    T::DbWeight::get().reads(T::MaxX3StorageSlots::get().saturating_add(1) as u64)
+                )
         )]
         pub fn submit_comit_v2(
             origin: OriginFor<T>,
@@ -1844,7 +1869,11 @@ pub mod pallet {
             };
 
             let x3_receipt = if let Some(ref tx) = x3_tx {
-                match T::X3Adapter::execute(tx, x3_gas_limit) {
+                // The chain's own slots, read before execution: a program that reads a slot an
+                // earlier comit persisted must see that value, and a program that writes over one
+                // must report it as the write's `old_value`.
+                let slots = Self::x3_storage_view()?;
+                match T::X3Adapter::execute_with_slots(tx, x3_gas_limit, &slots) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         return Err(Self::fail_with_reason(
@@ -3457,6 +3486,24 @@ pub mod pallet {
             Ok(changes_applied)
         }
 
+        /// This chain's X3VM contract slots, for an execution to start from.
+        ///
+        /// The read is bounded by [`Config::MaxX3StorageSlots`] and refuses by name past it — see
+        /// `Error::X3StorageViewTooLarge` for why a partial view would be worse than a refusal.
+        /// `submit_comit_v2`'s weight pays for the bound, so a block cannot be made to read an
+        /// unbounded map here.
+        fn x3_storage_view() -> Result<Vec<(H256, [u8; 32])>, DispatchError> {
+            let limit = T::MaxX3StorageSlots::get() as usize;
+            let mut view: Vec<(H256, [u8; 32])> = Vec::new();
+            for (key, value) in X3ContractStorage::<T>::iter() {
+                if view.len() >= limit {
+                    return Err(Error::<T>::X3StorageViewTooLarge.into());
+                }
+                view.push((key, value));
+            }
+            Ok(view)
+        }
+
         /// Apply an X3 execution receipt's slot writes to `X3ContractStorage`.
         ///
         /// This is the destination for the receipt's typed `storage_writes` channel. It is kept out
@@ -3831,7 +3878,13 @@ pub mod pallet {
                 });
             }
 
-            let receipt = T::X3Adapter::execute(call.payload.as_slice(), call.gas_budget)?;
+            // The chain's slots, so a cross-VM X3VM call reads the same state a direct comit does.
+            // Its slot *writes* are deliberately not applied here: this path returns a receipt to a
+            // caller that may still roll the whole cross-VM operation back, so applying storage at
+            // this point would commit state an aborted caller was entitled to abandon (TICKET-152).
+            let slots = Pallet::<T>::x3_storage_view()?;
+            let receipt =
+                T::X3Adapter::execute_with_slots(call.payload.as_slice(), call.gas_budget, &slots)?;
             let result = if receipt.success {
                 CrossVmResult::success(receipt.return_data, receipt.gas_used)
             } else {

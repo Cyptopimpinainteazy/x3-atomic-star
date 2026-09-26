@@ -41,6 +41,19 @@ pub trait X3ExecutorAdapter {
     /// Execute X3 bytecode and return execution receipt
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError>;
 
+    /// Execute X3 bytecode with the chain's contract slots visible to the program.
+    ///
+    /// `slots` is the chain's `X3ContractStorage`, read by the caller before execution; an empty
+    /// slice means the chain holds no slot for this program. There is deliberately no default
+    /// implementation: an adapter that cannot see chain storage must say so where it is written,
+    /// because an adapter that silently ignores this argument produces receipts for a program that
+    /// read zeros instead of the chain's state.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError>;
+
     /// Validate X3 bytecode without execution
     fn validate(payload: &[u8]) -> Result<(), DispatchError>;
 
@@ -276,6 +289,17 @@ pub struct MockX3Adapter;
 
 impl X3ExecutorAdapter for MockX3Adapter {
     fn execute(payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_with_slots(payload, _gas_limit, &[])
+    }
+
+    /// The mock has no chain storage: it reports the state changes it synthesizes and nothing else,
+    /// which is what makes it a mock. Stated here rather than defaulted on the trait so a
+    /// production adapter cannot inherit "ignores the chain's slots" by accident.
+    fn execute_with_slots(
+        payload: &[u8],
+        _gas_limit: u64,
+        _slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
         // Mock execution: hash payload to generate deterministic state changes
         let state_root = if payload.is_empty() {
             H256::zero()
@@ -353,7 +377,20 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
             });
         }
 
-        MockX3Adapter::execute(payload, gas_limit)
+        MockX3Adapter::execute_with_slots(payload, gas_limit, &[])
+    }
+
+    /// `execute`s fault injection, with the same stance on chain storage as `MockX3Adapter`.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        if payload.first() == Some(&0xFF) {
+            return Err(DispatchError::Other("X3 execution failed (simulated)"));
+        }
+
+        MockX3Adapter::execute_with_slots(payload, gas_limit, slots)
     }
 
     fn validate(payload: &[u8]) -> Result<(), DispatchError> {
@@ -391,6 +428,16 @@ impl X3ExecutorAdapter for () {
 
     fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
+    }
+
+    /// Test-only adapter: it synthesizes a success receipt and cannot see chain storage, which is
+    /// why it is confined to test and `dev-mock` builds.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        _slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        <() as X3ExecutorAdapter>::execute(payload, gas_limit)
     }
 
     fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
@@ -490,11 +537,26 @@ pub mod real_adapters {
 
     impl super::X3ExecutorAdapter for X3VmAdapter {
         fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+            Self::execute_with_slots(payload, gas_limit, &[])
+        }
+
+        fn execute_with_slots(
+            payload: &[u8],
+            gas_limit: u64,
+            slots: &[(H256, [u8; 32])],
+        ) -> Result<ExecutionReceipt, DispatchError> {
             use x3_x3_integration::{X3Executor, X3ExecutorConfig};
 
             let config = X3ExecutorConfig::on_chain().with_gas_limit(gas_limit);
 
-            let receipt = X3Executor::execute(payload, &[], config).map_err(|e| {
+            // The chain's slots, in the executor's own key/value shape. The executor loads them as
+            // inherited state, so a program reads what a previous comit persisted.
+            let seeds: Vec<([u8; 32], [u8; 32])> = slots
+                .iter()
+                .map(|(key, value)| (key.to_fixed_bytes(), *value))
+                .collect();
+
+            let receipt = X3Executor::execute_with_slots(payload, &[], config, &seeds).map_err(|e| {
                 DispatchError::Other(match e {
                     x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
                         "X3 verification failed"

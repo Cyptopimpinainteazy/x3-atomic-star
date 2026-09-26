@@ -412,6 +412,15 @@ parameter_types! {
     pub const MaxEvmPayloadLength: u32 = 64 * 1024;  // 64 KB for EVM payloads
     pub const MaxSvmPayloadLength: u32 = 64 * 1024;  // 64 KB for SVM payloads
     pub const MaxX3PayloadLength: u32 = 64 * 1024;  // 64 KB for X3 payloads
+    /// Most X3VM contract slots one X3 execution may be handed, as its view of chain state.
+    ///
+    /// The slot map is unbounded and every entry is a database read the block pays for, so the view
+    /// is bounded and `submit_comit_v2`'s weight prices the bound. Past it the execution is refused
+    /// (`X3StorageViewTooLarge`) rather than run against a partial view — a slot missing from a
+    /// partial view is indistinguishable from a slot that was never written, which is the one
+    /// answer a program must not be given about state the chain holds. Per-contract keying plus a
+    /// declared read set is the fix that removes the bound (TICKET-153).
+    pub const MaxX3StorageSlots: u32 = 1024;
     pub const MaxCombinedPayloadLength: u32 = 128 * 1024;  // 128 KB combined limit
     pub const MaxCombinedPayloadLengthV2: u32 = 192 * 1024;  // 192 KB combined (EVM+SVM+X3)
     pub const MaxAuthorities: u32 = 100;  // Maximum 100 authorities
@@ -1680,6 +1689,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
+    type MaxX3StorageSlots = MaxX3StorageSlots;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type CrossChainProofVerifier = SubstrateProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowStorage;

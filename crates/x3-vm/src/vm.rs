@@ -217,6 +217,22 @@ impl VM {
 
     /// Create a new VM with custom configuration.
     pub fn with_config(module: BytecodeModule, config: VMConfig) -> Self {
+        Self::with_config_and_seeds(module, config, &[])
+            .expect("no seeds cannot exceed the storage key limit")
+    }
+
+    /// Create a VM with custom configuration and the chain's contract slots already loaded.
+    ///
+    /// `seeds` is the chain's contract storage: the 32-byte slot keys and the payloads a previous
+    /// execution persisted. They are loaded as state the execution inherited — not journaled, not
+    /// reported as writes — which is what lets a later `evm_sload` read what an earlier execution
+    /// stored, and what makes a subsequent `evm_sstore` report the chain's value as its
+    /// `old_value`. Fails rather than silently dropping a seed the storage limit refuses.
+    pub fn with_config_and_seeds(
+        module: BytecodeModule,
+        config: VMConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> VMResult<Self> {
         // initialize globals from module (use const pool initializers where present)
         let mut globals: Vec<Value> = Vec::new();
         for g in &module.globals {
@@ -234,7 +250,16 @@ impl VM {
         // enforce a private constant of 10 while the configuration said 32, so a program the
         // executor admitted was refused nine calls in (TICKET-131).
         let isolation_depth = config.max_call_depth as u32;
-        Self {
+        let mut storage = VmStorage::new();
+        for (key, value) in seeds {
+            storage.seed_slot(*key, *value).map_err(|err| {
+                VMError::without_ip(VMErrorKind::HostcallError(format!(
+                    "seed refused: {err:?}"
+                )))
+            })?;
+        }
+
+        Ok(Self {
             module,
             regs: vec![Value::Unit; MAX_REGISTERS],
             stack: Vec::with_capacity(config.max_stack_size),
@@ -249,9 +274,9 @@ impl VM {
             state_machine: StateMachine::new(),
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
-            storage: VmStorage::new(),
+            storage,
             jit: JitCompiler::new(JitConfig::default()),
-        }
+        })
     }
 
     /// Create a VM from raw bytes.

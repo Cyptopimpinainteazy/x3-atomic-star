@@ -17,7 +17,7 @@
 
 use x3_backend::{BytecodeModule, FunctionEntry};
 use x3_vm::VM;
-use x3_x3_integration::mini_x3::{execute_x3bc, X3Error};
+use x3_x3_integration::mini_x3::{execute_x3bc, execute_x3bc_with_slots, X3Error};
 
 /// A module whose `main` is `instruction`, then `Nop`s and a `RetVoid`, written by the real
 /// envelope writer.
@@ -195,6 +195,96 @@ fn slot_storage_is_implemented_by_both_engines_and_names_the_same_slot() {
     assert_eq!(
         runtime.storage_writes[0].old_value, journal[0].old_value,
         "including the value the write replaced"
+    );
+}
+
+/// Both engines must read the chain's seeded slot, and agree on what it makes the old value.
+///
+/// Seeding is the half of slot storage that a chain needs and a single execution cannot show: the
+/// slot a *previous* comit wrote has to be visible to the next one, on both engines, with the same
+/// `old_value` in the journal — because `old_value` is what describes the state transition the
+/// receipt claims. The control below runs the same program with no seed, so neither engine can pass
+/// this by answering a constant.
+#[test]
+fn both_engines_read_the_seeded_slot_and_report_it_as_the_old_value() {
+    // slot = r1 (0), store 9 over it, load it back into r3, return r3.
+    let bytes = module_with_code(&[
+        0x18, 0x01, 0x00, // LoadImm r1, 0
+        0x18, 0x02, 0x09, // LoadImm r2, 9
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0xB3, 0x03, 0x01, // EvmSload dst=r3 slot=r1
+        0x05, 0x03, // Ret r3
+    ]);
+
+    // `"X3EVM_SL"` little-endian, then the slot number — the derivation both engines share.
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&0x5833_4556_4D5F_534Cu64.to_le_bytes());
+    let mut payload_seven = [0u8; 32];
+    payload_seven[0] = 1;
+    payload_seven[1] = 8;
+    payload_seven[2..10].copy_from_slice(&7i64.to_le_bytes());
+    let mut payload_nine = [0u8; 32];
+    payload_nine[0] = 1;
+    payload_nine[1] = 8;
+    payload_nine[2..10].copy_from_slice(&9i64.to_le_bytes());
+    let seeds = [(key, payload_seven)];
+
+    let module = BytecodeModule::from_bytes(&bytes).expect("the std VM loads it");
+    let mut vm = VM::with_config_and_seeds(module, x3_vm::VMConfig::default(), &seeds)
+        .expect("the std VM accepts the seed");
+    let result = vm.call_function(0, &[]).expect("the std VM runs it");
+    assert_eq!(
+        result.value,
+        Some(x3_vm::Value::I64(9)),
+        "the std VM must read the chain's slot and write over it"
+    );
+    let journal = vm.drain_storage_journal();
+    assert_eq!(journal.len(), 1);
+    assert_eq!(
+        journal[0].old_value,
+        Some(payload_seven),
+        "the std VM must report the chain's value as the old value"
+    );
+    assert_eq!(journal[0].new_value, Some(payload_nine));
+
+    let runtime = execute_x3bc_with_slots(&bytes, 100_000, &seeds)
+        .expect("the runtime interpreter accepts the seed");
+    assert_eq!(
+        runtime.return_val,
+        x3_x3_integration::mini_x3::MiniValue::I64(9)
+    );
+    assert_eq!(runtime.storage_writes.len(), 1);
+    assert_eq!(
+        runtime.storage_writes[0].old_value,
+        Some(payload_seven),
+        "the on-chain interpreter must report the same old value"
+    );
+    assert_eq!(
+        runtime.storage_writes[0].key.as_bytes(),
+        &journal[0].key,
+        "and name the same slot"
+    );
+
+    // The control: with no seed, the same program writes over nothing on both engines — so the
+    // `Some(payload_seven)` above is the seed's doing and not a constant in either engine.
+    let mut unseeded_vm = VM::with_config_and_seeds(
+        BytecodeModule::from_bytes(&bytes).expect("loads"),
+        x3_vm::VMConfig::default(),
+        &[],
+    )
+    .expect("no seeds is valid");
+    unseeded_vm.call_function(0, &[]).expect("runs");
+    assert_eq!(
+        unseeded_vm.drain_storage_journal()[0].old_value,
+        None,
+        "without the seed there is nothing to have replaced"
+    );
+    assert_eq!(
+        execute_x3bc_with_slots(&bytes, 100_000, &[])
+            .expect("runs")
+            .storage_writes[0]
+            .old_value,
+        None
     );
 }
 

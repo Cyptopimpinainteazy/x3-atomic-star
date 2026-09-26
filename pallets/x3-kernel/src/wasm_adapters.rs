@@ -206,6 +206,14 @@ pub struct WasmX3Adapter;
 
 impl X3ExecutorAdapter for WasmX3Adapter {
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_with_slots(payload, gas_limit, &[])
+    }
+
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(sp_core::H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
@@ -213,7 +221,14 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             gas_limit,
             ..Default::default()
         };
-        x3_x3_integration::X3Executor::execute(payload, &[], config)
+        // The chain's slots in the executor's own shape. Loading them is what makes a program able
+        // to read a slot an earlier comit persisted; without them every `evm_sload` on a block
+        // answered EVM's zero.
+        let seeds: Vec<([u8; 32], [u8; 32])> = slots
+            .iter()
+            .map(|(key, value)| (key.to_fixed_bytes(), *value))
+            .collect();
+        x3_x3_integration::X3Executor::execute_with_slots(payload, &[], config, &seeds)
             .map(|rec| ExecutionReceipt {
                 version: crate::EXECUTION_RECEIPT_VERSION,
                 success: rec.success,
@@ -221,11 +236,10 @@ impl X3ExecutorAdapter for WasmX3Adapter {
                 return_data: rec.return_data,
                 logs: Vec::new(),
                 state_changes: Vec::new(),
-                // Carry the executor's slot channel through unchanged. In a `no_std` build the
-                // interpreter (`mini_x3`) has no slot storage and reports none; in a `std` build
-                // these are the writes the VM journaled, and they must not be dropped on the way
-                // to the pallet or a contract's state would silently vanish between execution and
-                // the receipt the chain stores.
+                // Carry the executor's slot channel through unchanged. Both engines journal the
+                // slot writes they made (`mini_x3` on a block, `x3-vm` in std builds), and they
+                // must not be dropped on the way to the pallet or a contract's state would
+                // silently vanish between execution and the receipt the chain stores.
                 storage_writes: rec
                     .storage_writes
                     .into_iter()

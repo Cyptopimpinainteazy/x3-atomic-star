@@ -98,6 +98,23 @@ impl X3Executor {
         args: &[X3Value],
         config: X3ExecutorConfig,
     ) -> X3Result<X3ExecutionReceipt> {
+        Self::execute_with_slots(bytecode, args, config, &[])
+    }
+
+    /// Execute X3 bytecode with the chain's contract slots visible to the program.
+    ///
+    /// `seeds` is the chain's `X3ContractStorage`: the 32-byte slot keys and the tagged payloads a
+    /// previous execution persisted. They are loaded as inherited state (the VM does not journal
+    /// them and the receipt does not report them), which is what makes a *second* comit able to
+    /// read what the first one wrote. Before this existed the executor was handed no prior state, so
+    /// `evm_sload` answered EVM's zero for every slot and contract state was write-only.
+    #[cfg(feature = "std")]
+    pub fn execute_with_slots(
+        bytecode: &[u8],
+        args: &[X3Value],
+        config: X3ExecutorConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> X3Result<X3ExecutionReceipt> {
         // Step 1: Verify bytecode
         let verify_opts = if config.allow_debug_ops {
             VerifyOptions::default()
@@ -119,7 +136,7 @@ impl X3Executor {
         // (`crates/x3-integration/tests/gas_accounting.rs`).
         let module = BytecodeModule::from_bytes(bytecode)
             .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
-        let mut vm = VM::with_config(
+        let mut vm = VM::with_config_and_seeds(
             module,
             VMConfig {
                 gas_limit: config.gas_limit,
@@ -127,7 +144,9 @@ impl X3Executor {
                 max_stack_size: config.max_stack_size,
                 trace: config.trace,
             },
-        );
+            seeds,
+        )
+        .map_err(|e| X3IntegrationError::ExecutionFailed(format!("{:?}", e)))?;
 
         // Step 3: Convert arguments to VM values
         let vm_args: Vec<x3_vm::Value> = args
@@ -226,8 +245,23 @@ impl X3Executor {
         _args: &[X3Value],
         config: X3ExecutorConfig,
     ) -> X3Result<X3ExecutionReceipt> {
+        Self::execute_with_slots(bytecode, _args, config, &[])
+    }
+
+    /// Execute X3BC bytecode on the engine a block runs, with the chain's slots visible.
+    ///
+    /// Same channel as the `std` arm above: the seeds are the chain's `X3ContractStorage`, loaded
+    /// as inherited state rather than as writes, so a program can read a slot a previous comit
+    /// persisted and a store over one reports the chain's value as its `old_value`.
+    #[cfg(not(feature = "std"))]
+    pub fn execute_with_slots(
+        bytecode: &[u8],
+        _args: &[X3Value],
+        config: X3ExecutorConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> X3Result<X3ExecutionReceipt> {
         use crate::mini_x3;
-        match mini_x3::execute_x3bc(bytecode, config.gas_limit) {
+        match mini_x3::execute_x3bc_with_slots(bytecode, config.gas_limit, seeds) {
             Ok(res) => Ok(X3ExecutionReceipt {
                 success: true,
                 gas_used: res.gas_used,

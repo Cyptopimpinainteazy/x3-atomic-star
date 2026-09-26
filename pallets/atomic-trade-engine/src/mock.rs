@@ -212,6 +212,16 @@ impl X3ExecutorAdapter for TradeEngineX3Adapter {
         payload: &[u8],
         gas_limit: u64,
     ) -> Result<ExecutionReceipt, sp_runtime::DispatchError> {
+        Self::execute_with_slots(payload, gas_limit, &[])
+    }
+
+    /// The trade engine's mock parses an amount out of the payload and has no chain storage; the
+    /// slots it would read are not part of what these tests are about.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        _slots: &[(sp_core::H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, sp_runtime::DispatchError> {
         // Simulate swap: parse amount from payload and return 99%
         let amount_in = if payload.len() >= 36 {
             // Parse amount from ABI-encoded payload (bytes 4-36)
@@ -308,6 +318,7 @@ impl pallet_x3_kernel::Config for Test {
     type EvmAdapter = TradeEngineEvmAdapter;
     type SvmAdapter = TradeEngineSvmAdapter;
     type X3Adapter = TradeEngineX3Adapter;
+    type MaxX3StorageSlots = ConstU32<256>;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;

@@ -267,6 +267,17 @@ pub struct TestX3Adapter;
 
 impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
     fn execute(payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
+        Self::execute_with_slots(payload, _gas_limit, &[])
+    }
+
+    /// The test adapter fabricates a receipt and has no chain storage to read: the slots it returns
+    /// are the ones this mock synthesizes, which is exactly why the production adapter's
+    /// `execute_with_slots` is exercised in `tests/x3_adapter_route.rs` instead of here.
+    fn execute_with_slots(
+        payload: &[u8],
+        _gas_limit: u64,
+        _slots: &[(sp_core::H256, [u8; 32])],
+    ) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Simulate an execution failure when the SCALE-encoded
         // `Packet::X3Vm(X3VmPacket::Transfer)`'s recipient field's
         // first byte is 0xFF. With Phase-1.4 strict-packet validation
@@ -343,6 +354,9 @@ impl pallet_x3_kernel::Config for Test {
     type EvmAdapter = TestEvmAdapter;
     type SvmAdapter = TestSvmAdapter;
     type X3Adapter = TestX3Adapter;
+    // Small on purpose: a test that fills the slot map past this gets the refusal by name, which is
+    // the bound `submit_comit_v2` prices.
+    type MaxX3StorageSlots = ConstU32<256>;
     type GovernanceOrigin = frame_system::EnsureRoot<AccountId>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;

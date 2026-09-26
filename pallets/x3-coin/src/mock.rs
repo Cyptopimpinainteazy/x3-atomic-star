@@ -154,6 +154,7 @@ impl pallet_x3_kernel::Config for Test {
     type EvmAdapter = MockEvmAdapter;
     type SvmAdapter = MockSvmAdapter;
     type X3Adapter = MockX3Adapter;
+    type MaxX3StorageSlots = ConstU32<256>;
     type CrossChainProofVerifier = NoopProofVerifier;
     type GovernanceOrigin = EnsureRoot<AccountId>;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;

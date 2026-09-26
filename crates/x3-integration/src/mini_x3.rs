@@ -566,9 +566,11 @@ struct Vm<'m> {
     regs: Vec<MiniValue>,
     call_stack: Vec<CallFrame>,
     globals: Vec<MiniValue>,
-    /// Contract slots this execution has written, keyed by the same 32-byte key `crates/x3-vm`
-    /// uses. Execution starts with an empty map: the interpreter is handed no prior state, so an
-    /// unwritten slot reads as EVM's zero and every entry's `old_value` is that view's old value.
+    /// This execution's view of the contract slots, keyed by the same 32-byte key `crates/x3-vm`
+    /// uses. It starts as the chain's `X3ContractStorage` ([`execute_x3bc_with_slots`] seeds it),
+    /// so a slot a *previous* comit wrote reads back as that value rather than EVM's zero, and an
+    /// entry's `old_value` is the value the execution started from. Seeded entries are not
+    /// journaled: they are the state this execution inherited, not a change it made.
     slots: BTreeMap<[u8; 32], [u8; 32]>,
     /// Every slot write this execution has made, in order.
     writes: Vec<X3StorageWrite>,
@@ -615,6 +617,20 @@ impl<'m> Vm<'m> {
             gas_used: 0,
             instructions_executed: 0,
             gas_limit,
+        }
+    }
+
+    /// Load the chain's contract slots into this execution's view.
+    ///
+    /// Deliberately not a write: nothing is appended to `writes` or `undo_log`, so a receipt never
+    /// reports the chain's own state as a change this program made, and an atomic window that rolls
+    /// back restores the seeded value rather than deleting the slot. A payload the chain holds that
+    /// this ISA did not write is *not* rejected here — it is rejected when a program reads it
+    /// (`CorruptStorageSlot`), so an execution that never touches a corrupt slot still succeeds
+    /// while an execution that reads one fails closed.
+    fn seed_slots(&mut self, seeds: &[([u8; 32], [u8; 32])]) {
+        for (key, payload) in seeds {
+            self.slots.insert(*key, *payload);
         }
     }
 
@@ -1467,11 +1483,31 @@ fn mini_value_from_const(c: &MiniConst) -> MiniValue {
 /// `payload` must be a valid X3BC binary.
 /// `gas_limit` caps execution; `GasExhausted` is returned if exceeded.
 pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Error> {
+    execute_x3bc_with_slots(payload, gas_limit, &[])
+}
+
+/// Execute the first (entry) function in an X3BC module with the chain's contract slots visible.
+///
+/// `seeds` is the chain's `X3ContractStorage`: the 32-byte slot keys and the payloads a previous
+/// execution persisted. Seeding them is what lets a *second* comit read what the first one wrote —
+/// without it `evm_sload` saw the interpreter's own empty map and answered EVM's zero for a slot
+/// the chain had held a value in since an earlier block, so contract state existed on the chain and
+/// was invisible to the contract that owned it.
+///
+/// The seeds carry no authority of their own: a payload whose tag, length or width this ISA did not
+/// write is refused with [`X3Error::CorruptStorageSlot`] when a program reads it, and a seeded slot
+/// a program does not touch costs it nothing.
+pub fn execute_x3bc_with_slots(
+    payload: &[u8],
+    gas_limit: u64,
+    seeds: &[([u8; 32], [u8; 32])],
+) -> Result<X3ExecResult, X3Error> {
     let module = parse_module(payload)?;
     if module.functions.is_empty() {
         return Err(X3Error::FunctionNotFound);
     }
     let mut vm = Vm::new(&module, gas_limit);
+    vm.seed_slots(seeds);
     let func_entry = module.functions[0].entry as usize;
     vm.call_stack.push(CallFrame {
         ret_dst: 0,
@@ -1815,5 +1851,110 @@ mod tests {
             },
         );
         assert!(outcome.is_ok(), "a committed window runs to the end");
+    }
+
+    /// The chain's own slots, as `X3ContractStorage` holds them: key → tagged payload.
+    fn chain_slots(entries: &[(u64, MiniValue)]) -> Vec<([u8; 32], [u8; 32])> {
+        entries
+            .iter()
+            .map(|(slot, value)| {
+                (
+                    evm_slot_key(*slot),
+                    encode_slot_payload(value).expect("the test value is storable"),
+                )
+            })
+            .collect()
+    }
+
+    /// `evm_sload r0 <- slot r1` then `ret r0`, with the slot index in the middle operand.
+    fn load_slot(slot: u8) -> Vec<u8> {
+        vec![
+            0x18, 0x01, slot, // LoadImm r1, slot
+            0xB3, 0x00, 0x01, // EvmSload dst=r0 slot=r1
+            0x05, 0x00, // Ret r0
+        ]
+    }
+
+    #[test]
+    fn a_slot_a_previous_comit_wrote_reads_back_as_that_value() {
+        // The gap this closes: the chain persisted a slot and the contract could not read it, so a
+        // second comit saw EVM's zero for state its own first comit had written.
+        let bytes = module_bytes(&load_slot(0));
+        let seeds = chain_slots(&[(0, MiniValue::I64(42))]);
+
+        let seeded = execute_x3bc_with_slots(&bytes, 100_000, &seeds).expect("the load runs");
+        assert_eq!(
+            seeded.return_val,
+            MiniValue::I64(42),
+            "the chain's value, not the interpreter's empty default"
+        );
+        assert!(
+            seeded.storage_writes.is_empty(),
+            "reading the chain's state is not a write"
+        );
+    }
+
+    #[test]
+    fn a_chain_holding_no_slot_still_reads_zero() {
+        // The control for the test above: the same program on the same view shape, with no seed,
+        // must answer EVM's zero — so the assertion above is about the seed and not about the
+        // opcode returning a constant.
+        let bytes = module_bytes(&load_slot(0));
+        let empty = execute_x3bc_with_slots(&bytes, 100_000, &[]).expect("the load runs");
+        assert_eq!(empty.return_val, MiniValue::I64(0));
+    }
+
+    #[test]
+    fn a_store_over_a_seeded_slot_reports_the_chain_value_as_its_old_value() {
+        // `old_value` is what the kernel's receipt channel carries, and what a cross-VM delta sync
+        // reads. Reporting `None` over a slot the chain held a value in would describe a change
+        // from "nothing" — a state transition that did not happen.
+        let code = [
+            0x18, 0x01, 0x00, // LoadImm r1, 0  (slot)
+            0x18, 0x02, 0x05, // LoadImm r2, 5  (new value)
+            0xB4, 0x01, 0x02, // EvmSstore slot=r1 value=r2
+            0x06, // RetVoid
+        ];
+        let bytes = module_bytes(&code);
+        let seeds = chain_slots(&[(0, MiniValue::I64(42))]);
+
+        let result = execute_x3bc_with_slots(&bytes, 100_000, &seeds).expect("the store runs");
+        assert_eq!(result.storage_writes.len(), 1);
+        assert_eq!(
+            result.storage_writes[0].old_value,
+            Some(encode_slot_payload(&MiniValue::I64(42)).unwrap()),
+            "the value the chain held, not None"
+        );
+        assert_eq!(
+            result.storage_writes[0].new_value,
+            Some(encode_slot_payload(&MiniValue::I64(5)).unwrap())
+        );
+    }
+
+    #[test]
+    fn a_seeded_payload_this_isa_did_not_write_is_refused_when_read() {
+        // A payload the chain holds that this ISA cannot decode must not become a value: the read
+        // fails closed rather than handing the program a guess.
+        let mut unknown_tag = [0u8; 32];
+        unknown_tag[0] = 0x7F;
+        let bytes = module_bytes(&load_slot(0));
+
+        let outcome = execute_x3bc_with_slots(&bytes, 100_000, &[(evm_slot_key(0), unknown_tag)]);
+        assert_eq!(outcome.unwrap_err(), X3Error::CorruptStorageSlot);
+    }
+
+    #[test]
+    fn an_execution_that_never_reads_a_corrupt_slot_still_succeeds() {
+        // The mirror of the test above, and the reason the refusal lives at the read rather than in
+        // `seed_slots`: one contract's undecodable slot must not stop a program that never touches
+        // it from running.
+        let mut unknown_tag = [0u8; 32];
+        unknown_tag[0] = 0x7F;
+        let code = [0x18, 0x00, 0x07, 0x05, 0x00]; // LoadImm r0, 7 + Ret r0
+        let bytes = module_bytes(&code);
+
+        let result = execute_x3bc_with_slots(&bytes, 100_000, &[(evm_slot_key(0), unknown_tag)])
+            .expect("the program never reads the corrupt slot");
+        assert_eq!(result.return_val, MiniValue::I64(7));
     }
 }

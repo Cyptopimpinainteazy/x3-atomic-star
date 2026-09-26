@@ -74,10 +74,42 @@ impl VmStorage {
         key: StorageKey,
         value: Option<StorageValue>,
     ) -> Result<(), StorageError> {
+        let old_value = self.data.get(&key).copied();
+        self.record(key, value, old_value)
+    }
+
+    /// Load a slot the chain already holds, without journaling it.
+    ///
+    /// A seed is the state an execution *starts* from, not a change it makes, so it must not appear
+    /// in the journal a receipt is built from. It does have to be in `data`: that is what makes a
+    /// later `set` report the chain's value as the write's `old_value` (instead of `None`), and what
+    /// makes an atomic window's rollback restore the chain's value rather than delete the slot.
+    ///
+    /// Refuses past the same key limit `set` enforces, so an execution cannot be handed more state
+    /// than a contract's storage may hold.
+    pub fn seed_slot(
+        &mut self,
+        key: StorageKey,
+        value: StorageValue,
+    ) -> Result<(), StorageError> {
         if self.data.len() >= MAX_STORAGE_KEYS && !self.data.contains_key(&key) {
             return Err(StorageError::StorageLimitExceeded);
         }
-        let old_value = self.data.get(&key).copied();
+        self.data.insert(key, value);
+        Ok(())
+    }
+
+    /// The one place a mutation is applied and journaled, so every write path records the same
+    /// `old_value` rule.
+    fn record(
+        &mut self,
+        key: StorageKey,
+        value: Option<StorageValue>,
+        old_value: Option<StorageValue>,
+    ) -> Result<(), StorageError> {
+        if self.data.len() >= MAX_STORAGE_KEYS && !self.data.contains_key(&key) {
+            return Err(StorageError::StorageLimitExceeded);
+        }
         match value {
             Some(v) => {
                 self.data.insert(key, v);
