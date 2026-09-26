@@ -1025,3 +1025,29 @@ and the built bundle `production/public/assets/index-*.js` falls back to fabrica
 numbers (42 validators, "99.8%" uptime) when its API call fails. Both point at a deployment
 state the ledger says does not exist, but a dead CTA and a baked bundle are TICKET-140-shaped
 (a surface the scanner still does not read), not rule-shaped.
+
+## TICKET-144 — the MEV/privacy family has three rows of code and no path to a chain — 2026-09-26
+
+**OPEN.** Round 4 measured the three shallowest rows of `feature-matrix/mev-privacy.toml` and moved
+all three on real code and real tests: `X3-MEV-002` 45/20/25 → 55/40/25, `X3-MEV-007` 5/0/0 →
+45/40/10, `X3-MEV-008` 15/5/5 → 45/40/10. What none of them gained is a caller. Measured
+2026-09-26:
+
+```
+$ cargo tree -i private-mempool --workspace      -> crates/confidential-gpu, and nothing depends on it
+$ cargo tree -i x3-swap-router --workspace       -> the crate itself
+$ rg submission|private|ModeCheck over crates/{x3-compiler,x3-vm,x3-backend,x3-common}  -> zero hits
+```
+
+So a private transaction cannot be submitted (no ingress), a decryption share cannot be produced by
+a running validator (no committee is wired to a node), and an order cannot be placed fairly (the
+commit-reveal lane in `crates/x3-swap-router/src/mev_protection/fair_ordering.rs` has no caller) —
+even though each of the three is implemented and tested in isolation, and each row's blockers now
+say so. This ticket is the single acceptance target that closes all three at once, because they
+fail for the same reason.
+
+Acceptance: one node-level test that starts a node, submits an encrypted transaction through a real
+ingress, has a threshold of committee members decrypt it under the DKG epoch the ciphertext names,
+executes it and checks the receipt — with the ordering lane deciding the order inside that same
+path, or an explicit record of which link is still missing and why. A unit test cannot satisfy this;
+the path is the point.

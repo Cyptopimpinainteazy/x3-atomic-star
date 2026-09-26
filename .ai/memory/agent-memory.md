@@ -8487,8 +8487,9 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
 - **ROUND 4 — MEV/privacy depth (primary/coordinator, 2026-09-26 18:25).** Three workstreams, four agents, and every
   agent again received no task text: `.ai/tasks/2026-09-26-round4-workstreams.md` did the dispatch and the agents
   self-assigned. The roster names did **not** match the lanes — `round4_mev002` took B (`X3-MEV-008`), `round4_mev008`
-  took C (`X3-MEV-002`), and `round4_mev007` holds A (`X3-MEV-007`), still running with `crates/private-mempool/src/*`
-  untouched at 18:25. Resolve ownership by reading the tree and the reports, never by the agent name.
+  took C (`X3-MEV-002`), and `round4_mev007` held A (`X3-MEV-007`) — and `round4_mev007` **is** the agent that wrote
+  this entry: it only learned its own name when `interrupt_agent` refused a self-interrupt. Identity had to be
+  measured, not assumed; resolve ownership by reading the tree and the reports, never by the agent name.
   Landed and verified by re-running, not by taking a report: `c85dba7f1` (x3-lang: a private-submission demand lowers
   into the same `ModeCheck` the strategy path emits, and the IR verifier refuses the policy without it; break-it-first
   shows the example program running to `Ok(())` on a config whose private-submission flag is false) and `e2879257c`
@@ -8512,3 +8513,16 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
 - **Next seed:** apply A's delta for `X3-MEV-007` when it reports (the reachability wording is already measured:
   `private-mempool` ← `confidential-gpu` as *library* code, and nothing in `runtime/` or `node/` depends on
   `confidential-gpu`), then work TICKET-142, the tautological `x3-dex` fair-ordering test.
+- **ROUND 4/A CLOSED — `X3-MEV-007` (2026-09-26 18:42), commit `dd22bddfd` + row `ed917cb23`.** The defect the brief
+  predicted was there: `DecryptionShare` carried no DKG epoch and `combine_shares` took none, so partials from two
+  ceremonies could be interpolated into a point belonging to neither, surfacing only as an opaque AES-GCM tag
+  failure. Now the share carries `dkg_epoch`, the combiner refuses a mismatch with a typed
+  `MempoolError::ShareEpochMismatch { expected, got }`, and `decrypt_with_shares` takes the epoch from the
+  ciphertext so the honest path has no caller-chosen epoch. One consumer followed: `ConfidentialGpuConfig::dkg_epoch`
+  → `DkgManager` → `combine_decryption_shares`. `crates/private-mempool` 19 → 29 tests, `crates/confidential-gpu`
+  9 → 10; control measured (disable the check → both new tests red; restore → green). Row 5/0/0 → 45/40/10,
+  `source = "master"`, `paths = ["crates/private-mempool"]`; audit counters NOT INTEGRATED 6→5, STUB 9→10. The
+  lesson worth keeping: **the epoch label is not the security boundary** — two different ceremonies labelled with
+  the same epoch still cannot open the ciphertext, which `the_epoch_label_is_not_the_security_boundary` asserts
+  under the same mutation that reddens the label test. The family-wide next blocker is now single and structural:
+  three rows of real MEV/privacy code and **no path from any of them to a chain**.
