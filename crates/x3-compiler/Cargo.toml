@@ -18,6 +18,7 @@ x3-hir = { path = "../x3-hir" }
 x3-mir = { path = "../x3-mir" }
 x3-backend = { path = "../x3-backend" }
 x3-typeck = { path = "../x3-typeck" }
+x3-semantics = { path = "../x3-semantics" }
 x3-common = { path = "../x3-common" }
 
 # Optimization

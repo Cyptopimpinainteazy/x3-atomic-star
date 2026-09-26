@@ -275,7 +275,7 @@ mod error_tests {
     }
 
     // This test enforces the numeric argument mismatch policy defined in
-    // `docs/rfc/RFC-t5-6-numeric-coercion-policy.md`.
+    // `docs/rfc/RFC-t5-6-numeric-coercion-policy.md` (as amended 2026-09-26).
     // It ensures incompatible literal arguments are diagnosed as
     // `ArgumentTypeMismatch` rather than generic type/unification failures.
     /// Test argument type mismatch.
@@ -296,12 +296,14 @@ mod error_tests {
         assert_only_argument_type_mismatch(&errors);
     }
 
-    /// Test literal argument type mismatches across numeric types.
+    /// Numeric argument mismatches under RFC t5-6 as amended 2026-09-26: an unsuffixed literal
+    /// takes the parameter's integer type when every value fits it, and a *typed* value never
+    /// converts between integer types.
     #[test]
     fn test_argument_type_mismatch_numeric_literals() {
         let cases = [
             (
-                "i64 literal to u64 parameter",
+                "negative literal to u64 parameter",
                 r#"
                     fn greet(x: u64) {
                         return;
@@ -312,46 +314,87 @@ mod error_tests {
                 "#,
             ),
             (
-                "u64 literal to i64 parameter",
-                r#"
-                    fn greet(x: i64) {
-                        return;
-                    }
-                    fn test() {
-                        greet(42);
-                    }
-                "#,
-            ),
-            (
-                "u64 literal to u32 parameter",
+                "negative literal to u32 parameter",
                 r#"
                     fn greet(x: u32) {
                         return;
                     }
                     fn test() {
-                        greet(42);
+                        greet(-1);
                     }
                 "#,
             ),
             (
-                "u64 literal to i32 parameter",
+                "literal out of range for u8 parameter",
                 r#"
-                    fn greet(x: i32) {
+                    fn greet(x: u8) {
                         return;
                     }
                     fn test() {
-                        greet(42);
+                        greet(300);
                     }
                 "#,
             ),
             (
-                "u64 literal to u128 parameter",
+                "literal out of range for i8 parameter",
                 r#"
-                    fn greet(x: u128) {
+                    fn greet(x: i8) {
                         return;
                     }
                     fn test() {
-                        greet(42);
+                        greet(-129);
+                    }
+                "#,
+            ),
+            (
+                "typed u64 value to i64 parameter",
+                r#"
+                    fn greet(x: i64) {
+                        return;
+                    }
+                    fn test() {
+                        let v: u64 = 42;
+                        greet(v);
+                    }
+                "#,
+            ),
+            (
+                "typed i64 value to u32 parameter",
+                r#"
+                    fn greet(x: u32) {
+                        return;
+                    }
+                    fn test() {
+                        let v: i64 = 1;
+                        greet(v);
+                    }
+                "#,
+            ),
+            (
+                "typed u32 value to u64 parameter (no widening)",
+                r#"
+                    fn greet(x: u64) {
+                        return;
+                    }
+                    fn test() {
+                        let v: u32 = 1;
+                        greet(v);
+                    }
+                "#,
+            ),
+            (
+                "literal bound to u64 by its first use, then passed as i64",
+                r#"
+                    fn takes_u64(x: u64) {
+                        return;
+                    }
+                    fn takes_i64(x: i64) {
+                        return;
+                    }
+                    fn test() {
+                        let v = 7;
+                        takes_u64(v);
+                        takes_i64(v);
                     }
                 "#,
             ),
@@ -362,6 +405,55 @@ mod error_tests {
             assert!(result.is_err(), "{} should produce a type error", case);
             let errors = result.unwrap_err();
             assert_only_argument_type_mismatch(&errors);
+        }
+    }
+
+    /// The accepted half of the amended policy: an unsuffixed literal takes the integer type its
+    /// parameter requires, whatever that type is, provided the value fits.
+    #[test]
+    fn test_numeric_literals_take_the_parameter_type() {
+        let cases = [
+            (
+                "42 to i64",
+                "fn f(x: i64) { return; }\nfn test() { f(42); }",
+            ),
+            (
+                "42 to u64",
+                "fn f(x: u64) { return; }\nfn test() { f(42); }",
+            ),
+            (
+                "42 to u32",
+                "fn f(x: u32) { return; }\nfn test() { f(42); }",
+            ),
+            (
+                "42 to u128",
+                "fn f(x: u128) { return; }\nfn test() { f(42); }",
+            ),
+            (
+                "255 to u8",
+                "fn f(x: u8) { return; }\nfn test() { f(255); }",
+            ),
+            (
+                "-1 to i64",
+                "fn f(x: i64) { return; }\nfn test() { f(-1); }",
+            ),
+            (
+                "-128 to i8",
+                "fn f(x: i8) { return; }\nfn test() { f(-128); }",
+            ),
+            (
+                "literal arithmetic to i64",
+                "fn f(x: i64) { return; }\nfn test() { f(1 + 2 * 3); }",
+            ),
+            ("i64 return", "fn f() -> i64 {\n    return 42;\n}"),
+        ];
+        for (case, source) in cases {
+            let result = parse_resolve_check(source);
+            assert!(
+                result.is_ok(),
+                "{case} should type check: {:?}",
+                result.err()
+            );
         }
     }
 

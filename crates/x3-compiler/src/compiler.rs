@@ -62,6 +62,18 @@ impl Compiler {
         let ast = x3_parser::parse_program(source)
             .map_err(|e| CompilerError::Parser(format!("{:?}", e)))?;
 
+        // Phase 1b: resolve names and check types. The resolver and the type checker existed and
+        // were never called — `CompilerError::TypeCheck` had no producer — so a program adding a
+        // bool to an integer, returning a bool from an `i64` function, passing `true` for an `i64`
+        // parameter, branching on an integer or falling off the end of a function with a return
+        // type compiled, and ran with whatever meaning the VM gave the bytes.
+        let resolved = x3_semantics::Resolver::new()
+            .resolve(&ast)
+            .map_err(|errors| CompilerError::TypeCheck(format!("{errors:?}")))?;
+        x3_typeck::TypeChecker::new()
+            .check(&ast, &resolved)
+            .map_err(|errors| CompilerError::TypeCheck(format!("{errors:?}")))?;
+
         // Where `main` sits among the functions, computed here because the AST is consumed by the
         // HIR lowering below and the HIR keeps the same order (TICKET-130).
         let entry_function_index = ast

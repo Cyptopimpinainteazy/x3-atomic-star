@@ -54,6 +54,13 @@ pub struct TypeChecker {
     current_return_type: Option<Type>,
     /// Whether we're in an atomic block.
     in_atomic: bool,
+    /// Integer-literal type variables and the literal values each one stands for.
+    ///
+    /// An unsuffixed integer literal takes the integer type its use requires (RFC t5-6, amended
+    /// 2026-09-26): it is a type variable here until the first concrete integer type it meets binds
+    /// it, at which point every value it stands for must fit that type. A variable never bound
+    /// defaults to `i64`, the X3VM's integer.
+    int_literals: std::collections::BTreeMap<u32, Vec<i128>>,
 }
 
 impl Default for TypeChecker {
@@ -71,6 +78,7 @@ impl TypeChecker {
             expr_types: Vec::new(),
             current_return_type: None,
             in_atomic: false,
+            int_literals: std::collections::BTreeMap::new(),
         }
     }
 
@@ -136,7 +144,7 @@ impl TypeChecker {
         let sig = FunctionSignature::new(params, return_type);
 
         // Look up the function's symbol ID
-        if let Some(symbol_id) = self.find_symbol_by_name(&func.name.name, resolved) {
+        if let Some(symbol_id) = self.symbol_defined_at(func.name.span, resolved) {
             self.env.register_function(symbol_id, sig.clone());
             self.env.bind(
                 ScopeId(0), // Global scope
@@ -213,7 +221,7 @@ impl TypeChecker {
             self.infer_expression_type(&global.initializer, resolved)
         };
 
-        if let Some(symbol_id) = self.find_symbol_by_name(&global.name.name, resolved) {
+        if let Some(symbol_id) = self.symbol_defined_at(global.name.span, resolved) {
             self.env.bind(ScopeId(0), symbol_id, ty);
         }
     }
@@ -222,7 +230,7 @@ impl TypeChecker {
     fn collect_const_type(&mut self, const_item: &Const, resolved: &ResolvedModule) {
         let ty = self.resolve_type_annotation(&const_item.ty);
 
-        if let Some(symbol_id) = self.find_symbol_by_name(&const_item.name.name, resolved) {
+        if let Some(symbol_id) = self.symbol_defined_at(const_item.name.span, resolved) {
             self.env.bind(ScopeId(0), symbol_id, ty);
         }
     }
@@ -254,7 +262,7 @@ impl TypeChecker {
     /// Type check a function.
     fn check_function(&mut self, func: &Function, resolved: &ResolvedModule) {
         // Get the function's signature
-        let sig = if let Some(symbol_id) = self.find_symbol_by_name(&func.name.name, resolved) {
+        let sig = if let Some(symbol_id) = self.symbol_defined_at(func.name.span, resolved) {
             self.env.get_function_sig(symbol_id).cloned()
         } else {
             None
@@ -268,7 +276,7 @@ impl TypeChecker {
         // Bind parameter types to the environment
         if let Some(ref sig) = sig {
             for (param, param_ty) in func.params.iter().zip(sig.params.iter()) {
-                if let Some(symbol_id) = self.find_symbol_by_name(&param.name.name, resolved) {
+                if let Some(symbol_id) = self.symbol_defined_at(param.name.span, resolved) {
                     self.env.bind(ScopeId(0), symbol_id, param_ty.clone());
                 }
             }
@@ -280,6 +288,19 @@ impl TypeChecker {
 
         // Type check the body
         self.check_block(&func.body, resolved);
+
+        // A function with a return type has to return on every path. One that fell off its end
+        // compiled to a `Ret` of nothing, so `fn f() -> i64 { let x = 1; }` "returned" a unit
+        // the caller then used as an integer.
+        let returns_a_value = !matches!(return_type.kind, TypeKind::Unit | TypeKind::Never);
+        if returns_a_value && !block_always_returns(&func.body.statements) {
+            self.errors.push(TypeError::new(
+                TypeErrorKind::MissingReturn {
+                    expected: return_type.clone(),
+                },
+                func.span,
+            ));
+        }
 
         // Restore previous return type
         self.current_return_type = prev_return_type;
@@ -340,14 +361,18 @@ impl TypeChecker {
     fn check_let_statement(&mut self, let_stmt: &LetStatement, resolved: &ResolvedModule) {
         let init_type = self.infer_expression_type(&let_stmt.initializer, resolved);
 
-        if let Some(ref ann) = let_stmt.ty {
+        // An annotated binding has its declared type, not its initialiser's.
+        let binding_type = if let Some(ref ann) = let_stmt.ty {
             let declared_type = self.resolve_type_annotation(ann);
             self.check_type_compatibility(&declared_type, &init_type, let_stmt.span);
-        }
+            declared_type
+        } else {
+            init_type
+        };
 
         // Bind the variable's type
-        if let Some(symbol_id) = self.find_symbol_by_name(&let_stmt.name.name, resolved) {
-            self.env.bind(ScopeId(0), symbol_id, init_type);
+        if let Some(symbol_id) = self.symbol_defined_at(let_stmt.name.span, resolved) {
+            self.env.bind(ScopeId(0), symbol_id, binding_type);
         }
     }
 
@@ -368,6 +393,7 @@ impl TypeChecker {
     fn check_if_statement(&mut self, if_stmt: &IfStatement, resolved: &ResolvedModule) {
         // Check condition is bool
         let cond_type = self.infer_expression_type(&if_stmt.condition, resolved);
+        let cond_type = self.env.apply_substitutions(&cond_type);
         if !cond_type.is_bool() && !cond_type.is_error() {
             self.errors.push(TypeError::condition_not_bool(
                 cond_type,
@@ -385,6 +411,7 @@ impl TypeChecker {
     /// Type check a while statement.
     fn check_while_statement(&mut self, while_stmt: &WhileStatement, resolved: &ResolvedModule) {
         let cond_type = self.infer_expression_type(&while_stmt.condition, resolved);
+        let cond_type = self.env.apply_substitutions(&cond_type);
         if !cond_type.is_bool() && !cond_type.is_error() {
             self.errors.push(TypeError::condition_not_bool(
                 cond_type,
@@ -413,6 +440,7 @@ impl TypeChecker {
                 }
                 if let Some(cond) = condition {
                     let cond_type = self.infer_expression_type(cond, resolved);
+                    let cond_type = self.env.apply_substitutions(&cond_type);
                     if !cond_type.is_bool() && !cond_type.is_error() {
                         self.errors
                             .push(TypeError::condition_not_bool(cond_type, cond.span()));
@@ -422,10 +450,16 @@ impl TypeChecker {
                     self.infer_expression_type(update, resolved);
                 }
             }
-            ForLoopKind::Range { range, .. } => {
-                // Type check the range bounds
-                self.infer_expression_type(&range.start, resolved);
-                self.infer_expression_type(&range.end, resolved);
+            ForLoopKind::Range { variable, range } => {
+                // The bounds are integers and the loop variable is one: it was never bound, so
+                // every use of it in the body was an unknown identifier.
+                for bound in [&range.start, &range.end] {
+                    let ty = self.infer_expression_type(bound, resolved);
+                    self.check_type_compatibility(&Type::i64(), &ty, bound.span());
+                }
+                if let Some(symbol_id) = self.symbol_defined_at(variable.span, resolved) {
+                    self.env.bind(ScopeId(0), symbol_id, Type::i64());
+                }
             }
         }
 
@@ -452,6 +486,27 @@ impl TypeChecker {
     fn infer_expression_type(&mut self, expr: &Expression, resolved: &ResolvedModule) -> Type {
         let ty = match expr {
             Expression::Literal(lit) => self.infer_literal_type(lit),
+            // `-42` is negation applied to the literal `42` in the AST; as a *type* it is one
+            // literal whose value is -42, so it cannot take an unsigned type.
+            Expression::Unary(unary)
+                if matches!(unary.op, x3_ast::UnaryOp::Negate)
+                    && matches!(
+                        &*unary.expr,
+                        Expression::Literal(LiteralExpression {
+                            literal: Literal::Integer(_),
+                            ..
+                        })
+                    ) =>
+            {
+                let Expression::Literal(LiteralExpression {
+                    literal: Literal::Integer(n),
+                    ..
+                }) = &*unary.expr
+                else {
+                    unreachable!("matched by the guard")
+                };
+                self.int_literal(-(*n as i128))
+            }
             Expression::Identifier(ident) => self.infer_identifier_type(ident, resolved),
             Expression::Binary(bin) => self.infer_binary_type(bin, resolved),
             Expression::Unary(unary) => self.infer_unary_type(unary, resolved),
@@ -468,16 +523,9 @@ impl TypeChecker {
     }
 
     /// Infer type of a literal.
-    fn infer_literal_type(&self, lit: &LiteralExpression) -> Type {
+    fn infer_literal_type(&mut self, lit: &LiteralExpression) -> Type {
         match &lit.literal {
-            Literal::Integer(n) => {
-                // Default to u64 for positive, i64 for negative
-                if *n < 0 {
-                    Type::i64()
-                } else {
-                    Type::u64()
-                }
-            }
+            Literal::Integer(n) => self.int_literal(*n as i128),
             Literal::Float(_) => Type::new(TypeKind::Primitive(PrimitiveType::U64)), // Float uses U64 until proper float type is added
             Literal::String(_) => Type::string(),
             Literal::Bool(_) => Type::bool(),
@@ -487,8 +535,10 @@ impl TypeChecker {
 
     /// Infer type of an identifier.
     fn infer_identifier_type(&mut self, ident: &Identifier, resolved: &ResolvedModule) -> Type {
-        // Look up the symbol's type
-        if let Some(symbol_id) = self.find_symbol_by_name(&ident.name, resolved) {
+        // Look up the symbol the resolver bound this use to. This was a lookup by *name* over
+        // the whole module, so a local `x` in one function took the type of the first `x`
+        // anywhere — another function's parameter, a global, a later shadowed binding.
+        if let Some(symbol_id) = self.symbol_used_at(ident.span, resolved) {
             if let Some(ty) = self.env.get(symbol_id) {
                 return ty.clone();
             }
@@ -504,8 +554,53 @@ impl TypeChecker {
     fn infer_binary_type(&mut self, bin: &BinaryExpression, resolved: &ResolvedModule) -> Type {
         let left_type = self.infer_expression_type(&bin.left, resolved);
         let right_type = self.infer_expression_type(&bin.right, resolved);
-
         let op = format!("{:?}", bin.op);
+
+        // An integer literal on either side takes the other side's type, and two literals stay one
+        // literal until something binds them. Logical operators take no integers at all, so a
+        // literal there falls through to the inference below and is refused.
+        let logical = matches!(
+            bin.op,
+            x3_ast::BinaryOp::LogicalAnd | x3_ast::BinaryOp::LogicalOr
+        );
+        let (left_var, right_var) = (
+            self.unbound_int_literal(&left_type),
+            self.unbound_int_literal(&right_type),
+        );
+        if !logical && (left_var.is_some() || right_var.is_some()) {
+            let other = if left_var.is_some() {
+                &right_type
+            } else {
+                &left_type
+            };
+            let literal = if left_var.is_some() {
+                &left_type
+            } else {
+                &right_type
+            };
+            if !self.accept(other, literal) {
+                self.errors.push(TypeError::invalid_binary_op(
+                    &op,
+                    self.env.apply_substitutions(&left_type),
+                    self.env.apply_substitutions(&right_type),
+                    bin.span,
+                ));
+                return Type::error();
+            }
+            let operand = self.env.apply_substitutions(&left_type);
+            return match bin.op {
+                x3_ast::BinaryOp::Equal
+                | x3_ast::BinaryOp::NotEqual
+                | x3_ast::BinaryOp::Less
+                | x3_ast::BinaryOp::LessEqual
+                | x3_ast::BinaryOp::Greater
+                | x3_ast::BinaryOp::GreaterEqual => Type::bool(),
+                _ => operand,
+            };
+        }
+        let left_type = self.env.apply_substitutions(&left_type);
+        let right_type = self.env.apply_substitutions(&right_type);
+
         let mut infer = TypeInference::new(&mut self.env);
 
         match infer.infer_binary_op(&op, &left_type, &right_type, bin.span) {
@@ -520,6 +615,13 @@ impl TypeChecker {
     /// Infer type of a unary expression.
     fn infer_unary_type(&mut self, unary: &UnaryExpression, resolved: &ResolvedModule) -> Type {
         let operand_type = self.infer_expression_type(&unary.expr, resolved);
+        // Negating a still-unbound literal is still that literal's integer type.
+        if matches!(unary.op, x3_ast::UnaryOp::Negate)
+            && self.unbound_int_literal(&operand_type).is_some()
+        {
+            return operand_type;
+        }
+        let operand_type = self.env.apply_substitutions(&operand_type);
 
         let op = format!("{:?}", unary.op);
         let mut infer = TypeInference::new(&mut self.env);
@@ -553,7 +655,7 @@ impl TypeChecker {
                 // Check argument types
                 for (i, (arg, param_ty)) in call.args.iter().zip(sig.params.iter()).enumerate() {
                     let arg_type = self.infer_expression_type(arg, resolved);
-                    if !self.types_compatible(param_ty, &arg_type) {
+                    if !self.accept(param_ty, &arg_type) {
                         self.errors.push(TypeError::argument_type_mismatch(
                             i,
                             param_ty.clone(),
@@ -664,9 +766,77 @@ impl TypeChecker {
         expected.kind == found.kind
     }
 
+    /// A fresh integer-literal type variable standing for `value`.
+    fn int_literal(&mut self, value: i128) -> Type {
+        let ty = self.env.fresh_type_var();
+        if let TypeKind::TypeVar(id) = ty.kind {
+            self.int_literals.insert(id, vec![value]);
+        }
+        ty
+    }
+
+    /// The integer-literal variable `ty` is, if it is one no concrete type has bound yet.
+    fn unbound_int_literal(&self, ty: &Type) -> Option<u32> {
+        match self.env.apply_substitutions(ty).kind {
+            TypeKind::TypeVar(id) if self.int_literals.contains_key(&id) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// Whether a value of type `found` may be used where `expected` is required, binding any
+    /// integer-literal variable on either side to the concrete integer type on the other.
+    ///
+    /// A literal binds only to an integer type every value it stands for fits in (`-1` is not a
+    /// `u64`, `300` is not a `u8`); two literals merge into one. Typed values are compared exactly:
+    /// there is no implicit conversion between integer types (RFC t5-6).
+    fn accept(&mut self, expected: &Type, found: &Type) -> bool {
+        let expected = self.env.apply_substitutions(expected);
+        let found = self.env.apply_substitutions(found);
+        match (
+            self.unbound_int_literal(&expected),
+            self.unbound_int_literal(&found),
+        ) {
+            (Some(a), Some(b)) => {
+                if a != b {
+                    let values = self.int_literals.remove(&b).unwrap_or_default();
+                    self.int_literals.entry(a).or_default().extend(values);
+                    self.env.substitute(b, expected);
+                }
+                true
+            }
+            (None, Some(var)) => self.bind_int_literal(var, &expected),
+            (Some(var), None) => self.bind_int_literal(var, &found),
+            (None, None) => self.types_compatible(&expected, &found),
+        }
+    }
+
+    fn bind_int_literal(&mut self, var: u32, target: &Type) -> bool {
+        match &target.kind {
+            TypeKind::Primitive(p) if p.is_integer() => {
+                let infer = TypeInference::new(&mut self.env);
+                let fits = self
+                    .int_literals
+                    .get(&var)
+                    .map(|values| {
+                        values
+                            .iter()
+                            .all(|v| infer.check_integer_bounds(*v, target))
+                    })
+                    .unwrap_or(true);
+                if fits {
+                    self.env.substitute(var, target.clone());
+                }
+                fits
+            }
+            // Error recovery, and the unconstrained variables of unannotated parameters.
+            TypeKind::Error | TypeKind::Any | TypeKind::TypeVar(_) => true,
+            _ => false,
+        }
+    }
+
     /// Check type compatibility and report error if incompatible.
     fn check_type_compatibility(&mut self, expected: &Type, found: &Type, span: Span) {
-        if !self.types_compatible(expected, found) {
+        if !self.accept(expected, found) {
             self.errors.push(TypeError::type_mismatch(
                 expected.clone(),
                 found.clone(),
@@ -675,14 +845,60 @@ impl TypeChecker {
         }
     }
 
-    /// Find a symbol ID by name in the resolved module.
-    fn find_symbol_by_name(&self, name: &str, resolved: &ResolvedModule) -> Option<SymbolId> {
+    /// The symbol whose definition is the identifier at `span`.
+    fn symbol_defined_at(&self, span: Span, resolved: &ResolvedModule) -> Option<SymbolId> {
         resolved
             .symbols
             .iter()
-            .find(|s| s.name == name)
+            .find(|s| s.def_span == span)
             .map(|s| s.id)
     }
+
+    /// The symbol a use of an identifier at `span` refers to, as the resolver bound it.
+    fn symbol_used_at(&self, span: Span, resolved: &ResolvedModule) -> Option<SymbolId> {
+        resolved
+            .resolve_span(span)
+            .or_else(|| self.symbol_defined_at(span, resolved))
+    }
+}
+
+/// Whether every path through `statements` ends in a `return` (or never ends).
+fn block_always_returns(statements: &[Statement]) -> bool {
+    statements.iter().any(statement_always_returns)
+}
+
+fn statement_always_returns(statement: &Statement) -> bool {
+    match statement {
+        Statement::Return(..) => true,
+        Statement::If(if_stmt) => match &if_stmt.else_block {
+            Some(else_block) => {
+                block_always_returns(&if_stmt.then_block.statements)
+                    && block_always_returns(&else_block.statements)
+            }
+            None => false,
+        },
+        // `loop` without a `break` of its own never falls through.
+        Statement::Loop(loop_stmt) => !breaks_out(&loop_stmt.body.statements),
+        Statement::Atomic(atomic) => block_always_returns(&atomic.body.statements),
+        _ => false,
+    }
+}
+
+/// Whether a `break` in `statements` leaves the loop these statements are the body of (a `break`
+/// inside a nested loop leaves that loop instead).
+fn breaks_out(statements: &[Statement]) -> bool {
+    statements.iter().any(|statement| match statement {
+        Statement::Break(_) => true,
+        Statement::If(if_stmt) => {
+            breaks_out(&if_stmt.then_block.statements)
+                || if_stmt
+                    .else_block
+                    .as_ref()
+                    .is_some_and(|b| breaks_out(&b.statements))
+        }
+        Statement::Atomic(atomic) => breaks_out(&atomic.body.statements),
+        _ => false,
+    })
 }
 
 #[cfg(test)]

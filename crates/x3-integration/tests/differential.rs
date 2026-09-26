@@ -519,3 +519,93 @@ fn entry_index(source: &str) -> Option<usize> {
         .filter(|line| line.starts_with("fn "))
         .position(|line| line.starts_with("fn main("))
 }
+
+/// Programs that are not well-typed or not well-formed. Each must be refused **at compile time**,
+/// at every optimization level: the chain executes what the compiler emits, and a program the
+/// compiler should have refused runs with whatever meaning the VM happens to give it.
+const ILL_FORMED: &[(&str, &str)] = &[
+    (
+        "bool_arithmetic",
+        "fn main() -> i64 {\n    let b = true;\n    return b + 1;\n}\n",
+    ),
+    (
+        "return_type_mismatch",
+        "fn f() -> bool {\n    return 5;\n}\n\nfn main() -> i64 {\n    if f() {\n        return 1;\n    }\n    return 0;\n}\n",
+    ),
+    (
+        "argument_type_mismatch",
+        "fn f(x: i64) -> i64 {\n    return x;\n}\n\nfn main() -> i64 {\n    return f(true);\n}\n",
+    ),
+    (
+        "non_bool_condition",
+        "fn main() -> i64 {\n    if 5 {\n        return 1;\n    }\n    return 0;\n}\n",
+    ),
+    (
+        "unknown_identifier",
+        "fn main() -> i64 {\n    return y;\n}\n",
+    ),
+    (
+        "duplicate_function",
+        "fn f() -> i64 {\n    return 1;\n}\n\nfn f() -> i64 {\n    return 2;\n}\n\nfn main() -> i64 {\n    return f();\n}\n",
+    ),
+    (
+        "wrong_argument_count",
+        "fn f(x: i64) -> i64 {\n    return x;\n}\n\nfn main() -> i64 {\n    return f(1, 2);\n}\n",
+    ),
+    (
+        "assign_to_immutable",
+        "fn main() -> i64 {\n    let x = 1;\n    x = 2;\n    return x;\n}\n",
+    ),
+    (
+        "annotation_mismatch",
+        "fn main() -> i64 {\n    let x: bool = 5;\n    return 1;\n}\n",
+    ),
+    (
+        "missing_return",
+        "fn f() -> i64 {\n    let x = 1;\n}\n\nfn main() -> i64 {\n    return f();\n}\n",
+    ),
+    (
+        "compare_int_with_bool",
+        "fn main() -> i64 {\n    if 1 < true {\n        return 1;\n    }\n    return 0;\n}\n",
+    ),
+    (
+        "call_a_non_function",
+        "fn main() -> i64 {\n    let x = 1;\n    return x();\n}\n",
+    ),
+    (
+        "string_arithmetic",
+        "fn main() -> i64 {\n    return \"a\" + 1;\n}\n",
+    ),
+    (
+        "logical_and_on_integers",
+        "fn main() -> i64 {\n    if 1 && 2 {\n        return 1;\n    }\n    return 0;\n}\n",
+    ),
+    (
+        "assignment_changes_type",
+        "fn main() -> i64 {\n    let mut x = 1;\n    x = true;\n    return 1;\n}\n",
+    ),
+    (
+        "main_returns_the_wrong_type",
+        "fn main() -> i64 {\n    return true;\n}\n",
+    ),
+];
+
+#[test]
+fn ill_formed_programs_are_refused_at_compile_time() {
+    let mut accepted = Vec::new();
+    for (name, source) in ILL_FORMED {
+        for (level, options) in levels() {
+            match std::panic::catch_unwind(|| Compiler::compile(source, options.clone())) {
+                Ok(Ok(_)) => accepted.push(format!("{name} [{level}]")),
+                Ok(Err(_)) => {}
+                Err(_) => accepted.push(format!("{name} [{level}]: the compiler panicked")),
+            }
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "{} build(s) of ill-formed programs were accepted:\n  {}",
+        accepted.len(),
+        accepted.join("\n  ")
+    );
+}
