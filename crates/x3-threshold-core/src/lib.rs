@@ -184,14 +184,19 @@ pub fn validate_encrypted_transaction(
             committee_size: key.committee_size,
         });
     }
-    // The group key must be a real point, or every share computed against it is meaningless.
-    let group =
-        encryption::decompress_point(&key.group_key).map_err(|_| MempoolError::InvalidPoint {
-            field: "committee group key",
-        })?;
+    // The group key must be a real point, or every share computed against it is meaningless. This
+    // is reported as an unusable *committee key* rather than as a malformed payload: the caller did
+    // not choose it, and the person who can fix it is whoever installed it.
+    let group = encryption::decompress_point(&key.group_key).map_err(|_| {
+        MempoolError::InvalidCommitteeKey {
+            threshold: key.threshold,
+            committee_size: key.committee_size,
+        }
+    })?;
     if group == curve25519_dalek::traits::Identity::identity() {
-        return Err(MempoolError::InvalidPoint {
-            field: "committee group key",
+        return Err(MempoolError::InvalidCommitteeKey {
+            threshold: key.threshold,
+            committee_size: key.committee_size,
         });
     }
     // The epoch binding: a payload for another ceremony cannot be opened by this committee.

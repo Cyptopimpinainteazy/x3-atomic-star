@@ -88,6 +88,10 @@ pub mod pallet {
         commitment_hash, order_key, CommitRevealLane, FairOrderError, OrderingWindow,
         MAX_PLAINTEXT_BYTES,
     };
+    use x3_threshold_core::{
+        validate_encrypted_transaction, EncryptedTransaction, MempoolError as ThresholdRefusal,
+        ThresholdPublicKey,
+    };
 
     type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -239,6 +243,17 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn dkg_epoch)]
     pub type DkgEpoch<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+    /// The DKG epoch each accepted private transaction was encrypted for.
+    ///
+    /// New storage rather than a field on `PrivateTxRecord`, so no migration is needed. A
+    /// submission is only decryptable by the committee whose key it was encrypted to, so the epoch
+    /// travels with the record: the committee that can open it is identifiable without decoding
+    /// the payload again.
+    #[pallet::storage]
+    #[pallet::getter(fn private_tx_epoch)]
+    pub type PrivateTxEpoch<T: Config> =
+        StorageMap<_, Blake2_128Concat, sp_core::H256, u64, OptionQuery>;
 
     /// Total private transactions processed.
     #[pallet::storage]
@@ -493,6 +508,22 @@ pub mod pallet {
         OrderingBondNotReserved,
         /// The unrevealed bond could not be removed in full.
         OrderingBondNotForfeitable,
+        /// The submitted payload is not a well-formed encrypted transaction.
+        ///
+        /// Before this existed the pallet stored whatever bytes it was handed — no shape, no
+        /// epoch, no committee binding — so a payload nothing in the committee could ever decrypt
+        /// was accepted and its fee escrowed.
+        InvalidEncryptedPayload,
+        /// The `tx_hash` argument is not the id inside the payload.
+        EncryptedPayloadHashMismatch,
+        /// The payload was encrypted for a different DKG epoch than the committee's current one.
+        ///
+        /// Unit-only: `frame_support` caps a pallet error at four encoded bytes, and the two epochs
+        /// would blow that cap. The operator-facing detail (both epochs) goes in the log line below
+        /// rather than in the dispatch error.
+        EncryptedPayloadEpochMismatch,
+        /// The stored committee key cannot be used as a threshold public key.
+        CommitteeKeyUnusable,
         /// Stored window state was refused by the lane when replayed.
         ///
         /// A window that the chain accepted a commitment into must replay. This
@@ -682,6 +713,50 @@ pub mod pallet {
                 Error::<T>::PayloadTooLarge
             );
 
+            // Decode and validate *before* any fee moves. The payload is a SCALE-encoded
+            // `EncryptedTransaction` (the format `x3-threshold-core` defines, which is also what
+            // `private-mempool` re-exports), and it has to be a submission this committee can
+            // actually open: a well-formed record, naming this chain's committee key epoch, whose
+            // id is the hash of its own ciphertext and matches the `tx_hash` the caller declared.
+            //
+            // Measured before this check existed: `submit_private_transaction` accepted
+            // `vec![0xCA; 256]` with an arbitrary `tx_hash`, charged the premium and escrowed it,
+            // and no validator could ever decrypt it.
+            let decoded = EncryptedTransaction::decode(&mut &encrypted_payload[..])
+                .map_err(|_| Error::<T>::InvalidEncryptedPayload)?;
+            ensure!(
+                decoded.id == tx_hash.0,
+                Error::<T>::EncryptedPayloadHashMismatch
+            );
+
+            let committee_bytes = CommitteePublicKey::<T>::get().ok_or(Error::<T>::NoDkgKey)?;
+            ensure!(
+                committee_bytes.len() == 32,
+                Error::<T>::CommitteeKeyUnusable
+            );
+            let mut group_key = [0u8; 32];
+            group_key.copy_from_slice(&committee_bytes);
+            let committee = ThresholdPublicKey {
+                group_key,
+                epoch: Self::dkg_epoch(),
+                threshold: T::MinConfidentialQuorum::get(),
+                committee_size: ConfidentialValidatorCount::<T>::get(),
+            };
+            validate_encrypted_transaction(&decoded, &committee).map_err(|refusal| match refusal {
+                ThresholdRefusal::WrongEpoch { expected, got } => {
+                    log::warn!(
+                        target: "runtime::private-execution",
+                        "refused a private submission encrypted for epoch {got} while the committee is at {expected}"
+                    );
+                    Error::<T>::EncryptedPayloadEpochMismatch
+                }
+                ThresholdRefusal::InvalidCommitteeKey { .. } => Error::<T>::CommitteeKeyUnusable,
+                _ => Error::<T>::InvalidEncryptedPayload,
+            })?;
+
+            // Store the *canonical re-encoding* of the record that was validated, so the bytes this
+            // pallet holds are the bytes it checked.
+            let canonical_payload = decoded.encode();
             // Collect premium fee
             let base_fee = priority_fee;
             let premium_bps = T::PrivateFeePremiumBps::get() as u128;
@@ -712,7 +787,7 @@ pub mod pallet {
             let record = PrivateTxRecord {
                 tx_hash,
                 sender: who.clone(),
-                encrypted_payload: BoundedVec::try_from(encrypted_payload)
+                encrypted_payload: BoundedVec::try_from(canonical_payload)
                     .map_err(|_| Error::<T>::PayloadTooLarge)?,
                 fee_commitment,
                 fee_paid: total_fee.saturated_into(),
@@ -722,6 +797,7 @@ pub mod pallet {
             };
 
             PrivateTransactions::<T>::insert(tx_hash, record);
+            PrivateTxEpoch::<T>::insert(tx_hash, decoded.dkg_epoch);
             TotalPrivateTxs::<T>::mutate(|t| *t = t.saturating_add(1));
 
             Self::deposit_event(Event::PrivateTxSubmitted {

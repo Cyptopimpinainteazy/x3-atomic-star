@@ -150,7 +150,13 @@ fn deregister_validator() {
 // Private Transaction Submission
 // ──────────────────────────────────────────────────────────────
 
-fn setup_quorum() {
+/// Register the quorum and install a **real** committee key: a Ristretto group key derived from a
+/// secret, not a fixed byte pattern.
+///
+/// It has to be real now. `submit_private_transaction` validates the payload against this key, and
+/// a key that is not a valid non-identity Ristretto point is refused (`CommitteeKeyUnusable`) —
+/// which is the correct outcome, and the reason `vec![0xBB; 32]` can no longer stand in for one.
+fn setup_quorum_with_committee() -> (curve25519_dalek::scalar::Scalar, u64) {
     assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), true));
 
     // Register 2 validators (MinConfidentialQuorum = 2)
@@ -163,11 +169,164 @@ fn setup_quorum() {
         ));
     }
 
-    // Set DKG committee key
+    let secret = curve25519_dalek::scalar::Scalar::random(&mut rand::rngs::OsRng);
+    let group_key = x3_threshold_core::threshold::group_public_key(&secret);
     assert_ok!(PrivateExecution::set_committee_key(
         RuntimeOrigin::root(),
-        vec![0xBB; 32],
+        group_key.to_vec(),
     ));
+    // `set_committee_key` bumps the epoch; a submission has to name the epoch that produced it.
+    (secret, PrivateExecution::dkg_epoch())
+}
+
+/// A submission a sender would really produce for this committee.
+fn private_submission(
+    secret: &curve25519_dalek::scalar::Scalar,
+    epoch: u64,
+    plaintext: &[u8],
+) -> (H256, Vec<u8>) {
+    let group_key = x3_threshold_core::threshold::group_public_key(secret);
+    let tx = x3_threshold_core::encryption::encrypt_for_committee(
+        plaintext, &group_key, &[7u8; 32], &[8u8; 32], epoch,
+    )
+    .expect("a real committee key encrypts");
+    (H256::from(tx.id), parity_scale_codec::Encode::encode(&tx))
+}
+
+/// The plaintext bytes the pallet used to accept, with any hash the caller liked.
+///
+/// Kept as a named fixture so the refusals below read as "the old shape is now refused" rather
+/// than as an arbitrary byte string.
+fn opaque_payload() -> Vec<u8> {
+    vec![0xCA; 256]
+}
+
+#[test]
+fn an_opaque_payload_is_refused_at_the_door() {
+    new_test_ext().execute_with(|| {
+        let _ = setup_quorum_with_committee();
+
+        // Before this check existed, this exact call succeeded: the pallet charged the premium,
+        // escrowed it, and stored bytes no validator could ever decrypt.
+        assert_noop!(
+            PrivateExecution::submit_private_transaction(
+                RuntimeOrigin::signed(10),
+                H256::repeat_byte(0x01),
+                opaque_payload(),
+                H256::repeat_byte(0x02),
+                1_000u128,
+            ),
+            Error::<Test>::InvalidEncryptedPayload
+        );
+        assert_eq!(
+            PrivateExecution::total_private_txs(),
+            0,
+            "a refused submission must not be counted"
+        );
+        assert_eq!(
+            Balances::free_balance(10),
+            Balances::free_balance(10),
+            "and must not have moved a fee"
+        );
+    });
+}
+
+#[test]
+fn a_payload_whose_id_is_not_the_declared_hash_is_refused() {
+    new_test_ext().execute_with(|| {
+        let (secret, epoch) = setup_quorum_with_committee();
+        let (_id, payload) = private_submission(&secret, epoch, b"mislabelled");
+
+        assert_noop!(
+            PrivateExecution::submit_private_transaction(
+                RuntimeOrigin::signed(10),
+                H256::repeat_byte(0x77), // not the id inside the payload
+                payload,
+                H256::repeat_byte(0x02),
+                1_000u128,
+            ),
+            Error::<Test>::EncryptedPayloadHashMismatch
+        );
+    });
+}
+
+/// The refusal this whole validation exists for: a payload encrypted to a committee whose key is
+/// gone can never be opened, so accepting it would escrow a fee against nothing.
+#[test]
+fn a_payload_for_a_stale_committee_epoch_is_refused() {
+    new_test_ext().execute_with(|| {
+        let (secret, epoch) = setup_quorum_with_committee();
+        // The sender encrypted before the key rotated.
+        let (tx_hash, payload) = private_submission(&secret, epoch - 1, b"encrypted too early");
+
+        assert_noop!(
+            PrivateExecution::submit_private_transaction(
+                RuntimeOrigin::signed(10),
+                tx_hash,
+                payload,
+                H256::repeat_byte(0x02),
+                1_000u128,
+            ),
+            Error::<Test>::EncryptedPayloadEpochMismatch
+        );
+    });
+}
+
+/// An accepted submission records which committee key can open it.
+#[test]
+fn an_accepted_submission_records_its_epoch() {
+    new_test_ext().execute_with(|| {
+        let (secret, epoch) = setup_quorum_with_committee();
+        let (tx_hash, payload) = private_submission(&secret, epoch, b"acceptable");
+
+        assert_ok!(PrivateExecution::submit_private_transaction(
+            RuntimeOrigin::signed(10),
+            tx_hash,
+            payload,
+            H256::repeat_byte(0x02),
+            1_000u128,
+        ));
+
+        assert_eq!(PrivateExecution::private_tx_epoch(tx_hash), Some(epoch));
+        assert_eq!(PrivateExecution::total_private_txs(), 1);
+    });
+}
+
+/// The committee key itself is checked: a byte pattern that is not a valid non-identity Ristretto
+/// point cannot be installed as one and then used to validate submissions.
+#[test]
+fn a_committee_key_that_is_not_a_point_is_refused() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), true));
+        for i in 1..=2u64 {
+            assert_ok!(PrivateExecution::register_confidential_validator(
+                RuntimeOrigin::signed(i),
+                b"NVIDIA H100".to_vec(),
+                dummy_attestation(),
+                [i as u8; 32],
+            ));
+        }
+        // The all-zero encoding is the Ristretto identity, which makes every share meaningless.
+        assert_ok!(PrivateExecution::set_committee_key(
+            RuntimeOrigin::root(),
+            vec![0u8; 32],
+        ));
+
+        // A syntactically valid submission, refused because the committee key is unusable.
+        let secret = curve25519_dalek::scalar::Scalar::random(&mut rand::rngs::OsRng);
+        let (tx_hash, payload) =
+            private_submission(&secret, PrivateExecution::dkg_epoch(), b"against a bad key");
+        assert_noop!(
+            PrivateExecution::submit_private_transaction(
+                RuntimeOrigin::signed(10),
+                tx_hash,
+                payload,
+                H256::repeat_byte(0x02),
+                1_000u128,
+            ),
+            Error::<Test>::CommitteeKeyUnusable
+        );
+    });
 }
 
 #[test]
@@ -193,15 +352,17 @@ fn submit_private_tx_requires_quorum() {
 #[test]
 fn fee_premium_accounting() {
     new_test_ext().execute_with(|| {
-        setup_quorum();
+        let (secret, epoch) = setup_quorum_with_committee();
 
         let user_balance_before = Balances::free_balance(10);
         let base_fee: u128 = 10_000;
 
+        // A real submission: encrypted to the committee key this pallet holds.
+        let (tx_hash, payload) = private_submission(&secret, epoch, b"a private swap");
         assert_ok!(PrivateExecution::submit_private_transaction(
             RuntimeOrigin::signed(10),
-            H256::repeat_byte(0x01),
-            vec![0xCA; 256],
+            tx_hash,
+            payload,
             H256::repeat_byte(0x02),
             base_fee,
         ));
@@ -216,7 +377,7 @@ fn fee_premium_accounting() {
         assert_eq!(PrivateExecution::total_premium_fees(), 150);
 
         // TX recorded
-        let record = PrivateExecution::private_transactions(H256::repeat_byte(0x01)).unwrap();
+        let record = PrivateExecution::private_transactions(tx_hash).unwrap();
         assert_eq!(record.status, PrivateTxStatus::Pending);
         assert_eq!(record.fee_paid, 10_150);
     });
@@ -229,15 +390,14 @@ fn fee_premium_accounting() {
 #[test]
 fn commit_state_diff_works() {
     new_test_ext().execute_with(|| {
-        setup_quorum();
+        let (secret, epoch) = setup_quorum_with_committee();
 
-        let tx_hash = H256::repeat_byte(0x01);
-
-        // Submit private TX
+        // Submit private TX: a real submission for this committee's epoch.
+        let (tx_hash, payload) = private_submission(&secret, epoch, b"a committed swap");
         assert_ok!(PrivateExecution::submit_private_transaction(
             RuntimeOrigin::signed(10),
             tx_hash,
-            vec![0xCA; 256],
+            payload,
             H256::repeat_byte(0x02),
             1_000u128,
         ));

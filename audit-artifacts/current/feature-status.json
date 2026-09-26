@@ -3302,19 +3302,21 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 30,
+      "composite": 49,
       "confidence": "high",
       "evidence": [
         "crates/private-mempool",
         "note: Measured 2026-09-26 (round 4, workstream A) - real Ristretto threshold crypto with adversarial coverage over a freshly generated committee per case, reached by one crate that no runtime path consumes"
       ],
       "id": "X3-MEV-007",
-      "implemented": 45,
+      "implemented": 65,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 25,
       "missing_work": [
+        "**2026-09-26 \u2014 there is an ingress now, and it validates.** The scheme moved to `crates/x3-threshold-core` (`no_std` + `alloc`, SCALE codecs) so a runtime pallet can link it, and `pallets/private-execution::submit_private_transaction` \u2014 which used to store whatever bytes it was handed and escrow the premium \u2014 now decodes the payload as an `EncryptedTransaction`, requires `tx_hash` to be the id inside it, derives the committee key from the pallet's own `CommitteePublicKey`/`DkgEpoch`/`MinConfidentialQuorum`, and refuses by name: `InvalidEncryptedPayload`, `EncryptedPayloadHashMismatch`, `EncryptedPayloadEpochMismatch`, `CommitteeKeyUnusable`. An accepted submission records the epoch in `PrivateTxEpoch` and stores the canonical re-encoding of the record that was validated, so the bytes the chain holds are the bytes it checked. Measured: the pallet suite went 34 -> 41 tests; deleting the validation call reddens `a_payload_for_a_stale_committee_epoch_is_refused` and `a_committee_key_that_is_not_a_point_is_refused`. It also closes the no-ingress half of the old blocker: `submit_private_transaction` is the node-reachable extrinsic.",
         "Reachability: `cargo tree -i private-mempool --workspace` returns one consumer, `crates/confidential-gpu`, and nothing in `runtime/` or `node/` depends on confidential-gpu; `PrivateMempool` itself has no caller anywhere in the tree, and there is no ingress (no extrinsic, no node mempool, no relayer) that puts a transaction into it - the crate is measured unit by unit and drives nothing on chain",
+        "What is still missing on chain: nothing decrypts. The pallet can refuse a bad submission and record which epoch can open a good one, but no committee job collects shares, no execution path consumes the pending record, and `commit_encrypted_state_diff` still takes an opaque diff from a signed validator without checking it against the payload. The 2026-09-26 change is the door, not the room: a validated submission now sits in `PrivateTransactions` exactly as before, waiting for a consumer that does not exist",
         "No DLEQ proof accompanies a partial decryption: `compute_decryption_share` returns an empty `proof`, so a malicious validator's bogus partial is caught only by the AEAD tag after interpolation. Fail-closed, but unattributed - the combiner learns that something was wrong, not which validator lied",
         "The DKG epoch is now stated by configuration (`ConfidentialGpuConfig::dkg_epoch`) rather than driven by a ceremony or an epoch transition in this tree, so the binding is enforced while the lifecycle it binds to is never exercised end to end",
         "No live or cross-node test: every case here is unit or component level, against committees generated in-process"
@@ -3323,15 +3325,16 @@
       "paths": [
         "crates/private-mempool",
         "crates/x3-threshold-core",
-        "crates/confidential-gpu"
+        "crates/confidential-gpu",
+        "pallets/private-execution"
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 40,
-      "tests": "tested score 40% (no named test list on this row)"
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4542,7 +4545,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "fede54ad2769c370243f5b831260db77bb34025bf651b130a710383bcfedaff1",
+    "source_digest": "2ac4abf1aaf18549a487778903587d927a65ba11481e9a898c7ac7844dec2fc8",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4554,7 +4557,7 @@
       "feature-matrix/economic-defi.toml": "cc1c338421dcaa20356e9496e581f0b07923a61e014f75ae326667fc6f290b3d",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
       "feature-matrix/language-trading.toml": "e8c51ee458e82b253e34e2b67f9c0e24b1b29146af333b387b19e557df19add3",
-      "feature-matrix/mev-privacy.toml": "15bf21a04c9d3d7351348a30c10506c18d92d58d8e5dc35741a0167e2e408a3f",
+      "feature-matrix/mev-privacy.toml": "8ab441ba9db9ab408a65239d16570a171b2be810df5a6f5f949b6bf24c21e92a",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -5001,8 +5004,8 @@
       "FUNCTIONAL BUT UNHARDENED": 57,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 70,
-      "STUB": 4
+      "PARTIAL": 71,
+      "STUB": 3
     },
     "matrix_features": 146,
     "registry_features": 21,
