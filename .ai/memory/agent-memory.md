@@ -8445,12 +8445,21 @@ Report: `.ai/reports/dependabot-triage-20260925.md`.
 
 ### Negative controls measured (reproduce these, not the prose)
 ```
-OK   - 5498 file(s) scanned, 476 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
+OK   - 5482 file(s) scanned, 460 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
 FAIL - production/public probe `<p>Sub-200ms finality at 100,000 TPS.</p>`   (new surface IS scanned)
 OK   - same file, `- [ ] 1,000 TPS demonstrated`                             (a plan item is not a claim)
 FAIL - same file, `- [x] 1,000 TPS demonstrated`                             (a ticked box is a claim)
 FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (the skip list is load-bearing)
 ```
+
+### A latent scope bug the widening exposed
+- `SKIP_DIRS` was matched one path component at a time, so `docs/audit` and `docs/superpowers` — the
+  entries that name a whole prefix — could never match, and those files were scanned while the
+  docstring said the audit registry is out of scope. Fixed with a prefix-aware `_in_skip_dirs()`;
+  `--list` named `docs/audit/X3_AGENT_QUEUE.md` and `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`
+  before and names none after (surfaces 476 -> 460). The gate was green either way.
+- Generalisable rule: in this repo, a hand-maintained skip/surface list is only as good as its
+  matcher. Check `--list` against the docstring when touching either.
 
 ### Dead ends to avoid
 - Do not exempt `docs/openspec/**` as a "proposal record" to avoid fixing it: its checklist *did* tick

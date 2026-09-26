@@ -176,6 +176,21 @@ UNCHECKED_TASK = re.compile(r"^\s*[-*+]\s+\[\s*\]")
 TEXT_SUFFIXES = {".md", ".rs", ".ts", ".tsx", ".js", ".jsx", ".py", ".sh", ".toml", ".json", ".txt", ".html"}
 
 
+def _in_skip_dirs(rel: str) -> bool:
+    """Is this tracked path inside a skipped directory?
+
+    SKIP_DIRS holds single path components, but a few entries name a whole prefix
+    (`docs/audit`). Comparing only components silently ignored those: `docs/audit/*` was
+    scanned even though the docstring says the audit registry is out of scope — the same
+    class of hand-maintained-list bug as the surface list TICKET-139 widened. Prefix entries
+    are matched against the path as well.
+    """
+    dirs = rel.split("/")[:-1]
+    if any(part in SKIP_DIRS for part in dirs):
+        return True
+    return any("/" in entry and rel.startswith(entry + "/") for entry in SKIP_DIRS)
+
+
 def tracked_files() -> list[Path]:
     out = subprocess.run(
         ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
@@ -185,7 +200,7 @@ def tracked_files() -> list[Path]:
         if not raw:
             continue
         rel = raw.decode("utf-8", "replace")
-        if any(part in SKIP_DIRS for part in rel.split("/")[:-1]):
+        if _in_skip_dirs(rel):
             continue
         p = ROOT / rel
         if p.suffix in TEXT_SUFFIXES and p.is_file():

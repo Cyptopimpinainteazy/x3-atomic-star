@@ -896,12 +896,19 @@ mark a bound or a projection rather than a result.
 **Measured, all four controls on this box:**
 
 ```
-OK   - 5498 file(s) scanned, 476 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
+OK   - 5482 file(s) scanned, 460 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
 FAIL - production/public probe `<p>Sub-200ms finality at 100,000 TPS.</p>`  (new surface IS scanned)
 OK   - the same file with `- [ ] 1,000 TPS demonstrated`                    (a plan item is not a claim)
 FAIL - the same file with `- [x] 1,000 TPS demonstrated`                    (a ticked box is a claim)
 FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive   (the skip list is load-bearing)
 ```
+
+**Found while widening it:** `SKIP_DIRS` was matched one path component at a time, so its
+`docs/audit` and `docs/superpowers` entries — the two that contain a slash — did nothing, and those
+files were scanned while the docstring said the registry is out of scope. `--list` named
+`docs/audit/X3_AGENT_QUEUE.md` and `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md` as claim surfaces
+before the fix and names none after. The gate was green either way, so this is the stated scope
+becoming true rather than a way to obtain green.
 
 **TICKET-140 — decide the `apps/**` surfaces the scanner still does not read.** Measured
 2026-09-26: `apps/inferstructor-dashboard/src/components/RegisterPage.tsx` carries 5 unqualified

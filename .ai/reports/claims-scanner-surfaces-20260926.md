@@ -46,7 +46,7 @@ surface can be added without being scanned".
 
 ```
 $ python3 scripts/ci/check-claims-hygiene.py
-claims-hygiene: OK - 5498 file(s) scanned, 476 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
+claims-hygiene: OK - 5482 file(s) scanned, 460 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim
 
 # new surface is scanned, plan item is not a claim, ticked item is
 $ printf '%s\n' '- [ ] 1,000 TPS demonstrated' '<p>Sub-200ms finality at 100,000 TPS.</p>' > production/public/zzz-probe.html
@@ -64,6 +64,16 @@ claims-hygiene: FAIL -> ABSOLUTE (MEV protection is not implemented (X3-MEV-001.
 ```
 
 All probes removed; `git status` shows only the intended files.
+
+## A skipped path with a slash in it was never skipped
+
+`SKIP_DIRS` was matched one path component at a time
+(`any(part in SKIP_DIRS for part in rel.split("/")[:-1])`), so the two entries that name a whole
+prefix — `docs/audit` and `docs/superpowers` — could never match anything, and those files were
+scanned while the docstring above says the audit registry is out of scope. `--list` named
+`docs/audit/X3_AGENT_QUEUE.md` and `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md` as claim surfaces
+before the fix, and none after; the surface count moved 476 -> 460. The gate passed before and after,
+so this is the stated scope becoming true, not a way to obtain green.
 
 ## Registry / gate reconciliation
 
