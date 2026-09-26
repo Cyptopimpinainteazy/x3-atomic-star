@@ -199,7 +199,12 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
 // WasmX3Adapter
 // ---------------------------------------------------------------------------
 
-/// X3 adapter backed by `mini_x3` in no-std and `x3-vm` in std.
+/// The runtime's X3 adapter: `X3Executor`'s on-chain engine, the same code in every build.
+///
+/// This used to call `X3Executor::execute`, which is `mini_x3` in the wasm build and `x3-vm` in a
+/// `std` one, so the chain ran one engine and the native runtime — its tests and its benchmarks —
+/// ran another (see `X3Executor::execute_on_chain`). `X3VmAdapter`, the native runtime's adapter,
+/// now delegates here as well.
 pub struct WasmX3Adapter;
 
 impl X3ExecutorAdapter for WasmX3Adapter {
@@ -207,11 +212,7 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        let config = x3_x3_integration::X3ExecutorConfig {
-            gas_limit,
-            ..Default::default()
-        };
-        x3_x3_integration::X3Executor::execute(payload, &[], config)
+        x3_x3_integration::X3Executor::execute_on_chain(payload, gas_limit)
             .map(|rec| ExecutionReceipt {
                 version: crate::EXECUTION_RECEIPT_VERSION,
                 success: rec.success,
@@ -226,14 +227,21 @@ impl X3ExecutorAdapter for WasmX3Adapter {
                 to: Vec::new(),
                 value: 0,
             })
-            .map_err(|_| DispatchError::Other("X3 execution failed"))
+            .map_err(|error| {
+                DispatchError::Other(match error {
+                    x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
+                        "X3 verification failed"
+                    }
+                    _ => "X3 execution failed",
+                })
+            })
     }
 
     fn validate(payload: &[u8]) -> Result<(), DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        x3_x3_integration::X3Executor::verify(payload, false)
+        x3_x3_integration::X3Executor::verify_on_chain(payload)
             .map_err(|_| DispatchError::Other("X3 validation failed"))
     }
 
@@ -241,8 +249,9 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        x3_x3_integration::X3Executor::estimate_gas(payload)
-            .map_err(|_| DispatchError::Other("X3 gas estimation failed"))
+        Ok(x3_x3_integration::X3Executor::estimate_gas_on_chain(
+            payload,
+        ))
     }
 }
 

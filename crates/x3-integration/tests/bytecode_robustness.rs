@@ -89,12 +89,43 @@ fn corpus() -> Vec<(&'static str, Vec<u8>)> {
 
 /// What each reader decided, without unwrapping anything: a panic inside is the failure mode
 /// this whole file exists to catch, so the readers are called for their verdict only.
+///
+/// `mini` is the runtime's *format* reader. Its on-chain validator (`validate_x3bc`) also checks
+/// the code, so it refuses modules both readers can read; it is called here too, for the panic
+/// check and for `the_on_chain_validator_never_admits_what_the_std_reader_refuses`.
 fn verdicts(bytes: &[u8]) -> (bool, bool, bool) {
-    let mini = mini_x3::validate_x3bc(bytes).is_ok();
+    let mini = mini_x3::read_x3bc(bytes).is_ok();
+    let _ = mini_x3::validate_x3bc(bytes);
     let backend = BytecodeModule::from_bytes(bytes).is_ok();
     let verifier =
         x3_vm::Verifier::verify_module_bytes(bytes, &x3_vm::VerifyOptions::on_chain()).is_ok();
     (mini, backend, verifier)
+}
+
+#[test]
+fn the_on_chain_validator_never_admits_what_the_std_reader_refuses() {
+    let mut admitted_unreadable = Vec::new();
+    for (name, bytes) in corpus() {
+        for offset in 0..bytes.len() {
+            for value in [0x00u8, 0xFF, 0x7F, 0x80, 0x01] {
+                let mut damaged = bytes.clone();
+                if damaged[offset] == value {
+                    continue;
+                }
+                damaged[offset] = value;
+                reseal(&mut damaged);
+                if mini_x3::validate_x3bc(&damaged).is_ok()
+                    && BytecodeModule::from_bytes(&damaged).is_err()
+                {
+                    admitted_unreadable.push(format!("{name}: byte[{offset}] = {value:#04x}"));
+                }
+            }
+        }
+    }
+    assert!(
+        admitted_unreadable.is_empty(),
+        "the runtime would run modules the std toolchain cannot read: {admitted_unreadable:?}"
+    );
 }
 
 #[test]

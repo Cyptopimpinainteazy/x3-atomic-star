@@ -58,6 +58,18 @@ pub enum X3Error {
     FunctionNotFound,
     GlobalOutOfBounds,
     RegisterOutOfBounds,
+    /// A call passed a different number of arguments than the callee declares parameters.
+    ArgumentCountMismatch,
+    /// An opcode this engine has no implementation for (it is refused, never approximated).
+    UnimplementedOpcode(u8),
+    /// An atomic commit or rollback with no atomic block open.
+    AtomicEndWithoutBegin,
+    /// The program rolled back an atomic block, which aborts the execution.
+    AtomicAborted,
+    /// The module is well-formed but not admissible on chain (see `validate_x3bc`).
+    ForbiddenOnChain(u8),
+    /// A jump or call target, or a function entry, that is not the start of an instruction.
+    InvalidJumpTarget(u32),
     UserPanic,
 }
 
@@ -126,7 +138,6 @@ enum MiniConst {
 #[derive(Debug, Clone)]
 struct MiniFunc {
     entry: u32,
-    #[allow(dead_code)]
     param_count: u8,
     local_count: u16,
 }
@@ -213,15 +224,20 @@ impl<'a> Reader<'a> {
         Ok(v)
     }
     fn read_bytes(&mut self, n: usize) -> X3Result<Vec<u8>> {
-        if self.pos + n > self.data.len() {
+        // `n` comes from the input, and the runtime is wasm32: `pos + n` can wrap a 32-bit
+        // `usize`, pass a `> len` check, and then panic in the slice. Compare against what is left.
+        if n > self.data.len().saturating_sub(self.pos) {
             return Err(X3Error::UnexpectedEof);
         }
         let v = self.data[self.pos..self.pos + n].to_vec();
         self.pos += n;
         Ok(v)
     }
+    fn peek_u8(&self) -> Option<u8> {
+        self.data.get(self.pos).copied()
+    }
     fn skip(&mut self, n: usize) -> X3Result<()> {
-        if self.pos + n > self.data.len() {
+        if n > self.data.len().saturating_sub(self.pos) {
             return Err(X3Error::UnexpectedEof);
         }
         self.pos += n;
@@ -354,12 +370,62 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
     let code_len = r.read_u32()? as usize;
     let code = r.read_bytes(code_len)?;
 
+    // Trailing sections. The runtime does not use them, but it has to accept exactly the modules
+    // `x3-backend` accepts: this reader used to stop after the code, so a module whose debug
+    // section was malformed was refused by the std reader and run by the chain.
+    skip_trailer(&mut r)?;
+
     Ok(MiniModule {
         const_pool,
         functions,
         globals,
         code,
     })
+}
+
+/// Read past the optional debug and metadata sections with `x3-backend`'s acceptance rules
+/// (`BytecodeModule::from_bytes`): a section is present when its flag byte is 1, any other flag
+/// byte means absent, and a present section must be complete.
+fn skip_trailer(r: &mut Reader<'_>) -> X3Result<()> {
+    fn skip_u16_prefixed(r: &mut Reader<'_>) -> X3Result<()> {
+        let len = r.read_u16()? as usize;
+        r.skip(len)
+    }
+    fn skip_optional_string(r: &mut Reader<'_>) -> X3Result<()> {
+        if r.read_u8()? == 1 {
+            skip_u16_prefixed(r)?;
+        }
+        Ok(())
+    }
+
+    // Debug info.
+    if r.remaining() > 0 && r.read_u8()? == 1 {
+        let map_count = r.read_u32()? as usize;
+        for _ in 0..map_count {
+            r.skip(8)?; // code offset u32, line u16, column u16
+        }
+        let name_count = r.read_u32()? as usize;
+        for _ in 0..name_count {
+            r.skip(4)?; // symbol index
+            skip_u16_prefixed(r)?;
+        }
+    }
+    // Metadata.
+    if r.remaining() > 0 && r.peek_u8() == Some(1) {
+        r.skip(1)?;
+        skip_u16_prefixed(r)?; // compiler
+        skip_u16_prefixed(r)?; // compiler version
+        r.skip(8)?; // compiled at
+        skip_optional_string(r)?; // source file
+        skip_optional_string(r)?; // source hash
+        r.skip(1)?; // opt level
+        let annotations = r.read_u32()? as usize;
+        for _ in 0..annotations {
+            skip_u16_prefixed(r)?;
+            skip_u16_prefixed(r)?;
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -402,6 +468,8 @@ struct Vm<'m> {
     call_stack: Vec<CallFrame>,
     globals: Vec<MiniValue>,
     gas_used: u64,
+    /// Open atomic blocks.
+    atomic_depth: u32,
     /// Instructions executed, counted next to gas rather than inferred from it.
     instructions_executed: u64,
     gas_limit: u64,
@@ -433,13 +501,10 @@ impl<'m> Vm<'m> {
             call_stack: Vec::with_capacity(MAX_DEPTH),
             globals,
             gas_used: 0,
+            atomic_depth: 0,
             instructions_executed: 0,
             gas_limit,
         }
-    }
-
-    fn resolve(&self, reg: usize) -> usize {
-        self.call_stack.last().map(|f| f.base).unwrap_or(0) + reg
     }
 
     fn r8(&self, ip: usize) -> X3Result<u8> {
@@ -525,11 +590,18 @@ impl<'m> Vm<'m> {
         // Capture base FIRST — this ends the immutable borrow before any mutable ops.
         let base = self.call_stack.last().map(|f| f.base).unwrap_or(0);
 
-        // Helper: absolute register index from relative reg operand
+        // Helper: absolute register index from relative reg operand, refused when it falls outside
+        // the register file. Operands are a `u8` added to the frame's base, so a callee frame could
+        // name a register past the end of `regs`, and indexing it panicked — inside the runtime,
+        // on bytes an extrinsic supplied. This is the rule `x3-vm` applies (`resolve_reg_checked`).
         macro_rules! reg {
-            ($r:expr) => {
-                base + $r as usize
-            };
+            ($r:expr) => {{
+                let index = base + $r as usize;
+                if index >= MAX_REGS {
+                    return Err(X3Error::RegisterOutOfBounds);
+                }
+                index
+            }};
         }
         macro_rules! rv {
             ($r:expr) => {
@@ -587,7 +659,7 @@ impl<'m> Vm<'m> {
                 let mut args = Vec::with_capacity(argc.min(MAX_REGS));
                 for i in 0..argc {
                     let ar = self.r8(ip + 8 + i)? as usize;
-                    args.push(self.regs[self.resolve(ar)].clone());
+                    args.push(self.regs[reg!(ar)].clone());
                 }
                 // The callee's window starts after the caller's whole frame (params + locals), not
                 // after its locals alone: see the note in the std VM's `Call` arm (TICKET-131).
@@ -603,7 +675,15 @@ impl<'m> Vm<'m> {
                     })
                     .unwrap_or((0, 0));
                 let callee_base = caller_base + caller_footprint;
-                if callee_base + func.local_count as usize >= MAX_REGS {
+                // A call passes exactly the callee's parameters. The arguments are written into the
+                // callee's window below, and `argc` is a `u16` from the code stream, so a larger
+                // count wrote past the register file (a panic) and a smaller one left parameters
+                // holding whatever the previous frame left there.
+                if argc != func.param_count as usize {
+                    return Err(X3Error::ArgumentCountMismatch);
+                }
+                // The whole callee window — parameters and locals — has to fit.
+                if callee_base + func.param_count as usize + func.local_count as usize > MAX_REGS {
                     return Err(X3Error::RegisterOutOfBounds);
                 }
                 for (i, a) in args.into_iter().enumerate() {
@@ -622,7 +702,7 @@ impl<'m> Vm<'m> {
             0x05 => {
                 // Ret
                 let s = self.r8(ip + 1)? as usize;
-                let v = self.regs[self.resolve(s)].clone();
+                let v = self.regs[reg!(s)].clone();
                 Ok(Step::Return(Some(v)))
             }
             0x06 => Ok(Step::Return(None)), // RetVoid
@@ -784,18 +864,6 @@ impl<'m> Vm<'m> {
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 3))
             } // NegI
-            0x26 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()? + 1;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            } // Inc
-            0x27 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()? - 1;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            } // Dec
 
             // -------- Float Arithmetic --------
             0x30 => {
@@ -1063,146 +1131,6 @@ impl<'m> Vm<'m> {
                 Ok(Step::Continue(ip + 3))
             }
 
-            // -------- Type Conversions --------
-            0x60 | 0x61 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()?;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x62 | 0x63 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()?;
-                self.regs[reg!(d)] = MiniValue::F64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x64 | 0x65 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()? as i64;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x66 | 0x67 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()?;
-                self.regs[reg!(d)] = MiniValue::F64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x68 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_bool()?;
-                self.regs[reg!(d)] = MiniValue::Bool(v);
-                Ok(Step::Continue(ip + 3))
-            }
-
-            // -------- Array / Context / Atomic / Agent / Intrinsics (return defaults) --------
-            // These opcodes decode their operands and skip the right number of bytes.
-            // In the WASM no-std context, cross-VM intrinsics and GPU ops are no-ops.
-            0x70 => {
-                self.r8(ip + 1)?;
-                self.r16(ip + 2)?;
-                Ok(Step::Continue(ip + 4))
-            } // NewArray
-            0x71 => {
-                let (d, _) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)?);
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 3))
-            }
-            0x72 | 0x73 => {
-                self.r8(ip + 1)?;
-                self.r8(ip + 2)?;
-                Ok(Step::Continue(ip + 3))
-            }
-            0x74 => {
-                let n = self.r16(ip + 2)? as usize;
-                Ok(Step::Continue(ip + 4 + n))
-            } // NewTuple: [op][dst][count][regs...]
-            0x75 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r16(ip + 3)?;
-                set!(d, MiniValue::Unit);
-                Ok(Step::Continue(ip + 5))
-            }
-
-            // Context ops — return zero / unit
-            0x80 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Bytes(sp_std::vec![0u8;20]));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_sender -> zero addr
-            0x81 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_block_height
-            0x82 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_timestamp
-            0x83 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 2))
-            } // ctx_value
-            0x84 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(
-                    d,
-                    MiniValue::I64(self.gas_limit as i64 - self.gas_used as i64)
-                );
-                Ok(Step::Continue(ip + 2))
-            } // ctx_gas
-            0x85 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(3375));
-                Ok(Step::Continue(ip + 2))
-            } // chain_id
-
-            // Atomic ops — tracked but no real isolation here (single-threaded WASM)
-            0x90..=0x92 => {
-                self.r16(ip + 1)?;
-                Ok(Step::Continue(ip + 3))
-            }
-            0x93 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Bool(false));
-                Ok(Step::Continue(ip + 2))
-            }
-
-            // Agent / emit — skipped
-            0xA0 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::Unit);
-                Ok(Step::Continue(ip + 2))
-            }
-            0xA1 => {
-                // agent_init: [op][agent:u8][field_count:u16][...]
-                let _a = self.r8(ip + 1)?;
-                let n = self.r16(ip + 2)? as usize;
-                Ok(Step::Continue(ip + 4 + n * 3))
-            }
-            0xA2 => {
-                // emit: [op][event_id:u32][argc:u16][args...]
-                let argc = self.r16(ip + 5)? as usize;
-                Ok(Step::Continue(ip + 7 + argc))
-            }
-
-            // VM intrinsics — all return zero/unit
-            0xB0..=0xB9 | 0xC0..=0xC7 | 0xD0..=0xD7 => {
-                // All EVM / SVM / GPU ops take dst+src operands; return zero and skip sensibly.
-                // Simplification: read dst, skip 4 more bytes, return I64(0).
-                let d = self.r8(ip + 1)? as usize;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 6))
-            }
-
-            // Debug ops
-            0xF0 | 0xF1 => {
-                self.r8(ip + 1)?;
-                Ok(Step::Continue(ip + 2))
-            } // DebugPrint, Breakpoint
             0xF2 => {
                 // Assert
                 let cond = self.r8(ip + 1)? as usize;
@@ -1214,34 +1142,54 @@ impl<'m> Vm<'m> {
             }
             0xF3 => Err(X3Error::UserPanic), // Panic
 
-            // LoadIndex / StoreIndex / LoadField / StoreField — arrays not implemented in mini
-            0x14 | 0x15 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r8(ip + 3)?;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 4))
+            // -------- Atomic blocks --------
+            // The semantics `x3-vm` gives them: a begin opens a block, a commit closes the innermost
+            // one (and is refused outside any), and a rollback aborts the execution — the whole
+            // program's effects are discarded, which is what undoing the block amounts to here.
+            // These arms used to be no-ops, so an explicit rollback carried on and committed.
+            0x90 => {
+                self.r16(ip + 1)?;
+                self.atomic_depth += 1;
+                Ok(Step::Continue(ip + 3))
             }
-            0x16 | 0x17 => {
-                let d = self.r8(ip + 1)? as usize;
-                self.r8(ip + 2)?;
-                self.r16(ip + 3)?;
-                set!(d, MiniValue::I64(0));
-                Ok(Step::Continue(ip + 5))
+            0x91 => {
+                self.r16(ip + 1)?;
+                if self.atomic_depth == 0 {
+                    return Err(X3Error::AtomicEndWithoutBegin);
+                }
+                self.atomic_depth -= 1;
+                Ok(Step::Continue(ip + 3))
+            }
+            0x92 => {
+                self.r16(ip + 1)?;
+                if self.atomic_depth == 0 {
+                    return Err(X3Error::AtomicEndWithoutBegin);
+                }
+                Err(X3Error::AtomicAborted)
             }
 
-            // ModF (0x34)
-            0x34 => {
-                let (d, a, b) = (
-                    self.r8(ip + 1)? as usize,
-                    self.r8(ip + 2)? as usize,
-                    self.r8(ip + 3)? as usize,
-                );
-                let vb = self.regs[reg!(b)].as_f64()?;
-                let v = self.regs[reg!(a)].as_f64()? % vb;
-                self.regs[reg!(d)] = MiniValue::F64(v);
-                Ok(Step::Continue(ip + 4))
-            }
+            // -------- Opcodes with no implementation in this engine --------
+            // Arrays, fields and indexing, conversions, `Inc`/`Dec`, float modulo, execution
+            // context, agents, events, cross-VM calls and GPU intrinsics. Every one of them used to
+            // "succeed" here with a made-up result — a zero, a unit, a zero address, a hard-coded
+            // chain id, `false` — so a program that called into the EVM, read the sender or emitted
+            // an event ran to a successful receipt without any of it having happened. The engine
+            // has no host to give them meaning, so they are refused by name. The set implemented
+            // is the set `x3-vm` implements, so the two engines agree on what runs.
+            0x14..=0x17
+            | 0x26
+            | 0x27
+            | 0x34
+            | 0x60..=0x68
+            | 0x70..=0x75
+            | 0x80..=0x85
+            | 0x93
+            | 0xA0..=0xA2
+            | 0xB0..=0xB9
+            | 0xC0..=0xC7
+            | 0xD0..=0xD7
+            | 0xF0
+            | 0xF1 => Err(X3Error::UnimplementedOpcode(op)),
 
             _ => Err(X3Error::InvalidOpcode(op)),
         }
@@ -1267,9 +1215,9 @@ fn mini_value_from_const(c: &MiniConst) -> MiniValue {
 /// `gas_limit` caps execution; `GasExhausted` is returned if exceeded.
 pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Error> {
     let module = parse_module(payload)?;
-    if module.functions.is_empty() {
-        return Err(X3Error::FunctionNotFound);
-    }
+    // Execution admits exactly what validation admits: the runtime validates before it executes,
+    // and so does this, so no caller can run a module the validator would refuse.
+    verify_code(&module)?;
     let mut vm = Vm::new(&module, gas_limit);
     let func_entry = module.functions[0].entry as usize;
     vm.call_stack.push(CallFrame {
@@ -1287,9 +1235,157 @@ pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Er
     })
 }
 
-/// Validate the X3BC binary format without executing.
+/// Read the X3BC envelope and tables — the format only, not the code — without executing.
+///
+/// This is the counterpart of `x3-backend`'s `BytecodeModule::from_bytes`, and the two are held to
+/// agreeing on every input (`tests/bytecode_robustness.rs`). Whether the module may *run* on chain
+/// is `validate_x3bc`'s question.
+pub fn read_x3bc(payload: &[u8]) -> Result<(), X3Error> {
+    parse_module(payload).map(|_| ())
+}
+
+/// Validate an X3BC module for on-chain execution, without executing it.
+///
+/// This used to parse the envelope and stop, so the runtime — whose X3 adapter validates with this
+/// function in the wasm build — admitted any instruction stream behind a well-formed header, while
+/// the std build refused the same bytes with `x3-vm`'s verifier. Beyond the envelope this now checks
+/// the code the way the interpreter will read it:
+///
+/// - the code decodes from its first byte to its last into instructions this engine implements;
+/// - every function entry and every jump target is the start of an instruction;
+/// - every call names an existing function with exactly its parameter count;
+/// - every constant and global index is in range;
+/// - the entry function (index 0, which the runtime calls with no arguments) has no parameters,
+///   and every function's frame fits the register file;
+/// - float arithmetic, which the on-chain verifier of `x3-vm` forbids, is refused.
 pub fn validate_x3bc(payload: &[u8]) -> Result<(), X3Error> {
-    let _ = parse_module(payload)?;
+    let module = parse_module(payload)?;
+    verify_code(&module)
+}
+
+/// The length of the instruction at `ip`, or an error if it is not one this engine implements.
+fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
+    let op = *code.get(ip).ok_or(X3Error::UnexpectedEof)?;
+    let len = match op {
+        0x00 | 0x06 | 0x07 | 0xF3 => 1,
+        0x05 | 0x19..=0x1B => 2,
+        0x11 | 0x18 | 0x25 | 0x35 | 0x53 | 0x5A | 0x90..=0x92 => 3,
+        0x20..=0x24 | 0x30..=0x33 | 0x40..=0x4B | 0x50..=0x52 | 0x54..=0x56 | 0x58 | 0x59 => 4,
+        0x01 => 5,
+        0x02 | 0x03 | 0x10 | 0x12 | 0x13 | 0xF2 => 6,
+        0x04 => {
+            let argc = code
+                .get(ip + 6..ip + 8)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]) as usize)
+                .ok_or(X3Error::UnexpectedEof)?;
+            8 + argc
+        }
+        0x14..=0x17
+        | 0x26
+        | 0x27
+        | 0x34
+        | 0x60..=0x68
+        | 0x70..=0x75
+        | 0x80..=0x85
+        | 0x93
+        | 0xA0..=0xA2
+        | 0xB0..=0xB9
+        | 0xC0..=0xC7
+        | 0xD0..=0xD7
+        | 0xF0
+        | 0xF1 => return Err(X3Error::UnimplementedOpcode(op)),
+        _ => return Err(X3Error::InvalidOpcode(op)),
+    };
+    if ip + len > code.len() {
+        return Err(X3Error::UnexpectedEof);
+    }
+    Ok(len)
+}
+
+fn read_u32_at(code: &[u8], at: usize) -> u32 {
+    // Only called on an instruction `instruction_len` has already bounded.
+    u32::from_le_bytes([code[at], code[at + 1], code[at + 2], code[at + 3]])
+}
+
+fn verify_code(module: &MiniModule) -> Result<(), X3Error> {
+    let code = &module.code;
+    let entry = module.functions.first().ok_or(X3Error::FunctionNotFound)?;
+    if entry.param_count != 0 {
+        // The runtime calls the entry with no arguments; `x3-vm` refuses the same module.
+        return Err(X3Error::ArgumentCountMismatch);
+    }
+    for function in &module.functions {
+        if function.param_count as usize + function.local_count as usize > MAX_REGS {
+            return Err(X3Error::RegisterOutOfBounds);
+        }
+    }
+
+    // Pass 1: decode, and record where instructions start.
+    let mut starts = vec![false; code.len()];
+    let mut ip = 0;
+    while ip < code.len() {
+        starts[ip] = true;
+        ip += instruction_len(code, ip)?;
+    }
+    let is_start = |target: u32| (target as usize) < code.len() && starts[target as usize];
+
+    for function in &module.functions {
+        if !is_start(function.entry) {
+            return Err(X3Error::InvalidJumpTarget(function.entry));
+        }
+    }
+
+    // Pass 2: operands.
+    let mut ip = 0;
+    while ip < code.len() {
+        let op = code[ip];
+        let len = instruction_len(code, ip)?;
+        match op {
+            0x01 => {
+                let target = read_u32_at(code, ip + 1);
+                if !is_start(target) {
+                    return Err(X3Error::InvalidJumpTarget(target));
+                }
+            }
+            0x02 | 0x03 => {
+                let target = read_u32_at(code, ip + 2);
+                if !is_start(target) {
+                    return Err(X3Error::InvalidJumpTarget(target));
+                }
+            }
+            0x04 => {
+                let callee = read_u32_at(code, ip + 2) as usize;
+                let argc = len - 8;
+                let function = module
+                    .functions
+                    .get(callee)
+                    .ok_or(X3Error::FunctionNotFound)?;
+                if function.param_count as usize != argc {
+                    return Err(X3Error::ArgumentCountMismatch);
+                }
+            }
+            0x10 => {
+                if read_u32_at(code, ip + 2) as usize >= module.const_pool.len() {
+                    return Err(X3Error::ConstPoolOutOfBounds);
+                }
+            }
+            0x12 => {
+                if read_u32_at(code, ip + 2) as usize >= module.globals.len() {
+                    return Err(X3Error::GlobalOutOfBounds);
+                }
+            }
+            0x13 => {
+                if read_u32_at(code, ip + 1) as usize >= module.globals.len() {
+                    return Err(X3Error::GlobalOutOfBounds);
+                }
+            }
+            // AddF, SubF, MulF, DivF: forbidden on chain, as `x3-vm`'s `VerifyOptions::on_chain`
+            // forbids them.
+            0x30..=0x33 => return Err(X3Error::ForbiddenOnChain(op)),
+            _ => {}
+        }
+        ip += len;
+    }
     Ok(())
 }
 

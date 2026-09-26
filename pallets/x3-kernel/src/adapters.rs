@@ -475,77 +475,24 @@ pub mod real_adapters {
         }
     }
 
-    /// Production X3 VM adapter using x3-vm
+    /// The native runtime's X3 adapter. It delegates to `WasmX3Adapter`, so the native and the
+    /// wasm runtime execute X3 programs with the same engine; it used to run `x3-vm`, which no node
+    /// executing the wasm runtime ever runs (see `X3Executor::execute_on_chain`).
     pub struct X3VmAdapter;
 
     impl super::X3ExecutorAdapter for X3VmAdapter {
         fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-            use x3_x3_integration::{X3Executor, X3ExecutorConfig};
-
-            let config = X3ExecutorConfig::on_chain().with_gas_limit(gas_limit);
-
-            let receipt = X3Executor::execute(payload, &[], config).map_err(|e| {
-                DispatchError::Other(match e {
-                    x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
-                        "X3 verification failed"
-                    }
-                    x3_x3_integration::X3IntegrationError::InvalidBytecode(_) => {
-                        "Invalid X3 bytecode"
-                    }
-                    x3_x3_integration::X3IntegrationError::GasExhausted { .. } => "X3 out of gas",
-                    x3_x3_integration::X3IntegrationError::ExecutionFailed(_) => {
-                        "X3 execution failed"
-                    }
-                    x3_x3_integration::X3IntegrationError::StackOverflow => "X3 stack overflow",
-                    x3_x3_integration::X3IntegrationError::MemoryOutOfBounds => "X3 memory error",
-                    _ => "X3 VM error",
-                })
-            })?;
-
-            // Convert X3 receipt to pallet ExecutionReceipt
-            Ok(ExecutionReceipt {
-                version: crate::EXECUTION_RECEIPT_VERSION,
-                success: receipt.success,
-                gas_used: receipt.gas_used,
-                return_data: receipt.return_data,
-                logs: receipt
-                    .logs
-                    .into_iter()
-                    .map(|log| ExecutionLog {
-                        address: vec![0u8; 32], // X3 uses module-level logging
-                        topics: vec![log.topic],
-                        data: log.data,
-                        block_number: 0,
-                    })
-                    .collect(),
-                state_changes: receipt
-                    .state_changes
-                    .into_iter()
-                    .map(|change| StateChange {
-                        address: vec![0u8; 32], // X3 module address
-                        key: change.key,
-                        value: H256::from_slice(change.new_value.get(..32).unwrap_or(&[0u8; 32])),
-                    })
-                    .collect(),
-                protocol_version: 1,
-                migration_history: Vec::new(),
-                compatibility_flags: 0,
-                from: Vec::new(),
-                to: Vec::new(),
-                value: 0,
-            })
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute(
+                payload, gas_limit,
+            )
         }
 
         fn validate(payload: &[u8]) -> Result<(), DispatchError> {
-            use x3_x3_integration::X3Executor;
-            X3Executor::verify(payload, false)
-                .map_err(|_| DispatchError::Other("Invalid X3 bytecode"))
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::validate(payload)
         }
 
         fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
-            use x3_x3_integration::X3Executor;
-            X3Executor::estimate_gas(payload)
-                .map_err(|_| DispatchError::Other("X3 gas estimation failed"))
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::estimate_gas(payload)
         }
     }
 

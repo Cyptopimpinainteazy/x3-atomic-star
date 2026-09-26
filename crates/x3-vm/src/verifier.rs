@@ -893,7 +893,21 @@ impl Verifier {
     fn verify_on_chain_restrictions(instrs: &[DecodedInstr]) -> VerifierResult<()> {
         for instr in instrs {
             match Opcode::from_byte(instr.opcode) {
-                Some(Opcode::DebugPrint) | Some(Opcode::Breakpoint) => {
+                // GPU intrinsics are host calls into whatever device the node has: a device count
+                // or a benchmark result differs from validator to validator, and a runtime has no
+                // GPU host at all, so a block containing one cannot be agreed on.
+                Some(
+                    Opcode::DebugPrint
+                    | Opcode::Breakpoint
+                    | Opcode::GpuSha256Batch
+                    | Opcode::GpuEd25519Verify
+                    | Opcode::GpuPohChain
+                    | Opcode::GpuSha256Streamed
+                    | Opcode::GpuDeviceCount
+                    | Opcode::GpuBenchmark
+                    | Opcode::GpuKeccak256Batch
+                    | Opcode::GpuSecp256k1Verify,
+                ) => {
                     return Err(VerifierError::new(
                         VerifierErrorKind::ForbiddenOnChain(instr.opcode),
                         instr.offset,

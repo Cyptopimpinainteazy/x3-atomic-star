@@ -73,6 +73,9 @@ fn run_one(source: &str, options: CompilationOptions, expected: i64) -> Result<(
 
 /// Execute one artifact on both engines; `Err` describes the first divergence from `expected`.
 fn run_bytes(bytes: &[u8], expected: i64) -> Result<(), String> {
+    // The runtime validates before it executes; a compiled program it refuses cannot reach a chain.
+    mini_x3::validate_x3bc(bytes)
+        .map_err(|e| format!("the runtime's validator refused it: {e:?}"))?;
     let receipt = X3Executor::execute(bytes, &[], X3ExecutorConfig::on_chain())
         .map_err(|e| format!("X3Executor: {e:?}"))?;
     if !receipt.success {
