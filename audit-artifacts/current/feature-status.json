@@ -61,19 +61,21 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 19,
+      "composite": 57,
       "confidence": "high",
       "evidence": [
         "crates/x3-swarm-core",
-        "note: FEATURE_REGISTRY explicitly records missing kill-switch test"
+        "note: FEATURE_REGISTRY records the history - four required_tests were removed by CRITICAL-TOK-1 in 2026-09-06 because none existed as real test functions; they exist now, and the dispatch-refusal pair is added alongside them"
       ],
       "id": "X3-AGENT-003",
-      "implemented": 30,
+      "implemented": 70,
       "launch_scope": "dev_tooling",
       "live_tested": "GUARDED_TESTNET",
-      "mainnet_ready": 15,
+      "mainnet_ready": 35,
       "missing_work": [
-        "Previously claimed tests were fictional and removed"
+        "Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child \u2014 but the scheduler's only route to work was `next_task(AgentKind)`, which compared the agent's class and never asked the authority anything. Measured: with `Sanction::Kill` on record and a pending task queued, the killed agent was handed the task. Closed: `SwarmAuthority::may_dispatch` (no genesis record / terminated / expired / quarantined / suspended / killed -> `DispatchRefusal`) is now called by `SwarmScheduler::next_task_for`, which is the only public route to a task; `next_task` is gone, so a caller cannot bypass it. An unregistered agent is refused too \u2014 the dispatcher fails closed on an identity it cannot check rather than reading 'no record' as 'no violations'.",
+        "The crate is still not on the deployed path: `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, and its own service (`crates/x3-swarm-core/services/x3-swarm-api`) does not call the scheduler at all. A kill switch that stops a dispatch nothing performs is enforced but not yet load-bearing in production \u2014 that is the same gap as REG-x3_swarm_core-1, not something this change closes.",
+        "Sanctions escalate only; there is no governance reset path, so an agent that reaches Kill is permanently gone. That is intentional per AGENT_LAW \u00a73, but it has never been exercised on a live multi-agent run, and there is still no race-condition or partition-tolerance testing for the control plane."
       ],
       "name": "Agent kill-switch concept",
       "paths": [
@@ -81,11 +83,11 @@
       ],
       "priority": "P3",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "agents_experimental",
-      "tested": 10,
-      "tests": "4 named tests in FEATURE_REGISTRY"
+      "tested": 75,
+      "tests": "6 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -123,7 +125,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": true,
-      "composite": 69,
+      "composite": 61,
       "confidence": "high",
       "evidence": [
         "CURRENT_MAINNET_STATUS.md",
@@ -136,12 +138,13 @@
       "implemented": 80,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 55,
+      "mainnet_ready": 35,
       "missing_work": [
         "Re-measured 2026-09-26: the row's instruction (\"rename to MEV-resistant architecture under development\") had already been carried out in `CURRENT_MAINNET_STATUS.md` \u2014 the file does not mention MEV at all \u2014 which is why the row looked half-closed. The claim had moved into the desktop CRM's outbound templates (`apps/x3-desktop/src-tauri/src/crm/`) and grown: \"Deterministic execution guarantees (no MEV/reorg risk)\", \"Sub-300ms cross-chain settlement (vs 12+ seconds standard)\", \"300ms cross-chain finality (vs 12s on Solana)\", \"5,000 TPS baseline\", \"Live in 3 production networks\", \"Compute revenue per GPU: $1200/month (current pilot)\", \"We have 3 regional partners already live\", \"processes cross-chain transactions at 100K TPS with 300ms finality\", \"committed minimum $500K/quarter purchase\", \"X3 provides certified e-waste and IT surplus management services\", \"NIST SP 800-88 compliant\" \u2014 plus six seeded contacts naming real people at real organisations (DeepMind, Anthropic, MIT CSAIL, IQC, CoreWeave) with invented personal addresses that the app's own SMTP sender could mail. All of it is rewritten to what the project can show; the seeded contacts are now reserved-`example.com` placeholders.",
         "The gate is a scanner, not a proof of honesty: `scripts/ci/check-claims-hygiene.py` reads 78 declared claim surfaces (root markdown, `docs/testnet-config`, the CRM) tree-wide for phrases that are false in every context and on surfaces only for figures, skipping lines that qualify themselves. Its surface list is hand-maintained, so a new surface can be added without being scanned.",
         "Outside the scanned surfaces there is a large legacy pile that still asserts unverifiable figures \u2014 `docs/openspec/changes/p4-solana-gpu-acceleration/`, `benchmarks/tps-archive-2026-02/`, `.planning/`, `.audit/`, `tests_phase4/`, `infra-structure/` and others \u2014 measured at roughly 150 further hits. They are ticketed rather than silently rewritten; widening the surface list is the way to close them (TICKET-139, TESTNET_GAP_LEDGER.md).",
-        "The CRM modules themselves are dead code: `apps/x3-desktop/src-tauri/src/crm/mod.rs` declares only `db`, `models`, `commands`, `smtp` and `agents`, so `outreach_system.rs`, `hardware_acquisition_commands.rs`, `funding*.rs`, `dorks*.rs`, `audit_tournament.rs` and `hardware_sources_db.rs` are neither compiled nor called (the crate is also excluded from the cargo workspace, so nothing type-checks them). Honest text in an unreachable file is still not a working feature; either wire it with tests or delete it (TICKET-138, TESTNET_GAP_LEDGER.md)."
+        "The CRM modules themselves are dead code: `apps/x3-desktop/src-tauri/src/crm/mod.rs` declares only `db`, `models`, `commands`, `smtp` and `agents`, so `outreach_system.rs`, `hardware_acquisition_commands.rs`, `funding*.rs`, `dorks*.rs`, `audit_tournament.rs` and `hardware_sources_db.rs` are neither compiled nor called (the crate is also excluded from the cargo workspace, so nothing type-checks them). Honest text in an unreachable file is still not a working feature; either wire it with tests or delete it (TICKET-138, TESTNET_GAP_LEDGER.md).",
+        "`mainnet_ready` stays below 40 by the matrix's own cap on `claim_risk`/`research` rows, not by measurement: this row briefly carried 55 and `feature matrix check` refused it (`X3-CLAIM-002: claim-risk feature must remain below 40 mainnet readiness`). The hygiene work is real and the removed claim is not coming back; the row is a record that a claim was retracted, so it must never read as a mainnet capability. Do not raise it again without dropping `claim_risk`/`launch_scope = \"research\"` in the same change and saying why."
       ],
       "name": "MEV-proof marketing claim",
       "paths": [
@@ -4455,12 +4458,12 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "35f571cbcf480928c86e6afc2615b23a0f4f1d3b1957a7d47a001c61b0e7bf4c",
+    "source_digest": "2e61042d9e1bb6c41df34d78eca46d473666d9df621bd49eb10b24018ff69dcc",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
-      "FEATURE_REGISTRY.toml": "005386b2f0a707c938b6bfc11d58387f3d02410940370da0085fc70fbe88b79e",
-      "feature-matrix/agents-experimental.toml": "7b3892470b04752536c38df938a1c6422b2bc3139bee4fd3bd51a05047edce50",
-      "feature-matrix/claims-hygiene.toml": "19dc785653a9f76fb9a1d7e454e925fbadd78c8e7d1a10f6a5ddda4db5edbab4",
+      "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
+      "feature-matrix/agents-experimental.toml": "0ab28599c7db3de8bff25a16083a2036b3ce1e5ae405944a0bba2ab8a102b82a",
+      "feature-matrix/claims-hygiene.toml": "0087c3e2abc0bf4300e66f422ca3f86da2a7fc62d1d6ebe1f12d034fcf60a95c",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
@@ -4827,7 +4830,9 @@
         "swarm_agent_can_receive_task",
         "swarm_agent_cannot_touch_forbidden_files",
         "swarm_memory_records_lesson",
-        "swarm_kill_switch_stops_agents"
+        "swarm_kill_switch_stops_agents",
+        "a_killed_agent_is_not_handed_work",
+        "an_unregistered_agent_is_not_handed_work"
       ]
     },
     {
@@ -4906,8 +4911,8 @@
       "FUNCTIONAL BUT UNHARDENED": 57,
       "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
-      "PARTIAL": 61,
-      "STUB": 10
+      "PARTIAL": 62,
+      "STUB": 9
     },
     "matrix_features": 146,
     "registry_features": 21,

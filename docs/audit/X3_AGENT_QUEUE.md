@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `35f571cbcf480928…` — the artifacts move when
+Source digest: `2e61042d9e1bb6c4…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -58,7 +58,7 @@ fails when they do not match.
 | REG-atomic_router-1 | atomic_router (LIVE_TESTNET) | External-bridge path disabled at genesis — governance gate, not code gap | unassigned | — | — | at or above 60pct | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | MTX-X3-AGENT-001 | agents_experimental | X3 control pallet: Privileged control surface needs security review | unassigned | — | — | P2/medium | `bash scripts/local-ci.sh` | PARTIAL · tested score 25% (no named test list on this row) | open |
 | MTX-X3-AGENT-002 | agents_experimental | AI-generated code governance boundary: Needs full policy enforcement and credential isolation proof | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
-| MTX-X3-AGENT-003 | agents_experimental | Agent kill-switch concept: Previously claimed tests were fictional and removed | unassigned | — | — | P3/high | `bash scripts/local-ci.sh` | STUB · 4 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-AGENT-003 | agents_experimental | Agent kill-switch concept: Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child — but the scheduler's only route to work… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P3/high | `bash scripts/local-ci.sh` | PARTIAL · 6 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-CLAIM-001 | claims_hygiene | Million-TPS GPU claims: The current-performance wording is gone: `docs/testnet-config/RELEASE-NOTES.md` announced a released `solana-gpu-validator-v1.0.tar.gz` with "Achieved: 2.75M TPS in lab, 1-5M TPS on testnet" and a "Guarantee: Minimum 100k TPS", none of whic… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 25% (no named test list on this row) | open |
 | MTX-X3-CLAIM-002 | claims_hygiene | MEV-proof marketing claim: Re-measured 2026-09-26: the row's instruction ("rename to MEV-resistant architecture under development") had already been carried out in `CURRENT_MAINNET_STATUS.md` — the file does not mention MEV at all — which is why the row looked half-c… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 75% (no named test list on this row) | open |
 | MTX-X3-CLAIM-003 | claims_hygiene | Cross-chain complete claim: Distinguish internal cross-VM from external-chain settlement; **2026-09-26, corrected — the scoreboard fed the claim.** `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, and fourteen adapters declared `e… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 30% (no named test list on this row) | open |

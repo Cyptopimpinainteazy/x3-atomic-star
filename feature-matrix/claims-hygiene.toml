@@ -33,7 +33,7 @@ paths = [
 ]
 implemented = 80
 tested = 75
-mainnet_ready = 55
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "research"
@@ -43,6 +43,7 @@ blockers = [
   "The gate is a scanner, not a proof of honesty: `scripts/ci/check-claims-hygiene.py` reads 78 declared claim surfaces (root markdown, `docs/testnet-config`, the CRM) tree-wide for phrases that are false in every context and on surfaces only for figures, skipping lines that qualify themselves. Its surface list is hand-maintained, so a new surface can be added without being scanned.",
   "Outside the scanned surfaces there is a large legacy pile that still asserts unverifiable figures — `docs/openspec/changes/p4-solana-gpu-acceleration/`, `benchmarks/tps-archive-2026-02/`, `.planning/`, `.audit/`, `tests_phase4/`, `infra-structure/` and others — measured at roughly 150 further hits. They are ticketed rather than silently rewritten; widening the surface list is the way to close them (TICKET-139, TESTNET_GAP_LEDGER.md).",
   "The CRM modules themselves are dead code: `apps/x3-desktop/src-tauri/src/crm/mod.rs` declares only `db`, `models`, `commands`, `smtp` and `agents`, so `outreach_system.rs`, `hardware_acquisition_commands.rs`, `funding*.rs`, `dorks*.rs`, `audit_tournament.rs` and `hardware_sources_db.rs` are neither compiled nor called (the crate is also excluded from the cargo workspace, so nothing type-checks them). Honest text in an unreachable file is still not a working feature; either wire it with tests or delete it (TICKET-138, TESTNET_GAP_LEDGER.md).",
+  "`mainnet_ready` stays below 40 by the matrix's own cap on `claim_risk`/`research` rows, not by measurement: this row briefly carried 55 and `feature matrix check` refused it (`X3-CLAIM-002: claim-risk feature must remain below 40 mainnet readiness`). The hygiene work is real and the removed claim is not coming back; the row is a record that a claim was retracted, so it must never read as a mainnet capability. Do not raise it again without dropping `claim_risk`/`launch_scope = \"research\"` in the same change and saying why.",
 ]
 test_evidence = [
   "note: the `claims hygiene` gate runs scripts/ci/check-claims-hygiene.py in the local-ci default set (see scripts/local-ci.sh); it reports `OK - 6016 file(s) scanned, 78 claim surface(s), no unqualified claim` on this tree",
