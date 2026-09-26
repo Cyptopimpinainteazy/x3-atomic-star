@@ -1,0 +1,121 @@
+warning: /home/lojak/Desktop/xxxstar-main/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/xxxstar-main/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/xxxstar-main/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/xxxstar-main/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.24s
+     Running unittests src/lib.rs (target/debug/deps/x3_relayer-e4e48097f77d4265)
+
+running 58 tests
+test evm_receipt_proof::tests::a_legacy_receipt_is_encoded_as_a_bare_rlp_list ... ok
+test quorum::tests::a_malformed_key_is_named_not_trimmed ... ok
+test quorum::tests::a_duplicated_key_is_refused_and_cannot_inflate_the_set ... ok
+test evm_receipt_proof::tests::the_adapters_proof_satisfies_every_check_the_engine_makes ... ok
+test evm_receipt_proof::tests::a_receipt_wider_than_the_engine_accepts_is_an_error_not_a_truncation ... ok
+test quorum::tests::an_empty_set_still_requires_one_signature ... ok
+test quorum::tests::a_wrong_length_key_is_named ... ok
+test evm_receipt_proof::tests::a_typed_receipt_is_prefixed_with_its_type_byte ... ok
+test quorum::tests::accepts_an_optional_0x_prefix ... ok
+test quorum::tests::distinct_signers_ignores_unauthorized_and_repeated_keys ... ok
+test quorum::tests::the_quorum_is_the_supermajority_of_the_set_size ... ok
+test relayer::tests::safety_pipeline_accepts_evm_happy_path ... ok
+test relayer::tests::test_concurrency_semaphore_initialization ... ok
+test relayer::tests::safety_pipeline_rejects_unknown_domain_finality ... ok
+test relayer::tests::test_proof_deduplication_cache ... ok
+test relayer::tests::test_metrics_finality_tracking ... ok
+test relayer::tests::test_relay_state_uptime_tracking ... ok
+test relayer::tests::safety_pipeline_default_fails_closed_on_svm_proof_even_with_a_real_signature ... ok
+test relayer::tests::test_finality_state_tracking ... ok
+test relayer::tests::test_relayer_initialization ... ok
+test relayer::tests::test_relayer_state_transitions ... ok
+test submitter::tests::test_acquire_evm_proof ... ok
+test submitter::tests::test_exponential_backoff_calculation ... ok
+test submitter::tests::test_acquire_svm_proof ... ok
+test submitter::tests::test_submission_config_retries ... ok
+test watchers::evm::tests::test_hex_to_array32_empty ... ok
+test watchers::evm::tests::test_hex_to_array32_invalid_chars ... ok
+test watchers::evm::tests::test_hex_to_array32_invalid_too_long ... ok
+test watchers::evm::tests::test_hex_to_array32_invalid_too_short ... ok
+test watchers::evm::tests::test_hex_to_array32_valid ... ok
+test watchers::evm::tests::test_hex_to_array32_without_prefix ... ok
+test watchers::evm::tests::test_retry_rpc_call_fails_after_all_retries ... ok
+test watchers::evm::tests::test_retry_rpc_call_succeeds_on_first_try ... ok
+test watchers::svm::tests::test_base58_all_ones_is_zeros ... ok
+test watchers::svm::tests::test_base58_decode_empty ... ok
+test watchers::svm::tests::test_base58_decode_genesis ... ok
+test watchers::svm::tests::test_base58_decode_invalid_chars ... ok
+test watchers::svm::tests::test_base58_decode_known_hash ... ok
+test watchers::svm::tests::test_retry_logic_sync ... ok
+test watchers::svm::tests::test_blockhash_conversion_roundtrip ... ok
+test submitter::tests::test_signing_key_derived_from_seed ... ok
+test relayer::tests::safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied ... ok
+test relayer::tests::safety_pipeline_rejects_repeated_svm_signer ... ok
+test relayer::tests::safety_pipeline_refuses_a_proof_that_carries_fewer_signatures_than_policy ... ok
+test relayer::tests::safety_pipeline_rejects_svm_quorum_gap ... ok
+test relayer::tests::relayer_svm_payload_verifies_through_the_real_verifier ... ok
+test relayer::tests::safety_pipeline_refuses_a_claim_above_the_signatures_it_carries ... ok
+test relayer::tests::safety_pipeline_accepts_a_three_of_three_proof ... ok
+test submitter::tests::test_submitting_without_a_runtime_signer_is_refused ... ok
+test submitter::tests::test_svm_proof_signature_is_real_nonzero ... ok
+test submitter::tests::acquire_svm_proof_refuses_when_its_key_is_not_authorized ... ok
+test submitter::tests::acquire_svm_proof_refuses_with_no_validator_set ... ok
+test submitter::tests::acquire_svm_proof_refuses_a_set_it_cannot_back ... ok
+test submitter::tests::test_acquired_svm_proof_passes_quorum_check ... ok
+test submitter::tests::test_custody_authority_reported_when_configured ... ok
+test evm_receipt_proof::tests::a_transaction_the_chain_does_not_know_has_no_proof ... ok
+test evm_receipt_proof::tests::a_typed_receipt_is_encoded_with_its_type_byte ... ok
+test evm_receipt_proof::tests::a_receipt_proves_inclusion_in_its_blocks_trie ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+
+     Running unittests src/main.rs (target/debug/deps/x3_relayer-45d556b590443d7d)
+
+running 5 tests
+test tests::test_config_env_var_expansion ... ok
+test tests::test_event_topic_computes_keccak ... ok
+test tests::test_parse_withdrawal_released_log ... ok
+test tests::test_parse_deposit_log_roundtrip ... ok
+test tests::signed_deposit_relay_envelope_contains_verifier_lock_proof ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running unittests src/lib.rs (target/debug/deps/x3_validator_attestation-50c603318dc285bc)
+
+running 15 tests
+test tests::supermajority_is_monotonic_in_the_set_size ... ok
+test tests::supermajority_is_strictly_more_than_two_thirds ... ok
+test tests::supermajority_never_admits_an_empty_set ... ok
+test tests::rejects_tampered_statement_hash ... ok
+test tests::rejects_short_signature ... ok
+test tests::rejects_empty_signature ... ok
+test tests::rejects_zero_public_key ... ok
+test tests::with_authorized_validators_rejects_a_self_generated_key ... ok
+test tests::accepts_valid_signature_and_counts_weight ... ok
+test tests::rejects_duplicate_validator ... ok
+test tests::duplicate_validator_does_not_double_count_weight ... ok
+test tests::rejects_forged_signature ... ok
+test tests::with_authorized_validators_accepts_a_listed_key ... ok
+test tests::computes_weight_and_quorum_correctly ... ok
+test tests::has_supermajority_counts_distinct_validators_from_the_single_rule ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests x3_relayer
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests x3_validator_attestation
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

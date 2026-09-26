@@ -1,0 +1,46 @@
+warning: /home/lojak/Desktop/xxxstar-main/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/xxxstar-main/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/xxxstar-main/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/xxxstar-main/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+    Blocking waiting for file lock on build directory
+   Compiling x3-relayer v0.1.0 (/home/lojak/Desktop/xxxstar-main/crates/x3-relayer)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.25s
+     Running unittests src/lib.rs (target/debug/deps/x3_relayer-e4e48097f77d4265)
+
+running 9 tests
+test relayer::tests::safety_pipeline_accepts_evm_happy_path ... ok
+test relayer::tests::safety_pipeline_rejects_unknown_domain_finality ... ok
+test relayer::tests::safety_pipeline_default_fails_closed_on_svm_proof_even_with_a_real_signature ... ok
+test relayer::tests::safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied ... FAILED
+test relayer::tests::safety_pipeline_rejects_svm_quorum_gap ... ok
+test relayer::tests::safety_pipeline_refuses_a_proof_that_carries_fewer_signatures_than_policy ... ok
+test relayer::tests::safety_pipeline_rejects_repeated_svm_signer ... ok
+test relayer::tests::safety_pipeline_refuses_a_claim_above_the_signatures_it_carries ... ok
+test relayer::tests::safety_pipeline_accepts_a_three_of_three_proof ... ok
+
+failures:
+
+---- relayer::tests::safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied stdout ----
+
+thread 'relayer::tests::safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied' panicked at crates/x3-relayer/src/relayer.rs:1380:14:
+one of three authorized validators is not a supermajority: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    relayer::tests::safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p x3-relayer --lib`
