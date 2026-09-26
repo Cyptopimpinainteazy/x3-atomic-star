@@ -30,7 +30,8 @@ pub mod pallet {
     use sp_runtime::traits::{Hash, SaturatedConversion};
     use sp_std::vec::Vec;
     use x3_wallet::{
-        AddressBook, BiometricProfile, GuardianAccount, HardwareWallet, MultisigWallet,
+        biometric_unlock::BiometricManager, social_recovery::SocialRecoveryManager, AddressBook,
+        BiometricProfile, GuardianAccount, HardwareWallet, MultisigWallet, RecoveryRequest,
         TransactionApproval, UnlockSession,
     };
 
@@ -97,6 +98,16 @@ pub mod pallet {
     #[pallet::storage]
     pub type Minters<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
 
+    /// A pending or executed social-recovery request, per account.
+    ///
+    /// `initiate_recovery` used to take a caller-supplied `new_owner` and *only emit an event* —
+    /// no guardians, no quorum, no delay, no state change (measured 2026-09-26; the event read
+    /// like a completed hand-over). The request now lives here and is only produced through
+    /// `SocialRecoveryManager`, which requires an active guardian set and a delay.
+    #[pallet::storage]
+    pub type RecoveryRequests<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, RecoveryRequest, OptionQuery>;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -113,7 +124,34 @@ pub mod pallet {
         /// Social recovery initiated
         RecoveryInitiated {
             account: T::AccountId,
+            request_id: [u8; 32],
             new_owner: [u8; 32],
+            executable_block: u64,
+        },
+        /// A guardian set was registered for an account
+        RecoveryGuardiansRegistered {
+            account: T::AccountId,
+            guardians: u32,
+            required: u32,
+            delay_blocks: u64,
+        },
+        /// A guardian approved a pending recovery
+        RecoveryApproved {
+            account: T::AccountId,
+            guardian: [u8; 32],
+            approvals: u32,
+            required: u32,
+        },
+        /// A recovery completed: the account's recovery owner changed
+        RecoveryExecuted {
+            account: T::AccountId,
+            previous_owner: [u8; 32],
+            new_owner: [u8; 32],
+        },
+        /// The recovery owner cancelled a pending request
+        RecoveryCancelled {
+            account: T::AccountId,
+            request_id: [u8; 32],
         },
         /// Transaction approval requested
         ApprovalRequested { account: T::AccountId, amount: u128 },
@@ -145,6 +183,32 @@ pub mod pallet {
         TooManyWallets,
         /// Recovery not approved
         RecoveryNotApproved,
+        /// Biometric type is not one this chain accepts (0=fingerprint, 1=face, 2=iris)
+        InvalidBiometricType,
+        /// The biometric template hash is empty
+        EmptyTemplateHash,
+        /// The PIN hash is empty, so the profile would have no fallback
+        EmptyPinHash,
+        /// The biometric profile was refused for a reason without its own variant
+        InvalidBiometricProfile,
+        /// The guardian set is empty, too large, or the threshold cannot be met
+        InvalidGuardianSet,
+        /// This account already has a registered guardian set
+        RecoveryAccountExists,
+        /// The caller is not a guardian of this account
+        NotGuardian,
+        /// The caller does not own this account's recovery record
+        NotRecoveryOwner,
+        /// A recovery request is already pending for this account
+        RecoveryAlreadyPending,
+        /// No recovery request exists for this account
+        NoRecoveryRequest,
+        /// The request has not reached its threshold, or its delay has not elapsed
+        RecoveryNotReady,
+        /// This guardian has already approved this request
+        DuplicateGuardianApproval,
+        /// The account's guardian set is marked inactive
+        RecoveryInactive,
     }
 
     #[pallet::call]
@@ -258,6 +322,13 @@ pub mod pallet {
         }
 
         /// Register biometric profile
+        ///
+        /// The profile is built by `BiometricManager::create_profile`, not by hand. Measured
+        /// 2026-09-26: this extrinsic used to store whatever it was given — `biometric_type` of any
+        /// value, an all-zero template hash, an all-zero PIN hash — and hardcoded
+        /// `owner: [0u8; 32]`, so the stored profile did not name the account that registered it.
+        /// The checks existed in `crates/x3-wallet` the whole time; the pallet just did not call
+        /// them.
         #[pallet::call_index(3)]
         #[pallet::weight(8_000)]
         pub fn register_biometric(
@@ -267,20 +338,24 @@ pub mod pallet {
             pin_hash: [u8; 32],
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
+            let now = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
 
-            let profile = BiometricProfile {
-                id: T::Hashing::hash_of(&template_hash).encode()[..32]
-                    .try_into()
-                    .unwrap_or([0u8; 32]),
-                owner: [0u8; 32],
+            let profile = BiometricManager::create_profile(
+                Self::account_bytes(&who),
                 biometric_type,
                 template_hash,
                 pin_hash,
-                is_enabled: true,
-                attempts_remaining: 5,
-                locked_until_block: 0,
-                created_block: frame_system::Pallet::<T>::block_number().saturated_into::<u64>(),
-            };
+                now,
+            )
+            .map_err(|reason| match reason {
+                "Invalid biometric type" => Error::<T>::InvalidBiometricType,
+                "Invalid template hash" => Error::<T>::EmptyTemplateHash,
+                "PIN hash required" => Error::<T>::EmptyPinHash,
+                // Anything this pallet has not been taught to name is still refused, and the
+                // mapping test below pins the messages above so a library rename cannot silently
+                // turn a specific refusal into the generic one.
+                _ => Error::<T>::InvalidBiometricProfile,
+            })?;
 
             BiometricProfiles::<T>::insert(who.clone(), profile);
             Self::deposit_event(Event::BiometricProfileCreated { account: who });
@@ -288,18 +363,226 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Initiate recovery with guardians
+        /// Register the guardians that may recover this account.
+        ///
+        /// Owner-only. The set is built by `SocialRecoveryManager::create_recovery_account`, which
+        /// is where the "at least one guardian, a threshold the set can meet, at most 30 guardians"
+        /// rules live; the pallet previously had no path that created a `GuardianAccount` at all,
+        /// which is why its recovery tests had to insert one into storage by hand.
+        #[pallet::call_index(8)]
+        #[pallet::weight(15_000)]
+        pub fn register_recovery_guardians(
+            origin: OriginFor<T>,
+            guardians: Vec<[u8; 32]>,
+            required_guardians: u32,
+            recovery_delay_blocks: u64,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                !RecoveryAccounts::<T>::contains_key(&who),
+                Error::<T>::RecoveryAccountExists
+            );
+
+            let account = SocialRecoveryManager::create_recovery_account(
+                Self::account_bytes(&who),
+                guardians,
+                required_guardians,
+                recovery_delay_blocks,
+            )
+            .map_err(|_| Error::<T>::InvalidGuardianSet)?;
+
+            let guardian_count = account.guardians.len() as u32;
+            RecoveryAccounts::<T>::insert(
+                who.clone(),
+                GuardianAccount {
+                    // The library derives its id from the owner's first 16 bytes; keeping the
+                    // record's own `owner` field authoritative is what makes the finalize below
+                    // observable.
+                    owner: account.owner,
+                    ..account
+                },
+            );
+
+            Self::deposit_event(Event::RecoveryGuardiansRegistered {
+                account: who,
+                guardians: guardian_count,
+                required: required_guardians,
+                delay_blocks: recovery_delay_blocks,
+            });
+
+            Ok(())
+        }
+
+        /// A guardian starts recovery of `account_id`.
+        ///
+        /// Guardian-only, and a request is only created from an active guardian set (the library
+        /// refuses an inactive one, a `new_owner` equal to the current owner, and a set the
+        /// threshold cannot satisfy). The request carries the delay: nothing changes ownership
+        /// until `finalize_recovery`, after the threshold is met *and* the delay has passed.
+        ///
+        /// `account_id` is named explicitly because the caller is a *guardian*: keying the request
+        /// off the caller (which is what the first version of this change did) looks up the wrong
+        /// record. The original extrinsic took no account at all, which is part of why it could
+        /// only ever announce a `new_owner` for whoever called it.
         #[pallet::call_index(4)]
         #[pallet::weight(12_000)]
-        pub fn initiate_recovery(origin: OriginFor<T>, new_owner: [u8; 32]) -> DispatchResult {
+        pub fn initiate_recovery(
+            origin: OriginFor<T>,
+            account_id: T::AccountId,
+            new_owner: [u8; 32],
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
+            let caller = Self::account_bytes(&who);
 
-            let recovery = RecoveryAccounts::<T>::get(who.clone());
-            ensure!(recovery.is_some(), Error::<T>::WalletNotFound);
+            let account =
+                RecoveryAccounts::<T>::get(account_id.clone()).ok_or(Error::<T>::WalletNotFound)?;
+            ensure!(account.guardians.contains(&caller), Error::<T>::NotGuardian);
+            ensure!(
+                !RecoveryRequests::<T>::contains_key(&account_id),
+                Error::<T>::RecoveryAlreadyPending
+            );
 
+            let now = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+            let request = SocialRecoveryManager::initiate_recovery(&account, new_owner, now)
+                .map_err(|_| Error::<T>::RecoveryNotReady)?;
+
+            RecoveryRequests::<T>::insert(account_id.clone(), request.clone());
             Self::deposit_event(Event::RecoveryInitiated {
-                account: who,
+                account: account_id,
+                request_id: request.id,
                 new_owner,
+                executable_block: request.executable_block,
+            });
+
+            Ok(())
+        }
+
+        /// A guardian approves the pending recovery request for an account.
+        ///
+        /// The library refuses a duplicate approval, an inactive set, and a request that is no
+        /// longer pending, so an approval cannot be counted twice.
+        #[pallet::call_index(9)]
+        #[pallet::weight(10_000)]
+        pub fn approve_recovery(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let guardian = Self::account_bytes(&who);
+
+            let guardians =
+                RecoveryAccounts::<T>::get(account.clone()).ok_or(Error::<T>::WalletNotFound)?;
+            ensure!(
+                guardians.guardians.contains(&guardian),
+                Error::<T>::NotGuardian
+            );
+
+            let mut request =
+                RecoveryRequests::<T>::get(account.clone()).ok_or(Error::<T>::NoRecoveryRequest)?;
+            let now = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+
+            SocialRecoveryManager::guardian_approve_recovery(
+                &guardians,
+                &mut request,
+                guardian,
+                [0u8; 32],
+                now,
+            )
+            .map_err(|reason| match reason {
+                "Not an authorized guardian" => Error::<T>::NotGuardian,
+                "Guardian already approved" => Error::<T>::DuplicateGuardianApproval,
+                "Account not active" => Error::<T>::RecoveryInactive,
+                // "Recovery not pending" and anything unnamed: there is nothing to approve.
+                _ => Error::<T>::NoRecoveryRequest,
+            })?;
+
+            let approvals = request.approvals.len() as u32;
+            RecoveryRequests::<T>::insert(account.clone(), request);
+            Self::deposit_event(Event::RecoveryApproved {
+                account,
+                guardian,
+                approvals,
+                required: guardians.required_guardians,
+            });
+
+            Ok(())
+        }
+
+        /// Finalize a recovery once its threshold is met and its delay has elapsed.
+        ///
+        /// This is the only place the account's recovery owner changes. Both conditions are checked
+        /// before any write — the library's `is_recovery_approved` and `can_execute_recovery` — and
+        /// the request is marked executed so it cannot be finalized twice.
+        #[pallet::call_index(10)]
+        #[pallet::weight(12_000)]
+        pub fn finalize_recovery(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let caller = Self::account_bytes(&who);
+
+            let mut guardians =
+                RecoveryAccounts::<T>::get(account.clone()).ok_or(Error::<T>::WalletNotFound)?;
+            ensure!(
+                guardians.guardians.contains(&caller),
+                Error::<T>::NotGuardian
+            );
+
+            let mut request =
+                RecoveryRequests::<T>::get(account.clone()).ok_or(Error::<T>::NoRecoveryRequest)?;
+            let now = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
+
+            ensure!(
+                SocialRecoveryManager::is_recovery_approved(&guardians, &request),
+                Error::<T>::RecoveryNotApproved
+            );
+            ensure!(
+                SocialRecoveryManager::can_execute_recovery(&request, now)
+                    .map_err(|_| Error::<T>::RecoveryNotApproved)?,
+                Error::<T>::RecoveryNotReady
+            );
+
+            // Captured before the execution moves the owner, so the event reports the change
+            // rather than repeating the new owner in both fields (measured: the first version of
+            // this reported `previous_owner == new_owner`).
+            let previous_owner = guardians.owner;
+            SocialRecoveryManager::execute_recovery(&mut guardians, &mut request, now)
+                .map_err(|_| Error::<T>::RecoveryNotReady)?;
+
+            // The one write that makes this a recovery and not an announcement.
+            RecoveryAccounts::<T>::insert(
+                account.clone(),
+                GuardianAccount {
+                    owner: request.new_owner,
+                    ..guardians
+                },
+            );
+            RecoveryRequests::<T>::insert(account.clone(), request.clone());
+
+            Self::deposit_event(Event::RecoveryExecuted {
+                account,
+                previous_owner,
+                new_owner: request.new_owner,
+            });
+
+            Ok(())
+        }
+
+        /// The account's recovery owner cancels a pending request.
+        #[pallet::call_index(11)]
+        #[pallet::weight(8_000)]
+        pub fn cancel_recovery(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let caller = Self::account_bytes(&who);
+
+            let guardians =
+                RecoveryAccounts::<T>::get(account.clone()).ok_or(Error::<T>::WalletNotFound)?;
+            ensure!(caller == guardians.owner, Error::<T>::NotRecoveryOwner);
+
+            let mut request =
+                RecoveryRequests::<T>::get(account.clone()).ok_or(Error::<T>::NoRecoveryRequest)?;
+            SocialRecoveryManager::cancel_recovery(&mut request, caller, guardians.owner)
+                .map_err(|_| Error::<T>::NoRecoveryRequest)?;
+
+            RecoveryRequests::<T>::remove(&account);
+            Self::deposit_event(Event::RecoveryCancelled {
+                account,
+                request_id: request.id,
             });
 
             Ok(())
@@ -399,6 +682,24 @@ pub mod pallet {
         /// Get recovery account
         pub fn get_recovery_account(account: &T::AccountId) -> Option<GuardianAccount> {
             RecoveryAccounts::<T>::get(account)
+        }
+
+        /// This pallet's 32-byte identity for an account, used by the `x3-wallet` managers, whose
+        /// types carry `[u8; 32]` addresses rather than `T::AccountId`.
+        ///
+        /// Same convention as `create_multisig_wallet` (the encoded account, truncated to 32
+        /// bytes) so a guardian id and a wallet id mean the same thing on this chain.
+        pub fn account_bytes(account: &T::AccountId) -> [u8; 32] {
+            let mut out = [0u8; 32];
+            let encoded = account.encode();
+            let copy_len = encoded.len().min(32);
+            out[..copy_len].copy_from_slice(&encoded[..copy_len]);
+            out
+        }
+
+        /// The pending recovery request for an account, if any.
+        pub fn get_recovery_request(account: &T::AccountId) -> Option<RecoveryRequest> {
+            RecoveryRequests::<T>::get(account)
         }
     }
 }

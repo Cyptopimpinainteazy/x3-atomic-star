@@ -321,13 +321,24 @@ required_tests = [
   "mint_tokens_authorized_only",
   "add_remove_minter_root_only",
   "register_biometric_works",
-  "initiate_recovery_works"
+  # `initiate_recovery_works` was replaced on 2026-09-26. It called `initiate_recovery` as the
+  # account being recovered, against a `GuardianAccount` the test inserted straight into storage
+  # (nothing in the pallet ever wrote one), and asserted only that an event was emitted — the
+  # extrinsic changed no state. The two names below are the replacement: the owner is refused,
+  # and a guardian-driven request runs to an actual owner change. Coverage went up, not sideways.
+  "the_account_owner_cannot_initiate_recovery",
+  "recovery_runs_from_guardian_request_to_owner_change",
+  "register_recovery_guardians_applies_the_library_rules",
+  "register_biometric_refuses_an_unsupported_type",
+  "register_biometric_refuses_an_empty_template_hash",
+  "register_biometric_refuses_an_empty_pin_hash",
 ]
 # `reports/wallet_pallet_report.md` does not exist; citation cleared.
 proof_report = ""
 readiness_score = 55
 blockers = [
-  "Biometric template and recovery logic have no security review"
+  "Biometric template and recovery logic have no security review",
+  "Measured 2026-09-26: the pallet's biometric registration validated nothing and its recovery extrinsic changed nothing. Both now delegate to the `x3-wallet` library's managers (`BiometricManager::create_profile`, `SocialRecoveryManager`), which is where the type/template/PIN rules and the guardian/quorum/delay model live. Still open on those paths: nothing consumes the biometric attempt counter, the recovery owner is a 32-byte address rather than a `T::AccountId` binding, and a pending request never expires"
 ]
 dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
 

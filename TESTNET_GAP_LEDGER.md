@@ -1051,8 +1051,8 @@ ingress, has a threshold of committee members decrypt it under the DKG epoch the
 executes it and checks the receipt — with the ordering lane deciding the order inside that same
 path, or an explicit record of which link is still missing and why. A unit test cannot satisfy this;
 the path is the point.
-**TICKET-145 — the production rollback dropped pre-window writes, and the journal has no writer.
-CLOSED (the first half) and OPEN (the second), 2026-09-26.**
+**TICKET-145 — the production rollback dropped pre-window writes, and the journal had no writer.
+CLOSED (both halves, 2026-09-26).**
 
 `X3-MEV-004` ("Transactional host rollback", P0, 50/25/30) cites `x3-lang/compiler`, but the chain
 does not run that compiler: `pallet-x3-kernel` executes X3BC through `crates/x3-vm`, and that is
@@ -1082,14 +1082,95 @@ window abandons only its own writes. Four tests, and the control is measured: re
 `test_rollback_of_the_outer_window_abandons_a_committed_inner_window` fail; truncating returns the
 storage suite to 15/15. `cargo test -p x3-vm` is 154 passed.
 
-**Still open:** the journal cannot be populated from a program. `crates/x3-vm/src/vm.rs` touches
-`self.storage` only through `snapshot`/`commit`/`rollback` — no instruction writes a key.
-`EvmSstore`/`EvmSload` are in the ISA and the verifier (operands `slot:u8 val:u8`, 5000 gas) but hit
-the interpreter's `_` arm and return `UnimplementedOpcode`. So X3VM contracts cannot persist state
-at all today, which also means the atomic rollback over storage is proven only at the unit level.
-Acceptance: interpret a store opcode (or give a hostcall a storage write) with gas charged, then an
-end-to-end test that a rolled-back window leaves the store as it was *and* the applied delta without
-it. A second, related gap: `TradingHost::begin_transaction`/`commit_transaction`/
-`rollback_transaction` (`x3-lang/vm/src/trading.rs`) have no caller outside that crate's tests, and
-the language VM's `ATOMIC_ROLLBACK` restores VM state without invoking any host hook — safe only
-under an unwritten contract that hosts never apply effects during execution.
+**Second half, closed 2026-09-26:** the journal could not be populated from a program.
+`crates/x3-vm/src/vm.rs` touched `self.storage` only through `snapshot`/`commit`/`rollback` — no
+instruction wrote a key. `EvmSstore`/`EvmSload` were in the ISA
+(`x3-backend/src/opcode.rs`, 0xB4/0xB3), emitted by the backend
+(`emit_evm_sstore`/`emit_evm_sload`), decoded and priced by the verifier (200/5000 gas), and priced
+by the interpreter's own table — and both hit the interpreter's `_` arm and returned
+`UnimplementedOpcode`, so a deployed X3VM program could not carry one value between calls and the
+atomic rollback over storage was provable only at the storage unit level.
+
+Both opcodes are now interpreted (`crates/x3-vm/src/vm.rs`):
+
+* slots live in their own keyspace, disjoint from globals (`evm_slot_key`); a global index is read as
+  a `u32`, so no global can address a slot key, and `evm_load_of_an_unwritten_slot_reads_zero`
+  depends on that disjointness;
+* slot payloads carry a tag and a length (`value_to_storage_value`'s untagged layout cannot tell
+  `Bytes([1, 2])` from `Bytes([1, 2, 0])`, or either from `I64(197_121)`), so a store/load round trip
+  is exact for every `Value` kind;
+* a store refuses by name rather than writing something else: a negative or non-integer slot, a
+  payload over 30 bytes (the old helper silently truncated at 32), and `Unit`;
+* a load fails closed on a payload this ISA did not write (unknown tag, or a length that disagrees
+  with the fixed-width kind);
+* the interpreter charges the verifier's figures (200/5000), and a store lands in the journal — the
+  delta `drain_storage_journal` documents — while a store inside a reverted atomic window does not.
+
+Measured: `cargo test -p x3-vm` is 165 passed, 0 failed (154 before); clippy `-D warnings` and
+`cargo fmt --check` are clean. The control is measured: guarding both arms off (`if false`, so they
+fall through to the `_` arm as before) reddens 10 of the 11 new tests with
+`UnimplementedOpcode(180)`; restored, `cargo test -p x3-vm --lib evm_` is 15 passed.
+
+Still open, and now its own ticket (TICKET-147): the writes do not reach chain state. Also still
+open from this ticket: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction`
+(`x3-lang/vm/src/trading.rs`) have no caller outside that crate's tests, and the language VM's
+`ATOMIC_ROLLBACK` restores VM state without invoking any host hook — safe only under an unwritten
+contract that hosts never apply effects during execution.
+
+## TICKET-147 — X3VM contract storage has no channel into chain state — 2026-09-26
+
+Found while closing TICKET-145. A program can now write a slot, but nothing carries the write out of
+the VM:
+
+* `crates/x3-integration/src/executor.rs` builds the receipt with `state_changes: vec![]` and the
+  comment "Hostcall state change collection deferred to runtime integration";
+* `crates/x3-vm/src/vm.rs::drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests,
+  so the documented cross-VM delta is never applied;
+* the receipt's `state_changes` channel is *balance-shaped*, not storage-shaped:
+  `pallet-x3-kernel`'s `apply_canonical_ledger_update_v2` decodes every entry as (address -> account,
+  key -> asset id, value -> balance) and counts anything else in `DecodeFailureCount`. Routing slot
+  writes through it would increment a monitoring counter and persist nothing, so the fix is not
+  "fill the field in".
+
+Acceptance: a typed X3VM-storage channel (its own receipt field or its own pallet storage map, with
+a versioned encoding), `X3VmAdapter` mapping the drained journal into it, a `DecodeFailureCount`
+that stays at zero for a storage-writing comit, and a test that a slot written by a program is
+readable back after the receipt is stored — plus the same for a reverted window (nothing applied).
+Until then, `X3-MEV-004`'s `mainnet_ready` stays at 40 with this as the reason.
+
+**TICKET-146 — wallet registration accepted anything, and recovery was an announcement. CLOSED
+2026-09-26.** Both rows are `P0`/`core`, and both blockers ("biometric template handling
+unaudited", "recovery logic security review pending") turned out to understate what was there.
+
+*Biometric (`X3-ECO-001`).* `register_biometric` built the profile by hand: any `biometric_type`,
+an all-zero template hash, an all-zero PIN hash, and `owner: [0u8; 32]`, so the stored record did
+not name the account that registered it. `crates/x3-wallet`'s `BiometricManager::create_profile`
+had rejected the first three the whole time and the pallet already depended on that crate. It now
+calls the library and maps the refusals onto `InvalidBiometricType` / `EmptyTemplateHash` /
+`EmptyPinHash`, with `InvalidBiometricProfile` for anything unnamed. Delegation is measured, not
+asserted: deleting the library's `template_hash == [0u8; 32]` check makes the pallet's
+`register_biometric_refuses_an_empty_template_hash` fail.
+
+*Recovery (`X3-ECO-004`).* `initiate_recovery(origin, new_owner)` needed only that
+`RecoveryAccounts[caller]` existed, then emitted `RecoveryInitiated { account, new_owner }` — no
+guardian check, no quorum, no delay, no state change. And nothing in the pallet ever wrote
+`RecoveryAccounts`, so the `ensure!(recovery.is_some())` could never pass on a real chain; the
+pallet's own test made it pass by inserting the record into storage directly. Recovery is now the
+library's model, wired: `register_recovery_guardians` (owner-only, validated by
+`SocialRecoveryManager::create_recovery_account`) → `initiate_recovery(account_id, new_owner)` by
+a guardian (with a delay) → `approve_recovery` per guardian, duplicates refused → `finalize_recovery`
+only once the threshold is met *and* the delay elapsed, which is the one place the stored recovery
+owner changes → `cancel_recovery` by the recovery owner.
+
+Two controls were measured on the recovery path: with the library's delay check *and* the pallet's
+`ensure!` removed, an early finalize succeeds and the test fails; and the first version of the fix
+reported `previous_owner == new_owner` in the executed event (the test caught it) until the event
+captured the owner before the move. `cargo test -p pallet-x3-wallet` is 23 passed, up from 13, and
+`cargo check -p x3-chain-runtime` compiles the pallet into all four runtime variants.
+
+Still open, and recorded on the rows rather than hidden: nothing consumes the biometric
+`attempts_remaining` / `locked_until_block` (no verify-unlock extrinsic exists, so the lockout is
+stored and never spent, and a re-registration resets it); the recovery owner is a `[u8; 32]`
+address in the recovery record, so what is recovered is the right to manage a guardian set — no
+`T::AccountId`, balance or `HardwareWallets` entry follows it; a pending request never expires and
+only the recovery owner can cancel it; and neither path has had an independent security review.

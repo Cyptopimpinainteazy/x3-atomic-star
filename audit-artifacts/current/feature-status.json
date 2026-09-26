@@ -1818,19 +1818,22 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 44,
+      "composite": 55,
       "confidence": "high",
       "evidence": [
         "pallets/x3-wallet-pallet",
-        "note: Registry explicitly flags biometric security review"
+        "crates/x3-wallet/src/biometric_unlock.rs",
+        "note: Registry explicitly flags biometric security review; the pallet now delegates to the library's validator instead of re-implementing it"
       ],
       "id": "X3-ECO-001",
-      "implemented": 60,
+      "implemented": 70,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 30,
+      "mainnet_ready": 35,
       "missing_work": [
-        "Biometric template handling unaudited"
+        "Re-measured 2026-09-26: the pallet's `register_biometric` validated nothing and did not call the library that does. It built the `BiometricProfile` by hand \u2014 any `biometric_type`, an all-zero template hash, an all-zero PIN hash \u2014 and hardcoded `owner: [0u8; 32]`, so the stored profile did not name the account that registered it. `crates/x3-wallet`'s `BiometricManager::create_profile` had rejected all three of those the whole time. The extrinsic now calls it and maps its refusals onto named pallet errors (`InvalidBiometricType`, `EmptyTemplateHash`, `EmptyPinHash`, with `InvalidBiometricProfile` as the unnamed fallback), and the stored profile carries the signer's 32-byte address. Measured load-bearing: disabling the library's template check makes `register_biometric_refuses_an_empty_template_hash` fail, which is the delegation proof.",
+        "Still unexercised: nothing consumes `attempts_remaining` or `locked_until_block`. There is no verify-unlock extrinsic in this pallet, so the lockout counters are stored and never spent, and a re-registration resets them. A lockout that nothing updates is not a lockout.",
+        "No independent security review of the template handling, and no decision recorded about whether a template hash belongs on chain at all (the profile's `attempts_remaining`/`locked_until_block` design assumes a verifier that does not exist here)."
       ],
       "name": "Biometric wallet registration",
       "paths": [
@@ -1841,8 +1844,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
-      "tested": 45,
-      "tests": "7 named tests in FEATURE_REGISTRY"
+      "tested": 65,
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -1911,19 +1914,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 51,
+      "composite": 58,
       "confidence": "high",
       "evidence": [
         "pallets/x3-wallet-pallet",
-        "note: Registry required initiate_recovery_works"
+        "crates/x3-wallet/src/social_recovery.rs",
+        "note: Registry required initiate_recovery_works; that test is replaced by a real lifecycle (see the blockers)"
       ],
       "id": "X3-ECO-004",
-      "implemented": 65,
+      "implemented": 75,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 40,
+      "mainnet_ready": 35,
       "missing_work": [
-        "Recovery logic security review pending"
+        "Re-measured 2026-09-26: recovery was an announcement, not a flow. `initiate_recovery(origin, new_owner)` required only that `RecoveryAccounts[caller]` existed, then emitted `RecoveryInitiated { account, new_owner }` \u2014 no guardian check, no quorum, no delay, and no state change. Worse, nothing in the pallet ever *wrote* `RecoveryAccounts`, so the only registered extrinsic could never pass (`WalletNotFound` on every chain), and its own test seeded the record by inserting into storage directly.",
+        "Closed with the library's own model (`crates/x3-wallet/social_recovery.rs`, unused before this change): `register_recovery_guardians` (owner-only; the set is built by `SocialRecoveryManager::create_recovery_account`, so the 1-to-30 guardian and threshold rules apply) \u2192 `initiate_recovery(account_id, new_owner)` by a *guardian* (the account is named explicitly; keying it off the caller looks up the wrong record) recording a delayed request \u2192 `approve_recovery` by guardians with a duplicate approval refused \u2192 `finalize_recovery` only when the threshold is met *and* the delay has elapsed, which is the single place the stored recovery owner changes \u2192 `cancel_recovery` by the recovery owner. Every refusal has a named test, and two controls were measured: disabling the library's delay check plus the pallet's own `ensure!` lets an early finalize through, and an earlier version of the fix reported `previous_owner == new_owner` in the executed event until the event captured the owner before the move.",
+        "What the owner change is *not*: the recovery owner is a `[u8; 32]` address in the recovery record. It is the authority for future guardian operations, but no `T::AccountId` binding, balance, or `HardwareWallets` entry follows it, so 'recovery' currently recovers the right to manage a guardian set rather than control of an account. Closing that needs a decision about what an account's owner means on this chain.",
+        "Still open: no security review, no expiry for an abandoned request (a pending request blocks a new one until the owner cancels), no guardian-initiated cancel, and no test that a request survives a runtime upgrade."
       ],
       "name": "Wallet recovery flow",
       "paths": [
@@ -1934,8 +1941,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
-      "tested": 50,
-      "tests": "7 named tests in FEATURE_REGISTRY"
+      "tested": 70,
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -1964,7 +1971,7 @@
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
       "tested": 65,
-      "tests": "7 named tests in FEATURE_REGISTRY"
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -1993,7 +2000,7 @@
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
       "tested": 65,
-      "tests": "7 named tests in FEATURE_REGISTRY"
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -3166,36 +3173,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 42,
+      "composite": 57,
       "confidence": "high",
       "evidence": [
         "crates/x3-vm/src/storage.rs",
+        "crates/x3-vm/src/vm.rs",
         "x3-lang/vm/src/trading.rs",
-        "note: Trading Core v1 hardening item; the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs and the rollback semantics are now proven at the storage level"
+        "note: Re-measured 2026-09-26 (round 5) - the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs; `evm_sstore`/`evm_sload` are interpreted over a slot keyspace disjoint from the global keyspace (`evm_slot_keys_are_disjoint_from_global_keys`), priced at the verifier's own figures (200/5000), and the rollback is now proven through the opcode path and at the storage level"
       ],
       "id": "X3-MEV-004",
-      "implemented": 55,
+      "implemented": 70,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 40,
       "missing_work": [
-        "Re-measured 2026-09-26 on the *production* path (`crates/x3-vm`, which is what `pallet-x3-kernel` runs through `X3VmAdapter` \u2014 the row's own path, `x3-lang/compiler`, is not what the chain executes). The atomic window's rollback was not transactional: `VmStorage::rollback` restored the data map from its snapshot and then called `journal.clear()`, so every write recorded *before* the window was dropped from the journal too. Measured: write A, snapshot, write B, rollback -> `data = {A}` but an empty journal, and the journal is documented as the write delta for cross-VM sync. Fixed: the snapshot now records the journal length and rollback truncates to it, so a reverted window abandons only its own writes. Four tests, one break-it-first control (restoring `journal.clear()` reddens three of them).",
-        "The journal still has no writer, so nothing on a chain exercises the guarantee. `crates/x3-vm/src/vm.rs` mutates `self.storage` only through `snapshot`/`commit`/`rollback`; there is no instruction in the interpreter that writes a key. `EvmSstore`/`EvmSload` exist in the ISA and the verifier (operands `slot:u8 val:u8`, 5000 gas) but hit the interpreter's `_` arm and return `UnimplementedOpcode`. Until a store is interpreted (or a hostcall writes storage), X3VM contracts cannot persist state at all, and the atomic rollback over storage can only be proven at the unit level (TICKET-145).",
-        "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution \u2014 a contract that is stated in the trait's docs and enforced nowhere."
+        "Storage is now reachable and journaled, but the writes still do not land in chain state. `evm_sstore`/`evm_sload` (0xB4/0xB3) execute in the interpreter as of this measurement, so a contract can carry a value between calls and an atomic window's rollback abandons only the window's writes - but `X3Executor::execute` (`crates/x3-integration/src/executor.rs`) returns `state_changes: vec![]` with the comment \"Hostcall state change collection deferred to runtime integration\", and `drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests. A slot a program writes is therefore durable within one VM instance and invisible to everyone else (TICKET-147).",
+        "The receipt's `state_changes` channel cannot carry contract storage as it stands. `pallet-x3-kernel`'s `apply_canonical_ledger_update_v2` decodes every entry as (address -> account, key -> asset id, value -> balance) and counts anything else in `DecodeFailureCount`, so routing slot writes through it would inflate a monitoring counter rather than persist a byte (TICKET-147). X3VM contract storage needs its own typed channel before it can be claimed on chain.",
+        "The guarantee is proven at the VM level only. No node or validator network has executed a store, and the rollback is exercised by unit tests in `crates/x3-vm` rather than by a live chain, so this is not yet mainnet evidence.",
+        "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution - a contract that is stated in the trait's docs and enforced nowhere."
       ],
       "name": "Transactional host rollback",
       "paths": [
         "x3-lang/compiler",
         "x3-lang/vm",
-        "crates/x3-vm/src/storage.rs"
+        "crates/x3-vm/src/storage.rs",
+        "crates/x3-vm/src/vm.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 45,
-      "tests": "tested score 45% (no named test list on this row)"
+      "tested": 65,
+      "tests": "tested score 65% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3514,7 +3524,7 @@
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
       "tested": 62,
-      "tests": "7 named tests in FEATURE_REGISTRY"
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -4494,19 +4504,19 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "3442c00172b31da6b0cf83b078a4af866166aa6f038bc3016f4eb2f971c13385",
+    "source_digest": "2093dde3b3e7ab1123b8b4990c1d8935ee72b127bdc3be791b464371226f20d0",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
-      "FEATURE_REGISTRY.toml": "bf8543a812b2ef7355f399e4ae35269f4696dd3508d4a07daf00f678f52d5b7b",
+      "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
       "feature-matrix/agents-experimental.toml": "0ab28599c7db3de8bff25a16083a2036b3ce1e5ae405944a0bba2ab8a102b82a",
       "feature-matrix/claims-hygiene.toml": "03b541230c64713f1ec9a2e8f3a8a8ec488488831896c7073b5feabcf390a252",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
-      "feature-matrix/economic-defi.toml": "d113b7fe3d4217a992b91cbfcb56187eb2e215d5e26c5add68080caed6ffe080",
+      "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "972ae7bcc545d9065140faaa3812f75cda1f535e413000dab8b607e6a4b0f6ed",
+      "feature-matrix/mev-privacy.toml": "5fa496e5288b0aea38a3c2b0955494c3b801f15341ea83642cff41a31fbf84cd",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -4873,7 +4883,8 @@
     },
     {
       "blockers": [
-        "Biometric template and recovery logic have no security review"
+        "Biometric template and recovery logic have no security review",
+        "Measured 2026-09-26: the pallet's biometric registration validated nothing and its recovery extrinsic changed nothing. Both now delegate to the `x3-wallet` library's managers (`BiometricManager::create_profile`, `SocialRecoveryManager`), which is where the type/template/PIN rules and the guardian/quorum/delay model live. Still open on those paths: nothing consumes the biometric attempt counter, the recovery owner is a 32-byte address rather than a `T::AccountId` binding, and a pending request never expires"
       ],
       "crate_or_service": "pallets/x3-wallet-pallet",
       "feature": "x3_wallet_pallet",
@@ -4887,7 +4898,12 @@
         "mint_tokens_authorized_only",
         "add_remove_minter_root_only",
         "register_biometric_works",
-        "initiate_recovery_works"
+        "the_account_owner_cannot_initiate_recovery",
+        "recovery_runs_from_guardian_request_to_owner_change",
+        "register_recovery_guardians_applies_the_library_rules",
+        "register_biometric_refuses_an_unsupported_type",
+        "register_biometric_refuses_an_empty_template_hash",
+        "register_biometric_refuses_an_empty_pin_hash"
       ]
     },
     {

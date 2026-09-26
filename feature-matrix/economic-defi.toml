@@ -6,15 +6,30 @@ name = "Biometric wallet registration"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-wallet-pallet"]
-implemented = 60
-tested = 45
-mainnet_ready = 30
+implemented = 70
+tested = 65
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Biometric template handling unaudited"]
-evidence = ["pallets/x3-wallet-pallet", "note: Registry explicitly flags biometric security review"]
+blockers = [
+  "Re-measured 2026-09-26: the pallet's `register_biometric` validated nothing and did not call the library that does. It built the `BiometricProfile` by hand — any `biometric_type`, an all-zero template hash, an all-zero PIN hash — and hardcoded `owner: [0u8; 32]`, so the stored profile did not name the account that registered it. `crates/x3-wallet`'s `BiometricManager::create_profile` had rejected all three of those the whole time. The extrinsic now calls it and maps its refusals onto named pallet errors (`InvalidBiometricType`, `EmptyTemplateHash`, `EmptyPinHash`, with `InvalidBiometricProfile` as the unnamed fallback), and the stored profile carries the signer's 32-byte address. Measured load-bearing: disabling the library's template check makes `register_biometric_refuses_an_empty_template_hash` fail, which is the delegation proof.",
+  "Still unexercised: nothing consumes `attempts_remaining` or `locked_until_block`. There is no verify-unlock extrinsic in this pallet, so the lockout counters are stored and never spent, and a re-registration resets them. A lockout that nothing updates is not a lockout.",
+  "No independent security review of the template handling, and no decision recorded about whether a template hash belongs on chain at all (the profile's `attempts_remaining`/`locked_until_block` design assumes a verifier that does not exist here).",
+]
+test_evidence = [
+  "pallets/x3-wallet-pallet/src/tests.rs",
+  "note: cargo test -p pallet-x3-wallet -> 23 passed, 0 failed; cargo clippy -p pallet-x3-wallet --all-targets -- -D warnings and cargo fmt -p pallet-x3-wallet -- --check are clean; cargo check -p x3-chain-runtime compiles the pallet into all runtime variants",
+  "note: measured load-bearing - removing the `template_hash == [0u8; 32]` check from crates/x3-wallet's `BiometricManager::create_profile` makes `register_biometric_refuses_an_empty_template_hash` FAIL in the pallet's suite, proving the pallet refuses because the library refuses",
+]
+required_tests = [
+  "register_biometric_works",
+  "register_biometric_refuses_an_unsupported_type",
+  "register_biometric_refuses_an_empty_template_hash",
+  "register_biometric_refuses_an_empty_pin_hash",
+]
+evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/biometric_unlock.rs", "note: Registry explicitly flags biometric security review; the pallet now delegates to the library's validator instead of re-implementing it"]
 registry_feature = "x3_wallet_pallet"
 
 [[feature]]
@@ -80,15 +95,32 @@ name = "Wallet recovery flow"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-wallet-pallet"]
-implemented = 65
-tested = 50
-mainnet_ready = 40
+implemented = 75
+tested = 70
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Recovery logic security review pending"]
-evidence = ["pallets/x3-wallet-pallet", "note: Registry required initiate_recovery_works"]
+blockers = [
+  "Re-measured 2026-09-26: recovery was an announcement, not a flow. `initiate_recovery(origin, new_owner)` required only that `RecoveryAccounts[caller]` existed, then emitted `RecoveryInitiated { account, new_owner }` — no guardian check, no quorum, no delay, and no state change. Worse, nothing in the pallet ever *wrote* `RecoveryAccounts`, so the only registered extrinsic could never pass (`WalletNotFound` on every chain), and its own test seeded the record by inserting into storage directly.",
+  "Closed with the library's own model (`crates/x3-wallet/social_recovery.rs`, unused before this change): `register_recovery_guardians` (owner-only; the set is built by `SocialRecoveryManager::create_recovery_account`, so the 1-to-30 guardian and threshold rules apply) → `initiate_recovery(account_id, new_owner)` by a *guardian* (the account is named explicitly; keying it off the caller looks up the wrong record) recording a delayed request → `approve_recovery` by guardians with a duplicate approval refused → `finalize_recovery` only when the threshold is met *and* the delay has elapsed, which is the single place the stored recovery owner changes → `cancel_recovery` by the recovery owner. Every refusal has a named test, and two controls were measured: disabling the library's delay check plus the pallet's own `ensure!` lets an early finalize through, and an earlier version of the fix reported `previous_owner == new_owner` in the executed event until the event captured the owner before the move.",
+  "What the owner change is *not*: the recovery owner is a `[u8; 32]` address in the recovery record. It is the authority for future guardian operations, but no `T::AccountId` binding, balance, or `HardwareWallets` entry follows it, so 'recovery' currently recovers the right to manage a guardian set rather than control of an account. Closing that needs a decision about what an account's owner means on this chain.",
+  "Still open: no security review, no expiry for an abandoned request (a pending request blocks a new one until the owner cancels), no guardian-initiated cancel, and no test that a request survives a runtime upgrade.",
+]
+test_evidence = [
+  "pallets/x3-wallet-pallet/src/tests.rs",
+  "note: cargo test -p pallet-x3-wallet -> 23 passed, 0 failed (was 13 before this change); the lifecycle test walks request -> threshold -> delay -> owner change and asserts the stored state at each step, not just the events",
+  "note: measurement that replaced the old test - `initiate_recovery_works` called `initiate_recovery` as the account being recovered, against a storage-seeded guardian record, and asserted only that an event was emitted. It is replaced by `the_account_owner_cannot_initiate_recovery` (the owner is refused) plus `recovery_runs_from_guardian_request_to_owner_change` (a completed, state-changing lifecycle), so coverage went up rather than sideways",
+]
+required_tests = [
+  "register_recovery_guardians_applies_the_library_rules",
+  "the_account_owner_cannot_initiate_recovery",
+  "recovery_runs_from_guardian_request_to_owner_change",
+  "the_owner_can_cancel_a_pending_recovery",
+  "initiate_recovery_fails_without_guardian",
+]
+evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/social_recovery.rs", "note: Registry required initiate_recovery_works; that test is replaced by a real lifecycle (see the blockers)"]
 registry_feature = "x3_wallet_pallet"
 
 [[feature]]
