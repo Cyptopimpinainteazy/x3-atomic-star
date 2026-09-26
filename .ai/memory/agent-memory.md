@@ -8476,3 +8476,39 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   before starting. The next scanner-shaped item, if the compiler stack is busy, is TICKET-140
   (`apps/**` surfaces) or TICKET-141 (`Now live on testnet` on the public pages) — both in
   TESTNET_GAP_LEDGER.md, both non-runtime.
+- **UPDATE (xxxstar-main-2d, 2026-09-26 17:45):** PR **#518** (`fix/x3lang-finish`, 8 commits) is open; production-gate
+  dispatched (run 36260073848). Live evidence on this branch: `x3vm_live_lifecycle` 7/7, `x3lang_network_receipt` (local3)
+  1/1, identical receipts from all three validators at 103:0xb97e8718…. **Runtime-affecting:** re-attest the wasm hash
+  record after merge. Measured `x3_execute` = 573.7 µs + 22.95 ns/gas in wasm; `DefaultX3GasLimit` 6,000,000 → 1,000,000
+  (the old value was 137 ms of a 150 ms block while charged 60 µs). RFC t5-6 amended by owner decision: unsuffixed integer
+  literals take their context's integer type (both compilers). New fuzz crate `crates/x3-integration/fuzz` (cargo fuzz on
+  `nightly-2026-05-01`). Env gotcha: an out-of-tree `CARGO_TARGET_DIR` needs `WASM_BUILD_WORKSPACE_HINT=<checkout>` or the
+  runtime's wasm build re-resolves without the lockfile and dies on an unpatched `crypto-common`.
+- **ROUND 4 — MEV/privacy depth (primary/coordinator, 2026-09-26 18:25).** Three workstreams, four agents, and every
+  agent again received no task text: `.ai/tasks/2026-09-26-round4-workstreams.md` did the dispatch and the agents
+  self-assigned. The roster names did **not** match the lanes — `round4_mev002` took B (`X3-MEV-008`), `round4_mev008`
+  took C (`X3-MEV-002`), and `round4_mev007` holds A (`X3-MEV-007`), still running with `crates/private-mempool/src/*`
+  untouched at 18:25. Resolve ownership by reading the tree and the reports, never by the agent name.
+  Landed and verified by re-running, not by taking a report: `c85dba7f1` (x3-lang: a private-submission demand lowers
+  into the same `ModeCheck` the strategy path emits, and the IR verifier refuses the policy without it; break-it-first
+  shows the example program running to `Ok(())` on a config whose private-submission flag is false) and `e2879257c`
+  (`crates/x3-swap-router/src/mev_protection/fair_ordering.rs`, new: window-bounded commit-reveal ordering, 26 tests,
+  4 mutate-test-restore controls, no consumer for the crate at all). Matrix applied as `97226e578`: **X3-MEV-002**
+  45/20/25 → 55/40/25 and **X3-MEV-008** 15/5/5 → 45/40/10, both `source = "master"`, both rows now carrying
+  `required_tests` + `test_evidence`; audit counters NOT INTEGRATED 8→6, PARTIAL 63→64, STUB 8→9.
+- **Four gate traps that cost time in this family — do not re-derive.** (1) `cargo tree -i <crate>` fails on this tree
+  because the root manifest is a virtual workspace (`error: package ID specification ... did not match any packages`);
+  use `cargo tree -i <crate> --workspace`. (2) `feature_matrix.py` reads every `evidence`/`test_evidence` string as a
+  repo path unless it starts with `note:`/`commit:`/`pr:`/`registry:`/`workflow:`/`claim:`/`http(s)://` — free text must
+  carry the prefix. (3) `check-matrix-test-evidence.py` counts any lower-case identifier with two or more underscores in
+  a `test_evidence` note as a citation that must resolve, so a bare `allow_private_submission` fails the gate; name the
+  concept, not the field. (4) `check-matrix-tests-exist.py` resolves `required_tests` under `paths` only (it ignores
+  `test_paths`), so a row citing VM tests has to list the VM path.
+- **Dead end, recorded so it is not re-run:** the dirty `reports/rc6/*` (verdict FAIL) and `reports/panic_unwrap_audit.md`
+  in the tree are the 2026-09-24 raw outputs of `scripts/mainnet/rc6_public_testnet_readiness.sh` and the panic audit at
+  `4b74f025b`, and that RC6 result is already recorded in `audit-artifacts/prelaunch-cutover/4b74f025b/baseline.md`
+  (FAIL = `X3_TESTNET_AUTHORITIES` unset, a config/deployment blocker). It is not a new regression. Do not "fix" it by
+  weakening the spec's env gate, and do not commit the stale raw outputs over the pinned record.
+- **Next seed:** apply A's delta for `X3-MEV-007` when it reports (the reachability wording is already measured:
+  `private-mempool` ← `confidential-gpu` as *library* code, and nothing in `runtime/` or `node/` depends on
+  `confidential-gpu`), then work TICKET-142, the tautological `x3-dex` fair-ordering test.
