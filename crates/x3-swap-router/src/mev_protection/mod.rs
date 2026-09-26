@@ -7,9 +7,16 @@
 //! - Transaction reordering
 //! - Miner extractable value (MEV)
 
+pub mod fair_ordering;
+
 use serde::{Deserialize, Serialize};
 use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
+
+pub use fair_ordering::{
+    commitment_hash, order_key, CommitRevealLane, Commitment, FairOrderError, OrderedTransaction,
+    OrderingWindow, Reveal, WindowSettlement, COMMITMENT_DOMAIN, MAX_PLAINTEXT_BYTES,
+};
 
 /// MEV Protection strategies
 #[derive(Debug, Clone, Serialize, Deserialize)]
