@@ -85,6 +85,32 @@ impl Compiler {
             })
             .position(|function| function.name.name == "main");
 
+        // The runtime executes function 0 with no arguments, and this pipeline puts `main` there.
+        // A program with no `main` compiled to a module the chain refuses (`FunctionNotFound`, found
+        // by the `compile_and_run` fuzz target on the empty program), and a `main` with parameters
+        // to one it refuses too (the entry would run on registers no caller wrote). Both are the
+        // program's error, so they are reported here, against the source.
+        let Some(entry) = entry_function_index else {
+            return Err(CompilerError::TypeCheck(
+                "a program must declare `fn main()`: it is the function the chain executes".into(),
+            ));
+        };
+        let main_params = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                x3_ast::Item::Function(function) => Some(function),
+                _ => None,
+            })
+            .nth(entry)
+            .map(|function| function.params.len())
+            .unwrap_or(0);
+        if main_params != 0 {
+            return Err(CompilerError::TypeCheck(format!(
+                "`main` takes {main_params} parameter(s), but the chain calls it with none"
+            )));
+        }
+
         // Phase 2: Lower AST to HIR
         if options.verbose {
             eprintln!("  [2/5] Lowering to HIR...");
@@ -326,6 +352,10 @@ mod tests {
             fn add(a: i64, b: i64) -> i64 {
                 return a + b;
             }
+
+            fn main() -> i64 {
+                return add(1, 2);
+            }
         "#;
 
         let options = CompilationOptions::opt2()
@@ -350,6 +380,10 @@ mod tests {
                 let a = x * 2;
                 let b = a + 10;
                 return b;
+            }
+
+            fn main() -> i64 {
+                return compute(4);
             }
         "#;
 
@@ -378,6 +412,10 @@ mod tests {
         let source = r#"
             fn compute(a: i64, b: i64) -> i64 {
                 return a + b;
+            }
+
+            fn main() -> i64 {
+                return compute(2, 3);
             }
         "#;
 

@@ -1668,7 +1668,13 @@ pub mod pallet {
         // declared here rather than absorbed silently: an undeclared storage write is exactly the
         // under-count that lets a block be built past its own limit.
         #[pallet::weight(
-            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(T::DbWeight::get().writes(1))
+            <T as Config>::WeightInfo::submit_comit_v2()
+                .saturating_add(T::DbWeight::get().writes(1))
+                .saturating_add(if x3_payload.is_empty() {
+                    Weight::zero()
+                } else {
+                    Pallet::<T>::x3_execution_weight()
+                })
         )]
         pub fn submit_comit_v2(
             origin: OriginFor<T>,
@@ -1950,7 +1956,18 @@ pub mod pallet {
 
         /// Submit a cross-VM bridge operation for atomic execution (prepare + commit).
         #[pallet::call_index(10)]
-        #[pallet::weight(<T as Config>::WeightInfo::submit_comit_v2())]
+        #[pallet::weight(
+            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(
+                if matches!(
+                    operation,
+                    CrossVmOperation::CallX3Vm { .. } | CrossVmOperation::AtomicTriSwap { .. }
+                ) {
+                    Pallet::<T>::x3_execution_weight()
+                } else {
+                    Weight::zero()
+                }
+            )
+        )]
         pub fn submit_cross_vm_operation(
             origin: OriginFor<T>,
             operation: CrossVmOperation,
@@ -1983,8 +2000,14 @@ pub mod pallet {
         }
 
         /// Commit a previously prepared cross-VM operation.
+        ///
+        /// The prepared operation is not visible to the weight, so an X3 call's worst case is always
+        /// paid for.
         #[pallet::call_index(12)]
-        #[pallet::weight(<T as Config>::WeightInfo::submit_comit_v2())]
+        #[pallet::weight(
+            <T as Config>::WeightInfo::submit_comit_v2()
+                .saturating_add(Pallet::<T>::x3_execution_weight())
+        )]
         pub fn commit_cross_vm_operation(origin: OriginFor<T>, comit_id: H256) -> DispatchResult {
             let who = ensure_signed(origin)?;
             // SEC-009: Emergency pause guard
@@ -2455,6 +2478,15 @@ pub mod pallet {
                 CrossChainProof::LockProof(bytes) => H256::from(blake2_256(bytes)),
                 CrossChainProof::MerkleReceipt(bytes) => H256::from(blake2_256(bytes)),
             }
+        }
+
+        /// The weight of running an X3 program for the most gas one extrinsic may give it
+        /// (`DefaultX3GasLimit`). Every extrinsic that executes X3 charges this: it used to charge
+        /// nothing for the execution, while the measured cost of the old 6,000,000-gas limit was
+        /// 137 ms against a 150 ms block.
+        pub fn x3_execution_weight() -> Weight {
+            let gas = T::DefaultX3GasLimit::get().min(u32::MAX as u64) as u32;
+            <T as Config>::WeightInfo::x3_execute(gas)
         }
 
         fn estimate_cross_vm_fee(

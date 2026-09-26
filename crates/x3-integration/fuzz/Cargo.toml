@@ -1,0 +1,31 @@
+[package]
+name = "x3-integration-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license.workspace = true
+description = "Fuzz targets for the X3 language path: compiler, X3BC readers, and both X3 engines"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+x3-x3-integration = { path = "..", features = ["std", "compile"] }
+x3-compiler = { path = "../../x3-compiler" }
+x3-backend = { path = "../../x3-backend" }
+x3-vm = { path = "../../x3-vm" }
+
+[[bin]]
+name = "x3bc_engines"
+path = "fuzz_targets/x3bc_engines.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "compile_and_run"
+path = "fuzz_targets/compile_and_run.rs"
+test = false
+doc = false
+bench = false

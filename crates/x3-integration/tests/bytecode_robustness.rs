@@ -283,3 +283,36 @@ fn the_two_readers_agree_about_re_sealed_body_mutations() {
             .join("\n")
     );
 }
+
+/// Found by the `x3bc_engines` fuzz target: x3-backend unpacked the version fields eight bits at a
+/// time, so a version of `0x4301_0000` (a high byte the format does not have) read as 1.0.0 there
+/// and was refused by the runtime's reader, and a `min_version` with a high byte set passed the
+/// std loader's gate. Both readers now apply `x3-common`'s gate to the full `u32`.
+#[test]
+fn a_version_field_with_a_high_byte_is_refused_by_both_readers() {
+    let crash: &[u8] = &[
+        0x58, 0x33, 0x42, 0x43, 0x00, 0x00, 0x01, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x5b, 0x00, 0x00, 0x42, 0x29, 0x36, 0xff, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00,
+    ];
+    let (mini, backend, _) = verdicts(crash);
+    assert_eq!(
+        mini, backend,
+        "the two readers must agree on the fuzzer's input"
+    );
+
+    for (name, offset) in [
+        ("version", VERSION_OFFSET),
+        ("min_version", MIN_VERSION_OFFSET),
+    ] {
+        let mut bytes = module_with_integer_const();
+        bytes[offset + 3] = 0x43; // the high byte of the little-endian u32
+        reseal(&mut bytes);
+        let (mini, backend, _) = verdicts(&bytes);
+        assert!(
+            !mini && !backend,
+            "{name} with a high byte: mini={mini} backend={backend}"
+        );
+    }
+}

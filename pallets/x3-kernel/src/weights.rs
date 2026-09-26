@@ -38,6 +38,7 @@ pub trait WeightInfo {
     fn remove_authority() -> Weight;
     fn schedule_authority_change() -> Weight;
     fn enact_authority_change() -> Weight;
+    fn x3_execute(g: u32) -> Weight;
 }
 
 /// Weights for `pallet_x3_kernel` using the Substrate node and recommended hardware.
@@ -185,6 +186,19 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(1_u64))
             .saturating_add(T::DbWeight::get().writes(2_u64))
     }
+
+    /// Running an X3 program for `g` gas on the chain's engine. Measured 2026-09-26 with
+    /// `x3-chain-node benchmark pallet --pallet pallet_x3_kernel --extrinsic x3_execute --steps 10
+    /// --repeat 5` in the wasm executor: 573.7 µs + 22.95 ns per gas (6,000,000 gas: 137.4 ms).
+    fn x3_execute(g: u32) -> Weight {
+        // Proof Size summary in bytes:
+        //  Measured:  `0`
+        //  Estimated: `0`
+        // Minimum execution time: 33_780_000 picoseconds.
+        Weight::from_parts(573_703_649, 0)
+            // Standard Error: 108
+            .saturating_add(Weight::from_parts(22_950, 0).saturating_mul(g.into()))
+    }
 }
 
 // For testing and non-benchmarked builds
@@ -227,5 +241,18 @@ impl WeightInfo for () {
 
     fn enact_authority_change() -> Weight {
         Weight::from_parts(18_000_000, 64_000)
+    }
+
+    /// Running an X3 program for `g` gas on the chain's engine. Measured 2026-09-26 with
+    /// `x3-chain-node benchmark pallet --pallet pallet_x3_kernel --extrinsic x3_execute --steps 10
+    /// --repeat 5` in the wasm executor: 573.7 µs + 22.95 ns per gas (6,000,000 gas: 137.4 ms).
+    fn x3_execute(g: u32) -> Weight {
+        // Proof Size summary in bytes:
+        //  Measured:  `0`
+        //  Estimated: `0`
+        // Minimum execution time: 33_780_000 picoseconds.
+        Weight::from_parts(573_703_649, 0)
+            // Standard Error: 108
+            .saturating_add(Weight::from_parts(22_950, 0).saturating_mul(g.into()))
     }
 }

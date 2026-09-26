@@ -584,6 +584,22 @@ const ILL_FORMED: &[(&str, &str)] = &[
         "assignment_changes_type",
         "fn main() -> i64 {\n    let mut x = 1;\n    x = true;\n    return 1;\n}\n",
     ),
+    // Found by the `compile_and_run` fuzz target: the empty program compiled to a module the
+    // chain refuses.
+    ("empty_program", ""),
+    // Also from `compile_and_run`: `^` compiled to a call to a "builtin" no engine implements.
+    (
+        "power_operator",
+        "fn main() -> i64 {\n    let x = 2;\n    return x ^ 3;\n}\n",
+    ),
+    (
+        "no_main",
+        "fn helper() -> i64 {\n    return 1;\n}\n",
+    ),
+    (
+        "main_with_parameters",
+        "fn main(x: i64) -> i64 {\n    return x;\n}\n",
+    ),
     (
         "main_returns_the_wrong_type",
         "fn main() -> i64 {\n    return true;\n}\n",
