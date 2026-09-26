@@ -473,6 +473,15 @@ const BOND: u128 = 1_000;
 /// Turn private execution on and register the confidential quorum the window
 /// guards require. Mirrors `setup_quorum` for the ordering tests.
 fn enable_with_quorum() {
+    // The ordering lane has its own switch. It used to share the confidential path's guards
+    // (`Enabled` + a confidential-validator quorum), which made it unreachable on any chain
+    // running this runtime: the runtime's `AttestationVerifier = RefuseAllAttestations`, so no
+    // confidential validator can register and the quorum is never met.
+    assert_ok!(PrivateExecution::set_ordering_windows_enabled(
+        RuntimeOrigin::root(),
+        true,
+    ));
+    // Kept so tests that exercise the confidential path can still see it switched on.
     assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), true));
     for i in 1..=2u64 {
         assert_ok!(PrivateExecution::register_confidential_validator(
@@ -589,23 +598,27 @@ fn an_inverted_or_already_closed_window_is_refused() {
 }
 
 #[test]
-fn opening_and_committing_need_the_same_guards_as_private_submission() {
+fn the_ordering_lane_has_its_own_switch_and_private_execution_keeps_its_guards() {
     new_test_ext().execute_with(|| {
-        // Disabled: both refused.
+        // Nothing is on: a window cannot be opened.
         assert_noop!(
             PrivateExecution::open_ordering_window(RuntimeOrigin::signed(10), OPEN, CLOSE),
-            Error::<Test>::PrivateExecutionDisabled
+            Error::<Test>::OrderingWindowsDisabled
         );
 
-        // Enabled but below quorum: refused with a different name, so the two
-        // guards are distinguishable.
-        assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), true));
-        assert_noop!(
-            PrivateExecution::open_ordering_window(RuntimeOrigin::signed(10), OPEN, CLOSE),
-            Error::<Test>::InsufficientQuorum
+        // Turning the ordering switch on is enough to open a window — without private execution
+        // and without a single confidential validator. That is the point of the split: the lane
+        // orders opaque commitments, and the confidential path is unreachable on this runtime by
+        // policy (`AttestationVerifier = RefuseAllAttestations`).
+        assert_ok!(PrivateExecution::set_ordering_windows_enabled(
+            RuntimeOrigin::root(),
+            true,
+        ));
+        assert!(
+            !PrivateExecution::is_enabled(),
+            "private execution is still off"
         );
-
-        enable_with_quorum();
+        assert_eq!(PrivateExecution::confidential_validator_count(), 0);
         System::set_block_number(OPEN);
         let window_id = PrivateExecution::next_ordering_window_id();
         assert_ok!(PrivateExecution::open_ordering_window(
@@ -613,20 +626,43 @@ fn opening_and_committing_need_the_same_guards_as_private_submission() {
             OPEN,
             CLOSE,
         ));
+        assert_ok!(PrivateExecution::commit_ordering(
+            RuntimeOrigin::signed(11),
+            window_id,
+            hash_for(11, b"payload", &[1u8; 32]),
+            BOND,
+        ));
 
-        // A commit while private execution is off is refused before it can
-        // reserve a bond.
-        assert_ok!(PrivateExecution::set_enabled(RuntimeOrigin::root(), false));
+        // The reverse direction: switching ordering windows off refuses the next commit before it
+        // can reserve a bond, and does not touch private execution's own switch.
+        assert_ok!(PrivateExecution::set_ordering_windows_enabled(
+            RuntimeOrigin::root(),
+            false,
+        ));
+        let reserved_before = Balances::reserved_balance(12);
         assert_noop!(
             PrivateExecution::commit_ordering(
-                RuntimeOrigin::signed(11),
+                RuntimeOrigin::signed(12),
                 window_id,
-                hash_for(11, b"payload", &[1u8; 32]),
+                hash_for(12, b"payload", &[2u8; 32]),
                 BOND,
+            ),
+            Error::<Test>::OrderingWindowsDisabled
+        );
+        assert_eq!(Balances::reserved_balance(12), reserved_before);
+
+        // And private submission is still refused while private execution is off, so the split did
+        // not open the confidential path.
+        assert_noop!(
+            PrivateExecution::submit_private_transaction(
+                RuntimeOrigin::signed(10),
+                H256::repeat_byte(0x01),
+                opaque_payload(),
+                H256::repeat_byte(0x02),
+                1_000u128,
             ),
             Error::<Test>::PrivateExecutionDisabled
         );
-        assert_eq!(Balances::reserved_balance(11), 0);
     });
 }
 

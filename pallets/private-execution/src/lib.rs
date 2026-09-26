@@ -255,6 +255,22 @@ pub mod pallet {
     pub type PrivateTxEpoch<T: Config> =
         StorageMap<_, Blake2_128Concat, sp_core::H256, u64, OptionQuery>;
 
+    /// Whether commit-reveal ordering windows may be opened and committed into.
+    ///
+    /// Off by default, set by the same `AdminOrigin` as the rest of this pallet's switches.
+    ///
+    /// This is deliberately *not* `Enabled` (private execution) or the confidential-validator
+    /// quorum. Those belong to the confidential path, and on this runtime they can never be
+    /// satisfied: `AttestationVerifier = RefuseAllAttestations` in the runtime config refuses every
+    /// report, so no confidential validator can register and the quorum is never met. Gating a
+    /// public commit-reveal lane on them made the whole ordering feature unreachable on a live
+    /// chain — measured 2026-09-26, and the reason a live drill could not exist. The lane orders
+    /// opaque commitments and needs none of the confidential machinery; it gets its own switch,
+    /// and a chain that has not turned it on still refuses to open a window.
+    #[pallet::storage]
+    #[pallet::getter(fn ordering_windows_enabled)]
+    pub type OrderingWindowsEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
+
     /// Total private transactions processed.
     #[pallet::storage]
     #[pallet::getter(fn total_private_txs)]
@@ -381,6 +397,8 @@ pub mod pallet {
         },
         /// Private execution enabled/disabled.
         PrivateExecutionToggled { enabled: bool },
+        /// Commit-reveal ordering windows were enabled or disabled.
+        OrderingWindowsToggled { enabled: bool },
         /// A commit–reveal ordering window was opened.
         OrderingWindowOpened {
             window_id: u64,
@@ -508,6 +526,12 @@ pub mod pallet {
         OrderingBondNotReserved,
         /// The unrevealed bond could not be removed in full.
         OrderingBondNotForfeitable,
+        /// Ordering windows are not enabled on this chain.
+        ///
+        /// Set by `set_ordering_windows_enabled` (AdminOrigin). Distinct from
+        /// `PrivateExecutionDisabled` on purpose: the two features are switched separately, and a
+        /// chain can order commitments without offering a confidential execution path.
+        OrderingWindowsDisabled,
         /// The submitted payload is not a well-formed encrypted transaction.
         ///
         /// Before this existed the pallet stored whatever bytes it was handed — no shape, no
@@ -906,6 +930,22 @@ pub mod pallet {
             Enabled::<T>::put(enabled);
 
             Self::deposit_event(Event::PrivateExecutionToggled { enabled });
+            Ok(())
+        }
+
+        /// Enable or disable commit-reveal ordering windows (admin only).
+        ///
+        /// Separate from `set_enabled` on purpose: ordering windows are a public mechanism over
+        /// opaque commitments and do not need a confidential execution path. On this runtime the
+        /// confidential path is unreachable anyway (`AttestationVerifier = RefuseAllAttestations`),
+        /// so tying the two together left the ordering lane with no live entry point at all.
+        #[pallet::call_index(12)]
+        #[pallet::weight(T::DbWeight::get().writes(1))]
+        pub fn set_ordering_windows_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)?;
+            OrderingWindowsEnabled::<T>::put(enabled);
+
+            Self::deposit_event(Event::OrderingWindowsToggled { enabled });
             Ok(())
         }
 
@@ -1351,10 +1391,9 @@ pub mod pallet {
         /// gate *opening* a window and *committing* to one. They deliberately do
         /// not gate revealing or settling — see `reveal_ordering`.
         fn ensure_ordering_accepts_new_commitments() -> DispatchResult {
-            ensure!(Enabled::<T>::get(), Error::<T>::PrivateExecutionDisabled);
             ensure!(
-                ConfidentialValidatorCount::<T>::get() >= T::MinConfidentialQuorum::get(),
-                Error::<T>::InsufficientQuorum
+                OrderingWindowsEnabled::<T>::get(),
+                Error::<T>::OrderingWindowsDisabled
             );
             Ok(())
         }
