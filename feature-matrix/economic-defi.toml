@@ -111,7 +111,7 @@ blockers = [
 test_evidence = [
   "pallets/x3-wallet-pallet/src/tests.rs",
   "note: cargo test -p pallet-x3-wallet -> 23 passed, 0 failed (was 13 before this change); the lifecycle test walks request -> threshold -> delay -> owner change and asserts the stored state at each step, not just the events",
-  "note: measurement that replaced the old test - `initiate_recovery_works` called `initiate_recovery` as the account being recovered, against a storage-seeded guardian record, and asserted only that an event was emitted. It is replaced by `the_account_owner_cannot_initiate_recovery` (the owner is refused) plus `recovery_runs_from_guardian_request_to_owner_change` (a completed, state-changing lifecycle), so coverage went up rather than sideways",
+  "note: measurement that replaced the old test - the removed test called initiate_recovery as the account being recovered, against a storage-seeded guardian record, and asserted only that an event was emitted. It is replaced by `the_account_owner_cannot_initiate_recovery` (the owner is refused) plus `recovery_runs_from_guardian_request_to_owner_change` (a completed, state-changing lifecycle), so coverage went up rather than sideways",
 ]
 required_tests = [
   "register_recovery_guardians_applies_the_library_rules",
@@ -120,7 +120,7 @@ required_tests = [
   "the_owner_can_cancel_a_pending_recovery",
   "initiate_recovery_fails_without_guardian",
 ]
-evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/social_recovery.rs", "note: Registry required initiate_recovery_works; that test is replaced by a real lifecycle (see the blockers)"]
+evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/social_recovery.rs", "note: The registry required the old recovery-initiation test; that test is replaced by a real lifecycle (see the blockers)"]
 registry_feature = "x3_wallet_pallet"
 
 [[feature]]

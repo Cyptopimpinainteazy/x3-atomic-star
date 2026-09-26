@@ -1919,7 +1919,7 @@
       "evidence": [
         "pallets/x3-wallet-pallet",
         "crates/x3-wallet/src/social_recovery.rs",
-        "note: Registry required initiate_recovery_works; that test is replaced by a real lifecycle (see the blockers)"
+        "note: The registry required the old recovery-initiation test; that test is replaced by a real lifecycle (see the blockers)"
       ],
       "id": "X3-ECO-004",
       "implemented": 75,
@@ -4528,7 +4528,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "69ec49c66d4d63eb43f5d3d3135f4fac44f84edb75eb3717c5271b9d0c359224",
+    "source_digest": "5e7efd0d330f01691422fdbb290bb629962f55526ca32b0bc25423dba7b6904d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4537,7 +4537,7 @@
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
-      "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
+      "feature-matrix/economic-defi.toml": "cc1c338421dcaa20356e9496e581f0b07923a61e014f75ae326667fc6f290b3d",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
       "feature-matrix/language-trading.toml": "5fbcecc0cdc8edec6122c24c4fafc8e5258df0a999a21720c693955af124bc3f",
       "feature-matrix/mev-privacy.toml": "dfb9d12c403eeb395e4c152cbb801adaeb4348e91bc6741f486006d7dde04095",
