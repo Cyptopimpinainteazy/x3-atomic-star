@@ -426,10 +426,7 @@ impl HirLowerer {
                     span: loop_stmt.span,
                 }])
             }
-            Statement::For(for_stmt) => {
-                // Desugar for loops
-                self.lower_for_loop(for_stmt, scope).map(|s| vec![s])
-            }
+            Statement::For(for_stmt) => self.lower_for_loop(for_stmt, scope),
             Statement::Break(break_stmt) => {
                 if self.loop_depth == 0 {
                     return Err(HirError::break_outside_loop(break_stmt.span));
@@ -496,21 +493,54 @@ impl HirLowerer {
         }
     }
 
-    /// Lower a for loop by desugaring to while.
+    /// Lower a `for` loop by desugaring it to `while`.
+    ///
+    /// Both forms used to lose part of the loop. The range form built `let i = start` and then
+    /// never emitted it, and appended `i = i + 1` to the end of the body, so a `continue` jumped to
+    /// the condition past the increment and spun until it ran out of gas. The C-style form lowered
+    /// its initializer and discarded the result, and lowered its update with the expression
+    /// lowering, which refuses an assignment. The desugarings below keep every part, and put the
+    /// step where `continue` cannot skip it.
     fn lower_for_loop(
         &mut self,
         for_stmt: &x3_ast::ForStatement,
         scope: &mut ScopeStack,
-    ) -> HirResult<HirStmt> {
+    ) -> HirResult<Vec<HirStmt>> {
+        let span = for_stmt.span;
         match &for_stmt.kind {
+            // for (let i in start..end) { body }
+            //
+            //   let mut <counter> = start;
+            //   let <end> = end;              // evaluated once, as a range is a value
+            //   while <counter> < <end> {
+            //       let i = <counter>;        // a fresh, immutable binding per iteration
+            //       <counter> = <counter> + 1;
+            //       body                      // `continue` re-tests an already-stepped counter
+            //   }
             x3_ast::ForLoopKind::Range { variable, range } => {
-                scope.push_frame();
+                let iter_ty = Type::i64();
+                // The bounds are evaluated in the enclosing scope: `i` is not visible in them.
+                let start = self.lower_expression(&range.start, scope)?;
+                let end = self.lower_expression(&range.end, scope)?;
 
-                // Create iterator variable
-                let iter_ty = Type::i64(); // Range iteration defaults to i64; full inference requires type checker
+                let counter = self.allocate_symbol(
+                    "<for counter>",
+                    SymbolKind::Local { mutable: true },
+                    iter_ty.clone(),
+                    span,
+                );
+                let end_symbol = self.allocate_symbol(
+                    "<for end>",
+                    SymbolKind::Local { mutable: false },
+                    iter_ty.clone(),
+                    span,
+                );
+                let var = |symbol| HirExpr::new(HirExprKind::Var(symbol), iter_ty.clone(), span);
+
+                scope.push_frame();
                 let iter_symbol = self.allocate_symbol(
                     &variable.name,
-                    SymbolKind::Local { mutable: true },
+                    SymbolKind::Local { mutable: false },
                     iter_ty.clone(),
                     variable.span,
                 );
@@ -519,122 +549,167 @@ impl HirLowerer {
                     LocalInfo {
                         symbol: iter_symbol,
                         ty: iter_ty.clone(),
-                        mutable: true,
+                        mutable: false,
                     },
                 );
+                self.loop_depth += 1;
+                let user_body = self.lower_block(&for_stmt.body.statements, scope);
+                self.loop_depth -= 1;
+                scope.pop_frame();
+                let user_body = user_body?;
 
-                // Lower range bounds
-                let start = self.lower_expression(&range.start, scope)?;
-                let end = self.lower_expression(&range.end, scope)?;
-
-                // Create: let i = start
-                let _init = HirStmt::Let {
+                let step = HirExpr::new(
+                    HirExprKind::Binary {
+                        op: x3_ast::BinaryOp::Add,
+                        left: Box::new(var(counter)),
+                        right: Box::new(HirExpr::new(
+                            HirExprKind::Literal(x3_common::Literal::Integer(1)),
+                            iter_ty.clone(),
+                            span,
+                        )),
+                    },
+                    iter_ty.clone(),
+                    span,
+                );
+                let mut body = Vec::with_capacity(user_body.len() + 2);
+                body.push(HirStmt::Let {
                     symbol: iter_symbol,
                     ty: iter_ty.clone(),
-                    value: start,
-                    mutable: true,
+                    value: var(counter),
+                    mutable: false,
                     span: variable.span,
-                };
+                });
+                body.push(HirStmt::Assign {
+                    target: AssignTarget::Variable(counter),
+                    value: step,
+                    span,
+                });
+                body.extend(user_body);
 
-                // Create condition: i < end
-                let iter_access = HirExpr::new(
-                    HirExprKind::Var(iter_symbol),
-                    iter_ty.clone(),
-                    for_stmt.span,
-                );
                 let condition = HirExpr::new(
                     HirExprKind::Binary {
                         op: x3_ast::BinaryOp::Less,
-                        left: Box::new(iter_access.clone()),
-                        right: Box::new(end),
+                        left: Box::new(var(counter)),
+                        right: Box::new(var(end_symbol)),
                     },
                     Type::bool(),
-                    for_stmt.span,
+                    span,
                 );
-
-                // Lower body
-                self.loop_depth += 1;
-                let mut body = self.lower_block(&for_stmt.body.statements, scope)?;
-                self.loop_depth -= 1;
-
-                // Create increment: i = i + 1
-                let one = HirExpr::new(
-                    HirExprKind::Literal(x3_common::Literal::Integer(1)),
-                    iter_ty.clone(),
-                    for_stmt.span,
-                );
-                let inc_expr = HirExpr::new(
-                    HirExprKind::Binary {
-                        op: x3_ast::BinaryOp::Add,
-                        left: Box::new(iter_access),
-                        right: Box::new(one),
+                Ok(vec![
+                    HirStmt::Let {
+                        symbol: counter,
+                        ty: iter_ty.clone(),
+                        value: start,
+                        mutable: true,
+                        span,
                     },
-                    iter_ty,
-                    for_stmt.span,
-                );
-                let increment = HirStmt::Assign {
-                    target: AssignTarget::Variable(iter_symbol),
-                    value: inc_expr,
-                    span: for_stmt.span,
-                };
-                body.push(increment);
-
-                scope.pop_frame();
-
-                Ok(HirStmt::While {
-                    label: None,
-                    condition,
-                    body,
-                    span: for_stmt.span,
-                })
+                    HirStmt::Let {
+                        symbol: end_symbol,
+                        ty: iter_ty.clone(),
+                        value: end,
+                        mutable: false,
+                        span,
+                    },
+                    HirStmt::While {
+                        label: None,
+                        condition,
+                        body,
+                        span,
+                    },
+                ])
             }
+            // for (init; cond; update) { body }
+            //
+            //   init;
+            //   let mut <first> = true;
+            //   while true {
+            //       if <first> { <first> = false; } else { update; }
+            //       if !cond { break; }
+            //       body                      // `continue` returns to the top, which runs update
+            //   }
             x3_ast::ForLoopKind::CStyle {
                 init,
                 condition,
                 update,
             } => {
-                // C-style for loop: for (init; cond; update) { body }
-                // Desugar to: { init; while (cond) { body; update; } }
                 scope.push_frame();
+                let result = (|| -> HirResult<Vec<HirStmt>> {
+                    let mut stmts = Vec::new();
+                    if let Some(init_stmt) = init {
+                        stmts.extend(self.lower_statement(init_stmt, scope)?);
+                    }
+                    let cond = condition
+                        .as_ref()
+                        .map(|c| self.lower_expression(c, scope))
+                        .transpose()?;
+                    let update = update
+                        .as_ref()
+                        .map(|u| self.lower_expression_statement(u, scope))
+                        .transpose()?;
+                    self.loop_depth += 1;
+                    let user_body = self.lower_block(&for_stmt.body.statements, scope);
+                    self.loop_depth -= 1;
+                    let user_body = user_body?;
 
-                // Lower init if present — result is collected but not embedded
-                // into the desugared while-loop (init runs once before the loop).
-                // The lowered statements are intentionally scoped out since the
-                // while desugaring places init before the loop body.
-                if let Some(init_stmt) = init {
-                    let _ = self.lower_statement(init_stmt, scope)?;
-                }
-
-                // Lower condition (default to true if absent)
-                let cond = if let Some(c) = condition {
-                    self.lower_expression(c, scope)?
-                } else {
-                    HirExpr::new(
-                        HirExprKind::Literal(x3_common::Literal::Bool(true)),
-                        Type::bool(),
-                        for_stmt.span,
-                    )
-                };
-
-                // Lower body
-                self.loop_depth += 1;
-                let mut body = self.lower_block(&for_stmt.body.statements, scope)?;
-                self.loop_depth -= 1;
-
-                // Add update if present
-                if let Some(upd) = update {
-                    let upd_expr = self.lower_expression(upd, scope)?;
-                    body.push(HirStmt::Expr(upd_expr));
-                }
-
+                    let bool_lit = |value| {
+                        HirExpr::new(
+                            HirExprKind::Literal(x3_common::Literal::Bool(value)),
+                            Type::bool(),
+                            span,
+                        )
+                    };
+                    let mut body = Vec::new();
+                    if let Some(update) = update {
+                        let first = self.allocate_symbol(
+                            "<for first>",
+                            SymbolKind::Local { mutable: true },
+                            Type::bool(),
+                            span,
+                        );
+                        stmts.push(HirStmt::Let {
+                            symbol: first,
+                            ty: Type::bool(),
+                            value: bool_lit(true),
+                            mutable: true,
+                            span,
+                        });
+                        body.push(HirStmt::If {
+                            condition: HirExpr::new(HirExprKind::Var(first), Type::bool(), span),
+                            then_block: vec![HirStmt::Assign {
+                                target: AssignTarget::Variable(first),
+                                value: bool_lit(false),
+                                span,
+                            }],
+                            else_block: vec![update],
+                            span,
+                        });
+                    }
+                    if let Some(cond) = cond {
+                        body.push(HirStmt::If {
+                            condition: HirExpr::new(
+                                HirExprKind::Unary {
+                                    op: x3_ast::UnaryOp::Not,
+                                    operand: Box::new(cond),
+                                },
+                                Type::bool(),
+                                span,
+                            ),
+                            then_block: vec![HirStmt::Break { label: None, span }],
+                            else_block: vec![],
+                            span,
+                        });
+                    }
+                    body.extend(user_body);
+                    stmts.push(HirStmt::While {
+                        label: None,
+                        condition: bool_lit(true),
+                        body,
+                        span,
+                    });
+                    Ok(stmts)
+                })();
                 scope.pop_frame();
-
-                Ok(HirStmt::While {
-                    label: None,
-                    condition: cond,
-                    body,
-                    span: for_stmt.span,
-                })
+                result
             }
         }
     }

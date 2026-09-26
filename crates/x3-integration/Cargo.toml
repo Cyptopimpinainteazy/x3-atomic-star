@@ -39,6 +39,9 @@ log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.10"
+# The differential tests run each optimizer pass on its own against the unoptimized program.
+x3-opt = { path = "../x3-opt" }
+x3-mir = { path = "../x3-mir" }
 x3-evm-integration = { path = "../evm-integration", default-features = false, features = ["std", "test-utils"] }
 x3-svm-integration = { path = "../svm-integration", default-features = false, features = ["std", "test-utils"] }
 

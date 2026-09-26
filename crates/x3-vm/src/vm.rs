@@ -812,7 +812,10 @@ impl VM {
                 if vb == 0 {
                     return Err(self.error_at(ip, VMErrorKind::DivisionByZero));
                 }
-                self.regs[dst] = Value::I64(va / vb);
+                // `i64::MIN / -1` overflows, and Rust panics on it in release builds too: a program
+                // dividing those two values would take the executor down with it. Integer
+                // arithmetic here wraps (add, sub, mul and neg already do), so division does too.
+                self.regs[dst] = Value::I64(va.wrapping_div(vb));
                 Ok(StepResult::Continue(ip + 4))
             }
 
@@ -825,7 +828,8 @@ impl VM {
                 if vb == 0 {
                     return Err(self.error_at(ip, VMErrorKind::DivisionByZero));
                 }
-                self.regs[dst] = Value::I64(va % vb);
+                // `i64::MIN % -1` panics for the same reason as the division above; it wraps to 0.
+                self.regs[dst] = Value::I64(va.wrapping_rem(vb));
                 Ok(StepResult::Continue(ip + 4))
             }
 

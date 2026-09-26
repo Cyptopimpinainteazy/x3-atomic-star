@@ -1,691 +1,165 @@
-//! Partial Redundancy Elimination (PRE) - Morel-Renvoise Algorithm
+//! Redundancy elimination over the dominator tree.
 //!
-//! Advanced PRE implementation with three core analyses:
+//! An expression is **fully redundant** at a statement when an identical pure expression over the
+//! same operands was computed at a point that dominates it: every path to the second computation
+//! passed through the first, and SSA operands cannot have changed in between. The second statement
+//! is removed and its uses read the first result.
 //!
-//! 1. **Value Numbering**: Assigns unique IDs to equivalent expressions
-//!    - Recognizes commutative equivalences: (a+b) == (b+a)
-//!    - Foundation for redundancy detection
+//! This is the safe subset of partial redundancy elimination, and it is deliberately the only part
+//! implemented. The previous pass under this name (a Morel-Renvoise sketch) was wrong in three
+//! ways, each measured by `crates/x3-integration/tests/differential.rs`:
 //!
-//! 2. **Anticipatability Analysis** (Bottom-Up):
-//!    - Question: "Is this expression guaranteed to be computed on some path from here?"
-//!    - Backward dataflow with meet operator
-//!    - Conservative: only marks truly anticipated expressions
+//! - its availability and anticipation maps were built over the **whole module** keyed by
+//!   `MirBlockId`, and every function has a block 0, so one function's expressions were "available"
+//!   in another — the reason a program that declared `main` first failed to compile at O2
+//!   (`MIR value MirValue(1) not found in register map`);
+//! - it prepended "hoisted" computations to the **start** of the entry block, before the operands
+//!   the entry block itself defines, so `let a = 17; let b = 5; return (a+b) + (a+b)` read `a`
+//!   before it was written;
+//! - it hoisted computations out of conditional code into the entry block, which **speculates**
+//!   them: `if b != 0 { return a / b }` would divide on the path that tested `b` and found zero.
 //!
-//! 3. **Availability Analysis** (Forward):
-//!    - Question: "Is this expression already computed and not invalidated?"
-//!    - Forward dataflow with union operator
-//!    - Tracks kill sets (expressions invalidated by stores/calls)
-//!
-//! 4. **Redundancy Identification**:
-//!    - Expression is REDUNDANT at block B if:
-//!      * Available at B (computed before)
-//!      * Anticipated from B (needed later)
-//!      * Not critical to CFG structure
-//!
-//! 5. **Hoisting**:
-//!    - Creates phi nodes to merge definitions
-//!    - Replaces redundant computations with hoisted values
-//!    - Enables downstream DCE to clean up original computations
-//!
-//! Key insight: PRE handles cases that ConditionalFold (Pass A) misses by working
-//! across non-dominating blocks and handling complex control flow patterns.
-//!
-//! Reference: Morel & Renvoise (1979), "Global Optimization by Suppression of Partial Redundancies"
+//! Removing a computation that a dominating one already made cannot do any of those: nothing is
+//! inserted, nothing moves, and a division that trapped would have trapped at the first site. Truly
+//! partial redundancies (computed on some paths only) are left alone.
 
+use crate::cfg::Cfg;
 use crate::pass::{Pass, PassResult};
-use crate::value_numbering::{CanonicalExpr, ValueNumber, ValueNumbering};
+use crate::value_numbering::CanonicalExpr;
 use crate::OptResult;
 use std::collections::{BTreeMap, BTreeSet};
-use x3_ast::BinaryOp;
 use x3_mir::{MirBlockId, MirFunction, MirModule, MirRhs, MirStatement, MirTerminator, MirValue};
 
-/// Value-numbered expression for redundancy analysis
+/// The identity of a pure expression: its canonical form (commutative operands sorted) and, for a
+/// binary operation, whether it is the float or the integer instruction.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExprKey {
-    /// Canonical form (handles commutativity)
-    pub canonical: CanonicalExpr,
-    /// Value number for fast equivalence
-    pub value_number: ValueNumber,
+    canonical: CanonicalExpr,
+    float: bool,
 }
 
 impl ExprKey {
-    /// Extract and canonicalize expression from MIR RHS
-    pub fn from_rhs(rhs: &MirRhs, vn_table: &mut ValueNumbering) -> Option<Self> {
-        let canonical = match rhs {
+    /// The key of `rhs` if it is an expression this pass may deduplicate: a unary or binary
+    /// operation. Literals, calls, loads and stores are not — a call may have effects and a load
+    /// reads storage a store can change.
+    pub fn from_rhs(rhs: &MirRhs) -> Option<Self> {
+        match rhs {
             MirRhs::Binary {
                 op,
-                left: lhs,
-                right: rhs,
-                ..
-            } => CanonicalExpr::from_binary(*op, *lhs, *rhs),
-            MirRhs::Unary(op, val) => CanonicalExpr::from_unary(*op, *val),
-            _ => return None, // Skip literals, calls, etc.
-        };
-
-        let value_number = vn_table.canonicalize(canonical.clone());
-
-        Some(ExprKey {
-            canonical,
-            value_number,
-        })
-    }
-
-    /// Is this a pure expression (no side effects)?
-    pub fn is_pure(&self) -> bool {
-        matches!(
-            self.canonical,
-            CanonicalExpr::Binary(..)
-                | CanonicalExpr::CommutativeBinary(..)
-                | CanonicalExpr::Unary(..)
-        )
-    }
-}
-
-/// Anticipatability lattice: whether expr will definitely be used
-/// Lattice: ⊥ (Unknown) < Anticipated < ⊤ (Overdefined)
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Anticipatability {
-    /// Not yet determined
-    Unknown = 0,
-    /// Expression will definitely be used on all paths from here
-    Anticipated = 1,
-    /// Can't determine or mixed paths
-    Overdefined = 2,
-}
-
-impl Anticipatability {
-    /// Meet operator for backward merge (AND logic)
-    pub fn meet(a: Self, b: Self) -> Self {
-        use Anticipatability::*;
-        match (a, b) {
-            (Unknown, x) | (x, Unknown) => x,
-            (Anticipated, Anticipated) => Anticipated,
-            _ => Overdefined,
+                left,
+                right,
+                float,
+            } => Some(ExprKey {
+                canonical: CanonicalExpr::from_binary(*op, *left, *right),
+                float: *float,
+            }),
+            MirRhs::Unary(op, operand) => Some(ExprKey {
+                canonical: CanonicalExpr::from_unary(*op, *operand),
+                float: false,
+            }),
+            _ => None,
         }
     }
-
-    pub fn is_anticipated(&self) -> bool {
-        matches!(self, Anticipatability::Anticipated)
-    }
 }
 
-/// Availability lattice: whether expr is available (computed)
-/// Lattice: ⊥ (Unknown) < Available < ⊤ (Overdefined)
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Availability {
-    /// Not yet determined
-    Unknown = 0,
-    /// Expression definitely computed on all paths to here
-    Available = 1,
-    /// Can't guarantee or computation killed
-    Overdefined = 2,
-}
-
-impl Availability {
-    /// Join operator for forward merge (OR logic)
-    pub fn join(a: Self, b: Self) -> Self {
-        use Availability::*;
-        match (a, b) {
-            (Unknown, x) | (x, Unknown) => x,
-            (Available, Available) => Available,
-            _ => Overdefined,
-        }
-    }
-
-    pub fn is_available(&self) -> bool {
-        matches!(self, Availability::Available)
-    }
-}
-
-/// Partial Redundancy Elimination pass
+/// Dominator-based redundancy elimination (see the module documentation).
 ///
-/// Implements the Morel-Renvoise algorithm with three core analysis phases
-pub struct PrePass {
-    /// Maximum iterations for fixpoint computation
-    pub max_iterations: usize,
-}
-
-impl Default for PrePass {
-    fn default() -> Self {
-        PrePass {
-            max_iterations: 128,
-        }
-    }
-}
+/// The pass keeps its historical name so pipelines and telemetry that name it stay valid.
+#[derive(Default)]
+pub struct PrePass;
 
 impl PrePass {
     pub fn new() -> Self {
-        Self::default()
+        PrePass
     }
 
-    /// Phase 1: Collect pure candidate expressions from all blocks
-    ///
-    /// Returns:
-    /// - Vec of candidate expressions (expressions that might be redundant)
-    /// - Value numbering table (for equivalence checking)
-    pub fn collect_candidates(module: &MirModule) -> (Vec<ExprKey>, ValueNumbering) {
-        let mut seen = BTreeSet::new(); // Track seen value numbers to avoid duplicates
-        let mut vec = Vec::new();
-        let mut vn_table = ValueNumbering::new();
-
-        for func in &module.functions {
-            for block in &func.blocks {
-                for stmt in &block.statements {
-                    if let Some(rhs) = stmt.rhs() {
-                        if let Some(expr) = ExprKey::from_rhs(rhs, &mut vn_table) {
-                            if expr.is_pure() && !seen.contains(&expr.value_number) {
-                                seen.insert(expr.value_number);
-                                vec.push(expr);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        (vec, vn_table)
-    }
-
-    /// Phase 2: Compute anticipatability (backward dataflow)
-    ///
-    /// Question: "For this expression, will it definitely be used on some path from here?"
-    ///
-    /// Algorithm:
-    /// - Start from blocks that USE expressions
-    /// - Propagate upward through predecessors using MEET operator
-    /// - Converge to fixpoint
-    pub fn compute_anticipatability(
-        &self,
-        module: &MirModule,
-        candidates: &[ExprKey],
-    ) -> BTreeMap<MirBlockId, BTreeMap<ExprKey, Anticipatability>> {
-        let mut map: BTreeMap<MirBlockId, BTreeMap<ExprKey, Anticipatability>> = BTreeMap::new();
-
-        // Phase 2.1: Initialize all blocks
-        for func in &module.functions {
-            for block in &func.blocks {
-                let mut m = BTreeMap::new();
-                for expr in candidates.iter() {
-                    // Mark expressions used in this block as Anticipated
-                    let mut anticipated = Anticipatability::Unknown;
-
-                    // Check if any statement uses this expression
-                    for stmt in &block.statements {
-                        if let Some(rhs) = stmt.rhs() {
-                            if let Some(used_expr) =
-                                ExprKey::from_rhs(rhs, &mut ValueNumbering::new())
-                            {
-                                if used_expr.value_number == expr.value_number {
-                                    anticipated = Anticipatability::Anticipated;
-                                }
-                            }
-                        }
-                    }
-
-                    m.insert(expr.clone(), anticipated);
-                }
-                map.insert(block.id, m);
-            }
+    /// Remove every fully redundant expression in `func`; returns how many were removed.
+    pub fn eliminate_in_function(func: &mut MirFunction) -> usize {
+        if func.blocks.is_empty() {
+            return 0;
         }
 
-        // Phase 2.2: Backward pass until fixpoint (iterate up to max_iterations)
-        for _iteration in 0..self.max_iterations {
-            let mut changed = false;
+        // A value that is the address of a register store is a mutable variable's storage, not an
+        // SSA value: two reads of it may differ. Expressions are never built on one directly (reads
+        // go through a `Load`), but an expression that were would not be pure in the sense this pass
+        // needs, so it is skipped rather than assumed away.
+        let cells: BTreeSet<MirValue> = func
+            .blocks
+            .iter()
+            .flat_map(|block| block.statements.iter())
+            .filter_map(|stmt| match stmt.rhs() {
+                Some(MirRhs::Store { addr, .. }) => Some(*addr),
+                _ => None,
+            })
+            .collect();
 
-            for func in &module.functions {
-                // Process blocks in reverse order (backward pass)
-                for block_idx in (0..func.blocks.len()).rev() {
-                    let block = &func.blocks[block_idx];
-                    let block_id = block.id;
+        let cfg = Cfg::from_function(func);
+        let (idom, _) = cfg.compute_dominators();
 
-                    // Start with what's anticipated in this block
-                    let old_map = map.get(&block_id).cloned().unwrap_or_default();
-
-                    // For each successor, get what they anticipate
-                    for expr in candidates.iter() {
-                        let mut anticipated = old_map
-                            .get(expr)
-                            .copied()
-                            .unwrap_or(Anticipatability::Unknown);
-
-                        // Merge with successor anticipations (via meet)
-                        // In a full CFG, we'd check actual successors
-                        // For now, conservative: if any use exists downstream, it's anticipated
-                        for other_block in &func.blocks {
-                            if other_block.id == block_id {
-                                continue;
-                            }
-                            if let Some(succ_anticipate) =
-                                map.get(&other_block.id).and_then(|m| m.get(expr))
-                            {
-                                anticipated = Anticipatability::meet(anticipated, *succ_anticipate);
-                            }
-                        }
-
-                        let new_entry = map.entry(block_id).or_insert_with(BTreeMap::new);
-                        if new_entry.insert(expr.clone(), anticipated) != Some(anticipated) {
-                            changed = true;
-                        }
-                    }
-                }
-            }
-
-            if !changed {
-                break; // Reached fixpoint
-            }
-        }
-
-        map
-    }
-
-    /// Phase 3: Compute availability (forward dataflow)
-    ///
-    /// Question: "Is this expression definitely computed on all paths to here and not killed?"
-    ///
-    /// Algorithm:
-    /// - Start from entry blocks (no expressions available)
-    /// - Track which expressions are computed in each block
-    /// - Mark expressions as killed by stores/calls
-    /// - Propagate forward using JOIN operator
-    pub fn compute_availability(
-        &self,
-        module: &MirModule,
-        candidates: &[ExprKey],
-    ) -> BTreeMap<MirBlockId, BTreeMap<ExprKey, Availability>> {
-        let mut map: BTreeMap<MirBlockId, BTreeMap<ExprKey, Availability>> = BTreeMap::new();
-        let mut vn_table = ValueNumbering::new();
-
-        // Phase 3.1: Initialize all blocks with Unknown
-        for func in &module.functions {
-            for block in &func.blocks {
-                let mut m = BTreeMap::new();
-                for expr in candidates.iter() {
-                    m.insert(expr.clone(), Availability::Unknown);
-                }
-                map.insert(block.id, m);
-            }
-        }
-
-        // Phase 3.2: Forward pass until fixpoint
-        for _iteration in 0..self.max_iterations {
-            let mut changed = false;
-
-            for func in &module.functions {
-                for block in &func.blocks {
-                    let block_id = block.id;
-                    let mut state = map.get(&block_id).cloned().unwrap_or_default();
-
-                    // Process each statement in the block
-                    for stmt in &block.statements {
-                        // Check if this statement computes a candidate
-                        if let Some(rhs) = stmt.rhs() {
-                            if let Some(expr) = ExprKey::from_rhs(rhs, &mut vn_table) {
-                                if candidates.contains(&expr) && expr.is_pure() {
-                                    // This expression becomes available
-                                    state.insert(expr.clone(), Availability::Available);
-                                }
-                            }
-                        }
-
-                        // Conservative: calls have side effects, kill all expressions
-                        if matches!(
-                            stmt,
-                            MirStatement::Assign {
-                                rhs: MirRhs::Call { .. },
-                                ..
-                            }
-                        ) {
-                            for (_, v) in state.iter_mut() {
-                                *v = Availability::Overdefined;
-                            }
-                        }
-
-                        // Stores: conservatively kill all (full version would do alias analysis)
-                        if matches!(
-                            stmt,
-                            MirStatement::Assign {
-                                rhs: MirRhs::Store { .. },
-                                ..
-                            }
-                        ) {
-                            for (_, v) in state.iter_mut() {
-                                *v = Availability::Overdefined;
-                            }
-                        }
-                    }
-
-                    if map.insert(block_id, state.clone()) != Some(state) {
-                        changed = true;
-                    }
-                }
-            }
-
-            if !changed {
-                break; // Reached fixpoint
-            }
-        }
-
-        map
-    }
-
-    /// Phase 4: Identify redundancies
-    ///
-    /// An expression is redundant at block B if:
-    /// - Available at B (computed before, not killed)
-    /// - Anticipated from B (will be used later)
-    /// - Not critical to CFG
-    ///
-    /// Returns: Set of (block, expression) pairs that are redundant
-    pub fn find_redundancies(
-        &self,
-        module: &MirModule,
-        candidates: &[ExprKey],
-        avail: &BTreeMap<MirBlockId, BTreeMap<ExprKey, Availability>>,
-        anticip: &BTreeMap<MirBlockId, BTreeMap<ExprKey, Anticipatability>>,
-    ) -> BTreeSet<(MirBlockId, ExprKey)> {
-        let mut redundancies = BTreeSet::new();
-
-        for func in &module.functions {
-            for block in &func.blocks {
-                let block_id = block.id;
-
-                for expr in candidates.iter() {
-                    // Check if available AND anticipated at this block
-                    let is_available = avail
-                        .get(&block_id)
-                        .and_then(|m| m.get(expr))
-                        .map(|a| a.is_available())
-                        .unwrap_or(false);
-
-                    let is_anticipated = anticip
-                        .get(&block_id)
-                        .and_then(|m| m.get(expr))
-                        .map(|a| a.is_anticipated())
-                        .unwrap_or(false);
-
-                    if is_available && is_anticipated {
-                        redundancies.insert((block_id, expr.clone()));
-                    }
-                }
-            }
-        }
-
-        redundancies
-    }
-}
-
-impl PrePass {
-    /// Phase 5: Transform IR by hoisting redundant expressions
-    ///
-    /// Conservative implementation:
-    /// - For each redundant expression, find its statement in the block
-    /// - Hoist a single computation to the function's entry block (if not already hoisted)
-    /// - Replace all uses of the redundant target with the hoisted value
-    /// - Remove the redundant statement (DCE can clean any leftover dead defs)
-    pub fn transform_ir(
-        &self,
-        module: &mut MirModule,
-        redundancies: &BTreeSet<(MirBlockId, ExprKey)>,
-    ) -> usize {
-        let mut transformations = 0;
-
-        for func in &mut module.functions {
-            if func.blocks.is_empty() {
-                continue;
-            }
-
-            let mut hoisted_map: BTreeMap<ExprKey, MirValue> = BTreeMap::new();
-            let mut hoisting_stmts: Vec<MirStatement> = Vec::new();
-            let mut removals: BTreeMap<MirBlockId, BTreeSet<usize>> = BTreeMap::new();
-            let mut block_index: BTreeMap<MirBlockId, usize> = BTreeMap::new();
-            for (idx, block) in func.blocks.iter().enumerate() {
-                block_index.insert(block.id, idx);
-            }
-
-            let mut next_value = next_value_id(func);
-
-            // Where every value in this function is defined, so a hoist can check that its operands
-            // are available at the block it is hoisted *to* (below: the entry block).
-            let mut value_defs: BTreeMap<MirValue, MirBlockId> = BTreeMap::new();
-            for block in func.blocks.iter() {
-                for stmt in block.statements.iter() {
-                    if let Some(target) = stmt.target() {
-                        value_defs.insert(target, block.id);
-                    }
-                }
-            }
-            let entry_id = func.blocks[0].id;
-
-            for (block_id, expr) in redundancies.iter() {
-                let Some(&b_idx) = block_index.get(block_id) else {
+        // Every candidate in block order, statement order: (block, index, key, target).
+        let mut candidates: Vec<(MirBlockId, usize, ExprKey, MirValue)> = Vec::new();
+        for block in &func.blocks {
+            for (index, stmt) in block.statements.iter().enumerate() {
+                let (Some(target), Some(rhs)) = (stmt.target(), stmt.rhs()) else {
                     continue;
                 };
-                let block = &func.blocks[b_idx];
+                if operands(rhs).iter().any(|operand| cells.contains(operand)) {
+                    continue;
+                }
+                if let Some(key) = ExprKey::from_rhs(rhs) {
+                    candidates.push((block.id, index, key, target));
+                }
+            }
+        }
 
-                // Find first matching statement for this expression in the block
-                let mut stmt_index: Option<usize> = None;
-                let mut rhs_clone: Option<MirRhs> = None;
-                for (s_idx, stmt) in block.statements.iter().enumerate() {
-                    if let Some(rhs) = stmt.rhs() {
-                        if let Some(candidate) = ExprKey::from_rhs(rhs, &mut ValueNumbering::new())
-                        {
-                            if candidate.value_number == expr.value_number {
-                                stmt_index = Some(s_idx);
-                                rhs_clone = Some(rhs.clone());
-                                break;
-                            }
+        // For each candidate, a surviving identical expression that dominates it.
+        let mut replacements: BTreeMap<MirValue, MirValue> = BTreeMap::new();
+        let mut removals: BTreeMap<MirBlockId, BTreeSet<usize>> = BTreeMap::new();
+        for (i, (block, index, key, target)) in candidates.iter().enumerate() {
+            let dominating = candidates
+                .iter()
+                .enumerate()
+                .find(|(j, (other_block, other_index, other_key, other_target))| {
+                    *j != i
+                        && other_key == key
+                        && !replacements.contains_key(other_target)
+                        && if other_block == block {
+                            other_index < index
+                        } else {
+                            cfg.dominates(*other_block, *block, &idom)
                         }
-                    }
-                }
+                })
+                .map(|(_, (_, _, _, earlier))| *earlier);
+            if let Some(earlier) = dominating {
+                replacements.insert(*target, earlier);
+                removals.entry(*block).or_default().insert(*index);
+            }
+        }
 
-                let Some(stmt_idx) = stmt_index else {
-                    continue;
-                };
-                let Some(rhs) = rhs_clone else {
-                    continue;
-                };
+        if replacements.is_empty() {
+            return 0;
+        }
 
-                // The hoist target is the entry block (see the note above), so every operand has to
-                // be defined there already — an operand defined inside a loop is not, and hoisting a
-                // computation above its own operand's definition computes it from a register the
-                // defining instruction has not written yet. Measured: `while (i <= n)` had its
-                // comparison hoisted above the `Load` of `i`, so the loop tested the pre-loop value
-                // forever (TICKET-132). A parameter has no defining statement and is available.
-                let operands_ready = operands_of(&rhs)
-                    .into_iter()
-                    .all(|operand| value_defs.get(&operand).is_none_or(|def| *def == entry_id));
-                if !operands_ready {
-                    continue;
-                }
-
-                // Allocate or reuse a hoisted value for this expression
-                let hoisted_value = *hoisted_map.entry(expr.clone()).or_insert_with(|| {
-                    let v = MirValue(next_value);
-                    next_value += 1;
-                    hoisting_stmts.push(MirStatement::Assign {
-                        target: v,
-                        rhs: rhs.clone(),
-                    });
-                    v
+        for block in &mut func.blocks {
+            if let Some(indices) = removals.get(&block.id) {
+                let mut index = 0;
+                block.statements.retain(|_| {
+                    let keep = !indices.contains(&index);
+                    index += 1;
+                    keep
                 });
-
-                // Replace all uses of the redundant target with the hoisted value
-                let original_target = block.statements[stmt_idx]
-                    .target()
-                    .expect("PRE: redundant statement must be an assignment");
-                replace_value_in_function(func, original_target, hoisted_value);
-
-                // Mark redundant statement for removal
-                removals.entry(*block_id).or_default().insert(stmt_idx);
-                transformations += 1;
             }
-
-            // Remove redundant statements
-            for (block_id, indices) in removals {
-                if let Some(&b_idx) = block_index.get(&block_id) {
-                    let block = &mut func.blocks[b_idx];
-                    let mut new_stmts = Vec::with_capacity(block.statements.len());
-                    for (i, stmt) in block.statements.iter().enumerate() {
-                        if indices.contains(&i) {
-                            continue;
-                        }
-                        new_stmts.push(stmt.clone());
-                    }
-                    block.statements = new_stmts;
+            for stmt in &mut block.statements {
+                if let MirStatement::Assign { rhs, .. } = stmt {
+                    replace_operands(rhs, &replacements);
                 }
             }
-
-            // Prepend hoisted computations to entry block
-            if !hoisting_stmts.is_empty() {
-                let entry_block = &mut func.blocks[0];
-                let mut new_stmts = hoisting_stmts;
-                new_stmts.append(&mut entry_block.statements);
-                entry_block.statements = new_stmts;
+            if let Some(term) = &mut block.terminator {
+                replace_in_terminator(term, &replacements);
             }
         }
 
-        transformations
-    }
-}
-
-/// Compute the next available SSA value id within a function
-fn next_value_id(func: &MirFunction) -> usize {
-    let mut max_id = func
-        .params
-        .iter()
-        .map(|v| v.0)
-        .max()
-        .unwrap_or(0)
-        .max(func.entry.0);
-
-    for block in &func.blocks {
-        max_id = max_id.max(block.id.0);
-        for stmt in &block.statements {
-            if let Some(target) = stmt.target() {
-                max_id = max_id.max(target.0);
-            }
-            if let Some(rhs) = stmt.rhs() {
-                match rhs {
-                    MirRhs::Unary(_, v) => {
-                        max_id = max_id.max(v.0);
-                    }
-                    MirRhs::Binary {
-                        left: l, right: r, ..
-                    } => {
-                        max_id = max_id.max(l.0.max(r.0));
-                    }
-                    MirRhs::Call { args, .. } => {
-                        for arg in args {
-                            max_id = max_id.max(arg.0);
-                        }
-                    }
-                    MirRhs::Load { addr, .. } => {
-                        max_id = max_id.max(addr.0);
-                    }
-                    MirRhs::Store { addr, val, .. } => {
-                        max_id = max_id.max(addr.0.max(val.0));
-                    }
-                    MirRhs::Literal(_) => {}
-                }
-            }
-        }
-
-        if let Some(term) = &block.terminator {
-            match term {
-                MirTerminator::Return(Some(v)) => max_id = max_id.max(v.0),
-                MirTerminator::Return(None) => {}
-                MirTerminator::Goto(_) => {}
-                MirTerminator::Branch {
-                    cond,
-                    then_block,
-                    else_block,
-                } => {
-                    max_id = max_id.max(cond.0);
-                    max_id = max_id.max(then_block.0.max(else_block.0));
-                }
-            }
-        }
-    }
-
-    max_id + 1
-}
-
-fn replace_value_in_function(func: &mut MirFunction, from: MirValue, to: MirValue) {
-    for block in &mut func.blocks {
-        for stmt in &mut block.statements {
-            if let MirStatement::Assign { target, rhs } = stmt {
-                if *target == from {
-                    *target = to;
-                }
-                replace_value_in_rhs(rhs, from, to);
-            }
-            // Atomic markers have no target/rhs to replace.
-        }
-
-        if let Some(term) = &mut block.terminator {
-            replace_value_in_terminator(term, from, to);
-        }
-    }
-}
-
-fn replace_value_in_rhs(rhs: &mut MirRhs, from: MirValue, to: MirValue) {
-    match rhs {
-        MirRhs::Unary(_, v) => {
-            if *v == from {
-                *v = to;
-            }
-        }
-        MirRhs::Binary {
-            left: l, right: r, ..
-        } => {
-            if *l == from {
-                *l = to;
-            }
-            if *r == from {
-                *r = to;
-            }
-        }
-        MirRhs::Call { args, .. } => {
-            for arg in args {
-                if *arg == from {
-                    *arg = to;
-                }
-            }
-        }
-        MirRhs::Load { addr, .. } => {
-            if *addr == from {
-                *addr = to;
-            }
-        }
-        MirRhs::Store { addr, val, .. } => {
-            if *addr == from {
-                *addr = to;
-            }
-            if *val == from {
-                *val = to;
-            }
-        }
-        MirRhs::Literal(_) => {}
-    }
-}
-
-fn replace_value_in_terminator(term: &mut MirTerminator, from: MirValue, to: MirValue) {
-    match term {
-        MirTerminator::Return(Some(v)) => {
-            if *v == from {
-                *v = to;
-            }
-        }
-        MirTerminator::Return(None) => {}
-        MirTerminator::Goto(_) => {}
-        MirTerminator::Branch {
-            cond,
-            then_block: _,
-            else_block: _,
-        } => {
-            if *cond == from {
-                *cond = to;
-            }
-        }
+        replacements.len()
     }
 }
 
@@ -695,45 +169,67 @@ impl Pass for PrePass {
     }
 
     fn run(&self, module: &mut MirModule) -> OptResult<PassResult> {
-        let (candidates, _vn_table) = Self::collect_candidates(module);
-        if candidates.is_empty() {
-            return Ok(PassResult::no_change());
-        }
-
-        // Compute anticipatability and availability
-        let anticip = self.compute_anticipatability(module, &candidates);
-        let avail = self.compute_availability(module, &candidates);
-
-        // Find redundancies
-        let redundancies = self.find_redundancies(module, &candidates, &avail, &anticip);
-
-        if redundancies.is_empty() {
-            return Ok(PassResult::no_change());
-        }
-
-        let hoisted = self.transform_ir(module, &redundancies);
-        if hoisted == 0 {
-            return Ok(PassResult::no_change());
-        }
-
+        // Per function: value and block ids are local to a function, so nothing may be shared
+        // between two of them.
+        let removed: usize = module
+            .functions
+            .iter_mut()
+            .map(Self::eliminate_in_function)
+            .sum();
         Ok(PassResult::with_count(
-            hoisted,
-            "Hoisted redundant expressions",
+            removed,
+            "Removed fully redundant expressions",
         ))
     }
 }
 
 /// The values an expression reads.
-fn operands_of(rhs: &MirRhs) -> Vec<MirValue> {
+fn operands(rhs: &MirRhs) -> Vec<MirValue> {
     match rhs {
         MirRhs::Literal(_) => vec![],
         MirRhs::Unary(_, v) => vec![*v],
-        MirRhs::Binary {
-            left: a, right: b, ..
-        } => vec![*a, *b],
+        MirRhs::Binary { left, right, .. } => vec![*left, *right],
         MirRhs::Call { args, .. } => args.clone(),
         MirRhs::Load { addr, .. } => vec![*addr],
         MirRhs::Store { addr, val, .. } => vec![*addr, *val],
+    }
+}
+
+/// Follow `replacements` to the surviving value.
+fn resolve(value: MirValue, replacements: &BTreeMap<MirValue, MirValue>) -> MirValue {
+    let mut current = value;
+    for _ in 0..=replacements.len() {
+        match replacements.get(&current) {
+            Some(&next) if next != current => current = next,
+            _ => break,
+        }
+    }
+    current
+}
+
+fn replace_operands(rhs: &mut MirRhs, replacements: &BTreeMap<MirValue, MirValue>) {
+    let fix = |v: &mut MirValue| *v = resolve(*v, replacements);
+    match rhs {
+        MirRhs::Literal(_) => {}
+        MirRhs::Unary(_, v) => fix(v),
+        MirRhs::Binary { left, right, .. } => {
+            fix(left);
+            fix(right);
+        }
+        MirRhs::Call { args, .. } => args.iter_mut().for_each(fix),
+        MirRhs::Load { addr, .. } => fix(addr),
+        MirRhs::Store { addr, val, .. } => {
+            fix(addr);
+            fix(val);
+        }
+    }
+}
+
+fn replace_in_terminator(term: &mut MirTerminator, replacements: &BTreeMap<MirValue, MirValue>) {
+    match term {
+        MirTerminator::Return(Some(v)) => *v = resolve(*v, replacements),
+        MirTerminator::Branch { cond, .. } => *cond = resolve(*cond, replacements),
+        MirTerminator::Return(None) | MirTerminator::Goto(_) => {}
     }
 }
 
@@ -741,258 +237,234 @@ fn operands_of(rhs: &MirRhs) -> Vec<MirValue> {
 mod tests {
     use super::*;
     use x3_ast::{BinaryOp, UnaryOp};
-    use x3_common::Span;
-    use x3_mir::{MirBlock, MirBlockId, MirFunction, MirStatement, MirTerminator, MirValue};
+    use x3_common::{Literal, Span};
+    use x3_hir::hir::SymbolId;
+    use x3_mir::MirBlock;
 
-    fn make_binary_stmt(target: usize, op: BinaryOp, lhs: usize, rhs: usize) -> MirStatement {
+    fn lit(target: usize, n: i64) -> MirStatement {
+        MirStatement::Assign {
+            target: MirValue(target),
+            rhs: MirRhs::Literal(Literal::Integer(n)),
+        }
+    }
+
+    fn bin(target: usize, op: BinaryOp, l: usize, r: usize) -> MirStatement {
         MirStatement::Assign {
             target: MirValue(target),
             rhs: MirRhs::Binary {
                 op,
-                left: MirValue(lhs),
-                right: MirValue(rhs),
+                left: MirValue(l),
+                right: MirValue(r),
                 float: false,
             },
         }
     }
 
-    fn make_unary_stmt(target: usize, op: UnaryOp, val: usize) -> MirStatement {
-        MirStatement::Assign {
-            target: MirValue(target),
-            rhs: MirRhs::Unary(op, MirValue(val)),
+    fn block(id: usize, statements: Vec<MirStatement>, terminator: MirTerminator) -> MirBlock {
+        MirBlock {
+            id: MirBlockId(id),
+            statements,
+            terminator: Some(terminator),
         }
     }
 
-    fn make_simple_module() -> MirModule {
-        MirModule {
-            functions: vec![],
-            span: Span::dummy(),
-        }
-    }
-
-    #[test]
-    fn pre_pass_name() {
-        let pass = PrePass::new();
-        assert_eq!(pass.name(), "partial_redundancy_elimination");
-    }
-
-    #[test]
-    fn pre_collect_candidates_empty() {
-        let module = make_simple_module();
-        let (candidates, _vn) = PrePass::collect_candidates(&module);
-        assert!(candidates.is_empty());
-    }
-
-    #[test]
-    fn pre_collect_candidates_binary() {
-        // Test that binary operations are recognized as candidates
-        let block = MirBlock {
-            id: MirBlockId(0),
-            statements: vec![make_binary_stmt(0, BinaryOp::Add, 1, 2)],
-            terminator: Some(MirTerminator::Return(Some(MirValue(0)))),
-        };
-
-        let func = MirFunction {
-            symbol: x3_mir::SymbolId(0),
+    fn function(blocks: Vec<MirBlock>) -> MirFunction {
+        MirFunction {
+            symbol: SymbolId(0),
             params: vec![],
             entry: MirBlockId(0),
-            blocks: vec![block],
+            blocks,
             span: Span::dummy(),
-        };
+        }
+    }
 
-        let module = MirModule {
-            functions: vec![func],
+    fn module(functions: Vec<MirFunction>) -> MirModule {
+        MirModule {
+            functions,
             span: Span::dummy(),
-        };
+        }
+    }
 
-        let (candidates, _vn) = PrePass::collect_candidates(&module);
-        assert!(
-            !candidates.is_empty(),
-            "Binary operations should be recognized"
+    #[test]
+    fn pass_name_is_stable() {
+        assert_eq!(PrePass::new().name(), "partial_redundancy_elimination");
+    }
+
+    #[test]
+    fn a_repeated_expression_in_one_block_reuses_the_first() {
+        let mut m = module(vec![function(vec![block(
+            0,
+            vec![
+                lit(0, 17),
+                lit(1, 5),
+                bin(2, BinaryOp::Add, 0, 1),
+                bin(3, BinaryOp::Add, 1, 0), // commutative: the same expression
+                bin(4, BinaryOp::Mul, 2, 3),
+            ],
+            MirTerminator::Return(Some(MirValue(4))),
+        )])]);
+        let result = PrePass::new().run(&mut m).unwrap();
+        assert_eq!(result.transformations, 1);
+        let stmts = &m.functions[0].blocks[0].statements;
+        assert_eq!(
+            stmts.len(),
+            4,
+            "the duplicate is removed, nothing is inserted"
+        );
+        // Definitions stay in order: the operands come before the expression that reads them.
+        assert_eq!(stmts[0].target(), Some(MirValue(0)));
+        assert_eq!(stmts[1].target(), Some(MirValue(1)));
+        assert_eq!(
+            stmts[3].rhs(),
+            Some(&MirRhs::Binary {
+                op: BinaryOp::Mul,
+                left: MirValue(2),
+                right: MirValue(2),
+                float: false,
+            })
         );
     }
 
     #[test]
-    fn pre_anticipatability_empty() {
-        let module = make_simple_module();
-        let candidates: Vec<ExprKey> = Vec::new();
-        let pass = PrePass::new();
-        let result = pass.compute_anticipatability(&module, &candidates);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn pre_availability_empty() {
-        let module = make_simple_module();
-        let candidates: Vec<ExprKey> = Vec::new();
-        let pass = PrePass::new();
-        let result = pass.compute_availability(&module, &candidates);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn pre_find_redundancies_empty() {
-        let pass = PrePass::new();
-        let module = make_simple_module();
-        let candidates: Vec<ExprKey> = Vec::new();
-        let avail = BTreeMap::new();
-        let anticip = BTreeMap::new();
-        let result = pass.find_redundancies(&module, &candidates, &avail, &anticip);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn pre_no_changes_empty_module() {
-        let mut module = make_simple_module();
-        let pass = PrePass::new();
-        let result = pass.run(&mut module).unwrap();
+    fn a_non_commutative_expression_with_swapped_operands_is_kept() {
+        let mut m = module(vec![function(vec![block(
+            0,
+            vec![
+                lit(0, 17),
+                lit(1, 5),
+                bin(2, BinaryOp::Sub, 0, 1),
+                bin(3, BinaryOp::Sub, 1, 0),
+            ],
+            MirTerminator::Return(Some(MirValue(3))),
+        )])]);
+        let result = PrePass::new().run(&mut m).unwrap();
         assert!(!result.changed);
     }
 
+    /// A division under a guard must not move above the guard, and must not be replaced by one
+    /// that did not dominate it.
     #[test]
-    fn pre_anticipatability_lattice_meet() {
-        // Test the meet operator for anticipatability
+    fn an_expression_in_one_branch_is_not_used_by_the_other() {
+        let mut m = module(vec![function(vec![
+            block(
+                0,
+                vec![lit(0, 1), lit(1, 10), lit(2, 0)],
+                MirTerminator::Branch {
+                    cond: MirValue(0),
+                    then_block: MirBlockId(1),
+                    else_block: MirBlockId(2),
+                },
+            ),
+            block(
+                1,
+                vec![bin(3, BinaryOp::Div, 1, 2)],
+                MirTerminator::Return(Some(MirValue(3))),
+            ),
+            block(
+                2,
+                vec![bin(4, BinaryOp::Div, 1, 2)],
+                MirTerminator::Return(Some(MirValue(4))),
+            ),
+        ])]);
+        let result = PrePass::new().run(&mut m).unwrap();
+        assert!(!result.changed, "neither branch dominates the other");
         assert_eq!(
-            Anticipatability::meet(Anticipatability::Unknown, Anticipatability::Unknown),
-            Anticipatability::Unknown
-        );
-        assert_eq!(
-            Anticipatability::meet(Anticipatability::Anticipated, Anticipatability::Unknown),
-            Anticipatability::Anticipated
-        );
-        assert_eq!(
-            Anticipatability::meet(Anticipatability::Anticipated, Anticipatability::Anticipated),
-            Anticipatability::Anticipated
-        );
-        assert_eq!(
-            Anticipatability::meet(Anticipatability::Overdefined, Anticipatability::Anticipated),
-            Anticipatability::Overdefined
+            m.functions[0].blocks[0].statements.len(),
+            3,
+            "nothing hoisted"
         );
     }
 
     #[test]
-    fn pre_availability_lattice_join() {
-        // Test the join operator for availability
+    fn a_dominating_computation_serves_a_later_block() {
+        let mut m = module(vec![function(vec![
+            block(
+                0,
+                vec![lit(0, 3), lit(1, 4), bin(2, BinaryOp::Mul, 0, 1)],
+                MirTerminator::Goto(MirBlockId(1)),
+            ),
+            block(
+                1,
+                vec![bin(3, BinaryOp::Mul, 0, 1)],
+                MirTerminator::Return(Some(MirValue(3))),
+            ),
+        ])]);
+        let result = PrePass::new().run(&mut m).unwrap();
+        assert_eq!(result.transformations, 1);
+        assert!(m.functions[0].blocks[1].statements.is_empty());
         assert_eq!(
-            Availability::join(Availability::Unknown, Availability::Unknown),
-            Availability::Unknown
-        );
-        assert_eq!(
-            Availability::join(Availability::Available, Availability::Unknown),
-            Availability::Available
-        );
-        assert_eq!(
-            Availability::join(Availability::Available, Availability::Available),
-            Availability::Available
-        );
-        assert_eq!(
-            Availability::join(Availability::Overdefined, Availability::Available),
-            Availability::Overdefined
+            m.functions[0].blocks[1].terminator,
+            Some(MirTerminator::Return(Some(MirValue(2))))
         );
     }
 
+    /// Two functions share value and block ids; the pass may not treat one's expression as
+    /// available in the other.
     #[test]
-    fn pre_expr_key_is_pure() {
-        // Binary expressions should be pure
-        let mut vn_table = ValueNumbering::new();
-        let stmt = make_binary_stmt(0, BinaryOp::Add, 1, 2);
-        let expr = ExprKey::from_rhs(stmt.rhs().unwrap(), &mut vn_table).unwrap();
-        assert!(expr.is_pure());
+    fn functions_do_not_share_expressions() {
+        let f = || {
+            function(vec![block(
+                0,
+                vec![lit(0, 2), lit(1, 3), bin(2, BinaryOp::Add, 0, 1)],
+                MirTerminator::Return(Some(MirValue(2))),
+            )])
+        };
+        let mut m = module(vec![f(), f()]);
+        let result = PrePass::new().run(&mut m).unwrap();
+        assert!(!result.changed);
+        assert_eq!(m.functions[1].blocks[0].statements.len(), 3);
     }
 
     #[test]
-    fn pre_expr_key_commutativity() {
-        // Test that commutative expressions are recognized
-        let mut vn_table = ValueNumbering::new();
-
-        let add1 = make_binary_stmt(0, BinaryOp::Add, 1, 2);
-        let add2 = make_binary_stmt(1, BinaryOp::Add, 2, 1);
-
-        let expr1 = ExprKey::from_rhs(add1.rhs().unwrap(), &mut vn_table).unwrap();
-        let expr2 = ExprKey::from_rhs(add2.rhs().unwrap(), &mut vn_table).unwrap();
-
-        // They should have the same value number (commutative equivalence)
-        assert_eq!(expr1.value_number, expr2.value_number);
-    }
-
-    #[test]
-    fn pre_simple_redundancy_in_module() {
-        // Create a simple module with a redundant binary operation
-        let block1 = MirBlock {
-            id: MirBlockId(0),
-            statements: vec![
-                make_binary_stmt(0, BinaryOp::Add, 1, 2), // x = 1 + 2
+    fn a_unary_expression_is_deduplicated() {
+        let mut m = module(vec![function(vec![block(
+            0,
+            vec![
+                lit(0, 9),
+                MirStatement::Assign {
+                    target: MirValue(1),
+                    rhs: MirRhs::Unary(UnaryOp::Negate, MirValue(0)),
+                },
+                MirStatement::Assign {
+                    target: MirValue(2),
+                    rhs: MirRhs::Unary(UnaryOp::Negate, MirValue(0)),
+                },
+                bin(3, BinaryOp::Add, 1, 2),
             ],
-            terminator: Some(MirTerminator::Goto(MirBlockId(1))),
-        };
-
-        let block2 = MirBlock {
-            id: MirBlockId(1),
-            statements: vec![
-                make_binary_stmt(1, BinaryOp::Add, 1, 2), // y = 1 + 2 (REDUNDANT!)
-            ],
-            terminator: Some(MirTerminator::Return(Some(MirValue(1)))),
-        };
-
-        let func = MirFunction {
-            symbol: x3_mir::SymbolId(0),
-            params: vec![],
-            entry: MirBlockId(0),
-            blocks: vec![block1, block2],
-            span: Span::dummy(),
-        };
-
-        let mut module = MirModule {
-            functions: vec![func],
-            span: Span::dummy(),
-        };
-
-        let pass = PrePass::new();
-        let result = pass.run(&mut module);
-
-        // Should detect some redundancy
-        assert!(result.is_ok());
+            MirTerminator::Return(Some(MirValue(3))),
+        )])]);
+        let result = PrePass::new().run(&mut m).unwrap();
+        assert_eq!(result.transformations, 1);
     }
 
     #[test]
-    fn pre_determinism_btreeset() {
-        // Ensure candidates are stored in deterministic order (BTreeSet)
-        let mut vn_table = ValueNumbering::new();
-
-        let mut set1 = BTreeSet::new();
-        let mut set2 = BTreeSet::new();
-
-        // Add in different orders
-        let add1 = make_binary_stmt(0, BinaryOp::Add, 1, 2);
-        let mul1 = make_binary_stmt(1, BinaryOp::Mul, 3, 4);
-
-        let expr_add = ExprKey::from_rhs(add1.rhs().unwrap(), &mut vn_table).unwrap();
-        let expr_mul = ExprKey::from_rhs(mul1.rhs().unwrap(), &mut vn_table).unwrap();
-
-        set1.insert(expr_mul.clone());
-        set1.insert(expr_add.clone());
-
-        set2.insert(expr_add.clone());
-        set2.insert(expr_mul.clone());
-
-        // Both should have same order (deterministic)
-        let iter1: Vec<_> = set1.iter().collect();
-        let iter2: Vec<_> = set2.iter().collect();
-        assert_eq!(iter1, iter2);
-    }
-
-    #[test]
-    fn pre_expr_key_non_commutative() {
-        // Test that non-commutative operations preserve order
-        let mut vn_table = ValueNumbering::new();
-
-        let sub1 = make_binary_stmt(0, BinaryOp::Sub, 1, 2); // 1 - 2
-        let sub2 = make_binary_stmt(1, BinaryOp::Sub, 2, 1); // 2 - 1
-
-        let expr1 = ExprKey::from_rhs(sub1.rhs().unwrap(), &mut vn_table).unwrap();
-        let expr2 = ExprKey::from_rhs(sub2.rhs().unwrap(), &mut vn_table).unwrap();
-
-        // They should have DIFFERENT value numbers (order matters)
-        assert_ne!(expr1.value_number, expr2.value_number);
+    fn three_identical_expressions_collapse_onto_the_first_deterministically() {
+        let build = || {
+            module(vec![function(vec![block(
+                0,
+                vec![
+                    lit(0, 1),
+                    lit(1, 2),
+                    bin(2, BinaryOp::Add, 0, 1),
+                    bin(3, BinaryOp::Add, 0, 1),
+                    bin(4, BinaryOp::Add, 0, 1),
+                    bin(5, BinaryOp::Add, 3, 4),
+                ],
+                MirTerminator::Return(Some(MirValue(5))),
+            )])])
+        };
+        let (mut a, mut b) = (build(), build());
+        PrePass::new().run(&mut a).unwrap();
+        PrePass::new().run(&mut b).unwrap();
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        assert_eq!(
+            a.functions[0].blocks[0].statements[3].rhs(),
+            Some(&MirRhs::Binary {
+                op: BinaryOp::Add,
+                left: MirValue(2),
+                right: MirValue(2),
+                float: false,
+            })
+        );
     }
 }

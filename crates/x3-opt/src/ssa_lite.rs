@@ -168,11 +168,41 @@ pub(crate) fn eval_binary(op: BinaryOp, left: &Literal, right: &Literal) -> Opti
     use BinaryOp::*;
 
     match op {
-        Add => numerical_op(left, right, |a, b| a + b, |a, b| Some(a + b)),
-        Sub => numerical_op(left, right, |a, b| a - b, |a, b| Some(a - b)),
-        Mul => numerical_op(left, right, |a, b| a * b, |a, b| Some(a * b)),
-        Div => numerical_op(left, right, |a, b| a / b, |a, b| Some(a / b)),
-        Mod => numerical_op(left, right, |a, b| a % b, |_, _| None),
+        // Integer folding has to compute what the VM computes: both engines wrap on overflow, so
+        // the fold wraps too. Plain `+`/`-`/`*` panicked in a debug-built compiler and wrapped in a
+        // release one, so the same source compiled differently depending on the build profile, and
+        // `a / b` with a literal zero divisor crashed the compiler on user source. A zero divisor
+        // is left unfolded: the program's meaning is the VM's `DivisionByZero`, not a constant.
+        Add => numerical_op(
+            left,
+            right,
+            |a, b| Some(a.wrapping_add(b)),
+            |a, b| Some(a + b),
+        ),
+        Sub => numerical_op(
+            left,
+            right,
+            |a, b| Some(a.wrapping_sub(b)),
+            |a, b| Some(a - b),
+        ),
+        Mul => numerical_op(
+            left,
+            right,
+            |a, b| Some(a.wrapping_mul(b)),
+            |a, b| Some(a * b),
+        ),
+        Div => numerical_op(
+            left,
+            right,
+            |a, b| (b != 0).then(|| a.wrapping_div(b)),
+            |a, b| (b != 0.0).then(|| a / b),
+        ),
+        Mod => numerical_op(
+            left,
+            right,
+            |a, b| (b != 0).then(|| a.wrapping_rem(b)),
+            |_, _| None,
+        ),
         Equal => eq_op(left, right, |a, b| a == b, |a, b| a == b),
         NotEqual => eq_op(left, right, |a, b| a != b, |a, b| a != b),
         Less => cmp_op(left, right, |a, b| a < b, |a, b| a < b),
@@ -188,7 +218,7 @@ pub(crate) fn eval_binary(op: BinaryOp, left: &Literal, right: &Literal) -> Opti
 pub(crate) fn eval_unary(op: UnaryOp, value: &Literal) -> Option<Literal> {
     match op {
         UnaryOp::Negate => match value {
-            Literal::Integer(i) => Some(Literal::Integer(-i)),
+            Literal::Integer(i) => Some(Literal::Integer(i.wrapping_neg())),
             Literal::Float(f) => Some(Literal::Float(-f)),
             _ => None,
         },
@@ -201,13 +231,11 @@ pub(crate) fn eval_unary(op: UnaryOp, value: &Literal) -> Option<Literal> {
 
 fn numerical_op<F, G>(left: &Literal, right: &Literal, int_op: F, float_op: G) -> Option<Literal>
 where
-    F: Fn(i64, i64) -> i64,
+    F: Fn(i64, i64) -> Option<i64>,
     G: Fn(f64, f64) -> Option<f64>,
 {
     match (left, right) {
-        (Literal::Integer(lhs), Literal::Integer(rhs)) => {
-            Some(Literal::Integer(int_op(*lhs, *rhs)))
-        }
+        (Literal::Integer(lhs), Literal::Integer(rhs)) => int_op(*lhs, *rhs).map(Literal::Integer),
         (Literal::Float(lhs), Literal::Float(rhs)) => float_op(*lhs, *rhs).map(Literal::Float),
         _ => None,
     }

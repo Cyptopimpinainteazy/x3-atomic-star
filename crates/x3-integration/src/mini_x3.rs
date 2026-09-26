@@ -755,7 +755,10 @@ impl<'m> Vm<'m> {
                 if vb == 0 {
                     return Err(X3Error::DivisionByZero);
                 }
-                let v = self.regs[reg!(a)].as_i64()? / vb;
+                // `i64::MIN / -1` panics in Rust, release builds included, and this engine runs
+                // inside the runtime: one extrinsic dividing those two values would abort block
+                // execution. Wrapping matches `x3-vm` and the other integer opcodes.
+                let v = self.regs[reg!(a)].as_i64()?.wrapping_div(vb);
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 4))
             }
@@ -770,7 +773,8 @@ impl<'m> Vm<'m> {
                 if vb == 0 {
                     return Err(X3Error::DivisionByZero);
                 }
-                let v = self.regs[reg!(a)].as_i64()? % vb;
+                // `i64::MIN % -1` panics likewise; it wraps to 0.
+                let v = self.regs[reg!(a)].as_i64()?.wrapping_rem(vb);
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 4))
             }
