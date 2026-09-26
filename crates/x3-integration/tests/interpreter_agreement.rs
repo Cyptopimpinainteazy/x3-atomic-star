@@ -67,7 +67,13 @@ fn agreed_refusals() -> Vec<(u8, &'static str)> {
         (0xA1, "agent_init"),
         (0xA2, "emit"),
     ];
-    for byte in (0xB0u8..=0xB9).chain(0xC0..=0xC7).chain(0xD0..=0xD7) {
+    // `0xB3`/`0xB4` (`EvmSload`/`EvmSstore`) are excluded because both engines now genuinely
+    // implement them; the test below is what holds that pair rather than this refusal table.
+    for byte in (0xB0u8..=0xB9)
+        .chain(0xC0..=0xC7)
+        .chain(0xD0..=0xD7)
+        .filter(|byte| *byte != 0xB3 && *byte != 0xB4)
+    {
         table.push((byte, "cross-vm / gpu intrinsic"));
     }
     table
@@ -133,16 +139,17 @@ fn both_engines_execute_the_same_supported_program() {
     assert_eq!(result.value, Some(x3_vm::Value::I64(21)));
 }
 
-/// The one place the engines genuinely differ today, pinned so it cannot drift unnoticed.
+/// Both engines implement slot storage, and they must name the same slot.
 ///
-/// `crates/x3-vm` implements `evm_sstore`/`evm_sload` against its own journaled storage, so a
-/// contract can carry a slot between calls **off chain**. The runtime interpreter has no storage at
-/// all and refuses both opcodes, so the same contract cannot carry one on chain. The test asserts
-/// both halves: the `std` VM stores and reads back the value, and the runtime interpreter refuses
-/// the very same artifact by name. That is `X3-MEV-004`'s remaining gap expressed as an executable
-/// claim rather than as a note.
+/// `crates/x3-vm` journaled `evm_sstore`/`evm_sload` while the runtime interpreter refused both, so
+/// a contract could carry a slot between calls off chain and could not carry one on chain at all —
+/// which also meant the kernel's storage-write channel had no producer on the canonical path. Both
+/// engines implement the pair now, over the same key derivation and the same tagged payload, and
+/// this test is the thing that makes "the same slot" a checked claim: the two journals are compared
+/// key byte for key byte and value byte for value byte, because a contract whose state depends on
+/// which engine ran it is not a contract.
 #[test]
-fn slot_storage_is_implemented_off_chain_and_refused_on_chain() {
+fn slot_storage_is_implemented_by_both_engines_and_names_the_same_slot() {
     // slot = r1 (0), value = r2 (5); store; load back into r3; return r3.
     let bytes = module_with_code(&[
         0x18, 0x01, 0x00, // LoadImm r1, 0
@@ -161,11 +168,33 @@ fn slot_storage_is_implemented_off_chain_and_refused_on_chain() {
         Some(x3_vm::Value::I64(5)),
         "the std VM must read back what it stored"
     );
+    let journal = vm.drain_storage_journal();
+    assert_eq!(journal.len(), 1, "the std VM journals the write");
+
+    let runtime = execute_x3bc(&bytes, 100_000).expect("the runtime interpreter implements it too");
+    assert_eq!(
+        runtime.return_val,
+        x3_x3_integration::mini_x3::MiniValue::I64(5),
+        "and must read back what it stored"
+    );
+    assert_eq!(
+        runtime.storage_writes.len(),
+        1,
+        "the on-chain interpreter journals the write the kernel is handed"
+    );
 
     assert_eq!(
-        execute_x3bc(&bytes, 100_000).unwrap_err(),
-        X3Error::UnsupportedOpcode(0xB4),
-        "the runtime interpreter must refuse the store rather than answer it"
+        runtime.storage_writes[0].key.as_bytes(),
+        &journal[0].key,
+        "the two engines must name the same 32-byte slot"
+    );
+    assert_eq!(
+        runtime.storage_writes[0].new_value, journal[0].new_value,
+        "and must persist the same bytes in it"
+    );
+    assert_eq!(
+        runtime.storage_writes[0].old_value, journal[0].old_value,
+        "including the value the write replaced"
     );
 }
 
@@ -179,7 +208,7 @@ fn slot_storage_is_implemented_off_chain_and_refused_on_chain() {
 //   were silently skipped by the runtime one; the runtime interpreter now implements the window
 //   over globals, so both engines have a real implementation.
 // * The runtime interpreter refuses the whole aggregate family and every cross-vm/gpu intrinsic
-//   (`AGENTS.md` §5, §18). `crates/x3-vm` refuses them too, except `0xB3`/`0xB4`
-//   (`EvmSload`/`EvmSstore`), which it implements against its own journaled storage — so a contract
-//   that persists a slot off-chain cannot yet persist one on chain. That gap is recorded on
-//   `X3-MEV-004`, not papered over here.
+//   (`AGENTS.md` §5, §18), and `crates/x3-vm` refuses them too. `0xB3`/`0xB4`
+//   (`EvmSload`/`EvmSstore`) used to be the one exception, in the wrong direction — the `std` VM
+//   implemented them and the runtime refused them. Both implement them now, and the test above
+//   compares the two journals rather than assuming they agree.

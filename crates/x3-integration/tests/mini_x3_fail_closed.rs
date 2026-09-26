@@ -91,8 +91,13 @@ fn unexecutable_instructions() -> Vec<(&'static str, Vec<u8>)> {
 
     // Cross-VM and GPU intrinsics. Each is a real opcode with a defined encoding; none has a host
     // to call in the runtime build, and a GPU result that no device produced is exactly what §18
-    // forbids accepting.
-    for byte in (0xB0u8..=0xB9).chain(0xC0..=0xC7).chain(0xD0..=0xD7) {
+    // forbids accepting. `0xB3`/`0xB4` (`EvmSload`/`EvmSstore`) are deliberately absent: they are
+    // the slot-storage pair and are implemented for real, which the tests below hold them to.
+    for byte in (0xB0u8..=0xB9)
+        .chain(0xC0..=0xC7)
+        .chain(0xD0..=0xD7)
+        .filter(|byte| *byte != 0xB3 && *byte != 0xB4)
+    {
         cases.push(("intrinsic", vec![byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]));
     }
     cases
@@ -289,5 +294,88 @@ fn nesting_more_windows_than_the_limit_is_refused() {
         execute_x3bc(&nested(33), 1_000_000).unwrap_err(),
         X3Error::AtomicDepthExceeded,
         "one window past the limit must be refused, not tracked"
+    );
+}
+
+/// A value written to a slot must reach the caller as a write the chain can apply.
+///
+/// `0xB3`/`0xB4` are the only way an `.x3` program carries a value between executions, so this is
+/// also the only place an on-chain program can change chain state at all. The *key* matters as much
+/// as the value: it is the 32 bytes the kernel applies, so it is asserted literally rather than
+/// compared against the interpreter's own helper (which would agree with itself whatever it did).
+#[test]
+fn a_slot_written_on_chain_is_reported_as_a_write_the_receipt_can_carry() {
+    // LoadImm r1, 0; LoadImm r2, 5; EvmSstore r1 <- r2; EvmSload r3 <- r1; Ret r3
+    let bytes = module_with_code(&[
+        0x18, 0x01, 0x00, //
+        0x18, 0x02, 0x05, //
+        0xB4, 0x01, 0x02, //
+        0xB3, 0x03, 0x01, //
+        0x05, 0x03, //
+    ]);
+    let result = execute_x3bc(&bytes, 100_000).expect("a storing program must run");
+
+    assert_eq!(
+        result.return_val,
+        MiniValue::I64(5),
+        "the load must read back what the store wrote"
+    );
+    assert_eq!(result.storage_writes.len(), 1, "one store, one write");
+
+    let write = &result.storage_writes[0];
+    // The EVM domain tag in the first eight bytes, the slot index little-endian in the next eight,
+    // the rest zero. These are the bytes `crates/x3-vm` produces for the same slot, and
+    // `interpreter_agreement.rs` holds the two engines to it; the literal is here so a change to
+    // the derivation cannot pass by changing the helper that computes it.
+    let mut expected_key = [0u8; 32];
+    expected_key[..8].copy_from_slice(&0x5833_4556_4D5F_534Cu64.to_le_bytes());
+    assert_eq!(write.key.as_bytes(), &expected_key);
+
+    assert_eq!(
+        write.old_value, None,
+        "the slot was empty in this execution's view"
+    );
+    let mut expected_payload = [0u8; 32];
+    expected_payload[0] = 1; // integer tag
+    expected_payload[1] = 8; // eight bytes of payload
+    expected_payload[2..10].copy_from_slice(&5i64.to_le_bytes());
+    assert_eq!(write.new_value, Some(expected_payload));
+}
+
+/// An unwritten slot reads as zero — EVM's rule, and the only rule an interpreter that starts with
+/// no state can honestly apply. Anything else would be a fabricated value.
+#[test]
+fn an_unwritten_slot_reads_as_zero_and_a_read_is_not_a_write() {
+    // LoadImm r1, 9 (never written); EvmSload r3 <- r1; Ret r3
+    let bytes = module_with_code(&[0x18, 0x01, 0x09, 0xB3, 0x03, 0x01, 0x05, 0x03]);
+    let result = execute_x3bc(&bytes, 100_000).expect("a reading program must run");
+
+    assert_eq!(result.return_val, MiniValue::I64(0));
+    assert!(
+        result.storage_writes.is_empty(),
+        "a load must not be journaled as a write"
+    );
+}
+
+/// A store the slot cannot carry is refused by name instead of being dropped.
+///
+/// `StoreGlobal` ignores a `Unit` write, so the program is told a write it did not get succeeded.
+/// The slot store must not repeat that: the register here is never initialised, so it holds `Unit`.
+#[test]
+fn a_store_of_a_value_a_slot_cannot_carry_is_refused() {
+    // LoadImm r1, 0; EvmSstore r1 <- r2 (r2 is still Unit); RetVoid
+    let bytes = module_with_code(&[0x18, 0x01, 0x00, 0xB4, 0x01, 0x02, 0x06]);
+    assert_eq!(
+        execute_x3bc(&bytes, 100_000).unwrap_err(),
+        X3Error::UnencodableStorageValue("unit is not a storable value")
+    );
+
+    // A slot index that is not a non-negative integer is refused too: a negative index is not a
+    // key, and reinterpreting it as one would move the write to a slot nobody asked for.
+    // LoadImm r1, -1 is not expressible here, so the register is loaded with a Bool instead.
+    let bool_slot = module_with_code(&[0x18, 0x01, 0x00, 0xB3, 0x03, 0x02, 0x06]);
+    assert_eq!(
+        execute_x3bc(&bool_slot, 100_000).unwrap_err(),
+        X3Error::InvalidStorageSlot("slot index is not an integer")
     );
 }
