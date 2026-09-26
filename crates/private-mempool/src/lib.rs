@@ -79,6 +79,17 @@ pub struct DecryptionShare {
     pub share: Vec<u8>,
     /// Proof of correct decryption (DLEQ proof).
     pub proof: Vec<u8>,
+    /// The DKG epoch the share was minted under.
+    ///
+    /// A partial decryption is only meaningful against the ciphertext it was
+    /// produced for: it is `share_scalar * ephemeral_point`, and the scalar
+    /// comes from one specific DKG ceremony. Shares from two different epochs
+    /// can therefore be combined into a point that belongs to neither, and
+    /// before this field existed nothing distinguished them — the only
+    /// symptom was an opaque AES-GCM tag failure. [`crate::encryption::combine_shares`]
+    /// refuses a share whose epoch is not the one being decrypted, with
+    /// [`MempoolError::ShareEpochMismatch`].
+    pub dkg_epoch: u64,
 }
 
 /// Configuration for the private mempool.
@@ -212,6 +223,11 @@ pub enum MempoolError {
 
     #[error("TX encrypted for wrong epoch (expected {expected}, got {got})")]
     WrongEpoch { expected: u64, got: u64 },
+
+    #[error(
+        "decryption share belongs to DKG epoch {got}, not the epoch {expected} being decrypted"
+    )]
+    ShareEpochMismatch { expected: u64, got: u64 },
 
     #[error("Duplicate transaction")]
     Duplicate,

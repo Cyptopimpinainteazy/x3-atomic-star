@@ -86,6 +86,15 @@ pub struct ConfidentialGpuConfig {
     pub threshold: u32,
     /// Total committee size n.
     pub committee_size: u32,
+    /// The DKG ceremony this committee is serving.
+    ///
+    /// A partial decryption is only meaningful under the ceremony it was
+    /// minted in, so the runtime has to state one: it is recorded on every
+    /// [`private_mempool::DecryptionShare`] this runtime's managers produce and
+    /// checked again when shares are combined. It must match the epoch the
+    /// transactions being decrypted were encrypted for
+    /// (`private_mempool::EncryptedTransaction::dkg_epoch`).
+    pub dkg_epoch: u64,
 }
 
 impl Default for ConfidentialGpuConfig {
@@ -99,6 +108,7 @@ impl Default for ConfidentialGpuConfig {
             validator_index: 0,
             threshold: 3,
             committee_size: 5,
+            dkg_epoch: 1,
         }
     }
 }
@@ -127,6 +137,7 @@ impl ConfidentialGpuRuntime {
                 config.validator_index,
                 config.threshold,
                 config.committee_size,
+                config.dkg_epoch,
             ),
             status: RuntimeStatus::Uninitialized,
             executions_completed: 0,
