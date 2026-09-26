@@ -79,7 +79,10 @@ blockers = [
 evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item"]
 
 [[feature]]
-# Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/vm/src/executor.rs (snapshot/rollback path)
+# Re-measured 2026-09-26 (round 5) on 703ca5d24 of feat/x3-prelaunch-economics-x3lang-cutover.
+# The row's own paths (`x3-lang/compiler`, `x3-lang/vm`) are not what a chain executes; the chain
+# runs X3BC through `crates/x3-vm`, and the 2026-09-22 provenance note against a closed PR is
+# superseded by measurements taken on the tree itself.
 id = "X3-MEV-004"
 name = "Transactional host rollback"
 subsystem = "mev_privacy"
@@ -88,18 +91,20 @@ paths = [
   "x3-lang/compiler",
   "x3-lang/vm",
   "crates/x3-vm/src/storage.rs",
+  "crates/x3-vm/src/vm.rs",
 ]
-implemented = 55
-tested = 45
-mainnet_ready = 30
+implemented = 70
+tested = 65
+mainnet_ready = 40
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "Re-measured 2026-09-26 on the *production* path (`crates/x3-vm`, which is what `pallet-x3-kernel` runs through `X3VmAdapter` — the row's own path, `x3-lang/compiler`, is not what the chain executes). The atomic window's rollback was not transactional: `VmStorage::rollback` restored the data map from its snapshot and then called `journal.clear()`, so every write recorded *before* the window was dropped from the journal too. Measured: write A, snapshot, write B, rollback -> `data = {A}` but an empty journal, and the journal is documented as the write delta for cross-VM sync. Fixed: the snapshot now records the journal length and rollback truncates to it, so a reverted window abandons only its own writes. Four tests, one break-it-first control (restoring `journal.clear()` reddens three of them).",
-  "The journal still has no writer, so nothing on a chain exercises the guarantee. `crates/x3-vm/src/vm.rs` mutates `self.storage` only through `snapshot`/`commit`/`rollback`; there is no instruction in the interpreter that writes a key. `EvmSstore`/`EvmSload` exist in the ISA and the verifier (operands `slot:u8 val:u8`, 5000 gas) but hit the interpreter's `_` arm and return `UnimplementedOpcode`. Until a store is interpreted (or a hostcall writes storage), X3VM contracts cannot persist state at all, and the atomic rollback over storage can only be proven at the unit level (TICKET-145).",
-  "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution — a contract that is stated in the trait's docs and enforced nowhere.",
+  "Storage is now reachable and journaled, but the writes still do not land in chain state. `evm_sstore`/`evm_sload` (0xB4/0xB3) execute in the interpreter as of this measurement, so a contract can carry a value between calls and an atomic window's rollback abandons only the window's writes - but `X3Executor::execute` (`crates/x3-integration/src/executor.rs`) returns `state_changes: vec![]` with the comment \"Hostcall state change collection deferred to runtime integration\", and `drain_storage_journal` has no caller outside `crates/x3-vm`'s own tests. A slot a program writes is therefore durable within one VM instance and invisible to everyone else (TICKET-147).",
+  "The receipt's `state_changes` channel cannot carry contract storage as it stands. `pallet-x3-kernel`'s `apply_canonical_ledger_update_v2` decodes every entry as (address -> account, key -> asset id, value -> balance) and counts anything else in `DecodeFailureCount`, so routing slot writes through it would inflate a monitoring counter rather than persist a byte (TICKET-147). X3VM contract storage needs its own typed channel before it can be claimed on chain.",
+  "The guarantee is proven at the VM level only. No node or validator network has executed a store, and the rollback is exercised by unit tests in `crates/x3-vm` rather than by a live chain, so this is not yet mainnet evidence.",
+  "The language VM's host-transaction protocol is unexercised in production: `TradingHost::begin_transaction`/`commit_transaction`/`rollback_transaction` have no caller outside `x3-lang/vm/tests`, and the bytecode-level `ATOMIC_ROLLBACK` in `x3-lang/vm/src/executor.rs` restores VM state (registers, memory, op records, instruction count) without invoking any host hook. That is safe only if a host never applies an effect during execution - a contract that is stated in the trait's docs and enforced nowhere.",
 ]
 required_tests = [
   "test_rollback_keeps_the_journal_of_writes_that_predate_the_window",
@@ -108,16 +113,30 @@ required_tests = [
   "test_rollback_of_a_delete_restores_the_key_and_the_journal",
   "test_nested_snapshots",
   "test_snapshot_and_rollback",
+  "evm_store_and_load_round_trip_every_value_kind",
+  "evm_load_of_an_unwritten_slot_reads_zero",
+  "evm_store_refuses_a_negative_slot",
+  "evm_store_refuses_a_non_integer_slot",
+  "evm_store_refuses_a_payload_that_does_not_fit_a_slot",
+  "evm_store_refuses_unit",
+  "evm_load_fails_closed_on_a_payload_this_isa_did_not_write",
+  "evm_store_inside_a_rolled_back_window_is_abandoned",
+  "evm_store_journals_the_write_for_cross_vm_sync",
+  "evm_storage_is_charged_the_verifier_table_cost",
+  "evm_slot_keys_are_disjoint_from_global_keys",
 ]
 test_evidence = [
   "crates/x3-vm/src/storage.rs",
-  "note: `cargo test -p x3-vm` -> 154 lib tests passed, 0 failed (plus 8 in another target and one pre-existing ignored test); `cargo clippy -p x3-vm --all-targets -- -D warnings` and `cargo fmt -p x3-vm -- --check` are clean",
-  "note: measured load-bearing - restoring `journal.clear()` in `VmStorage::rollback` makes test_rollback_keeps_the_journal_of_writes_that_predate_the_window, test_nested_rollback_truncates_the_journal_to_the_inner_window and test_rollback_of_the_outer_window_abandons_a_committed_inner_window FAIL; truncating to the snapshot's journal length returns all 15 storage tests to green",
+  "note: `cargo test -p x3-vm` -> 165 lib tests passed, 0 failed, 0 ignored (154 before this measurement) plus 8 in another target and one pre-existing ignored test; `cargo clippy -p x3-vm --all-targets -- -D warnings` -> exit 0; `cargo fmt -p x3-vm -- --check` -> exit 0 (measured 2026-09-26 on 703ca5d24)",
+  "note: measured load-bearing (storage) - restoring `journal.clear()` in `VmStorage::rollback` makes test_rollback_keeps_the_journal_of_writes_that_predate_the_window, test_nested_rollback_truncates_the_journal_to_the_inner_window and test_rollback_of_the_outer_window_abandons_a_committed_inner_window FAIL; truncating to the snapshot's journal length returns all 15 storage tests to green",
+  "note: measured load-bearing (opcodes) - guarding the two new interpreter arms off (`Opcode::EvmSload if false`, `Opcode::EvmSstore if false`, so both fall through to the `_` arm that returned `UnimplementedOpcode` before this change) reddens 10 of the 11 new tests with `UnimplementedOpcode(180)`; restored, `cargo test -p x3-vm --lib evm_` -> 15 passed, 0 failed",
+  "note: fail-closed coverage - an unknown payload tag, a payload shorter than its declared kind, a negative slot and a non-integer slot each return a typed error (`CorruptStorageSlot`/`InvalidStorageSlot`) instead of a value, and a 31-byte payload is refused (`UnencodableStorageValue`) rather than truncated into a 32-byte slot",
 ]
 evidence = [
   "crates/x3-vm/src/storage.rs",
+  "crates/x3-vm/src/vm.rs",
   "x3-lang/vm/src/trading.rs",
-  "note: Trading Core v1 hardening item; the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs and the rollback semantics are now proven at the storage level",
+  "note: Re-measured 2026-09-26 (round 5) - the atomic window lifecycle (AtomicBegin/AtomicCommit/AtomicRollback + AtomicAborted) is implemented in crates/x3-vm/src/vm.rs; `evm_sstore`/`evm_sload` are interpreted over a slot keyspace disjoint from the global keyspace (`evm_slot_keys_are_disjoint_from_global_keys`), priced at the verifier's own figures (200/5000), and the rollback is now proven through the opcode path and at the storage level",
 ]
 
 [[feature]]
