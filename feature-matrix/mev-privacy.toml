@@ -162,16 +162,36 @@ id = "X3-MEV-006"
 name = "MEV-resistant architecture"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["pallets/private-execution"]
-implemented = 45
-tested = 25
+paths = ["pallets/private-execution", "runtime/src/lib.rs"]
+implemented = 60
+tested = 45
 mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No complete formal MEV threat model; do not claim MEV-proof"]
-evidence = ["pallets/private-execution", "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"]
+blockers = [
+  "The pallet now runs an ordering window on chain, so this is no longer 'private execution and nothing else': `open_ordering_window` / `commit_ordering` / `reveal_ordering` / `install_ordering_beacon` / `settle_ordering_window` drive the `CommitRevealLane` from `crates/x3-order-window` (the same algorithm its 26 crate tests verify), the settled order is stored as the *recomputable* canonical order and the dispatchable asserts the published sequence equals `settlement.canonical_order()`, and bonds are reserved on commit, released on reveal and `slash_reserved` for the unrevealed set with a fail-closed check that the whole amount moved. Measured: 22 new pallet tests, 34 in the pallet's suite, and `cargo check -p x3-chain-runtime` compiles the wiring into every runtime variant.",
+  "No complete formal MEV threat model, and 'MEV-proof' is still not claimable: the beacon extrinsic exists but nothing supplies a beacon, so the placement hole the lane documents is open (a participant that can grind its own nonce chooses where its own commitment lands); the weights for the five new extrinsics are hand-sized rather than benchmarked; nothing has run on a live node; and reveal/settle are deliberately not gated on the `Enabled` switch or the validator quorum (gating them would freeze bonds the chain already took) — so disabling private execution does not stop an open window from settling, which is a policy the operator should confirm rather than discover.",
+]
+required_tests = [
+  "a_settled_window_is_the_canonical_key_order_and_recomputes_from_storage",
+  "a_settled_window_uses_the_installed_beacon",
+  "a_reveal_that_does_not_hash_to_its_commit_is_refused",
+  "only_the_committer_may_reveal",
+  "a_second_reveal_of_the_same_commitment_is_refused",
+  "an_unrevealed_commitment_is_excluded_and_its_bond_forfeited",
+  "settling_an_open_window_is_refused_and_settling_twice_is_refused",
+  "one_sender_commits_once_per_window",
+  "disabling_private_execution_does_not_trap_committed_bonds",
+]
+test_evidence = [
+  "pallets/private-execution/src/tests.rs",
+  ".ai/runlogs/round5-workstream-a-ordering-window-20260926.md",
+  "note: cargo test -p pallet-private-execution -> 34 passed, 0 failed (12 pre-existing + 22 new); clippy --all-targets -D warnings and cargo fmt --all --check clean; cargo check -p pallet-private-execution --no-default-features ok",
+  "note: measured load-bearing - making settle sort by the reveal block and then the commit hash instead of by the order key makes the canonical-order test FAIL with the exact reversed sequence; the test gives each commit and reveal its own block, so that failure cannot be masked by everything landing in one block",
+]
+evidence = ["pallets/private-execution", "crates/x3-order-window", "note: Private execution and trading controls exist, and as of 2026-09-26 a chain path enforces a canonical order over a closed window; the MEV-proof claim remains forbidden"]
 
 [[feature]]
 # Re-measured 2026-09-26 (round 4, workstream A) on commit dd22bddfd of
@@ -231,17 +251,19 @@ source = "master"
 paths = [
   "crates/x3-order-window",
   "crates/x3-swap-router/src/mev_protection",
+  "pallets/private-execution",
   "crates/x3-dex/src/batch_swap_router.rs",
 ]
-implemented = 45
-tested = 40
-mainnet_ready = 10
+implemented = 55
+tested = 60
+mainnet_ready = 15
 priority = "P1"
 confidence = "high"
 launch_scope = "research"
 claim_risk = false
 blockers = [
   "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
+  "Half of that is closed and half is not. `pallets/private-execution` now calls the lane directly (`crates/x3-order-window`, the no_std crate the algorithm moved into), opens windows, takes commits and reveals, settles into the stored canonical order, and moves bonds; `cargo test -p pallet-private-execution` -> 34 passed. What still has no caller is `crates/x3-swap-router` itself: the router's own execution path does not read `OrderingSettlements`, so a swap batch and an ordering window can disagree about who went first",
   "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
   "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
   "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
@@ -272,6 +294,8 @@ required_tests = [
   "a_front_runner_cannot_reorder_the_batch_by_handing_it_over_differently",
   "the_refusal_happens_before_any_output_is_accepted",
   "a_batch_in_the_order_it_declares_executes",
+  "a_settled_window_is_the_canonical_key_order_and_recomputes_from_storage",
+  "settling_an_open_window_is_refused_and_settling_twice_is_refused",
   "a_window_beyond_its_capacity_is_refused",
   "settling_before_the_window_closes_is_refused",
   "settling_twice_is_refused",
@@ -280,6 +304,7 @@ required_tests = [
 ]
 test_evidence = [
   "note: cargo test -p x3-swap-router --lib fair_ordering -> 26 passed, 0 failed, 12 filtered out (re-run by the primary agent 2026-09-26 on commit e2879257c)",
+  "note: cargo test -p pallet-private-execution -> 34 passed, 0 failed: the on-chain window settles into the canonical order, stores it, and asserts the published sequence equals `settlement.canonical_order()`",
   "note: cargo test -p x3-dex -> 216 passed, 0 failed, 0 ignored with the batch-order enforcement in place; deleting the execute-side check makes the_refusal_happens_before_any_output_is_accepted fail with `assertion left == right failed: a batch carrying one order while declaring another must be refused` (TICKET-142)",
   "note: cargo test -p x3-swap-router -> 38 passed in the lib target and 25 passed in prop_swap_math, 0 doc-tests; cargo clippy -p x3-swap-router --all-targets -- -D warnings -> exit 0",
   "note: break-it-first controls, disabling one rule at a time - order by arrival block makes reveals_landing_at_different_blocks_still_order_by_key FAIL with the exact reversed sequence; reveal after the deadline, sender binding and hash binding each turn their tests red; restored, green",

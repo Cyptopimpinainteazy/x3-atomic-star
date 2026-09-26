@@ -3239,31 +3239,34 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 36,
+      "composite": 46,
       "confidence": "high",
       "evidence": [
         "pallets/private-execution",
-        "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"
+        "crates/x3-order-window",
+        "note: Private execution and trading controls exist, and as of 2026-09-26 a chain path enforces a canonical order over a closed window; the MEV-proof claim remains forbidden"
       ],
       "id": "X3-MEV-006",
-      "implemented": 45,
+      "implemented": 60,
       "launch_scope": "guarded",
-      "live_tested": "not a registered launch feature",
+      "live_tested": "GUARDED_TESTNET",
       "mainnet_ready": 35,
       "missing_work": [
-        "No complete formal MEV threat model; do not claim MEV-proof"
+        "The pallet now runs an ordering window on chain, so this is no longer 'private execution and nothing else': `open_ordering_window` / `commit_ordering` / `reveal_ordering` / `install_ordering_beacon` / `settle_ordering_window` drive the `CommitRevealLane` from `crates/x3-order-window` (the same algorithm its 26 crate tests verify), the settled order is stored as the *recomputable* canonical order and the dispatchable asserts the published sequence equals `settlement.canonical_order()`, and bonds are reserved on commit, released on reveal and `slash_reserved` for the unrevealed set with a fail-closed check that the whole amount moved. Measured: 22 new pallet tests, 34 in the pallet's suite, and `cargo check -p x3-chain-runtime` compiles the wiring into every runtime variant.",
+        "No complete formal MEV threat model, and 'MEV-proof' is still not claimable: the beacon extrinsic exists but nothing supplies a beacon, so the placement hole the lane documents is open (a participant that can grind its own nonce chooses where its own commitment lands); the weights for the five new extrinsics are hand-sized rather than benchmarked; nothing has run on a live node; and reveal/settle are deliberately not gated on the `Enabled` switch or the validator quorum (gating them would freeze bonds the chain already took) \u2014 so disabling private execution does not stop an open window from settling, which is a policy the operator should confirm rather than discover."
       ],
       "name": "MEV-resistant architecture",
       "paths": [
-        "pallets/private-execution"
+        "pallets/private-execution",
+        "runtime/src/lib.rs"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 25,
-      "tests": "tested score 25% (no named test list on this row)"
+      "tested": 45,
+      "tests": "3 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -3300,19 +3303,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 30,
+      "composite": 40,
       "confidence": "high",
       "evidence": [
         "crates/x3-swap-router/src/mev_protection",
         "note: Measured 2026-09-26 (round 4, workstream B) on e2879257c - a deterministic commit-reveal lane replaces the pre-existing MEVProtector, which returned `(min + max) / 2` as a random delay, filled tx hashes with `H256::zero()` and no consumer ever reached; the row stays research-scoped because nothing consumes the crate"
       ],
       "id": "X3-MEV-008",
-      "implemented": 45,
+      "implemented": 55,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 10,
+      "mainnet_ready": 15,
       "missing_work": [
         "No execution path consumes x3-swap-router: `cargo tree -i x3-swap-router --workspace` lists only the crate itself, so the lane orders nothing on any chain yet",
+        "Half of that is closed and half is not. `pallets/private-execution` now calls the lane directly (`crates/x3-order-window`, the no_std crate the algorithm moved into), opens windows, takes commits and reveals, settles into the stored canonical order, and moves bonds; `cargo test -p pallet-private-execution` -> 34 passed. What still has no caller is `crates/x3-swap-router` itself: the router's own execution path does not read `OrderingSettlements`, so a swap batch and an ordering window can disagree about who went first",
         "Beacon provenance is an off-chain assumption: a beacon is refused only while participants can still commit, so whoever installs it can grind it and bias the whole order - it needs a source the caller cannot choose (a future block hash, a VRF or a threshold signature)",
         "Sybil addresses are not prevented: the lane allows one commitment per sender address, not per entity",
         "Bond forfeiture is reported through `WindowSettlement::forfeitable_bond()` and never applied - there is no pallet integration that moves the bond",
@@ -3322,15 +3326,16 @@
       "paths": [
         "crates/x3-order-window",
         "crates/x3-swap-router/src/mev_protection",
+        "pallets/private-execution",
         "crates/x3-dex/src/batch_swap_router.rs"
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 40,
-      "tests": "tested score 40% (no named test list on this row)"
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4504,7 +4509,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "2093dde3b3e7ab1123b8b4990c1d8935ee72b127bdc3be791b464371226f20d0",
+    "source_digest": "bbfee065d57e607bb85d3c87423b7d604eacabc201263919b8f330a0defde996",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4516,7 +4521,7 @@
       "feature-matrix/economic-defi.toml": "d5fa7faa958b6038d92dae1f0fee99bd37e0e5045b88cd45bf557e0e5105cd51",
       "feature-matrix/gpu-performance.toml": "4d2e111139f384af42b60afba4db9193a7dc6e2009622d18cf47f98ae6ccd1be",
       "feature-matrix/language-trading.toml": "57c82b54a2695e2c0403f7c87baa00a22cb54218dcba753ee5f27c0d13bf9eba",
-      "feature-matrix/mev-privacy.toml": "5fa496e5288b0aea38a3c2b0955494c3b801f15341ea83642cff41a31fbf84cd",
+      "feature-matrix/mev-privacy.toml": "7e1bde644f08ac57ac06955726f0891f267965cf3ff13e91cb31bce8aad882a4",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -4963,8 +4968,8 @@
       "FUNCTIONAL BUT UNHARDENED": 57,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 64,
-      "STUB": 10
+      "PARTIAL": 66,
+      "STUB": 8
     },
     "matrix_features": 146,
     "registry_features": 21,
