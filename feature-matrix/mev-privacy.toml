@@ -229,7 +229,7 @@ id = "X3-MEV-007"
 name = "Encrypted mempool / threshold encryption"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["crates/private-mempool"]
+paths = ["crates/private-mempool", "crates/x3-threshold-core", "crates/confidential-gpu"]
 implemented = 45
 tested = 40
 mainnet_ready = 10
@@ -262,6 +262,7 @@ required_tests = [
 ]
 test_evidence = [
   "note: cargo test -p private-mempool -> 29 passed, 0 failed, 0 ignored (19 before this lane's ten tests)",
+  "note: 2026-09-26 the scheme moved to crates/x3-threshold-core (`no_std` + alloc, SCALE codecs, so a runtime pallet can link it) and private-mempool re-exports it - one definition, one set of tests, 29 before and after (22 moved, 7 new validation tests). Measured for the runtime target: cargo check -p x3-threshold-core --no-default-features -> ok and --target wasm32-unknown-unknown -> ok. Deleting the epoch comparison makes a_submission_for_another_epoch_is_refused_by_name fail",
   "note: cargo test -p confidential-gpu -> 10 passed, 0 failed; cargo clippy -p private-mempool -p confidential-gpu --all-targets -- -D warnings -> exit 0; cargo fmt --all -- --check -> exit 0",
   "note: break-it-first control - disabling the epoch check in the combiner turns a_share_from_a_different_dkg_epoch_is_refused_with_a_typed_error red, and confidential-gpu's a_share_from_another_ceremony_is_refused_by_name red; restored, both suites are green",
   "note: reachability measured 2026-09-26 - cargo tree -i private-mempool --workspace returns confidential-gpu alone, nothing in runtime/ or node/ depends on confidential-gpu, and the mempool type has no caller in the tree",
