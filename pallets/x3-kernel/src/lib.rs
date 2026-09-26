@@ -1041,6 +1041,9 @@ pub mod pallet {
         SettlementMismatch,
         /// State inconsistency detected across VM branches.
         StateInconsistency,
+        /// An X3 call asked for more gas than `DefaultX3GasLimit`, the most one extrinsic's weight
+        /// pays for.
+        X3GasBudgetExceedsLimit,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -2517,6 +2520,23 @@ pub mod pallet {
                     let svm_balance = dispatcher.get_svm_balance(&pubkey) as u128;
                     ensure!(svm_balance >= *svm_amount, Error::<T>::InsufficientBalance);
                 }
+                // An X3 call's gas budget came from the caller and was unbounded, while every
+                // extrinsic that runs one is weighted for at most `DefaultX3GasLimit`: one
+                // operation with a looping program and a `u64::MAX` budget would run until the
+                // block author stalled. Refused here, before any fee is locked, and again where
+                // the call executes.
+                CrossVmOperation::CallX3Vm { call, .. } => {
+                    ensure!(
+                        call.gas_budget <= T::DefaultX3GasLimit::get(),
+                        Error::<T>::X3GasBudgetExceedsLimit
+                    );
+                }
+                CrossVmOperation::AtomicTriSwap { x3vm_call, .. } => {
+                    ensure!(
+                        x3vm_call.gas_budget <= T::DefaultX3GasLimit::get(),
+                        Error::<T>::X3GasBudgetExceedsLimit
+                    );
+                }
                 _ => {}
             }
             Ok(())
@@ -3711,6 +3731,11 @@ pub mod pallet {
                 });
             }
 
+            // Checked at admission too (`cross_vm_prepare_checks`); this is the bound that holds
+            // whichever path reached the dispatcher.
+            if call.gas_budget > T::DefaultX3GasLimit::get() {
+                return Err(Error::<T>::X3GasBudgetExceedsLimit.into());
+            }
             let receipt = T::X3Adapter::execute(call.payload.as_slice(), call.gas_budget)?;
             let result = if receipt.success {
                 CrossVmResult::success(receipt.return_data, receipt.gas_used)

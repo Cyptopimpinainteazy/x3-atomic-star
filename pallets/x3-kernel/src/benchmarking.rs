@@ -145,6 +145,31 @@ mod benchmarks {
         Ok(())
     }
 
+    /// Running an X3 program on the chain's engine, as a function of the gas it spends.
+    ///
+    /// `submit_comit_v2` executes its X3 payload for up to `DefaultX3GasLimit` gas, and the cross-VM
+    /// extrinsics execute an X3 call for up to the same bound; their weight was a constant that paid
+    /// for none of that execution, so a block could be filled with work its weight did not count.
+    /// This measures the engine the runtime runs — `WasmX3Adapter`, which the native runtime's
+    /// adapter delegates to — on a program that spends exactly `g` gas, so the weight is linear in
+    /// the gas an extrinsic is allowed.
+    #[benchmark]
+    fn x3_execute(g: Linear<1_000, 6_000_000>) -> Result<(), BenchmarkError> {
+        use crate::X3ExecutorAdapter;
+        let receipt;
+        #[block]
+        {
+            receipt = crate::wasm_adapters::WasmX3Adapter::execute(
+                crate::bench_fixtures::X3_LOOP_FIXTURE,
+                g as u64,
+            );
+        }
+        let receipt = receipt.map_err(|_| BenchmarkError::Stop("the loop fixture must execute"))?;
+        assert!(!receipt.success, "the loop only ends by exhausting its gas");
+        assert_eq!(receipt.gas_used, g as u64);
+        Ok(())
+    }
+
     /// Benchmark register_asset
     ///
     /// Measures cost of:
