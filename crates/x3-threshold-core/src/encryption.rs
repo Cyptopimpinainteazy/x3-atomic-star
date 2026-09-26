@@ -18,6 +18,9 @@
 
 use crate::threshold::{self, SecretShare};
 use crate::{DecryptionShare, EncryptedTransaction, MempoolError};
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 /// Encrypt a transaction payload for the committee.
 ///
@@ -25,6 +28,7 @@ use crate::{DecryptionShare, EncryptedTransaction, MempoolError};
 /// see [`crate::threshold::group_public_key`].
 ///
 /// # Invariant: PRIV-EXEC-001
+#[cfg(feature = "std")]
 pub fn encrypt_for_committee(
     plaintext: &[u8],
     committee_group_key: &[u8; 32],
@@ -124,7 +128,7 @@ pub fn combine_shares(
         )));
     }
 
-    let mut seen_indices = std::collections::HashSet::with_capacity(shares.len());
+    let mut seen_indices = alloc::collections::BTreeSet::new();
     let mut points = Vec::with_capacity(shares.len());
     for share in shares {
         if share.dkg_epoch != dkg_epoch {
@@ -185,7 +189,7 @@ pub fn decrypt_transaction(
 /// constant, publicly-known value regardless of the ephemeral scalar,
 /// silently discarding confidentiality for the entire mempool with no
 /// error and no dependence on any validator's share.
-fn decompress_point(bytes: &[u8; 32]) -> Result<RistrettoPoint, MempoolError> {
+pub fn decompress_point(bytes: &[u8; 32]) -> Result<RistrettoPoint, MempoolError> {
     let point = CompressedRistretto(*bytes)
         .decompress()
         .ok_or_else(|| MempoolError::EncryptionError("invalid Ristretto point".to_string()))?;
@@ -217,7 +221,9 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use hkdf::Hkdf;
+#[cfg(feature = "std")]
 use rand::rngs::OsRng;
+#[cfg(feature = "std")]
 use rand::RngCore;
 use sha2::Sha256;
 
@@ -229,6 +235,7 @@ fn hkdf_derive(ikm: &[u8; 32]) -> Result<[u8; 32], MempoolError> {
     Ok(okm)
 }
 
+#[cfg(feature = "std")]
 fn generate_nonce() -> [u8; 12] {
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
@@ -254,7 +261,7 @@ fn aes_gcm_decrypt(ciphertext: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Resul
     cipher.decrypt(nonce, ciphertext).map_err(|e| e.to_string())
 }
 
-fn blake3_hash(data: &[u8]) -> [u8; 32] {
+pub fn blake3_hash(data: &[u8]) -> [u8; 32] {
     use blake3::Hasher;
     let mut hasher = Hasher::new();
     hasher.update(data);
@@ -263,7 +270,7 @@ fn blake3_hash(data: &[u8]) -> [u8; 32] {
     hash
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
     use crate::threshold::{group_public_key, split_secret};

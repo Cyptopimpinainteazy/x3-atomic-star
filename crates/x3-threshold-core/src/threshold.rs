@@ -27,10 +27,12 @@
 //!   sender computed as `ephemeral_sk * (s * G)`. Fewer than `t` distinct
 //!   validators can never produce that point.
 
+use alloc::vec::Vec;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
+#[cfg(feature = "std")]
 use rand::rngs::OsRng;
 
 /// One committee member's share of a secret scalar.
@@ -48,9 +50,20 @@ pub struct SecretShare {
 /// them reconstruct it (via [`lagrange_coefficient`] interpolation at
 /// `x = 0`), and fewer than `threshold` reveal nothing about it.
 ///
+/// The random coefficients come from `rng`, so this compiles without `std`. The chain does not
+/// hold a committee secret; this is the ceremony's side.
+///
 /// # Panics
 /// If `threshold` is 0 or exceeds `total`.
-pub fn split_secret(secret: Scalar, threshold: u32, total: u32) -> Vec<SecretShare> {
+pub fn split_secret_with<R>(
+    secret: Scalar,
+    threshold: u32,
+    total: u32,
+    rng: &mut R,
+) -> Vec<SecretShare>
+where
+    R: rand_core::CryptoRngCore + ?Sized,
+{
     assert!(threshold >= 1, "threshold must be at least 1");
     assert!(
         threshold <= total,
@@ -60,7 +73,7 @@ pub fn split_secret(secret: Scalar, threshold: u32, total: u32) -> Vec<SecretSha
     let mut coefficients = Vec::with_capacity(threshold as usize);
     coefficients.push(secret);
     for _ in 1..threshold {
-        coefficients.push(Scalar::random(&mut OsRng));
+        coefficients.push(Scalar::random(rng));
     }
 
     (1..=total)
@@ -69,6 +82,16 @@ pub fn split_secret(secret: Scalar, threshold: u32, total: u32) -> Vec<SecretSha
             scalar: evaluate_polynomial(&coefficients, index),
         })
         .collect()
+}
+
+/// [`split_secret_with`] over the operating system's RNG.
+///
+/// `std` only: a runtime has no `OsRng`, and the ceremony that holds the committee secret runs
+/// off-chain. The chain's half of this scheme is validation and shared decryption, both of which
+/// are deterministic and live above.
+#[cfg(feature = "std")]
+pub fn split_secret(secret: Scalar, threshold: u32, total: u32) -> Vec<SecretShare> {
+    split_secret_with(secret, threshold, total, &mut OsRng)
 }
 
 /// Evaluate a polynomial (lowest-degree coefficient first) at `x`.
@@ -138,7 +161,7 @@ pub fn group_public_key(secret: &Scalar) -> [u8; 32] {
     (secret * RISTRETTO_BASEPOINT_POINT).compress().to_bytes()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
