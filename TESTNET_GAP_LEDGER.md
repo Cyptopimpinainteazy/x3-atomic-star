@@ -916,9 +916,38 @@ figures, `apps/x3-studio/electron/main.ts` 4, `apps/dashboard/src/panels/docs/An
 2. Only `apps/*/src-tauri/src/crm` is a surface today. Acceptance: for each app, either declare the
 path a claim surface and fix what it finds, or record it in `EVIDENCE_RECORDS` with the reason.
 
-**TICKET-141 — the public pages still say `Now live on testnet`.** Every page under
-`production/public/` carries the hero tag `Now live on testnet`, and the same ledger records that
-nothing is deployed and all local evidence is loopback. No scanner rule matches a bare liveness
-phrase, so TICKET-139's widening did not touch it. Acceptance: decide what the pages may claim
-about deployment state, fix the copy, and add the rule (a liveness tag with no deployment is the
-same class of claim as the retracted MEV one).
+## TICKET-141 — deployment-state copy, and the rule that now reads it — 2026-09-26
+
+**CLOSED.** This ticket opened because the pages under `production/public/` carried the hero tag
+`Now live on testnet` — a liveness claim with no deployment behind it, the same class as the
+retracted MEV one, and no scanner rule matched it. Measured on this box, four sites stated a
+deployment state that does not exist:
+
+| file | said | now says |
+| --- | --- | --- |
+| `production/public/x3-ecosystem.html` (hero) | `Now live on testnet` | `In development — public testnet not yet deployed` |
+| `production/public/x3-ecosystem(1).html` (hero) | the byte-identical twin of the line above | same fix, or the two files diverge |
+| `production/public/x3-ecosystem*.html` (final CTA) | "Testnet is live. Contracts are deployed." | "The public testnet is not deployed yet. …in development…" |
+| `docs/root/README.md` | "X3 Chain Testnet v1 is NOW LIVE!" | "…is in development — the public testnet is not deployed yet." |
+
+The `README.md` case is the sharpest: the same file says ten lines later that nothing resolves,
+so the page contradicted its own evidence. The hero's pulsing dot went with the claim — a
+blinking green "live" indicator is the claim in a different alphabet.
+
+`LIVENESS` is a third rule set in `scripts/ci/check-claims-hygiene.py`, surface-scoped like
+`NUMERIC` and with the same self-qualification escape, so `not live`, `planned`, `will be live`
+and `- [ ] go live on testnet` are not claims. The rule is load-bearing — measured, and measured
+missing first:
+
+```
+OK   - the committed scanner at b80604eac reads this page with the hero tag: no claim found
+FAIL - the scanner with LIVENESS, same page, same line: "unqualified deployment-state claim"
+OK   - the fixed page, same line: no hit
+OK   - a probe line that says it is not live yet, and a "- [ ]" plan box: qualified, no hit
+```
+
+**Still open, adjacent, not this ticket:** the pages' `Launch on Testnet` button links to `#`,
+and the built bundle `production/public/assets/index-*.js` falls back to fabricated dashboard
+numbers (42 validators, "99.8%" uptime) when its API call fails. Both point at a deployment
+state the ledger says does not exist, but a dead CTA and a baked bundle are TICKET-140-shaped
+(a surface the scanner still does not read), not rule-shaped.

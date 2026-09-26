@@ -16,7 +16,7 @@ all), and all of it text a human would paste into an outbound email. `X3-CLAIM-0
 "MEV-proof marketing claim" had been removed from `CURRENT_MAINNET_STATUS.md`, which is why
 the row read as half-closed: the claim had moved here.
 
-Two rule sets, because the two kinds of claim behave differently:
+Three rule sets, because the kinds of claim behave differently:
 
   * ABSOLUTE  — phrases that are false regardless of context ("MEV-proof", "no MEV",
                 "no front-running", "guaranteed finality"). Scanned across the whole tree.
@@ -24,6 +24,14 @@ Two rule sets, because the two kinds of claim behave differently:
                 results, so these are scanned on the declared claim surfaces and skipped
                 when the line itself qualifies the number (target, research, unverified,
                 not measured, placeholder, ...).
+  * LIVENESS  — statements about *deployment state* ("Now live on testnet", "Testnet is
+                live"). Added 2026-09-26 (TICKET-141): every page under `production/public/`
+                carried the hero tag `Now live on testnet` while the ledger records that the
+                public testnet is not deployed and all local evidence is loopback. A liveness
+                tag with nothing behind it is the same class of claim as the retracted MEV
+                one (`X3-CLAIM-002`), so it is scanned on the claim surfaces and, like
+                NUMERIC, it is skipped when the line qualifies itself (`not live`, `planned`,
+                a plan checkbox).
 
 Widened 2026-09-26 (TICKET-139). The surface list used to be root markdown, `docs/testnet-config`
 and the CRM; the ledger measured ~150 unqualified figures outside it. Each of those paths is now
@@ -150,6 +158,21 @@ NUMERIC = [
     (re.compile(r"\bacross\s+\d+\s+(?:countries|continents|regions)\b", re.I), "traction claim"),
 ]
 
+# Deployment-state phrases (TICKET-141). Narrow on purpose: `LIVE_TESTNET` is a registry
+# lifecycle label, "live network data" is a panel heading, and "live tests" are gates — none
+# of those is a statement that a network is up, and matching them would make the rule noise
+# that the next person switches off. Each pattern here names an actual deployment claim.
+# Scanned on the declared claim surfaces only, with the same self-qualification escape as
+# NUMERIC, so "not live", "planned", "will be live" and `- [ ] go live on testnet` are not
+# claims. (TICKET-141 closed 2026-09-26: the four sites this found were the two public
+# `production/public/x3-ecosystem*` pages and one line each of `docs/root/README.md`.)
+LIVENESS = [
+    (re.compile(r"\bnow\s+live\b", re.I), "deployment-state claim"),
+    (re.compile(r"\blive\s+on\s+(?:testnet|mainnet|devnet)\b", re.I), "deployment-state claim"),
+    (re.compile(r"\b(?:testnet|mainnet|network|chain)\s+is\s+(?:now\s+)?live\b", re.I), "deployment-state claim"),
+    (re.compile(r"\bwe(?:'re|\s+are)\s+live\b", re.I), "deployment-state claim"),
+]
+
 # A number is a claim only when nothing on the line marks it as not-yet-true. `claim` is in
 # this list so that a sentence *about* a claim (the registry, a ticket, a report) is not one.
 # The second group covers what the widened surfaces turned up: a bound to meet
@@ -244,6 +267,10 @@ def scan_line(rel: str, lineno: int, line: str, surface: bool, absolute_only: bo
             hits.append(f"{rel}:{lineno}: ABSOLUTE ({why}): {line.strip()[:160]}")
     if surface and not absolute_only and not numeric_qualified:
         for pattern, why in NUMERIC:
+            if pattern.search(line):
+                hits.append(f"{rel}:{lineno}: unqualified {why}: {line.strip()[:160]}")
+                break
+        for pattern, why in LIVENESS:
             if pattern.search(line):
                 hits.append(f"{rel}:{lineno}: unqualified {why}: {line.strip()[:160]}")
                 break

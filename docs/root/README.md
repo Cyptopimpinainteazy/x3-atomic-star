@@ -37,9 +37,11 @@ X3 Chain is a next-generation Layer-1 blockchain purpose-built to host dual virt
 
 ## Current Status
 
-🎉 **X3 Chain Testnet v1 is NOW LIVE!**
+🚧 **X3 Chain Testnet v1 is in development — the public testnet is not deployed yet.**
 
-- ✅ **Testnet Deployment:** Public testnet with 3+ validators, RPC endpoints, and faucet service operational
+- 🚧 **Testnet Deployment:** Planned, not deployed. What exists today is a **local** seven-validator
+  testnet (`scripts/testnet/`); no public validator, RPC endpoint or faucet is reachable — the three
+  intended names below do not resolve
 - ✅ **X3 Kernel MVP:** Comit submission, nonce management, asset registry, and canonical ledger primitives implemented and wired into runtime
 - ✅ **Runtime Integration:** Aura + GRANDPA consensus, transaction payment, and X3 Kernel fully integrated for end-to-end Comit processing
 - ✅ **Node Service & RPC:** Node starts with Aura + GRANDPA consensus, networking (peer discovery and sync), with HTTP JSON-RPC on `127.0.0.1:9933` and WebSocket JSON-RPC on `127.0.0.1:9944`
