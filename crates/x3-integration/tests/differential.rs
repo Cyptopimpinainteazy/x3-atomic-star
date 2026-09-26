@@ -587,6 +587,15 @@ const ILL_FORMED: &[(&str, &str)] = &[
     // Found by the `compile_and_run` fuzz target: the empty program compiled to a module the
     // chain refuses.
     ("empty_program", ""),
+    // `compile_and_run` again: the lexer skipped control characters, so these compiled.
+    (
+        "nul_inside_a_statement",
+        "fn main() -> i64 {\n    return\u{0} 1;\n}\n",
+    ),
+    (
+        "backspace_before_an_expression",
+        "fn main() -> i64 {\n    let x = 1;\n    \u{8}x;\n    return x;\n}\n",
+    ),
     // Also from `compile_and_run`: `^` compiled to a call to a "builtin" no engine implements.
     (
         "power_operator",
@@ -624,4 +633,32 @@ fn ill_formed_programs_are_refused_at_compile_time() {
         accepted.len(),
         accepted.join("\n  ")
     );
+}
+
+/// Unbounded recursion ends the same way at every optimization level, on both engines. The
+/// optimizer changes frame sizes, so the unoptimized build used to run out of register file first
+/// and report `RegisterOutOfBounds` — a bad-operand error — while the optimized build hit the depth
+/// limit (found by the `compile_and_run` fuzz target). Both are a stack overflow now.
+#[test]
+fn unbounded_recursion_is_a_stack_overflow_at_every_level() {
+    let source = "fn f(n: i64) -> i64 {\n    let a = n + 1;\n    let b = a * 2;\n    let c = b - n;\n    return f(c);\n}\n\nfn main() -> i64 {\n    return f(0);\n}\n";
+    for (level, options) in levels() {
+        let bytes = Compiler::compile(source, options)
+            .unwrap_or_else(|e| panic!("[{level}] must compile: {e:?}"))
+            .bytecode
+            .to_bytes();
+        assert_eq!(
+            mini_x3::execute_x3bc(&bytes, KERNEL_GAS).map(|r| r.return_val),
+            Err(mini_x3::X3Error::StackOverflow),
+            "[{level}] mini_x3"
+        );
+        let std = X3Executor::execute(&bytes, &[], X3ExecutorConfig::on_chain())
+            .expect("a runtime fault is an unsuccessful receipt");
+        assert!(!std.success, "[{level}] x3-vm reported success");
+        let reason = String::from_utf8_lossy(&std.return_data);
+        assert!(
+            reason.contains("StackOverflow"),
+            "[{level}] x3-vm: {reason}"
+        );
+    }
 }

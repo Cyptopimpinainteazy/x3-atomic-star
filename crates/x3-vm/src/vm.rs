@@ -638,15 +638,17 @@ impl VM {
                     ));
                 }
 
-                // Bounds check for the callee window: parameters and locals both have to fit.
+                // Bounds check for the callee window: parameters and locals both have to fit. A
+                // window that does not fit means the call stack's registers are spent — a stack
+                // overflow, as `mini_x3` reports it too, not a bad register operand.
                 if callee_base + func.param_count as usize + func.local_count as usize
                     > MAX_REGISTERS
                 {
                     return Err(self.error_at(
                         ip,
-                        VMErrorKind::RegisterOutOfBounds(
-                            (callee_base + func.param_count as usize + func.local_count as usize)
-                                .min(u16::MAX as usize) as u16,
+                        VMErrorKind::StackOverflow(
+                            self.call_stack.len(),
+                            self.config.max_call_depth,
                         ),
                     ));
                 }

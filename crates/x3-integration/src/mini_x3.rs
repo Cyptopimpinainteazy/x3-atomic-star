@@ -682,9 +682,11 @@ impl<'m> Vm<'m> {
                 if argc != func.param_count as usize {
                     return Err(X3Error::ArgumentCountMismatch);
                 }
-                // The whole callee window — parameters and locals — has to fit.
+                // The whole callee window — parameters and locals — has to fit. When it does not,
+                // the call stack's register budget is spent: that is a stack overflow, reported as
+                // one, not a bad register operand (which would be a compiler fault).
                 if callee_base + func.param_count as usize + func.local_count as usize > MAX_REGS {
-                    return Err(X3Error::RegisterOutOfBounds);
+                    return Err(X3Error::StackOverflow);
                 }
                 for (i, a) in args.into_iter().enumerate() {
                     self.regs[callee_base + i] = a;

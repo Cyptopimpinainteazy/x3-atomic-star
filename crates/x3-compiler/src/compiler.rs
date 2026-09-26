@@ -59,6 +59,19 @@ impl Compiler {
         if options.verbose {
             eprintln!("  [1/5] Parsing source...");
         }
+        // Control characters other than tab, newline and carriage return are refused. The lexer
+        // skipped them, so a NUL or backspace inside a statement changed nothing the compiler
+        // reported while hiding what the source shows a reader (found by the `compile_and_run`
+        // fuzz target, whose inputs carried them into a program that then compiled).
+        if let Some((offset, ch)) = source
+            .char_indices()
+            .find(|(_, c)| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        {
+            return Err(CompilerError::Lexer(format!(
+                "control character U+{:04X} at byte {offset} is not allowed in source",
+                ch as u32
+            )));
+        }
         let ast = x3_parser::parse_program(source)
             .map_err(|e| CompilerError::Parser(format!("{:?}", e)))?;
 
