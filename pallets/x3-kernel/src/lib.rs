@@ -1898,7 +1898,12 @@ pub mod pallet {
                 // earlier comit persisted must see that value, and a program that writes over one
                 // must report it as the write's `old_value`.
                 let slots = Self::x3_storage_view()?;
-                match T::X3Adapter::execute_with_slots(tx, x3_gas_limit, &slots) {
+                match T::X3Adapter::execute_with_slots_and_policy(
+                    tx,
+                    x3_gas_limit,
+                    &slots,
+                    T::PrivateSubmissionChannel::get(),
+                ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         return Err(Self::fail_with_reason(
@@ -3941,8 +3946,12 @@ pub mod pallet {
             // the VM and not on another.
             Pallet::<T>::ensure_private_submission_available(call.payload.as_slice())?;
             let slots = Pallet::<T>::x3_storage_view()?;
-            let receipt =
-                T::X3Adapter::execute_with_slots(call.payload.as_slice(), call.gas_budget, &slots)?;
+            let receipt = T::X3Adapter::execute_with_slots_and_policy(
+                call.payload.as_slice(),
+                call.gas_budget,
+                &slots,
+                T::PrivateSubmissionChannel::get(),
+            )?;
             let result = if receipt.success {
                 CrossVmResult::success(receipt.return_data, receipt.gas_used)
             } else {

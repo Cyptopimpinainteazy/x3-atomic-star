@@ -201,6 +201,14 @@ pub enum X3Error {
     GlobalOutOfBounds,
     RegisterOutOfBounds,
     UserPanic,
+    /// The artifact's compiled policy requires private submission and this execution context has no
+    /// private channel to offer it.
+    ///
+    /// Refused rather than run: the alternative is executing a program that asked not to be public
+    /// in the clear, which is the one direction a compiled privacy policy must never take. It is the
+    /// engine's own copy of the check `pallet-x3-kernel` performs at intake, so an artifact that
+    /// reaches this interpreter by any route is still refused.
+    PrivateSubmissionRequired,
 }
 
 pub type X3Result<T> = Result<T, X3Error>;
@@ -285,6 +293,12 @@ struct MiniModule {
     functions: Vec<MiniFunc>,
     globals: Vec<MiniGlobal>,
     code: Vec<u8>,
+    /// The compiled policy's demands, read from the header rather than skipped.
+    ///
+    /// This field is here because the reader used to read the feature word and *discard* it
+    /// (`let _features = ...`), which made the artifact's policy a value nobody in the runtime
+    /// consulted. A demand the engine cannot see is a demand the engine cannot honour.
+    requires_private_submission: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +406,9 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
     let _flags = r.read_u32()?;
     let checksum = r.read_u32()?;
     let min_version = r.read_u32()?;
-    let _features = r.read_u32()?;
+    let features = r.read_u32()?;
+    let requires_private_submission =
+        features & x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED != 0;
 
     if !x3_common::bytecode::version_is_readable(version) {
         return Err(X3Error::UnsupportedVersion(version));
@@ -501,6 +517,7 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
         functions,
         globals,
         code,
+        requires_private_submission,
     })
 }
 
@@ -1502,7 +1519,30 @@ pub fn execute_x3bc_with_slots(
     gas_limit: u64,
     seeds: &[([u8; 32], [u8; 32])],
 ) -> Result<X3ExecResult, X3Error> {
+    execute_x3bc_with_slots_and_policy(payload, gas_limit, seeds, false)
+}
+
+/// Execute an X3BC module, honouring the compiled policy in its header.
+///
+/// `private_channel_available` is the *execution context's* answer to "can this program be
+/// submitted privately here?" — for a block that is the chain's own posture
+/// (`pallet-x3-kernel::Config::PrivateSubmissionChannel`, bound in the runtime to
+/// `pallet_private_execution::Enabled`). A module whose header demands private submission is
+/// refused with [`X3Error::PrivateSubmissionRequired`] when the answer is `false`, and runs when it
+/// is `true`.
+///
+/// The [`execute_x3bc_with_slots`] wrapper above passes `false`, which is the fail-closed default: a
+/// caller that has not said it can offer a private channel has not offered one.
+pub fn execute_x3bc_with_slots_and_policy(
+    payload: &[u8],
+    gas_limit: u64,
+    seeds: &[([u8; 32], [u8; 32])],
+    private_channel_available: bool,
+) -> Result<X3ExecResult, X3Error> {
     let module = parse_module(payload)?;
+    if module.requires_private_submission && !private_channel_available {
+        return Err(X3Error::PrivateSubmissionRequired);
+    }
     if module.functions.is_empty() {
         return Err(X3Error::FunctionNotFound);
     }

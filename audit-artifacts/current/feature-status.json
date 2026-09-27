@@ -3162,26 +3162,30 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 69,
+      "composite": 75,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "crates/x3-common/src/lib.rs",
         "crates/x3-compiler/src/options.rs",
         "crates/x3-integration/src/compiler_bridge.rs",
+        "crates/x3-integration/src/mini_x3.rs",
+        "crates/x3-integration/src/executor.rs",
         "pallets/x3-kernel/src/lib.rs",
         "pallets/x3-kernel/src/private_submission_intake.rs",
-        "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM. Measured 2026-09-27 - the chain-intake compiler records the same demand and the pallet refuses the program at intake when the runtime's private channel is off"
+        "pallets/x3-kernel/src/adapters.rs",
+        "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM. Measured 2026-09-27 - the chain-intake compiler records the same demand, the pallet refuses the program at intake when the runtime's private channel is off, both engines refuse it independently, and the pallet passes the chain's posture through to the adapter when it is on"
       ],
       "id": "X3-MEV-002",
-      "implemented": 85,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 50,
+      "mainnet_ready": 55,
       "missing_work": [
         "**Superseded 2026-09-26 \u2014 the two entries below describe the tree before `6a3358041`/`23350ca0c`, and both of their central claims are now false; they are kept so the history is readable.** Both interpreters implement `evm_sstore`/`evm_sload` \u2014 `mini_x3`, the one a block runs, uses the same key derivation and the same tagged payload as `crates/x3-vm`, and `interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key byte for key byte \u2014 and the writes do land in chain state: the kernel applies them to its own `X3ContractStorage` keyspace through the typed `storage_writes` channel instead of the balance decoder, so `DecodeFailureCount` stays 0 for a storage-writing comit. What is still open is the *read*, not the write: nothing seeds a program's slots from chain state before it runs, so a second comit's `evm_sload` sees the interpreter's empty store rather than the slot the chain persisted; the per-slot weight is under-declared; and no node or validator network has run any of it.",
         "**CLOSED 2026-09-27 \u2014 the chain-intake pipeline carries the policy now, and the chain enforces it.** The gap was structural and this entry said so exactly: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` found zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reached the chain could not demand private submission *at all* \u2014 the demand and the enforcement sat on opposite sides of a boundary nothing crossed. Three pieces now cross it. (1) The compiler records the demand: `CompilationOptions::require_private_submission` sets a bit in the artifact's own feature word (`x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED`, aliased in `x3_backend::bc_format::FeatureFlags`), and `compiler_bridge::compile_source_with_policy` is the intake entry point that takes the policy. The bit deliberately does not raise `min_version_required`: the demand is *interpreted*, and a format bump would make the module unreadable by the very loader meant to read it. (2) The chain enforces it at intake: `pallet-x3-kernel` reads the header on both routes into the VM (`submit_comit_v2` before any state is touched, and `KernelCrossVmDispatcher::execute_x3vm_tx`) and refuses with `Error::PrivateSubmissionUnavailable` when the runtime's `Config::PrivateSubmissionChannel` says this chain cannot meet the demand. (3) The posture is wired rather than assumed: the runtime binds `PrivateSubmissionChannel = RuntimePrivateSubmissionChannel`, which reads `pallet_private_execution::Enabled` \u2014 the switch governance already flips \u2014 so the entry that said 'no runtime sets it' is answered by construction instead of by a constant. Measured: `pallets/x3-kernel` 240/240 lib tests, `x3-common` 39/39, `x3-x3-integration` compiler-bridge 7/7, `cargo check -p x3-chain-runtime` clean; break-it-first \u2014 with the intake guard disabled, exactly `a_program_that_demands_private_submission_is_refused_where_the_chain_offers_none` and `the_demand_is_read_from_the_artifact_not_from_the_compiler` fail and the four controls stay green; restored, 6/6.",
-        "Still open, and why this is not mainnet-ready: the enforcement point is *intake*, and nothing in the interpreters enforces the bit a second time \u2014 a program that demanded privacy and reached an adapter by some route that skips both call sites would run, which is defence in depth not yet written (`mini_x3` still reads the feature word as `let _features` and discards it). The wire format's record of the demand has no version bite, so a third-party loader that predates the bit would ignore it; in this repository both readers take the constant from `x3-common`, which is what makes them agree. Nothing has run on a validator network: the two-sided test is a pallet test with the mock adapter, so what is proven is the chain's *decision*, not a real X3VM execution under a real private channel. And the private channel itself is still the part this row never had \u2014 `pallet_private_execution::Enabled` can be turned on by governance, but `submit_private_transaction` is a separate submission route and no node in this repository has run one, so no end-to-end private submission has been observed."
+        "**CLOSED 2026-09-27 (same day, second half) \u2014 the engines enforce the demand too, and the path that opens when the chain can serve it is now wired end to end.** Intake alone left two holes, and both are closed. (1) Defence in depth: `mini_x3` read the header's feature word as `let _features` and *discarded* it, so an artifact that reached an interpreter by any route skipping the pallet's two call sites would have run in the clear \u2014 the shape a policy takes when nothing can enforce it. The reader now keeps the demand, a module carrying it is refused with `X3Error::PrivateSubmissionRequired` unless the execution context says a private channel exists, and the `std` engine refuses the same bytes with the same rule (`X3ExecutorConfig::allow_private_submission`, default `false` in `default()`, `on_chain()` *and* `simulation()`, so 'nobody told me' resolves to the refusal). `both_engines_refuse_a_demanding_artifact_without_a_private_channel` drives one artifact through both engines and requires the same answer. (2) The acceptance direction was wired to the chain's own posture rather than to a constant: `X3ExecutorAdapter::execute_with_slots_and_policy` defaults to ignoring the posture (fail closed \u2014 an adapter that does not implement it still hands its engine a channel-less context), and both shipped X3 adapters override it to pass `Config::PrivateSubmissionChannel` into the executor, which the pallet supplies at both call sites. So with the runtime's private channel enabled, a program that demands private submission now reaches a *real* adapter with the posture the chain declared, instead of being refused by an engine default nothing could override.",
+        "Still open, and why this is not mainnet-ready: none of it has run on a validator network or against a node. The two-sided proof is a pallet test with the mock adapter plus engine tests, so what is proven is the chain's *decision* and the engines' *agreement*, not an X3VM execution on a live chain under a private channel. The private channel itself is still the part this row never had: `pallet_private_execution::Enabled` can be turned on by governance and no node in this repository ever has been, `submit_private_transaction` is a separate submission route, and no end-to-end private submission has been observed anywhere. The wire format gives the demand no version bite \u2014 a loader that predates the bit would ignore it, and in this repository both readers take the constant from `x3-common`, which is what makes them agree rather than a rule the format enforces. Finally, the gas/weight accounting for a demanding program is the same as for any other: the check is a branch, not a priced operation."
       ],
       "name": "Private transaction submission controls",
       "paths": [
@@ -3197,8 +3201,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 78,
-      "tests": "tested score 78% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4629,7 +4633,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "a8806e542b8ea2d86803d66193483e7f8a112b4e92f3862cd8d255ab3c282d2c",
+    "source_digest": "20cbe6060b0e7edc89179feb75630e06fa72fe2d643756abce03abf48c341185",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4641,7 +4645,7 @@
       "feature-matrix/economic-defi.toml": "7c59d189d4d478dbc008edbb7b42f337f35c70b537a4ae783f4630b7310b8d5b",
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
-      "feature-matrix/mev-privacy.toml": "f8ee7c72716d086800630b54a2d5b47888c9d57b67caa4a70baa85542bdcb11c",
+      "feature-matrix/mev-privacy.toml": "a3d8d284e59a486a4b52a8d2cadb88b87a6e2acbd1d58f0af37d141ec3138dc4",
       "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
       "feature-matrix/runtime-core.toml": "5d8859153c18969b55f1140a6119c8908fc17a3254c96e76ba016178ff50f2df",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
