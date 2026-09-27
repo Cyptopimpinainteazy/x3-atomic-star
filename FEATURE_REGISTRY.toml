@@ -163,13 +163,29 @@ required_tests = [
   "genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block",
   "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
   "genesis_refuses_two_checkpoints_at_one_height",
+  # The header *source* (TICKET-095's missing half). `scripts/btc/push-headers.py` reads a run
+  # of consecutive headers from a real Esplora endpoint (or `bitcoin-cli`), checks that the run
+  # links and that the source agrees with itself, and emits the SCALE `Vec<BtcBlockHeader>`
+  # `submit_btc_headers` decodes; `scripts/testnet/btc-header-source-drill.sh` proves it live
+  # against public testnet and proves it refuses a tampered answer. The fixture these two tests
+  # decode is that script's own output from a real testnet3 run (heights 5151279..5151284,
+  # anchored on 5151278), so the pallet is proven to admit what the relayer emits — not merely
+  # that both compile.
+  "the_relayer_payload_decodes_and_admits_on_an_anchored_chain",
+  "the_relayer_payload_is_refused_when_its_first_header_is_dropped",
 ]
 # `reports/btc_gateway_report.md` does not exist; citation cleared.
 proof_report = ""
-readiness_score = 45
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40 = 85*0.35 + 90*0.25 + 50*0.40 = 72.
+# The relayer's source half is now real and the drill runs it against a public endpoint, which
+# moves implemented/tested; `mainnet_ready` stays low because no public chain has a checkpoint
+# pinned, the push still needs a root origin (`BtcHeaderOrigin = EnsureRoot`), no coin has moved
+# and there is no audit — a public-network *chain* run is what would lift it.
+readiness_score = 72
 blockers = [
-  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
-  "The header chain bootstraps from a checkpoint (spec_version 14/15): `anchor_btc_checkpoint` pins one by root call, and a spec can now carry one in genesis (`btc_checkpoints`), so a chain can be born anchored and the live gate proves it (`scripts/testnet/btc-checkpoint-genesis-drill.sh`). No public network has one pinned, and the header still arrives by an operator copying a hash — there is no header source and no peer-sourced sync",
+  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, and a header source now reads real testnet3 headers (`scripts/btc/push-headers.py`, drilled live in `scripts/testnet/btc-header-source-drill.sh`) — but no X3 chain has admitted a public-network header and the deposit/withdrawal path has never moved a coin",
+  "A header source exists now, but a public chain does not run it: the header chain bootstraps from a checkpoint (spec_version 14/15) and `anchor_btc_checkpoint`/genesis `btc_checkpoints` pins one, yet no public network has one pinned, the relayer is a script an operator runs rather than a node feature, and nothing bonds it for withholding — TICKET-095 stays open until there is more than one",
+  "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks (which alternate `nBits` mid-epoch whenever twenty minutes pass) are refused. The relayer therefore only emits a uniform-`nBits` run, and tracking testnet for real needs the network's own rule modelled",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",
   "No external audit of the gateway, the vault or the header check",
@@ -276,7 +292,15 @@ required_tests = ["testnet_rc_gate", "mainnet_rc_gate"]
 proof_report = ""
 readiness_score = 55
 blockers = [
-  "mainnet_rc_gate is manual approval, not automated"
+  "mainnet_rc_gate is manual approval, not automated",
+  # 2026-09-27, found by `scripts/swarm/x3_repo_scan.py` (kind `stale-registry-test`): both
+  # `required_tests` entries name things that exist nowhere — `mainnet_rc_gate` is the script in
+  # `crate_or_service`, `testnet_rc_gate` is not in the tree at all — so this row's test evidence has
+  # never existed. `scripts/check-readiness-consistency.sh` skips the whole row because a
+  # `crate_or_service` that is a file, not a directory of `.rs` files, is never resolved. Either write
+  # the two gates as real, runnable checks (they are shell gates, so the registry should cite them as
+  # `path::case`) or drop the citation; the scanner's ratchet keeps the finding visible until then.
+  "required_tests cites two names that no function defines (`testnet_rc_gate`, `mainnet_rc_gate`), and the readiness gate never resolved this row because its target is a script",
 ]
 dangerous_paths = ["mainnet deployment", "approval gates"]
 
@@ -404,13 +428,53 @@ dangerous_paths = [
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/swarm/swarm_scan.sh"
 tauri_app = "SwarmCommand"
-# `reports/swarm_scan_report.md` does not exist; citation cleared.
-proof_report = ""
-readiness_score = 25
-required_tests = ["swarm_scan_generates_report"]
+# Rebuilt 2026-09-27. The old script dumped every `TODO|FIXME|unwrap(` line plus a list of filenames
+# whose name contained a subsystem word: no severity, no symbol, no fix, no gate, no test — and the
+# row above cited `swarm_scan_generates_report`, a test that existed nowhere. Nothing caught that,
+# because the readiness gate only resolves citations whose `crate_or_service` is a directory of `.rs`
+# files, and this row points at a script. That is now the scanner's own first finding class.
+#
+# What it is now (`scripts/swarm/x3_repo_scan.py`, wrapped by `scripts/swarm/swarm_scan.sh`):
+#   * every finding carries id, severity, kind, path, line, symbol, why, suggested_fix,
+#     test_required and gate_affected — asserted field-by-field by the fixture test;
+#   * sorted by severity/kind/path/line, so two runs over one tree are byte-identical;
+#   * `reports/swarm_scan_report.md` for a person, `reports/swarm_scan_findings.json` for a program;
+#   * a ratchet over the kinds it owns (`docs/reports/repo-scan-baseline.json`), so growth fails and
+#     shrinkage is always allowed;
+#   * `--patches` writes a real unified diff to `.ai/patches/<id>.patch` for the classes whose fix is
+#     mechanical (`ungated-crate`: one gate line); nothing is ever applied to the tree.
+#
+# It does not re-report what the existing ratchets own: `TODO`/stub markers and test cheats belong to
+# `scripts/x3_fake_code_scan.py`, reachable panics to `scripts/audit/panic_unwrap_scan.py`. It runs
+# both and folds their verdicts into the report's gate summary instead of duplicating their debt.
+#
+# First live run, 2026-09-27 (36 findings): 13 registered pallets charge invented literal weights
+# (`Weight::from_parts(10_000, 0)`) while shipping generated weights — the class the PR #519 weights
+# incident belongs to; `launch_gate` cites two tests nobody wrote; 7 crates (2 fuzz, 3 under the
+# nested `x3-autonomic-core` workspace, the SVM broadcaster client, an integration-test crate) have
+# suites no gate runs; `pallets/pallet-x3-control` is not registered. Those are recorded in the
+# baseline as debt, not repaired here.
+proof_report = "reports/swarm_scan_report.md"
+readiness_score = 58
+required_tests = [
+  "swarm_scan_generates_report",
+  "test_swarm_scan_generates_report",
+  "test_clean_tree_produces_no_findings",
+  "test_patch_context_matches_the_file_it_patches",
+  "test_scanner_is_the_registry_citation",
+]
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   80 — real detectors, schema, ratchet, report and patch emission, wired into two
+#                      gates; the detector set is the part that could still grow
+#   tested        70 — 4 fixture-driven tests (one of them the cited name) plus a live run; the
+#                      negative control proves the scanner is not asserting a constant. No
+#                      property/fuzz coverage of the parsers, no long-duration run
+#   mainnet_ready 30 — operational tooling, not part of the runtime; it runs in the default gate set
+# 0.35*80 + 0.25*70 + 0.40*30 = 28 + 17.5 + 12 = 57.5 -> 58
 blockers = [
   "Dev-ops tooling — not part of blockchain runtime",
-  "Single test; no CI gate"
+  "It finds and records; it does not repair: the 36 findings of its first run sit in docs/reports/repo-scan-baseline.json as ratcheted debt",
+  "The `ungated-crate` standard follows this repository's own (a workspace-wide `cargo test` counts as coverage for root-workspace members), so a root suite that only the opt-in `--deep` run reaches is not reported",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
 
