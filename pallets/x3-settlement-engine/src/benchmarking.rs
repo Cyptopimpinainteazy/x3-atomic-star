@@ -11,9 +11,10 @@
 
 use super::*;
 use frame_benchmarking::benchmarks;
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, ReservableCurrency};
 use frame_system::RawOrigin;
 use sp_core::H256;
+use sp_runtime::SaturatedConversion;
 use sp_std::vec;
 use sp_std::vec::Vec;
 
@@ -44,6 +45,66 @@ fn setup_intent<T: Config>() -> (T::AccountId, T::AccountId, H256, AssetSpec, As
     (maker, taker, secret_hash, asset_a, asset_b)
 }
 
+/// A canonical Refund proof set covering every escrowed leg of `intent_id`, one bundle per domain.
+fn refund_proof_set<T: Config>(intent_id: H256) -> x3_atomic_swap::CrossDomainProofSet {
+    use x3_atomic_swap::{
+        CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
+    };
+    let runtime_intent_id = intent_id.to_fixed_bytes();
+    let intent = SettlementIntents::<T>::get(intent_id).expect("intent exists");
+    let mut bundles: Vec<CrossDomainProofBundle> = Vec::new();
+    for leg_idx in 0..intent.legs_total {
+        let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
+            continue;
+        };
+        let (chain_id, vm_type, block_number): (&str, VmType, u64) = match escrow.chain {
+            ExternalChainId::X3Native => ("x3-native", VmType::X3Vm, 1),
+            ExternalChainId::Solana => ("solana-mainnet", VmType::Svm, 2),
+            ExternalChainId::Bitcoin => ("bitcoin-mainnet", VmType::BitcoinScript, 3),
+            _ => ("ethereum-mainnet", VmType::Evm, 4),
+        };
+        if bundles
+            .iter()
+            .any(|b| b.chain_id == chain_id && b.vm_type == vm_type)
+        {
+            continue;
+        }
+        let mut bundle = CrossDomainProofBundle {
+            version: CrossDomainProofBundle::VERSION,
+            intent_id: 1,
+            runtime_intent_id,
+            intent_hash: [0x11u8; 32],
+            chain_id: chain_id.into(),
+            vm_type,
+            operation: CrossDomainOperation::Refund,
+            tx_id: "0xbenchrefund".into(),
+            block_number,
+            block_hash: "0xbenchrefundblock".into(),
+            execution_evidence: vec![1, 2, 3],
+            finality: FinalityProof {
+                chain_id: chain_id.into(),
+                vm_type,
+                tx_id: "0xbenchrefund".into(),
+                block_number,
+                block_hash: "0xbenchrefundblock".into(),
+                confirmations: 12,
+                finalized: true,
+                finality_source: "benchmark".into(),
+                safe_to_reveal_secret: true,
+            },
+            proof_hash: [0u8; 32],
+        };
+        bundle.proof_hash = bundle.compute_hash().expect("canonical bundle hash");
+        bundles.push(bundle);
+    }
+    CrossDomainProofSet {
+        intent_id: 1,
+        runtime_intent_id,
+        intent_hash: [0x11u8; 32],
+        bundles,
+    }
+}
+
 benchmarks! {
     create_intent {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
@@ -54,34 +115,46 @@ benchmarks! {
         assert!(nonce > 0);
     }
 
+    // The worst case: a native X3 leg, which reserves the depositor's funds as well as recording
+    // the escrow (an external leg only records it).
     lock_escrow {
-        let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
-
-        // Create intent first
-        let create_origin = RawOrigin::Signed(maker.clone()).into();
+        let (maker, taker, secret_hash, _, asset_b) = setup_intent::<T>();
+        let native_amount = 1_000_000u128;
+        let asset_a = AssetSpec {
+            chain: ExternalChainId::X3Native,
+            token: TokenId::Native,
+            amount: native_amount,
+        };
         Pallet::<T>::create_intent(
-            create_origin,
+            RawOrigin::Signed(maker.clone()).into(),
             taker.clone(),
-            asset_a.clone(),
-            asset_b.clone(),
+            asset_a,
+            asset_b,
             secret_hash,
             Some(86400u64),
-        ).ok();
-
+        )?;
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
         let escrow_data = vec![1u8; 64];
+        let held = <T as pallet::Config>::Currency::reserved_balance(&maker);
 
         let origin = RawOrigin::Signed(maker.clone());
     }: _(
         origin,
         intent_id,
         0u32,
-        ExternalChainId::Ethereum,
-        1_000_000u128,
+        ExternalChainId::X3Native,
+        native_amount,
         escrow_data
     )
     verify {
         assert!(EscrowStates::<T>::contains_key(intent_id, 0u32));
+        let native: <<T as pallet::Config>::Currency as Currency<T::AccountId>>::Balance =
+            native_amount.saturated_into();
+        assert_eq!(
+            <T as pallet::Config>::Currency::reserved_balance(&maker),
+            held + native,
+            "the native leg is held"
+        );
     }
 
     claim_settlement {
@@ -126,38 +199,64 @@ benchmarks! {
         assert!(ClaimedLegs::<T>::get(intent_id, 0u32));
     }
 
+    // The worst case: a native X3 leg this pallet holds (returned to its depositor) beside an
+    // external leg, with the canonical Refund proof set a terminal refund requires. This bench
+    // used to lock one external leg and present no proof set, so the call it measured was the
+    // `CrossDomainProofSetIncomplete` refusal and the benchmark could not run.
     refund_settlement {
-        let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
+        let (maker, taker, secret_hash, _, asset_b) = setup_intent::<T>();
+        let native_amount = 1_000_000u128;
+        let asset_a = AssetSpec {
+            chain: ExternalChainId::X3Native,
+            token: TokenId::Native,
+            amount: native_amount,
+        };
 
-        // Create intent with very short timeout
-        let create_origin = RawOrigin::Signed(maker.clone()).into();
+        // Timeout 0: the intent is refundable as soon as it exists.
         Pallet::<T>::create_intent(
-            create_origin,
+            RawOrigin::Signed(maker.clone()).into(),
             taker.clone(),
-            asset_a.clone(),
+            asset_a,
             asset_b.clone(),
             secret_hash,
             Some(0u64),
-        ).ok();
-
+        )?;
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
-
-        // Lock escrow
-        let escrow_origin = RawOrigin::Signed(maker.clone()).into();
         Pallet::<T>::lock_escrow(
-            escrow_origin,
+            RawOrigin::Signed(maker.clone()).into(),
             intent_id,
             0u32,
-            ExternalChainId::Ethereum,
-            1_000_000u128,
-            vec![1u8; 64],
-        ).ok();
+            ExternalChainId::X3Native,
+            native_amount,
+            vec![1u8; 32],
+        )?;
+        Pallet::<T>::lock_escrow(
+            RawOrigin::Signed(taker.clone()).into(),
+            intent_id,
+            1u32,
+            asset_b.chain,
+            asset_b.amount,
+            vec![2u8; 32],
+        )?;
+        let held = <T as pallet::Config>::Currency::reserved_balance(&maker);
+        Pallet::<T>::submit_cross_domain_proof_set(
+            RawOrigin::Signed(maker.clone()).into(),
+            intent_id,
+            refund_proof_set::<T>(intent_id),
+        )?;
 
         let origin = RawOrigin::Signed(maker.clone());
     }: _(origin, intent_id)
     verify {
         let state = IntentStates::<T>::get(intent_id);
         assert!(matches!(state, IntentState::Refunded));
+        let native: <<T as pallet::Config>::Currency as Currency<T::AccountId>>::Balance =
+            native_amount.saturated_into();
+        assert_eq!(
+            <T as pallet::Config>::Currency::reserved_balance(&maker),
+            held - native,
+            "the native leg is returned to its depositor"
+        );
     }
 
     submit_btc_proof {
