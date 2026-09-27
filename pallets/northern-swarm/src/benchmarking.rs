@@ -9,7 +9,7 @@ use crate::Pallet as NorthernSwarm;
 use frame_benchmarking::{v2::*, whitelisted_caller};
 use frame_support::{
     assert_ok,
-    traits::{Currency, Get},
+    traits::{ConstU32, Currency, Get},
     BoundedVec,
 };
 use frame_system::RawOrigin;
