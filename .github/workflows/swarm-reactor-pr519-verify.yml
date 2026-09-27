@@ -25,11 +25,14 @@ jobs:
       - name: Checkout exact branch revision
         uses: actions/checkout@v4
 
+      - name: Restore local Rust toolchain PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
       - name: Record revision
         run: |
           git rev-parse HEAD
-          rustc --version
-          cargo --version
+          "$HOME/.cargo/bin/rustc" --version
+          "$HOME/.cargo/bin/cargo" --version
 
       - name: Northern Swarm pallet
         run: cargo test -p pallet-northern-swarm --all-targets --no-fail-fast
