@@ -1783,3 +1783,40 @@ warp sync.
 snapshot-zero-downtime-export`). Red evidence for the fix: removing `--regenesis` from the drill's
 restore makes the gate fail
 (`.ai/runlogs/snapshot-zero-downtime-20260927T0013Z/red-without-regenesis.log`).
+
+## GAP-ROUTER-FEE-DEPOSIT — the signed cross-VM transfer was unusable below `ED * 10_000 / bps`
+
+**Found 2026-09-27** while driving X3-ECO-002's pending-supply invariant through the router on three
+validators. `X3CrossVmRouter::xvm_transfer` charges `amount * RoutingFeeBps / 10_000` to the signing
+account and sends it to the protocol treasury. The currency refuses any deposit that would leave the
+*destination* below the existential deposit (`pallet-balances` `can_deposit` → `BelowMinimum`; SDK
+checkout `substrate/frame/balances/src/impl_fungible.rs`), and the treasury account has never existed
+on a dev/local chain — the runtime's transaction fees do not go to it. So every transfer whose fee is
+below `ExistentialDeposit = 100 * MICRO_ATLAS` was refused with `RoutingFeeNotAffordable`.
+
+Measured by post-mortem on the kept chain (block
+`0x6523cca5195dcbac4d421943ae8286b81f8ed78ed5d8992a4102057f3f99e3c5`; the test keeps its data dir
+on failure): the refused extrinsic decoded as pallet `0x1a` = `X3CrossVmRouter`, call `0x00` =
+`xvm_transfer`, signed by the X3Lang gateway `4c81d416…`; the router's error code was variant **36**
+`RoutingFeeNotAffordable`; and the payer's `System::Account` at that block read
+`free = 999_999_999_900_043_000`, `frozen = 0`, `flags = NEW_LOGIC`, i.e. nothing locked and nothing
+spent except the extrinsic fee. The treasury's `System::Account` key **did not exist**. The amount
+was 1_000_000 and the fee 2_000.
+
+Two reasons the existing evidence could not see it. The router's own mock wires `RoutingFeeBps = 0`,
+so the branch never ran in `pallets/x3-cross-vm-router/src/tests.rs`. And the rc2 smoke drives every
+route at `amount = 10`, whose fee is 0, so it skipped the branch too — its six-route results
+(`reports/rc2/six_route_results.json`, committed in `681e2e260`) show the routes failing *later*, at
+completion, while never exercising the fee.
+
+**Fixed** in `ded7e558d`: `do_initiate_transfer` now asks the payer's balance which side refused.
+Funds present ⇒ the refusal is the destination's, the fee is waived and a distinct
+`XvmRoutingFeeWaived` event records it (a waived fee is uncollected revenue and must not be silent).
+Funds absent ⇒ `RoutingFeeNotAffordable` stands unchanged. Three pallet tests cover all three
+branches, measured break-it-first. Residual: waived fees are not accrued, and nothing yet requires an
+operator to keep the treasury funded — a policy decision, recorded on row X3-XVM-014.
+
+**Re-attestation ordering:** `crates/x3-cross-vm-router` is in the runtime graph, so this change
+invalidates any runtime attestation taken before it. An srtool run was in progress on this box while
+this landed, and several lanes were still editing runtime files at 02:15 local. The release
+attestation has to be taken after the last runtime-graph change.
