@@ -1072,6 +1072,17 @@ fn decode_hex_field(what: &str, value: &str) -> Result<Vec<u8>, SnapshotError> {
 // bytes — and until the chain spec that was just built hashes back to that same
 // declared root.
 //
+// One part of a state is not state in this sense: `frame_system`'s bookkeeping
+// says *where the chain that produced the state was*, not what it held. Restored
+// verbatim, `System::Number` is the donor's height, and the runtime's own
+// `frame_system::initialize` asserts `number == Self::block_number() + 1`, so
+// the first block a restored chain tries to author panics with "Block number
+// must be strictly increasing". That is measured, not theorised: it is what the
+// `snapshot zero downtime export` gate found the first time a restored spec was
+// actually booted (`snapshot-zero-downtime-proof.sh`). `regenesis` below is the
+// explicit, named way to drop those keys so the runtime's storage defaults —
+// which *are* a genesis — apply again.
+//
 // Two things this deliberately does not do:
 //
 // * it does not merge restored state into a template's state. Merging produces a
@@ -1102,6 +1113,73 @@ pub struct RestoreRequest<'a> {
     /// `protocolId`, telemetry, `properties`) is carried into the restored spec.
     /// Its state, if it has any, is discarded.
     pub template: Option<&'a serde_json::Value>,
+    /// Drop the producing chain's `frame_system` bookkeeping, so the restored
+    /// spec is the genesis of a *new* chain rather than a continuation of the
+    /// one the state came from. Required for the result to be bootable: see
+    /// [`strip_chain_bookkeeping`]. The restored state root then differs from
+    /// the snapshot's declared root by exactly those keys, and both are
+    /// reported instead of one being presented as the other.
+    pub regenesis: bool,
+}
+
+/// The `frame_system` entries that record where a chain *was*, not what it held.
+///
+/// Every one of these is either asserted against, or rewritten by,
+/// `frame_system::initialize` at the start of the next block — so a state that
+/// carries the producing chain's values is not a genesis, whatever its root
+/// says. Names are `(pallet prefix, storage entry)`; the key is the two
+/// `xxhash`-derived halves Substrate builds it from, computed here with the same
+/// `sp_core::twox_128` the runtime uses rather than a table of hex constants.
+pub const CHAIN_BOOKKEEPING_ENTRIES: &[(&str, &str)] = &[
+    ("System", "Number"),
+    ("System", "ParentHash"),
+    ("System", "Digest"),
+    ("System", "ExecutionPhase"),
+    ("System", "ExtrinsicCount"),
+    ("System", "BlockWeight"),
+];
+
+/// The storage key of a `(pallet, entry)` pair, as `#[pallet::storage]` builds it.
+pub fn storage_key(pallet: &str, entry: &str) -> Vec<u8> {
+    use sp_core::hashing::twox_128;
+    let mut key = Vec::with_capacity(32);
+    key.extend_from_slice(&twox_128(pallet.as_bytes()));
+    key.extend_from_slice(&twox_128(entry.as_bytes()));
+    key
+}
+
+/// Drop the producing chain's bookkeeping entries from a decoded state.
+///
+/// Returns the `0x`-prefixed keys that were removed, or an error when none of
+/// them is present: a state that carries no `frame_system` bookkeeping at all is
+/// not the state of a running chain, and re-genesising it would be a claim the
+/// caller cannot have meant.
+pub fn strip_chain_bookkeeping(
+    entries: &mut Vec<StateEntry>,
+) -> Result<Vec<String>, SnapshotError> {
+    let wanted: Vec<Vec<u8>> = CHAIN_BOOKKEEPING_ENTRIES
+        .iter()
+        .map(|(pallet, entry)| storage_key(pallet, entry))
+        .collect();
+    let mut removed = Vec::new();
+    entries.retain(|(key, _)| {
+        if wanted.iter().any(|wanted| wanted == key) {
+            removed.push(format!("0x{}", hex::encode(key)));
+            false
+        } else {
+            true
+        }
+    });
+    if removed.is_empty() {
+        return Err(SnapshotError::MalformedRawSpec {
+            reason: format!(
+                "none of the {} frame_system bookkeeping entries is present, so this state is \
+                 not the state of a chain that was running; refusing to call it a genesis",
+                CHAIN_BOOKKEEPING_ENTRIES.len()
+            ),
+        });
+    }
+    Ok(removed)
 }
 
 /// Where the state in a restored chain spec came from.
@@ -1128,6 +1206,13 @@ pub struct RestoreProvenance {
     pub state_entries: u64,
     /// Trie layout the state root was recomputed with (`V0` or `V1`).
     pub trie_layout: String,
+    /// Whether the producing chain's `frame_system` bookkeeping was dropped.
+    pub regenesis: bool,
+    /// The bookkeeping keys that were dropped, when `regenesis` is set.
+    pub bookkeeping_keys_removed: Vec<String>,
+    /// State root of the genesis this restore produces when `regenesis` is set.
+    /// `None` without it, where the restored root *is* [`Self::state_root`].
+    pub genesis_state_root: Option<String>,
 }
 
 /// Turn a snapshot into a raw chain spec a node can boot from.
@@ -1154,7 +1239,15 @@ pub fn restore_snapshot(
     )?;
 
     let stream = concatenated_chunk_stream(request.manifest, request.chunks)?;
-    let entries = decode_state_entries(&stream)?;
+    let mut entries = decode_state_entries(&stream)?;
+
+    // The state the snapshot declares is the state *as exported*, so it is
+    // verified before anything is dropped from it. Only then does `regenesis`
+    // rewrite the chain-local bookkeeping.
+    let mut bookkeeping_keys_removed = Vec::new();
+    if request.regenesis {
+        bookkeeping_keys_removed = strip_chain_bookkeeping(&mut entries)?;
+    }
 
     let mut top = serde_json::Map::with_capacity(entries.len());
     for (key, value) in &entries {
@@ -1204,7 +1297,7 @@ pub fn restore_snapshot(
     spec.entry("chainType".to_string())
         .or_insert_with(|| serde_json::Value::String("Local".to_string()));
 
-    let provenance = RestoreProvenance {
+    let mut provenance = RestoreProvenance {
         chain_id: request.manifest.chain_id.clone(),
         block_number: request.manifest.block_number,
         block_hash: request.manifest.block_hash.clone(),
@@ -1214,6 +1307,9 @@ pub fn restore_snapshot(
         chunk_count: request.manifest.chunk_count,
         state_entries: entries.len() as u64,
         trie_layout: format!("{:?}", request.version),
+        regenesis: request.regenesis,
+        bookkeeping_keys_removed: bookkeeping_keys_removed.clone(),
+        genesis_state_root: None,
     };
 
     // `properties` is the chain spec's own arbitrary-metadata bag, so provenance
@@ -1238,6 +1334,7 @@ pub fn restore_snapshot(
             provenance.state_entries.to_string(),
         ),
         ("x3SnapshotTrieLayout", provenance.trie_layout.clone()),
+        ("x3SnapshotRegenesis", provenance.regenesis.to_string()),
     ] {
         properties.insert(key.to_string(), serde_json::Value::String(value));
     }
@@ -1259,7 +1356,7 @@ pub fn restore_snapshot(
         }),
     );
 
-    let spec = serde_json::Value::Object(spec);
+    let mut spec = serde_json::Value::Object(spec);
 
     // Last check before the spec is offered: read it back the way the exporter
     // reads a spec and hash it again. This is what makes "the bytes we verified
@@ -1267,7 +1364,34 @@ pub fn restore_snapshot(
     // about it.
     let reread = state_entries_from_raw_spec(&spec)?;
     let reread_root = compute_state_root(&reread, request.version)?;
-    if !hashes_equal(&request.manifest.state_root, &reread_root) {
+    if request.regenesis {
+        // The spec is the snapshot's state *minus* the bookkeeping entries, so
+        // its root is deliberately not the declared one. Rather than skip the
+        // check, prove the relationship it does have: the spec hashes to the
+        // very entries it was built from, and those entries differ from the
+        // verified state only by the keys named above.
+        let expected = compute_state_root(&entries, request.version)?;
+        if !hashes_equal(&expected, &reread_root) {
+            return Err(SnapshotError::RecomputedStateRootMismatch {
+                declared: expected,
+                recomputed: reread_root,
+            });
+        }
+        provenance.genesis_state_root = Some(reread_root.clone());
+        if let Some(properties) = spec
+            .get_mut("properties")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            properties.insert(
+                "x3SnapshotGenesisStateRoot".to_string(),
+                serde_json::Value::String(reread_root.clone()),
+            );
+            properties.insert(
+                "x3SnapshotBookkeepingRemoved".to_string(),
+                serde_json::Value::String(bookkeeping_keys_removed.join(",")),
+            );
+        }
+    } else if !hashes_equal(&request.manifest.state_root, &reread_root) {
         return Err(SnapshotError::RecomputedStateRootMismatch {
             declared: request.manifest.state_root.clone(),
             recomputed: reread_root,

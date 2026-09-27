@@ -785,6 +785,7 @@ fn restore_request<'a>(
         chain_name: "x3 restored".to_string(),
         spec_id: "x3_restored".to_string(),
         template: None,
+        regenesis: false,
     }
 }
 
@@ -1005,5 +1006,193 @@ fn a_template_contributes_metadata_but_never_state() {
     assert!(
         top.get("0xdead").is_none(),
         "template state must be replaced"
+    );
+}
+
+// ── Re-genesis ──────────────────────────────────────────────────────────────
+
+/// The state of a chain that was actually running: real bookkeeping entries plus
+/// state that must survive the reset untouched.
+fn chain_entries() -> Vec<StateEntry> {
+    use sp_core::Encode;
+
+    let mut entries = vec![
+        (b":code".to_vec(), vec![0x00, 0x61, 0x73, 0x6d]),
+        (storage_key("System", "Number"), 4_242u32.encode()),
+        (storage_key("System", "ParentHash"), vec![0xAB; 32]),
+        (storage_key("System", "Digest"), vec![0x0c, 0x00]),
+        (
+            storage_key("Balances", "TotalIssuance"),
+            1_000_000u128.encode(),
+        ),
+    ];
+    entries.sort();
+    entries
+}
+
+fn chain_snapshot() -> (SnapshotManifest, Vec<ChunkSlot>, String, Vec<StateEntry>) {
+    let entries = chain_entries();
+    let root = compute_state_root(&entries, TrieVersion::V1).expect("compute");
+    let mut builder = builder();
+    builder.state_root = root.clone();
+    let (manifest, chunks) = builder.build(&entries).expect("build");
+    (
+        manifest,
+        chunks.into_iter().map(Some).collect(),
+        root,
+        entries,
+    )
+}
+
+#[test]
+fn the_bookkeeping_keys_are_the_ones_the_runtime_actually_uses() {
+    // `System::Number` is the well-known `:number` key: `twox_128("System")` then
+    // `twox_128("Number")`. This is the value every Substrate client and explorer
+    // looks the current height up under, and it was confirmed against a live
+    // chain (the key returned the finalized height, SCALE-encoded) before being
+    // pinned here. If this crate's derivation drifted, the reset would silently
+    // target nothing and the restored chain would panic on its first block.
+    assert_eq!(
+        hex::encode(storage_key("System", "Number")),
+        "26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac"
+    );
+
+    let keys: Vec<String> = CHAIN_BOOKKEEPING_ENTRIES
+        .iter()
+        .map(|(pallet, entry)| hex::encode(storage_key(pallet, entry)))
+        .collect();
+    assert_eq!(
+        keys.len(),
+        6,
+        "the reset set is exactly the six named entries"
+    );
+    for key in &keys {
+        assert_eq!(key.len(), 64, "a pallet storage key is two 128-bit halves");
+    }
+    let unique: std::collections::BTreeSet<&String> = keys.iter().collect();
+    assert_eq!(unique.len(), keys.len(), "no two entries may share a key");
+}
+
+#[test]
+fn regenesis_drops_the_producing_chains_bookkeeping_and_nothing_else() {
+    let mut entries = chain_entries();
+    let before: Vec<Vec<u8>> = entries.iter().map(|(key, _)| key.clone()).collect();
+    let removed = strip_chain_bookkeeping(&mut entries).expect("strip");
+
+    let expected: Vec<String> = ["Number", "ParentHash", "Digest"]
+        .iter()
+        .map(|entry| format!("0x{}", hex::encode(storage_key("System", entry))))
+        .collect();
+    for key in &expected {
+        assert!(removed.contains(key), "{key} must have been dropped");
+    }
+    assert_eq!(
+        removed.len(),
+        3,
+        "only the entries this state actually carried are dropped: {removed:?}"
+    );
+    // The state that is not bookkeeping is bit-for-bit what it was.
+    let after: Vec<&Vec<u8>> = entries.iter().map(|(key, _)| key).collect();
+    for key in &before {
+        if !removed
+            .iter()
+            .any(|dropped| dropped == &format!("0x{}", hex::encode(key)))
+        {
+            assert!(
+                after.contains(&key),
+                "{} must have survived",
+                hex::encode(key)
+            );
+        }
+    }
+    assert_eq!(entries.len(), before.len() - 3);
+}
+
+#[test]
+fn a_state_with_no_bookkeeping_at_all_is_refused_by_the_reset() {
+    // A state that carries none of the six is not the state of a chain that was
+    // running, so calling it a genesis would be a claim the caller cannot mean.
+    let mut entries = entries();
+    assert!(matches!(
+        strip_chain_bookkeeping(&mut entries),
+        Err(SnapshotError::MalformedRawSpec { .. })
+    ));
+    assert_eq!(
+        entries.len(),
+        3,
+        "a refusal must not have mutated the state"
+    );
+}
+
+#[test]
+fn a_regenerated_spec_is_a_new_chain_and_reports_both_roots() {
+    let (manifest, chunks, root, entries) = chain_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    let mut request = restore_request(&manifest, &anchor, &chunks);
+    request.regenesis = true;
+    let (spec, provenance) = restore_snapshot(&request).expect("restore");
+
+    let genesis_root = provenance
+        .genesis_state_root
+        .clone()
+        .expect("a regenerated restore names its genesis root");
+    assert!(provenance.regenesis);
+    assert_eq!(provenance.bookkeeping_keys_removed.len(), 3);
+    // The declared root is still the snapshot's, and the genesis root is a
+    // *different* root. Presenting one as the other is exactly what this flag
+    // must not do.
+    assert_eq!(provenance.state_root, root);
+    assert_ne!(genesis_root, root);
+    assert_eq!(
+        compute_state_root(
+            &state_entries_from_raw_spec(&spec).expect("read"),
+            TrieVersion::V1
+        )
+        .expect("root"),
+        genesis_root
+    );
+    // The state that is not bookkeeping is all still there.
+    let top = top_of(&spec);
+    let top = top.as_object().expect("top");
+    assert_eq!(top.len(), entries.len() - 3);
+    assert!(top.contains_key(&format!("0x{}", hex::encode(b":code"))));
+    assert!(top.contains_key(&format!(
+        "0x{}",
+        hex::encode(storage_key("Balances", "TotalIssuance"))
+    )));
+    assert!(!top.contains_key(&format!(
+        "0x{}",
+        hex::encode(storage_key("System", "Number"))
+    )));
+    // ... and the spec says so, in the bag that survives a round trip.
+    assert_eq!(spec["properties"]["x3SnapshotRegenesis"], "true");
+    assert_eq!(
+        spec["properties"]["x3SnapshotGenesisStateRoot"],
+        genesis_root
+    );
+    assert_eq!(spec["properties"]["x3SnapshotStateRoot"], root);
+}
+
+#[test]
+fn a_restore_that_is_not_asked_to_regenerate_keeps_the_chain_bookkeeping() {
+    let (manifest, chunks, root, entries) = chain_snapshot();
+    let anchor = TrustedAnchor {
+        state_root: &root,
+        ..anchor(None)
+    };
+
+    let (spec, provenance) =
+        restore_snapshot(&restore_request(&manifest, &anchor, &chunks)).expect("restore");
+    assert!(!provenance.regenesis);
+    assert!(provenance.genesis_state_root.is_none());
+    assert!(provenance.bookkeeping_keys_removed.is_empty());
+    assert_eq!(
+        top_of(&spec).as_object().expect("top").len(),
+        entries.len(),
+        "without regenesis the state is restored verbatim"
     );
 }
