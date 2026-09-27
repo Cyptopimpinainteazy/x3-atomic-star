@@ -3156,6 +3156,7 @@ impl pallet_x3_treasury_policy::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type OperatorOrigin = EnsureRootOrHalfCouncil;
     type MaxInsuranceReserve = MaxInsuranceReserve;
+    type WeightInfo = pallet_x3_treasury_policy::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Custody Configuration =====
@@ -3541,8 +3542,14 @@ mod benches {
     // them because the pallet was not registered here.
     #[allow(unused_imports)]
     use pallet_x3_supply_ledger::Pallet as X3SupplyLedger;
+    // Added 2026-09-27: `pallet-x3-treasury-policy` charged literals for all eight calls — a vault
+    // funding at 80,000,000 picoseconds — behind a `runtime-benchmarks` feature that had nothing in
+    // it and that this list did not enable either, so the pallet could not be measured at all.
+    #[allow(unused_imports)]
+    use pallet_x3_treasury_policy::Pallet as X3TreasuryPolicy;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_treasury_policy, X3TreasuryPolicy]
         [pallet_x3_supply_ledger, X3SupplyLedger]
         [pallet_atomic_trade_engine, AtomicTradeEngine]
         [pallet_x3_atomic_kernel, X3AtomicKernel]

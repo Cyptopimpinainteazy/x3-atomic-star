@@ -2,14 +2,14 @@
   "schema": 1,
   "root": "/home/lojak/Desktop/xxxstar-main",
   "counts": {
-    "pallet-call-without-weights": 22
+    "pallet-call-without-weights": 21
   },
   "structural_counts": {
     "stale-registry-test": 0,
     "missing-registry-path": 0,
     "stale-proof-report": 0,
     "unregistered-pallet": 0,
-    "pallet-call-without-weights": 22,
+    "pallet-call-without-weights": 21,
     "ungated-crate": 0
   },
   "documented_unwired": [
@@ -230,19 +230,6 @@
       "why": "4 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
       "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
       "test_required": "cargo test -p x3-token-factory --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "673fe9fe9ec47f20",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-treasury-policy/src/lib.rs",
-      "line": 267,
-      "symbol": "x3-treasury-policy::Weight::from_parts(50_000_000, 0",
-      "why": "8 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-treasury-policy --features runtime-benchmarks",
       "gate_affected": "runtime identity / benchmarks",
       "patch_eligible": false
     },

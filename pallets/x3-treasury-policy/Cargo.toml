@@ -9,6 +9,7 @@ description = "X3 treasury policy: allocation caps, vault funding controls, and 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2", default-features = false, features = ["derive"] }
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
@@ -25,6 +26,7 @@ default = ["std"]
 std = [
     "codec/std",
     "scale-info/std",
+    "frame-benchmarking?/std",
     "frame-support/std",
     "frame-system/std",
     "sp-runtime/std",
@@ -32,5 +34,9 @@ std = [
     "pallet-x3-inventory/std",
     "serde/std",
 ]
-runtime-benchmarks = ["frame-support/runtime-benchmarks"]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "pallet-x3-inventory/runtime-benchmarks",
+]
 try-runtime = ["frame-support/try-runtime"]

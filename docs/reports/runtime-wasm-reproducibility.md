@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `730c608e5`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `af80888a6`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -467,3 +467,17 @@ alters the runtime, so the record and the code land together.
   (the development genesis holds none, and the ledger refuses an unknown asset), so they measure the
   state a chain can reach rather than a ledger seeded by hand. Scanner
   `pallet-call-without-weights` 23 → 22.
+
+* `af80888a6` — **the treasury policy's eight calls stop charging literals.** `pallets/x3-treasury-policy`
+  had hand-typed weights on every dispatchable — a settlement vault funding at 80,000,000 picoseconds,
+  a cap at 50,000,000 — behind a `runtime-benchmarks` feature that had nothing in it and that the
+  runtime's feature list did not enable either, so `define_benchmarks!` could not see the pallet at
+  all. It carries a generated `weights.rs`, a `benchmarking.rs` and a `type WeightInfo` now, and the
+  bytes move: compact 8881232 bytes (`0x88164e76c0d4207735324e0413cfe58fe8fd0bec4ed6a61d56bb49101bc92f98`) — was 8,885,606 — and compressed
+  1526056 (`0xa764ea628bde1995afe7fd41e654acb92a37ec85d4d585e9771c610cad7bd4d5`) — was 1,526,168.
+
+  The vault-funding benchmark creates its vault with the inventory pallet's own root-only
+  `create_vault` and sets an allocation cap and an operator threshold first, because the default
+  threshold of zero sends every non-zero funding action into the governance queue — measuring that
+  branch would have missed the immediate-apply path a chain takes. Scanner
+  `pallet-call-without-weights` 22 → 21.
