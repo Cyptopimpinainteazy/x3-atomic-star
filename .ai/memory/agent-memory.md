@@ -9084,3 +9084,40 @@ registration, with the outcome per file:
   attestation) — money path first: `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`,
   `x3-wrapped`, `x3-wallet-pallet`, `x3-cross-vm-router`. Also open: no workflow re-runs the
   regeneration, so a weight file can go stale silently.
+
+## 2026-09-27 (still later) — the supply ledger joins the measured-weights set, and the trap that hid it
+
+- **`pallets/x3-supply-ledger` charged literals for a governance MINT (20,000 ps) and a BURN
+  (15,000 ps)** plus three switches at 10,000, while each one reads and writes `Ledgers`. It is the
+  third pallet measured by the repo's own CLI (`bed 22 pallets left`). Pattern to copy for the
+  remaining heavy class — a pallet with no `weights.rs` at all:
+  1. `Cargo.toml`: optional `frame-benchmarking` + (if the benchmark must touch a sibling pallet)
+     that pallet as an optional dep for the lib and a **dev-dependency** for the mock; add
+     `runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks", "<sibling>"]`.
+  2. `src/benchmarking.rs` with `#[benchmarks(where T: Config + <sibling>::Config)] mod benchmarks`.
+     The `where` argument **replaces** the generated impl's clause; the macro re-adds `T: Config`
+     itself, so listing both is safe and listing neither form of the sibling bound fails. A bound on
+     the individual `#[benchmark] fn` does **not** work — the generated `Benchmarking` impl calls the
+     fn without it.
+  3. `lib.rs`: `pub mod weights;` + `pub use weights::WeightInfo;` + `use crate::weights::WeightInfo;`
+     **inside** the `pub mod pallet` block (that inner import is what makes
+     `<T as Config>::WeightInfo::x()` resolve), and `type WeightInfo: WeightInfo;` in `Config`.
+  4. `runtime/Cargo.toml`: add `"<pallet>/runtime-benchmarks"` to the runtime's own
+     `runtime-benchmarks` feature list. **This is the trap**: without it the pallet's benchmark impl
+     is `#[cfg(any(feature = "runtime-benchmarks", test))]`-gated out, `define_benchmarks!` fails with
+     `Pallet<Runtime>: Benchmarking is not satisfied`, and no amount of fixing the pallet itself helps.
+  5. Run the CLI (before wiring the calls — the trait only gains the functions after generation),
+     then wire the five call sites and add `type WeightInfo` to **every** `Config` impl in the crate
+     (the mock and every test file that defines its own runtime).
+- **A benchmark's precondition must be reachable on a chain.** The mint/burn benchmarks register an
+  asset through the asset registry (whose origin is EnsureRootOrHalfCouncil, so
+  `try_successful_origin()` works), because the dev genesis holds no assets and the ledger refuses an
+  unknown one. Seeding `Ledgers` directly would have measured a state the chain cannot reach.
+- **Evidence**: `cargo test -p pallet-x3-supply-ledger` 41 passed; `--features runtime-benchmarks`
+  46 passed (5 benchmark entries); scanner `pallet-call-without-weights` 23 → **22** (one finding per
+  pallet, not per call site); `check-runtime-weights-wired.py` now names 39 wired configs (was 38).
+- **Next seeds:** 22 pallets remain, all heavy class, money path first — `x3-treasury-policy`,
+  `x3-token-factory`, `x3-wrapped`, `x3-wallet-pallet`, `x3-cross-vm-router`. Budget one
+  re-attestation (~20 min, two srtool builds) per batch, and remember the runtime feature-list trap
+  above: 15 pallets that declare a `runtime-benchmarks` feature are still excluded from the runtime's
+  list with their first compile error written next to them.

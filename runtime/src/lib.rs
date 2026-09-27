@@ -2595,6 +2595,7 @@ impl pallet_x3_asset_registry::Config for Runtime {
 impl pallet_x3_supply_ledger::Config for Runtime {
     type SupplyGovernance = EnsureRootOrHalfCouncil;
     type Registry = X3AssetRegistry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Runtime>;
 }
 
 // ── Protocol fee parameters ──────────────────────────────────────────────────
@@ -3535,8 +3536,14 @@ mod benches {
     // "No benchmarks found which match your input".
     #[allow(unused_imports)]
     use pallet_atomic_trade_engine::Pallet as AtomicTradeEngine;
+    // Added 2026-09-27: `pallet-x3-supply-ledger` charged literals for a governance mint, a burn
+    // and three switches while its own `Ledgers` map was the real cost, and nothing could re-measure
+    // them because the pallet was not registered here.
+    #[allow(unused_imports)]
+    use pallet_x3_supply_ledger::Pallet as X3SupplyLedger;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_supply_ledger, X3SupplyLedger]
         [pallet_atomic_trade_engine, AtomicTradeEngine]
         [pallet_x3_atomic_kernel, X3AtomicKernel]
         [pallet_x3_kernel, AtlasKernel]

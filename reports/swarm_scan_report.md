@@ -3,13 +3,13 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 23
+Findings: 22
 
 ## Counts
 
 | kind | count | ratcheted here |
 |---|---|---|
-| `pallet-call-without-weights` | 23 | yes |
+| `pallet-call-without-weights` | 22 | yes |
 
 ## Related ratchets (not re-reported here)
 
@@ -145,15 +145,6 @@ Findings: 23
 - **why it matters:** 1 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
 - **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
 - **test required:** cargo test -p x3-sequencer --features runtime-benchmarks
-- **release gate affected:** runtime identity / benchmarks
-
-### HIGH — `pallet-call-without-weights` — pallets/x3-supply-ledger/src/lib.rs:366
-
-- **id:** `e58d8b8c26725ac3`
-- **symbol:** `x3-supply-ledger::Weight::from_parts(20_000, 0`
-- **why it matters:** 5 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
-- **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
-- **test required:** cargo test -p x3-supply-ledger --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
 ### HIGH — `pallet-call-without-weights` — pallets/x3-token-factory/src/lib.rs:259

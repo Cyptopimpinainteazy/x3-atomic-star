@@ -12733,9 +12733,11 @@ dependencies = [
 name = "pallet-x3-supply-ledger"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
+ "pallet-x3-asset-registry",
  "parity-scale-codec",
  "quickcheck",
  "quickcheck_macros",

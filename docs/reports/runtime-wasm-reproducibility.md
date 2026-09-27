@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `ddec9b166`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `730c608e5`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -448,3 +448,22 @@ alters the runtime, so the record and the code land together.
   had fixed. Both benchmarks now establish their own preconditions, and the full 13-benchmark pallet
   run rewrites `pallets/x3-kernel/src/weights.rs`. Scanner finding `pallet-call-without-weights`
   25 → 23.
+
+* `730c608e5` — **the supply ledger's weights are measured, and its mint stops being free.**
+  `pallets/x3-supply-ledger` charged literals for a governance **mint** (20,000 picoseconds), a
+  **burn** (15,000) and three switches (10,000) while every one of them reads and writes `Ledgers`.
+  The pallet now carries a generated `weights.rs`, a `benchmarking.rs` and a `type WeightInfo`, so
+  the bytes move: compact 8,885,606 bytes
+  (`0x227964acfaa64bde9a11e8ad8f4fe3b92f8312e0e5da871453cf056b8f812ac9`) — was 8,884,011 — and
+  compressed 1,526,168
+  (`0xd1019855e47ca229a7b3af6dba9c768a49d77a05d24a21f793cea89c3b187ac4`) — was 1,525,686.
+
+  It could not be benchmarked at all before this, and the reason is worth keeping: the runtime's
+  `runtime-benchmarks` feature list did not enable `pallet-x3-supply-ledger/runtime-benchmarks`, so
+  the pallet's generated `impl Benchmarking` was `#[cfg(any(feature = "runtime-benchmarks", test))]`
+  -gated out and `define_benchmarks!` failed with
+  `Pallet<Runtime>: Benchmarking is not satisfied` — a message that names neither the feature list nor
+  the pallet's own manifest. The mint and burn benchmarks register an asset through the asset registry
+  (the development genesis holds none, and the ledger refuses an unknown asset), so they measure the
+  state a chain can reach rather than a ledger seeded by hand. Scanner
+  `pallet-call-without-weights` 23 → 22.

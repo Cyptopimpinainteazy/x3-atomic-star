@@ -325,6 +325,9 @@ runtime-benchmarks = [
 	"pallet-x3-atomic-kernel/runtime-benchmarks",
 	"pallet-x3-settlement-engine/runtime-benchmarks",
 	"pallet-cross-chain-validator/runtime-benchmarks",
+	# Added 2026-09-27: absent from this list is a pallet whose benchmarks are never compiled, so
+	# `Pallet<Runtime>: Benchmarking` is unsatisfied and the CLI cannot measure the pallet at all.
+	"pallet-x3-supply-ledger/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 	# Measured 2026-09-25: 37 of the 52 runtime dependencies that declare a `runtime-benchmarks`
 	# feature compile with it on, and 15 do not — their benchmark modules have **never been
