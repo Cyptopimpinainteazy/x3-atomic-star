@@ -385,3 +385,47 @@ evidence = [
   "node/src/rpc.rs",
   "note: 2026-09-27 - eleven wallet-service RPCs answered with fabricated values, including a public test mnemonic as a wallet seed",
 ]
+
+[[feature]]
+id = "X3-OPS-016"
+name = "EVM call and gas-estimation RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = [
+  "node/src/rpc_frontier.rs",
+  "node/src/rpc.rs",
+  "crates/x3-rpc/src/gas_estimation.rs",
+]
+implemented = 60
+tested = 55
+mainnet_ready = 25
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = true
+# The `eth_*` half of this row was already real (`AtlasKernelRuntimeApi::call_evm` behind
+# `eth_call`, runtime dry-run behind `eth_estimateGas`, a hard block-range cap on `eth_getLogs`).
+# The X3-native names were not, and they were registered unconditionally rather than behind a dev
+# flag.
+blockers = [
+  "**CLOSED 2026-09-27 — `x3_call` answered a read with the reader's own question.** The node registered `x3_call` against `x3_rpc::GasEstimationRPC::call`, whose body was `Ok(tx.data.clone())` — it echoed the caller's calldata back as the call's output and labelled it `ExecutionStatus::Success`. A wallet reading a contract value through it read its own calldata. `x3_call` now goes through the same runtime-backed implementation as `eth_call`: the call body was factored into `rpc_frontier::evm_call_output`, which invokes `AtlasKernelRuntimeApi::call_evm` at the best block and returns its bytes or its revert reason.",
+  "**CLOSED 2026-09-27 — the crate-level `call` refuses.** `GasEstimationRPC::call` had no execution backend to reach; it refuses now with a message naming the real implementation, and the test that asserted `assert!(result.is_ok())` (which cannot tell an execution from an echo) was replaced by one that requires the refusal and the name.",
+  "**Still `eth_*`-named only for the rest of the namespace.** The node serves `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_call`, `eth_estimateGas`, `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getTransactionLogs` and the SVM `svm_*` methods; `eth_sendRawTransaction`, `eth_getCode`, `eth_getStorageAt`, `eth_getBlockByNumber`, `eth_syncing` and the subscription family are not registered. A dapp that needs one of those gets `method not found`.",
+  "Open: the `x3_estimateGas` heuristic. It counts opcodes linearly and sums base costs (`simulate_opcodes`), which ignores control flow, memory, storage and calls, and it reports `ExecutionStatus::Success` for a transaction it never executed. The real estimate is `eth_estimateGas` (runtime dry-run). It is labelled simulation-only and deprecated in the crate, and the node still registers it — the label is the honest part, the status is not.",
+]
+required_tests = [
+  "a_read_only_call_is_refused_without_an_execution_backend",
+  "decode_address_accepts_20_byte_hex",
+  "test_rpc_estimate_gas",
+  "test_rpc_missing_from",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed (2026-09-27); `cargo check -p x3-chain-node` finishes with `x3_call` rewired to the runtime call path, which is the compile-level proof that the registration site type-checks against `evm_call_output`.",
+  "note: break-it-first on the crate rule: restoring the `Ok(tx.data.clone())` echo reddens a_read_only_call_is_refused_without_an_execution_backend, and the file was restored byte-identically.",
+]
+evidence = [
+  "node/src/rpc_frontier.rs",
+  "node/src/rpc.rs",
+  "crates/x3-rpc/src/gas_estimation.rs",
+  "note: 2026-09-27 - `x3_call` returned the caller's calldata as the call result",
+]

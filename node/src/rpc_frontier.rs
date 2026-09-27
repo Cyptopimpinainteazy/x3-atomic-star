@@ -155,6 +155,66 @@ fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::types::
     ))
 }
 
+/// Execute a read-only EVM call through the runtime and return its raw output.
+///
+/// This is the *only* implementation of a node-side EVM call. `eth_call` is one
+/// name for it; `x3_call` is another. Before this existed, `x3_call` was served by
+/// `x3_rpc::GasEstimationRPC::call`, which returned the caller's own calldata as
+/// the "output" of the call — a read that answered with its question.
+pub fn evm_call_output<C>(
+    client: &C,
+    tx_obj: &serde_json::Value,
+) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned>
+where
+    C: ProvideRuntimeApi<Block> + HeaderBackend<Block>,
+    C::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+{
+    let target = tx_obj.get("to").and_then(|v| v.as_str()).ok_or_else(|| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            "Missing to address".to_string(),
+            None::<()>,
+        )
+    })?;
+    let target_bytes = decode_address(target)?;
+    let caller = tx_obj
+        .get("from")
+        .and_then(|v| v.as_str())
+        .map(decode_address)
+        .transpose()?;
+
+    let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
+    let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
+    let input_data = hex::decode(data_stripped).map_err(|e| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            format!("Invalid data: {}", e),
+            None::<()>,
+        )
+    })?;
+    let gas_limit = parse_gas_limit(tx_obj)?;
+
+    let api = client.runtime_api();
+    let at = client.info().best_hash;
+    let result: Result<Vec<u8>, Vec<u8>> = api
+        .call_evm(at, caller, target_bytes, input_data, gas_limit)
+        .map_err(|e| {
+            jsonrpsee::types::ErrorObjectOwned::owned(
+                -32603,
+                format!("EVM API error: {}", e),
+                None::<()>,
+            )
+        })?;
+
+    result.map_err(|err| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            format!("EVM call failed: {}", String::from_utf8_lossy(&err)),
+            None::<()>,
+        )
+    })
+}
+
 fn decode_u64_block_param(s: &str) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
     if s == "latest" {
         return Err(jsonrpsee::types::ErrorObjectOwned::owned(
@@ -385,54 +445,11 @@ where
                     (tx, serde_json::Value::Null)
                 });
 
-            let target = tx_obj.get("to").and_then(|v| v.as_str()).ok_or_else(|| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    "Missing to address".to_string(),
-                    None::<()>,
-                )
-            })?;
-            let target_bytes = decode_address(target)?;
-            let caller = tx_obj
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map(decode_address)
-                .transpose()?;
-
-            let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
-            let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
-            let input_data = hex::decode(data_stripped).map_err(|e| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Invalid data: {}", e),
-                    None::<()>,
-                )
-            })?;
-            let gas_limit = parse_gas_limit(&tx_obj)?;
-
-            let api = c.runtime_api();
-            let at = c.info().best_hash;
-            let result: Result<Vec<u8>, Vec<u8>> = api
-                .call_evm(at, caller, target_bytes, input_data, gas_limit)
-                .map_err(|e| {
-                    jsonrpsee::types::ErrorObjectOwned::owned(
-                        -32603,
-                        format!("EVM API error: {}", e),
-                        None::<()>,
-                    )
-                })?;
-
-            match result {
-                Ok(output) => Ok(serde_json::Value::String(format!(
-                    "0x{}",
-                    hex::encode(output)
-                ))),
-                Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("EVM call failed: {}", String::from_utf8_lossy(&err)),
-                    None::<()>,
-                )),
-            }
+            let output = evm_call_output(c.as_ref(), &tx_obj)?;
+            Ok(serde_json::Value::String(format!(
+                "0x{}",
+                hex::encode(output)
+            )))
         },
     )?;
 

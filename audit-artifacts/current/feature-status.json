@@ -3885,6 +3885,42 @@
     },
     {
       "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 45,
+      "confidence": "high",
+      "evidence": [
+        "node/src/rpc_frontier.rs",
+        "node/src/rpc.rs",
+        "crates/x3-rpc/src/gas_estimation.rs",
+        "note: 2026-09-27 - `x3_call` returned the caller's calldata as the call result"
+      ],
+      "id": "X3-OPS-016",
+      "implemented": 60,
+      "launch_scope": "core",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 25,
+      "missing_work": [
+        "**CLOSED 2026-09-27 \u2014 `x3_call` answered a read with the reader's own question.** The node registered `x3_call` against `x3_rpc::GasEstimationRPC::call`, whose body was `Ok(tx.data.clone())` \u2014 it echoed the caller's calldata back as the call's output and labelled it `ExecutionStatus::Success`. A wallet reading a contract value through it read its own calldata. `x3_call` now goes through the same runtime-backed implementation as `eth_call`: the call body was factored into `rpc_frontier::evm_call_output`, which invokes `AtlasKernelRuntimeApi::call_evm` at the best block and returns its bytes or its revert reason.",
+        "**CLOSED 2026-09-27 \u2014 the crate-level `call` refuses.** `GasEstimationRPC::call` had no execution backend to reach; it refuses now with a message naming the real implementation, and the test that asserted `assert!(result.is_ok())` (which cannot tell an execution from an echo) was replaced by one that requires the refusal and the name.",
+        "**Still `eth_*`-named only for the rest of the namespace.** The node serves `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_call`, `eth_estimateGas`, `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getTransactionLogs` and the SVM `svm_*` methods; `eth_sendRawTransaction`, `eth_getCode`, `eth_getStorageAt`, `eth_getBlockByNumber`, `eth_syncing` and the subscription family are not registered. A dapp that needs one of those gets `method not found`.",
+        "Open: the `x3_estimateGas` heuristic. It counts opcodes linearly and sums base costs (`simulate_opcodes`), which ignores control flow, memory, storage and calls, and it reports `ExecutionStatus::Success` for a transaction it never executed. The real estimate is `eth_estimateGas` (runtime dry-run). It is labelled simulation-only and deprecated in the crate, and the node still registers it \u2014 the label is the honest part, the status is not."
+      ],
+      "name": "EVM call and gas-estimation RPC",
+      "paths": [
+        "node/src/rpc_frontier.rs",
+        "node/src/rpc.rs",
+        "crates/x3-rpc/src/gas_estimation.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "operations_user_tools",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
       "claim_risk": false,
       "composite": 78,
       "confidence": "high",
@@ -4838,7 +4874,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "09157cd0bbfe5b157215726ea59104cd6c9e87305391abac2c8845de6938ecf9",
+    "source_digest": "74781b1c88b21aa253f72e9d57939ef57cda2a9351fa87179306b26944cb6b2c",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "b8f8547e4ce2d80f52822512aadc23e411190ee386574075bce98b5fafdb953c",
@@ -4851,7 +4887,7 @@
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
-      "feature-matrix/operations-user-tools.toml": "cd6992c282f10c41167a145e3420589d8952f9d89147d468e97b07ddca6b88e2",
+      "feature-matrix/operations-user-tools.toml": "fb4c92c5780d6d6165bc9c48c1f19fde92fc05c411570d7b0ed95372872791f4",
       "feature-matrix/runtime-core.toml": "d6883d27846f614206d7daeb2645cb5d44d2b8219c926ffb829c28f66ba3a82d",
       "feature-matrix/security-proofgate.toml": "e068bac58eb1ef680f457bcea1d8ad794ba65d89a410c7871b89d5edac2c9f37"
     }
@@ -5377,12 +5413,12 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 62,
-      "NOT INTEGRATED": 7,
+      "NOT INTEGRATED": 8,
       "NOT STARTED": 0,
       "PARTIAL": 71,
       "STUB": 1
     },
-    "matrix_features": 151,
+    "matrix_features": 152,
     "registry_features": 22,
     "registry_max_readiness": 88,
     "registry_mean_readiness": 63.18,

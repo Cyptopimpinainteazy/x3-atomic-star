@@ -2252,18 +2252,19 @@ where
         )?;
     }
     {
-        let ge = gas_estimator.clone();
+        // `x3_call` is the X3-native name for a read-only EVM call, so it goes
+        // through the same runtime-backed implementation as `eth_call`. It used to
+        // be served by `GasEstimationRPC::call`, which answered with the caller's
+        // own calldata as the call's output.
+        let c = client.clone();
         module.register_method(
             "x3_call",
             move |params, _, _| -> Result<serde_json::Value, JsonRpseeError> {
-                let tx: RPCTransaction = params
-                    .parse()
+                let tx_obj: serde_json::Value = params
+                    .one()
                     .map_err(|e| custom_error(format!("Invalid call params: {e}")))?;
-                ge.call(&tx)
-                    .map(|output| {
-                        serde_json::json!({ "output": format!("0x{}", hex::encode(output)) })
-                    })
-                    .map_err(|e| custom_error(e))
+                let output = crate::rpc_frontier::evm_call_output(c.as_ref(), &tx_obj)?;
+                Ok(serde_json::json!({ "output": format!("0x{}", hex::encode(output)) }))
             },
         )?;
     }
