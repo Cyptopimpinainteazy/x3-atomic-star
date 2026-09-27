@@ -303,6 +303,81 @@ def test_a_shell_case_resolves_wherever_it_is_defined(tmp_path: Path) -> None:
     assert [f["symbol"] for f in stale] == ["shell_gate:swarm_scan_generates_report"], stale
 
 
+def unwired_fixture(root: Path, runtime_names_it: bool = False) -> None:
+    """A tree whose only `pallets/` crate is on the scanner's documented-unwired list."""
+    write(
+        root / "FEATURE_REGISTRY.toml",
+        "\n".join(
+            [
+                "[x3_control_pallet]",
+                'crate_or_service = "pallets/pallet-x3-control"',
+                "required_tests = []",
+                "readiness_score = 46",
+                "",
+            ]
+        ),
+    )
+    write(
+        root / "pallets/pallet-x3-control/Cargo.toml",
+        '[package]\nname = "pallet-x3-control"\nversion = "0.1.0"\n',
+    )
+    write(root / "pallets/pallet-x3-control/src/lib.rs", "pub struct ControlState;\n")
+    write(root / "feature-matrix/agents-experimental.toml", 'paths = ["pallets/pallet-x3-control"]\n')
+    write(
+        root / "runtime/src/lib.rs",
+        "PalletX3Control: pallet_x3_control,\n" if runtime_names_it else "SomeOtherPallet: x,\n",
+    )
+
+
+def test_a_documented_unwired_pallet_is_a_decision_not_a_finding(tmp_path: Path) -> None:
+    """An absence the registry records on purpose is rendered, not reported as a defect.
+
+    `pallets/pallet-x3-control` is fail-closed and tested but no chain reads its state, and the
+    owning feature row records that as a decision. The scanner has to be able to tell that apart
+    from a pallet somebody forgot to wire — while still failing the moment the decision goes stale.
+    """
+    unwired_fixture(tmp_path)
+    assert by_kind(scan_findings(tmp_path), "unregistered-pallet") == []
+
+    documented, stale = scan_mod.documented_unwired(scan_mod.ScanContext(tmp_path))
+    assert stale == []
+    assert [row["package"] for row in documented] == ["pallet-x3-control"]
+    assert documented[0]["owner"] == "feature-matrix/agents-experimental.toml"
+    assert documented[0]["reason"], "a documented decision must carry its reason"
+
+
+def test_a_documented_decision_goes_stale_when_the_runtime_names_the_pallet(tmp_path: Path) -> None:
+    unwired_fixture(tmp_path, runtime_names_it=True)
+    findings = by_kind(scan_findings(tmp_path), "unregistered-pallet")
+    assert [f["symbol"] for f in findings] == ["stale-unwired-decision:pallet-x3-control"], findings
+    assert "KNOWN_UNWIRED_PALLETS" in findings[0]["suggested_fix"]
+    documented, stale = scan_mod.documented_unwired(scan_mod.ScanContext(tmp_path))
+    assert documented == []
+    assert len(stale) == 1 and "now names it" in stale[0]
+
+
+def test_a_documented_decision_without_its_owner_document_is_reported(tmp_path: Path) -> None:
+    unwired_fixture(tmp_path)
+    (tmp_path / "feature-matrix/agents-experimental.toml").unlink()
+    documented, stale = scan_mod.documented_unwired(scan_mod.ScanContext(tmp_path))
+    assert documented == []
+    assert len(stale) == 1 and "owning document" in stale[0]
+    findings = by_kind(scan_findings(tmp_path), "unregistered-pallet")
+    assert [f["symbol"] for f in findings] == ["stale-unwired-decision:pallet-x3-control"], findings
+
+
+def test_an_unregistered_pallet_that_is_not_on_the_list_is_still_a_finding(tmp_path: Path) -> None:
+    """The control: the list is keyed by package, so a second unwired pallet is reported."""
+    unwired_fixture(tmp_path)
+    write(
+        tmp_path / "pallets/forgotten-pallet/Cargo.toml",
+        '[package]\nname = "forgotten-pallet"\nversion = "0.1.0"\n',
+    )
+    write(tmp_path / "pallets/forgotten-pallet/src/lib.rs", "pub struct Nothing;\n")
+    findings = by_kind(scan_findings(tmp_path), "unregistered-pallet")
+    assert [f["symbol"] for f in findings] == ["forgotten-pallet"], findings
+
+
 def test_scanner_is_the_registry_citation() -> None:
     """Every test `[repo_scanner_agent]` cites must be a function this module defines.
 

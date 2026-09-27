@@ -3,23 +3,21 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 28
+Findings: 25
 
 ## Counts
 
 | kind | count | ratcheted here |
 |---|---|---|
 | `pallet-call-without-weights` | 25 | yes |
-| `ungated-crate` | 2 | yes |
-| `unregistered-pallet` | 1 | yes |
 
 ## Related ratchets (not re-reported here)
 
 | gate | status | detail |
 |---|---|---|
-| stub / marker ratchet | pass | critical-marker=443, explicit-stub=74, marker=1185 |
-| fake-code scan | pass | constant-assert=17, noop-test=2, skip=139 |
-| panic / unwrap ratchet | pass | pallet-call=0, production=440, runtime-hook=0 |
+| stub / marker ratchet | skipped |  |
+| fake-code scan | skipped |  |
+| panic / unwrap ratchet | skipped |  |
 
 ## Findings
 
@@ -212,35 +210,6 @@ Findings: 28
 - **test required:** cargo test -p x3-wrapped --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
-### MEDIUM — `ungated-crate` — pallets/x3-cross-vm-router/fuzz/Cargo.toml
-
-- **id:** `275693779fa5e4da`
-- **symbol:** `pallet-x3-cross-vm-router-fuzz`
-- **why it matters:** 1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers
-- **suggested fix:** append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated
-- **test required:** cargo test -p pallet-x3-cross-vm-router-fuzz
-- **release gate affected:** crate tests are gated
-- **patch:** `.ai/patches/275693779fa5e4da.patch` (`--patches`)
-
-### MEDIUM — `ungated-crate` — pallets/x3-settlement-engine/fuzz/Cargo.toml
-
-- **id:** `343b07a276c84a27`
-- **symbol:** `pallet-x3-settlement-engine-fuzz`
-- **why it matters:** 1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers
-- **suggested fix:** append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated
-- **test required:** cargo test -p pallet-x3-settlement-engine-fuzz
-- **release gate affected:** crate tests are gated
-- **patch:** `.ai/patches/343b07a276c84a27.patch` (`--patches`)
-
-### MEDIUM — `unregistered-pallet` — pallets/pallet-x3-control/Cargo.toml
-
-- **id:** `a2af0f92e1602244`
-- **symbol:** `pallet-x3-control`
-- **why it matters:** a pallet under pallets/ that runtime/src/lib.rs never names: either it is half-wired (declared, built, not in the runtime) or it is dead weight in the pallet directory
-- **suggested fix:** add it to the runtime with weights and a genesis config, or move it out of pallets/ and say what it is
-- **test required:** runtime registration / genesis build test
-- **release gate affected:** runtime identity
-
 ### LOW — `pallet-call-without-weights` — pallets/depin-marketplace/src/lib.rs:368
 
 - **id:** `1f4c6126e754ae38`
@@ -277,6 +246,11 @@ Findings: 28
 - **test required:** cargo test -p x3-rebalance --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
+## Documented decisions
+
+These `pallets/` crates are deliberately absent from `runtime/src/lib.rs`. The scanner reports an entry the moment the runtime names the pallet, so the list can only shrink.
+
+- `pallets/pallet-x3-control/Cargo.toml` — the control plane is fail-closed and carries 12 tests, but nothing on a chain reads `ControlState`, so wiring it means deciding who acts on `Frozen`/`Paused` — a design decision the owning row records, not an oversight (owning document: `feature-matrix/agents-experimental.toml`)
 ## What this scan does not cover
 
 `TODO`/`stub`/test-cheat markers and reachable `unwrap()`/`panic!` counts are owned by the two ratchets above; this report cites their verdicts instead of duplicating their debt.

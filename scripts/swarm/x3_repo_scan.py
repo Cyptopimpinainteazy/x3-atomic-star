@@ -87,6 +87,23 @@ STRUCTURAL_KINDS = (
     "ungated-crate",
 )
 
+# Pallets under `pallets/` that the runtime deliberately does not include, each with the document
+# that owns the decision and the reason for it. An entry is a *recorded decision*, not a way to
+# stop looking: the detector still reports the entry the moment `runtime/src/lib.rs` names the
+# pallet (the decision is stale and the list has to shrink), and it reports the entry if the
+# owning document disappears. The decisions are rendered in the report's own section, so the
+# reader sees them instead of an absence.
+KNOWN_UNWIRED_PALLETS: dict[str, dict[str, str]] = {
+    "pallet-x3-control": {
+        "owner": "feature-matrix/agents-experimental.toml",
+        "reason": (
+            "the control plane is fail-closed and carries 12 tests, but nothing on a chain reads "
+            "`ControlState`, so wiring it means deciding who acts on `Frozen`/`Paused` — a design "
+            "decision the owning row records, not an oversight"
+        ),
+    },
+}
+
 SKIP_DIRS = {
     ".git",
     "target",
@@ -386,6 +403,69 @@ def detect_registry_citations(ctx: ScanContext, defined: set[str]) -> list[Findi
     return findings
 
 
+def runtime_names_pallet(runtime: str, package: str, entry_name: str) -> bool:
+    """Whether the runtime names a crate, by package name or by local module name."""
+    aliases = {
+        package,
+        package.replace("-", "_"),
+        entry_name,
+        entry_name.replace("-", "_"),
+    }
+    return any(alias in runtime for alias in aliases)
+
+
+def documented_unwired(ctx: ScanContext) -> tuple[list[dict[str, str]], list[str]]:
+    """The recorded `pallets/` omissions, and the notes for entries that have gone stale.
+
+    Returns the decisions that are still live (the pallet is in this tree, the runtime does not name
+    it, and the owning document exists) and notes for the ones that are not. A pallet that is not in
+    the tree at all is not a note: an unrelated fixture tree has nothing to decide about, and a
+    deleted crate leaves an entry nobody needs to act on.
+    """
+    documented: list[dict[str, str]] = []
+    stale: list[str] = []
+    runtime = ctx.text("runtime/src/lib.rs")
+    pallets_dir = ctx.root / "pallets"
+    if not pallets_dir.is_dir():
+        return documented, stale
+
+    entry_names: dict[str, str] = {}
+    for entry in sorted(pallets_dir.iterdir()):
+        manifest = entry / "Cargo.toml"
+        if not manifest.is_file():
+            continue
+        try:
+            package = tomllib.loads(read_text(manifest)).get("package", {}).get("name", "")
+        except tomllib.TOMLDecodeError:
+            continue
+        if package:
+            entry_names[package] = entry.name
+
+    for package, decision in sorted(KNOWN_UNWIRED_PALLETS.items()):
+        if package not in entry_names:
+            continue
+        entry_name = entry_names[package]
+        if runtime_names_pallet(runtime, package, entry_name):
+            stale.append(
+                f"{package}: runtime/src/lib.rs now names it — the recorded decision is stale, so "
+                "drop the entry"
+            )
+            continue
+        owner = decision.get("owner", "")
+        if not owner or not (ctx.root / owner).exists():
+            stale.append(f"{package}: the owning document `{owner}` does not exist")
+            continue
+        documented.append(
+            {
+                "package": package,
+                "path": f"pallets/{entry_name}/Cargo.toml",
+                "owner": owner,
+                "reason": decision.get("reason", ""),
+            }
+        )
+    return documented, stale
+
+
 def detect_unregistered_pallets(ctx: ScanContext) -> list[Finding]:
     """`pallets/*` crates the runtime never mentions."""
     runtime = ctx.text("runtime/src/lib.rs")
@@ -407,13 +487,10 @@ def detect_unregistered_pallets(ctx: ScanContext) -> list[Finding]:
         # module (`pub mod fraud_proofs;` / `crate::fraud_proofs::pallet::pallet`)
         # — checking only the package name reported `pallets/fraud-proofs` as
         # unregistered when it is registered four times over.
-        aliases = {
-            package,
-            package.replace("-", "_"),
-            entry.name,
-            entry.name.replace("-", "_"),
-        }
-        if any(alias in runtime for alias in aliases):
+        if runtime_names_pallet(runtime, package, entry.name):
+            continue
+        if package in KNOWN_UNWIRED_PALLETS:
+            # A recorded decision, rendered in the report's own section instead of here.
             continue
         findings.append(
             Finding(
@@ -745,7 +822,12 @@ def structural_counts(findings: list[Finding]) -> dict[str, int]:
     return counts
 
 
-def render_markdown(findings: list[Finding], summary: list[dict], root: Path) -> str:
+def render_markdown(
+    findings: list[Finding],
+    summary: list[dict],
+    root: Path,
+    documented: list[dict[str, str]] | None = None,
+) -> str:
     counts: dict[str, int] = {}
     for finding in findings:
         counts[finding.kind] = counts.get(finding.kind, 0) + 1
@@ -788,6 +870,20 @@ def render_markdown(findings: list[Finding], summary: list[dict], root: Path) ->
         if finding.patch_eligible:
             lines.append("- **patch:** `.ai/patches/" + finding.id + ".patch` (`--patches`)")
         lines.append("")
+    lines += ["## Documented decisions", ""]
+    if not documented:
+        lines.append("_None. Every `pallets/` crate is either named by the runtime or reported above._")
+    else:
+        lines.append(
+            "These `pallets/` crates are deliberately absent from `runtime/src/lib.rs`. The scanner "
+            "reports an entry the moment the runtime names the pallet, so the list can only shrink."
+        )
+        lines.append("")
+        for decision in documented:
+            lines.append(
+                f"- `{decision['path']}` — {decision['reason']} (owning document: "
+                f"`{decision['owner']}`)"
+            )
     lines += [
         "## What this scan does not cover",
         "",
@@ -859,6 +955,21 @@ def scan(root: Path, with_gate_summary: bool = True) -> tuple[list[Finding], lis
     defined = defined_symbols(ctx)
     findings: list[Finding] = []
     findings += detect_registry_citations(ctx, defined)
+    documented, stale_decisions = documented_unwired(ctx)
+    for note in stale_decisions:
+        findings.append(
+            Finding(
+                kind="unregistered-pallet",
+                severity="medium",
+                path="scripts/swarm/x3_repo_scan.py",
+                line=0,
+                symbol=f"stale-unwired-decision:{note.split(':', 1)[0]}",
+                why=f"a recorded `pallets/` decision no longer describes the tree: {note}",
+                suggested_fix="delete or correct the entry in `KNOWN_UNWIRED_PALLETS`",
+                test_required="repo scanner test",
+                gate_affected="repo scanner",
+            )
+        )
     findings += detect_unregistered_pallets(ctx)
     findings += detect_pallet_call_without_weights(ctx)
     findings += detect_ungated_crates(ctx)
@@ -871,17 +982,19 @@ def write_reports(root: Path, findings: list[Finding], summary: list[dict]) -> d
     counts: dict[str, int] = {}
     for finding in findings:
         counts[finding.kind] = counts.get(finding.kind, 0) + 1
+    documented, _ = documented_unwired(ScanContext(root))
     payload = {
         "schema": 1,
         "root": str(root),
         "counts": {k: counts[k] for k in sorted(counts)},
         "structural_counts": structural_counts(findings),
+        "documented_unwired": documented,
         "gate_summary": summary,
         "findings": [f.as_dict() for f in findings],
     }
     ctx = ScanContext(root)
     ctx.write_text(REPORT_JSON, json.dumps(payload, indent=2, sort_keys=False) + "\n")
-    ctx.write_text(REPORT_MD, render_markdown(findings, summary, root))
+    ctx.write_text(REPORT_MD, render_markdown(findings, summary, root, documented))
     return payload
 
 

@@ -2,33 +2,39 @@
   "schema": 1,
   "root": "/home/lojak/Desktop/xxxstar-main",
   "counts": {
-    "pallet-call-without-weights": 25,
-    "ungated-crate": 2,
-    "unregistered-pallet": 1
+    "pallet-call-without-weights": 25
   },
   "structural_counts": {
     "stale-registry-test": 0,
     "missing-registry-path": 0,
     "stale-proof-report": 0,
-    "unregistered-pallet": 1,
+    "unregistered-pallet": 0,
     "pallet-call-without-weights": 25,
-    "ungated-crate": 2
+    "ungated-crate": 0
   },
+  "documented_unwired": [
+    {
+      "package": "pallet-x3-control",
+      "path": "pallets/pallet-x3-control/Cargo.toml",
+      "owner": "feature-matrix/agents-experimental.toml",
+      "reason": "the control plane is fail-closed and carries 12 tests, but nothing on a chain reads `ControlState`, so wiring it means deciding who acts on `Frozen`/`Paused` \u2014 a design decision the owning row records, not an oversight"
+    }
+  ],
   "gate_summary": [
     {
       "gate": "stub / marker ratchet",
-      "status": "pass",
-      "detail": "critical-marker=443, explicit-stub=74, marker=1185"
+      "status": "skipped",
+      "detail": ""
     },
     {
       "gate": "fake-code scan",
-      "status": "pass",
-      "detail": "constant-assert=17, noop-test=2, skip=139"
+      "status": "skipped",
+      "detail": ""
     },
     {
       "gate": "panic / unwrap ratchet",
-      "status": "pass",
-      "detail": "pallet-call=0, production=440, runtime-hook=0"
+      "status": "skipped",
+      "detail": ""
     }
   ],
   "findings": [
@@ -303,45 +309,6 @@
       "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
       "test_required": "cargo test -p x3-wrapped --features runtime-benchmarks",
       "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "275693779fa5e4da",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "pallets/x3-cross-vm-router/fuzz/Cargo.toml",
-      "line": 0,
-      "symbol": "pallet-x3-cross-vm-router-fuzz",
-      "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p pallet-x3-cross-vm-router-fuzz",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
-      "id": "343b07a276c84a27",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "pallets/x3-settlement-engine/fuzz/Cargo.toml",
-      "line": 0,
-      "symbol": "pallet-x3-settlement-engine-fuzz",
-      "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p pallet-x3-settlement-engine-fuzz",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
-      "id": "a2af0f92e1602244",
-      "kind": "unregistered-pallet",
-      "severity": "medium",
-      "path": "pallets/pallet-x3-control/Cargo.toml",
-      "line": 0,
-      "symbol": "pallet-x3-control",
-      "why": "a pallet under pallets/ that runtime/src/lib.rs never names: either it is half-wired (declared, built, not in the runtime) or it is dead weight in the pallet directory",
-      "suggested_fix": "add it to the runtime with weights and a genesis config, or move it out of pallets/ and say what it is",
-      "test_required": "runtime registration / genesis build test",
-      "gate_affected": "runtime identity",
       "patch_eligible": false
     },
     {
