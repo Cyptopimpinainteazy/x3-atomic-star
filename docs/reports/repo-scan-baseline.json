@@ -1,7 +1,7 @@
 {
   "counts": {
     "missing-registry-path": 0,
-    "pallet-call-without-weights": 25,
+    "pallet-call-without-weights": 23,
     "stale-proof-report": 0,
     "stale-registry-test": 0,
     "ungated-crate": 0,

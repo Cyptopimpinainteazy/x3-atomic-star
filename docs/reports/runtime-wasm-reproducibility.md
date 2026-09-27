@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `4e1f5bdcf`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `ddec9b166`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -426,3 +426,25 @@ alters the runtime, so the record and the code land together.
 * Toolchain note: the image must be able to build this dependency graph. Both
   `1.75.0` (the previous pin) and `1.88.0` refuse with
   `enum-ordinalize@4.4.2 requires rustc 1.89`.
+
+* `ddec9b166` — **two pallets stop charging hand-written weights, and the record moves with them.**
+  `pallets/atomic-trade-engine` had four calls (`register_liquidity_pool`, `update_liquidity_pool`,
+  `sync_pool_price`, `submit_price_observation`) and `pallets/x3-kernel` had three
+  (`emergency_pause`, `emergency_unpause`, `emergency_halt`) charging literals — the kernel's three
+  were 10,000/15,000 picoseconds, i.e. a *freeze of the chain* for essentially nothing. Both pallets
+  now carry benchmark-derived weights, so the bytes move for real: compact 8,884,011 bytes
+  (`0xd45f2cc766c5531a74b97ae0fb58cb21c86b9d04020f444b2dc022b1bff431d4`) — was 8,888,727 — and
+  compressed 1,525,686
+  (`0xcbbe7219852b60bf436f3d76f07eb6642c290a9f428194ee525b7eff7bb7e5ae`) — was 1,527,036.
+
+  `pallet-atomic-trade-engine` could not be benchmarked at all before this: it ships a
+  `benchmarking.rs` but was missing from `mod benches` in `runtime/src/lib.rs`, so the CLI answered
+  "No benchmarks found which match your input" and the four literals were never re-measurable.
+  `pallet_x3_kernel` *was* registered, but two of its own benchmarks failed when re-run, so its
+  weights could not be regenerated either: `register_asset` registered the default asset the
+  development genesis already holds (`AssetAlreadyRegistered`), and `submit_comit` presented
+  `prepare_root = H256::zero()`, which `verify_dual_vm_with_receipts` refuses on any build without
+  the `dev-bypass` feature (`ComitVerificationFailed`) — the same trap `submit_comit_v2` had already
+  had fixed. Both benchmarks now establish their own preconditions, and the full 13-benchmark pallet
+  run rewrites `pallets/x3-kernel/src/weights.rs`. Scanner finding `pallet-call-without-weights`
+  25 → 23.

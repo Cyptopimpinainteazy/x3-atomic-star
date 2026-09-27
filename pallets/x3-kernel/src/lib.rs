@@ -1174,7 +1174,7 @@ pub mod pallet {
         /// Activate emergency pause — halts all user-facing extrinsics.
         /// Only callable by `GovernanceOrigin` (root or council).
         #[pallet::call_index(40)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_pause())]
         pub fn emergency_pause(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
@@ -1186,7 +1186,7 @@ pub mod pallet {
         /// Deactivate emergency pause — resumes normal operation.
         /// Only callable by `GovernanceOrigin` (root or council).
         #[pallet::call_index(41)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_unpause())]
         pub fn emergency_unpause(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             // Only unpause if currently paused (nothing to do otherwise)
@@ -1211,7 +1211,7 @@ pub mod pallet {
         /// Use emergency_pause for routine operational pauses.
         /// Use emergency_halt for invariant violations requiring immediate asset freeze.
         #[pallet::call_index(42)]
-        #[pallet::weight(Weight::from_parts(15_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_halt())]
         pub fn emergency_halt(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             T::EmergencyHaltController::trigger();

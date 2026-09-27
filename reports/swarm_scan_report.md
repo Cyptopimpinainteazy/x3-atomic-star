@@ -3,32 +3,23 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 25
+Findings: 23
 
 ## Counts
 
 | kind | count | ratcheted here |
 |---|---|---|
-| `pallet-call-without-weights` | 25 | yes |
+| `pallet-call-without-weights` | 23 | yes |
 
 ## Related ratchets (not re-reported here)
 
 | gate | status | detail |
 |---|---|---|
-| stub / marker ratchet | skipped |  |
-| fake-code scan | skipped |  |
-| panic / unwrap ratchet | skipped |  |
+| stub / marker ratchet | pass | critical-marker=443, explicit-stub=74, marker=1185 |
+| fake-code scan | pass | constant-assert=17, noop-test=2, skip=139 |
+| panic / unwrap ratchet | pass | pallet-call=0, production=440, runtime-hook=0 |
 
 ## Findings
-
-### HIGH — `pallet-call-without-weights` — pallets/atomic-trade-engine/src/lib.rs:877
-
-- **id:** `e87a13dabeda42dc`
-- **symbol:** `atomic-trade-engine::Weight::from_parts(60_000_000, 0`
-- **why it matters:** 4 extrinsic(s) charge an invented literal weight while the pallet ships generated weights, so the benchmarked numbers are not the ones being charged
-- **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
-- **test required:** cargo test -p atomic-trade-engine --features runtime-benchmarks
-- **release gate affected:** runtime identity / benchmarks
 
 ### HIGH — `pallet-call-without-weights` — pallets/x3-account-registry/src/lib.rs:143
 
@@ -109,15 +100,6 @@ Findings: 25
 - **why it matters:** 3 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
 - **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
 - **test required:** cargo test -p x3-flashloan --features runtime-benchmarks
-- **release gate affected:** runtime identity / benchmarks
-
-### HIGH — `pallet-call-without-weights` — pallets/x3-kernel/src/lib.rs:1177
-
-- **id:** `e744dafce65577c9`
-- **symbol:** `x3-kernel::Weight::from_parts(10_000, 0`
-- **why it matters:** 3 extrinsic(s) charge an invented literal weight while the pallet ships generated weights, so the benchmarked numbers are not the ones being charged
-- **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
-- **test required:** cargo test -p x3-kernel --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
 ### HIGH — `pallet-call-without-weights` — pallets/x3-partner/src/lib.rs:256

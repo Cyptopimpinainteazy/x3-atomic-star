@@ -49,6 +49,7 @@ die()     { echo -e "${RED}[benchmark] ✗ ERROR:${NC} $*" >&2; exit 1; }
 
 # Pallet name → output path mapping
 declare -A PALLET_PATHS=(
+  ["pallet-atomic-trade-engine"]="pallets/atomic-trade-engine/src/weights.rs"
   ["pallet-x3-atomic-kernel"]="pallets/x3-atomic-kernel/src/weights.rs"
   ["pallet-x3-settlement-engine"]="pallets/x3-settlement-engine/src/weights.rs"
   ["pallet-cross-chain-validator"]="pallets/cross-chain-validator/src/weights.rs"

@@ -3528,8 +3528,16 @@ mod benches {
     // answered "No benchmarks found which match your input".
     #[allow(unused_imports)]
     use pallet_x3_kernel::Pallet as AtlasKernel;
+    // Added 2026-09-27: `pallet-atomic-trade-engine` ships a generated `weights.rs` and a
+    // `benchmarking.rs`, but four of its calls (register/update liquidity pool, sync pool price,
+    // submit price observation) charged literal weights written by hand — and nothing could
+    // re-measure them, because the pallet was not registered here: the CLI answered
+    // "No benchmarks found which match your input".
+    #[allow(unused_imports)]
+    use pallet_atomic_trade_engine::Pallet as AtomicTradeEngine;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_atomic_trade_engine, AtomicTradeEngine]
         [pallet_x3_atomic_kernel, X3AtomicKernel]
         [pallet_x3_kernel, AtlasKernel]
         [pallet_x3_settlement_engine, X3SettlementEngine]
