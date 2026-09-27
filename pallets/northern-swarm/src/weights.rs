@@ -18,7 +18,7 @@ pub trait WeightInfo {
     fn submit_heartbeat() -> Weight;
     fn submit_task() -> Weight;
     fn claim_task() -> Weight;
-    fn submit_result(max_executors: u32) -> Weight;
+    fn submit_result() -> Weight;
     fn slash_executor() -> Weight;
 }
 
@@ -61,11 +61,12 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().writes(4))
     }
 
-    fn submit_result(max_executors: u32) -> Weight {
-        Weight::from_parts(65_000_000, 6_000)
-            .saturating_add(Weight::from_parts(12_000_000, 512).saturating_mul(max_executors.into()))
-            .saturating_add(T::DbWeight::get().reads(6 + (max_executors as u64 * 2)))
-            .saturating_add(T::DbWeight::get().writes(5 + (max_executors as u64 * 3)))
+    fn submit_result() -> Weight {
+        // Temporary upper bound for the configured 3-executor path. This file
+        // must be replaced by benchmark CLI output before the release gate can pass.
+        Weight::from_parts(101_000_000, 7_536)
+            .saturating_add(T::DbWeight::get().reads(12))
+            .saturating_add(T::DbWeight::get().writes(14))
     }
 
     fn slash_executor() -> Weight {
@@ -112,11 +113,10 @@ impl WeightInfo for () {
             .saturating_add(RocksDbWeight::get().writes(4))
     }
 
-    fn submit_result(max_executors: u32) -> Weight {
-        Weight::from_parts(65_000_000, 6_000)
-            .saturating_add(Weight::from_parts(12_000_000, 512).saturating_mul(max_executors.into()))
-            .saturating_add(RocksDbWeight::get().reads(6 + (max_executors as u64 * 2)))
-            .saturating_add(RocksDbWeight::get().writes(5 + (max_executors as u64 * 3)))
+    fn submit_result() -> Weight {
+        Weight::from_parts(101_000_000, 7_536)
+            .saturating_add(RocksDbWeight::get().reads(12))
+            .saturating_add(RocksDbWeight::get().writes(14))
     }
 
     fn slash_executor() -> Weight {
