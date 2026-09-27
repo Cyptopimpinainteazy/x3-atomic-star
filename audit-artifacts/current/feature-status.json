@@ -1688,19 +1688,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 86,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
         "pallets/x3-cross-vm-router/src/lib.rs",
-        "note: Native internal routing and supply tests"
+        "note: Native internal routing and supply tests",
+        "note: 2026-09-27 \u2014 the fee branch's three outcomes are now named tests, and the branch is reachable because the mock's `RoutingFeeBps`/`ExistentialDeposit` are storage-backed"
       ],
       "id": "X3-XVM-014",
-      "implemented": 92,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 82,
+      "mainnet_ready": 85,
       "missing_work": [
-        "External boundary proof remains separate"
+        "External boundary proof remains separate",
+        "**2026-09-27 \u2014 `xvm_transfer` was unusable below `ED * 10_000 / bps` and the error blamed the payer.** The routing fee is `amount * RoutingFeeBps / 10_000` (2_000 on a 1_000_000 transfer at `XvmRoutingFeeBps = 20`), and the currency refuses any deposit that would leave the *destination* below the existential deposit (`pallet-balances` `can_deposit` \u2192 `BelowMinimum`; the SDK checkout is `substrate/frame/balances/src/impl_fungible.rs`). The protocol treasury account has never existed on a dev/local chain \u2014 the runtime's own transaction fees do not go to it \u2014 so every transfer whose fee is below `ExistentialDeposit = 100 * MICRO_ATLAS` was refused with `RoutingFeeNotAffordable`. Measured on `local3`: the signing gateway held 999_999_999_900_043_000 with `frozen = 0` and no locks, the fee was 2_000, the treasury had no `System::Account` key at all, and `xvm_transfer` failed. The message was about the *payer* for a refusal by the *destination*, so topping the payer up could never fix it. The pallet's own suite could not see it: the mock wired `RoutingFeeBps = 0`, so the branch never ran.",
+        "**CLOSED 2026-09-27 \u2014 a fee the treasury cannot accept is waived, not fatal.** `do_initiate_transfer` now asks the payer's own balance which side refused: if the funds are there, the refusal is the destination's and the fee is waived with its own `XvmRoutingFeeWaived` event (a waived fee is uncollected revenue and has to be visible, not silent); if they are not, `RoutingFeeNotAffordable` stands unchanged. `RoutingFeeBps` and `ExistentialDeposit` are storage-backed in the mock so all three branches are reachable: `a_fee_the_treasury_cannot_accept_is_waived_rather_than_failing_the_transfer`, `a_fee_the_treasury_can_accept_is_collected`, `a_payer_that_cannot_cover_the_fee_is_still_refused`. Break-it-first measured: `Err(_) if payer_covers_it` \u2192 `Err(_) if false && payer_covers_it` reddens exactly the waiver test (at `do_xvm`'s `xvm_transfer` expect) and leaves the other two green; restoring byte-identically returns 85/85.",
+        "Still open on this row, and why `mainnet_ready` stops at 85: the waiver means protocol revenue is not accrued whenever the treasury cannot take a dust fee, and nobody has decided whether the operator should instead be required to keep the treasury funded (a documented operational requirement) or the fee should round up to the deposit floor. The pallet-level proof is three tests in `pallets/x3-cross-vm-router/src/tests.rs`; the live half is `node/tests/supply_invariant_distributed.rs`, which drives the same call through a three-validator chain and was being re-run when this row was measured."
       ],
       "name": "X3 \u2192 EVM route",
       "paths": [
@@ -1711,7 +1715,7 @@
       "state": "COMPLETE",
       "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_vm_atomic",
-      "tested": 82,
+      "tested": 89,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4637,7 +4641,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "4025772b595e8ef65e369ede8e2eec921a7f372f0bb4be0b838b8db32d95dac0",
+    "source_digest": "6339c2cd929697fa34f8d3b7b7bd2e6762dec1f9a3d153e169141d69096c7f17",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4645,7 +4649,7 @@
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "dda586ca67a2f7bfd098247b402c419107e0bc0db67376ab860c1d499710374f",
-      "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
+      "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "7c59d189d4d478dbc008edbb7b42f337f35c70b537a4ae783f4630b7310b8d5b",
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",

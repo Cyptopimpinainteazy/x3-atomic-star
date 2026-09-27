@@ -13,7 +13,7 @@ use crate::Error;
 use codec::Encode;
 use frame_support::{
     assert_noop, assert_ok, construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, EnsureOrigin},
+    traits::{ConstU32, Currency, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -77,7 +77,7 @@ impl pallet_balances::Config for Test {
     type Balance = u128;
     type RuntimeEvent = RuntimeEvent;
     type DustRemoval = ();
-    type ExistentialDeposit = frame_support::traits::ConstU128<1>;
+    type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
     type FreezeIdentifier = ();
@@ -137,8 +137,14 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
 
 parameter_types! {
     pub const MaxAssets: u32 = 64;
-    pub const RoutingFeeBps: u16 = 0;
+    // Storage-backed so a test can turn the fee on. It was a `const … = 0`, which is why the
+    // routing-fee branch — the one that made every `xvm_transfer` of more than a few units fail on
+    // `local3` — had no test that could reach it.
+    pub storage RoutingFeeBps: u16 = 0;
     pub const ProtocolTreasury: u64 = 99;
+    // Likewise the deposit floor: a fee only fails to be credited when it is *below* this, so a
+    // test that wants the refusal has to be able to raise it.
+    pub storage ExistentialDeposit: u128 = 1;
     // Low value for testability: epoch rolls over every 5 blocks.
     // Mainnet uses 14_400 (86_400 / 6s block time).
     pub const BlocksPerDay: u32 = 5;
@@ -2760,4 +2766,108 @@ fn edge_xorshift_produces_distinct_values() {
         "xorshift must produce ~unique values; got {} distinct",
         seen.len()
     );
+}
+
+// ── the routing fee: the branch the mock's `RoutingFeeBps = 0` hid ────────────
+//
+// `xvm_transfer` charges `amount * RoutingFeeBps / 10_000` to the signing account and moves it to
+// the protocol treasury. The currency refuses a deposit that would leave the destination below its
+// existential deposit, so on `local3` — where the treasury has never been credited — every transfer
+// whose fee is below the existential deposit failed with `RoutingFeeNotAffordable`. Measured
+// 2026-09-27: the paying gateway held 999_999_999_900_043_000 with nothing frozen, the fee was
+// 2_000, the treasury had no account at all, and the transfer was refused with an error about the
+// payer for a refusal by the destination.
+
+/// Give `who` a free balance. `amount` has to clear the existential deposit or the currency burns
+/// the deposit as dust, which is the same rule this section is about.
+fn fund(who: u64, amount: u128) {
+    let _ = <Balances as Currency<u64>>::deposit_creating(&who, amount);
+}
+
+/// The runtime's `ExistentialDeposit` is `100 * MICRO_ATLAS`; the fee below is 2_000 against it.
+const FEE_ED: u128 = 100_000;
+/// `XvmRoutingFeeBps` at the time of the measurement.
+const FEE_BPS: u16 = 20;
+/// 20 bps of this is 2_000 — positive, and far below `FEE_ED`.
+const FEE_AMOUNT: u128 = 1_000_000;
+/// 20 bps of `FEE_AMOUNT`.
+const FEE_EXPECTED: u128 = 2_000;
+
+#[test]
+fn a_fee_the_treasury_cannot_accept_is_waived_rather_than_failing_the_transfer() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        fund(1, 1_000_000);
+        assert_eq!(
+            Balances::free_balance(ProtocolTreasury::get()),
+            0,
+            "the treasury has to be dead for this to be the refusal under test"
+        );
+
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+        let message_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, FEE_AMOUNT);
+
+        // The transfer landed: the fee was not allowed to fail it.
+        let ledger = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(ledger.native_supply, 1_000_000_000 - FEE_AMOUNT);
+        assert_eq!(ledger.evm_supply, FEE_AMOUNT);
+        assert_eq!(ledger.pending_supply, 0);
+        // The waiver is recorded, so the uncollected revenue is visible rather than silent …
+        System::assert_has_event(RuntimeEvent::Router(crate::Event::XvmRoutingFeeWaived {
+            message_id,
+            asset_id,
+            fee: FEE_EXPECTED,
+        }));
+        // … and nothing was credited to a treasury the currency would not let receive it.
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), 0);
+    });
+}
+
+#[test]
+fn a_fee_the_treasury_can_accept_is_collected() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        fund(1, 1_000_000);
+        // A treasury that already holds its existential deposit can receive any positive fee.
+        fund(ProtocolTreasury::get(), FEE_ED);
+        let before = Balances::free_balance(ProtocolTreasury::get());
+
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+        let message_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, FEE_AMOUNT);
+
+        assert_eq!(
+            Balances::free_balance(ProtocolTreasury::get()),
+            before + FEE_EXPECTED
+        );
+        System::assert_has_event(RuntimeEvent::Router(crate::Event::XvmRoutingFeeCollected {
+            message_id,
+            asset_id,
+            fee: FEE_EXPECTED,
+        }));
+    });
+}
+
+#[test]
+fn a_payer_that_cannot_cover_the_fee_is_still_refused() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+
+        // Account 2 holds nothing, so the refusal is the payer's and stands: the waiver above is
+        // for a destination that will not take a fee, not for a payer that cannot send one.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(2),
+                asset_id,
+                DomainId::X3Evm,
+                addr_for(DomainId::X3Evm),
+                FEE_AMOUNT,
+                System::block_number() + 50,
+            ),
+            Error::<Test>::RoutingFeeNotAffordable
+        );
+    });
 }

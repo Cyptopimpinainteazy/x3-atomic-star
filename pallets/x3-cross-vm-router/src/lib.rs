@@ -485,6 +485,19 @@ pub mod pallet {
             asset_id: AssetId,
             fee: BalanceOf<T>,
         },
+        /// The routing fee could not be credited to the protocol treasury and was waived.
+        ///
+        /// The currency refuses a deposit that would leave the destination below its existential
+        /// deposit, so a fee that is dust relative to the treasury — a small transfer's `bps`, or
+        /// any transfer on a chain where the treasury holds nothing — cannot be moved at all. The
+        /// transfer itself is not failed for it, and the waiver is recorded here rather than
+        /// dropped: a waived fee is revenue the protocol did not collect, which is an accounting
+        /// fact an operator has to be able to see.
+        XvmRoutingFeeWaived {
+            message_id: H256,
+            asset_id: AssetId,
+            fee: BalanceOf<T>,
+        },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────
@@ -1074,24 +1087,54 @@ pub mod pallet {
 
                 // ── Protocol routing fee (best-effort, signed-origin only) ───
                 // VM-adapter calls pass `fee_payer = None` and skip this block.
+                //
+                // The fee is `RoutingFeeBps` of the amount, so on a small transfer it is a small
+                // absolute number — and the currency refuses any deposit that would leave the
+                // *destination* below its existential deposit (`can_deposit` answers
+                // `BelowMinimum`), which is what the protocol treasury is on a chain where no fee
+                // has ever been credited. Measured 2026-09-27 on `local3`: the paying gateway held
+                // 999_999_999_900_043_000 with nothing frozen, the fee was 2_000, the treasury had
+                // no account at all, and `xvm_transfer` failed with `RoutingFeeNotAffordable` — an
+                // error about the *payer* for a refusal by the *destination*, so topping the payer
+                // up could never fix it. Every transfer below `ED * 10_000 / bps` was unusable
+                // (100_000_000_000 units at the runtime's `ExistentialDeposit = 100 * MICRO_ATLAS`
+                // and `XvmRoutingFeeBps = 20`), and the existing suite could not see it because
+                // this mock wires `RoutingFeeBps = 0` and the branch never ran.
+                //
+                // So a fee the currency will not accept does not fail a transfer whose payer can
+                // cover it: the payer's own balance decides which side refused. If the funds are
+                // there the refusal is the destination's, and the fee is **waived and emitted** as
+                // `XvmRoutingFeeWaived` rather than dropped silently. If they are not, the refusal
+                // stands unchanged.
                 if let Some(ref payer) = fee_payer {
                     let fee_bps = T::RoutingFeeBps::get() as u128;
                     if fee_bps > 0 {
                         let fee_raw = amount.saturating_mul(fee_bps).saturating_div(10_000);
                         if fee_raw > 0 {
                             let fee: BalanceOf<T> = fee_raw.saturated_into();
-                            T::Currency::transfer(
+                            let payer_covers_it = T::Currency::free_balance(payer) >= fee;
+                            match T::Currency::transfer(
                                 payer,
                                 &T::ProtocolTreasury::get(),
                                 fee,
                                 ExistenceRequirement::KeepAlive,
-                            )
-                            .map_err(|_| Error::<T>::RoutingFeeNotAffordable)?;
-                            Self::deposit_event(Event::XvmRoutingFeeCollected {
-                                message_id,
-                                asset_id,
-                                fee,
-                            });
+                            ) {
+                                Ok(()) => Self::deposit_event(Event::XvmRoutingFeeCollected {
+                                    message_id,
+                                    asset_id,
+                                    fee,
+                                }),
+                                Err(_) if payer_covers_it => {
+                                    Self::deposit_event(Event::XvmRoutingFeeWaived {
+                                        message_id,
+                                        asset_id,
+                                        fee,
+                                    })
+                                }
+                                Err(_) => {
+                                    return Err(Error::<T>::RoutingFeeNotAffordable.into());
+                                }
+                            }
                         }
                     }
                 }
