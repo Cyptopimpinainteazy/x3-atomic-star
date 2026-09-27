@@ -1354,3 +1354,45 @@ Acceptance criteria:
 
 Validation: `cargo test -p x3-atomic-swap` stays green, the restart test fails with the persistence
 removed, and the reorg drill fails when `CertificateRewindsAcceptedAnchor` is removed.
+
+## TICKET-153 — the halt exemption list is a policy, and nothing checks it against the runtime — 2026-09-26
+
+Found while closing X3-RT-001 (`6d7bfc540`). A halt that refuses *everything* also refuses its own
+remedy, so `RuntimeInvariantCheck`-style gates now consult `pallet_x3_invariants::Config::HaltExemptCalls`
+(`RuntimeHaltExemptCalls` in the runtime): `clear_halted`, `set_halt_on_violation`, `resume_transfers`,
+`rollback_atomic_bundle`, `emergency_unpause`, and the council motion that reaches them. Everything
+else is still refused while `Halted` is set.
+
+What that does **not** prove, and what this ticket is for:
+
+1. **The list can go stale.** It was written by hand from the calls that were known to hold funds.
+   A pallet added later that reserves a bond, escrow or deposit with no rollback extrinsic would be
+   trapped by a halt, and no gate would notice. There is no enumeration of "calls that release funds"
+   to check the list against, and `emergency_unpause` is on the list on the reasoning that a paused
+   kernel is the routine case — not because a test drives a halt with a paused kernel and requires
+   recovery.
+2. **Nothing measures the halt/unhalt cycle on a node.** The evidence is a runtime-level
+   `TestExternalities` test (`Executive::validate_transaction` plus direct dispatch). No drill starts
+   a node, trips the halt through governance, clears it through a council motion and shows a
+   transaction landing afterwards.
+3. **`clear_halted` has no benchmark.** Its weight is hand-copied from `set_halt_on_violation`'s
+   shape (one storage write) with a comment saying so.
+4. **There is no automatic unhalt.** After remediation the flag stays set until governance clears it;
+   if an operator clears it while the violating invariant is still out of range, `enforce_all`
+   re-raises it the next block — which is intended, but untested as a sequence.
+
+Acceptance criteria:
+
+* a checker that lists the runtime's fund-holding calls (those that reserve, escrow, lock or bond)
+  and fails when one of them is neither on `RuntimeHaltExemptCalls` nor accompanied by an exempt
+  rollback/refund path, with the list of exceptions written down in the checker;
+* a live drill: three-validator network, halt through the kernel, a pending bundle's bond released
+  while halted, both flags cleared through a council motion, and an ordinary `balances.transfer` that
+  was refused during the halt landing afterwards;
+* `clear_halted` re-benchmarked rather than copied;
+* a halt-and-remediate-then-clear sequence test: while the violation persists the gate re-raises the
+  flag, and once the bound is back in range `clear_halted` sticks.
+
+Validation: the checker fails on a deliberately-removed exemption; the drill's post-clear transfer is
+`InBlock`; the re-benchmarked weight is within the copied value's order of magnitude or the copied
+value is replaced.

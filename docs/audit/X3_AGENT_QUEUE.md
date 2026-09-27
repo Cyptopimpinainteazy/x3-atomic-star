@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `f58d8cc72bf04182…` — the artifacts move when
+Source digest: `acf34427d21824b3…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -171,8 +171,8 @@ fails when they do not match.
 | MTX-X3-RT-003 | runtime_core | mainnet-rc1 feature mode: Historical status documents show verification churn; exact-head proof still required | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-004 | runtime_core | Canonical state ledger updates: Supply conservation across all failure paths needs stronger proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 50% (no named test list on this row) | open |
 | MTX-X3-RT-005 | runtime_core | Atomic bundle submission: Needs multi-validator adversarial lifecycle proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
-| MTX-X3-RT-006 | runtime_core | Economic Halt safety valve: Dedicated halt invariant tests incomplete | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
-| MTX-X3-RT-007 | runtime_core | Halt blocks new atomic bundles: Needs explicit regression test | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-RT-006 | runtime_core | Economic Halt safety valve: **CLOSED 2026-09-26 — the valve is proven end to end instead of by reading three files.** The blocker was "Dedicated halt invariant tests incomplete". The chain the halt travels is now measured at runtime level: `the_emergency_halt_reaches_… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-RT-007 | runtime_core | Halt blocks new atomic bundles: **CLOSED 2026-09-26 — the regression test exists at both layers.** "Needs explicit regression test" is answered by `runtime/src/tests.rs::the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` (a bundle accepted before the halt i… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-008 | runtime_core | X3 runtime: Full mainnet proof depends on weights, upgrades, and network testing | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-009 | runtime_core | Forbidden experimental compile guards: Must keep mainnet and experimental feature graphs separated | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 8 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-010 | runtime_core | Runtime API surface: **CLOSED 2026-09-25 — the kernel's API surface is declared once, and one of its accessors is now proven over the wire.** `pallets/x3-kernel/src/runtime_api.rs` declared a second trait (`AtlasKernelApi`) that no `mod` declaration ever compil… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
