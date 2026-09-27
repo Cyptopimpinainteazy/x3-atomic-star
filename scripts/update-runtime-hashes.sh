@@ -26,6 +26,26 @@ SRTOOL_IMAGE="${SRTOOL_IMAGE:-paritytech/srtool:1.93.0-0.18.4}"
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 
+# The same exclusive lock the mainnet release gate takes. Both build
+# `$RUNTIME_DIR/target/srtool`, and a second build of that directory does not fail
+# — it *succeeds*, producing a hash that describes a mixture of the two runs.
+# Measured 2026-09-27: four overlapping `make mainnet-check` runs left the srtool
+# stage racing for ~50 minutes. Failing fast here is the point: a refused
+# attestation is recoverable, a plausible wrong hash is not.
+BUILD_LOCK="$ROOT/.x3-release-build.lock"
+# `>>`, not `>`: opening for write truncates the file, which would erase the
+# holding run's pid before the refusal below can name it.
+exec 9>>"$BUILD_LOCK"
+if ! flock -n 9; then
+  holder="$(cat "$BUILD_LOCK" 2>/dev/null || true)"
+  printf '::error:: another release-gate or runtime-attestation run holds %s%s\n' \
+    "$(basename "$BUILD_LOCK")" "${holder:+ (pid $holder)}" >&2
+  printf '  Both build %s/target/srtool, so two at once produce a hash describing neither.\n' \
+    "$RUNTIME_DIR" >&2
+  exit 2
+fi
+printf '%s\n' "$$" >&9
+
 info() { printf '[runtime-hashes] %s\n' "$*"; }
 
 clear_srtool_target() {

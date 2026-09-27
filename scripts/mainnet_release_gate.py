@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import fcntl
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
@@ -78,6 +79,42 @@ REQUIRED_DOCS = [
     "TESTING.md",
     "AUDIT_SPEC.md",
 ]
+
+
+BUILD_LOCK = ROOT / ".x3-release-build.lock"
+
+
+def acquire_build_lock():
+    """Take the exclusive lock every runtime-build-bearing run shares.
+
+    Returns the open handle (kept alive for the process lifetime) or `None` when another run holds
+    it, in which case the caller must not proceed: the two would write the same
+    `runtime/target/srtool` and the hashes one of them reports would describe the other's build.
+    The lock is advisory and process-scoped, so it disappears with the holder.
+    """
+    # `a+`, not `w`: opening for write truncates the file, which would erase the
+    # holding run's pid before we can name it in the refusal.
+    handle = open(BUILD_LOCK, "a+")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        holder = ""
+        try:
+            holder = BUILD_LOCK.read_text().strip()
+        except OSError:
+            holder = ""
+        print("::error:: another release-gate or runtime-attestation run holds "
+              f"{BUILD_LOCK.name}" + (f" (pid {holder})" if holder else ""))
+        print("  Both build runtime/target/srtool and boot nodes on fixed ports, so running two at")
+        print("  once produces evidence that describes neither. Wait for it to finish, or run")
+        print("  `scripts/local-ci.sh --only <gate>` for a gate that does not rebuild the runtime.")
+        handle.close()
+        return None
+    handle.seek(0)
+    handle.truncate()
+    handle.write(f"{os.getpid()}\n")
+    handle.flush()
+    return handle
 
 
 def check_required_docs() -> None:
@@ -770,6 +807,15 @@ def main() -> int:
     print("═" * 60)
     print("  Mainnet Release Gate")
     print("═" * 60)
+
+    # This gate builds the runtime in `runtime/target/srtool` and boots nodes on fixed ports. Two
+    # concurrent runs therefore share both, and the second one corrupts the first one's evidence
+    # rather than failing loudly: measured 2026-09-27, four `make mainnet-check` runs overlapped and
+    # the srtool stage spent ~50 minutes in a three-way build race. `scripts/update-runtime-hashes.sh`
+    # takes the same lock, because it builds the same target directory.
+    lock_handle = acquire_build_lock()
+    if lock_handle is None:
+        return 2
 
     check_required_docs()
     check_build()
