@@ -42,11 +42,23 @@ required_tests = [
 # the row's score is *not* re-measured by this edit, and the absence of a written
 # proof report is part of why it sits where it sits.
 proof_report = ""
-readiness_score = 35
+# Re-measured 2026-09-27. Derived on this registry's own formula
+# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 60 — unchanged tonight; the bundle lifecycle (submit, assign, rollback with
+#     per-reason penalties, finalize through the settlement engine) is what it was.
+#   tested 70 — every blocker of the *testing* kind is now closed and measured: the halt path runs
+#     on three real validators, and a bundle **in flight** when the halt lands is rolled back while
+#     halted with its bond returned to the submitter
+#     (`scripts/drills/halt_recovery_live.sh`, gate `halt recovery on a live chain`, PASS 27s).
+#   mainnet_ready 40 — multi-validator evidence exists; no rc1-featured or public network has run
+#     it, and the bond-accounting change still has no independent audit.
+# 60*0.35 + 70*0.25 + 40*0.40 = 21 + 17.5 + 16 = 54.5 -> 55.
+readiness_score = 55
 blockers = [
   "**CLOSED 2026-09-23 — bundle finalization is authorized, and the unauthorised entry point is gone.** `submit_finalization_result` was `ensure_none` and its off-chain marker (`x3fin:`) had no writer anywhere in this repository; together with an equally unsigned certificate anchor it let any account finalize any `Executing` bundle with a proof nobody produced (TICKET-097). The call, its pool validation, its OCW branch, its weight entry, its benchmark and the settlement engine's marker path were removed. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin` — a genesis-named gateway account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`), and the pallet's finalization tests drive that core. Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`. The score below is *not* re-measured here: raising it is TICKET-101's re-measurement, not an edit made in passing. Still open on this row: the signed path's certificate comes from an unsigned anchor any peer can write first (TICKET-107), and the halt/rollback paths have never been exercised on a multi-validator network.",
-  "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
-  "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
+  "**CLOSED 2026-09-27 — the halt path runs on a multi-validator network, including the case nobody had measured.** `scripts/drills/halt_recovery_live.sh` trips the halt by council motion on three real validators and requires two different nodes' pools to refuse an ordinary transfer with the runtime's halt code while the destination balance does not move; it requires the remedy to be submittable *while still halted*; and it now also requires a bundle **in flight** when the halt lands to be rolled back with its bond released (`reserved back to 0`) while a *new* bundle is refused by the pool. Measured 2026-09-27, exit 0, `[PASS] halt_and_recovery_on_a_live_chain`",
+  "**CLOSED 2026-09-27 — the multi-validator half of this blocker is answered; the audit is not.** Bond accounting on rollback was fixed on 2026-09-18 and has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. The live three-validator drill now measures the bond returning in full from a rollback performed *while the chain is halted*, with no supply minted and both validators agreeing at one finalized block. Still outstanding: an independent audit of this change, and a run on an rc1-featured or public network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
 

@@ -183,15 +183,28 @@ id = "X3-RT-005"
 name = "Atomic bundle submission"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+paths = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "scripts/drills/halt_recovery_live.sh",
+]
 implemented = 80
-tested = 55
-mainnet_ready = 55
+tested = 75
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs multi-validator adversarial lifecycle proof"]
+blockers = [
+  "**CLOSED 2026-09-27 — the bundle lifecycle now has a multi-validator adversarial proof, and it found the case nobody had measured.** The blocker was one sentence; the drill `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS 27s) boots three real validators, submits a real bundle as `//x3-atomic-gateway` (`submit_atomic_bundle` is gated on `EnsureX3LangGateway`), records its bond as reserved, and then requires — **while the chain is halted** — that (a) a new bundle is refused *by the pool* (`submit_atomic_bundle` is deliberately not on `RuntimeHaltExemptCalls`), (b) the in-flight bundle's `rollback_atomic_bundle` is **included** (it is exempt) and its stored status becomes `RolledBack`, (c) the submitter's reserved balance returns to exactly its pre-bundle value, and (d) after the remedy a fresh bundle is accepted again. Measured: `bundle 0x8faa7708… RolledBack at block 52, reserved back to 0`, `a new bundle while halted: refused by the pool — 1010: Custom error: 1`, `a fresh bundle is accepted after the remedy — 0xd045536a… at block 78`, and no supply minted with both validators agreeing at one finalized block. Before this, every halt/rollback proof was against an **idle** chain or a bundle id that does not exist, so \"the valve leaves the way out open\" had never been measured for a bundle that was actually holding funds",
+  "Still open on this row: no independent audit of the bond-accounting change, and no run on an rc1-featured or public network — `mainnet_ready` moves to 65 on the strength of the live three-validator evidence, not on deployment",
+]
+required_tests = [
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "a_finalized_bundle_cannot_be_rolled_back",
+  "a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice",
+]
 evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real submit_atomic_bundle path with EconomicHalt guard"]
 
 [[feature]]
