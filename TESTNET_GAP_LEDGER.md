@@ -2001,3 +2001,55 @@ graph, a release attestation was being taken while this was found, and editing a
 underneath a running `make mainnet-check` invalidates it. The alternative fix — keep the treasury
 funded so the fee can always be credited — is a policy decision for the operator, and it is the same
 one recorded on row X3-XVM-014.
+
+## NIGHT SHIFT — the state at 05:00 local on 2026-09-27, for whoever starts next
+
+Written for the operator's return. Nothing below is a plan; it is what is true on disk and on
+`origin/master`.
+
+**Green and verified at `8e23c9cbe`:** `make mainnet-check` passes end to end, including stage 6b
+rebuilding the runtime in srtool and matching `docs/reports/runtime-wasm-hashes.json`
+(`0x1ea62909…` / `0x50c5a499…`, `recorded_revision` `248435935`); the full default gate set is
+**102/102**; the rc6 sequence is 5/5 (step 2 retired with a ticket); `runtime hash freshness` PASSes.
+
+**Scoreboard:** composite **67.94%**, P0 mean **69.38%**, **66 of 82 P0 rows below 80**, 0 broken
+rows, 2 stubs (`X3-GPU-001` hardware-blocked at 7, `X3-MEV-001` at 25 — a lane is on it).
+
+**What moved overnight, worst-first:**
+
+| area | change |
+| --- | --- |
+| X3-MEV-002 private submission | 39 → **75**: the compiled artifact records the demand, `pallet-x3-kernel` refuses it at intake, both engines enforce it, the runtime binds the posture to `pallet_private_execution::Enabled` |
+| runtime variant / CLI / sidecar | the **mainnet-rc1 variant did not compile** and `x3-cli` did not build; both fixed, with the gates that missed them named |
+| router fee | every small `xvm_transfer` was refused because the treasury could not accept the 20 bps fee; fixed with an explicit waiver + event |
+| X3-ECO-002 distributed supply | proven on three validators (pending 6,000,000 → 0, every leg resolved, per-validator conservation at one finalized block); the failure was a nonce collision in the driver |
+| X3-OPS-002 zero-downtime snapshot | the proof script was missing the `--regenesis` its own comment requires; with it, a running chain is exported, rebuilt and restored, and the restored chain finalizes |
+| rc2/rc6 gates | seven defects between a red sequence and a green one (hardcoded repo path ×2, a non-starting dev chain, a missing cargo feature, a stale raw spec, an authorized-but-unfunded gateway, an HttpProvider that cannot subscribe) |
+| panic ratchet | **520 → 450** sites, with the baseline re-baselined downward at each step |
+
+**The morning's real blockers**, in the order I would take them:
+
+1. **The 7 physical servers.** The 72-hour soak, public testnet hosting, the live 7-node runtime
+   upgrade and the per-validator monitoring all need them; nothing local substitutes.
+2. **No rc1-featured network exists yet** — the `mainnet-rc1` variant compiles now, but there is no
+   rc1 genesis, so the feature mode has never run on a chain.
+3. **The six-route live sweep is still one route in Rust.** The legacy JS driver cannot decode
+   extrinsic v5, so the route/negative matrix it used to cover is recorded as GAP-RC2-DRIVER-FORMAT,
+   half-ported (`node/tests/supply_invariant_distributed.rs` covers X3Native → X3Evm).
+4. **Two decisions are the operator's, not an agent's:** whether a validator must keep its treasury
+   funded (rather than the router fee being waived), and what charge primitive replaces
+   `pallet-x3-da`/`pallet-x3-sequencer`'s `reserve`-as-anti-spam-fee, which holds funds nothing can
+   release (TICKET-154).
+5. **Remaining panic sites are now concentrated** in `pallets/*/benchmarking.rs` (101 of the 450,
+   compiled only under `runtime-benchmarks`), `crates/x3-dex` (19), `crates/x3-gpu-validator-swarm`
+   (18) and `crates/x3-bridge-adapters` (18) — all runtime-graph, so each batch costs a re-attest
+   (~10 min) and a `mainnet-check` (~30 min). The free (non-runtime-graph) ones left are
+   `crates/x3-bot` (15), `crates/x3-mobile-sdk` (14), `crates/quantum-swarm`'s `CircuitBuilder`
+   (11) and `crates/x3-cli` (10).
+
+**Process notes worth keeping.** Five actors share this box; load average sat at 19–27 and the
+default `target/` is a queue everyone waits in — `CARGO_TARGET_DIR=/tmp/<name>` cuts a build from
+minutes to under a minute, but it breaks the nested WASM build for a node check, so pair it with
+`SKIP_WASM_BUILD=1`. Two `make mainnet-check` runs at once fight over ports 9944/9945; two
+`supply_invariant_distributed` runs cannot coexist at all (the test asserts its ports free).
+`~/.cargo/bin` is still the one directory CI deletes, and the fix for that is `ab18567f5`.
