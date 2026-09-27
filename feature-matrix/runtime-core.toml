@@ -95,14 +95,29 @@ subsystem = "runtime_core"
 source = "master"
 paths = ["runtime/src/lib.rs"]
 implemented = 75
-tested = 55
-mainnet_ready = 50
+tested = 78
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Historical status documents show verification churn; exact-head proof still required"]
-evidence = ["runtime/src/lib.rs", "note: Feature wired through node/runtime and production gate"]
+blockers = [
+  "**2026-09-27 — the `mainnet-rc1` variant did not compile, and nothing in the default set said so.** `crates/x3-compiler` and the runtime gained a private-submission demand in `ed798764d`: `RuntimePrivateSubmissionChannel` (runtime/src/lib.rs) answered `pallet_private_execution::Enabled::<Runtime>::get()`, and `pallet-private-execution` is *not* in the `mainnet-rc1` `construct_runtime!` block — the scope lock excludes it. `Runtime: pallet_private_execution::Config` was therefore unimplemented and the storage item's `get()` did not resolve (E0599 at that line), so `bash scripts/check-runtime-variants.sh mainnet-rc1` failed in 36 s on the variant mainnet is meant to run. The rc6 release gate's stage 5 claims a migration dry-run for every variant; it had not been re-run since that commit.",
+  "**CLOSED 2026-09-27 — the reference is cfg-aware and the whole six-variant set is green.** That variant answers a constant `false`, which is the fact the derived version would have reported there — a chain with no private channel refuses a program whose compiled policy demands one — so the fail-closed posture is unchanged. Measured: `bash scripts/check-runtime-variants.sh` — full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s. Break-it-first: the undivided reference is what failed, so the gate's own red log (`runtime-variant-20260927T075116Z-mainnet-rc1.log`, FAIL 36s, E0599) is the before and the PASS run is the after.",
+  "Still open, and why `mainnet_ready` stops at 58: a *build* of the rc1 variant is not a *chain* of it. No rc1-featured runtime has ever been booted, no genesis for it exists in `chain-specs/`, and its migration dry-run is in-process rather than against a live state. The gate proves the variant compiles and its `OnRuntimeUpgrade` work fits in a block; it does not prove an rc1 network runs.",
+]
+evidence = [
+  "runtime/src/lib.rs",
+  "note: Feature wired through node/runtime and production gate",
+  "note: 2026-09-27 — the six-variant dry-run gate now passes on every variant, including `mainnet-rc1`, which had not been built since the private-submission wiring landed",
+]
+required_tests = [
+  "runtime_upgrade_rehearsal",
+  "runtime_upgrade_rehearsal_storage_versions",
+]
+test_evidence = [
+  "note: `bash scripts/check-runtime-variants.sh` — all six variants PASS (2026-09-27); the gate is auto-selected by `scripts/local-ci.sh` when a `runtime/*` path changes, which is how this variant's breakage is supposed to be caught",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]

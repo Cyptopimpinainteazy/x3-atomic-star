@@ -1398,10 +1398,26 @@ impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowStorage {
 /// private submission channel?" instead of two that can drift apart. With private execution off —
 /// the shipped posture — a program whose compiled policy demands private submission is refused at
 /// intake instead of executed in the clear.
+///
+/// `mainnet-rc1` is the exception, and it has to be spelled out because the reference above cannot
+/// compile there: the scope lock does **not** include `pallet-private-execution`, so
+/// `Runtime: pallet_private_execution::Config` is not implemented and the storage item's `get()`
+/// does not resolve. Answering a constant `false` on that variant is not a workaround — it is the
+/// fact the derived version would have reported, and it keeps the fail-closed posture: a program
+/// whose compiled policy demands private submission is refused at intake because this chain has no
+/// private channel to submit it through. Measured 2026-09-27: without this, `runtime variant
+/// dry-runs` failed to build the `mainnet-rc1` variant outright (E0599 at this line), which is the
+/// variant mainnet is meant to run.
 pub struct RuntimePrivateSubmissionChannel;
 impl frame_support::traits::Get<bool> for RuntimePrivateSubmissionChannel {
+    #[cfg(not(feature = "mainnet-rc1"))]
     fn get() -> bool {
         pallet_private_execution::Enabled::<Runtime>::get()
+    }
+
+    #[cfg(feature = "mainnet-rc1")]
+    fn get() -> bool {
+        false
     }
 }
 

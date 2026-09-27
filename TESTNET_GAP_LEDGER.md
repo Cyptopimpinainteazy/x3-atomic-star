@@ -1897,3 +1897,43 @@ driver can decode the chain, so it is verified only by `node --check` and by the
 wiring. The real repair for the coverage is a Rust live suite for the six routes plus the nine
 negative cases (the port `681e2e260` names); the pending-supply phase in
 `node/tests/supply_invariant_distributed.rs` is one route's worth of that port and the rest is open.
+
+## GAP-RC1-VARIANT-NOT-BUILT — the runtime variant mainnet is meant to run did not compile
+
+**Found 2026-09-27** by running the variants gate on the `mainnet-rc1` feature set — the one mainnet
+is meant to run, and the one that has the scope lock excluding unaudited pallets.
+
+```
+=== runtime variant: mainnet-rc1 (features: std,mainnet-rc1) ===
+error[E0599]: the function or associated item `get` exists for struct
+              StorageValue<_GeneratedPrefixForStorageEnabled<Runtime>, bool, ...>, but its trait
+              bounds were not satisfied
+    --> runtime/src/lib.rs:1404:55
+     |     pallet_private_execution::Enabled::<Runtime>::get()
+     |     doesn't satisfy `Runtime: pallet_private_execution::Config`
+FAIL (36s)
+```
+
+`ed798764d` (tonight's private-submission wiring) added `RuntimePrivateSubmissionChannel`, whose
+`get()` reads `pallet_private_execution::Enabled::<Runtime>`. `pallet-private-execution` is **not** in
+the `mainnet-rc1` `construct_runtime!` block — the scope lock leaves it out, as it leaves out the
+other unaudited surfaces — so `Runtime: pallet_private_execution::Config` is unimplemented there and
+the storage item does not resolve. The variant simply did not build.
+
+Nothing in the default gate set said so. The check is `bash scripts/check-runtime-variants.sh` (the
+`--variants` group); `scripts/local-ci.sh` auto-selects it when a `runtime/*` path changes, and the
+rc6 sequence's stage 5 claims a migration dry-run for *every* variant. It had not been re-run since
+that commit. The breakage is invisible to `cargo check --workspace`, which compiles the runtime once,
+with default features, and never sees the other five `construct_runtime!` blocks.
+
+**Fixed 2026-09-27:** the reference is now cfg-aware. On `mainnet-rc1` the answer is a constant
+`false`, which is not a workaround — it is the fact the derived version would have reported on a
+chain with no private channel, and it keeps the posture fail-closed: a program whose compiled policy
+demands private submission is refused at intake. Measured after: `bash
+scripts/check-runtime-variants.sh` — full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier
+PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s.
+
+**Still open:** a build of the variant is not a chain of it. No rc1-featured runtime has been booted
+and no rc1 genesis exists in `chain-specs/`, so this closes "the variant compiles and its
+`OnRuntimeUpgrade` work fits in a block", not "an rc1 network runs". That is recorded on row
+X3-RT-003, whose scores were resting on a variant that did not build.
