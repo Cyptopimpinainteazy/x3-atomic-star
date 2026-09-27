@@ -87,11 +87,7 @@ impl VmStorage {
     ///
     /// Refuses past the same key limit `set` enforces, so an execution cannot be handed more state
     /// than a contract's storage may hold.
-    pub fn seed_slot(
-        &mut self,
-        key: StorageKey,
-        value: StorageValue,
-    ) -> Result<(), StorageError> {
+    pub fn seed_slot(&mut self, key: StorageKey, value: StorageValue) -> Result<(), StorageError> {
         if self.data.len() >= MAX_STORAGE_KEYS && !self.data.contains_key(&key) {
             return Err(StorageError::StorageLimitExceeded);
         }

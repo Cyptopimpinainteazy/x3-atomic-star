@@ -411,9 +411,12 @@ fn a_second_comit_reads_the_slot_the_first_one_wrote() {
         let load = load_slot_zero();
 
         // The adapter contract itself: the same module, handed the chain's slot, returns it...
-        let with_slot =
-            X3VmAdapter::execute_with_slots(&load, 5_000_000, &[(evm_slot_key(0), encoded_i64_payload(7))])
-                .expect("the adapter executes the load");
+        let with_slot = X3VmAdapter::execute_with_slots(
+            &load,
+            5_000_000,
+            &[(evm_slot_key(0), encoded_i64_payload(7))],
+        )
+        .expect("the adapter executes the load");
         assert!(with_slot.success);
         assert_eq!(with_slot.return_data, 7i64.to_le_bytes().to_vec());
 

@@ -299,7 +299,8 @@ fn encoded_i64_payload(value: i64) -> [u8; 32] {
 
 /// The storage key of the kernel's `X3ContractStorage` entry for `slot_key`.
 fn x3_contract_slot_storage_key(slot_key: H256) -> String {
-    let mut key = frame_support::storage::storage_prefix(b"AtlasKernel", b"X3ContractStorage").to_vec();
+    let mut key =
+        frame_support::storage::storage_prefix(b"AtlasKernel", b"X3ContractStorage").to_vec();
     let encoded = slot_key.encode();
     key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
     key.extend_from_slice(&encoded);
@@ -308,11 +309,7 @@ fn x3_contract_slot_storage_key(slot_key: H256) -> String {
 
 /// Read a contract slot from one validator, at one block. `None` means the chain holds no slot
 /// there, which is different from an RPC failure and is distinguished for that reason.
-fn x3_contract_slot_at(
-    port: u16,
-    slot_key: H256,
-    at: &str,
-) -> Option<[u8; 32]> {
+fn x3_contract_slot_at(port: u16, slot_key: H256, at: &str) -> Option<[u8; 32]> {
     let value = rpc_try(
         port,
         "state_getStorage",
@@ -938,7 +935,9 @@ fn a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it() {
         x3_contract_slot_at(CHARLIE_RPC, slot_key, &hash).is_none(),
         "the chain held a slot before anything stored one"
     );
-    println!("[x3-lang-net] control: a read before any store returned 0, and the chain holds no slot");
+    println!(
+        "[x3-lang-net] control: a read before any store returned 0, and the chain holds no slot"
+    );
 
     let store_id = H256::from_low_u64_be(STORE_COMIT_ID_SEED);
     let signed = alice
@@ -968,8 +967,8 @@ fn a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it() {
         .expect("sign the reading comit");
     submit_to(ALICE_RPC, &signed);
     let (_n, read_hash) = wait_finalized(CHARLIE_RPC, &signed, FINALITY_TIMEOUT);
-    let read_receipt =
-        x3_receipt_at(CHARLIE_RPC, load_after_id, &read_hash).expect("the read's receipt is stored");
+    let read_receipt = x3_receipt_at(CHARLIE_RPC, load_after_id, &read_hash)
+        .expect("the read's receipt is stored");
     assert_eq!(
         read_receipt.return_data,
         7i64.to_le_bytes().to_vec(),

@@ -253,9 +253,7 @@ impl VM {
         let mut storage = VmStorage::new();
         for (key, value) in seeds {
             storage.seed_slot(*key, *value).map_err(|err| {
-                VMError::without_ip(VMErrorKind::HostcallError(format!(
-                    "seed refused: {err:?}"
-                )))
+                VMError::without_ip(VMErrorKind::HostcallError(format!("seed refused: {err:?}")))
             })?;
         }
 

@@ -556,23 +556,28 @@ pub mod real_adapters {
                 .map(|(key, value)| (key.to_fixed_bytes(), *value))
                 .collect();
 
-            let receipt = X3Executor::execute_with_slots(payload, &[], config, &seeds).map_err(|e| {
-                DispatchError::Other(match e {
-                    x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
-                        "X3 verification failed"
-                    }
-                    x3_x3_integration::X3IntegrationError::InvalidBytecode(_) => {
-                        "Invalid X3 bytecode"
-                    }
-                    x3_x3_integration::X3IntegrationError::GasExhausted { .. } => "X3 out of gas",
-                    x3_x3_integration::X3IntegrationError::ExecutionFailed(_) => {
-                        "X3 execution failed"
-                    }
-                    x3_x3_integration::X3IntegrationError::StackOverflow => "X3 stack overflow",
-                    x3_x3_integration::X3IntegrationError::MemoryOutOfBounds => "X3 memory error",
-                    _ => "X3 VM error",
-                })
-            })?;
+            let receipt =
+                X3Executor::execute_with_slots(payload, &[], config, &seeds).map_err(|e| {
+                    DispatchError::Other(match e {
+                        x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
+                            "X3 verification failed"
+                        }
+                        x3_x3_integration::X3IntegrationError::InvalidBytecode(_) => {
+                            "Invalid X3 bytecode"
+                        }
+                        x3_x3_integration::X3IntegrationError::GasExhausted { .. } => {
+                            "X3 out of gas"
+                        }
+                        x3_x3_integration::X3IntegrationError::ExecutionFailed(_) => {
+                            "X3 execution failed"
+                        }
+                        x3_x3_integration::X3IntegrationError::StackOverflow => "X3 stack overflow",
+                        x3_x3_integration::X3IntegrationError::MemoryOutOfBounds => {
+                            "X3 memory error"
+                        }
+                        _ => "X3 VM error",
+                    })
+                })?;
 
             // Convert X3 receipt to pallet ExecutionReceipt
             Ok(ExecutionReceipt {
