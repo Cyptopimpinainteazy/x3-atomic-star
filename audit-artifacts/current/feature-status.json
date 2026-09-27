@@ -4761,10 +4761,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "4f87348f3b3f7e467bc3dd5be5870afc01c718b6068135d14af869f2bbb074d9",
+    "source_digest": "a579fbe40b5ebbc70617c67f96e8df0478932d5632031df6747e0003d5828c46",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "a87323281ae738f2acb2e3bf2f4f0d46626b4a2aa2d929b5fddac843f0c9d232",
+      "FEATURE_REGISTRY.toml": "9b681813d46c7bae1fe879daa3e515130ae71404132c1bdb7be7905a086fccb8",
       "feature-matrix/agents-experimental.toml": "fb40d266a070b61f4bed312eb30e3e3e16443179fbbde5cb12678cf67768628f",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5046,16 +5046,23 @@
     {
       "blockers": [
         "Desktop UI only \u2014 not part of blockchain runtime",
-        "Dead buttons imply incomplete wiring",
-        "No CI gate; E2E report is manual",
-        "No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts"
+        "Six console domains have no command: agents, compute providers, benchmarks, settlement, logs, alerts",
+        "launch_node / stop_node were deleted (they returned a fabricated success); a real spawn with a tracked child handle is unwritten",
+        "No packaged app (bundle / notarise) and no public-testnet run of the console",
+        "The swarm path is proven against the service's real bodies and routes by a local server, not against a booted x3-swarm-api"
       ],
       "crate_or_service": "apps/tauri-os",
       "feature": "tauri_os",
       "mode": "GUARDED_TESTNET",
-      "proof_report": "",
-      "readiness_score": 15,
-      "required_tests": []
+      "proof_report": "reports/tauri-os-operator-console-20260927.md",
+      "readiness_score": 42,
+      "required_tests": [
+        "a_node_that_is_not_there_is_a_typed_error_not_an_empty_status",
+        "the_console_reads_the_chain_off_a_real_jsonrpc_conversation",
+        "the_console_calls_the_routes_the_swarm_service_actually_serves",
+        "a_dead_endpoint_is_reported_as_unreachable",
+        "live_operator_console_reads_a_running_node"
+      ]
     },
     {
       "blockers": [
@@ -5289,7 +5296,7 @@
     "matrix_features": 149,
     "registry_features": 22,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 61.59,
-    "registry_min_readiness": 15
+    "registry_mean_readiness": 62.82,
+    "registry_min_readiness": 40
   }
 }

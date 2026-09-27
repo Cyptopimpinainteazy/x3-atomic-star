@@ -5,18 +5,19 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `4f87348f3b3f7e46…` — the artifacts move when
+Source digest: `a579fbe40b5ebbc7…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
 | ID | Subsystem | Description (verbatim from the record) | Owner | Dependency | Branch | Triage | Test command | Completion evidence | Merge status |
 |---|---|---|---|---|---|---|---|---|---|
-| REG-tauri_os-1 | tauri_os (GUARDED_TESTNET) | Desktop UI only — not part of blockchain runtime | unassigned | — | — | below 40pct - highest-triage candidate | `bash scripts/local-ci.sh` | none recorded - closing this needs a proof artifact | open |
-| REG-tauri_os-2 | tauri_os (GUARDED_TESTNET) | Dead buttons imply incomplete wiring | unassigned | — | — | below 40pct - highest-triage candidate | `bash scripts/local-ci.sh` | none recorded - closing this needs a proof artifact | open |
-| REG-tauri_os-3 | tauri_os (GUARDED_TESTNET) | No CI gate; E2E report is manual | unassigned | — | — | below 40pct - highest-triage candidate | `bash scripts/local-ci.sh` | none recorded - closing this needs a proof artifact | open |
-| REG-tauri_os-4 | tauri_os (GUARDED_TESTNET) | No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts | unassigned | — | — | below 40pct - highest-triage candidate | `bash scripts/local-ci.sh` | none recorded - closing this needs a proof artifact | open |
 | REG-x3_reactor-1 | x3_reactor (LIVE_TESTNET) | Benchmark infrastructure not in CI critical path | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-x3_reactor-2 | x3_reactor (LIVE_TESTNET) | GPU benchmark path depends on optional sidecar | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
+| REG-tauri_os-1 | tauri_os (GUARDED_TESTNET) | Desktop UI only — not part of blockchain runtime | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/tauri-os-operator-console-20260927.md` | open |
+| REG-tauri_os-2 | tauri_os (GUARDED_TESTNET) | Six console domains have no command: agents, compute providers, benchmarks, settlement, logs, alerts | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/tauri-os-operator-console-20260927.md` | open |
+| REG-tauri_os-3 | tauri_os (GUARDED_TESTNET) | launch_node / stop_node were deleted (they returned a fabricated success); a real spawn with a tracked child handle is unwritten | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/tauri-os-operator-console-20260927.md` | open |
+| REG-tauri_os-4 | tauri_os (GUARDED_TESTNET) | No packaged app (bundle / notarise) and no public-testnet run of the console | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/tauri-os-operator-console-20260927.md` | open |
+| REG-tauri_os-5 | tauri_os (GUARDED_TESTNET) | The swarm path is proven against the service's real bodies and routes by a local server, not against a booted x3-swarm-api | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/tauri-os-operator-console-20260927.md` | open |
 | REG-x3_htlc-1 | x3_htlc (SIM_TESTNET) | Not wired into any live cross-VM route — no caller in the atomic router or crates/cross-vm-coordinator; the live SVM route runs the sibling programs/svm/x3_atomic_swap program | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-x3_htlc-2 | x3_htlc (SIM_TESTNET) | Local validator and in-process SVM only — no devnet or mainnet deployment has been performed | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-x3_htlc-3 | x3_htlc (SIM_TESTNET) | No external audit of the program or its client | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
@@ -204,6 +205,6 @@ fails when they do not match.
 | MTX-X3-SWARM-001 | swarm_compute | Northern Swarm on-chain pallet (stake/task/quorum/reward): Closed 2026-09-27 — a `Disputed` task no longer strands funds. `resolve_disputed_task` (call_index 8) refunds the submitter's exact reserved reward and moves the task to the new terminal `TaskStatus::Refunded`; it is permissionless because… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · tested score 78% (no named test list on this row) | open |
 | MTX-X3-SWARM-002 | swarm_compute | Northern Swarm executor: signed metadata-driven chain contract and compute backends: No live-node integration test. The watcher/encoder/signer contract is proven at its own boundary - the storage prefix is derived and stable, the map key decodes to the task id, the HTTP polling URL conversion is pinned, the signature parser… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 13 named tests in FEATURE_REGISTRY | open |
 
-**192 open rows** (9 blocker lines on registry rows are marked CLOSED and are not
+**193 open rows** (9 blocker lines on registry rows are marked CLOSED and are not
 listed). A row disappears only when the underlying record changes - a fixed blocker removed
 from `FEATURE_REGISTRY.toml`, or a matrix row that reached `COMPLETE`.

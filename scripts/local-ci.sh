@@ -740,6 +740,12 @@ GATES_FAST=(
   # `ungated-crate` count and the ratchet was re-baselined in the same commit.
   "test x3-svm-client:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-client cargo test --locked --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml -p x3-svm-client"
   "test svm counter:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-counter cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml"
+  # The Tauri operator console is its own cargo workspace and had never been built, let alone tested:
+  # measured 2026-09-27, no test attribute existed anywhere under apps/tauri-os, and the crate did not
+  # compile (tauri.conf.json was in the wrong directory and there were no icons). The wrapper carries
+  # the box's pkg-config reality — see its header — and names the package, so the repo scanner's
+  # `ungated-crate` finds it. The live half is in the live set below.
+  "tauri-os operator console:bash apps/tauri-os/src-tauri/run-tests.sh"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).
@@ -848,6 +854,11 @@ GATES_LIVE=(
   # clock sysvar: refund-before-expiry refused, refund-after-expiry moving real tokens back to the
   # initiator, double refund refused, claim-after-refund refused, and the late-claim rule asserted.
   "SVM HTLC x3_htlc expiry:env PATH=\"$HOME/.cargo/bin:$PATH\" bash X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh"
+  # The console's own reads against a real node: boots `x3-chain-node --dev` on free ports, waits for
+  # finality past genesis, then runs the `live-node`-feature suite, which reads system_health,
+  # chain_getFinalizedHead/chain_getHeader, system_name/version/chain and system_nodeRoles through the
+  # same client the commands use. A node that does not answer is an error there, not a skipped test.
+  "tauri-os live operator console:bash apps/tauri-os/src-tauri/run-live-test.sh"
 )
 
 GATES_VARIANTS=(

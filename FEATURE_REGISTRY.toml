@@ -269,17 +269,32 @@ dangerous_paths = ["gpu benchmark", "concurrency"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "apps/tauri-os"
 tauri_app = "AtomicConsole"
-required_tests = []
-# `reports/tauri_e2e_report.md` does not exist. `reports/tauri_desktop_gap_report.md`
-# does, but it is a gap report, not the end-to-end proof this field names, so the
-# citation is cleared rather than repointed at something close enough.
-proof_report = ""
-readiness_score = 15
+required_tests = [
+  "a_node_that_is_not_there_is_a_typed_error_not_an_empty_status",
+  "the_console_reads_the_chain_off_a_real_jsonrpc_conversation",
+  "the_console_calls_the_routes_the_swarm_service_actually_serves",
+  "a_dead_endpoint_is_reported_as_unreachable",
+  "live_operator_console_reads_a_running_node"
+]
+# The lane's own report: what was wrong, what changed, the live read against a
+# booted dev chain, and the break-it-first log path.
+# `reports/tauri_e2e_report.md` still does not exist; this is not it.
+proof_report = "reports/tauri-os-operator-console-20260927.md"
+# implemented 0.60*0.35 + tested 0.70*0.25 + mainnet_ready 0.10*0.40 = 42.
+# implemented — the read path is real for the four panels that exist (chain
+#   status, validator health, hardware, swarm task queue); six domains the lane
+#   named (agents, compute providers, benchmarks, settlement, logs, alerts) have
+#   no command at all.
+# tested — 42 unit + 6 integration tests, a live test against a booted dev chain,
+#   and a break-it-first run; the frontend has no tests of its own.
+# mainnet_ready — no packaged/notarised app and no public-testnet run.
+readiness_score = 42
 blockers = [
   "Desktop UI only — not part of blockchain runtime",
-  "Dead buttons imply incomplete wiring",
-  "No CI gate; E2E report is manual",
-  "No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts"
+  "Six console domains have no command: agents, compute providers, benchmarks, settlement, logs, alerts",
+  "launch_node / stop_node were deleted (they returned a fabricated success); a real spawn with a tracked child handle is unwritten",
+  "No packaged app (bundle / notarise) and no public-testnet run of the console",
+  "The swarm path is proven against the service's real bodies and routes by a local server, not against a booted x3-swarm-api"
 ]
 dangerous_paths = ["dead buttons", "Tauri wiring"]
 

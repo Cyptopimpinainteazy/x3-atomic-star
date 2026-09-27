@@ -3,7 +3,8 @@ import {
   DiskMetrics,
   EVENT_NODE_STATUS,
   EVENT_SYSTEM_METRICS,
-  NodeStatusData,
+  IpcError,
+  NodeStatus,
   SystemMetricsData,
   fetchNodeStatus,
   fetchSystemMetrics,
@@ -30,7 +31,8 @@ type ConnectionState =
  */
 export function LiveTelemetryPanel() {
   const [metrics, setMetrics] = useState<SystemMetricsData | null>(null);
-  const [node, setNode] = useState<NodeStatusData | null>(null);
+  const [node, setNode] = useState<NodeStatus | null>(null);
+  const [nodeError, setNodeError] = useState<IpcError | null>(null);
   const [conn, setConn] = useState<ConnectionState>({ type: "connecting" });
 
   useEffect(() => {
@@ -45,14 +47,27 @@ export function LiveTelemetryPanel() {
     (async () => {
       // Seed with the current snapshots, then keep listening for pushes.
       try {
-        const [m, n] = await Promise.all([fetchSystemMetrics(), fetchNodeStatus()]);
+        const metricsSnapshot = await fetchSystemMetrics();
         if (disposed) return;
-        setMetrics(m);
-        setNode(n);
+        setMetrics(metricsSnapshot);
         setConn({ type: "live" });
       } catch {
         if (disposed) return;
         setConn({ type: "offline", reason: "backend metrics not reachable" });
+        return;
+      }
+
+      // The system metrics are the app's own; the node read can fail on its
+      // own, and a failed read is shown as a failure rather than as empty data.
+      try {
+        const nodeStatus = await fetchNodeStatus();
+        if (disposed) return;
+        setNode(nodeStatus);
+        setNodeError(null);
+      } catch (error) {
+        if (disposed) return;
+        setNode(null);
+        setNodeError(error as IpcError);
       }
 
       try {
@@ -60,8 +75,9 @@ export function LiveTelemetryPanel() {
           setMetrics(m);
           setConn({ type: "live" });
         });
-        const u2 = await subscribeNodeStatus((n) => {
-          setNode(n);
+        const u2 = await subscribeNodeStatus((event) => {
+          setNode(event.status);
+          setNodeError(event.error);
           setConn({ type: "live" });
         });
         if (!disposed) {
@@ -119,8 +135,8 @@ export function LiveTelemetryPanel() {
           </GaugeCard>
 
           <StorageCard disks={metrics.disk} />
-          <NodeCard node={node} />
-          <Button refresh={() => refreshOnce(setMetrics, setNode, setConn)} />
+          <NodeCard node={node} error={nodeError} />
+          <Button refresh={() => refreshOnce(setMetrics, setNode, setNodeError, setConn)} />
         </div>
       )}
 
@@ -135,17 +151,24 @@ export function LiveTelemetryPanel() {
 
 async function refreshOnce(
   setMetrics: React.Dispatch<React.SetStateAction<SystemMetricsData | null>>,
-  setNode: React.Dispatch<React.SetStateAction<NodeStatusData | null>>,
+  setNode: React.Dispatch<React.SetStateAction<NodeStatus | null>>,
+  setNodeError: React.Dispatch<React.SetStateAction<IpcError | null>>,
   setConn: React.Dispatch<React.SetStateAction<ConnectionState>>,
 ) {
   if (!isTauri()) return;
   try {
-    const [m, n] = await Promise.all([fetchSystemMetrics(), fetchNodeStatus()]);
-    setMetrics(m);
-    setNode(n);
+    setMetrics(await fetchSystemMetrics());
     setConn({ type: "live" });
   } catch {
     setConn({ type: "offline", reason: "backend metrics not reachable" });
+    return;
+  }
+  try {
+    setNode(await fetchNodeStatus());
+    setNodeError(null);
+  } catch (error) {
+    setNode(null);
+    setNodeError(error as IpcError);
   }
 }
 
@@ -230,7 +253,7 @@ function GaugeRow({ label, percent, detail }: { label: string; percent: number; 
   );
 }
 
-function NodeCard({ node }: { node: NodeStatusData | null }) {
+function NodeCard({ node, error }: { node: NodeStatus | null; error: IpcError | null }) {
   return (
     <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
       <h3 style={{ marginTop: 0 }}>Node Status</h3>
@@ -238,20 +261,35 @@ function NodeCard({ node }: { node: NodeStatusData | null }) {
         <div>
           <p>
             Status:{" "}
-            <span style={{ color: node.running ? "#16a34a" : "#b45309" }}>
-              {node.running ? "running" : "offline / syncing"}
+            <span style={{ color: node.isSyncing ? "#b45309" : "#16a34a" }}>
+              {node.isSyncing ? "syncing" : "running"}
             </span>
           </p>
-          <p>Peers: {node.peerCount}</p>
-          <p>Block height: {node.blockHeight}</p>
-          {node.pid !== null && <p>PID: {node.pid}</p>}
-          <p style={{ fontSize: 12, color: "#555" }}>Last check: {node.updatedAt}</p>
+          <p>
+            {node.name} {node.version}
+          </p>
+          <p>Chain: {node.chain}</p>
+          <p>Role: {node.role ?? "not reported"}</p>
+          <p>Peers: {node.peers}</p>
+          <p>
+            Finalized: #{node.finalized.number}{" "}
+            <code style={{ fontSize: 11 }}>
+              {node.finalized.hash.slice(0, 10)}…{node.finalized.hash.slice(-6)}
+            </code>
+          </p>
+          <p style={{ fontSize: 12, color: "#555" }}>Last check: {node.observedAt}</p>
+        </div>
+      ) : error ? (
+        <div>
+          <p style={{ color: "#b45309" }}>Node unreachable: {error.code}</p>
+          <p style={{ fontSize: 12, color: "#555" }}>{error.details ?? error.message}</p>
         </div>
       ) : (
         <p style={{ color: "#6b7280" }}>No node status received yet.</p>
       )}
       <p style={{ fontSize: 12, color: "#555", marginTop: 8 }}>
-        Polled from the local chain JSON-RPC (127.0.0.1:9933) by the Rust backend.
+        Read from the node&apos;s JSON-RPC endpoint by the Rust backend; a node that does not answer
+        is reported here, never guessed at.
       </p>
     </div>
   );

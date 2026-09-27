@@ -523,13 +523,15 @@ class PackageInfo:
 # on every run so it cannot hide. The repository already uses the same shape for
 # `check-registry-tests-are-gated.py`'s KNOWN_UNGATED list.
 KNOWN_UNGATED: dict[str, str] = {
-    "apps/tauri-os/src-tauri/Cargo.toml": (
-        "Tauri v2 backend: `cargo test` for this crate needs the platform web stack "
-        "(webkit2gtk-4.1, gtk+-3.0, libsoup-3.0). Measured 2026-09-27 on this box: all three "
-        "are absent from pkg-config, so no gate can build it here. The JS half is gated "
-        "(`test js …`); the Rust half needs an image that ships the stack. Delete this entry "
-        "when such a gate exists."
-    ),
+    # `apps/tauri-os/src-tauri/Cargo.toml` was listed here on 2026-09-27 with "no gate can
+    # build it here". That measurement came from pkg-config's default search path on this
+    # box, which is Homebrew-only: `webkit2gtk-4.1`, `gtk+-3.0` and `libsoup-3.0` are
+    # installed under `/usr/lib/x86_64-linux-gnu/pkgconfig` and are found as soon as that
+    # directory is on `PKG_CONFIG_PATH`. `apps/tauri-os/src-tauri/run-tests.sh` does that
+    # (and supplies the missing `shared-mime-info.pc` Debian does not ship), the fast set
+    # runs it as `tauri-os operator console`, and the live set runs the node-backed suite as
+    # `tauri-os live operator console`. The entry is deleted rather than kept: leaving it
+    # would hide a real regression if that gate ever stopped naming the package.
 }
 KNOWN_UNGATED_SEEN: list[str] = []
 
