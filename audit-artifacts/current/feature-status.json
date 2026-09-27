@@ -3760,7 +3760,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 72,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "pallets/x3-atomic-kernel/src/lib.rs",
@@ -3769,16 +3769,17 @@
         "note: 2026-09-26 - `RuntimeHaltExemptCalls` is the exemption list and `InvariantCheck` consults it (`&call`, so the signed-extension wire format is unchanged)"
       ],
       "id": "X3-RT-001",
-      "implemented": 85,
+      "implemented": 88,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 55,
+      "mainnet_ready": 62,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 the halt permits recovery, and the tests that say so are named here.** The open item was \"required tests not yet proven in canonical registry\". They exist and are gated (`test atomic-kernel`, `test x3-kernel`): `economic_halt_does_not_trap_pending_bundle_funds` halts the economy with a bundle already submitted and requires `rollback_atomic_bundle` to succeed *anyway*, releasing the whole bond while a new submission is still refused with `EconomicHaltActive` \u2014 and asserts the balances, the 50% cancel penalty and that total issuance is unchanged (slashed funds move to the treasury rather than being burned). `economic_halt_blocks_bundle_submission` pins the fail-closed half, including that lifting the halt restores work.",
         "The kernel's own pause gets the same treatment: `emergency_pause_blocks_submit_comit` (refuses), `test_emergency_halt_recovery_restores_functionality` (the same caller and nonce succeed again after `emergency_unpause`), and, added 2026-09-26, `a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact` \u2014 a comit accepted before the pause stays byte-identical in storage while paused, a submission the pause refuses leaves the account's nonce untouched, and the same nonce works after resuming. Measured load-bearing: deleting the `ProtocolIsPaused` guard from `submit_comit` turns that test red at its `assert_noop!`, then the file was restored byte-identically.",
         "**2026-09-26 \u2014 both switches were driven together, and then the gate itself turned out to be the trap.** The three named unproven things are measured: `the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` walks `pallet_x3_kernel::emergency_halt` \u2192 `RuntimeEmergencyHaltController::trigger` \u2192 `pallet_x3_supply_ledger::TransferHalted` \u2192 the atomic kernel refusing the bundle the gateway submitted a moment earlier with `EconomicHaltActive`; `a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable` cancels a bundle *while paused* and requires the record to reach `RolledBack`, the bond to come back, the 50% penalty to be kept and total issuance to be unchanged.",
         "**The recovery path this row is named for did not exist above the dispatch layer, and that was a P0.** `pallet_x3_invariants::InvariantCheck` is in `SignedExtra` and refused *every* signed extrinsic while `Halted` was set \u2014 including the halt's own remedy. Measured at the transaction-validity layer (the layer that stops a chain, not dispatch): `runtime/src/tests.rs::a_halted_chain_still_accepts_the_recovery_calls_that_release_funds` builds the same signed extrinsic the node's RPC and signer build, halts through the kernel, and shows `rollback_atomic_bundle`, `clear_halted`, `resume_transfers` and the council motion all refused with `INVARIANT_HALT_CODE` / `Custom(1)`. A pending bundle's bond was unreachable and the flag could not be cleared by any call the chain has: `clear_halted` was named in two doc comments and did not exist. Fixed in `6d7bfc540` \u2014 the gate now exempts a short justified list (`clear_halted`, `set_halt_on_violation`, `resume_transfers`, `rollback_atomic_bundle`, `emergency_unpause`, council `propose`/`vote`/`close`/`execute`) and refuses everything else; `clear_halted` now exists. The same test drives both flags to false with the origin `Council::close` produces, requires ordinary traffic to validate again, and requires a `Members(0, 2)` minority to be refused. Load-bearing: deleting the exemption reddens it at \"the bond-releasing rollback must not be refused by the halt\"; restoring the file returns 57/57 runtime tests and 26/26 pallet tests.",
-        "Still open: the exemption list is a runtime policy, not a proof \u2014 a pallet that holds funds and has no rollback extrinsic would still be trapped, and nothing enumerates the runtime's fund-holding calls against the list (TICKET-153). The halt is cleared only by an explicit governed call; there is no automatic unhalt once the violating invariant is back inside its bound. `clear_halted`'s weight is hand-written to `set_halt_on_violation`'s shape, not benchmarked, and no live-node halt/unhalt drill has run."
+        "**2026-09-26 \u2014 the halt/unhalt cycle now runs on a live three-validator chain.** `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`) trips the halt through a council motion (the only route the chain has), requires `x3Invariants.halted` and `x3SupplyLedger.transferHalted` to be set, and then measures both halves at once: a signed `balances.transferKeepAlive` is refused by the **pool of two different validators** with `1010: Invalid Transaction: Custom error: 1` while the destination balance does not move, and `x3AtomicKernel.rollbackAtomicBundle` on a non-existent bundle **is included in a block** and refused by the pallet (`x3AtomicKernel.BundleNotFound`) \u2014 so the bond-releasing call is not blocked by the halt. The remedy then goes in *while the chain is still halted*: council motions for `x3Invariants.clearHalted` and `x3SupplyLedger.resumeTransfers` both execute, the flags read false, and a transfer afterwards is `InBlock` and moves the balance. Load-bearing on the live path: with the exemption check removed the same drill fails at the remedy \u2014 `submitExtrinsic` for the motion's own `propose` returns `1010: Invalid Transaction: Custom error: 1`, which is the one-way door (evidence in `.ai/runlogs/halt-recovery-live-20260927T010259Z/`); restoring the file byte-identically returns the PASS.",
+        "Still open: the exemption list is a runtime policy, not a proof \u2014 a pallet that holds funds and has no rollback extrinsic would still be trapped, and nothing enumerates the runtime's fund-holding calls against the list (TICKET-153). The halt is cleared only by an explicit governed call; there is no automatic unhalt once the violating invariant is back inside its bound, and no test drives the re-raise sequence (clear while the violation persists). `clear_halted`'s weight is hand-written to `set_halt_on_violation`'s shape, not benchmarked. The live drill halts an idle chain: no bundle is in flight while the halt lands."
       ],
       "name": "Halt permits recovery/refund paths",
       "paths": [
@@ -3789,10 +3790,10 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "runtime_core",
-      "tested": 80,
+      "tested": 88,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -3919,7 +3920,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 74,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "pallets/x3-atomic-kernel/src/lib.rs",
@@ -3931,11 +3932,11 @@
       "implemented": 88,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 58,
+      "mainnet_ready": 60,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 the valve is proven end to end instead of by reading three files.** The blocker was \"Dedicated halt invariant tests incomplete\". The chain the halt travels is now measured at runtime level: `the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` trips `pallet_x3_kernel::emergency_halt`, requires the runtime's `RuntimeEmergencyHaltController` to have set `pallet_x3_supply_ledger::TransferHalted`, which is what `T::EconomicHalt::is_halted` returns for the atomic kernel, and requires the bundle submitted a moment earlier to be refused with `EconomicHaltActive`. That distinction matters because `EconomicHalt` has a blanket no-op impl for `()`: a mock configured with `()` would let every \"the halt works\" test pass while a real chain accepted bundles.",
         "**The valve had a hole above the dispatch layer.** `pallet_x3_invariants::InvariantCheck` (in `SignedExtra`) refused every signed extrinsic while `Halted` was set, so a tripped valve also refused `rollback_atomic_bundle` and the call that lifts it \u2014 the safety valve could not be closed again. Measured at the transaction-validity layer and fixed in `6d7bfc540`; see X3-RT-001 for the test and the load-bearing check. `clear_halted` now exists (it was named in two doc comments and implemented nowhere).",
-        "Still open: no live-node halt/unhalt drill, `clear_halted`'s weight is hand-written to the shape of `set_halt_on_violation` rather than benchmarked, and the valve stays tripped after remediation until governance explicitly clears it \u2014 there is no automatic close once the violated bound is back in range."
+        "**The live drill covers the valve on a network.** `scripts/drills/halt_recovery_live.sh` trips the valve through `atlasKernel.emergencyHalt` on three validators, requires both flags, requires two validators' pools to refuse an ordinary transfer with the runtime's halt code, and requires the remedy to land and traffic to resume. Still open: `clear_halted`'s weight is hand-written to the shape of `set_halt_on_violation` rather than benchmarked, the valve stays tripped after remediation until governance explicitly clears it (no automatic close once the violated bound is back in range), and no test drives the re-raise sequence."
       ],
       "name": "Economic Halt safety valve",
       "paths": [
@@ -3944,16 +3945,16 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "runtime_core",
-      "tested": 78,
+      "tested": 84,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 74,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "pallets/x3-atomic-kernel/src/lib.rs",
@@ -3965,10 +3966,10 @@
       "implemented": 88,
       "launch_scope": "core",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 58,
+      "mainnet_ready": 60,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 the regression test exists at both layers.** \"Needs explicit regression test\" is answered by `runtime/src/tests.rs::the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` (a bundle accepted before the halt is refused with `EconomicHaltActive` afterwards, through the real controller) and `a_halted_chain_still_accepts_the_recovery_calls_that_release_funds` (at the pool: a signed user call is refused with `INVARIANT_HALT_CODE` while the bond-releasing rollback is not). The pallet-level half is `economic_halt_blocks_bundle_submission`, and `a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable` pins that the *routine* pause is a different switch and does not by itself stop a bundle from being cancelled and refunded.",
-        "Still open: no live-node drill, and the two switches (kernel `ProtocolPaused` vs. the economic halt) are deliberately independent \u2014 a chain operator who trips only the pause still accepts new atomic bundles."
+        "**The live drill measures the fail-closed half.** On three validators, the pool of two different nodes refuses an ordinary signed call with `1010: Invalid Transaction: Custom error: 1` and the destination balance does not move, while the value-carrying rollback for a non-existent bundle is still *included* and refused by the pallet instead \u2014 the halt blocks new work without blocking the way out. Still open: no live bundle is in flight when the halt lands (so \"the pending bundle's bond is released on a live chain\" is proven at runtime level, not on a node), and the two switches (kernel `ProtocolPaused` vs. the economic halt) are deliberately independent \u2014 a chain operator who trips only the pause still accepts new atomic bundles."
       ],
       "name": "Halt blocks new atomic bundles",
       "paths": [
@@ -3977,10 +3978,10 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "runtime_core",
-      "tested": 78,
+      "tested": 84,
       "tests": "8 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4589,7 +4590,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "92d077b9df06c76d810660f0a05a557380506db89e317886e198ae3efc73d9df",
+    "source_digest": "858bc372f4d6278100228f00f388a82c3a872b3da77c9eaaf7de3da1d6147ac0",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4603,7 +4604,7 @@
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
       "feature-matrix/operations-user-tools.toml": "4d5cae49aea9c2b12541ca5fd29519c3ab6ac39b6153412fcbaf5a7c6e592682",
-      "feature-matrix/runtime-core.toml": "04948305b0afb654e4b78e274d53899ec340c2035287980f6ce5a1d933b31cc2",
+      "feature-matrix/runtime-core.toml": "14d92befdb56b8efb8daa9b30ed2abef361e8e84ac3c23c77a7e68d5b3f51dc4",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },
@@ -5045,10 +5046,10 @@
     "by_state": {
       "BROKEN": 0,
       "COMPLETE": 10,
-      "FUNCTIONAL BUT UNHARDENED": 57,
+      "FUNCTIONAL BUT UNHARDENED": 60,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 72,
+      "PARTIAL": 69,
       "STUB": 2
     },
     "matrix_features": 146,

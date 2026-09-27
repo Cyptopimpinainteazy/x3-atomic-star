@@ -699,6 +699,12 @@ GATES_LIVE=(
   # with a delay, two approvals, a finalize refused before the delay and refused again for a
   # non-owner cancel, and a finalize that changes the *stored* recovery owner.
   "wallet recovery on a live chain:bash scripts/drills/wallet_recovery_live.sh"
+  # `X3-RT-001`/`X3-RT-006`/`X3-RT-007` and `TICKET-153`: the economic halt had never been tripped
+  # on a network, so every claim about it was a single-process claim. This trips it through a
+  # council motion on three validators, requires the pool of two different validators to refuse a
+  # transfer with the runtime's halt code (with no balance change), submits the council motion that
+  # clears it *while still halted*, and requires traffic to resume afterwards.
+  "halt recovery on a live chain:bash scripts/drills/halt_recovery_live.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1175,6 +1181,7 @@ SERIAL_GATES=(
   "runtime upgrade through governance"
   "ordering window on a live chain"
   "wallet recovery on a live chain"
+  "halt recovery on a live chain"
   "load soak across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"

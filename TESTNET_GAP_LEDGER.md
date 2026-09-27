@@ -1371,10 +1371,13 @@ What that does **not** prove, and what this ticket is for:
    to check the list against, and `emergency_unpause` is on the list on the reasoning that a paused
    kernel is the routine case — not because a test drives a halt with a paused kernel and requires
    recovery.
-2. **Nothing measures the halt/unhalt cycle on a node.** The evidence is a runtime-level
-   `TestExternalities` test (`Executive::validate_transaction` plus direct dispatch). No drill starts
-   a node, trips the halt through governance, clears it through a council motion and shows a
-   transaction landing afterwards.
+2. ~~**Nothing measures the halt/unhalt cycle on a node.**~~ **CLOSED 2026-09-26.**
+   `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS in ~25 s) starts
+   three validators, trips the halt through a council motion, requires two different validators'
+   pools to refuse a transfer with the halt code while the balance stays put, requires the
+   bond-releasing rollback to be *included* and refused by the pallet instead, clears both flags
+   through council motions submitted while the chain is still halted, and requires traffic to resume.
+   With the exemption check removed the same drill fails at the remedy, which is the one-way door.
 3. **`clear_halted` has no benchmark.** Its weight is hand-copied from `set_halt_on_violation`'s
    shape (one storage write) with a comment saying so.
 4. **There is no automatic unhalt.** After remediation the flag stays set until governance clears it;
