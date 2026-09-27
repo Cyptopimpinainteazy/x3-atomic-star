@@ -1080,6 +1080,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         intent: &x3_atomic_swap::AtomicIntent,
         runtime_intent_id: [u8; 32],
         required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        finality: &crate::SettlementFinalityPolicy,
     ) -> Result<crate::SettlementSubmissionEnvelope, CoordinatorError> {
         let set = self.assemble_verified_claim_proof_set(
             session_id,
@@ -1092,6 +1093,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             runtime_intent_id,
             set,
             required_domains,
+            finality,
         )
     }
 
@@ -1102,6 +1104,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         intent: &x3_atomic_swap::AtomicIntent,
         runtime_intent_id: [u8; 32],
         required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        finality: &crate::SettlementFinalityPolicy,
     ) -> Result<crate::SettlementSubmissionEnvelope, CoordinatorError> {
         let set = self.assemble_verified_refund_proof_set(
             session_id,
@@ -1114,6 +1117,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             runtime_intent_id,
             set,
             required_domains,
+            finality,
         )
     }
 
