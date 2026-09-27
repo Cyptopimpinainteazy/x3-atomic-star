@@ -78,6 +78,12 @@ fn settlement_intent_creation_is_wired_through_the_runtime() {
 /// does not fit the block, and the settle weight is a function of what the window holds, so the
 /// capacity and the byte ceiling the runtime configures have to be settlable in one transaction.
 /// A test at the pallet level cannot see this: it needs the runtime's own `BlockWeights`.
+///
+/// `#[cfg(not(feature = "mainnet-rc1"))]` because the pallet it exercises is: the runtime's
+/// `impl pallet_private_execution::Config for Runtime` carries that same cfg, so without this the
+/// `mainnet-rc1` build of this test file does not compile (measured: `clippy runtime rc1` failed
+/// with `the trait bound Runtime: pallet_private_execution::Config is not satisfied`).
+#[cfg(not(feature = "mainnet-rc1"))]
 #[test]
 fn a_full_ordering_window_is_settlable_in_one_block() {
     use frame_support::weights::Weight;
@@ -878,4 +884,55 @@ fn a_halted_chain_still_accepts_the_recovery_calls_that_release_funds() {
             "the refusal must leave the halt in place"
         );
     });
+}
+
+/// A pallet wired into this runtime must charge something for its calls.
+///
+/// `impl WeightInfo for ()` returns `Weight::zero()` for every call, which drops the pallet out of
+/// block-weight accounting entirely: the weight-based limit never sees its dispatchables, so an
+/// attacker can pack blocks with them. Eighteen configs in this file were in that state until
+/// 2026-09-27 even though their pallets shipped non-zero, read/write-counted `SubstrateWeight`
+/// values. `scripts/check-runtime-weights-wired.py` holds the config line ("no `()` where weights
+/// are reachable", with a shrink-only exception list); this asserts the *runtime's own* choice
+/// returns real weight, so reverting one to `()` fails here with a number rather than with a grep.
+///
+/// Only pallets present in every feature set are named, so the test does not need a `cfg` of its own.
+#[test]
+fn a_wired_pallet_charges_more_than_nothing() {
+    use frame_support::weights::Weight;
+    use pallet_timestamp::weights::WeightInfo as _;
+    use pallet_x3_atomic_kernel::weights::WeightInfo as _;
+
+    fn assert_charged(label: &str, weight: Weight) {
+        assert!(
+            weight.ref_time() > 0 || weight.proof_size() > 0,
+            "{label} charges {weight:?} — a pallet wired to () charges Weight::zero() and its \
+             dispatchables are invisible to the block weight limit"
+        );
+    }
+
+    // Only pallets this runtime carries in *every* feature set, so the test needs no cfg of its own;
+    // x3-auction, x3-oracle and private-execution are `#[cfg(not(feature = "mainnet-rc1"))]` and are
+    // covered by the test below.
+    assert_charged(
+        "x3-atomic-kernel finalize_atomic_bundle",
+        <Runtime as pallet_x3_atomic_kernel::Config>::WeightInfo::finalize_atomic_bundle(),
+    );
+    assert_charged(
+        "timestamp set",
+        <Runtime as pallet_timestamp::Config>::WeightInfo::set(),
+    );
+}
+
+/// The same claim for the pallets the `mainnet-rc1` feature set removes from the runtime.
+#[cfg(not(feature = "mainnet-rc1"))]
+#[test]
+fn a_wired_rc1_excluded_pallet_charges_more_than_nothing() {
+    use pallet_x3_auction::weights::WeightInfo as _;
+
+    let weight = <Runtime as pallet_x3_auction::Config>::WeightInfo::create_auction();
+    assert!(
+        weight.ref_time() > 0 || weight.proof_size() > 0,
+        "x3-auction create_auction charges {weight:?} — a pallet wired to () charges Weight::zero()"
+    );
 }

@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `3a154e58741e1afd…` — the artifacts move when
+Source digest: `029a62335039534b…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -123,7 +123,7 @@ fails when they do not match.
 | MTX-X3-ECO-014 | economic_defi | AXE DEX pool creation: No concentrated liquidity or production liquidity stress test | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-ECO-015 | economic_defi | Token factory / X3 Forge: Sentinel score not fully wired into create origin | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · 2 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-GPU-001 | gpu_performance | GPU finalized-TPS proof: No physical GPU benchmark showing finalized-TPS improvement | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 5% (no named test list on this row) | open |
-| MTX-X3-GPU-002 | gpu_performance | Production runtime weights: Older audits found WeightInfo=() in several places | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
+| MTX-X3-GPU-002 | gpu_performance | Production runtime weights: **CLOSED 2026-09-27 — eighteen zero-weight dispatchable sets now charge their pallets' own weights.** Measured before: `runtime/src/lib.rs` set `type WeightInfo = ();` for `pallet_x3_{oracle,vrf,dex,automation,atomic_kernel,auction,launchpa… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-GPU-003 | gpu_performance | FRAME benchmarking: Generated production weights incomplete in older audits | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 60% (no named test list on this row) | open |
 | MTX-X3-GPU-004 | gpu_performance | GPU/CPU parity checking: Needs real hardware equivalence evidence | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 70% (no named test list on this row) | open |
 | MTX-X3-GPU-007 | gpu_performance | GPU Keccak256 batching: A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it return… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 60% (no named test list on this row) | open |

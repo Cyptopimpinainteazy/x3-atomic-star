@@ -21,16 +21,48 @@ id = "X3-GPU-002"
 name = "Production runtime weights"
 subsystem = "gpu_performance"
 source = "master"
-paths = ["runtime/src/lib.rs"]
-implemented = 55
-tested = 40
-mainnet_ready = 40
+# Re-measured 2026-09-27. The row's blocker was not a missing capability: the weights existed and
+# nothing pointed at them. 31 pallets ship `src/weights.rs`, 29 declare `pub mod weights;`, and
+# `runtime/src/lib.rs` referenced **zero** of them — every one of those configs set
+# `type WeightInfo = ()`, and `impl WeightInfo for ()` returns `Weight::zero()`, which drops the
+# pallet out of block-weight accounting entirely. Eighteen configs are now wired to the non-zero,
+# read/write-counted `SubstrateWeight` their pallets already shipped, and a gate holds the line.
+paths = [
+  "runtime/src/lib.rs",
+  "runtime/src/tests.rs",
+  "scripts/check-runtime-weights-wired.py",
+]
+implemented = 75
+tested = 75
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Older audits found WeightInfo=() in several places"]
-evidence = ["runtime/src/lib.rs", "note: Benchmark infrastructure exists but weight coverage is incomplete"]
+blockers = [
+  "**CLOSED 2026-09-27 — eighteen zero-weight dispatchable sets now charge their pallets' own weights.** Measured before: `runtime/src/lib.rs` set `type WeightInfo = ();` for `pallet_x3_{oracle,vrf,dex,automation,atomic_kernel,auction,launchpad,compute_market}`, `pallet_{governance,treasury,agent_accounts,agent_memory,depin_marketplace,meme_overlord,private_execution}`, `pallet_svm_runtime`, `pallet_grandpa`, `pallet_timestamp`, `pallet_scheduler`, `pallet_preimage` and `pallet_x3_lp_locker`. Eighteen of those (all but grandpa, launchpad and lp_locker) are wired to `<crate>::weights::SubstrateWeight<Runtime>`; the FRAME pallets use their SDK weights. The three that remain are in the gate's shrink-only exception list, each with the reason it cannot be wired today",
+  "**The generated weights are stubs, and the row says so.** Every `weights.rs` in this repository opens with `//! Auto-generated weight stubs … Run cargo benchmark against real hardware to populate concrete values`, so wiring them replaces `Weight::zero()` with a real read/write count at hand-sized `ref_time`, not with a measured one. That is strictly better than charging nothing and is not the same as benchmarking; the measured half of this subsystem is X3-GPU-003, and the values must be regenerated on target hardware before a mainnet claim",
+  "**Two generated weight files are dead, and one is worse than dead.** `pallets/x3-launchpad/src/weights.rs` is not a module of its pallet at all (`lib.rs` declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`), so the runtime cannot point at it — the gate's exception says so. `pallets/x3-consensus/src/weights.rs` is shadowed by an inline `pub mod weights { … }` in its `lib.rs`, so the runtime is correctly weighted but the file beside it is never compiled; the gate prints a WARNING rather than failing, because the wired numbers are live either way",
+  "**Found and fixed while here — `clippy runtime rc1` was red in the default gate set.** `runtime/src/tests.rs::a_full_ordering_window_is_settlable_in_one_block` exercises `pallet_private_execution`, whose `Config` impl for `Runtime` is `#[cfg(not(feature = \"mainnet-rc1\"))]`, but the test carried no `cfg` of its own, so the `mainnet-rc1` build of the test file did not compile (`the trait bound Runtime: pallet_private_execution::Config is not satisfied`, 12 errors). It carries that cfg now and the gate is green",
+  "Still open on this row: 3 runtime configs remain on `()`, and the runtime carries SDK pallets whose own weight modules were not audited here (`pallet_balances`, `pallet_session`, `pallet_evm`, `pallet_collective`, `pallet_transaction_payment`, `pallet_sudo` — the gate only checks that they do not charge zero, not that their numbers are current). Nothing has re-benchmarked on this host, and no weight here has been validated against a measured block",
+]
+evidence = [
+  "runtime/src/lib.rs",
+  "runtime/src/tests.rs",
+  "scripts/check-runtime-weights-wired.py",
+  "note: `impl WeightInfo for ()` returns `Weight::zero()` for every method — the reason a `()`-wired config is invisible to the block weight limit rather than merely under-charged",
+  "note: 2026-09-27 — 31 pallets ship `src/weights.rs`, 29 declare `pub mod weights;`, and before this change `rg 'WeightInfo = weights::' runtime/src/lib.rs` returned 0 matches; it returns 18 now, and the gate reports `37 runtime config(s) wired to generated weights, 3 documented exception(s)`",
+]
+test_evidence = [
+  "note: `cargo test -p x3-chain-runtime --lib` — 58 passed, 0 failed, including `a_wired_pallet_charges_more_than_nothing` (atomic-kernel + timestamp, both feature sets) and `a_wired_rc1_excluded_pallet_charges_more_than_nothing` (x3-auction)",
+  "note: `bash scripts/local-ci.sh --only test-runtime` — PASS 92s; `--only clippy-runtime-rc1,runtime-weights-wired` — both PASS (the rc1 gate was red before this change)",
+  "note: break-it-first measured both ways — reverting the x3-auction config at `runtime/src/lib.rs` to `()` makes the runtime test fail with `x3-auction create_auction charges Weight { ref_time: 0, proof_size: 0 }` and the gate exit 1 naming that line; restoring both returns green",
+]
+required_tests = [
+  "a_wired_pallet_charges_more_than_nothing",
+  "a_wired_rc1_excluded_pallet_charges_more_than_nothing",
+  "a_full_ordering_window_is_settlable_in_one_block",
+]
 
 [[feature]]
 id = "X3-GPU-003"

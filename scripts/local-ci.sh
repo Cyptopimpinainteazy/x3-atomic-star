@@ -199,6 +199,13 @@ GATES_FAST=(
   # they survived — `cleanBin` only unlinks `dirent.isFile()` entries). See
   # GAP-TOOLCHAIN-WIPE in TESTNET_GAP_LEDGER.md; this gate holds the line.
   "cargo home safety:python3 scripts/check-cargo-home-safety.py"
+  # `impl WeightInfo for ()` returns `Weight::zero()`, so a runtime config that sets
+  # `type WeightInfo = ();` for a pallet whose calls do storage work removes that pallet from
+  # block-weight accounting entirely. Eighteen configs were in that state on 2026-09-27 while their
+  # pallets shipped non-zero `SubstrateWeight` values (31 pallets have generated weights, 29 declare
+  # the module, and the runtime pointed at none of them). The gate also fails on a generated
+  # `weights.rs` that is not a module of its pallet, and its exception list may only shrink.
+  "runtime weights wired:python3 scripts/check-runtime-weights-wired.py"
   "workspace membership:python3 scripts/check-workspace-membership.py"
   # PHASE 43 is a prohibition, not a feature: a value that becomes a balance, a reward, a slash or a
   # settlement amount must be computed exactly. `x3-lang` has had this check for its own two crates for

@@ -1028,7 +1028,7 @@ impl pallet_x3_oracle::Config for Runtime {
     type MinSubmissionsForMedian = MinSubmissionsForMedian;
     type MaxSubmissionAge = MaxSubmissionAge;
     type UpdateOrigin = EnsureRootOrHalfCouncil;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_oracle::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -1047,7 +1047,7 @@ impl pallet_x3_vrf::Config for Runtime {
     type FeePerByte = FeePerByte;
     type MaxSeedLength = MaxSeedLength;
     type FulfillerOrigin = EnsureRootOrHalfCouncil;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_vrf::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -1057,7 +1057,7 @@ parameter_types! {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_dex::weights::SubstrateWeight<Runtime>;
     type EconomicHalt = X3SupplyLedger;
 }
 
@@ -1075,7 +1075,7 @@ impl pallet_x3_automation::Config for Runtime {
     type BaseRegistrationFee = BaseRegistrationFee;
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
     type Oracle = pallet_x3_automation::NoopOracle;
     type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
 }
@@ -1151,7 +1151,7 @@ impl pallet_timestamp::Config for Runtime {
     type Moment = Moment;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
-    type WeightInfo = ();
+    type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_aura::Config for Runtime {
@@ -1166,6 +1166,8 @@ impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type KeyOwnerProof = MembershipProof;
     type EquivocationReportSystem = X3EquivocationReportSystem;
+    // The SDK's GRANDPA weights are not publicly reachable (`mod default_weights;` is private in
+    // `substrate/frame/grandpa/src/lib.rs`), so there is nothing to point at from a runtime.
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
@@ -2313,7 +2315,7 @@ impl pallet_scheduler::Config for Runtime {
     type MaximumWeight = MaximumSchedulerWeight;
     type ScheduleOrigin = EnsureRootOrHalfCouncil;
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
-    type WeightInfo = ();
+    type WeightInfo = pallet_scheduler::weights::SubstrateWeight<Runtime>;
     type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
     type Preimages = Preimage;
     type BlockNumberProvider = frame_system::Pallet<Runtime>;
@@ -2328,7 +2330,7 @@ parameter_types! {
 
 impl pallet_preimage::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
+    type WeightInfo = pallet_preimage::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     type ManagerOrigin = EnsureRootOrHalfCouncil;
     // RC-1: no per-byte deposit; preimage costs governed by extrinsic weight only.
@@ -2373,7 +2375,7 @@ impl pallet_governance::Config for Runtime {
     type MaxVotes = MaxVotes;
     type MaxDelegations = MaxDelegations;
     type ConvictionPeriod = ConvictionPeriod;
-    type WeightInfo = ();
+    type WeightInfo = pallet_governance::weights::SubstrateWeight<Runtime>;
 
     // ============================================================================
     // AI Governance Configuration
@@ -2418,7 +2420,7 @@ impl pallet_treasury::Config for Runtime {
     type LargeSpendLimit = LargeSpendThreshold;
     type ProposalBond = ProposalBond;
     type ProposalBondMinimum = ProposalBondMinimum;
-    type WeightInfo = ();
+    type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
     // X3 (stable2512): local pallet-treasury Config does not declare BlockNumberProvider.
 }
 
@@ -2444,7 +2446,7 @@ impl pallet_agent_accounts::Config for Runtime {
     type DefaultGasPerEpoch = DefaultGasPerEpoch;
     type DefaultComputePerEpoch = DefaultComputePerEpoch;
     type BlocksPerEpoch = BlocksPerEpoch;
-    type WeightInfo = ();
+    type WeightInfo = pallet_agent_accounts::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Agent Memory Pallet Configuration =====
@@ -2466,7 +2468,7 @@ impl pallet_agent_memory::Config for Runtime {
     type PruneOrigin = EnsureRootOrHalfCouncil;
     type MemoryRetentionBlocks = MemoryRetentionBlocks;
     type MemoryConsensusThreshold = MemoryConsensusThreshold;
-    type WeightInfo = ();
+    type WeightInfo = pallet_agent_memory::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Evolution Core Pallet Configuration =====
@@ -2819,7 +2821,7 @@ impl pallet_depin_marketplace::Config for Runtime {
     type MaxJobDuration = MaxJobDuration;
     type MaxPendingOrders = MaxPendingOrders;
     type SlashFraction = DepinSlashFraction;
-    type WeightInfo = ();
+    type WeightInfo = pallet_depin_marketplace::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Private Execution Pallet Configuration =====
@@ -2874,7 +2876,7 @@ impl pallet_private_execution::Config for Runtime {
     type MinOrderingBond = MinOrderingBond;
     type MaxOrderingCommits = MaxOrderingCommits;
     type MaxOrderingWindowBytes = MaxOrderingWindowBytes;
-    type WeightInfo = ();
+    type WeightInfo = pallet_private_execution::weights::SubstrateWeight<Runtime>;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -2945,7 +2947,7 @@ parameter_types! {
 
 impl pallet_x3_atomic_kernel::Config for Runtime {
     type Currency = Balances;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_atomic_kernel::weights::SubstrateWeight<Runtime>;
     type MinBond = AtomicKernelMinBond;
     type MaxLegsPerBundle = AtomicKernelMaxLegsPerBundle;
     type BundleDeadlineBlocks = AtomicKernelBundleDeadlineBlocks;
@@ -3187,7 +3189,7 @@ impl pallet_x3_auction::Config for Runtime {
     type MaxActiveAuctions = AuctionMaxActiveAuctions;
     type AuctionDepositAmount = AuctionDepositAmount;
     type MinBidIncrementBps = AuctionMinBidIncrementBps;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_auction::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 LP Locker Configuration =====
@@ -3325,6 +3327,11 @@ impl pallet_x3_launchpad::Config for Runtime {
     type Dex = LaunchpadDexBridge;
     type LpLocker = LaunchpadLpLockerBridge;
     type QuoteAssetId = LaunchpadQuoteAssetId;
+    // `pallets/x3-launchpad/src/weights.rs` exists but is not a module of the pallet (`lib.rs`
+    // declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`),
+    // so there is nothing to point at. Wiring it needs the pallet to implement its own trait for the
+    // generated struct; until then `()` is the only thing that compiles, and the gate
+    // `runtime weights wired` fails on the dead file rather than on this line.
     type WeightInfo = ();
 }
 
@@ -3371,7 +3378,7 @@ impl pallet_x3_compute_market::Config for Runtime {
     type MaxSessionsPerProvider = ComputeMarketMaxSessionsPerProvider;
     type SessionExpiryBlocks = ComputeMarketSessionExpiryBlocks;
     type MinStakeForProvider = ComputeMarketMinStakeForProvider;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_compute_market::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Flash Loan Configuration =====
@@ -3399,7 +3406,7 @@ impl pallet_svm_runtime::Config for Runtime {
     type MaxAccountDataSize = SvmMaxAccountDataSize;
     type MaxProgramSize = SvmMaxProgramSize;
     type MaxComputeUnits = SvmMaxComputeUnits;
-    type WeightInfo = ();
+    type WeightInfo = pallet_svm_runtime::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Jury Anchor Configuration =====
@@ -3422,7 +3429,7 @@ parameter_types! {
 
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_meme_overlord::Config for Runtime {
-    type WeightInfo = ();
+    type WeightInfo = pallet_meme_overlord::weights::SubstrateWeight<Runtime>;
     type MaxTemplateNameLength = MemeMaxTemplateNameLength;
     type MaxMemeDataLength = MemeMaxMemeDataLength;
     type MaxAchievements = MemeMaxAchievements;
