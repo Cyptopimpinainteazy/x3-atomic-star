@@ -9152,3 +9152,38 @@ registration, with the outcome per file:
   feature-list exclusion comment still names ~12 pallets with their first compile error, and every
   one of those is the same shape of work: add `frame-benchmarking`, write `benchmarking.rs`, register
   in `mod benches`, enable the feature, generate, then wire.
+
+## 2026-09-27 (fifth weights pass) — the token factory, and two traps the release gate taught
+
+- **`pallets/x3-token-factory` charged 60,000 picoseconds for a token launch and 20,000 for a mint or
+  burn**, all four calls literals, behind a `runtime-benchmarks` feature with nothing in it. Measured
+  and wired now: scanner `pallet-call-without-weights` **21 → 20** (five pallets, 24 literals).
+  Its launch benchmark drives the whole path a chain takes — register the asset, activate it,
+  configure the internal routes, mint the initial supply. `CappedMintable` permits a post-launch mint
+  and `Burnable` permits a burn, and **no class allows both**, so the mint and burn benchmarks launch
+  different classes.
+- **Trap 1 — adding `type WeightInfo` to a pallet `Config` breaks every other crate that implements
+  it, and `make mainnet-check` does not see it.** The supply ledger's new associated type (commit
+  `af80888a6`) quietly broke `cargo test -p pallet-x3-token-factory` and
+  `cargo test -p pallet-x3-cross-vm-router`: their test runtimes wire the ledger, and a new associated
+  type is a required item in each impl. The release gate runs a *subset* of packages, so it stayed
+  green for two commits. Found only because this pass built the token factory's tests.
+  `cargo check --workspace --all-targets` is the check that sees this class — run it after every
+  weights pass, and when adding an associated type, grep for `impl <pallet>::Config for` across the
+  whole tree (tests, mocks, other pallets' test runtimes).
+- **Trap 2 — the panic/unwrap ratchet counts a `#[cfg(feature = "runtime-benchmarks")]` module.**
+  Three `.expect("…")` calls on `BoundedVec::try_from` in the new benchmark module grew the baseline
+  440 → 443 and failed `make mainnet-check` on the otherwise-green commit `d9817e154` (the srtool
+  rebuild and every other step had passed). Benchmarks are not `#[cfg(test)]`; use
+  `.map_err(|_| BenchmarkError::Weightless)?`. Fixed in `5a0b9707e`, ratchet back to 440/440.
+- **Evidence**: `cargo test -p pallet-x3-token-factory` 18 passed; `--features runtime-benchmarks`
+  22 passed (4 entries); `cargo test -p pallet-x3-cross-vm-router` 85 passed;
+  `cargo check --workspace --all-targets` clean (that is what found trap 1);
+  `make mainnet-check` PASS after two agreeing srtool builds recorded revision `69a58d4fe`
+  (compact 8,894,628 `0xcaab1852…`, compressed 1,524,541 `0x6399941a…`);
+  `check-runtime-weights-wired.py` 41 wired configs; `X3-GPU-003` 69 → 70.
+- **Next seeds:** 20 pallets remain. Money path first — `x3-wrapped`, `x3-wallet-pallet`,
+  `x3-cross-vm-router`, `x3-asset-registry`, `x3-reservation`, `x3-custody`. Note `x3-cross-vm-router`
+  already has benchmarks (`benchmarks/` gate) so it is the *cheap* class; `x3-wrapped` is heavy.
+  After each pass: fmt, scanner re-baseline, panic ratchet, `--workspace --all-targets`, attestation,
+  release gate.
