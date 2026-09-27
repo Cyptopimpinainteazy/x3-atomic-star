@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-27T09:56:56Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-27T10:08:54Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -17,7 +17,7 @@ exist in the runtime or in a release node build.
 | --- | --- | --- |
 | runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
-| production | 503 | 503 |
+| production | 495 | 495 |
 
 files scanned: 1409
 
@@ -40,7 +40,6 @@ None. No panic is reachable from a block hook.
 -   10  crates/x3-bot/src/telemetry.rs
 -   10  crates/x3-rpc/src/wallet_service_rpc.rs
 -    9  crates/x3-dns-server/src/config.rs
--    8  node/src/chain_spec.rs
 -    8  crates/x3-mobile-sdk/src/biometric_auth_mobile.rs
 -    8  crates/x3-backend/src/lower.rs
 -    7  pallets/pallet-x3-proof-carrying-agent/src/benchmarking.rs
@@ -52,6 +51,7 @@ None. No panic is reachable from a block hook.
 -    5  crates/external-chains/src/chains/universal.rs
 -    5  crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs
 -    5  crates/swarm-media/src/reputation.rs
+-    5  crates/x3-hir/src/lower.rs
 
 ## Verdict
 

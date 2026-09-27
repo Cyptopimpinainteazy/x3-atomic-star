@@ -530,7 +530,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development")
         .with_id("x3_chain_dev")
@@ -578,7 +578,7 @@ pub fn development_config_with_bridge_escrows(
         true,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development Bridge Test")
@@ -630,7 +630,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         true,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Two-Validator Bridge Test")
@@ -678,7 +678,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Testnet")
         .with_id("x3_chain_local")
@@ -734,7 +734,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local 3-Validator Testnet")
         .with_id("x3_chain_local3")
@@ -787,7 +787,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Staging")
         .with_id("x3_chain_staging")
@@ -853,7 +853,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Testnet")
         .with_id("x3_chain_testnet")
@@ -916,7 +916,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
-    );
+    )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Production")
         .with_id("x3_chain_production")
@@ -987,44 +987,48 @@ fn parse_svm_escrow_from_env(var: &str) -> [u8; 32] {
 /// block. The height is supplied beside it because a Bitcoin header does not carry one:
 /// a node knows it from where the header sits in the chain.
 ///
-/// Parsing fails loudly, naming the offending entry, so a typo shows up when the spec is
-/// built rather than as a spec that will not start.
-fn btc_checkpoints_from_env() -> Vec<BtcBlockHeader> {
+/// Parsing fails with the offending entry named, so a typo is reported when the spec is built
+/// rather than surfacing later as a node that will not start.
+///
+/// It returns `Err` rather than panicking: this runs while a *spec* is being built, and the caller
+/// already returns `Result<ChainSpec, String>`, so the operator gets "X3_BTC_CHECKPOINTS entry … is
+/// not hex" instead of a backtrace. The four `u32` reads below are infallible by construction — the
+/// length check above guarantees 80 bytes — so they index rather than converting a slice.
+fn btc_checkpoints_from_env() -> Result<Vec<BtcBlockHeader>, String> {
     let Ok(raw) = std::env::var("X3_BTC_CHECKPOINTS") else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
 
     raw.split(',')
         .map(str::trim)
         .filter(|entry| !entry.is_empty())
         .map(|entry| {
-            let (header_hex, height) = entry.rsplit_once('@').unwrap_or_else(|| {
-                panic!(
+            let Some((header_hex, height)) = entry.rsplit_once('@') else {
+                return Err(format!(
                     "X3_BTC_CHECKPOINTS entry {entry:?} must be <header hex>@<height>: a \
                      Bitcoin header carries no height of its own"
-                )
-            });
-            let height: u64 = height.parse().unwrap_or_else(|e| {
-                panic!("X3_BTC_CHECKPOINTS entry {entry:?} has an unreadable height: {e}")
-            });
+                ));
+            };
+            let height: u64 = height
+                .parse()
+                .map_err(|e| format!("X3_BTC_CHECKPOINTS entry {entry:?} has an unreadable height: {e}"))?;
             let bytes = hex::decode(header_hex)
-                .unwrap_or_else(|e| panic!("X3_BTC_CHECKPOINTS entry {entry:?} is not hex: {e}"));
+                .map_err(|e| format!("X3_BTC_CHECKPOINTS entry {entry:?} is not hex: {e}"))?;
             if bytes.len() != 80 {
-                panic!(
-                    "X3_BTC_CHECKPOINTS entry {entry:?} is {} bytes; a Bitcoin header is \
-                     exactly 80",
+                return Err(format!(
+                    "X3_BTC_CHECKPOINTS entry {entry:?} is {} bytes; a Bitcoin header is exactly 80",
                     bytes.len()
-                );
+                ));
             }
-            BtcBlockHeader {
-                version: u32::from_le_bytes(bytes[0..4].try_into().expect("4 bytes")),
+            Ok(BtcBlockHeader {
+                version: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
                 prev_block_hash: sp_core::H256::from_slice(&bytes[4..36]),
                 merkle_root: sp_core::H256::from_slice(&bytes[36..68]),
-                timestamp: u32::from_le_bytes(bytes[68..72].try_into().expect("4 bytes")),
-                bits: u32::from_le_bytes(bytes[72..76].try_into().expect("4 bytes")),
-                nonce: u32::from_le_bytes(bytes[76..80].try_into().expect("4 bytes")),
+                timestamp: u32::from_le_bytes([bytes[68], bytes[69], bytes[70], bytes[71]]),
+                bits: u32::from_le_bytes([bytes[72], bytes[73], bytes[74], bytes[75]]),
+                nonce: u32::from_le_bytes([bytes[76], bytes[77], bytes[78], bytes[79]]),
                 height,
-            }
+            })
         })
         .collect()
 }
@@ -1048,7 +1052,7 @@ fn x3_chain_genesis(
     // operator named in the environment, and is refused the published dev seeds.
     x3_lang_gateways: Vec<AccountId>,
     settlement_gateways: Vec<AccountId>,
-) -> RuntimeGenesisConfig {
+) -> Result<RuntimeGenesisConfig, String> {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
     // The SPV trust root this chain is born with, if the builder pinned one.
@@ -1060,7 +1064,7 @@ fn x3_chain_genesis(
     // `docs/reports/PUBLIC_TESTNET_LAUNCH.md`). The generated JSON — not the
     // environment — is what a validator runs, so the commitment is reviewable in the
     // same diff as the chain id.
-    let btc_checkpoints = btc_checkpoints_from_env();
+    let btc_checkpoints = btc_checkpoints_from_env()?;
 
     // Add authority accounts to endowed set
     for (aura, _) in initial_authorities.iter() {
@@ -1095,7 +1099,7 @@ fn x3_chain_genesis(
         })
         .collect();
 
-    RuntimeGenesisConfig {
+    Ok(RuntimeGenesisConfig {
         system: Default::default(),
         balances: BalancesConfig {
             balances,
@@ -1169,7 +1173,7 @@ fn x3_chain_genesis(
             btc_checkpoints,
             _phantom: core::marker::PhantomData,
         },
-    }
+    })
 }
 
 /// Live network council must have at least two independent members so
