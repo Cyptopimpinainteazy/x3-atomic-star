@@ -529,6 +529,15 @@ GATES_FAST=(
   # `x3_atomic_swap` client) and it holds the instruction layout that both the validator gate and the
   # program-test expiry suite drive, so its tests are gated explicitly rather than implied.
   "test x3-htlc client:env CARGO_TARGET_DIR=/tmp/x3-htlc-client cargo test --locked --manifest-path X3-contracts/svm/programs/x3_htlc/client/Cargo.toml"
+  # `scripts/swarm/swarm_scan.sh` dumped every `TODO|FIXME|unwrap(` line and a list of filenames whose
+  # name contained a subsystem word: no severity, no symbol, no fix, no gate — and the registry cited a
+  # test for it (`swarm_scan_generates_report`) that existed nowhere, which the readiness gate never
+  # noticed because that row's target is a script, not a directory. The scanner now emits a finding
+  # schema and a ratchet (`docs/reports/repo-scan-baseline.json`), and these two gates run it. Measured
+  # 2026-09-27: it is what found 13 registered pallets charging invented literal weights and two
+  # `launch_gate` citations that name tests nobody wrote.
+  "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
+  "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:

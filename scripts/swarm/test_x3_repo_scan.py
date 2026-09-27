@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""Fixture-driven tests for the X3 repo scanner.
+
+The scanner's job is to say true things about a tree, so the tests build trees:
+one with nothing wrong in it (the negative control — a scanner that always finds
+something fails here) and one with exactly one instance of each defect it claims
+to detect. Assertions name the file and symbol, not just a count, because a
+count-only assertion passes when the finding moves somewhere useless.
+
+`swarm_scan_generates_report` is the name `FEATURE_REGISTRY.toml` cites for
+`[repo_scanner_agent]`; `test_swarm_scan_generates_report` is the pytest-visible
+alias, so the citation resolves to a function a gate actually runs.
+"""
+
+from __future__ import annotations
+
+import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+SCANNER_DIR = REPO / "scripts" / "swarm"
+sys.path.insert(0, str(SCANNER_DIR))
+
+import x3_repo_scan as scan_mod  # noqa: E402  (path setup above)
+
+FINDING_FIELDS = (
+    "id",
+    "kind",
+    "severity",
+    "path",
+    "line",
+    "symbol",
+    "why",
+    "suggested_fix",
+    "test_required",
+    "gate_affected",
+)
+
+GATE_LIST = "\n".join(
+    [
+        "GATES_FAST=(",
+        '  "format check:cargo fmt --all -- --check"',
+        '  "test alpha:cargo test -p alpha-crate"',
+        '  "expiry:bash scripts/wrap.sh"',
+        ")",
+        "",
+    ]
+)
+
+
+def write(path: Path, body: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
+def clean_fixture(root: Path) -> None:
+    """A tree with nothing for the scanner to report."""
+    write(
+        root / "FEATURE_REGISTRY.toml",
+        "\n".join(
+            [
+                "[good_feature]",
+                'crate_or_service = "pallets/good-pallet"',
+                'required_tests = ["good_pallet_works"]',
+                'proof_report = "docs/proofs/good.md"',
+                "readiness_score = 80",
+                "",
+            ]
+        ),
+    )
+    write(root / "docs/proofs/good.md", "proof\n")
+    write(
+        root / "pallets/good-pallet/Cargo.toml",
+        '[package]\nname = "good-pallet"\nversion = "0.1.0"\n',
+    )
+    write(
+        root / "pallets/good-pallet/src/lib.rs",
+        "\n".join(
+            [
+                "pub trait WeightInfo {}",
+                "#[pallet::call]",
+                "impl<T: Config> Pallet<T> {}",
+                "#[cfg(test)]",
+                "mod tests {",
+                "    #[test]",
+                "    fn good_pallet_works() {}",
+                "}",
+                "",
+            ]
+        ),
+    )
+    write(root / "runtime/src/lib.rs", "GoodPallet: pallets::good_pallet,\n")
+    write(
+        root / "scripts/local-ci.sh",
+        GATE_LIST.replace(
+            '  "expiry:bash scripts/wrap.sh"',
+            '  "test good:cargo test -p good-pallet"\n  "expiry:bash scripts/wrap.sh"',
+        ),
+    )
+
+
+def dirty_fixture(root: Path) -> None:
+    """One instance of each defect the scanner claims to detect."""
+    write(
+        root / "FEATURE_REGISTRY.toml",
+        "\n".join(
+            [
+                "[ghost_test]",
+                'crate_or_service = "scripts/swarm/swarm_scan.sh"',
+                'required_tests = ["a_test_nobody_wrote"]',
+                'proof_report = "docs/proofs/missing.md"',
+                "readiness_score = 25",
+                "",
+                "[ghost_path]",
+                'crate_or_service = "pallets/not-here"',
+                "required_tests = []",
+                "",
+            ]
+        ),
+    )
+    # A registered pallet charging an invented literal weight.
+    write(
+        root / "pallets/loud-pallet/Cargo.toml",
+        '[package]\nname = "loud-pallet"\nversion = "0.1.0"\n',
+    )
+    write(
+        root / "pallets/loud-pallet/src/lib.rs",
+        "\n".join(
+            [
+                "#[pallet::call]",
+                "impl<T: Config> Pallet<T> {",
+                "    #[pallet::weight(Weight::from_parts(10_000, 0))]",
+                "    pub fn poke(origin: OriginFor<T>) -> DispatchResult { Ok(()) }",
+                "}",
+                "",
+            ]
+        ),
+    )
+    # A pallet the runtime never names.
+    write(
+        root / "pallets/orphan-pallet/Cargo.toml",
+        '[package]\nname = "orphan-pallet"\nversion = "0.1.0"\n',
+    )
+    write(
+        root / "pallets/orphan-pallet/src/lib.rs",
+        "#[pallet::call]\nimpl<T: Config> Pallet<T> {}\n",
+    )
+    write(root / "runtime/src/lib.rs", "LoudPallet: pallets::loud_pallet,\n")
+    # The row above names this script; it exists, so the only missing path in the
+    # registry is the one this fixture means to test.
+    write(root / "scripts/swarm/swarm_scan.sh", "#!/usr/bin/env bash\n")
+    # alpha-crate is gated by name; wrapped-crate only through scripts/wrap.sh,
+    # which a gate invokes; lonely-crate is gated by nothing.
+    for name in ("alpha-crate", "wrapped-crate", "lonely-crate"):
+        write(
+            root / f"crates/{name}/Cargo.toml",
+            f'[package]\nname = "{name}"\nversion = "0.1.0"\n',
+        )
+        write(
+            root / f"crates/{name}/src/lib.rs",
+            "#[cfg(test)]\nmod tests {\n    #[test]\n    fn it_works() {}\n}\n",
+        )
+    write(root / "scripts/local-ci.sh", GATE_LIST)
+    write(root / "scripts/wrap.sh", "#!/usr/bin/env bash\ncargo test -p wrapped-crate\n")
+
+
+@pytest.fixture()
+def dirty(tmp_path: Path) -> Path:
+    dirty_fixture(tmp_path)
+    return tmp_path
+
+
+def scan_findings(root: Path) -> list[dict]:
+    findings, summary = scan_mod.scan(root, with_gate_summary=False)
+    payload = scan_mod.write_reports(root, findings, summary)
+    return payload["findings"]
+
+
+def by_kind(findings: list[dict], kind: str) -> list[dict]:
+    return [f for f in findings if f["kind"] == kind]
+
+
+def swarm_scan_generates_report() -> None:
+    """The check `[repo_scanner_agent]` cites: the scanner finds the defects."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        dirty_fixture(root)
+        findings = scan_findings(root)
+
+        # Every finding is complete: a schema with holes is a report nobody can act on.
+        assert findings, "the scanner found nothing in a tree built to contain defects"
+        for finding in findings:
+            for field in FINDING_FIELDS:
+                assert field in finding, f"finding is missing {field}: {finding}"
+            assert finding["severity"] in {"critical", "high", "medium", "low"}
+            assert finding["why"].strip() and finding["suggested_fix"].strip()
+            assert finding["test_required"].strip() and finding["gate_affected"].strip()
+
+        stale = by_kind(findings, "stale-registry-test")
+        assert [f["symbol"] for f in stale] == ["ghost_test:a_test_nobody_wrote"]
+        ghost_paths = by_kind(findings, "missing-registry-path")
+        assert [f["symbol"] for f in ghost_paths] == ["ghost_path: pallets/not-here"]
+        assert by_kind(findings, "stale-proof-report"), "a missing proof_report must be reported"
+
+        weights = by_kind(findings, "pallet-call-without-weights")
+        assert [f["path"] for f in weights] == ["pallets/loud-pallet/src/lib.rs"]
+        assert weights[0]["line"] > 0, "a weight finding must name the line"
+
+        orphans = by_kind(findings, "unregistered-pallet")
+        assert [f["symbol"] for f in orphans] == ["orphan-pallet"]
+
+        ungated = sorted(f["symbol"] for f in by_kind(findings, "ungated-crate"))
+        assert ungated == ["lonely-crate"], (
+            "a crate gated by name (alpha-crate) or through a gate-invoked wrapper "
+            f"(wrapped-crate) must not be reported; got {ungated}"
+        )
+
+        # Deterministic order: same tree, same findings, run after run.
+        assert scan_findings(root) == findings
+
+        # The Markdown report is written and carries the schema for each finding.
+        report = root / scan_mod.REPORT_MD
+        assert report.is_file(), "the scan must write its Markdown report"
+        body = report.read_text()
+        for finding in findings:
+            assert finding["id"] in body
+            assert finding["gate_affected"] in body
+
+
+def test_swarm_scan_generates_report() -> None:
+    swarm_scan_generates_report()
+
+
+def test_clean_tree_produces_no_findings(tmp_path: Path) -> None:
+    """Negative control: the scanner is not asserting a constant."""
+    clean_fixture(tmp_path)
+    assert scan_findings(tmp_path) == []
+
+
+def test_patch_context_matches_the_file_it_patches(tmp_path: Path) -> None:
+    """A patch we hand over must actually apply to the file it names."""
+    dirty_fixture(tmp_path)
+    ctx = scan_mod.ScanContext(tmp_path)
+    findings, _ = scan_mod.scan(tmp_path, with_gate_summary=False)
+    written = scan_mod.write_patches(ctx, findings)
+    assert written, "an ungated crate must produce a patch"
+    lines = (tmp_path / written[0]).read_text().splitlines()
+    assert lines[0] == "--- a/scripts/local-ci.sh"
+    assert lines[1] == "+++ b/scripts/local-ci.sh"
+    header = lines[2]
+    assert header.startswith("@@ -")
+    start = int(header.split(" ")[1][1:].split(",")[0])
+    context = [l[1:] for l in lines[3:] if l.startswith(" ")]
+    target = (tmp_path / "scripts/local-ci.sh").read_text().splitlines()
+    window = target[start - 1 : start - 1 + len(context)]
+    assert window == context, (
+        "the patch's context lines must match the file at the stated offset, or the "
+        f"diff does not apply: {context} vs {window}"
+    )
+    assert any(l.startswith("+") and "lonely-crate" in l for l in lines[3:])
+
+
+def test_scanner_is_the_registry_citation() -> None:
+    """The registry must cite a test this module really defines."""
+    registry = (REPO / "FEATURE_REGISTRY.toml").read_text()
+    assert 'required_tests = ["swarm_scan_generates_report"]' in registry
+    assert callable(swarm_scan_generates_report)

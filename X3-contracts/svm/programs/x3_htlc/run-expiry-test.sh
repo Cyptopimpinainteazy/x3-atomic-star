@@ -35,4 +35,4 @@ BPF_OUT_DIR="$SVM_WORKSPACE_ROOT/target/deploy"
 echo "=== run the clock-warped expiry suite ==="
 cd "$SCRIPT_DIR/tests-live"
 BPF_OUT_DIR="$BPF_OUT_DIR" CARGO_TARGET_DIR="$TEST_TARGET_DIR" \
-  cargo test --locked
+  cargo test --locked -p x3-htlc-tests-live
