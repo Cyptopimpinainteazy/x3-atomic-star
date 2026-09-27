@@ -40,5 +40,8 @@ jobs:
       - name: Northern Swarm executor
         run: cargo test -p northern-swarm --all-targets --no-fail-fast
 
+      - name: Release runtime integration
+        run: cargo check -p x3-chain-runtime --features mainnet-rc1
+
       - name: Focused Swarm Reactor release gate
         run: python3 scripts/mainnet/swarm_reactor_gate.py
