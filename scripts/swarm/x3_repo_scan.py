@@ -517,6 +517,23 @@ class PackageInfo:
     test_attributes: int
 
 
+# Crates whose suite no gate *can* run in this environment, each with a reason a
+# reader can check. This is an exception list, not a dumping ground: an entry is
+# only legitimate while running the crate here is impossible, and it is printed
+# on every run so it cannot hide. The repository already uses the same shape for
+# `check-registry-tests-are-gated.py`'s KNOWN_UNGATED list.
+KNOWN_UNGATED: dict[str, str] = {
+    "apps/tauri-os/src-tauri/Cargo.toml": (
+        "Tauri v2 backend: `cargo test` for this crate needs the platform web stack "
+        "(webkit2gtk-4.1, gtk+-3.0, libsoup-3.0). Measured 2026-09-27 on this box: all three "
+        "are absent from pkg-config, so no gate can build it here. The JS half is gated "
+        "(`test js …`); the Rust half needs an image that ships the stack. Delete this entry "
+        "when such a gate exists."
+    ),
+}
+KNOWN_UNGATED_SEEN: list[str] = []
+
+
 def ungated_crate_findings(
     packages: list[PackageInfo],
     gate_text: str,
@@ -539,6 +556,10 @@ def ungated_crate_findings(
     }
     for package in sorted(packages, key=lambda p: p.name):
         if package.test_attributes <= 0:
+            continue
+        if package.manifest_path in KNOWN_UNGATED:
+            if package.manifest_path not in KNOWN_UNGATED_SEEN:
+                KNOWN_UNGATED_SEEN.append(package.manifest_path)
             continue
         if re.search(rf"(^|[^\w-]){re.escape(package.name)}([^\w-]|$)", gate_text):
             continue
@@ -912,6 +933,10 @@ def main(argv: list[str] | None = None) -> int:
         for finding in findings:
             where = finding.path + (f":{finding.line}" if finding.line else "")
             print(f"  {finding.severity:<8} {finding.kind:<28} {where} [{finding.symbol}]")
+        if KNOWN_UNGATED_SEEN:
+            print(f"  known-ungated (no gate can run it here): {len(KNOWN_UNGATED_SEEN)}")
+            for manifest in sorted(KNOWN_UNGATED_SEEN):
+                print(f"    {manifest} — {KNOWN_UNGATED[manifest]}")
 
     if args.check:
         ok, drift = check_baseline(ctx, counts)
