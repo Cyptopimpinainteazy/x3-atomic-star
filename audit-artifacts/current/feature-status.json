@@ -4651,21 +4651,24 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 32,
+      "composite": 43,
       "confidence": "medium",
       "evidence": [
         "crates/x3-bench",
-        "note: unchanged by the PR #519 landing - recorded here because the release-gate name implies coverage this crate does not have"
+        "note: unchanged by the PR #519 landing - recorded here because the release-gate name implies coverage this crate does not have",
+        "note: 2026-09-27 added `crates/x3-bench/src/job.rs` - `JobRequest` with a deterministic identity, `BenchmarkJob::submit`, an append-only `ReportRegistry::publish` that refuses a second publication and a report whose samples are not the requested set, and `report_digest`/`verify` for re-checking a published report. The digest excludes the wall-clock `timestamp` field, so it measures the report rather than the clock. This is the submit/publish path the row recorded as missing; the two names it used to cite (`benchmark_job_submits`, `benchmark_result_publishes`) still do not exist and are not claimed."
       ],
       "id": "X3-REACTOR-001",
-      "implemented": 55,
+      "implemented": 62,
       "launch_scope": "dev_tooling",
       "live_tested": "LIVE_TESTNET",
-      "mainnet_ready": 5,
+      "mainnet_ready": 8,
       "missing_work": [
         "The Northern Swarm/Reactor hard gate does not reach this crate. `scripts/mainnet/swarm_reactor_gate.py` checks `pallets/northern-swarm` and `crates/northern-swarm` only; the word 'Reactor' in its name is not coverage of `crates/x3-bench`, and `FEATURE_REGISTRY.toml`'s `[x3_reactor]` row is unchanged at 40 for that reason. Anything that reads the gate as Reactor coverage is reading it wrong.",
-        "Benchmark infrastructure is not in the CI critical path: no gate in `scripts/local-ci.sh` runs the crate, and its two tests (`create_and_compare_reports`, `test_compile_optimized`) are cited by the registry but executed only when a human runs them.",
-        "The GPU benchmark path depends on an optional sidecar, and there is no test covering a benchmark job submit/publish path - the previously cited `benchmark_job_submits` / `benchmark_result_publishes` never existed anywhere in the repository."
+        "**Corrected 2026-09-27: this row said no gate in `scripts/local-ci.sh` ran the crate, and that was stale.** `6d83b2af4 test(ci): gate the eight registry-cited crates that had none` added `test x3-bench: cargo test -p x3-bench`, which is how the suite below is executed. The row had kept a true sentence past the commit that made it false.",
+        "Publication is bound to the job's identity, not to a proof about the run. `JobRequest::id` commits to the claimed `git_revision`, and `ReportRegistry` refuses to overwrite or to store a report whose samples are not the requested ones - but nothing evidences that the measurements were taken *at* that revision: a submitter can name any revision it likes. Closing that needs a signed run attestation (host, revision, configuration, digests), which does not exist yet.",
+        "Still no scheduler. The release prompt's Reactor end state is `TaskKind -> requirements -> scheduler -> CPU/GPU/NPU/FPGA`; this crate now has a job lifecycle and no notion of a backend, and the GPU benchmark path still depends on an optional sidecar.",
+        "The measurement path itself is unvalidated: `test_compile_optimized` and the runner assert the pipeline completes, not that a number is right, and there is no pinned reference host - two generations of the same Northern Swarm benchmark on this machine differed by ~13% in ref_time."
       ],
       "name": "Reactor benchmark infrastructure (x3-bench)",
       "paths": [
@@ -4676,7 +4679,7 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "swarm_compute",
-      "tested": 45,
+      "tested": 72,
       "tests": "2 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4752,11 +4755,11 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "487421178e8db83af0a40789ac44c5023169791685b6dcc717876444f0e0bc68",
+    "source_digest": "ca077584ebb532bd276fbc5a442e8d77b1a4f1d2dc51dc0c6469c34e895b4698",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "394cfa23c254cf2d66b7e2fe24eda9760fe201a2bed37bff6da260bcc3620bb1",
-      "feature-matrix/agents-experimental.toml": "57a76561702a3315a6c4021a209863c99232e9f2771bf160815569c4ea2f2a48",
+      "feature-matrix/agents-experimental.toml": "943e0b023757ee84a2bf868881690cc9e08ca47397538f1ec7c67bc5d79edcd8",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "dda586ca67a2f7bfd098247b402c419107e0bc0db67376ab860c1d499710374f",

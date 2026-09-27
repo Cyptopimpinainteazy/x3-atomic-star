@@ -25804,6 +25804,7 @@ dependencies = [
  "prettytable",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "x3-ast",
  "x3-backend",
  "x3-common",

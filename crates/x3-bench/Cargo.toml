@@ -19,6 +19,9 @@ chrono = "0.4"
 hex = "0.4"
 log = "0.4"
 env_logger = "0.10"
+# Benchmark job identities and report digests. Already in the workspace lock
+# graph; declared because `job.rs` hashes with it.
+sha2 = "0.10"
 
 # X3 workspace crates
 x3-parser = { path = "../x3-parser" }
