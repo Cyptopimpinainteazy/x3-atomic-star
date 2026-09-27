@@ -80,7 +80,7 @@ pub struct TaskRecord<AccountId, Balance, BlockNumber, Hash> {
 
 /// Task lifecycle state.
 #[derive(
-    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum TaskStatus {
