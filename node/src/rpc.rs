@@ -42,13 +42,11 @@ use x3_common::{
     weight_metering::{WeightConfig, WeightMeter},
 };
 use x3_cross_vm_bridge::CrossVmOperation;
-use x3_rpc::{
-    RPCTransaction, SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc,
-};
-// Simulation-only gas estimator kept for off-chain developer tooling; canonical nodes
-// use the Frontier stub (see rpc_frontier).
-#[allow(deprecated)]
-use x3_rpc::GasEstimationRPC;
+use x3_rpc::{SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc};
+// `x3_estimateGas` and `x3_call` no longer use `x3_rpc::GasEstimationRPC`: both are
+// served by the runtime-backed implementations in `rpc_frontier`
+// (`evm_estimate_gas` / `evm_call_output`), which is what `eth_estimateGas` and
+// `eth_call` already used.
 
 use crate::rpc_middleware::RateLimiter;
 use crate::service::FullClient;
@@ -2219,35 +2217,61 @@ where
     }
 
     // ── Gas Estimation RPC ──────────────────────────────
-    // Simulation-only gas estimator for off-chain developer tooling.
-    // Production nodes should use the Frontier stub in rpc_frontier.
-    #[allow(deprecated)] // see note above: intentional simulation-only estimator.
-    let gas_estimator = std::sync::Arc::new(GasEstimationRPC::new());
+    // `x3_estimateGas` and `eth_estimateGas` are two names for the runtime's EVM
+    // dry-run (`AtlasKernelRuntimeApi::estimate_evm_gas`). They used to be two
+    // different answers: this one came from `GasEstimationRPC`, which counted
+    // opcodes linearly and reported `ExecutionStatus::Success` for a transaction it
+    // had never executed.
     {
-        let ge = gas_estimator.clone();
+        let c = client.clone();
         module.register_method(
             "x3_estimateGas",
             move |params, _, _| -> Result<serde_json::Value, JsonRpseeError> {
-                let tx: RPCTransaction = params
-                    .parse()
+                let tx_obj: serde_json::Value = params
+                    .one()
                     .map_err(|e| custom_error(format!("Invalid tx params: {e}")))?;
-                ge.estimate_gas(&tx)
-                    .map(|est| serde_json::to_value(est).unwrap_or_default())
-                    .map_err(|e| custom_error(e))
+                let started = std::time::Instant::now();
+                let gas_used = crate::rpc_frontier::evm_estimate_gas(c.as_ref(), &tx_obj)?;
+                Ok(serde_json::json!({
+                    "gas_used": gas_used,
+                    "gas_limit": x3_rpc::gas_limit_with_margin(gas_used),
+                    "execution_time_ms": started.elapsed().as_millis() as u64,
+                    // The dry-run succeeded, so the transaction would execute. This is a
+                    // measurement now, not a label on a heuristic.
+                    "status": "success",
+                    "revert_reason": serde_json::Value::Null,
+                }))
             },
         )?;
     }
     {
-        let ge = gas_estimator.clone();
+        let c = client.clone();
         module.register_method(
             "x3_estimateGasMany",
             move |params, _, _| -> Result<serde_json::Value, JsonRpseeError> {
-                let txs: Vec<RPCTransaction> = params
-                    .parse()
+                let txs: Vec<serde_json::Value> = params
+                    .one()
                     .map_err(|e| custom_error(format!("Invalid batch tx params: {e}")))?;
-                ge.estimate_gas_many(&txs)
-                    .map(|ests| serde_json::to_value(ests).unwrap_or_default())
-                    .map_err(|e| custom_error(e))
+                if txs.len() > x3_rpc::MAX_BATCH_SIZE {
+                    return Err(custom_error(format!(
+                        "batch too large: {} transactions (max {})",
+                        txs.len(),
+                        x3_rpc::MAX_BATCH_SIZE
+                    )));
+                }
+                let mut estimates = Vec::with_capacity(txs.len());
+                for tx_obj in &txs {
+                    let started = std::time::Instant::now();
+                    let gas_used = crate::rpc_frontier::evm_estimate_gas(c.as_ref(), tx_obj)?;
+                    estimates.push(serde_json::json!({
+                        "gas_used": gas_used,
+                        "gas_limit": x3_rpc::gas_limit_with_margin(gas_used),
+                        "execution_time_ms": started.elapsed().as_millis() as u64,
+                        "status": "success",
+                        "revert_reason": serde_json::Value::Null,
+                    }));
+                }
+                Ok(serde_json::Value::Array(estimates))
             },
         )?;
     }

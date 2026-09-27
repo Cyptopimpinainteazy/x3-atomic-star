@@ -396,9 +396,9 @@ paths = [
   "node/src/rpc.rs",
   "crates/x3-rpc/src/gas_estimation.rs",
 ]
-implemented = 60
-tested = 55
-mainnet_ready = 25
+implemented = 75
+tested = 70
+mainnet_ready = 30
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
@@ -410,17 +410,20 @@ claim_risk = true
 blockers = [
   "**CLOSED 2026-09-27 — `x3_call` answered a read with the reader's own question.** The node registered `x3_call` against `x3_rpc::GasEstimationRPC::call`, whose body was `Ok(tx.data.clone())` — it echoed the caller's calldata back as the call's output and labelled it `ExecutionStatus::Success`. A wallet reading a contract value through it read its own calldata. `x3_call` now goes through the same runtime-backed implementation as `eth_call`: the call body was factored into `rpc_frontier::evm_call_output`, which invokes `AtlasKernelRuntimeApi::call_evm` at the best block and returns its bytes or its revert reason.",
   "**CLOSED 2026-09-27 — the crate-level `call` refuses.** `GasEstimationRPC::call` had no execution backend to reach; it refuses now with a message naming the real implementation, and the test that asserted `assert!(result.is_ok())` (which cannot tell an execution from an echo) was replaced by one that requires the refusal and the name.",
-  "**Still `eth_*`-named only for the rest of the namespace.** The node serves `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_call`, `eth_estimateGas`, `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getTransactionLogs` and the SVM `svm_*` methods; `eth_sendRawTransaction`, `eth_getCode`, `eth_getStorageAt`, `eth_getBlockByNumber`, `eth_syncing` and the subscription family are not registered. A dapp that needs one of those gets `method not found`.",
-  "Open: the `x3_estimateGas` heuristic. It counts opcodes linearly and sums base costs (`simulate_opcodes`), which ignores control flow, memory, storage and calls, and it reports `ExecutionStatus::Success` for a transaction it never executed. The real estimate is `eth_estimateGas` (runtime dry-run). It is labelled simulation-only and deprecated in the crate, and the node still registers it — the label is the honest part, the status is not.",
+  "**CLOSED 2026-09-27 — `x3_estimateGas` was a heuristic wearing an execution status.** It was served by `GasEstimationRPC`, which counted opcodes linearly (`simulate_opcodes` sums base costs, ignoring control flow, memory, storage and calls) and reported `ExecutionStatus::Success` for a transaction it had never executed. `x3_estimateGas` and `x3_estimateGasMany` now go through `rpc_frontier::evm_estimate_gas` — the same runtime dry-run `eth_estimateGas` uses (`AtlasKernelRuntimeApi::estimate_evm_gas`) — and return the richer shape from real numbers: `gas_used` from the dry-run, `gas_limit` from one shared margin rule (`x3_rpc::gas_limit_with_margin`, now public so there is not a second one), `execution_time_ms` measured, `status: success` meaning the dry-run succeeded, and `revert_reason` null. The batch endpoint keeps its cap (`x3_rpc::MAX_BATCH_SIZE`) and now refuses a batch past it instead of silently truncating.",
+  "**The request contract is one parser now.** `eth_call`/`x3_call`/`eth_estimateGas`/`x3_estimateGas` all decode through `rpc_frontier::parse_evm_request`, which the test `the_evm_request_parser_enforces_the_contract` pins: a call without `to` is refused, an estimate without `to` is contract creation at the zero address with no caller, and a short address, bad hex or bad gas value are refusals rather than defaults. Break-it-first: disabling the address-length rule reddens that test *and* the older `decode_address_rejects_wrong_length`.",
+  "**Part of the namespace is still unregistered.** The node serves `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_call`, `eth_estimateGas`, `eth_sendRawTransaction`, `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getTransactionLogs` and the SVM `svm_*` methods; `eth_getCode`, `eth_getStorageAt`, `eth_getBlockByNumber`, `eth_syncing` and the subscription family are not. A dapp that needs one of those gets `method not found` — an honest refusal, but a gap for a public testnet.",
 ]
 required_tests = [
   "a_read_only_call_is_refused_without_an_execution_backend",
+  "the_evm_request_parser_enforces_the_contract",
   "decode_address_accepts_20_byte_hex",
+  "decode_address_rejects_wrong_length",
   "test_rpc_estimate_gas",
   "test_rpc_missing_from",
 ]
 test_evidence = [
-  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed (2026-09-27); `cargo check -p x3-chain-node` finishes with `x3_call` rewired to the runtime call path, which is the compile-level proof that the registration site type-checks against `evm_call_output`.",
+  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed; `cargo test -p x3-chain-node --lib rpc_frontier` -> 12 passed, 0 failed (2026-09-27); clippy -D warnings clean on both crates, so the registration sites type-check against `evm_call_output` and `evm_estimate_gas`.",
   "note: break-it-first on the crate rule: restoring the `Ok(tx.data.clone())` echo reddens a_read_only_call_is_refused_without_an_execution_backend, and the file was restored byte-identically.",
 ]
 evidence = [

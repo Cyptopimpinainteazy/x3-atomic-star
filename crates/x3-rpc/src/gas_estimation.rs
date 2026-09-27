@@ -99,7 +99,11 @@ pub struct OpcodeCost {
 /// transaction needs — and a limit one unit under is a transaction that runs out of gas rather than
 /// one that is provisioned for 25% more. A *limit* rounds up, which is the rule a fee ceiling and a
 /// compensation share in this repository already follow (TICKET-094).
-fn gas_limit_with_margin(total_gas: u64) -> u64 {
+/// The gas limit a caller should attach to a transaction estimated at `total_gas`.
+///
+/// Public because the node's runtime-backed estimators (`x3_estimateGas`,
+/// `eth_estimateGas`) answer with the same margin rule rather than inventing a second one.
+pub fn gas_limit_with_margin(total_gas: u64) -> u64 {
     total_gas.saturating_add(total_gas.div_ceil(4))
 }
 
