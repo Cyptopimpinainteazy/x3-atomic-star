@@ -110,16 +110,58 @@ id = "X3-RT-004"
 name = "Canonical state ledger updates"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-kernel/src/lib.rs"]
+# Re-measured 2026-09-27. The blocker was a proof gap, not a behaviour gap: the pallet's answer to
+# "what happens to the writes a refused comit already made?" was a comment ("returning error rolls
+# back all storage"), and two chaos tests named for rollback injected no failure at all — one
+# submitted a *successful* comit and asserted the nonce advanced, the other asserted that the mock
+# succeeded. The mechanism is real (`frame-support`'s pallet macro wraps every dispatchable in
+# `with_storage_layer`), and the write-then-refuse order in `submit_comit_v2` is now proven rather
+# than asserted: nonce -> adapters -> fee burn -> root check -> receipt/comit inserts -> ledger
+# update -> slot channel, with a refusal after the fee burn and another after the ledger write.
+paths = [
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-kernel/src/failure_path_conservation.rs",
+  "pallets/x3-kernel/src/chaos_tests.rs",
+  "pallets/x3-kernel/src/mock.rs",
+]
 implemented = 78
-tested = 50
-mainnet_ready = 52
+tested = 72
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Supply conservation across all failure paths needs stronger proof"]
-evidence = ["pallets/x3-kernel/src/lib.rs", "note: Kernel persists cross-VM state into canonical view"]
+blockers = [
+  "**CLOSED 2026-09-27 — the failure paths that write before they refuse now have a conservation test, and it is load-bearing.** `pallets/x3-kernel/src/failure_path_conservation.rs` drives three refusals *through `submit_comit_v2`* (never through the helpers, whose own refusals were already covered) and asserts, after each, that total issuance, the caller's balance, all three canonical-ledger legs, the `X3ContractStorage` slot count, the nonce, the comit record, the stored X3 receipt, the decode-failure counter and the event log are exactly where they started: a wrong `prepare_root` (refused *after* the fee is withdrawn), a ledger channel one entry past `MAX_STATE_CHANGES`, and a slot channel one write past it — the last of which fires only after the fee is burned, the comit and its receipt are recorded, and the canonical ledger has been updated for all three domains. Each refusal is paired with the same call succeeding on a fresh chain, asserting that the fee *is* burned and all three legs *do* land, so \"nothing changed\" cannot pass because the call does nothing. Break-it-first, measured: widening `MAX_STATE_CHANGES` to 2000 turns exactly the three bound-dependent tests red (`Ok(())` where `TooManyStateChanges`/`TooManyStorageWrites` was required) and leaves the other three green; restoring 1000 returns all six to green",
+  "**Fixed in the same change:** `chaos_tests::cross_vm::evm_failure_causes_full_rollback` submitted a comit that succeeded and asserted the nonce advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed successfully — neither could fail if rollback were broken, and the second one's name described a scenario its body never created. Both now inject a real failure (an EVM payload the adapter refuses by name; a failing third VM after two usable receipts) and assert the full no-trace set, including the event log",
+  "Still open on this row: the proof is pallet-level with the mock adapters, so it establishes that the *pallet's* writes are rolled back — not that a real adapter's own state is. That half is the documented contract (\"Runtime VM adapters MUST be transactional\") and belongs to the adapter suites (`tests/x3_adapter_route.rs`, the wasm adapters), not to this row. Nothing here has run on a multi-validator network; the distributed-traffic half is X3-ECO-002's `node/tests/supply_invariant_distributed.rs`",
+]
+evidence = [
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-kernel/src/failure_path_conservation.rs",
+  "note: Kernel persists cross-VM state into canonical view",
+  "note: 2026-09-27 — the rollback this row relies on is `frame_support`'s `with_storage_layer`, which the pallet macro wraps around every dispatchable body (SDK checkout: `substrate/frame/support/procedural/src/pallet/expand/call.rs`). That is what makes an `Err` return discard the nonce increment, the fee withdrawal, the receipt and comit inserts and the canonical-ledger writes made earlier in the same call",
+  "note: 2026-09-27 — the `0xFE`/`0xFD` markers in `mock::TestX3Adapter` exist so the extrinsic can be driven into the two bound refusals with real writes behind them; a well-behaved adapter produces neither receipt, and the helper-level refusals are covered separately in `tests.rs`",
+]
+test_evidence = [
+  "note: `cargo test -p pallet-x3-kernel --lib` — 234 passed, 0 failed (2026-09-27), including the six tests in `failure_path_conservation` and the two rewritten chaos tests",
+  "note: `cargo test -p pallet-x3-kernel --lib failure_path_conservation` — 6 passed; `cargo test -p pallet-x3-kernel --lib chaos_tests::cross_vm` — 3 passed",
+  "note: `cargo clippy -p pallet-x3-kernel --all-targets -- -D warnings` — clean",
+  "note: break-it-first measured, not asserted — `MAX_STATE_CHANGES` 1000 -> 2000 reddens `an_over_wide_ledger_channel_is_refused_after_the_fee_is_withdrawn_and_rolls_it_back`, `an_over_wide_slot_channel_is_refused_after_the_ledger_is_written_and_rolls_it_back` and `a_refused_slot_channel_write_set_does_not_reach_chain_storage` with `left: Ok(())`, and only those three; 1000 restores 6/6 green",
+]
+required_tests = [
+  "a_comit_that_passes_every_check_burns_the_fee_and_writes_all_three_ledger_legs",
+  "a_wrong_prepare_root_is_refused_after_the_fee_is_withdrawn_and_leaves_no_trace",
+  "a_failure_in_the_last_vm_leaves_the_fee_and_the_earlier_receipts_unapplied",
+  "an_over_wide_ledger_channel_is_refused_after_the_fee_is_withdrawn_and_rolls_it_back",
+  "an_over_wide_slot_channel_is_refused_after_the_ledger_is_written_and_rolls_it_back",
+  "a_refused_slot_channel_write_set_does_not_reach_chain_storage",
+  "evm_failure_causes_full_rollback",
+  "a_failure_in_the_last_vm_rolls_back_the_nonce_and_the_fee",
+  "test_canonical_supply_invariant_sequential",
+  "test_global_supply_reconciliation",
+  "test_no_balance_drift_on_operations",
+]
 
 [[feature]]
 id = "X3-RT-005"

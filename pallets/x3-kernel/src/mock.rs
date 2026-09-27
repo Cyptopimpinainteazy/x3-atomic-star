@@ -291,6 +291,75 @@ impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
             return Err(DispatchError::Other("X3 execution failed"));
         }
 
+        // Two more markers in that same byte, for the failure paths a *well-behaved* adapter never
+        // produces and which therefore have no other way to be reached:
+        //
+        //   0xFE -> a successful receipt whose ledger channel carries one entry more than
+        //           `MAX_STATE_CHANGES`
+        //   0xFD -> a successful receipt whose slot channel carries one write more than
+        //           `MAX_STATE_CHANGES`
+        //
+        // Both are refused by the pallet *after* it has already withdrawn the fee and written the
+        // canonical ledger for the other VMs. That is the point: the helper-level refusals are
+        // covered elsewhere, but only a receipt built this way drives the *extrinsic* into a
+        // refusal with real writes behind it, which is what proves those writes are rolled back.
+        if let Some(&marker) = payload.get(25) {
+            if marker == 0xFE || marker == 0xFD {
+                /// One more than the pallet's `MAX_STATE_CHANGES` (1000), which is private to the
+                /// pallet and deliberately not widened for a test.
+                const ONE_PAST_THE_BOUND: usize = 1_001;
+
+                let account: AccountId = ALICE;
+                let asset_id: AssetId = 2;
+                let balance: Balance = 333;
+
+                let mut key_bytes = [0u8; 32];
+                let asset_bytes = asset_id.encode();
+                key_bytes[..asset_bytes.len()].copy_from_slice(&asset_bytes);
+
+                let mut value_bytes = [0u8; 32];
+                let balance_bytes = balance.encode();
+                value_bytes[..balance_bytes.len()].copy_from_slice(&balance_bytes);
+
+                let ledger_entry = crate::StateChange {
+                    address: account.encode(),
+                    key: H256::from(key_bytes),
+                    value: H256::from(value_bytes),
+                };
+
+                let oversized_ledger = marker == 0xFE;
+                return Ok(crate::ExecutionReceipt {
+                    version: crate::EXECUTION_RECEIPT_VERSION,
+                    success: true,
+                    gas_used: 1000,
+                    return_data: Vec::new(),
+                    logs: Vec::new(),
+                    state_changes: if oversized_ledger {
+                        vec![ledger_entry.clone(); ONE_PAST_THE_BOUND]
+                    } else {
+                        vec![ledger_entry]
+                    },
+                    storage_writes: if oversized_ledger {
+                        Vec::new()
+                    } else {
+                        (0..ONE_PAST_THE_BOUND)
+                            .map(|i| crate::StorageWrite {
+                                key: H256::from_low_u64_be(i as u64 + 1),
+                                old_value: None,
+                                new_value: Some([0x7Au8; 32]),
+                            })
+                            .collect()
+                    },
+                    protocol_version: 1,
+                    migration_history: Vec::new(),
+                    compatibility_flags: 0,
+                    from: Vec::new(),
+                    to: Vec::new(),
+                    value: 0,
+                });
+            }
+        }
+
         let account: AccountId = ALICE;
         let asset_id: AssetId = 2;
         let balance: Balance = 333;

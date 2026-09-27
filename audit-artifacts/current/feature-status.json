@@ -3862,31 +3862,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 61,
+      "composite": 69,
       "confidence": "high",
       "evidence": [
         "pallets/x3-kernel/src/lib.rs",
-        "note: Kernel persists cross-VM state into canonical view"
+        "pallets/x3-kernel/src/failure_path_conservation.rs",
+        "note: Kernel persists cross-VM state into canonical view",
+        "note: 2026-09-27 \u2014 the rollback this row relies on is `frame_support`'s `with_storage_layer`, which the pallet macro wraps around every dispatchable body (SDK checkout: `substrate/frame/support/procedural/src/pallet/expand/call.rs`). That is what makes an `Err` return discard the nonce increment, the fee withdrawal, the receipt and comit inserts and the canonical-ledger writes made earlier in the same call",
+        "note: 2026-09-27 \u2014 the `0xFE`/`0xFD` markers in `mock::TestX3Adapter` exist so the extrinsic can be driven into the two bound refusals with real writes behind them; a well-behaved adapter produces neither receipt, and the helper-level refusals are covered separately in `tests.rs`"
       ],
       "id": "X3-RT-004",
       "implemented": 78,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 52,
+      "mainnet_ready": 60,
       "missing_work": [
-        "Supply conservation across all failure paths needs stronger proof"
+        "**CLOSED 2026-09-27 \u2014 the failure paths that write before they refuse now have a conservation test, and it is load-bearing.** `pallets/x3-kernel/src/failure_path_conservation.rs` drives three refusals *through `submit_comit_v2`* (never through the helpers, whose own refusals were already covered) and asserts, after each, that total issuance, the caller's balance, all three canonical-ledger legs, the `X3ContractStorage` slot count, the nonce, the comit record, the stored X3 receipt, the decode-failure counter and the event log are exactly where they started: a wrong `prepare_root` (refused *after* the fee is withdrawn), a ledger channel one entry past `MAX_STATE_CHANGES`, and a slot channel one write past it \u2014 the last of which fires only after the fee is burned, the comit and its receipt are recorded, and the canonical ledger has been updated for all three domains. Each refusal is paired with the same call succeeding on a fresh chain, asserting that the fee *is* burned and all three legs *do* land, so \"nothing changed\" cannot pass because the call does nothing. Break-it-first, measured: widening `MAX_STATE_CHANGES` to 2000 turns exactly the three bound-dependent tests red (`Ok(())` where `TooManyStateChanges`/`TooManyStorageWrites` was required) and leaves the other three green; restoring 1000 returns all six to green",
+        "**Fixed in the same change:** `chaos_tests::cross_vm::evm_failure_causes_full_rollback` submitted a comit that succeeded and asserted the nonce advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed successfully \u2014 neither could fail if rollback were broken, and the second one's name described a scenario its body never created. Both now inject a real failure (an EVM payload the adapter refuses by name; a failing third VM after two usable receipts) and assert the full no-trace set, including the event log",
+        "Still open on this row: the proof is pallet-level with the mock adapters, so it establishes that the *pallet's* writes are rolled back \u2014 not that a real adapter's own state is. That half is the documented contract (\"Runtime VM adapters MUST be transactional\") and belongs to the adapter suites (`tests/x3_adapter_route.rs`, the wasm adapters), not to this row. Nothing here has run on a multi-validator network; the distributed-traffic half is X3-ECO-002's `node/tests/supply_invariant_distributed.rs`"
       ],
       "name": "Canonical state ledger updates",
       "paths": [
-        "pallets/x3-kernel/src/lib.rs"
+        "pallets/x3-kernel/src/lib.rs",
+        "pallets/x3-kernel/src/failure_path_conservation.rs",
+        "pallets/x3-kernel/src/chaos_tests.rs",
+        "pallets/x3-kernel/src/mock.rs"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "runtime_core",
-      "tested": 50,
-      "tests": "tested score 50% (no named test list on this row)"
+      "tested": 72,
+      "tests": "tested score 72% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4590,7 +4598,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "0ff2921626ac3ff0cf768b35947010956423988a0fd7c34d08cabb0305e256c1",
+    "source_digest": "23f9fbe6c9884482073f592981235b6fee246a4ff7dd7ab55ad7c4311f3de867",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4604,7 +4612,7 @@
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
       "feature-matrix/operations-user-tools.toml": "9d2ec869ddcc7f4cf614d9400a2906d0b0ba775b736c5b4be18b049d2d52503b",
-      "feature-matrix/runtime-core.toml": "14d92befdb56b8efb8daa9b30ed2abef361e8e84ac3c23c77a7e68d5b3f51dc4",
+      "feature-matrix/runtime-core.toml": "72ed379b8ca2a7720a95ddd3aa1400e2b085310f5c342bd63e4d11ad1508e143",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },
@@ -5046,10 +5054,10 @@
     "by_state": {
       "BROKEN": 0,
       "COMPLETE": 10,
-      "FUNCTIONAL BUT UNHARDENED": 60,
+      "FUNCTIONAL BUT UNHARDENED": 61,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 69,
+      "PARTIAL": 68,
       "STUB": 2
     },
     "matrix_features": 146,

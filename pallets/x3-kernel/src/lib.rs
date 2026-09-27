@@ -4653,5 +4653,11 @@ mod tests;
 #[cfg(test)]
 mod chaos_tests;
 
+// The failure paths that mutate before they refuse: fee burn, ledger write and the X3 slot
+// channel, each driven through the extrinsic. See the module docs for why the pallet's
+// "returning an error rolls back storage" claim needed a test rather than a comment.
+#[cfg(test)]
+mod failure_path_conservation;
+
 #[cfg(test)]
 mod packet_integration_tests;
