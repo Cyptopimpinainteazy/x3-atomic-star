@@ -42,7 +42,8 @@ impl TaskExecutor {
         let output = if matches!(payload.kind, TaskKind::AiInference) {
             return Err(NorthernSwarmError::ExecutionFailed {
                 task_id: payload.task_id.clone(),
-                reason: "AiInference requires a real model backend; hash-only execution is refused".into(),
+                reason: "AiInference requires a real model backend; hash-only execution is refused"
+                    .into(),
             });
         } else if self.gpu.supports(&payload.kind) {
             match self.gpu.execute(&payload) {
@@ -89,7 +90,6 @@ impl TaskExecutor {
             status: ExecutionStatus::Success,
         })
     }
-
 }
 
 /// SHA-256 hex digest of `data`.

@@ -134,17 +134,23 @@ pub enum PublishRefusal {
     EmptyRevision,
     NoSamples,
     EmptySampleName,
-    DuplicateSampleName { name: String },
+    DuplicateSampleName {
+        name: String,
+    },
     /// A report was published for this job already. The registry is append-only;
     /// a second publication is refused rather than silently replacing evidence.
-    AlreadyPublished { job_id: [u8; 32] },
+    AlreadyPublished {
+        job_id: [u8; 32],
+    },
     /// The report does not cover the samples the job asked for.
     SampleSetMismatch {
         expected: Vec<String>,
         found: Vec<String>,
     },
     /// Nothing is published under this job id.
-    NotPublished { job_id: [u8; 32] },
+    NotPublished {
+        job_id: [u8; 32],
+    },
     /// The report's content does not hash to what was published.
     DigestMismatch {
         published: [u8; 32],
@@ -171,7 +177,10 @@ impl core::fmt::Display for PublishRefusal {
             ),
             PublishRefusal::NotPublished { .. } => write!(f, "nothing is published for this job"),
             PublishRefusal::DigestMismatch { .. } => {
-                write!(f, "the report's content does not match the published digest")
+                write!(
+                    f,
+                    "the report's content does not match the published digest"
+                )
             }
         }
     }
@@ -339,7 +348,10 @@ mod tests {
         assert!(registry.is_empty());
 
         let digest = registry
-            .publish(&job, report(vec![sample("one", 10, 100), sample("two", 20, 200)]))
+            .publish(
+                &job,
+                report(vec![sample("one", 10, 100), sample("two", 20, 200)]),
+            )
             .expect("a report covering the requested samples must publish");
 
         assert_eq!(registry.len(), 1);
@@ -347,9 +359,7 @@ mod tests {
         let published = registry.get(&job.id()).expect("recorded");
         assert_eq!(published.job_id, job.id());
         assert_eq!(published.digest, digest);
-        assert!(registry
-            .verify(&job.id(), &published.report)
-            .is_ok());
+        assert!(registry.verify(&job.id(), &published.report).is_ok());
     }
 
     #[test]
@@ -361,10 +371,7 @@ mod tests {
             .publish(&job, report(vec![sample("one", 10, 100)]))
             .unwrap_err();
         assert!(matches!(err, PublishRefusal::SampleSetMismatch { .. }));
-        assert!(
-            registry.is_empty(),
-            "a refused report must not be stored"
-        );
+        assert!(registry.is_empty(), "a refused report must not be stored");
     }
 
     #[test]
@@ -378,10 +385,7 @@ mod tests {
         let err = registry
             .publish(&job, report(vec![sample("one", 999, 999)]))
             .unwrap_err();
-        assert_eq!(
-            err,
-            PublishRefusal::AlreadyPublished { job_id: job.id() }
-        );
+        assert_eq!(err, PublishRefusal::AlreadyPublished { job_id: job.id() });
         assert_eq!(
             registry.get(&job.id()).unwrap().digest,
             first,

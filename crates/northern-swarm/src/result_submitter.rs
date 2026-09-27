@@ -74,9 +74,7 @@ impl ResultSubmitter {
 
     fn signer(&self) -> Result<Keypair, NorthernSwarmError> {
         let uri = SecretUri::from_str(&self.config.executor_key).map_err(|error| {
-            NorthernSwarmError::Crypto(format!(
-                "invalid NS_EXECUTOR_KEY secret URI: {error}"
-            ))
+            NorthernSwarmError::Crypto(format!("invalid NS_EXECUTOR_KEY secret URI: {error}"))
         })?;
 
         Keypair::from_uri(&uri).map_err(|error| {

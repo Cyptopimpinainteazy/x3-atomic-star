@@ -10,8 +10,7 @@ use codec::Decode;
 use serde_json::Value;
 use tracing::{debug, error, info, warn};
 
-type ChainTaskRecord =
-    pallet_northern_swarm::TaskRecord<[u8; 32], u128, u32, [u8; 32]>;
+type ChainTaskRecord = pallet_northern_swarm::TaskRecord<[u8; 32], u128, u32, [u8; 32]>;
 
 /// Watches the chain for claimable swarm tasks and drives execution.
 pub struct ChainWatcher {
@@ -95,9 +94,9 @@ impl ChainWatcher {
             .json_rpc_call("state_getKeys", &[Value::String(prefix_hex)])
             .await?;
 
-        let keys = keys.as_array().ok_or_else(|| NorthernSwarmError::ChainRpc(
-            "state_getKeys returned a non-array result".into(),
-        ))?;
+        let keys = keys.as_array().ok_or_else(|| {
+            NorthernSwarmError::ChainRpc("state_getKeys returned a non-array result".into())
+        })?;
 
         let mut tasks = Vec::new();
         for key in keys {
@@ -106,10 +105,7 @@ impl ChainWatcher {
             };
 
             let value = self
-                .json_rpc_call(
-                    "state_getStorage",
-                    &[Value::String(key_hex.to_string())],
-                )
+                .json_rpc_call("state_getStorage", &[Value::String(key_hex.to_string())])
                 .await?;
             let Some(value_hex) = value.as_str() else {
                 continue;
@@ -131,18 +127,17 @@ impl ChainWatcher {
             }
 
             let key_bytes = hex::decode(key_hex.trim_start_matches("0x")).map_err(|error| {
-                NorthernSwarmError::ChainRpc(format!(
-                    "Tasks storage key is not valid hex: {error}"
-                ))
+                NorthernSwarmError::ChainRpc(format!("Tasks storage key is not valid hex: {error}"))
             })?;
             let task_id = task_id_from_storage_key(&key_bytes)?;
 
-            let payload_uri = String::from_utf8(record.payload_uri.into_inner()).map_err(|error| {
-                NorthernSwarmError::PayloadFetch {
-                    uri: "<NorthernSwarm::Tasks>".into(),
-                    reason: format!("payload_uri is not UTF-8: {error}"),
-                }
-            })?;
+            let payload_uri =
+                String::from_utf8(record.payload_uri.into_inner()).map_err(|error| {
+                    NorthernSwarmError::PayloadFetch {
+                        uri: "<NorthernSwarm::Tasks>".into(),
+                        reason: format!("payload_uri is not UTF-8: {error}"),
+                    }
+                })?;
 
             tasks.push(NorthernTask {
                 id: format!("0x{}", hex::encode(task_id)),
@@ -180,10 +175,13 @@ impl ChainWatcher {
                 });
             }
 
-            let body = resp.bytes().await.map_err(|error| NorthernSwarmError::PayloadFetch {
-                uri: task.payload_uri.clone(),
-                reason: format!("read body failed: {error}"),
-            })?;
+            let body = resp
+                .bytes()
+                .await
+                .map_err(|error| NorthernSwarmError::PayloadFetch {
+                    uri: task.payload_uri.clone(),
+                    reason: format!("read body failed: {error}"),
+                })?;
 
             return Ok(TaskPayload {
                 task_id: task.id.clone(),
@@ -238,12 +236,13 @@ impl ChainWatcher {
                 reason: error.to_string(),
             })?;
 
-        let mut json: Value = resp.json().await.map_err(|error| {
-            NorthernSwarmError::ChainConnection {
-                url: rpc_url.clone(),
-                reason: format!("decode response: {error}"),
-            }
-        })?;
+        let mut json: Value =
+            resp.json()
+                .await
+                .map_err(|error| NorthernSwarmError::ChainConnection {
+                    url: rpc_url.clone(),
+                    reason: format!("decode response: {error}"),
+                })?;
 
         if let Some(error) = json.get("error") {
             return Err(NorthernSwarmError::ChainConnection {
@@ -330,13 +329,7 @@ mod tests {
 
     #[test]
     fn websocket_rpc_url_is_converted_for_http_polling() {
-        assert_eq!(
-            http_rpc_url("ws://127.0.0.1:9944"),
-            "http://127.0.0.1:9944"
-        );
-        assert_eq!(
-            http_rpc_url("wss://rpc.example"),
-            "https://rpc.example"
-        );
+        assert_eq!(http_rpc_url("ws://127.0.0.1:9944"), "http://127.0.0.1:9944");
+        assert_eq!(http_rpc_url("wss://rpc.example"), "https://rpc.example");
     }
 }
