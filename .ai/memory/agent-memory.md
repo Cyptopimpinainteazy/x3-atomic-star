@@ -8670,3 +8670,52 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   row's `required_tests` after any sweep, and land the source in the same push as the row.
 - **Next seed:** `TaskStatus::Disputed` still has no resolution path (funds stay reserved), and
   `X3-REACTOR-001`'s next honest step is the scheduler/backend notion rather than more job API.
+
+## 2026-09-27 06:25 — RECORD (/root): swarm-core stops keeping two lifecycles; the mandated fake-code scan runs
+
+- **Two commits landed on `feat/x3-prelaunch-economics-x3lang-cutover`:** `2cc3965a4` (swarm-core)
+  and `2484f279f` (the fake-code detectors). Both verified by re-running the gates, not by reading
+  the diff.
+- **`services/x3-swarm-api` kept a second task lifecycle.** It stored tasks in a private
+  `BTreeMap<String, AgentTask>` and wrote `task.status` directly, so `x3_swarm_core::SwarmScheduler`
+  — whose only route to work is `next_task_for`, gated by `SwarmAuthority` — was dead outside its
+  own tests. The service now holds every task in the scheduler and moves status with
+  `SwarmScheduler::update_status`; the scheduler gained `get`, an enqueue-ordered `tasks()` and
+  `Clone`. Four service tests drive the handlers (break-it-first: skipping `update_status` reddens
+  exactly the start/complete test). `test x3-swarm-api` replaced `check x3-swarm-api`, which ran
+  nothing.
+- **A dead duplicate was deleted, not left beside the real thing.**
+  `crates/x3-swarm-core/services/{x3-swarm-api,x3-swarm-worker}` were a stale copy with a *second*
+  `TaskStatus` (`Approved`/`Rejected`) that **no gate compiled**: `cargo test --manifest-path
+  crates/x3-swarm-core/Cargo.toml` selects the root package only, and nothing else named them. The
+  crate workspace now has no members and its lockfile lost the 136 packages they pulled in (pure
+  subtraction — checked with a set comparison; no package version moved).
+- **Trap that cost time: a dependency change leaves every consuming lockfile stale.** `4dd1f3470`
+  added `sha2` to `crates/x3-swarm-core` but did not refresh `services/x3-swarm-api/Cargo.lock`, so
+  `check x3-swarm-api` was **red under `--locked`** and would have stayed red. One added edge fixed
+  it. When you touch a nested crate's `Cargo.toml`, refresh the lockfiles of the crates that
+  path-depend on it.
+- **The `AGENTS.md`-mandated detectors had never run.** Measured: `scripts/x3-detect-stubs.sh` exit
+  124 at 240 s, `scripts/x3-detect-test-cheats.sh` exit 124 at 60 s,
+  `scripts/proof/verify_receipts.py` exit 126 (not executable). Both shell detectors walked build
+  output and vendored trees. Now `scripts/x3_fake_code_scan.py` (stubs 1.1 s, cheats 2.8 s; an `rg`
+  fast path with a same-pruning Python fallback), two ratchet baselines under `docs/reports/`, and
+  two fast-set gates. Baselined on this tree: stubs 1697, cheats 158, prod-mock 0.
+- **The ratchet refuses two things a count-only ratchet allows:** a class growing, and *the count
+  unchanged while the findings changed* (a fix that trades one finding for another). It also refuses
+  a baseline taken by a different scanner (SHA-256 pinned in the baseline). Excluded from the walk:
+  every hidden directory — which is how `.ai/`'s 1.2 GB and the `.wt-*` worktrees' vendored crates
+  stop being scanned — and the detector's own three files, which name the words they look for.
+- **The three lanes dispatched at 04:33–05:46 produced nothing in 45 minutes.**
+  `swarm_executor_backend`, `fake_code_detectors` and `repo_scanner_v2` all reported `running`, wrote
+  no file, ran no build and answered no message; B (`crates/northern-swarm`) and E (`scripts/swarm`)
+  are still untouched. Lanes C and F were therefore done by `/root` directly. Do not assume a lane is
+  working because it is listed.
+- **Editing `scripts/local-ci.sh` while a `local-ci.sh` run is in progress corrupts that run** — the
+  long `full-default-set` run printed a stray `` `  fi' `` from line 1349 after two edits landed
+  under it. Its verdict was already stale (HEAD moved twice); it is not evidence of anything.
+- **Next seed:** lane B (`crates/northern-swarm`: the executor↔chain contract, and an `AutoBackend`
+  that must never prefer a diverging accelerator) and lane E (`scripts/swarm/swarm_scan.sh`: findings
+  carrying severity/file/symbol/why/fix/test/gate, a fixture-driven test, a gate) are open and
+  unowned. `TaskStatus::Disputed` in the pallet is another session's (uncommitted
+  `pallets/northern-swarm/src/tests.rs`) — do not touch it.
