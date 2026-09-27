@@ -4755,10 +4755,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "ca077584ebb532bd276fbc5a442e8d77b1a4f1d2dc51dc0c6469c34e895b4698",
+    "source_digest": "83a707018a1271ee1cfa26aa197fdcf5f9438dbc1e51014c3298caf6684aa7f3",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "394cfa23c254cf2d66b7e2fe24eda9760fe201a2bed37bff6da260bcc3620bb1",
+      "FEATURE_REGISTRY.toml": "01bc2e0ebf4651ddde6709283b6e03650441fc830bcdbe280a81e10414e5ea59",
       "feature-matrix/agents-experimental.toml": "943e0b023757ee84a2bf868881690cc9e08ca47397538f1ec7c67bc5d79edcd8",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -4767,7 +4767,7 @@
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
-      "feature-matrix/mev-privacy.toml": "2ac7bd1283bf95338dec5be68b2cae268e6c9e9bc63c74373a56bd40883c024e",
+      "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
       "feature-matrix/runtime-core.toml": "833ae18c048a4a7b5bf8b40db02b5e249e40899add628656e3b03c872b3a9a89",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -5109,7 +5109,7 @@
       "blockers": [
         "Benchmark infrastructure not in CI critical path",
         "GPU benchmark path depends on optional sidecar",
-        "No test covers a benchmark job submit/publish path: the previously cited benchmark_job_submits / benchmark_result_publishes never existed anywhere in the repository. The crate's real tests cover report comparison and the compile pipeline only."
+        "**CLOSED 2026-09-27 \u2014 a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` (449 lines, commit `f31686518`) is a real job path with a publish step and a once-only guarantee, and `cargo test -p x3-bench` is 14 + 4 passed, 0 failed, run by the `test x3-bench` gate. The score stays 40 because the two blockers above it are unchanged and the formula is applied rather than re-guessed: implemented 55, tested 55, mainnet_ready 15 \u2192 19.25 + 13.75 + 6 = 39, and the previously cited `benchmark_job_submits` / `benchmark_result_publishes` names are still not used \u2014 the new tests are the ones that exist."
       ],
       "crate_or_service": "crates/x3-bench",
       "feature": "x3_reactor",
@@ -5144,7 +5144,7 @@
       "feature": "x3_swarm_core",
       "mode": "GUARDED_TESTNET",
       "proof_report": "",
-      "readiness_score": 25,
+      "readiness_score": 40,
       "required_tests": [
         "swarm_agent_can_receive_task",
         "swarm_agent_cannot_touch_forbidden_files",
@@ -5242,7 +5242,7 @@
     "matrix_features": 149,
     "registry_features": 22,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 55.5,
+    "registry_mean_readiness": 56.18,
     "registry_min_readiness": 15
   }
 }

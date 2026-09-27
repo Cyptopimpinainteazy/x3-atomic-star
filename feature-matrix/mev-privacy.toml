@@ -45,7 +45,7 @@ test_evidence = [
   "note: cargo test --features canonical-proofs (in crates/cross-vm-coordinator) -> 132 passed, 0 failed, 0 ignored; the seven new tests are `test settlement_finality::tests::*` (measured 2026-09-27 on c62f93200)",
   "note: cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml (default features) -> 115 + 41 passed, 0 failed; `bash scripts/local-ci.sh --only test-cross-vm-coordinator` -> PASS 112s, and the gate now also runs the `--features canonical-proofs` set because the default-feature run never compiled this code at all",
   "note: break-it-first control - with the depth comparison weakened to `observed < required && required > u64::MAX`, exactly `a_claim_one_confirmation_shallow_is_refused` and `a_refund_below_the_configured_depth_is_refused` fail and the other five stay green; restored byte-identically, 7/7",
-  "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md - assets, attacker capabilities, six surfaces with the closed/open split and the file:line of each refusal",
+  "note: docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md names the assets, the attacker capabilities and the six surfaces, with the closed/open split and the file:line of each refusal",
   "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV; this row now closes three named surfaces rather than claiming the category",
 ]
 evidence = ["crates/cross-vm-coordinator/src/settlement_finality.rs", "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md", "crates/cross-vm-coordinator"]
