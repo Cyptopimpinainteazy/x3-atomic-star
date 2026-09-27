@@ -159,6 +159,7 @@ impl pallet_x3_asset_registry::Config for Test {
 impl pallet_x3_supply_ledger::Config for Test {
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {

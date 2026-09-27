@@ -52,6 +52,7 @@ declare -A PALLET_PATHS=(
   ["pallet-atomic-trade-engine"]="pallets/atomic-trade-engine/src/weights.rs"
   ["pallet-x3-supply-ledger"]="pallets/x3-supply-ledger/src/weights.rs"
   ["pallet-x3-treasury-policy"]="pallets/x3-treasury-policy/src/weights.rs"
+  ["pallet-x3-token-factory"]="pallets/x3-token-factory/src/weights.rs"
   ["pallet-x3-atomic-kernel"]="pallets/x3-atomic-kernel/src/weights.rs"
   ["pallet-x3-settlement-engine"]="pallets/x3-settlement-engine/src/weights.rs"
   ["pallet-cross-chain-validator"]="pallets/cross-chain-validator/src/weights.rs"

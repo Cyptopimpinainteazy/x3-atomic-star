@@ -119,6 +119,7 @@ impl pallet_x3_asset_registry::Config for Test {
 impl pallet_x3_supply_ledger::Config for Test {
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {
@@ -149,9 +150,10 @@ impl pallet_x3_token_factory::Config for Test {
     type Ledger = Ledger;
     type EconomicHalt = Ledger;
     type Sentinel = Sentinel;
+    type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Test>;
 }
 
-fn new_test_ext() -> sp_io::TestExternalities {
+pub fn new_test_ext() -> sp_io::TestExternalities {
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();

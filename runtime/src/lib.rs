@@ -2636,6 +2636,7 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
     type Sentinel = X3Sentinel;
+    type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -3547,8 +3548,14 @@ mod benches {
     // it and that this list did not enable either, so the pallet could not be measured at all.
     #[allow(unused_imports)]
     use pallet_x3_treasury_policy::Pallet as X3TreasuryPolicy;
+    // Added 2026-09-27: `pallet-x3-token-factory` charged literals for a token launch, a mint, a
+    // burn and an authority handover, behind a `runtime-benchmarks` feature that had nothing in it
+    // and a runtime feature list that did not enable it either.
+    #[allow(unused_imports)]
+    use pallet_x3_token_factory::Pallet as X3TokenFactory;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_token_factory, X3TokenFactory]
         [pallet_x3_treasury_policy, X3TreasuryPolicy]
         [pallet_x3_supply_ledger, X3SupplyLedger]
         [pallet_atomic_trade_engine, AtomicTradeEngine]
