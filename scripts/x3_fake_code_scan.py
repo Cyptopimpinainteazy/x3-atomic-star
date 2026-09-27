@@ -197,8 +197,20 @@ CHEAT_CANDIDATE_PATTERNS = [
 TEST_DIR_PARTS = {"tests", "test", "__tests__", "spec"}
 
 
-def identity(kind: str, rel_path: str, lineno: int, text: str) -> str:
-    payload = f"{kind}\0{rel_path}\0{lineno}\0{text.strip()}"
+def identity(kind: str, rel_path: str, _lineno: int, text: str) -> str:
+    """Identity of a finding: *what* it is, not where the line currently sits.
+
+    The line number is deliberately excluded. Including it made every unrelated
+    insertion above a finding change the identity digest, so the ratchet failed
+    on edits that neither added nor removed anything — a false positive that
+    invites the one behaviour the baseline must never see: re-baselining to make
+    a red gate green. A finding that appears, disappears, moves file, changes
+    kind or changes wording still changes the digest, which is the swap this
+    ratchet exists to catch. Duplicate lines in one file still count twice,
+    because `identity_digest` keeps one entry per finding rather than per
+    distinct id.
+    """
+    payload = f"{kind}\0{rel_path}\0{text.strip()}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

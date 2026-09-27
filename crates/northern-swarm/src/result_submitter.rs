@@ -220,7 +220,7 @@ mod tests {
         // chains; it must produce a usable sr25519 signer, not fall back.
         let submitter = ResultSubmitter::new(config("//Alice"));
         let signer = submitter.signer().expect("//Alice derives a signer");
-        // A real key, not the all-zero placeholder.
+        // A real key, not the all-zero sentinel.
         assert_ne!(signer.public_key().0, [0u8; 32]);
     }
 
