@@ -2,7 +2,7 @@ use crate::{
     mock::*,
     ClaimedTaskCount, ResultCommits, TaskClaimSlots, TaskClaims, TaskKind, TaskStatus, Tasks,
 };
-use frame_support::{assert_noop, assert_ok, traits::Currency, BoundedVec};
+use frame_support::{assert_noop, assert_ok, BoundedVec};
 use sp_core::H256;
 
 fn register(executor: u64) {
