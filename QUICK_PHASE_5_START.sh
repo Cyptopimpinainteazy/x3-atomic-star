@@ -4,7 +4,9 @@
 # Run this to continue development from where we left off
 # Date: April 25, 2026
 
-PROJECT_ROOT="/home/lojak/Desktop/X3_ATOMIC_STAR"
+# Derived from this script's own location so the reference runs from any checkout. Set
+# PROJECT_ROOT=... in the environment to point it elsewhere.
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 cd "$PROJECT_ROOT"
 
 echo "═══════════════════════════════════════════════════════════"

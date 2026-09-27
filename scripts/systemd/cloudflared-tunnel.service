@@ -1,3 +1,6 @@
+# This is a user unit, so `%h` expands to the invoking user's home. The checkout is addressed as
+# %h/Desktop/xxxstar-main rather than the old hardcoded layout; update the ExecStart path if you
+# move the checkout.
 [Unit]
 Description=Cloudflare Tunnel for X3
 After=network.target x3-desktop.service x3fronend.service
@@ -8,7 +11,7 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=10
-ExecStart=/usr/bin/env cloudflared --config %h/Desktop/X3_ATOMIC_STAR/infra/cloudflare-tunnel/config.yml tunnel run atlas-sphere
+ExecStart=/usr/bin/env cloudflared --config %h/Desktop/xxxstar-main/infra/cloudflare-tunnel/config.yml tunnel run atlas-sphere
 StandardOutput=journal
 StandardError=journal
 KillMode=process

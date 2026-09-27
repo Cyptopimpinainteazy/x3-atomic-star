@@ -2,7 +2,9 @@
 # X3_ATOMIC_STAR Build Status Monitor
 # Tracks all three parallel builds and reports completion
 
-PROJECT_DIR="/home/lojak/Desktop/X3_ATOMIC_STAR"
+# Derived from this script's own location so the monitor works from any checkout. Set
+# PROJECT_DIR=... in the environment to point it elsewhere.
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 BUILD_DIR="$PROJECT_DIR/target/release"
 LOG_DIR="$PROJECT_DIR/logs"
 

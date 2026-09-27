@@ -188,6 +188,11 @@ GATES_FAST=(
   "agent guards:make guard"
   "make gate exit codes:make check-make-gates"
   "script syntax:bash scripts/check-script-syntax.sh"
+  # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
+  # machine it was written on — one such script mkdir'd the missing root and then reported a
+  # "missing" test crate. The operator is about to bring up seven validator servers, so this holds
+  # the line: derive the root from BASH_SOURCE, or name an explicit, documented override.
+  "bring-up paths:bash scripts/check-no-hardcoded-desktop-paths.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
   # 24 `Swatinem/rust-cache` steps across 17 workflows, and not one of them said
   # `cache-bin: false`. That action's save step unlinks every regular file in
