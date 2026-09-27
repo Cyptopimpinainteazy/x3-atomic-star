@@ -3727,7 +3727,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 37,
+      "composite": 44,
       "confidence": "high",
       "evidence": [
         "crates/x3-wallet/src/hardware_wallet.rs",
@@ -3735,13 +3735,13 @@
         "note: 2026-09-25 - the hardware verifier was fail-open on shaped bytes and the crate's tests ran in no gate"
       ],
       "id": "X3-OPS-011",
-      "implemented": 55,
+      "implemented": 65,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 20,
       "missing_work": [
         "**CLOSED 2026-09-25 \u2014 `HardwareWalletEngine::verify_signature` returned `Ok(true)` for bytes it never verified.** It refused an empty signature and a short one, then set `verified = true` unless `recovery_id > 3`: `tx_hash` was never read, the public key was never used and no ECDSA recovery or check ran, so any 64-byte blob with an in-range recovery id was reported as a verified hardware signature, bound to no transaction. The device's signing convention (message pre-hash, public-key encoding, derivation-path binding, recovery-id semantics) is defined nowhere in this repository and there is no device or test vector to pin it, so the directive's fail-closed branch applies: it refuses every input now, with an error saying verification is not implemented, and the two tests that pinned the old behaviour assert the refusal instead.",
-        "**OPEN \u2014 `approve_signature` still records `verified: true`.** A device approval is not a verification and the field name says otherwise; the struct derives `Encode`/`Decode`, so renaming it or keeping it as 'the device approved this request' is an interface decision this row has not taken.",
+        "**CLOSED 2026-09-26 \u2014 an approval is no longer recorded as a verification, at the type level.** `HardwareSignature.verified: bool` was set to `true` by `approve_signature` the moment the device handed back any non-empty bytes with an in-range recovery id, so the field said the bytes had been checked when nothing had looked at the transaction. It is now `verification: SignatureVerification`, whose only states are `DeviceApprovedOnly` (what an approval produces) and `Verified` (what a real verifier would produce \u2014 and nothing can, because the signing convention is undefined and `verify_signature` refuses every input). A test asserts both halves together, so neither can hold by accident. The SCALE encoding is unchanged in shape (an enum in place of a bool), but the *name* now says what the value means.",
         "**OPEN \u2014 nothing proves the crate talks to a real device.** No Ledger/Trezor integration test, no device fixture, and `crates/x3-wallet-cli` answers its commands with 'not implemented: this CLI does not talk to a node yet'.",
         "**OPEN \u2014 a signature convention has to be pinned before verification can be implemented.** Until a device, a test vector and the pre-hash are recorded, `verify_signature` refusing is the only honest state."
       ],
@@ -3754,8 +3754,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 40,
-      "tests": "tested score 40% (no named test list on this row)"
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4590,7 +4590,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "858bc372f4d6278100228f00f388a82c3a872b3da77c9eaaf7de3da1d6147ac0",
+    "source_digest": "0ff2921626ac3ff0cf768b35947010956423988a0fd7c34d08cabb0305e256c1",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4603,7 +4603,7 @@
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
-      "feature-matrix/operations-user-tools.toml": "4d5cae49aea9c2b12541ca5fd29519c3ab6ac39b6153412fcbaf5a7c6e592682",
+      "feature-matrix/operations-user-tools.toml": "9d2ec869ddcc7f4cf614d9400a2906d0b0ba775b736c5b4be18b049d2d52503b",
       "feature-matrix/runtime-core.toml": "14d92befdb56b8efb8daa9b30ed2abef361e8e84ac3c23c77a7e68d5b3f51dc4",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
