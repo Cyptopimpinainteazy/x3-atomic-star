@@ -2,7 +2,7 @@
 
 **Canonical source: `FEATURE_REGISTRY.toml`** — all readiness scores and blockers derive from it. Run `scripts/check-readiness-consistency.sh` to validate.
 
-**Overall readiness: ~54.8%** (54.82% arithmetic mean across the 22 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-26 after adding the Northern Swarm/Reactor release surface). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+**Overall readiness: ~55.5%** (55.5% arithmetic mean across the 22 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-27 when `northern_swarm_reactor` moved 30 → 45 on evidence). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
 
 ## Gate commands
 
@@ -35,7 +35,10 @@ Required before PASS:
 - `TaskKind` survives into execution routing, with a typed compute-backend abstraction, a GPU backend, and an explicit CPU fallback.
 - Accelerator use changes performance only. Consensus correctness and deterministic work must retain a CPU-verifiable path.
 
-Current canonical score: `northern_swarm_reactor = 30` in `FEATURE_REGISTRY.toml`. Passing the structural gate alone does not raise that score; evidence and tests must justify any readiness change.
+Current canonical score: `northern_swarm_reactor = 45` in `FEATURE_REGISTRY.toml`, derived on the matrix formula (`implemented*0.35 + tested*0.25 + mainnet_ready*0.40`) with implemented=75, tested=60, mainnet_ready=15, then rounded down because nothing on the row has run against a node. Passing the structural gate alone does not raise a score; evidence and tests must justify any readiness change, and the row's blockers name what is still open (no live-node test, hash-equality-only result acceptance, a `Disputed` task with no refund path, no `AutoBackend`, self-declared hardware).
+
+The gate reaches the pallet and the executor crate only. It does **not** reach `crates/x3-bench`
+(`[x3_reactor]`), so its name is not a claim about the Reactor benchmark crate.
 
 ## CI enforcement
 
@@ -43,4 +46,4 @@ Enforced in `.github/workflows/mainnet-readiness.yml` on every push/PR to main.
 
 ## Mainnet-ready claims
 
-Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~54.8% registry-scored readiness; this is **not** a mainnet-ready score.
+Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~55.5% registry-scored readiness; this is **not** a mainnet-ready score.
