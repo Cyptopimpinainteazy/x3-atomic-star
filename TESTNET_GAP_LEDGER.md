@@ -1493,6 +1493,54 @@ still missing and needed by `four-validator-mesh.yml` and
 cargo install subkey --locked --git https://github.com/paritytech/polkadot-sdk --branch stable2512
 ```
 
+## RUNTIME-ATTESTATION — 64 runtime-graph files moved since `335a27d8c`, and the rebuild is the last release-gate step — 2026-09-27
+
+The release gate rebuilds the runtime and fails when any hash differs from
+`docs/reports/runtime-wasm-hashes.json`, so every runtime-affecting change has to re-attest that
+record. It is the one named requirement of the public-testnet goal ("every release gate green")
+that is step-wise complete but **not yet performed**, and the reason is scheduling, not code.
+
+**Measured state (2026-09-27 01:49 UTC, at `e9c4b481e`):**
+
+```bash
+bash scripts/local-ci.sh --only runtime-hash-freshness   # FAIL, 15s
+```
+
+> `[runtime-hash] 64 changed file(s) since the record was taken at 335a27d8c can alter the runtime
+> that mainnet governance attests to, but docs/reports/runtime-wasm-hashes.json did not move`
+
+The 64 include every lane's landings today: `crates/x3-atomic-swap/{scoreboard,adapter,lib}.rs`
+(the internal/external split), `crates/x3-integration/**`, `crates/x3-dex/**`,
+`crates/x3-order-window/**`, `pallets/x3-kernel/src/**`, `pallets/x3-invariants/**`,
+`pallet-x3-control`, `x3-wallet`, `x3-backend`, `runtime/src/lib.rs` and more. The gate names all
+of them, so this is the complete list, not a guess.
+
+**Why it is still open.** `./scripts/update-runtime-hashes.sh` builds the runtime **twice** (it
+removes srtool's target dir between builds and refuses to write anything unless the two agree) and
+takes ~30 minutes. It has to run alone: this box is also the self-hosted CI runner, and an attempt
+at 01:45 UTC was aborted after six minutes because the runner was *already* executing
+`./scripts/run-srtool.sh build` in its own checkout
+(`/home/lojak/actions-runner-2/_work/xxxstar/xxxstar`, container up since ~01:35 UTC). Aborting is
+safe and wrote nothing — the script only touches the record after both builds agree — and the
+partial `runtime/target/srtool` it leaves is cleared by the next run's first step.
+
+**Do this when the box is quiet** (no `docker ps` srtool container, no `run-srtool.sh` in `ps`):
+
+```bash
+./scripts/update-runtime-hashes.sh                     # ~30 min, two builds, writes on agreement
+bash scripts/local-ci.sh --release --only 'release-gate-(mainnet-check)'
+python3 scripts/feature_matrix.py check                 # the record's revision line moves nothing else
+```
+
+If the WASM turns out to be byte-identical (a path the runtime never instantiates), the hashes stay
+and only `recorded_revision` moves — that is a legitimate outcome, not a failure to attest.
+
+**Also waiting on that quiet tree:** `reports/rc6/*` are dirty in the working tree and read FAIL
+from the earlier wasm-builder collision with a concurrent build; regenerate them on the quiet tree
+after the attestation rather than committing the collision's output. Those files, and
+`reports/panic_unwrap_audit.md`, are another lane's leftovers — nobody owns them right now, and they
+should be either regenerated or reverted by whoever takes the attestation.
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
