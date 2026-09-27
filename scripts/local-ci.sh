@@ -189,6 +189,16 @@ GATES_FAST=(
   "make gate exit codes:make check-make-gates"
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
+  # 24 `Swatinem/rust-cache` steps across 17 workflows, and not one of them said
+  # `cache-bin: false`. That action's save step unlinks every regular file in
+  # `$CARGO_HOME/bin` that existed before the build, which is harmless on a
+  # disposable hosted runner and destroys the shared toolchain on this box,
+  # where the GitHub Actions runner service and the developer shells share
+  # `$HOME`. `rustup`, `subkey`, `cargo-audit`, `cargo-deny` and `srtool` were
+  # deleted twice on 2026-09-26 that way (the `-> rustup` shims are symlinks, so
+  # they survived — `cleanBin` only unlinks `dirent.isFile()` entries). See
+  # GAP-TOOLCHAIN-WIPE in TESTNET_GAP_LEDGER.md; this gate holds the line.
+  "cargo home safety:python3 scripts/check-cargo-home-safety.py"
   "workspace membership:python3 scripts/check-workspace-membership.py"
   # PHASE 43 is a prohibition, not a feature: a value that becomes a balance, a reward, a slash or a
   # settlement amount must be computed exactly. `x3-lang` has had this check for its own two crates for

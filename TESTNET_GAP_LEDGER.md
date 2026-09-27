@@ -1430,6 +1430,69 @@ concurrent session reinstalled into that directory as root while repairing the s
 OpenClaw, the second agent framework on this box, keeps its state in SQLite and its records stop at
 03:36 today, so it does not describe the later events either.
 
+**ROOT CAUSE FOUND (same day, 2026-09-27 01:15 UTC) — it is `Swatinem/rust-cache`, running on the
+self-hosted runner.** The "honest limit" above is now closed; the earlier note that "no repository
+script deletes there" was true and incomplete — the repository *calls an action* that deletes there.
+The evidence, in the order it was found:
+
+* **The actor.** `actions.runner.Cyptopimpinainteazy-xxxstar.x3star1.service` is an enabled systemd
+  unit. The runner executes as `lojak`, so it shares `$HOME` with the developer shells. This is the
+  only non-interactive actor on the box with write access to `/home/lojak/.cargo/bin`.
+* **The timestamps.** `_diag/Worker_*.log` records a `Post Cache cargo` step (`dist/save.js`) at
+  **17:55:20 UTC** and again at **00:45:48 UTC**. The two observed wipes were reported at ~11:56
+  local (17:56 UTC) and ~18:43-18:45 local (00:43-00:45 UTC). The job ending at 00:45:52 UTC is
+  `svm-live / SVM HTLC live validator lifecycle`, whose `x3vm-svm-live-lifecycle.yml` has a
+  `Cache cargo` step; the job ending 17:55:23 UTC is the same workflow.
+* **The mechanism.** `Swatinem/rust-cache`'s save step (`src/save.ts`, pinned rev
+  `6323deb102c322ba6fcbdcafc7e3dddab59af2b6` for `@v2`) calls `cleanBin(config.cargoBins)` when the
+  `cache-bin` input is true — and `action.yml` declares `default: "true"` (the runner's own manifest
+  expansion in `Worker_20260927-003230-utc.log` line 7739 confirms the effective value `true`).
+  `config.cargoBins` is snapshotted as **every regular file in `$CARGO_HOME/bin`** when the action's
+  restore step runs; `cleanBin` then walks that directory and unlinks each one
+  (`src/cleanup.ts`: `if (dirent.isFile() && binsToRemove.has(dirent.name)) await rm(...)`). It is
+  deterministic, not a race, and it is not an interrupted anything.
+* **The signature matches exactly.** `cleanBin` filters on `dirent.isFile()`, and `Dirent.isFile()`
+  is false for a symlink, so it removes the regular files (`rustup`, `subkey`, `cargo-audit`,
+  `cargo-deny`, `srtool`) and leaves the `-> rustup` shims behind. That is precisely what was
+  observed twice, and it is why `~/.rustup` and `~/.local/bin` were never touched.
+* **Other things the same save step removes**, for the record: `$CARGO_HOME/credentials.toml` is
+  unlinked (`cleanRegistry`; it is absent on this box right now), and the registry
+  index `.cache`/src/cache and `target/` dirs are pruned to what the job's dependency graph needs.
+  That is the real source of the repeated "the registry cache/target dir vanished" churn, not just
+  the bin wipe.
+* **Why it stopped looking like a mystery.** The deletion is done by an action the workflows
+  *invite*, so `rg 'rm -rf' scripts/ .github/` finds nothing, no cron exists, and the only trace is
+  a runner step name. The root-owned state seen at 18:45 was the *repair*, not the deletion: two
+  runner workers plus agent sessions all reinstalled `rustup` into the same HOME.
+* **Why it is safe upstream and not here.** `rust-cache` assumes a disposable runner whose
+  `$CARGO_HOME` is job-scoped. On a hosted runner `cleanBin` is a no-op nobody notices. On this
+  machine `$HOME` is the developer's, and the prune is against the shared toolchain.
+
+**FIXED — repo side.** All **24** `Swatinem/rust-cache` steps across **17** workflow files now set
+`cache-bin: false` (which disables `cleanBin` and nothing else), and
+`scripts/check-cargo-home-safety.py` refuses any workflow that calls that action without it. It is
+wired into the default gate set as `cargo home safety`:
+
+```bash
+bash scripts/local-ci.sh --only cargo-home-safety      # PASS, 24 steps / 17 files verified
+python3 scripts/check-cargo-home-safety.py --workflows-dir <dir-with-a-reverted-copy>  # FAIL, exit 1
+```
+
+Break-it-first was run in both directions: removing one `cache-bin: false` from a copy of
+`x3vm-svm-live-lifecycle.yml` makes the gate report that exact file, job and step and exit 1.
+
+**Residual risk (not fixed):** `cache-bin: false` stops the toolchain deletion, but the same save
+step still prunes the registry index/src/cache and `target/` and still unlinks
+`$CARGO_HOME/credentials.toml`. Stopping that means either running these jobs with a job-scoped
+`CARGO_HOME` (and paying a toolchain install per job) or dropping `rust-cache` from the self-hosted
+jobs. Neither is needed to keep the toolchain alive, so both are recorded rather than done. Also
+still missing and needed by `four-validator-mesh.yml` and
+`scripts/testnet/x3-testnet-verify.service` (`Environment=SUBKEY_BIN=.../subkey`):
+
+```bash
+cargo install subkey --locked --git https://github.com/paritytech/polkadot-sdk --branch stable2512
+```
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
