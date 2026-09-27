@@ -53,6 +53,9 @@ fn spawn_x3_node() -> NodeGuard {
         "--port".into(),
         "30381".into(),
         "--no-telemetry".into(),
+        // No metrics endpoint: nothing here reads it, and every node binding the default 9615 made
+        // concurrent runs on one host fail with "Address already in use".
+        "--no-prometheus".into(),
     ];
     match std::env::var("X3_TEST_CHAIN_SPEC") {
         Ok(spec) => {

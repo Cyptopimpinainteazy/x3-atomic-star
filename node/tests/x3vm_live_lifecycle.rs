@@ -48,6 +48,9 @@ fn spawn_dev_node() -> NodeGuard {
             "--port",
             "30379",
             "--no-telemetry",
+            // No metrics endpoint: nothing here reads it, and every node binding the default 9615 made
+            // concurrent runs on one host fail with "Address already in use".
+            "--no-prometheus",
         ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -997,6 +1000,9 @@ fn spawn_dev_node_at_base_path(base_path: &std::path::Path) -> NodeGuard {
             "--port",
             "30379",
             "--no-telemetry",
+            // No metrics endpoint: nothing here reads it, and every node binding the default 9615 made
+            // concurrent runs on one host fail with "Address already in use".
+            "--no-prometheus",
         ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
