@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-27T10:10:44Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-27T12:49:20Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -17,9 +17,9 @@ exist in the runtime or in a release node build.
 | --- | --- | --- |
 | runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
-| production | 480 | 480 |
+| production | 450 | 450 |
 
-files scanned: 1409
+files scanned: 1416
 
 ## Block-hook panics
 
@@ -30,7 +30,6 @@ None. No panic is reachable from a block hook.
 -   35  pallets/pallet-x3-agent-registry/src/benchmarking.rs
 -   26  pallets/x3-atomic-kernel/src/benchmarking.rs
 -   23  pallets/agent-accounts/src/benchmarking.rs
--   19  crates/cross-vm-coordinator/src/persistence.rs
 -   17  pallets/governance/src/benchmarking.rs
 -   17  crates/x3-bridge-adapters/src/lib.rs
 -   16  crates/x3-compiler/src/parser.rs
@@ -46,12 +45,13 @@ None. No panic is reachable from a block hook.
 -    7  pallets/atomic-trade-engine/src/benchmarking.rs
 -    6  crates/external-chains/src/chains/base.rs
 -    6  crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs
--    6  crates/cross-vm-coordinator/src/state_machine.rs
 -    5  runtime/build.rs
 -    5  crates/external-chains/src/chains/universal.rs
 -    5  crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs
 -    5  crates/swarm-media/src/reputation.rs
 -    5  crates/x3-hir/src/lower.rs
+-    5  crates/x3-bot/src/api.rs
+-    5  crates/cross-vm-coordinator/src/persistence.rs
 
 ## Verdict
 
