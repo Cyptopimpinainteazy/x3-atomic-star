@@ -7666,6 +7666,7 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "x3-asset-kernel-types",
+ "x3-common",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
  "x3-packet-schema",

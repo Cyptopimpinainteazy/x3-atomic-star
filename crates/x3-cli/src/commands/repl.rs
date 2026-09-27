@@ -412,6 +412,10 @@ fn compile_and_run(
         emit_format: x3_compiler::options::EmitFormat::Bytecode,
         analyze_gas: state.show_gas,
         verify_contract: false,
+        // The REPL compiles a snippet in-process for immediate execution. The private-submission
+        // demand is a property of an artifact you ship, so there is nothing to demand here; `x3
+        // compile --require-private-submission` is where it is declared.
+        require_private_submission: false,
     };
 
     // Compile source to bytecode
@@ -488,6 +492,7 @@ fn show_mir(state: &ReplState, expr: &str) {
         emit_format: x3_compiler::options::EmitFormat::Mir,
         analyze_gas: false,
         verify_contract: false,
+        require_private_submission: false,
     };
 
     match Compiler::compile(&source, options) {
@@ -529,6 +534,7 @@ fn show_bytecode(state: &ReplState, expr: &str) {
         emit_format: x3_compiler::options::EmitFormat::Bytecode,
         analyze_gas: false,
         verify_contract: false,
+        require_private_submission: false,
     };
 
     match Compiler::compile(&source, options) {

@@ -1941,3 +1941,37 @@ PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s.
 and no rc1 genesis exists in `chain-specs/`, so this closes "the variant compiles and its
 `OnRuntimeUpgrade` work fits in a block", not "an rc1 network runs". That is recorded on row
 X3-RT-003, whose scores were resting on a variant that did not build.
+
+## GAP-WORKSPACE-RED — the whole workspace stopped building, and two gates said so
+
+**Found 2026-09-27** by running the *entire* default gate set for the first time tonight instead of
+the gates around whatever was being edited. 128 gates: 124 passed, 4 failed. Three of the four were
+real, and all three came from the same night's private-submission work (`ed798764d`), which is what a
+`CompilationOptions` field added for one caller does to every other caller.
+
+| gate | failure | cause |
+| --- | --- | --- |
+| `workspace check` | `crates/x3-cli` failed with `E0063: missing field \`require_private_submission\` in initializer of \`CompilationOptions\`` | five struct literals in `crates/x3-cli/src/commands/{compile,build,repl}.rs` |
+| `clippy workspace` | same E0063 | same |
+| `test x3-sidecar` | `the lock file crates/x3-sidecar/Cargo.lock needs to be updated but --locked was passed` | the sidecar has its own lockfile, and `pallet-x3-kernel` gained an `x3-common` dependency that never reached it |
+
+**`cargo check --workspace` failing is the loudest thing a repository can say, and it was not run.**
+`crates/x3-sidecar` is outside the workspace (its own manifest and lockfile), so the workspace check
+cannot cover it either — which is why it needs its own gate, and why its lockfile has to be
+regenerated whenever a path dependency's own dependency list grows. The earlier `a434ea852` fixed the
+same class for a different nested lockfile.
+
+**Fixed 2026-09-27.** The CLI's five initializers now name the field, and the artifact-producing
+commands declare the capability properly rather than defaulting it: `x3 compile
+--require-private-submission` and `x3 build --require-private-submission` compile the demand into the
+artifact, which is where it belongs — a chain with no private channel refuses the program at intake,
+so the demand is a property of what you ship, not of the invocation that runs it. The REPL, which
+compiles a snippet in-process for immediate execution, passes `false` with that reason written at the
+site. Verified: `x3 compile --help` and `x3 build --help` both list the flag; `workspace check` PASS
+50s; `clippy workspace` PASS 120s; `test x3-sidecar` PASS 120s after `cargo metadata` added the one
+missing lockfile line (`x3-common` under `pallet-x3-kernel`).
+
+**Still open:** the fourth failure is `runtime hash freshness`, which is the stale release attestation
+and is being re-taken separately. The lesson that produced all three is worth keeping: a gate set is
+only as good as how often the whole of it runs, and three lanes editing one tree means "green around
+my change" is not "green".

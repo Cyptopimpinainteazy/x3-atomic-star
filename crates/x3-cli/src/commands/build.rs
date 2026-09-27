@@ -59,6 +59,14 @@ pub struct BuildArgs {
     #[arg(long)]
     pub stats: bool,
 
+    /// Compile the artifact so its policy demands private submission.
+    ///
+    /// A property of the *artifact*, not of the invocation that runs it: the demanded capability is
+    /// compiled in, and a chain with no private channel refuses the program at intake rather than
+    /// executing it in the clear.
+    #[arg(long)]
+    pub require_private_submission: bool,
+
     /// Emit optimized MIR
     #[arg(long)]
     pub emit_mir_opt: bool,
@@ -160,6 +168,7 @@ fn build_x3_programs(project: &Project, args: &BuildArgs) -> Result<()> {
         emit_format,
         analyze_gas: false,
         verify_contract: false,
+        require_private_submission: args.require_private_submission,
     };
 
     // Compile each X3 file
