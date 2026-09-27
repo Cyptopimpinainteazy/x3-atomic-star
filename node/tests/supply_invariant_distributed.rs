@@ -461,6 +461,15 @@ fn pending_supply_now(port: u16, asset: x3_asset_kernel_types::AssetId) -> u128 
 
 /// Submit one signed extrinsic and require a transaction hash back. Inclusion is proven by the
 /// caller waiting for the state effect, not by this returning.
+///
+/// There is deliberately **no retry** here. `1014: Priority is too low: (x vs y)` is not pool
+/// backpressure — the SDK's own description is "too low priority to replace another transaction
+/// already in the pool" — so re-sending the same bytes cannot succeed; it means the caller signed
+/// two extrinsics for one nonce. A client that sees it must re-read the nonce and re-sign, and a
+/// driver that sees it has already broken the rule the transfer loop below spells out: each
+/// submission has to wait for the previous one's *effect*, because the signer reads its nonce from
+/// the node. Measured 2026-09-27: the completion loop signed every completion up front and the pool
+/// refused all but the first with 419 vs 419.
 fn submit_extrinsic(port: u16, signed: &str, label: &str) {
     let hash = rpc_try(
         port,
@@ -516,7 +525,9 @@ fn events_at(port: u16, block: &str) -> Vec<String> {
         &mut &bytes[..],
     );
     let Ok(records) = records else {
-        return vec!["System::Events did not decode as Vec<EventRecord<RuntimeEvent, H256>>".to_string()];
+        return vec![
+            "System::Events did not decode as Vec<EventRecord<RuntimeEvent, H256>>".to_string(),
+        ];
     };
     records
         .iter()
@@ -571,7 +582,8 @@ fn notable_events_between(port: u16, from: u64, to: u64) -> Vec<String> {
                     // produced it, and the encoding's first byte is not the call index (a signed
                     // extrinsic carries the address, signature and signed extensions first). So
                     // decode the block's extrinsics and print them next to the refusal.
-                    let mut entry = format!("block {height} {hash}:\n    {}", notable.join("\n    "));
+                    let mut entry =
+                        format!("block {height} {hash}:\n    {}", notable.join("\n    "));
                     if notable.iter().any(|e| e.contains("ExtrinsicFailed")) {
                         for (index, call) in extrinsics_in_block(port, hash).iter().enumerate() {
                             entry.push_str(&format!("\n    extrinsic #{index}: {call}"));
@@ -1367,10 +1379,21 @@ fn require_pending_supply_returns_to_zero(
         let signed = gateway
             .sign_complete_xvm_transfer(*message_id)
             .expect("sign complete_xvm_transfer");
-        submit_extrinsic(
-            ports[index % ports.len()],
-            &signed,
-            &format!("complete_xvm_transfer {index}"),
+        let label = format!("complete_xvm_transfer {index}");
+        submit_extrinsic(ports[index % ports.len()], &signed, &label);
+        // Wait for this completion's *effect* before signing the next one, for the reason the
+        // transfer loop above gives: `sign_complete_xvm_transfer` reads the gateway's nonce from the
+        // node, so signing them all up front gives every one the same nonce and the pool refuses all
+        // but the first with `1014: Priority is too low (... vs ...)` — "too low priority to replace
+        // another transaction already in the pool". Measured 2026-09-27 at this exact loop.
+        let remaining = expected_pending - (PENDING_AMOUNT * (index as u128 + 1));
+        wait_for_pending(
+            ports,
+            asset,
+            remaining,
+            &label,
+            Some((&signed, &gateway)),
+            completion_from,
         );
         last_completion = Some(signed);
     }

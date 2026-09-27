@@ -1877,7 +1877,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 54,
+      "composite": 67,
       "confidence": "high",
       "evidence": [
         "pallets/x3-supply-ledger/src/lib.rs",
@@ -1885,25 +1885,28 @@
         "note: 2026-09-25 - the transitions are now driven by a real test runtime and a property suite"
       ],
       "id": "X3-ECO-002",
-      "implemented": 60,
+      "implemented": 65,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 35,
+      "mainnet_ready": 55,
       "missing_work": [
         "**CLOSED 2026-09-25 \u2014 the invariant is proven on the transitions, not on a struct.** The pallet had no mock runtime, so `SupplyLedgerWrite` (`debit_source_to_pending`, `credit_destination_from_pending`, `refund_pending_to_source`) \u2014 the three calls every cross-domain operation goes through \u2014 had no test at all; the S0-1 file builds `SupplyLedger` values by hand and says in a note that it needs a runtime. `pallets/x3-supply-ledger/src/mock.rs` supplies one, and `tests_conservation.rs` drives the real paths: pending returns to zero after every settle or refund (`pending_supply_returns_to_zero_when_every_leg_is_resolved`), and 200 random leg sequences never leave it accumulating (`prop_random_leg_sequences_conserve_supply`). A refused transition leaves the ledger byte-for-byte identical, so a failed leg cannot strand or duplicate supply.",
-        "Still open on this row: the invariant is proven for one ledger view in one process \u2014 not under concurrent cross-domain traffic on a multi-validator network, and not against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set."
+        "**CLOSED 2026-09-27 \u2014 proven under concurrent cross-domain traffic on a three-validator network, on every validator's own view.** `node/tests/supply_invariant_distributed.rs` boots the built-in three-validator `local3` chain, drives fee-burning X3 comits into all three validators at once (one thread per validator, no two threads sharing an account nonce), and reads the conservation identity **on each validator separately at one finalized block**: sum over `System::Account(free + reserved)` equals `AtlasKernelRuntimeApi::get_total_issuance()`, both sides read with that block hash as `at`. Measured 2026-09-27 (exit 0, 271s, one frozen binary for every node): all three validators conserved at block 119 (accounted 9999999998338644985 == TotalIssuance 9999999998338644985 on each), the pending phase carried 6,000,000 on all three (native 999,994,000,000 from 1,000,000,000,000 with the destination leg untouched), and after resolution block 191 reads native 999,994,000,000 / evm 6,000,000 / pending 0 on all three \u2014 every leg resolved, every validator agreeing. The corrupted-chain control still refuses: a scratch chain with one unit added to `Balances::TotalIssuance` is reported as a violation with the delta named",
+        "**A driver defect this row found, fixed in the same change.** The completion phase signed every `complete_xvm_transfer` up front and then submitted them, so `sign_complete_xvm_transfer` \u2014 which reads the gateway account's nonce from the node \u2014 gave them all the *same* nonce. The pool refused all but the first with `1014: Priority is too low: (419 vs 419)`, whose SDK description is \"too low priority to replace another transaction already in the pool\". That reads like pool backpressure and is a nonce collision; the fix is to wait for each completion's effect before signing the next, exactly as the transfer loop above it already documented and did. Nothing about the chain was wrong",
+        "Still open on this row: nothing here has run against a *public* network or the seven physical validators, and the invariant is not yet checked against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set"
       ],
       "name": "Pending supply returns-to-zero invariant",
       "paths": [
-        "pallets/x3-supply-ledger/src/lib.rs"
+        "pallets/x3-supply-ledger/src/lib.rs",
+        "node/tests/supply_invariant_distributed.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "economic_defi",
-      "tested": 78,
-      "tests": "tested score 78% (no named test list on this row)"
+      "tested": 90,
+      "tests": "tested score 90% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4641,7 +4644,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "6339c2cd929697fa34f8d3b7b7bd2e6762dec1f9a3d153e169141d69096c7f17",
+    "source_digest": "5726b25592a7ec915d162347cfad9550704ef5421fa5a83318c2a08506a0add7",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4650,7 +4653,7 @@
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "dda586ca67a2f7bfd098247b402c419107e0bc0db67376ab860c1d499710374f",
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
-      "feature-matrix/economic-defi.toml": "7c59d189d4d478dbc008edbb7b42f337f35c70b537a4ae783f4630b7310b8d5b",
+      "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "a3d8d284e59a486a4b52a8d2cadb88b87a6e2acbd1d58f0af37d141ec3138dc4",

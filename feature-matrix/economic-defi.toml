@@ -40,24 +40,30 @@ id = "X3-ECO-002"
 name = "Pending supply returns-to-zero invariant"
 subsystem = "economic_defi"
 source = "master"
-paths = ["pallets/x3-supply-ledger/src/lib.rs"]
-implemented = 60
-tested = 78
-mainnet_ready = 35
+paths = [
+  "pallets/x3-supply-ledger/src/lib.rs",
+  "node/tests/supply_invariant_distributed.rs",
+]
+implemented = 65
+tested = 90
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-25 — the invariant is proven on the transitions, not on a struct.** The pallet had no mock runtime, so `SupplyLedgerWrite` (`debit_source_to_pending`, `credit_destination_from_pending`, `refund_pending_to_source`) — the three calls every cross-domain operation goes through — had no test at all; the S0-1 file builds `SupplyLedger` values by hand and says in a note that it needs a runtime. `pallets/x3-supply-ledger/src/mock.rs` supplies one, and `tests_conservation.rs` drives the real paths: pending returns to zero after every settle or refund (`pending_supply_returns_to_zero_when_every_leg_is_resolved`), and 200 random leg sequences never leave it accumulating (`prop_random_leg_sequences_conserve_supply`). A refused transition leaves the ledger byte-for-byte identical, so a failed leg cannot strand or duplicate supply.",
-  "Still open on this row: the invariant is proven for one ledger view in one process — not under concurrent cross-domain traffic on a multi-validator network, and not against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set.",
-]
+  "**CLOSED 2026-09-27 — proven under concurrent cross-domain traffic on a three-validator network, on every validator's own view.** `node/tests/supply_invariant_distributed.rs` boots the built-in three-validator `local3` chain, drives fee-burning X3 comits into all three validators at once (one thread per validator, no two threads sharing an account nonce), and reads the conservation identity **on each validator separately at one finalized block**: sum over `System::Account(free + reserved)` equals `AtlasKernelRuntimeApi::get_total_issuance()`, both sides read with that block hash as `at`. Measured 2026-09-27 (exit 0, 271s, one frozen binary for every node): all three validators conserved at block 119 (accounted 9999999998338644985 == TotalIssuance 9999999998338644985 on each), the pending phase carried 6,000,000 on all three (native 999,994,000,000 from 1,000,000,000,000 with the destination leg untouched), and after resolution block 191 reads native 999,994,000,000 / evm 6,000,000 / pending 0 on all three — every leg resolved, every validator agreeing. The corrupted-chain control still refuses: a scratch chain with one unit added to `Balances::TotalIssuance` is reported as a violation with the delta named",
+  "**A driver defect this row found, fixed in the same change.** The completion phase signed every `complete_xvm_transfer` up front and then submitted them, so `sign_complete_xvm_transfer` — which reads the gateway account's nonce from the node — gave them all the *same* nonce. The pool refused all but the first with `1014: Priority is too low: (419 vs 419)`, whose SDK description is \"too low priority to replace another transaction already in the pool\". That reads like pool backpressure and is a nonce collision; the fix is to wait for each completion's effect before signing the next, exactly as the transfer loop above it already documented and did. Nothing about the chain was wrong",
+  "Still open on this row: nothing here has run against a *public* network or the seven physical validators, and the invariant is not yet checked against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set",]
 required_tests = [
-  "pending_supply_returns_to_zero_when_every_leg_is_resolved",
+  "supply_is_conserved_on_every_validator_under_distributed_traffic",
   "prop_random_leg_sequences_conserve_supply",
   "a_refused_transition_does_not_mutate_the_ledger",
+  "pending_supply_returns_to_zero_when_every_leg_is_resolved",
 ]
 test_evidence = [
+  "note: 2026-09-27 - `env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test supply_invariant_distributed -- --ignored --nocapture --test-threads=1` exits 0 in 271s and prints the per-validator conservation lines quoted in the blocker above; the negative control (a scratch chain with one unit added to `Balances::TotalIssuance`) is part of the same run",
   "note: all three are in pallets/x3-supply-ledger/src/tests_conservation.rs, run by the `test x3-supply-ledger` gate (2026-09-25)",
 ]
 evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Registry corrections call out missing supply invariant tests", "note: 2026-09-25 - the transitions are now driven by a real test runtime and a property suite"]

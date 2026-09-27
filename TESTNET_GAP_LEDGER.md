@@ -1720,6 +1720,51 @@ Measured after the fixes: `rc2_internal_settlement_smoke.sh` reaches the chain a
 transactions; `rc2_mock_and_live_gate.sh` passes both halves (`PASS: mock suite and live suite both
 passed`, 16 + 4 tests).
 
+## X3-ECO-002 — the distributed proof passes, and the driver is what was broken — 2026-09-27
+
+The row's open blocker was *"the invariant is proven for one ledger view in one process — not under
+concurrent cross-domain traffic on a multi-validator network"*. The test for that already existed
+(`node/tests/supply_invariant_distributed.rs`) and was failing — for a reason in the driver, not the
+chain:
+
+> `complete_xvm_transfer 5: :19966 refused the submission: 1014: Priority is too low: (419 vs 419)`
+
+The SDK's own description of `POOL_TOO_LOW_PRIORITY` is *"the transaction has too low priority to
+replace another transaction already in the pool"* — a **nonce collision, not pool backpressure**. The
+completion loop signed every `complete_xvm_transfer` up front and then submitted them; because
+`sign_complete_xvm_transfer` reads the gateway account's nonce from the node, every signature carried
+the *same* nonce, so each validator's pool accepted the first and refused the rest. The transfer loop
+twenty lines above documents exactly this ("each submission has to follow the previous one's
+inclusion or the nonces collide") and follows it; the completion loop did not. Fixed by waiting for
+each completion's effect — the pending counter falling by one transfer's amount — before signing the
+next.
+
+**After the fix the proof runs green (exit 0, 271s, one frozen node binary for every node):**
+
+```text
+:19964/:19965/:19966 at 119 — 10 accounts, accounted 9999999998338644985,
+                              TotalIssuance 9999999998338644985 — conserved
+pending phase at 159 — native 999,994,000,000 (was 1,000,000,000,000), pending 6,000,000
+                       on all three validators, agreeing
+pending phase at 191 — native 999,994,000,000, evm 6,000,000, pending 0 —
+                       every leg resolved, on all three validators
+```
+
+with the corrupted-chain control still refusing (a scratch chain carrying one extra unit in
+`Balances::TotalIssuance` is reported as a violation with the delta named). X3-ECO-002's second
+blocker is closed on that evidence; what remains open there is a public-network run and the
+per-bridge observation path (X3-XVM-002).
+
+Two process notes worth keeping. A first attempt failed with a *different* error — `chain_getFinalizedHead
+on :19964 failed: Connection refused` — while the other two validators were conserved at the same
+block: another lane's live gate was running concurrently and its cleanup killed my nodes. The test
+itself refuses to start unless its ports are free (`assert_ports_free`), so the only fix is to
+serialize; a clean run needs the box quiet, and a failure of that shape is environmental, not a
+conservation violation. Second, a stray commit-then-push window meant one agent's commit
+(`feat(snapshot)`) rode along with a push of mine before I had verified it; it was verified
+afterwards (53 crate tests, three snapshot gates) and one defect in it was found and fixed
+(`snapshot-zero-downtime-proof.sh` was missing the `--regenesis` its own comment requires).
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
