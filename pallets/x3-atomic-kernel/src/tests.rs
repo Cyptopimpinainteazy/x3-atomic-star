@@ -1500,3 +1500,107 @@ fn finalization_has_no_unsigned_entry_point() {
         assert_ok!(finalize(bundle_id, root, cert));
     });
 }
+
+// ── the anchor's provenance: a certificate, not a first write ──────────────
+//
+// TICKET-107. `record_flash_finality_anchor` is unsigned, keeps the first value for a height, and
+// `do_finalize_bundle` accepts a bundle only when its `finality_cert` equals that stored value. An
+// anchor whose contents are chosen by the submitter is therefore not evidence — whoever wins the
+// race decides what the chain attests to, and the PoAE proof records it. These tests pin the rule
+// that replaced "first non-zero value wins": the value must be the one the chain derives from the
+// block's own hash, which is the only kind it can check.
+
+/// Give `block` a hash and move the chain past it, the way a running chain has.
+fn chain_with_block_hash(block: u64, hash: H256, head: u64) {
+    frame_system::BlockHash::<Test>::insert(block, hash);
+    System::set_block_number(head);
+}
+
+#[test]
+fn a_fabricated_finality_anchor_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain_with_block_hash(5, H256::repeat_byte(0x11), 6);
+
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                H256::repeat_byte(0xBB), // what a forger would like the chain to attest to
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert!(
+            crate::FinalityCertAnchors::<Test>::get(5).is_none(),
+            "the refusal has to leave the map empty: `do_finalize_bundle` reads whatever is in it"
+        );
+    });
+}
+
+#[test]
+fn only_the_certificate_the_chain_derives_can_be_anchored() {
+    new_test_ext().execute_with(|| {
+        let hash = H256::repeat_byte(0x11);
+        chain_with_block_hash(5, hash, 6);
+
+        let derived = AtomicKernel::derive_finality_cert(5).expect("block 5 has a hash");
+
+        // The claim the proof makes: an external verifier holding block 5's header recomputes
+        // exactly this, and the node and the runtime reach it by one shared definition.
+        assert_eq!(
+            derived,
+            H256::from(sp_io::hashing::blake2_256(hash.as_ref()))
+        );
+        assert_eq!(derived, crate::finality_cert_from_block_hash(hash.as_ref()));
+
+        assert_ok!(AtomicKernel::record_flash_finality_anchor(
+            RuntimeOrigin::none(),
+            5,
+            derived
+        ));
+        assert_eq!(crate::FinalityCertAnchors::<Test>::get(5), Some(derived));
+
+        // The point of the rule: there is no second value to try for this height, so winning the
+        // first-write race buys nothing.
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                H256::repeat_byte(0xCC)
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert_eq!(
+            crate::FinalityCertAnchors::<Test>::get(5),
+            Some(derived),
+            "a refused write leaves the anchor as it was"
+        );
+
+        // It stays an unsigned call: a signed account cannot write this map either.
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(RuntimeOrigin::signed(ALICE), 5, derived),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn an_anchor_for_a_height_the_chain_has_no_hash_for_is_refused() {
+    new_test_ext().execute_with(|| {
+        // Block 5 is a number the chain has no hash for: a height that never existed, a future
+        // one, or one older than the hash window. `blake2_256` of the default hash is what an
+        // implementation without that distinction would accept here, collapsing "no such block"
+        // into "a block whose hash is zero".
+        System::set_block_number(6);
+
+        assert_eq!(AtomicKernel::derive_finality_cert(5), None);
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                crate::finality_cert_from_block_hash(H256::zero().as_ref())
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert!(crate::FinalityCertAnchors::<Test>::get(5).is_none());
+    });
+}

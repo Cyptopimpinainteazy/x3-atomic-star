@@ -97,14 +97,14 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
-    /// Storage: `Bundles` (r:1 w:1)
-    /// Storage: `PoaeProofs` (r:1 w:1)
-    /// Storage: `FinalityCertAnchors` (r:1 w:0)
-    ///
     /// Storage: `FinalityCertAnchors` (r:1 w:1)
+    /// Storage: `BlockHash` (r:1 w:0)
+    ///
+    /// The `BlockHash` read is the check that makes the anchor a certificate rather than
+    /// whatever the submitter sent: the value must equal `blake2_256` of that block's hash.
     fn record_flash_finality_anchor() -> Weight {
         Weight::from_parts(8_000_000, 500)
-            .saturating_add(T::DbWeight::get().reads(1_u64))
+            .saturating_add(T::DbWeight::get().reads(2_u64))
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
