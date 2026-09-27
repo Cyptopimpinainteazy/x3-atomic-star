@@ -251,8 +251,8 @@ impl Warden {
             fallback_rules,
             decided_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+                .map(|elapsed| elapsed.as_secs())
+                .unwrap_or(0),
         };
 
         // Store decision

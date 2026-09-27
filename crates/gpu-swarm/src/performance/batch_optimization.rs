@@ -2,7 +2,7 @@
 // Task batch optimization for GPU efficiency
 
 use std::collections::VecDeque;
-use tokio::time::{Duration, timeout};
+use tokio::time::{timeout, Duration};
 use tracing::{debug, span, Level};
 
 #[derive(Clone, Debug)]
@@ -47,18 +47,21 @@ impl TaskBatchOptimizer {
         let _enter = span.enter();
 
         let mut queue = self.batch_queue.lock();
-        
+
         // Check if last batch is incomplete
         if let Some(last_batch) = queue.back_mut() {
             if last_batch.tasks.len() < self.max_batch_size {
                 last_batch.tasks.push(task.clone());
                 last_batch.total_memory += task.memory_required;
-                last_batch.estimated_duration_ms = 
-                    last_batch.estimated_duration_ms.max(task.estimated_duration_ms);
-                
+                last_batch.estimated_duration_ms = last_batch
+                    .estimated_duration_ms
+                    .max(task.estimated_duration_ms);
+
                 // Return batch if full
                 if last_batch.tasks.len() >= self.min_batch_size {
-                    let batch = queue.pop_back().unwrap();
+                    let Some(batch) = queue.pop_back() else {
+                        continue;
+                    };
                     debug!("📦 Created batch with {} tasks", batch.tasks.len());
                     return Some(batch);
                 }
@@ -67,7 +70,9 @@ impl TaskBatchOptimizer {
         }
 
         // Create new batch
-        let batch_id = self.batch_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let batch_id = self
+            .batch_counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let batch = Batch {
             id: batch_id,
             tasks: vec![task],
@@ -110,11 +115,12 @@ impl TaskBatchOptimizer {
         });
 
         // Sort by priority within same type
-        let mut groups: std::collections::HashMap<String, Vec<Task>> = 
+        let mut groups: std::collections::HashMap<String, Vec<Task>> =
             std::collections::HashMap::new();
-        
+
         for task in batch.tasks.drain(..) {
-            groups.entry(task.task_type.clone())
+            groups
+                .entry(task.task_type.clone())
                 .or_insert_with(Vec::new)
                 .push(task);
         }
@@ -164,11 +170,7 @@ impl TaskBatchOptimizer {
 
     /// Get total tasks waiting in queue
     pub fn pending_task_count(&self) -> usize {
-        self.batch_queue
-            .lock()
-            .iter()
-            .map(|b| b.tasks.len())
-            .sum()
+        self.batch_queue.lock().iter().map(|b| b.tasks.len()).sum()
     }
 }
 

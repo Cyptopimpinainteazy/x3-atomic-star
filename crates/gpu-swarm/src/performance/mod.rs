@@ -1,12 +1,12 @@
 // crates/gpu-swarm/src/performance/mod.rs
 // Performance optimization module
 
-pub mod memory_pooling;
 pub mod batch_optimization;
+pub mod memory_pooling;
 pub mod network_tuning;
 
-pub use memory_pooling::{GPUMemoryPool, MemoryBlock, MemoryStats, MemoryPoolError};
 pub use batch_optimization::TaskBatchOptimizer;
+pub use memory_pooling::{GPUMemoryPool, MemoryBlock, MemoryPoolError, MemoryStats};
 pub use network_tuning::NetworkTuner;
 
 /// Initialize all performance optimizations
@@ -52,7 +52,7 @@ mod tests {
     async fn test_init_optimizers() {
         let opts = init_performance_optimizations(2, 8 * 1024 * 1024 * 1024).await;
         assert!(opts.is_ok());
-        
+
         let opts = opts.unwrap();
         assert_eq!(opts.memory_pools.len(), 2);
     }

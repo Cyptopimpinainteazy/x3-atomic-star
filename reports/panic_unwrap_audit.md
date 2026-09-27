@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-27T10:08:54Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-27T10:10:44Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -17,7 +17,7 @@ exist in the runtime or in a release node build.
 | --- | --- | --- |
 | runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
-| production | 495 | 495 |
+| production | 480 | 480 |
 
 files scanned: 1409
 

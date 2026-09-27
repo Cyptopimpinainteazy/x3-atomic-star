@@ -289,8 +289,8 @@ impl MevDiscoveryJob {
                                 liquidation_target: None,
                                 discovered_at: std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs(),
+                                    .map(|elapsed| elapsed.as_secs())
+                                    .unwrap_or(0),
                             });
                         }
                     }
@@ -340,8 +340,8 @@ impl MevDiscoveryJob {
                                 liquidation_target: None,
                                 discovered_at: std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs(),
+                                    .map(|elapsed| elapsed.as_secs())
+                                    .unwrap_or(0),
                             });
                         }
                     }

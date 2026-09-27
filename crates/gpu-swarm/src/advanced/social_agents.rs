@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, error, span, Level};
+use tracing::{debug, error, info, span, Level};
 
 /// Supported social platforms
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ impl SocialAgentManager {
 
         let mut queue = self.message_queue.lock();
         queue.push(message.clone());
-        
+
         // Sort by priority (descending)
         queue.sort_by(|a, b| b.priority.cmp(&a.priority));
 
@@ -120,7 +120,10 @@ impl SocialAgentManager {
     }
 
     /// Send a message via the appropriate platform
-    async fn send_message(&self, message: &SocialMessage) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_message(
+        &self,
+        message: &SocialMessage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let agent = self
             .agents
             .get(&message.agent_id)
@@ -173,7 +176,10 @@ impl SocialAgentManager {
         let span = span!(Level::DEBUG, "send_telegram");
         let _enter = span.enter();
 
-        let chat_id = agent.chat_id.as_ref().ok_or("Telegram chat_id not configured")?;
+        let chat_id = agent
+            .chat_id
+            .as_ref()
+            .ok_or("Telegram chat_id not configured")?;
 
         let client = reqwest::Client::new();
         let response = client
@@ -207,7 +213,10 @@ impl SocialAgentManager {
         let span = span!(Level::DEBUG, "send_discord");
         let _enter = span.enter();
 
-        let webhook_url = agent.webhook_url.as_ref().ok_or("Discord webhook not configured")?;
+        let webhook_url = agent
+            .webhook_url
+            .as_ref()
+            .ok_or("Discord webhook not configured")?;
 
         let client = reqwest::Client::new();
         let response = client

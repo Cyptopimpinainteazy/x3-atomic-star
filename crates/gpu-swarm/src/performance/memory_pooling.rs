@@ -1,23 +1,23 @@
 // crates/gpu-swarm/src/performance/memory_pooling.rs
 // GPU Memory Pooling for efficient VRAM management
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::Mutex;
 use thiserror::Error;
-use tracing::{debug, warn, span, Level};
+use tracing::{debug, span, warn, Level};
 
 #[derive(Error, Debug)]
 pub enum MemoryPoolError {
     #[error("Insufficient GPU memory: requested {requested}, available {available}")]
     InsufficientMemory { requested: u64, available: u64 },
-    
+
     #[error("Memory pool exhausted")]
     PoolExhausted,
-    
+
     #[error("Invalid memory block")]
     InvalidBlock,
-    
+
     #[error("Allocation failed: {0}")]
     AllocationFailed(String),
 }
@@ -64,7 +64,7 @@ impl GPUMemoryPool {
     /// Create a new GPU memory pool
     pub fn new(device_id: u32, total_size: u64) -> Self {
         let metrics = MemoryMetrics::default();
-        
+
         let mut initial_block = MemoryBlock {
             id: 0,
             device_id,
@@ -90,7 +90,7 @@ impl GPUMemoryPool {
         let _enter = span.enter();
 
         let mut blocks = self.blocks.lock();
-        
+
         // Find first-fit available block
         for block in blocks.iter_mut() {
             if !block.allocated && block.size >= size {
@@ -98,7 +98,7 @@ impl GPUMemoryPool {
                 let mut allocated_block = block.clone();
                 allocated_block.allocated = true;
                 allocated_block.size = size;
-                
+
                 // Get next ID
                 let mut counter = self.allocation_counter.lock();
                 allocated_block.id = *counter;
@@ -113,11 +113,13 @@ impl GPUMemoryPool {
                         size: block.size - size,
                         allocated: false,
                     };
-                    
+
                     *counter += 1;
-                    
+
                     // Find position and insert
-                    let pos = blocks.iter().position(|b| b.id == block.id).unwrap();
+                    let Some(pos) = blocks.iter().position(|b| b.id == block.id) else {
+                        continue;
+                    };
                     blocks[pos] = allocated_block.clone();
                     blocks.insert(pos + 1, remaining_block);
                 } else {
@@ -127,7 +129,7 @@ impl GPUMemoryPool {
                 // Update metrics
                 let mut allocated = self.metrics.allocated_bytes.lock();
                 *allocated += size;
-                
+
                 let mut alloc_count = self.metrics.allocation_count.lock();
                 *alloc_count += 1;
 
@@ -148,7 +150,7 @@ impl GPUMemoryPool {
         let _enter = span.enter();
 
         let mut blocks = self.blocks.lock();
-        
+
         // Find and mark block as free
         let mut block_pos = None;
         for (i, block) in blocks.iter_mut().enumerate() {
@@ -158,23 +160,21 @@ impl GPUMemoryPool {
                 }
                 block.allocated = false;
                 block_pos = Some(i);
-                
+
                 // Update metrics
                 let mut allocated = self.metrics.allocated_bytes.lock();
                 *allocated = allocated.saturating_sub(block.size);
-                
+
                 let mut dealloc_count = self.metrics.deallocation_count.lock();
                 *dealloc_count += 1;
-                
+
                 break;
             }
         }
 
-        if block_pos.is_none() {
+        let Some(pos) = block_pos else {
             return Err(MemoryPoolError::InvalidBlock);
-        }
-
-        let pos = block_pos.unwrap();
+        };
 
         // Defragmentation: merge with adjacent free blocks
         // Merge with right neighbor
@@ -203,7 +203,7 @@ impl GPUMemoryPool {
         let _enter = span.enter();
 
         let mut blocks = self.blocks.lock();
-        
+
         // Collect allocated blocks and free blocks separately
         let mut allocated: Vec<_> = blocks.iter().filter(|b| b.allocated).collect();
         let mut free: Vec<_> = blocks.iter().filter(|b| !b.allocated).collect();
@@ -217,7 +217,7 @@ impl GPUMemoryPool {
         free.sort_by_key(|b| b.offset);
 
         let mut moved = 0u64;
-        
+
         // Simulate compaction by rebuilding blocks list
         let mut new_offset = 0u64;
         let mut new_blocks = Vec::new();
@@ -250,17 +250,17 @@ impl GPUMemoryPool {
     /// Get available memory
     pub fn available_memory(&self) -> u64 {
         let blocks = self.blocks.lock();
-        blocks
-            .iter()
-            .filter(|b| !b.allocated)
-            .map(|b| b.size)
-            .sum()
+        blocks.iter().filter(|b| !b.allocated).map(|b| b.size).sum()
     }
 
     /// Get memory allocation statistics
     pub fn stats(&self) -> MemoryStats {
         let blocks = self.blocks.lock();
-        let allocated = blocks.iter().filter(|b| b.allocated).map(|b| b.size).sum::<u64>();
+        let allocated = blocks
+            .iter()
+            .filter(|b| b.allocated)
+            .map(|b| b.size)
+            .sum::<u64>();
         let fragmentation = *self.metrics.fragmentation_percent.lock();
 
         MemoryStats {
@@ -277,7 +277,7 @@ impl GPUMemoryPool {
     fn calculate_fragmentation(&self, blocks: &[MemoryBlock]) {
         let free_blocks = blocks.iter().filter(|b| !b.allocated).count();
         let total_blocks = blocks.len();
-        
+
         let fragmentation = if total_blocks > 0 {
             (free_blocks as f32 / total_blocks as f32) * 100.0
         } else {
@@ -307,16 +307,16 @@ mod tests {
     #[test]
     fn test_allocate_and_deallocate() {
         let pool = GPUMemoryPool::new(0, 1024 * 1024);
-        
+
         let block1 = pool.allocate(1024).unwrap();
         assert_eq!(block1.size, 1024);
-        
+
         let block2 = pool.allocate(2048).unwrap();
         assert_eq!(block2.size, 2048);
-        
+
         assert!(pool.deallocate(block1.id).is_ok());
         assert!(pool.deallocate(block2.id).is_ok());
-        
+
         let stats = pool.stats();
         assert_eq!(stats.allocated_bytes, 0);
     }
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn test_insufficient_memory() {
         let pool = GPUMemoryPool::new(0, 1024);
-        
+
         let block = pool.allocate(2048);
         assert!(block.is_err());
     }
@@ -332,17 +332,17 @@ mod tests {
     #[test]
     fn test_compaction() {
         let pool = GPUMemoryPool::new(0, 10240);
-        
+
         let b1 = pool.allocate(1024).unwrap();
         let b2 = pool.allocate(2048).unwrap();
         let b3 = pool.allocate(1024).unwrap();
-        
+
         pool.deallocate(b1.id).unwrap();
         pool.deallocate(b2.id).unwrap();
-        
+
         let moved = pool.compact().unwrap();
         assert!(moved > 0);
-        
+
         let stats = pool.stats();
         assert!(stats.fragmentation_percent < 10.0);
     }
