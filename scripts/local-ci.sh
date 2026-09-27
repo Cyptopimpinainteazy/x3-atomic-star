@@ -424,6 +424,15 @@ GATES_FAST=(
   # files it reports on, so a new over-claim fails here.
   "adapter readiness claims:python3 scripts/ci/check-adapter-readiness-claims.py"
   "test x3-atomic-swap adapter readiness:cargo test -p x3-atomic-swap --test adapter_readiness_truth"
+  # `northern_swarm_reactor` cited `crates/northern-swarm` in FEATURE_REGISTRY.toml
+  # while no gate ran its tests — the same gap `registry tests are gated` was
+  # written for, caught by that checker on 2026-09-27. Both halves of the swarm
+  # release surface are gated together because the gate that guards the feature
+  # (`scripts/mainnet/swarm_reactor_gate.py`) fails on either half, and because a
+  # pallet whose on-chain reward/quorum path is only compiled, never executed,
+  # is exactly the shape of claim this repository keeps finding months later.
+  "test northern-swarm:cargo test -p northern-swarm"
+  "test pallet-northern-swarm:cargo test -p pallet-northern-swarm --all-targets"
   # `X3-CLAIM-002` scored 20/10/10 against a claim that had already been renamed out of
   # `CURRENT_MAINNET_STATUS.md` — because it had moved somewhere nothing checked: the desktop
   # CRM's outbound templates, which asserted "300ms cross-chain finality (vs 12s on Solana)",
@@ -581,7 +590,14 @@ GATES_FAST=(
   # box keeps losing ~/.cargo (shims, srtool and the registry cache have all
   # disappeared mid-session). Offline, the fetch fails and the test still runs
   # against whatever cache exists - cold cache surfaces as BLOCKED, never green.
-  "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # The default-feature run above does not compile the canonical cross-domain
+  # proof types at all (`x3-atomic-swap` is optional behind `canonical-proofs`),
+  # so it silently skipped the whole settlement release path — including the
+  # finality gate in `settlement_finality.rs`, which refuses to release a
+  # settlement whose external leg is shallower than the configured confirmation
+  # depth. The second run compiles and exercises it (`--offline --locked` for the
+  # same reasons as above).
+  "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml --features canonical-proofs"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
