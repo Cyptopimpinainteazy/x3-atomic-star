@@ -41,15 +41,28 @@ pub use pallet::*;
 mod types;
 pub use types::*;
 
+pub mod weights;
+pub use weights::WeightInfo;
+
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
     use frame_support::{
         pallet_prelude::*,
-        traits::{Currency, LockableCurrency, ReservableCurrency},
+        traits::{BalanceStatus, Currency, LockableCurrency, ReservableCurrency},
+        transactional,
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{Hash, Saturating};
+    use sp_runtime::traits::{Hash, Saturating, Zero};
+    use sp_std::vec::Vec;
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -80,6 +93,17 @@ pub mod pallet {
         /// Maximum number of concurrent open tasks per executor.
         #[pallet::constant]
         type MaxClaimedTasksPerExecutor: Get<u32>;
+
+        /// Number of matching independent result commits required to finalise.
+        #[pallet::constant]
+        type QuorumThreshold: Get<u32>;
+
+        /// Maximum distinct executors that may claim one task.
+        #[pallet::constant]
+        type MaxExecutorsPerTask: Get<u32>;
+
+        /// Runtime weight provider.
+        type WeightInfo: WeightInfo;
     }
 
     // -----------------------------------------------------------------------
@@ -122,6 +146,26 @@ pub mod pallet {
         T::Hash,      // result_hash
         OptionQuery,
     >;
+
+    /// Active task claims. Multiple executors may claim the same task so a
+    /// deterministic M-of-N result quorum can form.
+    #[pallet::storage]
+    #[pallet::getter(fn task_claims)]
+    pub type TaskClaims<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        T::Hash,
+        Blake2_128Concat,
+        T::AccountId,
+        (),
+        OptionQuery,
+    >;
+
+    /// Number of distinct claim slots consumed for a task.
+    #[pallet::storage]
+    #[pallet::getter(fn task_claim_slots)]
+    pub type TaskClaimSlots<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::Hash, u32, ValueQuery>;
 
     /// Number of tasks claimed per executor (enforces MaxClaimedTasksPerExecutor).
     #[pallet::storage]
@@ -168,6 +212,8 @@ pub mod pallet {
             task_id: T::Hash,
             winning_hash: T::Hash,
         },
+        /// Every available result slot was consumed without a matching quorum.
+        TaskDisputed { task_id: T::Hash },
         /// An executor was slashed for misbehaviour.
         ExecutorSlashed {
             executor: T::AccountId,
@@ -215,6 +261,16 @@ pub mod pallet {
         CooldownNotExpired,
         /// Executor has active claimed tasks; deregister after releasing them.
         HasActiveTasks,
+        /// Executor exists but is not in Active status.
+        ExecutorNotActive,
+        /// Executor already holds a claim for this task.
+        TaskAlreadyClaimedByExecutor,
+        /// Task has reached its configured maximum number of executor claims.
+        TaskClaimLimitReached,
+        /// Runtime quorum configuration is internally inconsistent.
+        InvalidQuorumConfig,
+        /// Reserved reward could not be moved completely to a winning executor.
+        RewardSettlementFailed,
     }
 
     // -----------------------------------------------------------------------
@@ -223,35 +279,6 @@ pub mod pallet {
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
-
-    // -----------------------------------------------------------------------
-    // Hooks
-    // -----------------------------------------------------------------------
-
-    #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn on_finalize(_block: BlockNumberFor<T>) {
-            for (task_id, mut task) in Tasks::<T>::iter() {
-                if task.status == TaskStatus::ResultCommitted {
-                    if let Some(result_hash) = task.result_hash {
-                        task.status = TaskStatus::Finalised;
-                        Tasks::<T>::insert(task_id, &task);
-                        Self::deposit_event(Event::TaskFinalised {
-                            task_id,
-                            winning_hash: result_hash,
-                        });
-                        if let Some(ref executor) = task.claimed_by {
-                            Self::deposit_event(Event::ExecutorRewarded {
-                                executor: executor.clone(),
-                                task_id,
-                                amount: task.reward,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // -----------------------------------------------------------------------
     // Extrinsics
@@ -263,7 +290,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::ExecutorRegistered`].
         #[pallet::call_index(0)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(T::WeightInfo::register_executor())]
         pub fn register_executor(
             origin: OriginFor<T>,
             stake: BalanceOf<T>,
@@ -306,7 +333,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::ExecutorDeregistering`].
         #[pallet::call_index(1)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(T::WeightInfo::deregister_executor())]
         pub fn deregister_executor(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -334,7 +361,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::ExecutorStakeUnlocked`].
         #[pallet::call_index(2)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(T::WeightInfo::release_stake())]
         pub fn release_stake(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -359,7 +386,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::HeartbeatReceived`].
         #[pallet::call_index(3)]
-        #[pallet::weight(Weight::from_parts(5_000, 0))]
+        #[pallet::weight(T::WeightInfo::submit_heartbeat())]
         pub fn submit_heartbeat(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let mut record = Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
@@ -381,17 +408,26 @@ pub mod pallet {
         ///
         /// Emits [`Event::TaskSubmitted`].
         #[pallet::call_index(4)]
-        #[pallet::weight(Weight::from_parts(20_000, 0))]
+        #[pallet::weight(T::WeightInfo::submit_task())]
         pub fn submit_task(
             origin: OriginFor<T>,
             payload_uri: BoundedVec<u8, ConstU32<512>>,
             reward: BalanceOf<T>,
+            kind: TaskKind,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            // Derive deterministic task ID from (submitter, payload_uri, block).
+            let quorum = T::QuorumThreshold::get();
+            let max_executors = T::MaxExecutorsPerTask::get();
+            ensure!(
+                quorum >= 2 && quorum <= max_executors,
+                Error::<T>::InvalidQuorumConfig,
+            );
+
+            // Include workload kind in the ID so two otherwise-identical jobs
+            // cannot alias while requiring different execution semantics.
             let block = frame_system::Pallet::<T>::block_number();
-            let task_id = T::Hashing::hash_of(&(&who, &payload_uri, block));
+            let task_id = T::Hashing::hash_of(&(&who, &payload_uri, &kind, block));
 
             T::Currency::reserve(&who, reward)?;
 
@@ -400,6 +436,7 @@ pub mod pallet {
                     submitter: who.clone(),
                     payload_uri,
                     reward,
+                    kind,
                     status: TaskStatus::Pending,
                     claimed_by: None,
                     submitted_at: block,
@@ -418,13 +455,18 @@ pub mod pallet {
         ///
         /// Emits [`Event::TaskClaimed`].
         #[pallet::call_index(5)]
-        #[pallet::weight(Weight::from_parts(15_000, 0))]
+        #[pallet::weight(T::WeightInfo::claim_task())]
         pub fn claim_task(origin: OriginFor<T>, task_id: T::Hash) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
+            let executor = Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
             ensure!(
-                Executors::<T>::contains_key(&who),
-                Error::<T>::NotRegistered
+                executor.status == ExecutorStatus::Active,
+                Error::<T>::ExecutorNotActive,
+            );
+            ensure!(
+                !TaskClaims::<T>::contains_key(task_id, &who),
+                Error::<T>::TaskAlreadyClaimedByExecutor,
             );
 
             let count = ClaimedTaskCount::<T>::get(&who);
@@ -433,19 +475,31 @@ pub mod pallet {
                 Error::<T>::TooManyClaimedTasks,
             );
 
+            let slots = TaskClaimSlots::<T>::get(task_id);
+            ensure!(
+                slots < T::MaxExecutorsPerTask::get(),
+                Error::<T>::TaskClaimLimitReached,
+            );
+
             Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
                 let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
                 ensure!(
-                    task.status == TaskStatus::Pending,
-                    Error::<T>::TaskNotClaimable
+                    matches!(
+                        task.status,
+                        TaskStatus::Pending | TaskStatus::Claimed | TaskStatus::ResultCommitted
+                    ),
+                    Error::<T>::TaskNotClaimable,
                 );
-                ensure!(task.claimed_by.is_none(), Error::<T>::TaskAlreadyClaimed);
                 task.status = TaskStatus::Claimed;
-                task.claimed_by = Some(who.clone());
+                if task.claimed_by.is_none() {
+                    task.claimed_by = Some(who.clone());
+                }
                 Ok(())
             })?;
 
-            ClaimedTaskCount::<T>::mutate(&who, |c| *c += 1);
+            TaskClaims::<T>::insert(task_id, &who, ());
+            TaskClaimSlots::<T>::insert(task_id, slots.saturating_add(1));
+            ClaimedTaskCount::<T>::mutate(&who, |c| *c = c.saturating_add(1));
 
             Self::deposit_event(Event::TaskClaimed {
                 task_id,
@@ -462,7 +516,8 @@ pub mod pallet {
         ///
         /// Emits [`Event::ResultCommitted`].
         #[pallet::call_index(6)]
-        #[pallet::weight(Weight::from_parts(15_000, 0))]
+        #[pallet::weight(T::WeightInfo::submit_result())]
+        #[transactional]
         pub fn submit_result(
             origin: OriginFor<T>,
             task_id: T::Hash,
@@ -474,7 +529,10 @@ pub mod pallet {
                 Executors::<T>::contains_key(&who),
                 Error::<T>::NotRegistered
             );
-
+            ensure!(
+                TaskClaims::<T>::contains_key(task_id, &who),
+                Error::<T>::NotTaskExecutor,
+            );
             ensure!(
                 !ResultCommits::<T>::contains_key(task_id, &who),
                 Error::<T>::ResultAlreadyCommitted,
@@ -483,17 +541,15 @@ pub mod pallet {
             Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
                 let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
                 ensure!(
-                    task.claimed_by.as_ref() == Some(&who),
-                    Error::<T>::NotTaskExecutor,
+                    matches!(task.status, TaskStatus::Claimed | TaskStatus::ResultCommitted),
+                    Error::<T>::TaskNotClaimable,
                 );
-                // RC1/RC2: single executor path — accept immediately.
-                // RC3: store commit and defer to quorum finalisation in on_finalize.
                 task.status = TaskStatus::ResultCommitted;
-                task.result_hash = Some(result_hash);
                 Ok(())
             })?;
 
             ResultCommits::<T>::insert(task_id, &who, result_hash);
+            TaskClaims::<T>::remove(task_id, &who);
             ClaimedTaskCount::<T>::mutate(&who, |c| *c = c.saturating_sub(1));
 
             Self::deposit_event(Event::ResultCommitted {
@@ -501,6 +557,28 @@ pub mod pallet {
                 executor: who,
                 result_hash,
             });
+
+            let winners: Vec<T::AccountId> = ResultCommits::<T>::iter_prefix(task_id)
+                .filter_map(|(executor, hash)| (hash == result_hash).then_some(executor))
+                .collect();
+
+            if (winners.len() as u32) >= T::QuorumThreshold::get() {
+                Self::finalise_with_quorum(task_id, result_hash, winners)?;
+                return Ok(());
+            }
+
+            let commit_count = ResultCommits::<T>::iter_prefix(task_id).count() as u32;
+            if commit_count >= T::MaxExecutorsPerTask::get() {
+                Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
+                    let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
+                    task.status = TaskStatus::Disputed;
+                    task.result_hash = None;
+                    Ok(())
+                })?;
+                Self::clear_remaining_claims(task_id);
+                Self::deposit_event(Event::TaskDisputed { task_id });
+            }
+
             Ok(())
         }
 
@@ -508,7 +586,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::ExecutorSlashed`].
         #[pallet::call_index(7)]
-        #[pallet::weight(Weight::from_parts(20_000, 0))]
+        #[pallet::weight(T::WeightInfo::slash_executor())]
         pub fn slash_executor(
             origin: OriginFor<T>,
             executor: T::AccountId,
@@ -535,6 +613,69 @@ pub mod pallet {
                 reason,
             });
             Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        fn finalise_with_quorum(
+            task_id: T::Hash,
+            winning_hash: T::Hash,
+            winners: Vec<T::AccountId>,
+        ) -> DispatchResult {
+            let mut task = Tasks::<T>::get(task_id).ok_or(Error::<T>::TaskNotFound)?;
+            let winner_count = winners.len() as u32;
+            ensure!(
+                winner_count >= T::QuorumThreshold::get(),
+                Error::<T>::InvalidQuorumConfig,
+            );
+
+            // Balance is an unsigned arithmetic type under Currency. Convert the
+            // bounded winner count and split the total task bounty exactly once.
+            let divisor: BalanceOf<T> = winner_count.into();
+            let share = task.reward / divisor;
+            let mut paid: BalanceOf<T> = Zero::zero();
+
+            for executor in winners.iter() {
+                let remaining = T::Currency::repatriate_reserved(
+                    &task.submitter,
+                    executor,
+                    share,
+                    BalanceStatus::Free,
+                )?;
+                ensure!(remaining.is_zero(), Error::<T>::RewardSettlementFailed);
+                paid = paid.saturating_add(share);
+                Self::deposit_event(Event::ExecutorRewarded {
+                    executor: executor.clone(),
+                    task_id,
+                    amount: share,
+                });
+            }
+
+            let refund = task.reward.saturating_sub(paid);
+            if !refund.is_zero() {
+                T::Currency::unreserve(&task.submitter, refund);
+            }
+
+            task.status = TaskStatus::Finalised;
+            task.result_hash = Some(winning_hash);
+            Tasks::<T>::insert(task_id, &task);
+            Self::clear_remaining_claims(task_id);
+
+            Self::deposit_event(Event::TaskFinalised {
+                task_id,
+                winning_hash,
+            });
+            Ok(())
+        }
+
+        fn clear_remaining_claims(task_id: T::Hash) {
+            let claimants: Vec<T::AccountId> =
+                TaskClaims::<T>::iter_prefix(task_id).map(|(account, ())| account).collect();
+            for account in claimants {
+                TaskClaims::<T>::remove(task_id, &account);
+                ClaimedTaskCount::<T>::mutate(&account, |c| *c = c.saturating_sub(1));
+            }
+            TaskClaimSlots::<T>::remove(task_id);
         }
     }
 }

@@ -8,7 +8,8 @@ Replaces the prior documentation-only check with:
   3. Critical runtime and pallet test suites
   4. Reproducible-build prerequisite check (srtool)
   5. Required documentation check (preserved from original)
-  6. Forbidden-secret scanning (preserved from original)
+  6. Northern Swarm + Reactor on-chain compute hard gate
+  7. Forbidden-secret scanning (preserved from original)
 
 Exit 0 → gate PASSES.
 Exit 1 → gate FAILS — do NOT cut a release.
@@ -446,6 +447,10 @@ TEST_PACKAGES = [
     # gate noticing (the workspace clippy gate caught it, which is not part of the
     # release bar). Every pallet that holds a terminal state belongs here.
     ("-p", "pallet-x3-settlement-engine", []),
+    # Swarm/compute release surface: both halves must compile and test under
+    # the same mainnet bar as settlement and runtime code.
+    ("-p", "pallet-northern-swarm", []),
+    ("-p", "northern-swarm", []),
 ]
 
 
@@ -502,6 +507,35 @@ def check_panic_ratchet() -> None:
         (line.strip() for line in output.splitlines() if "runtime-hook=" in line), ""
     )
     ok(counts_line or "panic ratchet holds")
+
+
+def check_swarm_reactor_gate() -> None:
+    """Northern Swarm/Reactor must be real on-chain compute before mainnet.
+
+    This delegates detailed structural and executable checks to a focused gate
+    so swarm-specific policy can evolve without bloating this release driver.
+    The focused gate intentionally fails while the current single-executor,
+    unsigned-submission, no-GPU path remains incomplete.
+    """
+    print("\n── 4c. Northern Swarm + Reactor on-chain compute ──")
+    script = ROOT / "scripts" / "mainnet" / "swarm_reactor_gate.py"
+    if not script.exists():
+        fail("scripts/mainnet/swarm_reactor_gate.py is missing")
+        return
+
+    result = run([sys.executable, str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("Northern Swarm + Reactor on-chain compute gate failed")
+        for line in output.splitlines()[-30:]:
+            print(f"    {line}")
+        return
+
+    summary = next(
+        (line.strip() for line in output.splitlines() if "swarm_reactor_gate: PASS" in line),
+        "swarm/reactor compute gate passed",
+    )
+    ok(summary)
 
 
 def check_runtime_upgrade_rehearsal() -> None:
@@ -749,6 +783,7 @@ def main() -> int:
     check_testnet_genesis()
     check_test_suites()
     check_panic_ratchet()
+    check_swarm_reactor_gate()
     check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()
     check_reproducible_build()

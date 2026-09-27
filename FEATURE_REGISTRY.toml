@@ -296,6 +296,38 @@ blockers = [
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
 
+
+[northern_swarm_reactor]
+mode = "GUARDED_TESTNET"
+crate_or_service = "crates/northern-swarm"
+tauri_app = "SwarmCommand"
+required_tests = [
+  "same_input_produces_same_hash",
+  "different_inputs_produce_different_hashes",
+  "result_status_is_success",
+  "sha256_hex_is_stable",
+]
+proof_report = ""
+readiness_score = 30
+blockers = [
+  "Mainnet hard gate added at scripts/mainnet/swarm_reactor_gate.py. The pallet is wired into the workspace/runtime, but its production path is not yet releasable.",
+  "pallet-northern-swarm has no wired mock.rs/tests.rs coverage and still uses hand-written Weight::from_parts constants instead of benchmark-derived weights.",
+  "The off-chain chain watcher targets a hard-coded PendingTasks storage key even though pallet-northern-swarm exposes Tasks; the watcher must use runtime metadata/events or the real storage layout.",
+  "Result submission constructs an unsigned raw extrinsic with hard-coded pallet index 82, while submit_result requires ensure_signed; executor signing and metadata-driven call encoding are required.",
+  "on_finalize auto-finalizes the first ResultCommitted task and only emits ExecutorRewarded; M-of-N quorum verification plus real reserved-reward settlement are required before mainnet.",
+  "TaskPayload drops TaskKind before execution and northern-swarm has no ComputeBackend/GPU backend/CPU fallback abstraction; AiInference currently cannot route to accelerated hardware.",
+  "Advertised hardware capabilities are self-declared and have no benchmark/attestation evidence binding a registered executor to the claimed hardware."
+]
+dangerous_paths = [
+  "pallets/northern-swarm",
+  "crates/northern-swarm",
+  "swarm rewards",
+  "executor slashing",
+  "executor signing keys",
+  "gpu acceleration",
+  "task settlement"
+]
+
 [repo_scanner_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/swarm/swarm_scan.sh"

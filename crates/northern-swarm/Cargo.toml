@@ -21,3 +21,16 @@ sha2        = "0.10"
 chrono      = { version = "0.4", default-features = false, features = ["clock"] }
 codec       = { workspace = true }
 reqwest     = { workspace = true }
+
+# Chain metadata/signing and shared runtime task types.
+subxt = "0.50.3"
+subxt-signer = { version = "0.50.3", default-features = false, features = ["std", "sr25519", "subxt"] }
+sp-core = { workspace = true, features = ["std"] }
+pallet-northern-swarm = { path = "../../pallets/northern-swarm" }
+
+# Vendor-neutral accelerator layer. CPU remains the deterministic reference.
+x3-accel = { path = "../x3-accel" }
+
+[features]
+default = []
+wgpu = ["x3-accel/wgpu"]

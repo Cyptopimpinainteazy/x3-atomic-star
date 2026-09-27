@@ -1,6 +1,6 @@
 # Northern Swarm Architecture
 
-> **Status:** RC1 off-chain executor scaffolded · RC2 on-chain pallet scaffolded · RC3–RC5 planned
+> **Status:** runtime wiring exists · executor/pallet contract is incomplete · mainnet hard gate intentionally RED · RC3–RC5 still required
 >
 > `pallets/swarm` is **legacy-only reference** — do not add new production dependencies to it.
 
@@ -43,20 +43,23 @@ Northern Swarm is a three-layer system for verified off-chain compute on X3:
 | Chain watcher (polling) | `src/chain_watcher.rs` | ✅ done (poll stub) |
 | Result submitter | `src/result_submitter.rs` | ✅ done (local proof store) |
 
-**RC1 limitations (explicitly stubbed):**
-- `poll_pending_tasks()` returns an empty vec — no live RPC connection yet.
-- `fetch_payload()` only supports the `hex:<hex>` URI scheme.
-- `submit()` writes proof files to `./proofs/` instead of calling the chain.
+**Current executor limitations (release-blocking):**
+- The watcher now calls JSON-RPC, but it targets a hard-coded `PendingTasks` storage key while the pallet exposes `Tasks`; this is not a valid pallet/executor contract.
+- IPFS and inline `hex:` payload fetching exist.
+- The submitter calls `author_submitExtrinsic`, but it constructs an unsigned call with hard-coded pallet index `82`; `submit_result` requires a signed executor origin.
+- `TaskPayload` currently drops `TaskKind`, so `AiInference` cannot be routed to a GPU/NPU backend.
+- No typed `ComputeBackend` abstraction, GPU backend, or explicit CPU fallback is present.
 
 ---
 
-### RC1.5 — Live chain watcher (planned)
+### RC1.5 — Live chain watcher (PARTIAL / NOT RELEASEABLE)
 
-**Goal:** connect the executor to a running node via `jsonrpsee` or `subxt`.
+**Goal:** connect the executor to a running node with metadata-compatible reads and signed submissions.
 
-- Subscribe to `NorthernSwarm::TaskSubmitted` events via WebSocket.
-- Implement IPFS payload fetch (`ipfs://` URI scheme).
-- Submit result hashes via `NorthernSwarm::submit_result` extrinsic.
+- [ ] Subscribe to `NorthernSwarm::TaskSubmitted` events or read the real `Tasks` storage through runtime metadata.
+- [x] Implement IPFS payload fetch (`ipfs://` URI scheme).
+- [ ] Sign `NorthernSwarm::submit_result` with the registered executor key.
+- [ ] Remove hard-coded pallet/call indices; derive call encoding from runtime metadata.
 
 ---
 
@@ -83,10 +86,12 @@ Northern Swarm is a three-layer system for verified off-chain compute on X3:
 | `slash_executor` | 7 | Root |
 
 **RC2 TODO before mainnet:**
-- [ ] Wire pallet into `runtime/src/lib.rs` — add `Config` impl, add to `construct_runtime!`
-- [ ] Add `pallet-northern-swarm` to `runtime/Cargo.toml`
-- [ ] Benchmark all extrinsics and replace placeholder `Weight::from_parts` constants
-- [ ] Add mock runtime and unit tests (`pallets/northern-swarm/src/tests.rs`)
+- [x] Wire pallet into `runtime/src/lib.rs` — `Config` impl + `construct_runtime!`.
+- [x] Add `pallet-northern-swarm` to `runtime/Cargo.toml` and std feature propagation.
+- [ ] Benchmark all extrinsics and replace placeholder `Weight::from_parts` constants.
+- [ ] Add mock runtime and unit tests (`pallets/northern-swarm/src/tests.rs`).
+- [ ] Replace single-result auto-finalization with M-of-N quorum verification.
+- [ ] Settle reserved task rewards to accepted executor(s) and prove balance invariants.
 
 ---
 
@@ -121,6 +126,20 @@ by `TaskExecutor::run_deterministic()`.
 - Dispute resolution protocol (RC3 jury vote removed — replaced by ZK proof).
 
 ---
+
+---
+
+## Mainnet release hard gate
+
+`python3 scripts/mainnet/swarm_reactor_gate.py` is called by
+`scripts/mainnet_release_gate.py`. It fails closed until RC1.5/RC2 correctness,
+RC3 quorum verification, and the first GPU/CPU backend contract are implemented.
+
+The gate deliberately separates **consensus correctness** from accelerator
+performance: CPU-verifiable deterministic execution remains the reference path;
+GPU/NPU/FPGA acceleration may improve throughput but may not change accepted
+results.
+
 
 ## Legacy reference
 

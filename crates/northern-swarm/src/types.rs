@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub use pallet_northern_swarm::{TaskKind, TaskStatus};
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -71,40 +73,14 @@ pub struct NorthernTask {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskPayload {
     pub task_id: TaskId,
+    /// Workload class preserved from the on-chain task record.
+    pub kind: TaskKind,
     /// Raw deterministic bytecode or script body.
     pub body: Vec<u8>,
     /// Key-value parameters injected at execution time.
     pub params: HashMap<String, serde_json::Value>,
     /// Optional secondary input dataset URI.
     pub input_uri: Option<String>,
-}
-
-/// High-level task categories.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, codec::Decode)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskKind {
-    /// Pure computation — no external I/O; must be fully deterministic.
-    Compute,
-    /// Off-chain data fetch + transform; result hash must be stable.
-    DataFetch,
-    /// AI/ML inference job.
-    AiInference,
-    /// X3 Lang compiled agent job (RC4).
-    X3LangAgent,
-    /// Custom / future extension kind.
-    Other(String),
-}
-
-/// Task lifecycle state, mirrored from the RC2 on-chain pallet enum.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, codec::Decode)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskStatus {
-    Pending,
-    Claimed,
-    Running,
-    Completed,
-    Failed,
-    Disputed,
 }
 
 // ---------------------------------------------------------------------------

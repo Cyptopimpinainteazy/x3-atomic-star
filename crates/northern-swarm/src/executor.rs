@@ -1,7 +1,9 @@
-use crate::types::*;
+use crate::{
+    backend::{ComputeBackend, CpuBackend, GpuBackend},
+    types::*,
+};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Off-chain task executor (RC1).
 ///
@@ -15,11 +17,17 @@ use tracing::{debug, info};
 /// slashing in the RC3 quorum round.
 pub struct TaskExecutor {
     executor_id: ExecutorId,
+    cpu: CpuBackend,
+    gpu: GpuBackend,
 }
 
 impl TaskExecutor {
     pub fn new(executor_id: ExecutorId) -> Self {
-        TaskExecutor { executor_id }
+        TaskExecutor {
+            executor_id,
+            cpu: CpuBackend,
+            gpu: GpuBackend::new(),
+        }
     }
 
     /// Execute a task payload and return the result.
@@ -28,10 +36,30 @@ impl TaskExecutor {
         payload: TaskPayload,
     ) -> Result<ExecutionResult, NorthernSwarmError> {
         let start = std::time::Instant::now();
-        info!(task_id = %payload.task_id, kind = ?payload.input_uri, "starting execution");
+        info!(task_id = %payload.task_id, kind = ?payload.kind, "starting execution");
 
         let input_hash = sha256_hex(&payload.body);
-        let output = self.run_deterministic(&payload)?;
+        let output = if matches!(payload.kind, TaskKind::AiInference) {
+            return Err(NorthernSwarmError::ExecutionFailed {
+                task_id: payload.task_id.clone(),
+                reason: "AiInference requires a real model backend; hash-only execution is refused".into(),
+            });
+        } else if self.gpu.supports(&payload.kind) {
+            match self.gpu.execute(&payload) {
+                Ok(output) => output,
+                Err(error) => {
+                    warn!(
+                        task_id = %payload.task_id,
+                        backend = self.gpu.name(),
+                        err = %error,
+                        "GPU execution unavailable/refused; falling back to canonical CPU backend",
+                    );
+                    self.cpu.execute(&payload)?
+                }
+            }
+        } else {
+            self.cpu.execute(&payload)?
+        };
         let duration_ms = start.elapsed().as_millis() as u64;
         let result_hash = sha256_hex(&output);
         let output_hash = result_hash.clone();
@@ -62,33 +90,6 @@ impl TaskExecutor {
         })
     }
 
-    /// Deterministic execution kernel.
-    ///
-    /// Execute the canonical deterministic payload kernel.
-    ///
-    /// The kernel treats the body and parameters as an immutable computation
-    /// input. Parameters are sorted before serialization so `HashMap` layout
-    /// cannot affect the result across executor processes.
-    fn run_deterministic(&self, payload: &TaskPayload) -> Result<Vec<u8>, NorthernSwarmError> {
-        if payload.body.is_empty() {
-            return Err(NorthernSwarmError::ExecutionFailed {
-                task_id: payload.task_id.clone(),
-                reason: "empty payload body".into(),
-            });
-        }
-
-        let canonical_params: BTreeMap<_, _> = payload.params.iter().collect();
-        let canonical_input = serde_json::to_vec(&(payload.body.as_slice(), canonical_params))
-            .map_err(|error| NorthernSwarmError::ExecutionFailed {
-                task_id: payload.task_id.clone(),
-                reason: format!("canonical input serialization failed: {error}"),
-            })?;
-
-        let mut hasher = Sha256::new();
-        hasher.update(b"X3-NORTHERN-SWARM-DETERMINISTIC-V1\0");
-        hasher.update(canonical_input);
-        Ok(hasher.finalize().to_vec())
-    }
 }
 
 /// SHA-256 hex digest of `data`.
@@ -117,6 +118,7 @@ mod tests {
     fn dummy_payload(body: &[u8]) -> TaskPayload {
         TaskPayload {
             task_id: "test-task-001".into(),
+            kind: TaskKind::Compute,
             body: body.to_vec(),
             params: Default::default(),
             input_uri: None,
@@ -148,6 +150,15 @@ mod tests {
         let exec = TaskExecutor::new("exec-1".into());
         let r = exec.execute(dummy_payload(b"data")).await.unwrap();
         assert_eq!(r.status, ExecutionStatus::Success);
+    }
+
+    #[tokio::test]
+    async fn ai_inference_without_real_model_backend_is_refused() {
+        let exec = TaskExecutor::new("exec-1".into());
+        let mut p = dummy_payload(b"model input");
+        p.kind = TaskKind::AiInference;
+        let err = exec.execute(p).await.unwrap_err();
+        assert!(err.to_string().contains("real model backend"));
     }
 
     #[test]

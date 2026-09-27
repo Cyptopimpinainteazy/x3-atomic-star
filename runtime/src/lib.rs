@@ -677,16 +677,17 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
-        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
 // ── mainnet-rc1: narrowed pallet set ─────────────────────────────────────────
-// Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
-// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
-// DePIN marketplace, private execution).
+// Excludes the legacy experimental Swarm plus DEX, flashloan, launchpad,
+// auction, meme, evolution, compute market, automation, oracle, VRF, DA,
+// sequencer, DePIN marketplace, and private execution. NorthernSwarm is part
+// of the guarded launch surface and is release-gated separately.
 #[cfg(all(
     not(feature = "dev"),
     not(feature = "frontier"),
@@ -745,6 +746,7 @@ construct_runtime!(
         X3JuryAnchor: pallet_x3_jury_anchor,
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -823,6 +825,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -901,6 +904,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -2810,21 +2814,26 @@ impl pallet_swarm::Config for Runtime {
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
 }
 
-// ===== Northern Swarm Pallet Configuration (dev-only; guarded until RC2) =====
-#[cfg(feature = "dev")]
+// ===== Northern Swarm Pallet Configuration =====
+// Guarded by the Swarm/Reactor mainnet release gate; available in dev and
+// production runtime variants so the launch binary can actually host the market.
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
-    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
+    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~48 minutes at 200ms blocks
     pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
+    pub const NorthernSwarmQuorumThreshold: u32 = 2;
+    pub const NorthernSwarmMaxExecutorsPerTask: u32 = 3;
 }
 
-#[cfg(feature = "dev")]
 impl pallet_northern_swarm::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MinExecutorStake = NorthernSwarmMinExecutorStake;
     type DeregistrationCooldown = NorthernSwarmDeregistrationCooldown;
     type MaxClaimedTasksPerExecutor = NorthernSwarmMaxClaimedTasksPerExecutor;
+    type QuorumThreshold = NorthernSwarmQuorumThreshold;
+    type MaxExecutorsPerTask = NorthernSwarmMaxExecutorsPerTask;
+    type WeightInfo = pallet_northern_swarm::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== DePIN Marketplace Pallet Configuration =====
@@ -3511,6 +3520,8 @@ mod benches {
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
     #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
+    #[allow(unused_imports)]
+    use pallet_northern_swarm::Pallet as NorthernSwarm;
     // Added 2026-09-25: `pallet-x3-kernel`'s benchmark module compiles and its `submit_comit_v2`
     // entry was a hand-written placeholder ("same base weight as submit_comit until benchmarks are
     // re-run") that nothing could re-run, because the pallet was not registered here — the CLI
@@ -3524,6 +3535,7 @@ mod benches {
         [pallet_x3_settlement_engine, X3SettlementEngine]
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]
+        [pallet_northern_swarm, NorthernSwarm]
     );
 }
 
