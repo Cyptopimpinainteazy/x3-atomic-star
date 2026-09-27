@@ -8861,6 +8861,36 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   one test attribute anywhere under `apps/tauri-os` today).
 - **Composite after this turn: registry mean 61.18%** (58.23% at the start of the day), 0 BROKEN rows,
   149 matrix rows. The fastest route to 75% is still the low rows: 15 / 40 / 45 / 45 / 50 / 55 …
+
+## 2026-09-27 (evening) — an untracked subsystem that was inventing answers, and a gate nobody ran locally
+
+- **`crates/x3-rpc/src/wallet_dex_rpc.rs` had three fabricated wallet-facing answers and no matrix row.**
+  Looked for while hunting an untracked subsystem; nothing in the audit knew the file existed. Found:
+  `walletDex_estimateSwap` returned `amount_out = amount_in * 95 / 100` and `estimated_gas = 100_000`
+  (a 5% fee no pool charges, from a simulation nobody ran, under a comment saying "In production: call
+  DEX runtime api for actual prices"); `walletDex_executeSwap` returned `Ok` with `swap_id: [1u8;32]`
+  and the same invented output; `walletDex_getApprovalStatus` returned `("pending", 2)` for an id
+  nothing looked up. Both tests for the first were constant assertions on the fabricated arithmetic —
+  `let amount_out = (request.amount_in * 95) / 100; assert_eq!(amount_out, 950)` — and never called
+  the method. Now: the estimate comes from the chain's own
+  `AtomicTradeEngineApi::simulate_trade` (refusing on a failed simulation or on output below the
+  caller's `min_amount_out`), execution refuses with "Atomic swap execution is not wired into this
+  node", approval status refuses, and both ids are blake2 commitments over their subject rather than
+  `[1u8;32]` / a splice. Matrix row `X3-OPS-014` added (150 rows now; the mean fell 67.91 -> 67.73
+  because the composite finally counts the subsystem).
+- **The S0/S1 security gate ran only in CI.** `scripts/run-security-gates.sh` had no local gate, which
+  is why a *missing java* went unnoticed on this box: every TLA+ spec errored out, the wrapper read
+  exit codes that were already 0, and it reported green over its own red report. It is now
+  `security gates S0 S1` in the fast set (PASS 43s, S0 VERIFIED 100.0%, six catastrophic + three
+  critical blockers, S1 five modules). `X3-SEC-005` re-measured 53 -> 60 against it.
+- **Two live gates re-verified by hand, not read**: `halt recovery on a live chain` PASS 27s (with the
+  in-flight bundle rolled back and the bond released) and `supply invariant across validators`
+  PASS 303s (three validators, concurrent X3 comits, conservation read on each node at one finalized
+  block). `atomic_kernel` re-measured 55 -> 57 after deleting a stale "Still open: TICKET-107 …
+  never exercised on a multi-validator network" tail that two later commits had closed.
+- **Trap to remember**: `git commit -m "…"` with backticks and quotes in the message runs the shell —
+  twice now a commit message has been mangled or a command aborted mid-add. Use `git commit -F -` with
+  a quoted heredoc for multi-line messages.
   `repo_scanner_v2`) no longer need to be re-checked.
 
 ## 2026-09-27 (later still) — the Tauri operator console reads a real node (15% -> 42%)
