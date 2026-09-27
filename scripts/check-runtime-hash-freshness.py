@@ -112,10 +112,28 @@ def is_not_build_input(relative: str, root: pathlib.Path | None = None, sources=
     if any(part in BUILD_INPUT_DIRS for part in path.parts[:-1]):
         return None
     needle = path.name
-    for _source, text in sources if sources is not None else graph_source_texts(root, [pathlib.Path(".")]):
+    namers: list[str] = []
+    for source, text in sources if sources is not None else graph_source_texts(root, [pathlib.Path(".")]):
         if needle in text:
+            namers.append(str(source))
+    if not namers:
+        return "not a build manifest, and no source in the runtime graph names it"
+
+    # Named by something. Whether that matters depends on *which* source names
+    # it: `include_str!` inside a `#[cfg(test)]` module is compiled for a test
+    # build only, so a fixture reached solely from there cannot be in the wasm.
+    # A file any non-test source names stays counted.
+    test_only_namers = []
+    for namer in namers:
+        try:
+            relative_namer = str(pathlib.Path(namer).relative_to(root))
+        except ValueError:
             return None
-    return "not a build manifest, and no source in the runtime graph names it"
+        if is_test_only(relative_namer, root) is None:
+            return None
+        test_only_namers.append(relative_namer)
+    listed = ", ".join(sorted(set(test_only_namers))[:3])
+    return f"named only by test-only source(s): {listed}"
 
 
 def is_test_only(relative: str, root: pathlib.Path | None = None) -> str | None:
@@ -337,6 +355,15 @@ def self_test() -> int:
             "src/lib.rs",
             "src/test_helpers.rs",
         }
+        # A fixture named only from a `#[cfg(test)]` module is test-only; the same
+        # bytes named from `lib.rs` are an input. Both directions asserted.
+        (root / "src" / "tests" / "data").mkdir(parents=True)
+        (root / "src" / "tests" / "data" / "fixture.txt").write_text("")
+        (root / "src" / "tests.rs").write_text(
+            (root / "src" / "tests.rs").read_text()
+            + '\nconst FIXTURE: &str = include_str!("tests/data/fixture.txt");\n'
+        )
+        non_rust_ignored.add("src/tests/data/fixture.txt")
         for rel in sorted(non_rust_ignored):
             reason = is_not_build_input(rel, root, graph_source_texts(root, [pathlib.Path(".")]))
             if reason is None:
@@ -353,9 +380,29 @@ def self_test() -> int:
             print(f"[runtime-hash self-test] FAIL: {failure}", file=sys.stderr)
         if failures:
             return 1
+
+        # …and the same fixture becomes a build input the moment a non-test
+        # source names it.
+        (root / "src" / "lib.rs").write_text(
+            (root / "src" / "lib.rs").read_text()
+            + '\n// see tests/data/fixture.txt\n'
+        )
+        reason = is_not_build_input(
+            "src/tests/data/fixture.txt", root, graph_source_texts(root, [pathlib.Path(".")])
+        )
+        if reason is not None:
+            failures.append(
+                f"src/tests/data/fixture.txt must stay counted once lib.rs names it ({reason})"
+            )
+        else:
+            print("  counted  src/tests/data/fixture.txt (named by src/lib.rs)")
+        if failures:
+            for failure in failures:
+                print(f"[runtime-hash self-test] FAIL: {failure}", file=sys.stderr)
+            return 1
     print(
         "[runtime-hash self-test] OK — 3 test-only shape(s) ignored, "
-        "5 that can reach the wasm counted; 2 non-build-input file(s) ignored, "
+        "5 that can reach the wasm counted; 3 non-build-input file(s) ignored, "
         "4 that can reach the wasm counted"
     )
     return 0
