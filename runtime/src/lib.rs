@@ -684,9 +684,10 @@ construct_runtime!(
 );
 
 // ── mainnet-rc1: narrowed pallet set ─────────────────────────────────────────
-// Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
-// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
-// DePIN marketplace, private execution).
+// Excludes the legacy experimental Swarm plus DEX, flashloan, launchpad,
+// auction, meme, evolution, compute market, automation, oracle, VRF, DA,
+// sequencer, DePIN marketplace, and private execution. NorthernSwarm is part
+// of the guarded launch surface and is release-gated separately.
 #[cfg(all(
     not(feature = "dev"),
     not(feature = "frontier"),
@@ -745,6 +746,7 @@ construct_runtime!(
         X3JuryAnchor: pallet_x3_jury_anchor,
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -823,6 +825,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -901,6 +904,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -2777,8 +2781,9 @@ impl pallet_swarm::Config for Runtime {
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
 }
 
-// ===== Northern Swarm Pallet Configuration (dev-only; guarded until RC2) =====
-#[cfg(feature = "dev")]
+// ===== Northern Swarm Pallet Configuration =====
+// Guarded by the Swarm/Reactor mainnet release gate; available in dev and
+// production runtime variants so the launch binary can actually host the market.
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
     pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~48 minutes at 200ms blocks
@@ -2787,7 +2792,6 @@ parameter_types! {
     pub const NorthernSwarmMaxExecutorsPerTask: u32 = 3;
 }
 
-#[cfg(feature = "dev")]
 impl pallet_northern_swarm::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
