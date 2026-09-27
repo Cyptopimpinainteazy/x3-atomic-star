@@ -368,15 +368,18 @@ cmd_test() {
   _check "Compressed WASM exists" test -f "$wasm_path"
 
   if [[ -f "$wasm_path" ]]; then
-    # 4. WASM magic bytes
-    echo -n "  Checking: WASM magic bytes (\\x00asm) … "
+    # 4. Blob magic bytes. This file is the *compressed* runtime, which starts with Substrate's
+    #    8-byte compression prefix (sp_maybe_compressed_blob: 52 bc 53 76 46 db 8e 05), never with
+    #    the plain `\0asm` magic this used to require — so the check could not pass on a real build
+    #    (first reached in production-gate run 36282807923). Either form is a valid runtime blob.
+    echo -n "  Checking: runtime blob magic (compressed prefix or \\x00asm) … "
     local magic
-    magic=$(xxd -p -l4 "$wasm_path" 2>/dev/null || hexdump -e '1/1 "%02x"' -n4 "$wasm_path" 2>/dev/null || echo "")
-    if [[ "$magic" == "0061736d" ]]; then
+    magic=$(xxd -p -l8 "$wasm_path" 2>/dev/null || hexdump -v -e '1/1 "%02x"' -n8 "$wasm_path" 2>/dev/null || echo "")
+    if [[ "$magic" == "52bc537646db8e05" || "${magic:0:8}" == "0061736d" ]]; then
       echo -e "${GREEN}✓ PASS${NC} (magic: $magic)"
       PASS=$((PASS + 1))
     else
-      echo -e "${RED}✗ FAIL${NC} (expected 0061736d, got: $magic)"
+      echo -e "${RED}✗ FAIL${NC} (expected 52bc537646db8e05 or 0061736d…, got: $magic)"
       FAIL=$((FAIL + 1))
     fi
 
