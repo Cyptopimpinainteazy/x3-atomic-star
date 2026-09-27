@@ -2946,7 +2946,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 69,
+      "composite": 74,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2958,10 +2958,11 @@
       "implemented": 82,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 48,
+      "mainnet_ready": 58,
       "missing_work": [
         "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
-        "What that still does not establish: no node or validator network has finalized a program whose *state* is then read from a second node. The live multi-validator test covers a receipt over a simple program; the state-carrying one runs against the pallet's mock runtime. The two halves are each proven and not yet joined on a live chain.",
+        "**2026-09-26 \u2014 the two halves are joined on a live chain, and the join is asserted with a control.** `node/tests/x3lang_network_receipt.rs` now drives four comits through the real extrinsic on three validators: a control read of slot 0 before anything stored one (which must return the interpreter's zero, and the chain must hold no slot), a comit whose hand-assembled `evm_sstore` program writes 7 to slot 0 (whose slot must then be readable from the *observer* node's chain storage, and whose receipt must carry a state change), and a third comit whose program reads slot 0 and returns 7 while its own receipt claims no write. Measured: the gate `X3Lang across validators` PASSes in 153 s on a three-validator local3 network, printing the store hash and the read value, with all three validators finalizing the same blocks. Without the seeding half the third comit returns 0, so the assertion is load-bearing rather than incidental.",
+        "What that still does not establish: the `.x3` *language* cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip on the live chain uses hand-assembled X3BC rather than compiled source; and no public network, independent operator or generated-program campaign has exercised any of it.",
         "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
         "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. Still not joined: no validator network has finalized a state-carrying program and read its state from a second node, and the `.x3` *language* still cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip is proven with hand-assembled X3BC rather than compiled source."
       ],
@@ -2978,8 +2979,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 85,
-      "tests": "tested score 85% (no named test list on this row)"
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4550,7 +4551,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "4073fed98d8142d5078391066c605176ed99b5635f212b65a531ec007c925349",
+    "source_digest": "a8a3e7e63c054ec69fe5f855100252781b85c1309f6f8747b1e75533ea561d94",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4561,7 +4562,7 @@
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "cc1c338421dcaa20356e9496e581f0b07923a61e014f75ae326667fc6f290b3d",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",
-      "feature-matrix/language-trading.toml": "ad5aa05388a4ce4fef0fa3c08a10df0b93860ca5867ebff34063afd2d941980e",
+      "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
       "feature-matrix/operations-user-tools.toml": "186d2caec11450cf6dcc6e1b79bdf5c90dc152d81319e691fc68dbf5892fae8c",
       "feature-matrix/runtime-core.toml": "89831af49036596a6b58d1f8b4d5d258987313ff3c5e24211de47151660c786d",

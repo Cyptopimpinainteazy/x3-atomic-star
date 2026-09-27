@@ -25976,6 +25976,7 @@ dependencies = [
  "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-atomic-trade",
+ "x3-backend",
  "x3-bridge-adapters",
  "x3-chain-runtime",
  "x3-common",

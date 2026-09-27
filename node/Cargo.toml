@@ -150,6 +150,10 @@ try-runtime = [
 # The live tests compile real `.x3` source with the same bridge the node uses, so a
 # program under test is an artifact the compiler produced rather than a fixture.
 x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "compile"] }
+# The live state half assembles a real X3BC module with the envelope writer the compiler uses
+# (`BytecodeModule`), so the module the node runs has a real checksum rather than a hand-rolled
+# header. The `.x3` front end cannot emit `evm_sstore` yet, which is why it is assembled here.
+x3-backend = { path = "../crates/x3-backend", features = ["std"] }
 # `supply_invariant_distributed` reads `System::Account` back out of chain state, so it decodes the
 # runtime's real `frame_system::AccountInfo<Nonce, pallet_balances::AccountData<Balance>>` instead
 # of a hand-copied byte layout. Same crate the runtime already links.

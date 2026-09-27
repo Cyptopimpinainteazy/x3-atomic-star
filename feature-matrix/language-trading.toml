@@ -146,6 +146,7 @@ required_tests = [
   "a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded",
   "a_corrupted_x3_program_is_refused_by_the_runtime_path",
   "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
+  "a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it",
   "the_current_artifact_runs_on_the_loader_the_chain_uses",
   "a_patch_bump_stays_readable",
   "a_newer_minor_is_refused_by_name",
@@ -234,15 +235,16 @@ paths = [
   "node/tests/x3lang_network_receipt.rs",
 ]
 implemented = 82
-tested = 85
-mainnet_ready = 48
+tested = 88
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
   "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
-  "What that still does not establish: no node or validator network has finalized a program whose *state* is then read from a second node. The live multi-validator test covers a receipt over a simple program; the state-carrying one runs against the pallet's mock runtime. The two halves are each proven and not yet joined on a live chain.",
+  "**2026-09-26 — the two halves are joined on a live chain, and the join is asserted with a control.** `node/tests/x3lang_network_receipt.rs` now drives four comits through the real extrinsic on three validators: a control read of slot 0 before anything stored one (which must return the interpreter's zero, and the chain must hold no slot), a comit whose hand-assembled `evm_sstore` program writes 7 to slot 0 (whose slot must then be readable from the *observer* node's chain storage, and whose receipt must carry a state change), and a third comit whose program reads slot 0 and returns 7 while its own receipt claims no write. Measured: the gate `X3Lang across validators` PASSes in 153 s on a three-validator local3 network, printing the store hash and the read value, with all three validators finalizing the same blocks. Without the seeding half the third comit returns 0, so the assertion is load-bearing rather than incidental.",
+  "What that still does not establish: the `.x3` *language* cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip on the live chain uses hand-assembled X3BC rather than compiled source; and no public network, independent operator or generated-program campaign has exercised any of it.",
   "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
   "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. Still not joined: no validator network has finalized a state-carrying program and read its state from a second node, and the `.x3` *language* still cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip is proven with hand-assembled X3BC rather than compiled source.",
 ]
@@ -259,6 +261,7 @@ required_tests = [
   "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
 ]
 test_evidence = [
+  "note: the live state round trip is the `X3Lang across validators` gate (`env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3lang_network_receipt -- --ignored --nocapture --test-threads=1`) -> PASS 153s on three validators: control read 0, store of 7 readable from the observer node, later read returns 7 with no write claimed",
   "crates/x3-integration/tests/compiler_bridge.rs",
   "node/tests/x3lang_network_receipt.rs",
   "pallets/x3-kernel/tests/x3_storage_channel.rs",
