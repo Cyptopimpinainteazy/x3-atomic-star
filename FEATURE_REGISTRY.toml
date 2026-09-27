@@ -336,7 +336,46 @@ proof_report = ""
 #   mainnet_ready 15 — unchanged: the crate is excluded from the root workspace and
 #     absent from the runtime dependency graph, so none of this is on the deployed
 #     path. That is a wiring decision, not a code-quality one.
-readiness_score = 45
+#
+# Third pass, 2026-09-27 — the race/partition blocker below is answered, and the
+# pass found a real defect while answering it:
+#
+#   * Dispatching used to be a **peek, not a claim.** `SwarmScheduler::next_task_for`
+#     returned a `Pending` task without marking it, so two consecutive calls handed
+#     the same task to two callers (measured: `("t-1", Ok(t-1))` on the second call;
+#     the probe is now the regression test `a_claimed_task_is_never_handed_out_twice`).
+#     It is replaced by `claim_next_for(&mut self, ..)`, which asks the authority,
+#     marks the task `Running` and stamps the holder in one operation, and returns an
+#     owned clone so a caller cannot hold the queue.
+#   * A claim now **outlives nothing**: `claim_of`/`claims()` make the holder visible
+#     (in enqueue order, so two reads agree), `release_claim`/`release_claims_of` put
+#     work back when its holder is killed — without which work taken by an agent that
+#     then dies was stuck `Running` forever — and re-queuing (the reject path) drops
+#     the stale stamp so `claim_of` cannot name the agent that lost the task.
+#   * Work that carries an approval requirement is **no longer dispatchable** before
+#     the approval exists: `ApprovalRequirement::is_satisfied_legacy()` gates the
+#     handout, and the new `DispatchRefusal::AwaitingApproval { agent_id, task_id,
+#     requirement }` distinguishes "nothing to do" from "your work is held back".
+#   * Race and partition evidence: `tests/race_and_partition.rs` claims a 32-task
+#     queue from 8 threads through one lock and requires the claimed set to equal a
+#     sequential reference run over the same queue (exactly once each); builds two
+#     replicas of one queue, has both claim the same task, and asserts the conflict
+#     is *visible* through `claims()` and recoverable through `release_claim`; and
+#     drives a 64-step enqueue/claim/release cycle asserting no stamped task is ever
+#     non-`Running` and claims never outnumber tasks.
+#   * Break-it-first: with the `task.status = Running` line removed,
+#     `a_claimed_task_is_never_handed_out_twice`, `a_clean_agent_is_handed_its_task`
+#     and `releasing_a_dead_holders_claim_puts_the_work_back` all go red (the first
+#     with the double handout itself), and the file was restored byte-identically.
+#
+#   implemented 65 — an atomic claim with a visible holder, an approval gate on the
+#     handout and a release path; the crate is still an off-chain control plane.
+#   tested 72 — 79 lib + 6 agent_lifecycle + 15 guard_tests + 3 race_and_partition +
+#     11 sensitive_actions = **114 passed, 0 failed, 0 ignored** in `test x3-swarm-core`,
+#     plus the service's 4 in `test x3-swarm-api`. No live-node or fleet-scale run.
+#   mainnet_ready 25 — nothing here is deployed; it is the local control plane.
+#   0.35*65 + 0.25*72 + 0.40*25 = 22.75 + 18 + 10 = 50.75 -> 51
+readiness_score = 51
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names previously
 # listed here existed as real test functions anywhere under crates/x3-swarm-core,
 # so they were removed rather than left as citations. Closed 2026-09-26: all four
@@ -357,10 +396,18 @@ required_tests = [
   "swarm_kill_switch_stops_agents",
   "a_killed_agent_is_not_handed_work",
   "an_unregistered_agent_is_not_handed_work",
+  "a_claimed_task_is_never_handed_out_twice",
+  "work_waiting_on_an_approval_is_not_dispatched",
+  "a_requeued_task_can_be_claimed_again_and_the_stamp_moves",
+  "releasing_a_dead_holders_claim_puts_the_work_back",
+  "parallel_claims_match_the_sequential_reference",
+  "a_partitioned_replica_pair_reports_its_conflict",
+  "claim_stamps_never_outnumber_the_queue",
 ]
 blockers = [
   "Experimental — its crate tests do run in the fast set (`test x3-swarm-core`), but crates/x3-swarm-core is excluded from the root workspace and is absent from the runtime dependency graph cargo metadata reports for x3-chain-runtime, so the swarm control plane is not on the deployed blockchain path",
-  "No multi-agent race-condition or partition-tolerance testing"
+  "Partition settlement has no reconciler: two replicas of one queue can both claim the same task, and while the conflict is now visible (`claims()`) and recoverable (`release_claim`), nothing diffs the replicas automatically — the arbiter is `pallet-northern-swarm`'s exclusive `claim_task`, and a second executor is refused there, not here",
+  "No live-node or fleet-scale run: the authority the scheduler consults is a local data structure; nothing drives this control plane from a real chain or a real worker fleet",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
 
