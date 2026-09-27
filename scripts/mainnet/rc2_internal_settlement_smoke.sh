@@ -612,7 +612,21 @@ async function main() {
     const messageId = extractMessageId(transferReceipt, false) || await findNewTransferId(api, transferIdsBefore, `transfer ${source} -> ${destination}`);
     lastMessageId = messageId;
     const pending = normalizeLedger(await api.query.x3SupplyLedger.ledgers(assetId));
-    const completeReceipt = await submit(api, alice, api.tx.x3CrossVmRouter.completeXvmTransfer(messageId), `complete ${source} -> ${destination}`);
+    // The completion must come from the gateway too. `complete_xvm_transfer` is gated on the same
+    // `EnsureX3LangGateway` origin as the transfer, so signing it with `alice` — which this did until
+    // 2026-09-27 — can only ever be refused with `BadOrigin`. The committed six-route results
+    // (`reports/rc2/six_route_results.json`, `681e2e260`) show every route with `destination_delta
+    // 0` and `pending_zero false` while the ledger row above it shows the debit, which is the shape
+    // of a completion that never ran. Whether this signer was the *only* cause cannot be settled by
+    // running it: this driver cannot decode the chain at all (its pinned `@polkadot/api` knows
+    // transaction format v4 and the chain emits v5), which is why step 2 is retired in the rc6
+    // sequence. The refusal is asserted first so the origin gate is pinned while the transfer really
+    // is in `SourceDebited`, and the case is honest the moment the driver can run again.
+    await expectNoStateChange(
+      'completion from a non-gateway account rejected',
+      api.tx.x3CrossVmRouter.completeXvmTransfer(messageId),
+    );
+    const completeReceipt = await submit(api, gateway, api.tx.x3CrossVmRouter.completeXvmTransfer(messageId), `complete ${source} -> ${destination}`);
     const after = normalizeLedger(await api.query.x3SupplyLedger.ledgers(assetId));
     const sourceDelta = diff(before, after, domainField(source));
     const destDelta = diff(before, after, domainField(destination));

@@ -1820,3 +1820,35 @@ operator to keep the treasury funded — a policy decision, recorded on row X3-X
 invalidates any runtime attestation taken before it. An srtool run was in progress on this box while
 this landed, and several lanes were still editing runtime files at 02:15 local. The release
 attestation has to be taken after the last runtime-graph change.
+
+## GAP-RC2-DRIVER-FORMAT — the six-route live gate cannot read the chain, and reported a driver bug as a chain bug
+
+`scripts/mainnet/rc2_internal_settlement_smoke.sh` is the only thing that drives all six internal
+routes plus the router's negative cases on a live chain. Step 2 of the rc6 sequence is **retired**,
+with the reason recorded in `681e2e260`: this driver cannot decode the chain at all. Its pinned
+`@polkadot/api` understands transaction format v4 and the chain emits v5 (`Unsupported unsigned
+extrinsic version 5` on every block). So the sequence no longer runs it, and nothing else exercises
+the six routes end to end.
+
+Before it was retired it also reported a **driver** bug as a chain bug. Every route's completion was
+signed by `alice`:
+
+```js
+await submit(api, alice, api.tx.x3CrossVmRouter.completeXvmTransfer(messageId), …)
+```
+
+But `complete_xvm_transfer` is gated on the same `EnsureX3LangGateway` origin as `xvm_transfer`, and
+on a dev/local chain the only account authorized for `GatewayRole::X3Lang` is `//x3-atomic-gateway`.
+Alice is not it, so the call could only ever be refused with `BadOrigin`. The committed
+`reports/rc2/six_route_results.json` shows exactly that shape: every route with `source_delta -10`,
+`pending_after_transfer 10`, `destination_delta 0` and `pending_zero false` — the debit moved and the
+completion never did. A reader would file that as a broken router. The same commit fixed the same
+mistake in the refund cleanup call and missed this one.
+
+**Fixed 2026-09-27:** the completion is submitted by the gateway, and the file now asserts *first*
+that a non-gateway completion of a `SourceDebited` transfer is refused, so the origin requirement is
+pinned while it is real rather than after the fact. **Unproven:** the fix cannot be run until the
+driver can decode the chain, so it is verified only by `node --check` and by the runtime's own origin
+wiring. The real repair for the coverage is a Rust live suite for the six routes plus the nine
+negative cases (the port `681e2e260` names); the pending-supply phase in
+`node/tests/supply_invariant_distributed.rs` is one route's worth of that port and the rest is open.
