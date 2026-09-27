@@ -452,7 +452,10 @@ fn sum() -> i64 {
 
         // A measurement of zero is not a measurement: the pipeline must have
         // emitted instructions, charged for them and produced bytes.
-        for (label, stats) in [("baseline", &baseline.stats), ("optimized", &optimized.stats)] {
+        for (label, stats) in [
+            ("baseline", &baseline.stats),
+            ("optimized", &optimized.stats),
+        ] {
             assert!(
                 stats.instruction_count > 0,
                 "{label} reported no instructions"
@@ -486,5 +489,4 @@ fn sum() -> i64 {
             optimized.stats.bytecode_size
         );
     }
-
 }
