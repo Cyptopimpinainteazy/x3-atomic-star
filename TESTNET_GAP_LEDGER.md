@@ -1396,3 +1396,44 @@ Acceptance criteria:
 Validation: the checker fails on a deliberately-removed exemption; the drill's post-clear transfer is
 `InBlock`; the re-benchmarked weight is within the copied value's order of magnitude or the copied
 value is replaced.
+
+## GAP-TOOLCHAIN-WIPE — `~/.cargo/bin` loses everything that was installed after the base image — 2026-09-26
+
+Not a repository defect, but it stopped work twice in one day, so it is recorded where the next
+agent will look. **Measured, twice (once at ~11:56 local, once at ~18:43):**
+
+* **gone** — every *regular file* in `/home/lojak/.cargo/bin`: the `rustup` binary itself, the
+  `subkey` the launcher needs, and everything installed with `cargo install` (`cargo-audit`,
+  `cargo-deny`, `srtool`). Those are exactly the files that did not exist in the base image.
+* **survived** — the rustup *shim symlinks* (dated Sep 2), the toolchains under `~/.rustup`
+  (Sep 2, hundreds of MB), `~/.cargo/registry` and `advisory-db`, `~/.local/bin` (Sep 20), and the
+  Homebrew tools (`promtool`, `prometheus`, `grafana`, `fluent-bit`). So it is neither a HOME reset
+  nor a disk-space sweep: it is a targeted removal of the base image's *absence*.
+* **what was ruled out** — no repository script writes or deletes there (`rg '\.cargo/bin'` finds
+  only scripts that *copy tools in*); no cron entry or user timer; the operator's `~/.bash_history`
+  (last written Sep 24) has no destructive command; and today's Codex session transcripts contain no
+  `rm`/`rustup self uninstall` against that path — they contain three sessions *discovering* the
+  damage within two minutes of each other.
+* **who wrote it back** — at 18:43 `~/.cargo/env` was rewritten and by 18:45 `~/.cargo/bin` was
+  **root-owned** (my own shells run as `lojak`, uid 1000, so this was another actor on the box), then
+  I reinstalled it at 18:56 as `lojak`. At least three agent sessions run concurrently on this
+  machine, and each reacted to the missing toolchain by reinstalling rustup into the same HOME. An
+  interrupted install leaves exactly the observed state — shims present, binaries gone — so the
+  repairs are themselves a source of churn.
+
+**Honest limit:** the first deleter is not identifiable from what is on disk. What is proven is the
+*scope* (only post-image files under `~/.cargo/bin`), the *not-repo* part, and that at least one
+concurrent session reinstalled into that directory as root while repairing the same damage.
+OpenClaw, the second agent framework on this box, keeps its state in SQLite and its records stop at
+03:36 today, so it does not describe the later events either.
+
+**Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
+`/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
+gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
+relocated, but `rustup-init.sh` restores it in seconds and the toolchains under `~/.rustup` survive
+every time.
+
+**If it happens again:** `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+--no-modify-path --default-toolchain 1.90.0-x86_64-unknown-linux-gnu`, then copy the three tools
+back into `~/.cargo/bin` from `~/.local/bin`. Do it as one actor: concurrent installers into the
+same directory are what makes this look worse than it is.
