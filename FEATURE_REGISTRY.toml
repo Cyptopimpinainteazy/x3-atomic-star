@@ -528,13 +528,16 @@ tauri_app = ""
 #
 # Measured 2026-09-27, first-hand this session:
 #   * `bash X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh` (the
-#     `SVM HTLC x3_htlc lifecycle` local-ci gate) — **52 assertions, 0 failed**,
-#     PASS 130s. Real `cargo build-sbf`, deployed at the id `declare_id!` fixes,
+#     `SVM HTLC x3_htlc lifecycle` local-ci gate) — **61 assertions, 0 failed**,
+#     PASS 160s. Real `cargo build-sbf`, deployed at the id `declare_id!` fixes,
 #     real SPL mint and token accounts on the real token program, then lock /
 #     wrong-preimage claim / wrong-recipient claim / correct claim / double-claim
 #     / claim-after-claim refund / refund-before-timelock / wrong-authority refund
 #     / amount-0 / timelock-too-short / timelock-too-long / re-lock, with every
-#     escrow, vault and token balance read straight out of raw account bytes.
+#     escrow, vault and token balance read straight out of raw account bytes. It
+#     then restarts the validator on the same ledger and requires the funded
+#     escrow, its vault balance and its timelock rule to come back from durable
+#     state before it can pass.
 #   * `bash X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh` (the
 #     `SVM HTLC x3_htlc expiry` local-ci gate) — 1 test, PASS. The same compiled
 #     artifact in `solana-program-test` with an overridden clock sysvar, because a
@@ -543,8 +546,12 @@ tauri_app = ""
 #     clock. Refund-before-expiry is refused with `TimelockNotExpired` (6006);
 #     refund-after-expiry drains the vault, returns exactly `amount` to the
 #     initiator and leaves the preimage zeroed; a second refund is refused (6005);
-#     a claim after the refund is refused (6004).
-#   * `test x3-htlc client` (local-ci) — 9 tests over the instruction layout the
+#     a claim after the refund is refused (6004). It also runs the program's
+#     read-only view, so `get_htlc_status` is exercised rather than merely
+#     compiled: Funded(1) before the timelock, Expired(4) for a still-funded
+#     escrow past it, Refunded(3) after the refund and Claimed(2) after the
+#     late claim, all decoded from the instruction's return data.
+#   * `test x3-htlc client` (local-ci) — 10 tests over the instruction layout the
 #     other two gates drive: the Anchor discriminator known-answer, data layout
 #     offsets, escrow/vault PDA binding, and that a compiled message hands the
 #     program the accounts in the declared order with the declared writability.
@@ -606,6 +613,7 @@ required_tests = [
   "compiled_message_preserves_program_account_order",
   "load_payer_fails_closed_without_a_keypair_path",
   "program_id_constant_is_the_declared_id",
+  "status_instruction_is_a_readonly_view_of_the_escrow",
   "expiry_lifecycle_on_the_compiled_program"
 ]
 proof_report = ""

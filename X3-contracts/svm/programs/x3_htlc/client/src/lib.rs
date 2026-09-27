@@ -253,6 +253,21 @@ pub fn build_refund_htlc_ix(
     )
 }
 
+/// Build `get_htlc_status()`, the program's read-only view.
+///
+/// The instruction returns a Borsh-serialized `HtlcStatusResponse` through
+/// program return data, so it is meant to be executed with
+/// `simulateTransaction`. Its first byte is the status tag:
+/// `0 Pending, 1 Funded, 2 Claimed, 3 Refunded, 4 Expired` — the last is
+/// reported only for a still-`Funded` escrow whose timelock has passed.
+pub fn build_get_htlc_status_ix(program_id: &Pubkey, htlc: &Pubkey) -> Instruction {
+    Instruction::new_with_bytes(
+        *program_id,
+        &anchor_global_discriminator("get_htlc_status"),
+        vec![AccountMeta::new_readonly(*htlc, false)],
+    )
+}
+
 /// The PDA pair a caller must reference for a given lock identity.
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct HtlcAddresses {
@@ -564,6 +579,18 @@ mod tests {
             X3_HTLC_PROGRAM_ID.to_string(),
             "X3HTLC1111111111111111111111111111111111111"
         );
+    }
+
+    #[test]
+    fn status_instruction_is_a_readonly_view_of_the_escrow() {
+        let htlc = Pubkey::new_from_array([3u8; 32]);
+        let ix = build_get_htlc_status_ix(&X3_HTLC_PROGRAM_ID, &htlc);
+        assert_eq!(ix.data, anchor_global_discriminator("get_htlc_status"));
+        assert_eq!(ix.data, [0xa0, 0xc2, 0x9f, 0x96, 0xbf, 0xe6, 0xa0, 0x5e]);
+        assert_eq!(ix.accounts.len(), 1);
+        assert_eq!(ix.accounts[0].pubkey, htlc);
+        assert!(!ix.accounts[0].is_writable);
+        assert!(!ix.accounts[0].is_signer);
     }
 
     /// The programs see instruction accounts in the order this crate declares

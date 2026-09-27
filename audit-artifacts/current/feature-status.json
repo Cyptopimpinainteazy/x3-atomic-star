@@ -4759,10 +4759,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "f45f2fdfc80cd804fa62637540026ec0659b163367510e68c3f13f2dacc167db",
+    "source_digest": "451811de7274889df2025ec1587bc2d12f0ddac598d0df5c38f8212d16de68bb",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "37360fee7349b11299d3ddae6b342269b4d8bf8f436da399b39e17b50a521992",
+      "FEATURE_REGISTRY.toml": "69b8e77e1a356a02d1fc34351e50f8079131a0edbdf1eaabe5e89f9fc0a36ddc",
       "feature-matrix/agents-experimental.toml": "a3f6c7070bc6ad2607790bb123bb7827ed71e74ffe5f8bb0f0e56ce439472320",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5118,6 +5118,7 @@
         "compiled_message_preserves_program_account_order",
         "load_payer_fails_closed_without_a_keypair_path",
         "program_id_constant_is_the_declared_id",
+        "status_instruction_is_a_readonly_view_of_the_escrow",
         "expiry_lifecycle_on_the_compiled_program"
       ]
     },

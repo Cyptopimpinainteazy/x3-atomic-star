@@ -174,6 +174,35 @@ async fn htlc_account(
         .unwrap_or_else(|| panic!("escrow {address} does not exist"))
 }
 
+/// Run the program's read-only view (`get_htlc_status`) and return the status
+/// tag it reports through program return data.
+async fn status_view(ctx: &mut solana_program_test::ProgramTestContext, htlc: &Pubkey) -> u8 {
+    let blockhash = ctx.get_new_latest_blockhash().await.expect("blockhash");
+    let payer = ctx.payer.insecure_clone();
+    let ix = x3_htlc_client::build_get_htlc_status_ix(&X3_HTLC_PROGRAM_ID, htlc);
+    let tx =
+        Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer], blockhash);
+    let simulated = ctx
+        .banks_client
+        .simulate_transaction(tx)
+        .await
+        .expect("simulate get_htlc_status");
+    assert!(
+        matches!(simulated.result, None | Some(Ok(()))),
+        "get_htlc_status failed: {:?}",
+        simulated.result
+    );
+    let data = simulated
+        .simulation_details
+        .expect("simulation details")
+        .return_data
+        .expect("get_htlc_status must return HtlcStatusResponse data")
+        .data;
+    // Borsh: status(u8) + amount(u64) + timelock(i64) + initiator(32) + recipient(32)
+    assert_eq!(data.len(), 81, "unexpected HtlcStatusResponse length");
+    data[0]
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn expiry_lifecycle_on_the_compiled_program() {
     let mut program_test = ProgramTest::new(PROGRAM_SO, X3_HTLC_PROGRAM_ID, None);
@@ -286,6 +315,11 @@ async fn expiry_lifecycle_on_the_compiled_program() {
         MINTED - LOCKED,
         "initiator must have paid exactly the locked amount"
     );
+    assert_eq!(
+        status_view(&mut ctx, &a.htlc).await,
+        1,
+        "get_htlc_status reports Funded while the timelock is in the future"
+    );
 
     // Before the timelock expires the initiator cannot refund.
     expect_custom_error(
@@ -319,6 +353,11 @@ async fn expiry_lifecycle_on_the_compiled_program() {
         readback.unix_timestamp,
         timelock_a + 1,
         "clock override must be visible to the runtime"
+    );
+    assert_eq!(
+        status_view(&mut ctx, &a.htlc).await,
+        4,
+        "get_htlc_status reports Expired for a still-funded escrow past its timelock"
     );
 
     send(
@@ -356,6 +395,11 @@ async fn expiry_lifecycle_on_the_compiled_program() {
         token_amount(&htlc_account(&ctx, &recipient_token).await),
         0,
         "the recipient must not be paid by a refund"
+    );
+    assert_eq!(
+        status_view(&mut ctx, &a.htlc).await,
+        3,
+        "get_htlc_status reports Refunded once the refund lands"
     );
 
     expect_custom_error(
@@ -455,6 +499,11 @@ async fn expiry_lifecycle_on_the_compiled_program() {
         token_amount(&htlc_account(&ctx, &recipient_token).await),
         LOCKED,
         "the claim must pay the recipient exactly the locked amount"
+    );
+    assert_eq!(
+        status_view(&mut ctx, &b.htlc).await,
+        2,
+        "get_htlc_status reports Claimed once the claim lands"
     );
     expect_custom_error(
         send(

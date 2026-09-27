@@ -649,6 +649,57 @@ check_reject "re-locking an existing escrow identity" \
 assert_eq "rejected re-lock left the original escrow untouched" "$STATUS_FUNDED" "$(decode_field "$HTLC_PDA2" status)"
 assert_eq "rejected re-lock moved no extra tokens" "$LOCK_AMOUNT" "$(token_amount "$VAULT_PDA2")"
 
+# ───────────────── scenario 4: restart recovery on the same ledger ──────────
+# An escrow that only exists in a process's memory is not an escrow. Restart
+# the validator on the same ledger and require the funded escrow, its vault
+# balance and its timelock rule to come back from durable state.
+echo "=== restarting the validator on the same ledger ==="
+kill "$VALIDATOR_PID" 2>/dev/null || true
+wait "$VALIDATOR_PID" 2>/dev/null || true
+VALIDATOR_PID=""
+
+solana-test-validator --quiet \
+  --rpc-port "$RPC_PORT" \
+  --faucet-port "$FAUCET_PORT" \
+  --ledger "$WORKDIR/ledger" \
+  > "$WORKDIR/validator-restart.log" 2>&1 &
+VALIDATOR_PID=$!
+
+restarted=0
+for i in $(seq 1 90); do
+  if solana cluster-version --url "$RPC_URL" >/dev/null 2>&1; then
+    restarted=1
+    break
+  fi
+  sleep 1
+done
+if [ "$restarted" != "1" ]; then
+  echo "FAIL: the validator did not come back up on the same ledger"
+  cat "$WORKDIR/validator-restart.log"
+  fail=$((fail + 1))
+else
+  echo "PASS: the validator restarted on the same ledger"
+  pass=$((pass + 1))
+fi
+
+wait_for_account "$HTLC_PDA2" "escrow after restart"
+assert_eq "the funded escrow survives a validator restart" "$STATUS_FUNDED" "$(decode_field "$HTLC_PDA2" status)"
+assert_eq "the escrow amount survives a validator restart" "$LOCK_AMOUNT" "$(decode_field "$HTLC_PDA2" amount)"
+assert_eq "the escrow hashlock survives a validator restart" "$HASHLOCK2" "$(decode_field "$HTLC_PDA2" hashlock)"
+assert_eq "the vault balance survives a validator restart" "$LOCK_AMOUNT" "$(token_amount "$VAULT_PDA2")"
+assert_eq "the claimed escrow is still Claimed after a restart" "$STATUS_CLAIMED" "$(decode_field "$HTLC_PDA" status)"
+
+check_reject "refund before the timelock is still refused after a restart" \
+  "0x1776|TimelockNotExpired|has not expired" \
+  "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/initiator.json" \
+  refund --escrow "$HTLC_PDA2" --initiator-token-account "$INITIATOR_ATA"
+assert_eq "the post-restart rejection moved no tokens" "$LOCK_AMOUNT" "$(token_amount "$VAULT_PDA2")"
+
+check_reject "double-claim on the settled escrow is still refused after a restart" \
+  "0x1774|HtlcNotClaimable|not in claimable state" \
+  "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/recipient.json" \
+  claim --escrow "$HTLC_PDA" --recipient-token-account "$RECIPIENT_ATA" --preimage "$PREIMAGE"
+
 assert_eq "supply is conserved across every path" "$MINTED_AMOUNT" \
   "$(( $(zero_if_missing "$(token_amount "$INITIATOR_ATA")") \
       + $(zero_if_missing "$(token_amount "$RECIPIENT_ATA")") \
