@@ -1,0 +1,65 @@
+# The calls that stay dispatchable while `pallet_x3_invariants::Halted` is set.
+#
+# `InvariantCheck` sits in `SignedExtra` and refuses every signed extrinsic while the chain is
+# halted. That is what a halt is for, but a gate that refuses *everything* also refuses the halt's
+# own remedy — and then `emergency_halt`, which is one governance call, is a one-way door: a pending
+# bundle's bond cannot be released and no extrinsic can clear the flag. That is not a theory; it was
+# `6d7bfc540`, and the live drill that shows it
+# (`.ai/runlogs/halt-recovery-live-20260927T010259Z/`) is what caught it.
+#
+# So the list below is load-bearing and must not drift silently. The runtime's list is a `matches!`
+# arm in `runtime/src/lib.rs::RuntimeHaltExemptCalls`; this file is the reviewed version of it, and
+# `scripts/ci/check-halt-exemptions.py` fails when the two disagree in either direction, when a
+# listed call no longer exists in the pallet source, or when an entry has no reason recorded.
+#
+# Adding an entry is a security decision: "exempt" means "the halt does not stop this call". Keep
+# the call's own origin check in mind — this gate does not replace it.
+#
+# Not yet checked (TICKET-153): that the list covers every call in the runtime that holds funds.
+# There is no inventory of those calls to check against yet, so this file cannot prove completeness,
+# only that the list is explicit, reviewed, resolvable, and unchanged by accident.
+
+[[exemption]]
+call = "X3Invariants::clear_halted"
+pallet = "pallets/x3-invariants/src/lib.rs"
+why = "The remedy. `set_halt_on_violation(false)` only stops future violations from re-raising the flag; without this call `Halted` is unclearable by any transaction the chain accepts."
+
+[[exemption]]
+call = "X3Invariants::set_halt_on_violation"
+pallet = "pallets/x3-invariants/src/lib.rs"
+why = "The other half of the documented remedy: an operator clears the flag and disarms the policy it was raised under. Refusing it while halted would leave the policy armed after recovery."
+
+[[exemption]]
+call = "X3SupplyLedger::resume_transfers"
+pallet = "pallets/x3-supply-ledger/src/lib.rs"
+why = "`RuntimeEmergencyHaltController` raises the supply ledger's `TransferHalted` at the same time as the invariants' `Halted`, so the economy freeze needs its own release. Refunds are not gated by it, which is why the freeze can be lifted without stranding pending legs."
+
+[[exemption]]
+call = "X3AtomicKernel::rollback_atomic_bundle"
+pallet = "pallets/x3-atomic-kernel/src/lib.rs"
+why = "The only path that releases a pending atomic bundle's bond. A halt that refuses it traps the submitter's funds for as long as the halt lasts."
+
+[[exemption]]
+call = "AtlasKernel::emergency_unpause"
+pallet = "pallets/x3-kernel/src/lib.rs"
+why = "Lifting the routine operational pause. It moves no funds itself; it restores the extrinsics the pause disabled."
+
+[[exemption]]
+call = "Council::propose"
+external = "polkadot-sdk stable2512: substrate/frame/collective/src/lib.rs"
+why = "Every call above is gated on `EnsureRootOrHalfCouncil` and a mainnet-rc1 chain has no sudo, so a council motion is the only transaction-reachable route to the remedy. Refusing the motion's own extrinsics is exactly how the halt became a one-way door."
+
+[[exemption]]
+call = "Council::vote"
+external = "polkadot-sdk stable2512: substrate/frame/collective/src/lib.rs"
+why = "Part of the same motion: the threshold has to be reached before anything is dispatched. A motion cannot pass on one member's proposal without the other votes."
+
+[[exemption]]
+call = "Council::close"
+external = "polkadot-sdk stable2512: substrate/frame/collective/src/lib.rs"
+why = "The call that dispatches the motion. `close` is where `clear_halted` actually executes, with the collective origin the origin check accepts."
+
+[[exemption]]
+call = "Council::execute"
+external = "polkadot-sdk stable2512: substrate/frame/collective/src/lib.rs"
+why = "Executing an already-approved motion dispatches the same remedy. An approval that cannot be executed is not a route out of the halt."

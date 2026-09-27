@@ -340,6 +340,12 @@ GATES_FAST=(
   # X3-RT-001/006/007 live here, and the gate's exemption list is what keeps `emergency_halt`
   # from refusing its own remedy. Sub-second suite.
   "test x3-invariants:cargo test -p pallet-x3-invariants"
+  # `InvariantCheck` refuses every signed extrinsic while the chain is halted *except* the calls in
+  # `RuntimeHaltExemptCalls`. Both directions of drift in that list are silent: a missing entry is
+  # how `emergency_halt` became a one-way door (`6d7bfc540`), and an undocumented entry lets a call
+  # through a halt without review. This compares the runtime's list with
+  # `security/halt-exemptions.toml` and requires every entry to resolve to a real dispatchable.
+  "halt exemptions:python3 scripts/ci/check-halt-exemptions.py"
   # `x3-packet-schema` is the comit path's wire format: `pallet-x3-kernel`'s packet adapters call
   # `Packet::from_wire_format` on bytes a transaction carries. It was in no fast gate — a root
   # workspace member, so `test workspace` covered it, but only under `--deep`. Its own 58 tests plus

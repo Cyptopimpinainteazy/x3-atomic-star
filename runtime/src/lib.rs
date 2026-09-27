@@ -989,8 +989,6 @@ pub struct RuntimeHaltExemptCalls;
 
 impl frame_support::traits::Contains<RuntimeCall> for RuntimeHaltExemptCalls {
     fn contains(call: &RuntimeCall) -> bool {
-        use pallet_collective::Call as CouncilCall;
-
         matches!(
             call,
             RuntimeCall::X3Invariants(pallet_x3_invariants::Call::clear_halted { .. })
@@ -1004,10 +1002,10 @@ impl frame_support::traits::Contains<RuntimeCall> for RuntimeHaltExemptCalls {
                     pallet_x3_atomic_kernel::Call::rollback_atomic_bundle { .. }
                 )
                 | RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::emergency_unpause { .. })
-                | RuntimeCall::Council(CouncilCall::propose { .. })
-                | RuntimeCall::Council(CouncilCall::vote { .. })
-                | RuntimeCall::Council(CouncilCall::close { .. })
-                | RuntimeCall::Council(CouncilCall::execute { .. })
+                | RuntimeCall::Council(pallet_collective::Call::propose { .. })
+                | RuntimeCall::Council(pallet_collective::Call::vote { .. })
+                | RuntimeCall::Council(pallet_collective::Call::close { .. })
+                | RuntimeCall::Council(pallet_collective::Call::execute { .. })
         )
     }
 }
