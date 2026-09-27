@@ -8626,3 +8626,47 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
 - **Next seed:** the `Disputed` refund path is the only one of these that strands funds — a task whose
   claim slots fill with non-matching hashes leaves the submitter's reward reserved forever, and
   nothing tests that it does not. That is the smallest honest next step on this surface.
+
+## 2026-09-27 05:00 — CLAIM (/root): swarm-core authorization, Reactor job publication, a dead gate
+
+- **Landed (all pushed to `origin/master`, tip `4360d972f`):** `4dd1f3470 fix(swarm-core): a sensitive
+  action cannot be self-authorized`, `f31686518 feat(reactor): a benchmark job submits and its report
+  publishes, once`, `4360d972f fix(gates): the runtime identity baseline gate can run, and something
+  runs it`. The first push also carried openclaw's four local commits (`15de06f7b`, `81e167ee9`,
+  `fd6d5d84a`, `dfe1b9771`); I re-ran their evidence (`test northern-swarm`,
+  `test pallet-northern-swarm`, `swarm_reactor_gate.py`) before carrying them.
+- **`crates/x3-swarm-core` had two half-holes, and the second made the first unreachable.**
+  `ApprovalGate` held a caller-chosen `ApprovalRequirement` and exposed `grant(&mut self)` setting it
+  to `None` — self-authorization — and `request_approval` never called `is_satisfied` at all. It had
+  no callers, which is why it was latent. Separately, `is_satisfied` verifies real Ed25519 M-of-N
+  approvals over `action_hash` but **nothing in the crate derived that hash**: the caller supplied
+  it, so a signature for one action could be presented for another. Now `SensitiveAction` (the five
+  production actions), `SensitiveRequest::commitment` (SHA-256 over a length-prefixed,
+  domain-separated `tag || 0x00 || subject`, deterministic and clock-free), a gate built from the
+  action that derives its own requirement and refuses a foreign hash, an operation-aware
+  `Permissions::required_approval` (unknown name ⇒ `Blocked`), and a security-council floor of three
+  because `ceil(2/3)` of a one-member council is one. Suite 83 → 105; three mutations each redden
+  exactly one or two tests. `mainnet_ready` deliberately left at 35: the row's real blocker — the
+  crate is not in the runtime graph and its own service never calls the scheduler — is untouched.
+- **`crates/x3-bench` had no job and no publication**, which `X3-REACTOR-001` recorded. `job.rs` adds
+  `JobRequest::id` (deterministic, sample-order-independent), `BenchmarkJob::submit`, an append-only
+  `ReportRegistry::publish` that refuses a second publication and a report whose samples are not the
+  requested set, and `report_digest`/`verify` that deliberately exclude `Report::timestamp` (a
+  wall-clock field — digesting it would measure the clock). Three mutations, one test each. Row
+  55/45/5 → 62/72/8. Honest residual: publication binds to the job's identity, not to a proof about
+  the run.
+- **The runtime identity baseline gate was dead and unwired.** `scripts/ci/verify_runtime_identity_baseline.sh`
+  pins `RuntimeVersion`, the `construct_runtime!` pallet order (every pallet index) and the
+  `SignedExtra` order, but it required `RuntimeVersion.state_version` — removed by the pinned
+  polkadot-sdk — so every run exited 1 before comparing anything, and nothing ran it. Its baseline had
+  also sat at `spec_version: 10` against a runtime at 20. Fixed, regenerated with `accepted_reasons`,
+  wired as the `runtime identity baseline` gate. Break-it-first: `spec_version 20→21` and swapping
+  `X3AtomicKernel`/`X3Slash` each produce name-and-index errors, exit 1.
+- **Trap worth remembering: a matrix row can be committed before the tests it cites exist.** A
+  concurrent broad commit swept my `feature-matrix/agents-experimental.toml` edit into `fd6d5d84a`
+  while the four test functions it names were still uncommitted, so for a few minutes `HEAD` cited
+  tests that did not exist anywhere in `HEAD` — a clean checkout would have failed
+  `scripts/ci/check-matrix-tests-exist.py`. Check `git grep -c "fn <name>" HEAD -- <path>` for a
+  row's `required_tests` after any sweep, and land the source in the same push as the row.
+- **Next seed:** `TaskStatus::Disputed` still has no resolution path (funds stay reserved), and
+  `X3-REACTOR-001`'s next honest step is the scheduler/backend notion rather than more job API.
