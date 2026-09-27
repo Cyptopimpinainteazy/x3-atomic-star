@@ -113,7 +113,7 @@ impl SwarmScheduler {
         let task = self
             .tasks
             .get_mut(&task_id)
-            .expect("next_dispatchable returned an id it just found");
+            .ok_or(DispatchRefusal::NoTask)?;
         task.status = TaskStatus::Running;
         let claimed = task.clone();
         self.claims.insert(task_id, *agent_id);

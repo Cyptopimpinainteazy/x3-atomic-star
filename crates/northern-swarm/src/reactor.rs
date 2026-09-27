@@ -355,26 +355,24 @@ pub fn schedule(
     backends: &[BackendDescriptor],
     requirements: &TaskRequirements,
 ) -> Result<ScheduleDecision, ScheduleRefusal> {
+    let mut disqualified: Vec<Candidate> = Vec::new();
     let mut eligible: Vec<&BackendDescriptor> = Vec::new();
-    let mut outcomes: Vec<Candidate> = Vec::new();
 
     for descriptor in backends {
-        let outcome = match disqualify(descriptor, requirements) {
-            Some(reason) => CandidateOutcome::Disqualified(reason),
+        match disqualify(descriptor, requirements) {
+            Some(reason) => disqualified.push(Candidate {
+                backend_id: descriptor.id.clone(),
+                accelerator: descriptor.accelerator,
+                outcome: CandidateOutcome::Disqualified(reason),
+            }),
             None => {
                 eligible.push(descriptor);
-                CandidateOutcome::NotPreferred(PreferenceReason::LowerTierUnderPreference)
             }
-        };
-        outcomes.push(Candidate {
-            backend_id: descriptor.id.clone(),
-            accelerator: descriptor.accelerator,
-            outcome,
-        });
+        }
     }
 
     if eligible.is_empty() {
-        let candidates = outcomes;
+        let candidates = disqualified;
         return Err(if requirements.must_accelerate {
             ScheduleRefusal::AcceleratorUnavailable {
                 kind: requirements.kind.clone(),
@@ -398,36 +396,35 @@ pub fn schedule(
     });
     let chosen = eligible[0];
 
-    // Re-state each non-chosen candidate's reason against the winner, so the
+    // Every eligible candidate's reason is computed against the winner, so the
     // report says which axis decided it rather than "somebody else won".
-    for outcome in outcomes.iter_mut() {
-        if outcome.backend_id == chosen.id {
-            outcome.outcome = CandidateOutcome::Chosen;
-            continue;
-        }
-        if matches!(outcome.outcome, CandidateOutcome::Disqualified(_)) {
-            continue;
-        }
-        let other = eligible
-            .iter()
-            .find(|candidate| candidate.id == outcome.backend_id)
-            .expect("a non-disqualified outcome came from an eligible candidate");
-        outcome.outcome = CandidateOutcome::NotPreferred(preference_reason(
-            chosen,
-            other,
-            requirements.preference,
-        ));
-    }
+    let mut candidates: Vec<Candidate> = eligible
+        .iter()
+        .map(|descriptor| Candidate {
+            backend_id: descriptor.id.clone(),
+            accelerator: descriptor.accelerator,
+            outcome: if descriptor.id == chosen.id {
+                CandidateOutcome::Chosen
+            } else {
+                CandidateOutcome::NotPreferred(preference_reason(
+                    chosen,
+                    descriptor,
+                    requirements.preference,
+                ))
+            },
+        })
+        .collect();
+    candidates.extend(disqualified);
 
-    // The chosen candidate leads, then the rest in the order they were advertised.
-    outcomes.sort_by_key(|candidate| !matches!(candidate.outcome, CandidateOutcome::Chosen));
+    // The chosen candidate leads, then the rest in the order they were considered.
+    candidates.sort_by_key(|candidate| !matches!(candidate.outcome, CandidateOutcome::Chosen));
 
     Ok(ScheduleDecision {
         kind: requirements.kind.clone(),
         chosen_backend_id: chosen.id.clone(),
         chosen_accelerator: chosen.accelerator,
         preference: requirements.preference,
-        candidates: outcomes,
+        candidates,
     })
 }
 
