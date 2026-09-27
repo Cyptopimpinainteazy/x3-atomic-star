@@ -3892,7 +3892,7 @@
       "live_tested": "GUARDED_TESTNET",
       "mainnet_ready": 58,
       "missing_work": [
-        "**2026-09-27 \u2014 the `mainnet-rc1` variant did not compile, and nothing in the default set said so.** `crates/x3-compiler` and the runtime gained a private-submission demand in `ed798764d`: `RuntimePrivateSubmissionChannel` (runtime/src/lib.rs) answered `pallet_private_execution::Enabled::<Runtime>::get()`, and `pallet-private-execution` is *not* in the `mainnet-rc1` `construct_runtime!` block \u2014 the scope lock excludes it. `Runtime: pallet_private_execution::Config` was therefore unimplemented and the storage item's `get()` did not resolve (E0599 at that line), so `bash scripts/check-runtime-variants.sh mainnet-rc1` failed in 36 s on the variant mainnet is meant to run. The rc6 release gate's stage 5 claims a migration dry-run for every variant; it had not been re-run since that commit.",
+        "**2026-09-27 \u2014 the `mainnet-rc1` variant did not compile, and the default gate set was red from `ed798764d` until this fix.** `crates/x3-compiler` and the runtime gained a private-submission demand in `ed798764d`: `RuntimePrivateSubmissionChannel` (runtime/src/lib.rs) answered `pallet_private_execution::Enabled::<Runtime>::get()`, and `pallet-private-execution` is *not* in the `mainnet-rc1` `construct_runtime!` block \u2014 the scope lock excludes it. `Runtime: pallet_private_execution::Config` was therefore unimplemented and the storage item's `get()` did not resolve (E0599 at that line), so `bash scripts/check-runtime-variants.sh mainnet-rc1` failed in 36 s on the variant mainnet is meant to run. `clippy runtime rc1` is in `GATES_FAST` and builds exactly that feature set, so a plain `bash scripts/local-ci.sh` was failing too; `cargo check --workspace` cannot see it, because it compiles the runtime once with default features and never touches the other five `construct_runtime!` blocks. The rc6 sequence's stage 5 also claims a migration dry-run for every variant; it had not been re-run since that commit.",
         "**CLOSED 2026-09-27 \u2014 the reference is cfg-aware and the whole six-variant set is green.** That variant answers a constant `false`, which is the fact the derived version would have reported there \u2014 a chain with no private channel refuses a program whose compiled policy demands one \u2014 so the fail-closed posture is unchanged. Measured: `bash scripts/check-runtime-variants.sh` \u2014 full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s. Break-it-first: the undivided reference is what failed, so the gate's own red log (`runtime-variant-20260927T075116Z-mainnet-rc1.log`, FAIL 36s, E0599) is the before and the PASS run is the after.",
         "Still open, and why `mainnet_ready` stops at 58: a *build* of the rc1 variant is not a *chain* of it. No rc1-featured runtime has ever been booted, no genesis for it exists in `chain-specs/`, and its migration dry-run is in-process rather than against a live state. The gate proves the variant compiles and its `OnRuntimeUpgrade` work fits in a block; it does not prove an rc1 network runs."
       ],
@@ -4647,7 +4647,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "c69a100588880cc60149bcc42c72a5e076ef9adfcbc394c4bdbe82620e70397f",
+    "source_digest": "a2c39dfe730ba07a215322d70fb39222169eff48c4c26b8ed1b931ec55f6e914",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4661,7 +4661,7 @@
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "a3d8d284e59a486a4b52a8d2cadb88b87a6e2acbd1d58f0af37d141ec3138dc4",
       "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
-      "feature-matrix/runtime-core.toml": "af4c56f06927dd66d9b3957258932d8f8791797bffda921a42b6d1d0a00b4f49",
+      "feature-matrix/runtime-core.toml": "833ae18c048a4a7b5bf8b40db02b5e249e40899add628656e3b03c872b3a9a89",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },

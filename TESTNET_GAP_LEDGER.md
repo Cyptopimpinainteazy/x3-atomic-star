@@ -1920,11 +1920,15 @@ the `mainnet-rc1` `construct_runtime!` block — the scope lock leaves it out, a
 other unaudited surfaces — so `Runtime: pallet_private_execution::Config` is unimplemented there and
 the storage item does not resolve. The variant simply did not build.
 
-Nothing in the default gate set said so. The check is `bash scripts/check-runtime-variants.sh` (the
-`--variants` group); `scripts/local-ci.sh` auto-selects it when a `runtime/*` path changes, and the
-rc6 sequence's stage 5 claims a migration dry-run for *every* variant. It had not been re-run since
-that commit. The breakage is invisible to `cargo check --workspace`, which compiles the runtime once,
-with default features, and never sees the other five `construct_runtime!` blocks.
+**The default gate set was red and nobody ran it.** `clippy runtime rc1` is in `GATES_FAST` — it is
+`cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D
+warnings`, the same feature set this error comes from — so a plain `bash scripts/local-ci.sh` failed
+from `ed798764d` until this fix, and the lane that landed that commit did not see it. The
+`--variants` group's `runtime variant dry-runs` (`scripts/check-runtime-variants.sh`, auto-selected by
+`scripts/local-ci.sh` when a `runtime/*` path changes) and the rc6 sequence's stage 5 both claim a
+migration dry-run for *every* variant, and neither had been re-run either. The breakage is invisible
+to `cargo check --workspace`, which compiles the runtime once, with default features, and never sees
+the other five `construct_runtime!` blocks.
 
 **Fixed 2026-09-27:** the reference is now cfg-aware. On `mainnet-rc1` the answer is a constant
 `false`, which is not a workaround — it is the fact the derived version would have reported on a
