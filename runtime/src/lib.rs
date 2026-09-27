@@ -677,9 +677,9 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
-        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
