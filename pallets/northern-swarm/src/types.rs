@@ -42,6 +42,23 @@ pub enum ExecutorStatus {
     Suspended,
 }
 
+/// Task category used for deterministic backend routing.
+///
+/// This enum is bounded/codec-stable so it can safely live in runtime storage.
+/// Vendor-specific backend selection remains off-chain; consensus only records
+/// the workload class.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+pub enum TaskKind {
+    Compute,
+    DataFetch,
+    AiInference,
+    X3LangAgent,
+    Other(u16),
+}
+
 /// Task record stored in the Tasks map.
 /// Hash is the runtime T::Hash type (typically sp_core::H256).
 #[derive(
@@ -52,7 +69,10 @@ pub struct TaskRecord<AccountId, Balance, BlockNumber, Hash> {
     pub submitter: AccountId,
     pub payload_uri: BoundedVec<u8, ConstU32<512>>,
     pub reward: Balance,
+    pub kind: TaskKind,
     pub status: TaskStatus,
+    /// First claimant retained for compact compatibility/debugging. Canonical
+    /// multi-executor membership lives in the pallet's TaskClaims map.
     pub claimed_by: Option<AccountId>,
     pub submitted_at: BlockNumber,
     pub result_hash: Option<Hash>,
