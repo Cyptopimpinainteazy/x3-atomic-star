@@ -235,6 +235,14 @@ GATES_FAST=(
   # modules counted as production and the release gate read 570 against a 516
   # baseline. This pins the classification and the empty result for runtime/src.
   "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
+  # The two detectors `AGENTS.md` names under "Forbidden" had never completed: they walked build
+  # output and vendored trees (`x3fronend/out/_next`, `*/node_modules`, a `.wt-*` worktree's
+  # `tauri-vendor/cc`) and died at the 240 s timeout, so a mandated check read as satisfied while it
+  # had never run. `scripts/x3_fake_code_scan.py` bounds the walk (~1 s and ~3 s here) and ratchets
+  # against `docs/reports/fake-code-baseline.json` and `test-cheat-baseline.json`, so the gates fail
+  # on a *new* finding rather than on the years-old annotations that are already counted.
+  "fake-code scan:python3 scripts/x3_fake_code_scan.py stubs"
+  "test-cheat scan:python3 scripts/x3_fake_code_scan.py cheats"
   # The runtime-hash check exempts files that cannot reach the wasm target
   # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
   # not demand a ten-minute double srtool rebuild. An exemption that is too wide
