@@ -3878,7 +3878,7 @@
       "mainnet_ready": 60,
       "missing_work": [
         "**CLOSED 2026-09-27 \u2014 the failure paths that write before they refuse now have a conservation test, and it is load-bearing.** `pallets/x3-kernel/src/failure_path_conservation.rs` drives three refusals *through `submit_comit_v2`* (never through the helpers, whose own refusals were already covered) and asserts, after each, that total issuance, the caller's balance, all three canonical-ledger legs, the `X3ContractStorage` slot count, the nonce, the comit record, the stored X3 receipt, the decode-failure counter and the event log are exactly where they started: a wrong `prepare_root` (refused *after* the fee is withdrawn), a ledger channel one entry past `MAX_STATE_CHANGES`, and a slot channel one write past it \u2014 the last of which fires only after the fee is burned, the comit and its receipt are recorded, and the canonical ledger has been updated for all three domains. Each refusal is paired with the same call succeeding on a fresh chain, asserting that the fee *is* burned and all three legs *do* land, so \"nothing changed\" cannot pass because the call does nothing. Break-it-first, measured: widening `MAX_STATE_CHANGES` to 2000 turns exactly the three bound-dependent tests red (`Ok(())` where `TooManyStateChanges`/`TooManyStorageWrites` was required) and leaves the other three green; restoring 1000 returns all six to green",
-        "**Fixed in the same change:** `chaos_tests::cross_vm::evm_failure_causes_full_rollback` submitted a comit that succeeded and asserted the nonce advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed successfully \u2014 neither could fail if rollback were broken, and the second one's name described a scenario its body never created. Both now inject a real failure (an EVM payload the adapter refuses by name; a failing third VM after two usable receipts) and assert the full no-trace set, including the event log",
+        "**Fixed in the same change:** `chaos_tests::cross_vm::evm_failure_causes_full_rollback` submitted a comit that succeeded and asserted the nonce advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed successfully \u2014 neither could fail if rollback were broken, and the second one's name described a scenario its body never created. Both now inject a real failure (an EVM payload the adapter refuses by name; a failing third VM after two usable receipts) and assert the full no-trace set, including the event log. A third test in that module, `comit_v2_triple_vm_atomicity`, wrapped its only assertion in `if result.is_ok()`, so a comit that failed every check passed it; it now requires the call to succeed and pins all three ledger legs, the single nonce and the burned fee",
         "Still open on this row: the proof is pallet-level with the mock adapters, so it establishes that the *pallet's* writes are rolled back \u2014 not that a real adapter's own state is. That half is the documented contract (\"Runtime VM adapters MUST be transactional\") and belongs to the adapter suites (`tests/x3_adapter_route.rs`, the wasm adapters), not to this row. Nothing here has run on a multi-validator network; the distributed-traffic half is X3-ECO-002's `node/tests/supply_invariant_distributed.rs`"
       ],
       "name": "Canonical state ledger updates",
@@ -4598,7 +4598,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "23f9fbe6c9884482073f592981235b6fee246a4ff7dd7ab55ad7c4311f3de867",
+    "source_digest": "67ee1eacc26b59e2eda19d6f97bf5ebf39a73fdc378c8c192787e560c09ee0db",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4612,7 +4612,7 @@
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
       "feature-matrix/operations-user-tools.toml": "9d2ec869ddcc7f4cf614d9400a2906d0b0ba775b736c5b4be18b049d2d52503b",
-      "feature-matrix/runtime-core.toml": "72ed379b8ca2a7720a95ddd3aa1400e2b085310f5c342bd63e4d11ad1508e143",
+      "feature-matrix/runtime-core.toml": "5d8859153c18969b55f1140a6119c8908fc17a3254c96e76ba016178ff50f2df",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }
   },

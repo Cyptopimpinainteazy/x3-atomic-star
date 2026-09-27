@@ -237,8 +237,16 @@ mod cross_vm {
             let x3 = wrap_x3_payload(&x3_intent);
             let prepare_root = compute_prepare_root_v2(comit_id, &evm, &svm, &x3, 0, FEE);
 
-            // Submit V2 comit with all three payloads
-            let result = AtlasKernel::submit_comit_v2(
+            let issuance_before = Balances::total_issuance();
+
+            // Submit V2 comit with all three payloads.
+            //
+            // This used to be `let result = ...; if result.is_ok() { assert!(event) }` — a
+            // conditional assertion, so a comit that failed every check passed the test. The
+            // fixture's intents are all benign (0x01/0x02/0x03 are not the mock's failure markers),
+            // so the call must succeed, and the point of the test is that *all three* domains land
+            // together: assert that rather than the possibility of it.
+            assert_ok!(AtlasKernel::submit_comit_v2(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
                 evm,
@@ -247,22 +255,32 @@ mod cross_vm {
                 0,
                 FEE,
                 prepare_root,
-            );
+            ));
 
-            // Document actual behavior (X3Adapter is FailingMockX3Adapter)
-            if result.is_ok() {
-                let events = System::events();
-                let has_completed_event = events.iter().any(|e| {
-                    matches!(
-                        e.event,
-                        RuntimeEvent::AtlasKernel(Event::ComitExecutionCompleted { .. })
-                    )
-                });
-                assert!(
-                    has_completed_event,
-                    "Should emit completed event on success"
-                );
-            }
+            let has_completed_event = System::events().iter().any(|e| {
+                matches!(
+                    e.event,
+                    RuntimeEvent::AtlasKernel(Event::ComitExecutionCompleted { success: true, .. })
+                )
+            });
+            assert!(
+                has_completed_event,
+                "a comit that passed every check must emit ComitExecutionCompleted{{success: true}}"
+            );
+            assert_eq!(
+                (
+                    CanonicalLedger::<Test>::get(ALICE, 0),
+                    CanonicalLedger::<Test>::get(ALICE, 1),
+                    CanonicalLedger::<Test>::get(ALICE, 2),
+                ),
+                (123, 222, 333),
+                "all three domains' ledger legs must land in the same comit"
+            );
+            assert_eq!(Nonces::<Test>::get(ALICE), 1, "exactly one nonce is spent");
+            assert!(
+                Balances::total_issuance() < issuance_before,
+                "the fee for a comit that ran must actually be burned"
+            );
         });
     }
 }
