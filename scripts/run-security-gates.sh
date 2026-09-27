@@ -43,6 +43,27 @@ run_s0_gate() {
     
     mkdir -p "$RESULTS_DIR"
     local results_file="${RESULTS_DIR}/s0-security-gate.txt"
+
+    # Fail with the reason that matters when the TLA+ toolchain is absent. The
+    # proof binary shells out to `java -cp tools/tla2tools.jar tlc2.TLC`, so with
+    # no JRE on PATH every spec reports `TLA+ invocation error … No such file or
+    # directory (os error 2)` — a message that names neither Java nor the fix.
+    # Measured 2026-09-27: that is exactly how `S0: formal_verification_blocked`
+    # appeared on a box with `tools/tla2tools.jar` present and no `java`.
+    if [ -n "$(find "${REPO_ROOT}/formal-proofs/tla" -name '*.tla' -print -quit 2>/dev/null)" ] \
+        && ! command -v java >/dev/null 2>&1; then
+        {
+            echo "=== S0 Security Gate Execution ==="
+            echo "Timestamp: $(date -u)"
+            echo ""
+            echo "✗ TLA+ specs exist under formal-proofs/tla but no 'java' is on PATH."
+            echo "  The proof binary runs 'java -cp tools/tla2tools.jar tlc2.TLC',"
+            echo "  so formal verification cannot run at all."
+            echo "  Fix: install a JRE (e.g. default-jre-headless) or put one on PATH."
+        } > "$results_file"
+        log_fail "S0 gate could not run: no JRE on PATH for the TLA+ model check"
+        return 1
+    fi
     
     {
         echo "=== S0 Security Gate Execution ==="
@@ -52,21 +73,44 @@ run_s0_gate() {
         echo ""
     } > "$results_file"
     
-    # Run security gate
-    if "$PROOF_BINARY" security-gate -v >> "$results_file" 2>&1; then
-        log_pass "S0 gate passed"
-    else
+    # The exit code is not the check. `x3-proof security-gate` returns 0 while
+    # its own report ends in `Gate Status: 1 BLOCKER(S) REMAIN` (measured
+    # 2026-09-27, on the missing-JRE blocker), so a wrapper that only looked at
+    # `if "$PROOF_BINARY" …` logged "✓ S0 gate passed" over a report that said a
+    # blocker remained. Read the report.
+    local s0_output
+    if ! s0_output="$("$PROOF_BINARY" security-gate -v 2>&1)"; then
+        printf '%s\n' "$s0_output" >> "$results_file"
         log_fail "S0 gate failed - see $results_file"
         return 1
     fi
+    printf '%s\n' "$s0_output" >> "$results_file"
+
+    if grep -q "BLOCKER(S) REMAIN" <<<"$s0_output"; then
+        grep -E "BLOCKER\(S\) REMAIN|⛔" <<<"$s0_output" | sed 's/^/  /' >&2
+        log_fail "S0 gate reports a remaining blocker - see $results_file"
+        return 1
+    fi
+    log_pass "S0 gate passed"
     
     {
         echo ""
         echo "=== Blockers Check ==="
     } >> "$results_file"
     
-    if "$PROOF_BINARY" explain-blockers all >> "$results_file" 2>&1; then
-        log_pass "No critical blockers detected"
+    # Informational only: the verdict is the report above. This used to log
+    # "No critical blockers detected" whenever the command exited 0, whatever it
+    # printed — which is how `reports/rc6/security_gates_*.log` came to say
+    # "✓ S0 gate passed / ✓ No critical blockers detected" four minutes after
+    # `.proof-results/s0-security-gate.txt` recorded `1 BLOCKER(S) REMAIN`.
+    local explain
+    if explain="$("$PROOF_BINARY" explain-blockers all 2>&1)"; then
+        printf '%s\n' "$explain" >> "$results_file"
+        log_pass "Blocker explanation written (the S0 report above is the verdict)"
+    else
+        printf '%s\n' "$explain" >> "$results_file"
+        log_fail "explain-blockers failed - see $results_file"
+        return 1
     fi
     
     return 0
