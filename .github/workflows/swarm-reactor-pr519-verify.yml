@@ -10,6 +10,9 @@ concurrency:
   group: swarm-reactor-pr519-verify
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     # Same-repository branch only. There is deliberately no pull_request trigger,
@@ -39,6 +42,26 @@ jobs:
 
       - name: Northern Swarm executor
         run: cargo test -p northern-swarm --all-targets --no-fail-fast
+
+      - name: Northern Swarm benchmark suite
+        run: cargo test -p pallet-northern-swarm --features runtime-benchmarks --no-fail-fast
+
+      - name: Generate measured Northern Swarm weights
+        run: |
+          if grep -q "THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI" pallets/northern-swarm/src/weights.rs; then
+            echo "Measured Northern Swarm weights already committed."
+            exit 0
+          fi
+          cargo build --release -p x3-chain-node --features runtime-benchmarks
+          BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 \
+            bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm
+          grep -q "THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI" \
+            pallets/northern-swarm/src/weights.rs
+          git config user.name "x3-benchmark-bot"
+          git config user.email "benchmark-bot@x3-chain.local"
+          git add pallets/northern-swarm/src/weights.rs
+          git commit -m "bench(swarm): record measured FRAME weights"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Release runtime integration
         run: cargo check -p x3-chain-runtime --features mainnet-rc1
