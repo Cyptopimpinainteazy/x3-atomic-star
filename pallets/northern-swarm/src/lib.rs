@@ -49,6 +49,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
@@ -513,7 +516,7 @@ pub mod pallet {
         ///
         /// Emits [`Event::ResultCommitted`].
         #[pallet::call_index(6)]
-        #[pallet::weight(T::WeightInfo::submit_result(T::MaxExecutorsPerTask::get()))]
+        #[pallet::weight(T::WeightInfo::submit_result())]
         #[transactional]
         pub fn submit_result(
             origin: OriginFor<T>,
