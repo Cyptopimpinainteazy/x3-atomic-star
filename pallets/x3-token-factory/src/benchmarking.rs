@@ -31,17 +31,24 @@ mod benchmarks {
     const MINT_AMOUNT: Balance = 1_000;
     const BURN_AMOUNT: Balance = 1_000;
 
-    fn launch_config(class: TokenClass) -> TokenFactoryConfig {
-        TokenFactoryConfig {
-            symbol: BoundedVec::try_from(b"XBENCH".to_vec()).expect("symbol fits"),
-            name: BoundedVec::try_from(b"Benchmark Token".to_vec()).expect("name fits"),
+    /// Build the launch config, refusing rather than panicking on a bound failure.
+    ///
+    /// The panic ratchet counts `expect`/`unwrap` in code that is not `#[cfg(test)]`, and a benchmark
+    /// module is not — three `expect` calls here grew the baseline 440 → 443 and reddened
+    /// `make mainnet-check`.
+    fn launch_config(class: TokenClass) -> Result<TokenFactoryConfig, BenchmarkError> {
+        Ok(TokenFactoryConfig {
+            symbol: BoundedVec::try_from(b"XBENCH".to_vec())
+                .map_err(|_| BenchmarkError::Weightless)?,
+            name: BoundedVec::try_from(b"Benchmark Token".to_vec())
+                .map_err(|_| BenchmarkError::Weightless)?,
             canonical_decimals: 18,
             initial_supply: INITIAL_SUPPLY,
             max_supply: Some(MAX_SUPPLY),
             class,
             enabled_domains: BoundedVec::try_from(vec![DomainId::X3Native, DomainId::X3Evm])
-                .expect("domains fit"),
-        }
+                .map_err(|_| BenchmarkError::Weightless)?,
+        })
     }
 
     /// Launch a token exactly the way the extrinsic does and return its canonical id.
@@ -49,7 +56,7 @@ mod benchmarks {
         origin: OriginFor<T>,
         class: TokenClass,
     ) -> Result<AssetId, BenchmarkError> {
-        Pallet::<T>::create_token(origin, launch_config(class))?;
+        Pallet::<T>::create_token(origin, launch_config(class)?)?;
         Tokens::<T>::iter_keys()
             .next()
             .ok_or(BenchmarkError::Weightless)
@@ -59,7 +66,7 @@ mod benchmarks {
     fn create_token() -> Result<(), BenchmarkError> {
         let origin = T::CreateTokenOrigin::try_successful_origin()
             .map_err(|_| BenchmarkError::Weightless)?;
-        let launch = launch_config(TokenClass::CappedMintable);
+        let launch = launch_config(TokenClass::CappedMintable)?;
 
         #[extrinsic_call]
         create_token(origin, launch);
