@@ -649,12 +649,14 @@ GATES_FAST=(
   # its types, which pulls the runtime — this check needs the types, not the
   # embedded blob, and the blob is built by the root workspace gates anyway.
   # One entry per workspace, not a loop over four. A loop hides both things a gate list is for:
-  # which crate failed when it fails, and what it covers when a reader asks. The three on `check`
-  # have nothing to run — `x3-swarm-api` and `x3-swarm-worker` declare no tests, and
-  # `x3-solvency-sidecar`'s suite has `state::tests::record_fill_time_ema_after_window`, still running
-  # after 60 seconds — while `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in
-  # seconds and are tested for real.
-  "check x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo check --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
+  # which crate failed when it fails, and what it covers when a reader asks. The two on `check`
+  # have nothing to run — `x3-swarm-worker` declares no tests, and `x3-solvency-sidecar`'s suite has
+  # `state::tests::record_fill_time_ema_after_window`, still running after 60 seconds — while
+  # `x3-swarm-api` (its create/start/complete/reject lifecycle on `x3-swarm-core::SwarmScheduler`),
+  # `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in seconds and are tested for real.
+  # `x3-swarm-api` moved from `check` to `test` because it now has those tests: it stores every task
+  # in the crate's scheduler rather than a private map, and four tests drive the handlers to prove it.
+  "test x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo test --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
   "check x3-swarm-worker:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-worker cargo check --locked --all-targets --manifest-path services/x3-swarm-worker/Cargo.toml"
   "check x3-solvency-sidecar:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-solvency-sidecar cargo check --locked --all-targets --manifest-path services/x3-solvency-sidecar/Cargo.toml"
   "test x3-sidecar:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml"

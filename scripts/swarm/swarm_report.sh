@@ -9,8 +9,10 @@ mkdir -p "$ROOT_DIR/reports"
 
 echo "# X3 Swarm Report" > "$REPORT_FILE"
 echo >> "$REPORT_FILE"
-echo "- API path: crates/x3-swarm-core/services/x3-swarm-api" >> "$REPORT_FILE"
-echo "- Worker path: crates/x3-swarm-core/services/x3-swarm-worker" >> "$REPORT_FILE"
+# The services the repo runs live at the top level (`services/`), not under the
+# crate; the copies this used to name were deleted as stale duplicates.
+echo "- API path: services/x3-swarm-api" >> "$REPORT_FILE"
+echo "- Worker path: services/x3-swarm-worker" >> "$REPORT_FILE"
 echo "- Memory path: data/agent-memory" >> "$REPORT_FILE"
 echo "- Generated at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$REPORT_FILE"
 echo >> "$REPORT_FILE"

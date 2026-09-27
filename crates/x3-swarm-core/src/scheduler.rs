@@ -4,7 +4,7 @@ use crate::{AgentKind, AgentTask, TaskStatus};
 use std::collections::{HashMap, VecDeque};
 
 /// Swarm task scheduler.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SwarmScheduler {
     tasks: HashMap<String, AgentTask>,
     task_order: VecDeque<String>,
@@ -63,6 +63,22 @@ impl SwarmScheduler {
             return true;
         }
         false
+    }
+
+    /// The task with this id, if the scheduler is holding one.
+    pub fn get(&self, task_id: &str) -> Option<&AgentTask> {
+        self.tasks.get(task_id)
+    }
+
+    /// Every task the scheduler holds, in the order it was first enqueued.
+    ///
+    /// The order is the queue's own `task_order`, not the hash map's iteration
+    /// order, so two calls over an unchanged scheduler produce the same
+    /// sequence. Re-enqueuing an id updates in place and does not move it.
+    pub fn tasks(&self) -> impl Iterator<Item = &AgentTask> {
+        self.task_order
+            .iter()
+            .filter_map(move |task_id| self.tasks.get(task_id))
     }
 
     pub fn count_tasks(&self) -> usize {
@@ -275,6 +291,40 @@ mod tests {
         assert_eq!(
             scheduler.next_task_for(class, &id(8), &authority, 10),
             Err(DispatchRefusal::NoTask)
+        );
+    }
+
+    #[test]
+    fn a_task_reads_back_and_lists_in_enqueue_order() {
+        let class = AgentKind::RepoScanner;
+        let mut scheduler = SwarmScheduler::new();
+        scheduler.enqueue(task("t-b", class.clone()));
+        scheduler.enqueue(task("t-a", class.clone()));
+
+        // `get` is by id, not position.
+        assert_eq!(scheduler.get("t-a").map(|t| t.id.as_str()), Some("t-a"));
+        assert!(scheduler.get("t-missing").is_none());
+
+        // Listing is the enqueue order, so it does not depend on how the
+        // scheduler's map happened to hash the ids.
+        let listed: Vec<&str> = scheduler.tasks().map(|t| t.id.as_str()).collect();
+        assert_eq!(listed, vec!["t-b", "t-a"]);
+        assert_eq!(scheduler.count_tasks(), 2);
+    }
+
+    #[test]
+    fn re_enqueuing_an_id_updates_in_place_and_keeps_its_position() {
+        let class = AgentKind::RepoScanner;
+        let mut scheduler = SwarmScheduler::new();
+        scheduler.enqueue(task("t-1", class.clone()));
+        scheduler.enqueue(task("t-2", class.clone()));
+        scheduler.enqueue(task("t-1", class.clone()));
+
+        let listed: Vec<&str> = scheduler.tasks().map(|t| t.id.as_str()).collect();
+        assert_eq!(
+            listed,
+            vec!["t-1", "t-2"],
+            "a duplicate id must not appear twice or reorder the queue"
         );
     }
 }

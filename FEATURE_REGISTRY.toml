@@ -286,24 +286,33 @@ crate_or_service = "crates/x3-swarm-core"
 tauri_app = "SwarmCommand"
 # `reports/swarm_health_report.md` does not exist; citation cleared.
 proof_report = ""
-# Re-measured 2026-09-27. Derived, not asserted, on this registry's own formula
-# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+# Re-measured 2026-09-27 (second pass). Derived, not asserted, on this registry's
+# own formula `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
 #
-#   implemented 60 — the crate gained a real authorization model rather than a
+#   implemented 68 — the crate gained a real authorization model rather than a
 #     permission constant: `src/sensitive.rs` (290 lines) classifies the five
 #     production actions the release prompt forbids an agent from taking on its own
 #     (mainnet runtime upgrade, supply change, validator key replacement, genesis
 #     change, critical settlement-rule change), and `approval.rs`/`permissions.rs`
-#     were hardened around it (commit `4dd1f3470`).
-#   tested 55 — `cargo test --locked --all-targets --manifest-path
-#     crates/x3-swarm-core/Cargo.toml` is 73 lib + 6 agent_lifecycle + 15 guard_tests
-#     + 11 sensitive_actions = **105 passed, 0 failed**, and the gate `test
-#     x3-swarm-core` runs them; the multi-agent race/partition evidence the second
-#     blocker asks for is still in flight, which is why this is not higher.
+#     were hardened around it (commit `4dd1f3470`). The scheduler now owns the
+#     service's tasks: `services/x3-swarm-api` holds every task in
+#     `x3_swarm_core::SwarmScheduler` instead of a private map, so the lifecycle
+#     `Agent -> Task -> Scheduler -> Executor -> ...` has one task store, and the
+#     two stale, never-compiled service copies under
+#     `crates/x3-swarm-core/services/` were deleted. Kept below 70 because nothing
+#     proves a multi-agent race or partition yet.
+#   tested 60 — `cargo test --locked --all-targets --manifest-path
+#     crates/x3-swarm-core/Cargo.toml` is 75 lib (two new scheduler accessor tests)
+#     + 6 agent_lifecycle + 15 guard_tests + 11 sensitive_actions = **107 passed,
+#     0 failed, 0 ignored**, run by the gate `test x3-swarm-core`; the API service
+#     gained four tests that drive its handlers through the scheduler and is now
+#     gated by `test x3-swarm-api` (was `check`, because it had no tests). The
+#     multi-agent race/partition evidence the second blocker asks for is still in
+#     flight, which is why this is not higher.
 #   mainnet_ready 15 — unchanged: the crate is excluded from the root workspace and
 #     absent from the runtime dependency graph, so none of this is on the deployed
 #     path. That is a wiring decision, not a code-quality one.
-readiness_score = 40
+readiness_score = 45
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names previously
 # listed here existed as real test functions anywhere under crates/x3-swarm-core,
 # so they were removed rather than left as citations. Closed 2026-09-26: all four

@@ -57,9 +57,9 @@ id = "X3-AGENT-003"
 name = "Agent kill-switch concept"
 subsystem = "agents_experimental"
 source = "master"
-paths = ["crates/x3-swarm-core"]
-implemented = 74
-tested = 84
+paths = ["crates/x3-swarm-core", "services/x3-swarm-api"]
+implemented = 78
+tested = 88
 mainnet_ready = 35
 priority = "P3"
 confidence = "high"
@@ -67,7 +67,7 @@ launch_scope = "dev_tooling"
 claim_risk = false
 blockers = [
   "Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child — but the scheduler's only route to work was `next_task(AgentKind)`, which compared the agent's class and never asked the authority anything. Measured: with `Sanction::Kill` on record and a pending task queued, the killed agent was handed the task. Closed: `SwarmAuthority::may_dispatch` (no genesis record / terminated / expired / quarantined / suspended / killed -> `DispatchRefusal`) is now called by `SwarmScheduler::next_task_for`, which is the only public route to a task; `next_task` is gone, so a caller cannot bypass it. An unregistered agent is refused too — the dispatcher fails closed on an identity it cannot check rather than reading 'no record' as 'no violations'.",
-  "The crate is still not on the deployed path: `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, and its own service (`crates/x3-swarm-core/services/x3-swarm-api`) does not call the scheduler at all. A kill switch that stops a dispatch nothing performs is enforced but not yet load-bearing in production — that is the same gap as REG-x3_swarm_core-1, not something this change closes.",
+  "Re-measured 2026-09-27: the crate is still not on the deployed path — `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, so the control plane is enforced but not load-bearing for the deployed chain (the same gap as REG-x3_swarm_core-1). Closed in this change: the 'its own service does not call the scheduler' half. `services/x3-swarm-api` now holds every task in `x3_swarm_core::SwarmScheduler` instead of a private `BTreeMap`, so create/start/complete/fail/approve/reject are transitions on one scheduler, and the two stale, never-compiled service copies under `crates/x3-swarm-core/services/` were deleted rather than left as a second, disagreeing lifecycle.",
   "Sanctions escalate only; there is no governance reset path, so an agent that reaches Kill is permanently gone. That is intentional per AGENT_LAW §3, but it has never been exercised on a live multi-agent run, and there is still no race-condition or partition-tolerance testing for the control plane.",
 ]
 required_tests = [
@@ -81,6 +81,10 @@ required_tests = [
   "a_signature_over_a_different_action_does_not_authorize_this_one",
   "a_foreign_approval_hash_is_refused_loudly",
   "a_one_member_council_cannot_authorize_a_runtime_upgrade",
+  "a_created_task_is_held_by_the_crate_scheduler",
+  "the_start_and_complete_transitions_land_in_the_scheduler",
+  "the_kill_switch_refuses_a_start_and_leaves_the_task_pending",
+  "the_listing_is_id_ordered_and_matches_the_scheduler",
 ]
 test_evidence = [
   "crates/x3-swarm-core/src/scheduler.rs",
@@ -88,7 +92,9 @@ test_evidence = [
   "crates/x3-swarm-core/src/sensitive.rs",
   "crates/x3-swarm-core/src/approval.rs",
   "crates/x3-swarm-core/tests/sensitive_actions.rs",
-  "note: the `test x3-swarm-core` gate runs `cargo test --locked --all-targets` for the crate; measured 105 passed (73 lib + 6 agent_lifecycle + 15 guard_tests + 11 sensitive_actions), 0 failed, 0 ignored",
+  "services/x3-swarm-api/src/main.rs",
+  "note: the `test x3-swarm-core` gate runs `cargo test --locked --all-targets` for the crate; re-measured 2026-09-27 at 107 passed (75 lib + 6 agent_lifecycle + 15 guard_tests + 11 sensitive_actions), 0 failed, 0 ignored",
+  "note: measured 2026-09-27 - the API service's four tests drive its HTTP handlers against the crate's `SwarmScheduler` and run in the fast set through the `test x3-swarm-api` gate (converted from `check`, which ran nothing). Measured load-bearing: making the status path skip `SwarmScheduler::update_status` reddens exactly `the_start_and_complete_transitions_land_in_the_scheduler` (3 of 4 still green); the file was restored to its recorded SHA-256 and all four passed again",
   "note: measured load-bearing - deleting the `may_dispatch` call from `next_task_for` makes `a_killed_agent_is_not_handed_work` fail with the killed agent receiving task T-KILL, and restoring the call returns it to green",
   "note: measured load-bearing for the authorization path - (1) dropping the comparison between the caller-supplied approval hash and the derived commitment reddens exactly `a_foreign_approval_hash_is_refused_loudly` (10/11 stay green); (2) removing the action tag from the commitment reddens exactly `commitment_binds_the_action_and_the_subject` and `commitment_separates_fields`; (3) removing the security-council size floor reddens exactly `a_one_member_council_cannot_authorize_a_runtime_upgrade`. Each mutation was restored and the file hash verified identical before the next run.",
 ]
