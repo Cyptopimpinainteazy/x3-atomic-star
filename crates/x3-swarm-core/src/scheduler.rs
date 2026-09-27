@@ -268,7 +268,8 @@ mod tests {
 
     /// The regression this module was missing: dispatching used to be a peek, so
     /// two calls both returned the same `Pending` task. Measured before the fix:
-    /// `next_task_for` twice returned `t-1` twice.
+    /// the method then called `next_task_for` twice returned `t-1` twice; it is
+    /// `claim_next_for` now.
     #[test]
     fn a_claimed_task_is_never_handed_out_twice() {
         let class = AgentKind::TestBuilder;

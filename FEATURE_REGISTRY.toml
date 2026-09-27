@@ -340,7 +340,7 @@ proof_report = ""
 # Third pass, 2026-09-27 — the race/partition blocker below is answered, and the
 # pass found a real defect while answering it:
 #
-#   * Dispatching used to be a **peek, not a claim.** `SwarmScheduler::next_task_for`
+#   * Dispatching used to be a **peek, not a claim.** `SwarmScheduler::claim_next_for` (then named `next_task_for`)
 #     returned a `Pending` task without marking it, so two consecutive calls handed
 #     the same task to two callers (measured: `("t-1", Ok(t-1))` on the second call;
 #     the probe is now the regression test `a_claimed_task_is_never_handed_out_twice`).
