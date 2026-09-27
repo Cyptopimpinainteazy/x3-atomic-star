@@ -150,13 +150,21 @@ def check_pallet_contract() -> None:
     else:
         ok("single-result auto-finalization path is absent")
 
-    if "repatriate_reserved" not in pallet:
-        fail(
-            "task reward settlement is not proven: reserved submitter reward is "
-            "not repatriated to winning executor(s)"
-        )
-    else:
-        ok("reward settlement moves reserved value to executor(s)")
+    required_pallet_tests = (
+        "quorum_requires_matching_results",
+        "task_reward_moves_reserved_balance_to_winner",
+        "task_reward_preserves_total_issuance",
+    )
+    test_sources = ""
+    for rel in ("pallets/northern-swarm/src/tests.rs", "pallets/northern-swarm/src/lib.rs"):
+        path = ROOT / rel
+        if path.exists():
+            test_sources += path.read_text(encoding="utf-8", errors="ignore")
+    for test_name in required_pallet_tests:
+        if not re.search(rf"fn\\s+{re.escape(test_name)}\\s*\\(", test_sources):
+            fail(f"missing required pallet behavior test: {test_name}")
+        else:
+            ok(f"pallet behavior test exists: {test_name}")
 
 
 def check_chain_executor_contract() -> None:
