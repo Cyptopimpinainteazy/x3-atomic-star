@@ -37,6 +37,7 @@ use alloc::string::{String, ToString};
 
 use crate::error::SwapError;
 use crate::intent::ChainKind;
+use serde::{Deserialize, Serialize};
 
 /// Default number of observed-chain blocks after which an observation is treated as stale.
 ///
@@ -372,6 +373,39 @@ impl InMemoryFinalityOracle {
         }
     }
 
+    /// The tips this oracle currently remembers, as a storable snapshot.
+    ///
+    /// This is what [`FinalityTipStore::store_tips`] persists and what
+    /// [`InMemoryFinalityOracle::restore_tips`] reloads; the two are inverses.
+    pub fn snapshot_tips(&self) -> BTreeMap<ChainKind, FinalityTipRecord> {
+        let mut out: BTreeMap<ChainKind, FinalityTipRecord> = BTreeMap::new();
+        for (chain, accepted) in &self.accepted_tip {
+            out.entry(*chain).or_default().accepted_tip = Some(*accepted);
+        }
+        for (chain, seen) in &self.seen_tip {
+            out.entry(*chain).or_default().seen_tip = Some(*seen);
+        }
+        out
+    }
+
+    /// Replace the remembered tips with a previously snapshotted set.
+    ///
+    /// Used on reload: an oracle that just started has no memory of the tips its predecessor
+    /// accepted, so without this a rewind that spans a process restart would look like a fresh,
+    /// lower chain rather than the rollback it is.
+    pub fn restore_tips(&mut self, tips: BTreeMap<ChainKind, FinalityTipRecord>) {
+        self.accepted_tip.clear();
+        self.seen_tip.clear();
+        for (chain, record) in tips {
+            if let Some(tip) = record.accepted_tip {
+                self.accepted_tip.insert(chain, tip);
+            }
+            if let Some(tip) = record.seen_tip {
+                self.seen_tip.insert(chain, tip);
+            }
+        }
+    }
+
     /// Whether a certificate meets its chain's depth rule.
     fn depth_met(
         chain: ChainKind,
@@ -528,6 +562,114 @@ impl FinalityOracle for InMemoryFinalityOracle {
             self.accept(chain, certificate.observed_at());
         }
         Ok(met)
+    }
+}
+
+/// The tips an oracle remembers for one chain, in a storable shape.
+///
+/// `accepted_tip` is the tallest tip a certificate was accepted at; `seen_tip` is the tallest tip
+/// witnessed at all, whatever the verdict. Both are needed: `seen_tip` is what makes a later, older
+/// certificate refusable as stale, and `accepted_tip` is what makes a lower tip refusable as a
+/// rewind. Losing either across a restart re-opens the gap this type exists to close.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FinalityTipRecord {
+    /// Tallest tip a final certificate was accepted at, if any.
+    pub accepted_tip: Option<u64>,
+    /// Tallest tip witnessed at all, if any.
+    pub seen_tip: Option<u64>,
+}
+
+/// Durable storage for the tips that make a rewind refusable across a process restart.
+///
+/// The oracle's memory is what refuses a rewound anchor, and that memory used to live only in the
+/// process that built it. This trait separates *what* must be remembered from *where*; the crate
+/// that owns a process supplies the implementation (a file, a database, the proof ledger). Both
+/// methods take `&self` so a store can be shared or internally mutable.
+pub trait FinalityTipStore {
+    /// Load every persisted tip. An empty map means nothing has been remembered yet.
+    fn load_tips(&self) -> Result<BTreeMap<ChainKind, FinalityTipRecord>, SwapError>;
+
+    /// Persist the full set of tips, replacing whatever was stored.
+    fn store_tips(&self, tips: &BTreeMap<ChainKind, FinalityTipRecord>) -> Result<(), SwapError>;
+}
+
+/// A finality oracle whose remembered tips survive a process restart.
+///
+/// It wraps [`InMemoryFinalityOracle`] with a [`FinalityTipStore`]: the tips are loaded once when
+/// the oracle is built, and written back whenever the oracle learns something. An *acceptance* is
+/// only reported once it is durable — a restart must not be able to forget the tip a certificate
+/// was accepted at. A *refusal* still records the witnessed tip when the store accepts the write,
+/// but a store failure on that path does not turn the refusal into a success.
+#[derive(Debug)]
+pub struct PersistentFinalityOracle<S: FinalityTipStore> {
+    inner: InMemoryFinalityOracle,
+    store: S,
+}
+
+impl<S: FinalityTipStore> PersistentFinalityOracle<S> {
+    /// Build an oracle from the tips the store already holds.
+    pub fn load(store: S) -> Result<Self, SwapError> {
+        let tips = store.load_tips()?;
+        let mut inner = InMemoryFinalityOracle::new();
+        inner.restore_tips(tips);
+        Ok(Self { inner, store })
+    }
+
+    /// The store this oracle persists through.
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
+    /// The wrapped in-memory oracle, for reads that do not need persistence.
+    pub fn inner(&self) -> &InMemoryFinalityOracle {
+        &self.inner
+    }
+
+    /// The tallest tip this oracle has accepted a final certificate at, for `chain`.
+    pub fn accepted_tip(&self, chain: ChainKind) -> Option<u64> {
+        self.inner.accepted_tip(chain)
+    }
+
+    /// The tallest tip this oracle has witnessed for `chain`, whatever the verdict on it was.
+    pub fn seen_tip(&self, chain: ChainKind) -> Option<u64> {
+        self.inner.seen_tip(chain)
+    }
+
+    /// Override the staleness window for one chain on this oracle.
+    pub fn set_staleness_window(&mut self, chain: ChainKind, blocks: u64) -> &mut Self {
+        self.inner.set_staleness_window(chain, blocks);
+        self
+    }
+
+    /// Flush the currently remembered tips to the store.
+    pub fn persist(&self) -> Result<(), SwapError> {
+        self.store.store_tips(&self.inner.snapshot_tips())
+    }
+}
+
+impl<S: FinalityTipStore> FinalityOracle for PersistentFinalityOracle<S> {
+    fn required_finality(&self, chain: ChainKind) -> FinalityConfig {
+        self.inner.required_finality(chain)
+    }
+
+    fn verify_finality(
+        &mut self,
+        chain: ChainKind,
+        certificate: &FinalityCertificate,
+    ) -> Result<bool, SwapError> {
+        let verdict = self.inner.verify_finality(chain, certificate);
+
+        if verdict == Ok(true) {
+            // A depth that passed is a fact a restart must not forget: report success only after
+            // the accepted tip is durable. A store failure here fails closed.
+            self.store.store_tips(&self.inner.snapshot_tips())?;
+        } else {
+            // The certificate was still a claim about its chain's tip, so the witness is worth
+            // keeping — but a store failure on a refusal path must not mask the refusal.
+            let _ = self.store.store_tips(&self.inner.snapshot_tips());
+        }
+
+        verdict
     }
 }
 
@@ -753,5 +895,107 @@ mod tests {
         assert_eq!(FinalityCertificate::confirmations_at(100, 111), Ok(12));
         assert!(FinalityCertificate::confirmations_at(100, 99).is_err());
         assert!(FinalityCertificate::confirmations_at(0, u64::MAX).is_err());
+    }
+
+    /// A store whose tips live in a shared cell, so an oracle can be dropped ("the process exits")
+    /// and a new one reloaded from the same bytes.
+    #[derive(Clone, Default)]
+    struct SharedTipStore(
+        alloc::rc::Rc<core::cell::RefCell<BTreeMap<ChainKind, FinalityTipRecord>>>,
+    );
+
+    impl FinalityTipStore for SharedTipStore {
+        fn load_tips(&self) -> Result<BTreeMap<ChainKind, FinalityTipRecord>, SwapError> {
+            Ok(self.0.borrow().clone())
+        }
+
+        fn store_tips(
+            &self,
+            tips: &BTreeMap<ChainKind, FinalityTipRecord>,
+        ) -> Result<(), SwapError> {
+            *self.0.borrow_mut() = tips.clone();
+            Ok(())
+        }
+    }
+
+    /// A store that always fails, to prove an unpersisted acceptance is not reported as success.
+    struct FailingTipStore;
+
+    impl FinalityTipStore for FailingTipStore {
+        fn load_tips(&self) -> Result<BTreeMap<ChainKind, FinalityTipRecord>, SwapError> {
+            Ok(BTreeMap::new())
+        }
+
+        fn store_tips(
+            &self,
+            _tips: &BTreeMap<ChainKind, FinalityTipRecord>,
+        ) -> Result<(), SwapError> {
+            Err(SwapError::FinalityTipStore(
+                "store is unavailable".to_string(),
+            ))
+        }
+    }
+
+    /// The restart gap this closes: an accepted tip must survive dropping the oracle, and the
+    /// reloaded oracle must refuse an older certificate as a rewind rather than read it as current.
+    #[test]
+    fn test_accepted_tip_survives_a_reload_and_refuses_a_rewind() {
+        let store = SharedTipStore::default();
+        {
+            let mut oracle =
+                PersistentFinalityOracle::load(store.clone()).expect("an empty store loads");
+            assert_eq!(oracle.accepted_tip(ChainKind::Ethereum), None);
+            assert_eq!(
+                oracle.verify_finality(ChainKind::Ethereum, &eth(1000, 1011)),
+                Ok(true)
+            );
+            assert_eq!(oracle.accepted_tip(ChainKind::Ethereum), Some(1011));
+        }
+
+        // "Process restart": the oracle is dropped; only the store remains.
+        let mut reloaded = PersistentFinalityOracle::load(store).expect("store reloads");
+        assert_eq!(
+            reloaded.accepted_tip(ChainKind::Ethereum),
+            Some(1011),
+            "the accepted tip must reload from the store"
+        );
+        assert_eq!(
+            reloaded.verify_finality(ChainKind::Ethereum, &eth(1000, 1005)),
+            Err(SwapError::CertificateRewindsAcceptedAnchor {
+                chain: ChainKind::Ethereum,
+                accepted_tip: 1011,
+                certificate_tip: 1005,
+            }),
+            "a certificate below the reloaded accepted tip is a rewind, not a fresh fact"
+        );
+    }
+
+    /// A witnessed-but-not-accepted tip is persisted too, so staleness survives a restart.
+    #[test]
+    fn test_witnessed_tip_survives_a_reload() {
+        let store = SharedTipStore::default();
+        {
+            let mut oracle = PersistentFinalityOracle::load(store.clone()).unwrap();
+            // One short of the requirement: refused, but the tip is still witnessed.
+            assert!(oracle
+                .verify_finality(ChainKind::Ethereum, &eth(1000, 1010))
+                .is_err());
+            assert_eq!(oracle.seen_tip(ChainKind::Ethereum), Some(1010));
+        }
+        let reloaded = PersistentFinalityOracle::load(store).unwrap();
+        assert_eq!(reloaded.seen_tip(ChainKind::Ethereum), Some(1010));
+        assert_eq!(reloaded.accepted_tip(ChainKind::Ethereum), None);
+    }
+
+    /// An acceptance that cannot be made durable fails closed instead of being reported.
+    #[test]
+    fn test_an_unpersisted_acceptance_is_not_reported_as_success() {
+        let mut oracle = PersistentFinalityOracle::load(FailingTipStore).unwrap();
+        assert_eq!(
+            oracle.verify_finality(ChainKind::Ethereum, &eth(1000, 1011)),
+            Err(SwapError::FinalityTipStore(
+                "store is unavailable".to_string()
+            ))
+        );
     }
 }

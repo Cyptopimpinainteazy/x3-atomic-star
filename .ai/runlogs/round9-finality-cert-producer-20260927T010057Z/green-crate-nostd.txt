@@ -1,0 +1,60 @@
+### cargo test -p x3-atomic-swap (default/no-std)
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::format`
+warning: unused imports: `String` and `ToString`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::format`
+warning: unused imports: `String` and `ToString`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::collections::BTreeSet`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::collections::BTreeSet`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::format`
+warning: unused import: `alloc::string::ToString`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::collections::BTreeSet`
+warning: unused import: `alloc::format`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::collections::BTreeSet`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::collections::BTreeSet`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::borrow::ToOwned`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::format`
+warning: unused import: `alloc::boxed::Box`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::vec`
+warning: unused import: `alloc::string::String`
+warning: unused import: `alloc::string::ToString`
+     Running unittests src/lib.rs (target/debug/deps/x3_atomic_swap-3d0c31138ba5b603)
+test result: ok. 671 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/adapter_readiness_truth.rs (target/debug/deps/adapter_readiness_truth-2dc181e86c7c6d16)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/atlas_htlc_deploy_test.rs (target/debug/deps/atlas_htlc_deploy_test-9e4f14503770ae80)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/atomic_swap_chaos.rs (target/debug/deps/atomic_swap_chaos-49fdab9cbf420f30)
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/atomic_swap_integration.rs (target/debug/deps/atomic_swap_integration-550d63321c730f7a)
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/evm_tx_minimal_integers.rs (target/debug/deps/evm_tx_minimal_integers-69bd10b2e764c9d8)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/rpc_live_test.rs (target/debug/deps/rpc_live_test-1e15deba47f67dc0)
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -1,0 +1,22 @@
+### cargo test -p x3-atomic-swap --features std
+     Running unittests src/lib.rs (target/debug/deps/x3_atomic_swap-f80f615111f46861)
+test result: ok. 704 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running unittests src/bin/gen_wallet.rs (target/debug/deps/gen_wallet-12e90808254d11b8)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/x3_evm_broadcast.rs (target/debug/deps/x3_evm_broadcast-36607b17676499c7)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/x3_finality_cert.rs (target/debug/deps/x3_finality_cert-a71e8ee44f904e1e)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/adapter_readiness_truth.rs (target/debug/deps/adapter_readiness_truth-7601d1d6fc56bc5e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/atlas_htlc_deploy_test.rs (target/debug/deps/atlas_htlc_deploy_test-0d19ce426843e682)
+test result: ok. 1 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/atomic_swap_chaos.rs (target/debug/deps/atomic_swap_chaos-afe16fae825e6c07)
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/atomic_swap_integration.rs (target/debug/deps/atomic_swap_integration-c14f7f88deb9165a)
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/evm_tx_minimal_integers.rs (target/debug/deps/evm_tx_minimal_integers-e70c7f3359730d75)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.50s
+     Running tests/rpc_live_test.rs (target/debug/deps/rpc_live_test-b3bfcbb1ade4727d)
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

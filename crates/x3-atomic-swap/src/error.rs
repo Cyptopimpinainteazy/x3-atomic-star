@@ -194,6 +194,40 @@ pub enum SwapError {
         certificate_tip: u64,
         window: u64,
     },
+
+    /// Finality producer: the node the certificate is being built from is a different chain.
+    ///
+    /// A receipt is only evidence about the chain that produced it. A reader pointed at the wrong
+    /// network — or at a node answering for a fork with its own chain id — must refuse *for the
+    /// chain*, before any depth is considered, so a foreign chain's receipt cannot be graded as a
+    /// shallow-but-valid one.
+    FinalityChainIdMismatch {
+        expected: u64,
+        found: u64,
+    },
+
+    /// Finality producer: the receipt's block hash is not the hash of the block at its own height.
+    ///
+    /// The receipt names both the height and the hash of the block a transaction is anchored in.
+    /// If the chain's block at that height carries a different hash, the receipt does not describe
+    /// this chain's history at that height — it is refused, never repaired to the chain's hash.
+    FinalityBlockHashMismatch {
+        block_height: u64,
+        receipt_hash: alloc::string::String,
+        block_hash: alloc::string::String,
+    },
+
+    /// Finality producer: the block returned for a height reports a different height.
+    ///
+    /// A node that answers `eth_getBlockByNumber(n)` with a block numbered `m != n` is not a
+    /// trustworthy reader for this purpose; the mismatch is refused rather than trusted.
+    FinalityBlockNumberMismatch {
+        receipt_number: u64,
+        block_number: u64,
+    },
+
+    /// Finality store: the persisted tip ledger could not be read or written.
+    FinalityTipStore(alloc::string::String),
 }
 
 impl SwapError {
@@ -418,6 +452,37 @@ impl core::fmt::Display for SwapError {
                     seen_tip,
                     window
                 )
+            }
+            SwapError::FinalityChainIdMismatch { expected, found } => {
+                write!(
+                    f,
+                    "Finality producer: node reports chain id {} but chain id {} was required",
+                    found, expected
+                )
+            }
+            SwapError::FinalityBlockHashMismatch {
+                block_height,
+                receipt_hash,
+                block_hash,
+            } => {
+                write!(
+                    f,
+                    "Finality producer: receipt anchors block {} at {} but the chain's block at that height is {}",
+                    block_height, receipt_hash, block_hash
+                )
+            }
+            SwapError::FinalityBlockNumberMismatch {
+                receipt_number,
+                block_number,
+            } => {
+                write!(
+                    f,
+                    "Finality producer: receipt anchors block {} but the node returned block {} for that height",
+                    receipt_number, block_number
+                )
+            }
+            SwapError::FinalityTipStore(msg) => {
+                write!(f, "Finality tip store error: {}", msg)
             }
         }
     }

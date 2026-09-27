@@ -85,6 +85,12 @@ pub mod evm_live;
 pub use evm_live::LiveEvmExecutor;
 
 #[cfg(feature = "std")]
+pub mod finality_producer;
+
+#[cfg(feature = "std")]
+pub use finality_producer::{EvmChainReader, EvmFinalityProducer, FileFinalityTipStore};
+
+#[cfg(feature = "std")]
 pub mod btc_live;
 
 #[cfg(feature = "std")]
