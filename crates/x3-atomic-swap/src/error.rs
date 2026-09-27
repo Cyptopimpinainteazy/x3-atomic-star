@@ -146,6 +146,88 @@ pub enum SwapError {
         amount_in: u128,
         min_amount_out: u128,
     },
+
+    /// Finality certificate: the certificate names a different chain than the one asked about.
+    CertificateChainMismatch {
+        expected: crate::intent::ChainKind,
+        found: crate::intent::ChainKind,
+    },
+
+    /// Finality certificate: the anchor is above the tip it claims to have been observed at.
+    CertificateBlockAfterObservation {
+        block_height: u64,
+        observed_at: u64,
+    },
+
+    /// Finality certificate: the derived confirmation depth does not fit a `u32`.
+    CertificateConfirmationsOverflow {
+        block_height: u64,
+        observed_at: u64,
+    },
+
+    /// Finality certificate: the reported confirmation count is not the one its own anchor implies.
+    ///
+    /// The count is a *derived* value (`observed_at - block_height + 1`). A caller that supplies a
+    /// count its anchor does not have is trying to claim depth the anchored block does not carry.
+    CertificateConfirmationsDisagree {
+        chain: crate::intent::ChainKind,
+        block_height: u64,
+        observed_at: u64,
+        reported: u32,
+        expected: u32,
+    },
+
+    /// Finality certificate: the tip is below the tallest tip this oracle already accepted.
+    ///
+    /// A chain cannot go backwards. A certificate observed at a lower tip than one already accepted
+    /// is a rollback presented as a fresh fact, and is refused rather than re-read.
+    CertificateRewindsAcceptedAnchor {
+        chain: crate::intent::ChainKind,
+        accepted_tip: u64,
+        certificate_tip: u64,
+    },
+
+    /// Finality certificate: the tip is further behind a witnessed tip than the configured window.
+    CertificateStale {
+        chain: crate::intent::ChainKind,
+        seen_tip: u64,
+        certificate_tip: u64,
+        window: u64,
+    },
+
+    /// Finality producer: the node the certificate is being built from is a different chain.
+    ///
+    /// A receipt is only evidence about the chain that produced it. A reader pointed at the wrong
+    /// network — or at a node answering for a fork with its own chain id — must refuse *for the
+    /// chain*, before any depth is considered, so a foreign chain's receipt cannot be graded as a
+    /// shallow-but-valid one.
+    FinalityChainIdMismatch {
+        expected: u64,
+        found: u64,
+    },
+
+    /// Finality producer: the receipt's block hash is not the hash of the block at its own height.
+    ///
+    /// The receipt names both the height and the hash of the block a transaction is anchored in.
+    /// If the chain's block at that height carries a different hash, the receipt does not describe
+    /// this chain's history at that height — it is refused, never repaired to the chain's hash.
+    FinalityBlockHashMismatch {
+        block_height: u64,
+        receipt_hash: alloc::string::String,
+        block_hash: alloc::string::String,
+    },
+
+    /// Finality producer: the block returned for a height reports a different height.
+    ///
+    /// A node that answers `eth_getBlockByNumber(n)` with a block numbered `m != n` is not a
+    /// trustworthy reader for this purpose; the mismatch is refused rather than trusted.
+    FinalityBlockNumberMismatch {
+        receipt_number: u64,
+        block_number: u64,
+    },
+
+    /// Finality store: the persisted tip ledger could not be read or written.
+    FinalityTipStore(alloc::string::String),
 }
 
 impl SwapError {
@@ -303,6 +385,104 @@ impl core::fmt::Display for SwapError {
                     "Partial fill not allowed: amount_in({}) < min_amount_out({})",
                     amount_in, min_amount_out
                 )
+            }
+            SwapError::CertificateChainMismatch { expected, found } => {
+                write!(
+                    f,
+                    "Finality certificate is for {:?}, not {:?}",
+                    found, expected
+                )
+            }
+            SwapError::CertificateBlockAfterObservation {
+                block_height,
+                observed_at,
+            } => {
+                write!(
+                    f,
+                    "Finality certificate anchors block {} but was observed at tip {}",
+                    block_height, observed_at
+                )
+            }
+            SwapError::CertificateConfirmationsOverflow {
+                block_height,
+                observed_at,
+            } => {
+                write!(
+                    f,
+                    "Finality certificate depth from block {} to tip {} does not fit a u32",
+                    block_height, observed_at
+                )
+            }
+            SwapError::CertificateConfirmationsDisagree {
+                chain,
+                block_height,
+                observed_at,
+                reported,
+                expected,
+            } => {
+                write!(
+                    f,
+                    "Finality certificate on {:?} reports {} confirmations for block {} at tip {} — the anchor implies {}",
+                    chain, reported, block_height, observed_at, expected
+                )
+            }
+            SwapError::CertificateRewindsAcceptedAnchor {
+                chain,
+                accepted_tip,
+                certificate_tip,
+            } => {
+                write!(
+                    f,
+                    "Finality certificate on {:?} rewinds the chain: tip {} is below the accepted tip {}",
+                    chain, certificate_tip, accepted_tip
+                )
+            }
+            SwapError::CertificateStale {
+                chain,
+                seen_tip,
+                certificate_tip,
+                window,
+            } => {
+                write!(
+                    f,
+                    "Finality certificate on {:?} is stale: tip {} is {} blocks behind the witnessed tip {} (window {})",
+                    chain,
+                    certificate_tip,
+                    seen_tip.saturating_sub(*certificate_tip),
+                    seen_tip,
+                    window
+                )
+            }
+            SwapError::FinalityChainIdMismatch { expected, found } => {
+                write!(
+                    f,
+                    "Finality producer: node reports chain id {} but chain id {} was required",
+                    found, expected
+                )
+            }
+            SwapError::FinalityBlockHashMismatch {
+                block_height,
+                receipt_hash,
+                block_hash,
+            } => {
+                write!(
+                    f,
+                    "Finality producer: receipt anchors block {} at {} but the chain's block at that height is {}",
+                    block_height, receipt_hash, block_hash
+                )
+            }
+            SwapError::FinalityBlockNumberMismatch {
+                receipt_number,
+                block_number,
+            } => {
+                write!(
+                    f,
+                    "Finality producer: receipt anchors block {} but the node returned block {} for that height",
+                    receipt_number, block_number
+                )
+            }
+            SwapError::FinalityTipStore(msg) => {
+                write!(f, "Finality tip store error: {}", msg)
             }
         }
     }

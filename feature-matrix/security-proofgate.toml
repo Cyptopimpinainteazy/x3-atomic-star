@@ -82,16 +82,25 @@ id = "X3-SEC-005"
 name = "Formal verification workflow"
 subsystem = "security_proofgate"
 source = "master"
-paths = [".github/workflows/formal-verification.yml"]
-implemented = 65
-tested = 50
+paths = [".github/workflows/formal-verification.yml", "scripts/run-security-gates.sh", "formal-proofs/tla"]
+implemented = 70
+tested = 70
 mainnet_ready = 45
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Selected proof coverage only; K/toolchain reliability historically required repair"]
-evidence = [".github/workflows/formal-verification.yml", "note: Formal verification CI exists"]
+blockers = [
+  "**CLOSED 2026-09-27 - the toolchain repair this row asked for, and a gate that was green over its own red report.** Measured and verified 2026-09-27: `bash scripts/run-security-gates.sh` exits 0 in 69s, `.proof-results/s0-security-gate.txt` records `Formal Verification (S0): status=VERIFIED score=100.0%` and `Gate Status: ALL SECURITY GATES PASS`, with all six catastrophic and three critical blockers passing and S1 verifying five modules (consensus, bridge, runtime, asset_kernel, custody). Getting there needed two fixes: no `java` existed on this box, so every TLA+ spec reported `TLA+ invocation error ... No such file or directory`, and the wrapper looked only at exit codes that were already 0 - it logged `S0 gate passed` four minutes after the report recorded a remaining blocker. Both are fixed (the wrapper reads the report and fails on a blocker line; `tools/setup-x3-test-tools.sh` checks for `java`).",
+  "**CLOSED 2026-09-27 - and the gate is now local.** `scripts/local-ci.sh` gained `security gates S0 S1: bash scripts/run-security-gates.sh`, so a missing JRE or a masked blocker fails on this box instead of only in CI. Measured: PASS 43s through local-ci.",
+  "Still open: coverage is selected. The gate verifies six catastrophic and three critical properties plus the TLA+ specs the proof binary runs, while the generic blocker list it prints still names three items of its own (`Missing test for failure case`, `Panic on malformed input`, `No mutation testing`), and `formal-proofs/` also carries Coq and K material that no step in this gate executes. No external review of the formal model.",
+]
+evidence = [
+  ".github/workflows/formal-verification.yml",
+  "scripts/run-security-gates.sh",
+  ".proof-results/s0-security-gate.txt",
+  "note: 2026-09-27 - S0 VERIFIED 100.0%, S1 five modules verified, gate added to local-ci",
+]
 
 [[feature]]
 id = "X3-SEC-006"

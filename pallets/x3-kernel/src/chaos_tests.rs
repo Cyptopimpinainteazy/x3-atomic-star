@@ -19,6 +19,7 @@ use super::test_helpers::{wrap_evm_payload, wrap_svm_payload, wrap_x3_payload};
 use super::*;
 use frame_support::{assert_noop, assert_ok};
 use sp_core::H256;
+use x3_packet_schema::{EvmPacket, Packet, U256};
 
 // Test constants
 const DAVE: AccountId = 4;
@@ -26,6 +27,18 @@ const FEE: Balance = 1000;
 
 fn random_comit_id(seed: u64) -> H256 {
     H256::from_low_u64_be(seed)
+}
+
+/// How many `AtlasKernel` events the block has emitted.
+///
+/// Used by the rollback tests: a refused comit must leave none, and `assert_noop!` alone would not
+/// catch an event written through `deposit_event` if the write were ever moved outside the
+/// dispatchable's storage layer.
+fn kernel_event_count() -> usize {
+    System::events()
+        .into_iter()
+        .filter(|record| matches!(record.event, RuntimeEvent::AtlasKernel(_)))
+        .count()
 }
 
 /// Compute prepare_root using the pallet's canonical algorithm
@@ -85,54 +98,127 @@ fn submit_comit(
 mod cross_vm {
     use super::*;
 
-    /// CRITICAL-01: Test that EVM failure rolls back the entire Comit
+    // Both tests below claimed a rollback and injected no failure.
+    //
+    // `evm_failure_causes_full_rollback` submitted a comit that **succeeded** and asserted the nonce
+    // had advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed
+    // successfully — so neither could fail if rollback were broken, and the second one's name
+    // described a scenario its body never created. They were rewritten 2026-09-27 to inject a real
+    // failure and to assert the trace it must not leave; the full mutation-order walk (fee burn,
+    // ledger write, slot channel) is in `failure_path_conservation`.
+
+    /// A comit whose EVM payload is not EVM bytecode at all.
+    ///
+    /// The EVM adapter refuses a SCALE-encoded `Packet` **by name** — a comit payload is the
+    /// artifact the adapter executes (X3-LANG-004), and a packet is a semantic operation, not code.
+    /// That is a real EVM-domain refusal, and it happens before the nonce is touched, so it pins the
+    /// earliest failure path: nothing at all may survive.
     #[test]
     fn evm_failure_causes_full_rollback() {
         new_test_ext().execute_with(|| {
-            // First, a successful comit (nonce starts at 0)
-            assert_ok!(submit_comit(ALICE, random_comit_id(1), &[0x01], &[0x02], 0,));
+            let comit_id = random_comit_id(1);
+            let evm = Packet::Evm(EvmPacket::Call {
+                contract: [0x11u8; 20],
+                function_selector: [0xaa, 0xbb, 0xcc, 0xdd],
+                args: vec![0xAAu8; 64],
+                value: U256::from(0),
+            })
+            .encode();
+            let svm = wrap_svm_payload(&[0x02]);
+            let x3 = wrap_x3_payload(&[0x11, 0x00, 0x00, 0x00]);
+            let prepare_root = compute_prepare_root_v2(comit_id, &evm, &svm, &x3, 0, FEE);
 
-            // Nonce should be incremented to 1
-            let nonce_after_success = Nonces::<Test>::get(ALICE);
-            assert_eq!(nonce_after_success, 1);
+            let issuance_before = Balances::total_issuance();
+            assert_noop!(
+                AtlasKernel::submit_comit_v2(
+                    RuntimeOrigin::signed(ALICE),
+                    comit_id,
+                    evm,
+                    svm,
+                    x3,
+                    0,
+                    FEE,
+                    prepare_root,
+                ),
+                Error::<Test>::InvalidEvmPacket
+            );
+
+            assert_eq!(
+                Nonces::<Test>::get(ALICE),
+                0,
+                "a refused comit must not consume the caller's nonce"
+            );
+            assert_eq!(
+                Balances::total_issuance(),
+                issuance_before,
+                "no fee may be burned by a refused comit"
+            );
+            assert_eq!(
+                CanonicalLedger::<Test>::get(ALICE, 0),
+                0,
+                "a refused comit must not write the ledger"
+            );
+            assert_eq!(
+                kernel_event_count(),
+                0,
+                "a refused comit must not leave an event behind"
+            );
         });
     }
 
-    /// CRITICAL-01: Test that SVM failure after EVM success rolls back EVM
+    /// The last of the three VMs fails *after* the earlier two returned usable receipts.
+    ///
+    /// This is the case the old second test was named for. The nonce has already been incremented by
+    /// the time the X3 adapter runs, so this is also the path where the pallet's own write has to be
+    /// rolled back rather than "not yet made".
     #[test]
-    fn svm_failure_after_evm_success_rolls_back() {
+    fn a_failure_in_the_last_vm_rolls_back_the_nonce_and_the_fee() {
         new_test_ext().execute_with(|| {
-            // Submit comit - in mock environment, both should succeed
-            let result = submit_comit(ALICE, random_comit_id(1), &[0x01], &[0x02], 0);
+            let comit_id = random_comit_id(1);
+            let evm = wrap_evm_payload(&[0x01]);
+            let svm = wrap_svm_payload(&[0x02]);
+            // 0xFF is the mock X3 adapter's execution-error marker.
+            let x3 = wrap_x3_payload(&[0xFF, 0x00, 0x00, 0x00]);
+            let prepare_root = compute_prepare_root_v2(comit_id, &evm, &svm, &x3, 0, FEE);
 
-            assert!(result.is_ok(), "Mock should succeed");
-
-            // Check that ComitExecutionCompleted event was emitted
-            let events = System::events();
-            let comit_events: Vec<_> = events
-                .iter()
-                .filter_map(|e| {
-                    if let RuntimeEvent::AtlasKernel(Event::ComitExecutionCompleted {
-                        success,
-                        gas_used,
-                        ..
-                    }) = &e.event
-                    {
-                        Some((*success, *gas_used))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            assert!(
-                !comit_events.is_empty(),
-                "Should have ComitExecutionCompleted event"
+            let issuance_before = Balances::total_issuance();
+            assert_noop!(
+                AtlasKernel::submit_comit_v2(
+                    RuntimeOrigin::signed(ALICE),
+                    comit_id,
+                    evm,
+                    svm,
+                    x3,
+                    0,
+                    FEE,
+                    prepare_root,
+                ),
+                Error::<Test>::X3ExecutionFailed
             );
 
-            for (success, _gas) in comit_events {
-                assert!(success, "Both VMs must succeed in atomic comit");
-            }
+            assert_eq!(
+                Nonces::<Test>::get(ALICE),
+                0,
+                "the nonce written before execution must be rolled back"
+            );
+            assert_eq!(
+                Balances::total_issuance(),
+                issuance_before,
+                "no fee may be burned when a later VM fails"
+            );
+            assert_eq!(
+                (
+                    CanonicalLedger::<Test>::get(ALICE, 0),
+                    CanonicalLedger::<Test>::get(ALICE, 1),
+                ),
+                (0, 0),
+                "the two successful domains' receipts must not be applied"
+            );
+            assert_eq!(
+                kernel_event_count(),
+                0,
+                "a refused comit must not leave an event behind"
+            );
         });
     }
 
@@ -151,8 +237,16 @@ mod cross_vm {
             let x3 = wrap_x3_payload(&x3_intent);
             let prepare_root = compute_prepare_root_v2(comit_id, &evm, &svm, &x3, 0, FEE);
 
-            // Submit V2 comit with all three payloads
-            let result = AtlasKernel::submit_comit_v2(
+            let issuance_before = Balances::total_issuance();
+
+            // Submit V2 comit with all three payloads.
+            //
+            // This used to be `let result = ...; if result.is_ok() { assert!(event) }` — a
+            // conditional assertion, so a comit that failed every check passed the test. The
+            // fixture's intents are all benign (0x01/0x02/0x03 are not the mock's failure markers),
+            // so the call must succeed, and the point of the test is that *all three* domains land
+            // together: assert that rather than the possibility of it.
+            assert_ok!(AtlasKernel::submit_comit_v2(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
                 evm,
@@ -161,22 +255,32 @@ mod cross_vm {
                 0,
                 FEE,
                 prepare_root,
-            );
+            ));
 
-            // Document actual behavior (X3Adapter is FailingMockX3Adapter)
-            if result.is_ok() {
-                let events = System::events();
-                let has_completed_event = events.iter().any(|e| {
-                    matches!(
-                        e.event,
-                        RuntimeEvent::AtlasKernel(Event::ComitExecutionCompleted { .. })
-                    )
-                });
-                assert!(
-                    has_completed_event,
-                    "Should emit completed event on success"
-                );
-            }
+            let has_completed_event = System::events().iter().any(|e| {
+                matches!(
+                    e.event,
+                    RuntimeEvent::AtlasKernel(Event::ComitExecutionCompleted { success: true, .. })
+                )
+            });
+            assert!(
+                has_completed_event,
+                "a comit that passed every check must emit ComitExecutionCompleted{{success: true}}"
+            );
+            assert_eq!(
+                (
+                    CanonicalLedger::<Test>::get(ALICE, 0),
+                    CanonicalLedger::<Test>::get(ALICE, 1),
+                    CanonicalLedger::<Test>::get(ALICE, 2),
+                ),
+                (123, 222, 333),
+                "all three domains' ledger legs must land in the same comit"
+            );
+            assert_eq!(Nonces::<Test>::get(ALICE), 1, "exactly one nonce is spent");
+            assert!(
+                Balances::total_issuance() < issuance_before,
+                "the fee for a comit that ran must actually be burned"
+            );
         });
     }
 }

@@ -6,15 +6,35 @@ name = "X3 control pallet"
 subsystem = "agents_experimental"
 source = "master"
 paths = ["pallets/pallet-x3-control"]
-implemented = 50
-tested = 25
-mainnet_ready = 25
+implemented = 65
+tested = 60
+mainnet_ready = 20
 priority = "P2"
 confidence = "medium"
 launch_scope = "dev_tooling"
 claim_risk = false
-blockers = ["Privileged control surface needs security review"]
-evidence = ["pallets/pallet-x3-control", "note: 2026-09-19 joined the workspace and has 10 tests; its authority check had accepted ControlAuthority::Governance from any signed account and was fixed in the same change"]
+blockers = [
+  "**Reviewed 2026-09-26, and the review found the same class of hole the row's evidence already recorded once — in the next arm along.** `ControlAuthority::Operator` was satisfied by `ensure_signed(origin)?` and nothing else, so *any* account at all could pause or resume *any* control domain on a ten-block cooldown. On a chain that wired this pallet up, that is a liveness lever anyone could pull, and it is exactly the shape the row's earlier fix (governance authority accepted from a signed account) closed for a different arm. Operators are now a governance-set list (`set_control_operators`, root-only, bounded at 50), empty at genesis, and `a_stranger_is_not_an_operator` pins the refusal — measured load-bearing: reverting the check to `ensure_signed` reddens that test and `only_governance_may_authorise_an_operator`; restoring returns 12/12. The remaining authority arms are: Root/Governance = root origin, EmergencyCommittee = membership of a governance-set committee, Operator = membership of a governance-set list, with `ensure_action_allowed` restricting each level (operator: pause/resume only) and a per-domain cooldown.",
+  "**The pallet is not wired into anything, so none of this is enforced on a chain.** `runtime/src/lib.rs` does not mention `pallet_x3_control`, and nothing outside the pallet references `ControlState`, `ControlDomain` or `ControlRecords` — the state a control action writes is read by no consumer. The authority model is now fail-closed and tested, but a control plane nothing consults is not a control plane; wiring it (and naming what acts on `Frozen`/`Paused`) is a design decision, not a test.",
+  "Still open: no external security review, and `execute_control_action`'s cooldowns are constants in code (`Root` 0, `Operator` 10, committee 1, governance 100 blocks) rather than runtime-configurable — a chain that wired this up would have to fork to retune them.",
+]
+required_tests = [
+  "a_stranger_is_not_an_operator",
+  "only_governance_may_authorise_an_operator",
+  "an_authorised_operator_may_pause_but_not_freeze",
+  "a_stranger_cannot_claim_governance_authority",
+  "a_stranger_cannot_claim_root_authority",
+  "only_committee_members_may_act_as_the_committee",
+]
+test_evidence = [
+  "pallets/pallet-x3-control/src/tests.rs",
+  "note: `cargo test -p pallet-x3-control` -> 12 passed, 0 failed (10 before; the operator test was rewritten to require authorisation and two were added); clippy --all-targets -D warnings and cargo fmt --check clean",
+  "note: measured load-bearing - restoring `ensure_signed(origin)?` for the Operator arm reddens `a_stranger_is_not_an_operator` and `only_governance_may_authorise_an_operator`; restoring the list check returns 12/12",
+]
+evidence = [
+  "pallets/pallet-x3-control",
+  "note: 2026-09-19 joined the workspace and has 12 tests; its authority check had accepted ControlAuthority::Governance from any signed account (fixed then), and on 2026-09-26 the Operator arm was found to accept any signed account too (fixed now, with an empty-at-genesis governance list)",
+]
 
 [[feature]]
 id = "X3-AGENT-002"
@@ -37,13 +57,197 @@ id = "X3-AGENT-003"
 name = "Agent kill-switch concept"
 subsystem = "agents_experimental"
 source = "master"
-paths = ["crates/x3-swarm-core"]
-implemented = 30
-tested = 10
-mainnet_ready = 15
+paths = ["crates/x3-swarm-core", "services/x3-swarm-api"]
+implemented = 78
+tested = 88
+mainnet_ready = 35
 priority = "P3"
 confidence = "high"
 launch_scope = "dev_tooling"
 claim_risk = false
-blockers = ["Previously claimed tests were fictional and removed"]
-evidence = ["crates/x3-swarm-core", "note: FEATURE_REGISTRY explicitly records missing kill-switch test"]
+blockers = [
+  "Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child — but the scheduler's only route to work was `next_task(AgentKind)`, which compared the agent's class and never asked the authority anything. Measured: with `Sanction::Kill` on record and a pending task queued, the killed agent was handed the task. Closed: `SwarmAuthority::may_dispatch` (no genesis record / terminated / expired / quarantined / suspended / killed -> `DispatchRefusal`) is now called by `SwarmScheduler::claim_next_for` (the consolidation renamed it from `next_task_for`), which is the only public route to a task; the old `next_task` is gone, so a caller cannot bypass it. An unregistered agent is refused too — the dispatcher fails closed on an identity it cannot check rather than reading 'no record' as 'no violations'.",
+  "Re-measured 2026-09-27: the crate is still not on the deployed path — `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, so the control plane is enforced but not load-bearing for the deployed chain (the same gap as REG-x3_swarm_core-1). Closed in this change: the 'its own service does not call the scheduler' half. `services/x3-swarm-api` now holds every task in `x3_swarm_core::SwarmScheduler` instead of a private `BTreeMap`, so create/start/complete/fail/approve/reject are transitions on one scheduler, and the two stale, never-compiled service copies under `crates/x3-swarm-core/services/` were deleted rather than left as a second, disagreeing lifecycle.",
+  "Sanctions escalate only; there is no governance reset path, so an agent that reaches Kill is permanently gone. That is intentional per AGENT_LAW §3, but it has never been exercised on a live multi-agent run, and there is still no race-condition or partition-tolerance testing for the control plane.",
+]
+required_tests = [
+  "a_killed_agent_is_not_handed_work",
+  "an_unregistered_agent_is_not_handed_work",
+  "a_quarantined_agent_is_refused_and_the_task_stays_pending",
+  "a_killed_agent_is_refused_even_though_a_task_waits",
+  "swarm_kill_switch_stops_agents",
+  "swarm_agent_can_receive_task",
+  "two_of_three_council_members_authorize_a_runtime_upgrade",
+  "a_signature_over_a_different_action_does_not_authorize_this_one",
+  "a_foreign_approval_hash_is_refused_loudly",
+  "a_one_member_council_cannot_authorize_a_runtime_upgrade",
+  "a_created_task_is_held_by_the_crate_scheduler",
+  "the_start_and_complete_transitions_land_in_the_scheduler",
+  "the_kill_switch_refuses_a_start_and_leaves_the_task_pending",
+  "the_listing_is_id_ordered_and_matches_the_scheduler",
+]
+test_evidence = [
+  "crates/x3-swarm-core/src/scheduler.rs",
+  "crates/x3-swarm-core/tests/agent_lifecycle.rs",
+  "crates/x3-swarm-core/src/sensitive.rs",
+  "crates/x3-swarm-core/src/approval.rs",
+  "crates/x3-swarm-core/tests/sensitive_actions.rs",
+  "services/x3-swarm-api/src/main.rs",
+  "note: the `test x3-swarm-core` gate runs `cargo test --locked --all-targets` for the crate; re-measured 2026-09-27 at 107 passed (75 lib + 6 agent_lifecycle + 15 guard_tests + 11 sensitive_actions), 0 failed, 0 ignored",
+  "note: measured 2026-09-27 - the API service's four tests drive its HTTP handlers against the crate's `SwarmScheduler` and run in the fast set through the `test x3-swarm-api` gate (converted from `check`, which ran nothing). Measured load-bearing: making the status path skip `SwarmScheduler::update_status` reddens exactly `the_start_and_complete_transitions_land_in_the_scheduler` (3 of 4 still green); the file was restored to its recorded SHA-256 and all four passed again",
+  "note: measured load-bearing - deleting the `may_dispatch` call from `SwarmScheduler::claim_next_for` makes `a_killed_agent_is_not_handed_work` fail with the killed agent receiving task T-KILL, and restoring the call returns it to green",
+  "note: measured load-bearing for the authorization path - (1) dropping the comparison between the caller-supplied approval hash and the derived commitment reddens exactly `a_foreign_approval_hash_is_refused_loudly` (10/11 stay green); (2) removing the action tag from the commitment reddens exactly `commitment_binds_the_action_and_the_subject` and `commitment_separates_fields`; (3) removing the security-council size floor reddens exactly `a_one_member_council_cannot_authorize_a_runtime_upgrade`. Each mutation was restored and the file hash verified identical before the next run.",
+]
+evidence = [
+  "crates/x3-swarm-core",
+  "note: FEATURE_REGISTRY records the history - four required_tests were removed by CRITICAL-TOK-1 in 2026-09-06 because none existed as real test functions; they exist now, and the dispatch-refusal pair is added alongside them",
+  "note: 2026-09-27 - the crate's only authorization primitive, `ApprovalGate`, held a caller-chosen `ApprovalRequirement` and exposed `grant(&mut self)` setting it to `None`, so any agent holding its own gate could authorize itself; `request_approval` never called `is_satisfied` at all. It had no callers, which is why the hole was latent. The gate is now built from a `SensitiveAction` (runtime upgrade / token supply change / validator key replacement / genesis modification / settlement-rule change), derives its own requirement, derives the commitment the approval must cover, and refuses a caller-supplied hash that does not match. Nothing in the crate previously derived an approval hash - `action_hash` was supplied by the caller - so a signature issued for one action could be presented for another; `SensitiveRequest::commitment` is now its only producer.",
+  "note: `mainnet_ready` is deliberately unchanged at 35. The row's first blocker (the crate is absent from the runtime dependency graph and its own service does not call the scheduler) is untouched by this change, and a boundary enforced in a crate nothing calls is still not load-bearing in production.",
+]
+
+[[feature]]
+id = "X3-SWARM-001"
+name = "Northern Swarm on-chain pallet (stake/task/quorum/reward)"
+subsystem = "swarm_compute"
+source = "master"
+paths = ["pallets/northern-swarm"]
+implemented = 82
+tested = 78
+mainnet_ready = 15
+priority = "P1"
+confidence = "medium"
+launch_scope = "guarded"
+claim_risk = false
+blockers = [
+  "Closed 2026-09-27 — a `Disputed` task no longer strands funds. `resolve_disputed_task` (call_index 8) refunds the submitter's exact reserved reward and moves the task to the new terminal `TaskStatus::Refunded`; it is permissionless because it can only move the submitter's own reserve, and it refuses any task not in `Disputed`. Evidence: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` (reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged, three executor stakes still 100, `DisputedTaskRefunded` emitted), `resolve_disputed_task_rejects_tasks_that_are_not_disputed` (Pending/Finalised -> `TaskNotDisputed`) and `resolve_disputed_task_cannot_be_replayed`. `SlashReason::QuorumMismatch` still has no constructor: hashes alone cannot prove which executor was wrong, so no stake is slashed on a dispute.",
+  "Accepted work is decided by hash equality, not verification. `finalise_with_quorum` pays an M-of-N set that agrees on a self-reported `result_hash`; nothing re-executes the work, so a quorum that agrees on a wrong hash is paid. There is no fraud proof, no verifiable computation and no challenge window. This is the difference between 'the executors agree' and 'the result is right', and the row's mainnet_ready reflects it.",
+  "Weights are measured but host-specific. `BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm` on x3star1 (Xeon E5-2620 v4) produced the committed file with real proof sizes; a second run on the same host the same day moved `register_executor` between 78.998 ms and 90.536 ms of ref_time, so the reference hardware is not pinned in the repository.",
+]
+required_tests = [
+  "quorum_requires_matching_results",
+  "task_reward_moves_reserved_balance_to_winner",
+  "task_reward_preserves_total_issuance",
+  "full_nonmatching_commit_set_enters_dispute_without_payout",
+  "multiple_executors_can_claim_one_task_up_to_the_bound",
+  "resolve_disputed_task_refunds_submitter_and_preserves_issuance",
+  "resolve_disputed_task_rejects_tasks_that_are_not_disputed",
+  "resolve_disputed_task_cannot_be_replayed",
+]
+test_evidence = [
+  "pallets/northern-swarm/src/tests.rs",
+  "note: `quorum_requires_matching_results` pins both directions of M-of-N - two different hashes leave the 2-of-3 task in `ResultCommitted` and the third matching commit finalises it with `result_hash` set and the dissent kept in `ResultCommits`",
+  "note: `task_reward_moves_reserved_balance_to_winner` asserts the exact deltas (submitter reserved 90 -> 0, each winner +45) and `task_reward_preserves_total_issuance` asserts `Balances::total_issuance()` is unchanged, so the payout is a transfer and never a mint",
+  "note: `full_nonmatching_commit_set_enters_dispute_without_payout` is the ugly path for the same money: three different hashes leave the submitter's 90 reserved, free balance untouched, and claim slots at 0",
+  "note: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` closes that ugly path - it drives the real dispatchable to the refund and asserts reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged and all three executor stakes untouched; `resolve_disputed_task_rejects_tasks_that_are_not_disputed` pins the `TaskNotDisputed`/`TaskNotFound` refusals and `resolve_disputed_task_cannot_be_replayed` proves a second call moves nothing. One test asserts a non-zero refund, so a refund that silently does nothing cannot pass",
+  "note: the mock had never recorded an event (`derive_impl(TestDefaultConfig)` left `frame_system::Config::RuntimeEvent = ()` and `new_test_ext` started at block 0, where `deposit_event` drops everything). Fixed in `mock.rs` so the refund's `DisputedTaskRefunded` event is now asserted rather than assumed",
+]
+evidence = [
+  "pallets/northern-swarm/src/lib.rs",
+  "pallets/northern-swarm/src/weights.rs",
+  "runtime/src/lib.rs",
+  "note: measured 2026-09-27 on the committed bytes - `cargo test -p pallet-northern-swarm --all-targets` 10 passed / 0 failed / 0 ignored; `cargo test -p pallet-northern-swarm --features runtime-benchmarks` 19 passed / 0 failed (including `bench_resolve_disputed_task`); `cargo clippy -p pallet-northern-swarm --all-targets -- -D warnings` clean",
+  "note: the Merkle-free correctness argument is `finalise_with_quorum`'s `ensure!(winner_count >= QuorumThreshold)` plus `repatriate_reserved(..., BalanceStatus::Free)` with `ensure!(remaining.is_zero())`, so a share that cannot be moved fails the whole call instead of paying part of the set",
+  "note: `swarm_reactor_gate.py` now requires the three dispute/refund test names and the `resolve_disputed_task` extrinsic with a `WeightInfo` weight and a `DisputedTaskRefunded` event, so removing the path reddens the release gate rather than only the unit suite",
+]
+registry_feature = "northern_swarm_reactor"
+
+[[feature]]
+id = "X3-SWARM-002"
+name = "Northern Swarm executor: signed metadata-driven chain contract and compute backends"
+subsystem = "swarm_compute"
+source = "master"
+paths = ["crates/northern-swarm"]
+implemented = 78
+tested = 78
+mainnet_ready = 13
+priority = "P1"
+confidence = "medium"
+launch_scope = "guarded"
+claim_risk = false
+blockers = [
+  "No live-node integration test. The watcher/encoder/signer contract is proven at its own boundary - the storage prefix is derived and stable, the map key decodes to the task id, the HTTP polling URL conversion is pinned, the signature parser rejects short ids - but nothing here has ever talked to a running chain. `state_getKeys`, the Subxt signing path and the inclusion watch are all exercised for the first time in production.",
+  "Closed 2026-09-27 — accelerator selection no longer trusts the device. `backend.rs` gained `AutoBackend`: it always computes the CPU reference, compares any accelerator output byte-for-byte, returns the accelerator result only on agreement, and on divergence quarantines the device (storing both hashes in `Divergence`), records it in `BackendTelemetry`, and returns the CPU result. Refusal/error is a separate, counted fallback. `TaskExecutor` now executes through `AutoBackend`, and `AutoBackend::execute` fails closed on a kind it does not support. Evidence: `auto_backend_agrees_with_the_cpu_reference_on_supported_work`, `auto_backend_falls_back_to_cpu_when_the_accelerator_refuses`, `auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result` (a fake returning `0xDEADBEEF` cannot change the result and is never consulted again) and `auto_backend_refuses_a_kind_it_cannot_serve`. Break-it-first: dropping the `candidate == reference` comparison reddens exactly the quarantine test.",
+  "`AiInference` is routed but not executed. `CpuBackend` and `GpuBackend` both declare `!supports(AiInference)`, and `ai_inference_without_real_model_backend_is_refused` pins that refusal - so the kind survives into routing and is then honestly refused, rather than hashed and called a result.",
+]
+required_tests = [
+  "same_input_produces_same_hash",
+  "different_inputs_produce_different_hashes",
+  "result_status_is_success",
+  "sha256_hex_is_stable",
+  "ai_inference_is_not_faked_by_hash_backend",
+  "cpu_backend_is_explicit_fallback_for_deterministic_work",
+  "auto_backend_agrees_with_the_cpu_reference_on_supported_work",
+  "auto_backend_falls_back_to_cpu_when_the_accelerator_refuses",
+  "auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result",
+  "auto_backend_refuses_a_kind_it_cannot_serve",
+  "a_non_success_result_is_not_submitted",
+  "a_bad_task_id_is_refused_before_any_network_call",
+  "a_bad_result_hash_is_refused_before_any_network_call",
+  "a_malformed_executor_key_is_refused_rather_than_defaulted",
+  "the_dev_shorthand_key_derives_a_real_signer",
+  "storage_prefix_is_32_bytes_and_stable",
+  "task_id_is_extracted_from_blake2_concat_map_key",
+]
+test_evidence = [
+  "crates/northern-swarm/src/chain_watcher.rs",
+  "crates/northern-swarm/src/backend.rs",
+  "crates/northern-swarm/src/result_submitter.rs",
+  "note: measured 2026-09-27 on the committed bytes - `cargo test -p northern-swarm --all-targets` 22 passed / 0 failed / 0 ignored; `cargo clippy -p northern-swarm --all-targets -- -D warnings` clean",
+  "note: the submitter boundary is proven without a node - `a_bad_task_id_is_refused_before_any_network_call` and `a_bad_result_hash_is_refused_before_any_network_call` encode an unreachable `ws://127.0.0.1:1` so any RPC attempt would fail, and still get the typed parse error; `a_non_success_result_is_not_submitted` proves a `Failed`/`NonDeterministic` result never reaches the chain; `a_malformed_executor_key_is_refused_rather_than_defaulted` and `the_dev_shorthand_key_derives_a_real_signer` pin signer selection. The chain-side refusals the brief names (unregistered key, already-claimed, already-finalised, duplicate result) are pallet-side and are exercised in `pallets/northern-swarm/src/tests.rs`; this crate cannot observe them without a live node, which the row's first blocker records",
+  "note: the four AutoBackend tests are the backend contract: parity returns the accelerator result only when it equals the CPU reference, a divergent fake is quarantined and its `0xDEADBEEF` never returned (and the device is not consulted again), a refusing accelerator is a counted fallback rather than a divergence, and an unsupported kind fails closed",
+  "note: `storage_prefix_is_32_bytes_and_stable` is the check that the watcher reads the real `NorthernSwarm::Tasks` map rather than a fabricated full key, and `task_id_is_extracted_from_blake2_concat_map_key` pins the 32+16+32 layout the pallet's `StorageMap` produces",
+  "note: `ai_inference_is_not_faked_by_hash_backend` asserts the refusal in both backends, which is the check that `TaskKind` is not silently dropped before routing",
+]
+evidence = [
+  "crates/northern-swarm/src/result_submitter.rs",
+  "crates/northern-swarm/src/types.rs",
+  "note: the gate `python3 scripts/mainnet/swarm_reactor_gate.py` reads this crate for `trait ComputeBackend`, a GPU marker and a CPU-fallback marker, and rejects the unsigned/`pallet_index: 82` shortcut in `result_submitter.rs`",
+  "note: `result_submitter.rs` builds Subxt `DynamicPayload`s by pallet and call *name* and signs with `sign_and_submit_then_watch_default`, so the pallet index cannot drift out from under it",
+]
+registry_feature = "northern_swarm_reactor"
+
+[[feature]]
+id = "X3-REACTOR-001"
+name = "Reactor benchmark infrastructure (x3-bench)"
+subsystem = "swarm_compute"
+source = "master"
+paths = ["crates/x3-bench"]
+implemented = 72
+tested = 78
+mainnet_ready = 10
+priority = "P3"
+confidence = "medium"
+launch_scope = "dev_tooling"
+claim_risk = false
+blockers = [
+  "The Northern Swarm/Reactor hard gate does not reach this crate. `scripts/mainnet/swarm_reactor_gate.py` checks `pallets/northern-swarm` and `crates/northern-swarm` only; the word 'Reactor' in its name is not coverage of `crates/x3-bench`, and `FEATURE_REGISTRY.toml`'s `[x3_reactor]` row is unchanged at 40 for that reason. Anything that reads the gate as Reactor coverage is reading it wrong.",
+  "**Corrected 2026-09-27: this row said no gate in `scripts/local-ci.sh` ran the crate, and that was stale.** `6d83b2af4 test(ci): gate the eight registry-cited crates that had none` added `test x3-bench: cargo test -p x3-bench`, which is how the suite below is executed. The row had kept a true sentence past the commit that made it false.",
+  "CLOSED 2026-09-27 - publication carries a proof about the run. `RunAttestation` commits to the job id, revision, host, a configuration digest and the report's content digest under an ed25519 signature; a registry built with `trusting(attesters)` refuses an unattested publication (`Unattested`) and `publish_attested` refuses a claim about another job, revision, measurement, key or a tampered field. Seven tests; break-it-first: dropping the samples-digest check reddens the mismatched-measurement test.",
+  "**2026-09-27 — the Reactor's placement scheduler exists, but not in this crate.** `crates/northern-swarm/src/reactor.rs` now implements the release prompt's `TaskKind -> requirements -> scheduler -> CPU/GPU/NPU/FPGA` end state (deterministic total order, per-candidate rejection reasons, `AcceleratorUnavailable` refusal instead of a silent CPU substitution, decision recorded in the execution receipt), and `crates/northern-swarm/src/backend.rs` holds the backends it schedules over. This row's `paths` are `crates/x3-bench`, which owns the other half the prompt asks for — benchmark submission and publication — and still has no notion of a backend: the two halves are not joined, so a benchmark report cannot yet say which backend a submitted job ran on. That gap, and the optional-sidecar dependency of the *benchmark* path, are what keep this row below 80.",
+  "The measurement path is asserted, not just the compilation: `the_optimizer_moves_the_measured_instruction_count_down` requires the optimized instruction count to be strictly lower on a redundant fixture, every reported figure non-zero, and each result's byte count to equal its emitted bytes. Still open: there is no pinned reference host - two generations of the same Northern Swarm benchmark on this machine differed by ~13% in ref_time.",
+  "The two halves of the Reactor are unjoined: the placement scheduler is in `crates/northern-swarm/src/reactor.rs` (where the backends are) and this crate owns benchmark submission and publication, so a published report cannot say which backend ran the job.",
+]
+required_tests = [
+  "create_and_compare_reports",
+  "test_compile_optimized",
+  "benchmark_job_submits_and_result_publishes",
+  "a_submitted_job_has_a_derived_identity",
+  "a_report_for_another_suite_is_refused",
+  "publishing_the_same_job_twice_is_refused",
+  "verify_detects_a_tampered_report",
+  "the_report_digest_ignores_the_wall_clock",
+]
+test_evidence = [
+  "crates/x3-bench/src/comparator.rs",
+  "crates/x3-bench/src/pipeline.rs",
+  "crates/x3-bench/src/job.rs",
+  "note: the `test x3-bench` gate runs `cargo test -p x3-bench`; measured 14 passed in the lib target (4 pipeline + 2 comparator + 8 job), 0 failed, 0 ignored, and `cargo clippy -p x3-bench --all-targets -- -D warnings` is clean",
+  "note: measured load-bearing for the publication rules, each mutation restored byte-identically (sha256 checked before and after) - (1) removing the append-only guard reddens exactly `publishing_the_same_job_twice_is_refused`; (2) removing the sample-set comparison reddens exactly `a_report_for_another_suite_is_refused`; (3) digesting `Report::timestamp` reddens exactly `the_report_digest_ignores_the_wall_clock`",
+  "note: the Reactor benchmark report that `[x3_reactor]` used to cite does not exist under `reports/`, so that row carries an empty `proof_report` rather than a citation to something close enough",
+]
+evidence = [
+  "crates/x3-bench",
+  "note: unchanged by the PR #519 landing - recorded here because the release-gate name implies coverage this crate does not have",
+  "note: 2026-09-27 added `crates/x3-bench/src/job.rs` - `JobRequest` with a deterministic identity, `BenchmarkJob::submit`, an append-only `ReportRegistry::publish` that refuses a second publication and a report whose samples are not the requested set, and `report_digest`/`verify` for re-checking a published report. The digest excludes the wall-clock `timestamp` field, so it measures the report rather than the clock. This is the submit/publish path the row recorded as missing; the two names it used to cite (`benchmark_job_submits`, `benchmark_result_publishes`) still do not exist and are not claimed.",
+]
+registry_feature = "x3_reactor"

@@ -71,6 +71,22 @@ impl BatchSwapRouter {
     const MAX_SWAPS_PER_BATCH: u32 = 10;
     const ROUTE_VALIDITY_BLOCKS: u64 = 10;
 
+    /// Is every swap's declared `sequence` its position in the vector?
+    ///
+    /// The batch's order is `SwapInstruction::sequence`; the vector is how it is carried. When
+    /// the two disagree, something downstream could execute the carried order while everyone
+    /// reads the declared one, so both entry points refuse instead. This is *not* fair ordering
+    /// — that is the commit-reveal window in `crates/x3-swap-router/src/mev_protection/
+    /// fair_ordering.rs`, which no caller reaches yet.
+    fn swaps_are_in_sequence_order(swaps: &[SwapInstruction]) -> Result<(), &'static str> {
+        for (index, swap) in swaps.iter().enumerate() {
+            if swap.sequence as usize != index {
+                return Err("Batch swaps are not in sequence order");
+            }
+        }
+        Ok(())
+    }
+
     /// Create a batch swap
     pub fn create_batch_swap(
         initiator: [u8; 32],
@@ -80,6 +96,16 @@ impl BatchSwapRouter {
         if swaps.is_empty() || swaps.len() > Self::MAX_SWAPS_PER_BATCH as usize {
             return Err("Invalid number of swaps in batch");
         }
+
+        // `SwapInstruction::sequence` is the batch's order, and the vector has to agree with it.
+        // Nothing here enforces a *fair* order — that lives in
+        // `crates/x3-swap-router/src/mev_protection/fair_ordering.rs` (a commit-reveal window) —
+        // but a batch that arrives in a different order than the one it declares must not be
+        // executed as if the two were the same thing. Measured 2026-09-26: `execute_batch_swap`
+        // summed `actual_outputs` in vector order and never read `sequence`, so the test named
+        // `liquidation_frontrun_eliminated_by_fair_ordering` was asserting `50 > 0` on two
+        // hardcoded locals while the router ordered nothing at all.
+        Self::swaps_are_in_sequence_order(&swaps)?;
 
         let mut total_input = 0u64;
 
@@ -111,6 +137,12 @@ impl BatchSwapRouter {
         if batch.status != 0 {
             return Err("Batch not pending");
         }
+
+        // Checked again here, because `execute_batch_swap` takes a `&mut BatchSwap` that a caller
+        // can build by hand (`BatchSwap`'s fields are public, and it is `Encode`/`Decode`, so it
+        // can also arrive from storage or the wire) — `create_batch_swap` is not the only way in.
+        // Before the output checks, so nobody can buy execution by paying every minimum.
+        Self::swaps_are_in_sequence_order(&batch.swaps)?;
 
         if actual_outputs.len() != batch.swaps.len() {
             return Err("Output count mismatch");

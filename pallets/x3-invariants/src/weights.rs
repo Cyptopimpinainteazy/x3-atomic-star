@@ -14,6 +14,7 @@ pub trait WeightInfo {
     fn set_bounds() -> Weight;
     fn report_issuance() -> Weight;
     fn set_halt_on_violation() -> Weight;
+    fn clear_halted() -> Weight;
     fn set_constitution_hash() -> Weight;
     // Phase 0 constitutional controls
     fn register_emergency_authority() -> Weight;
@@ -42,6 +43,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 
     /// Storage: `HaltOnViolation` (r:0 w:1)
     fn set_halt_on_violation() -> Weight {
+        Weight::from_parts(8_000_000, 0).saturating_add(RocksDbWeight::get().writes(1_u64))
+    }
+
+    /// Storage: `Halted` (r:0 w:1). Hand-written next to the generated set because the
+    /// benchmark run that produced this file predates the call; it has the same shape
+    /// as `set_halt_on_violation` (one storage write). Re-benchmark before mainnet.
+    fn clear_halted() -> Weight {
         Weight::from_parts(8_000_000, 0).saturating_add(RocksDbWeight::get().writes(1_u64))
     }
 
@@ -100,6 +108,9 @@ impl WeightInfo for () {
         Weight::zero()
     }
     fn set_halt_on_violation() -> Weight {
+        Weight::zero()
+    }
+    fn clear_halted() -> Weight {
         Weight::zero()
     }
     fn set_constitution_hash() -> Weight {

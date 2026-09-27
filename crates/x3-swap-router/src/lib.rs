@@ -20,6 +20,10 @@ pub use atomic_execution::{AtomicSwapExecutor, ExecutionResult, ExecutionStatus,
 pub use fee_calculator::{FeeCalculator, FeeStructure, ProtocolFees};
 pub use gas_optimization::{ChainGasParams, GasEstimate, GasOptimizer};
 pub use mev_protection::{
+    commitment_hash, order_key, CommitRevealLane, Commitment, FairOrderError, OrderedTransaction,
+    OrderingWindow, Reveal, WindowSettlement, COMMITMENT_DOMAIN, MAX_PLAINTEXT_BYTES,
+};
+pub use mev_protection::{
     Hop, MEVProtectionConfig, MEVProtectionError, MEVProtector, ProtectedRoute, ProtectionMetrics,
     ProtectionStrategy, SandwichAttack, SandwichProtection,
 };

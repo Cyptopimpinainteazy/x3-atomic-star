@@ -7,11 +7,11 @@
 
 ## 🎯 Objective
 
-Accelerate Solana validator throughput from **400 TPS** to **100,000+ TPS** via GPU-accelerated computation of the three critical bottlenecks:
+Target: accelerate Solana validator throughput from **400 TPS** to **100,000+ TPS** via GPU-accelerated computation of the three critical bottlenecks. Nothing in this repository builds, runs or benchmarks P4 — see `GPU_VALIDATOR_HONEST_AUDIT.md`:
 
 1. **Ed25519 Signature Verification** (25x speedup: 18k → 500k sig/sec)
-2. **Proof-of-History (PoH) Computation** (15x speedup: 3M → 50M hash/sec)
-3. **Transaction Validation** (10x speedup: 10k → 100k tx/sec)
+2. **Proof-of-History (PoH) Computation** (target: 15x speedup, 3M → 50M hash/sec)
+3. **Transaction Validation** (target: 10x speedup, 10k → 100k tx/sec)
 
 ## 📊 Problem Statement
 
@@ -29,10 +29,10 @@ Solana's bottleneck is **Ed25519 signature verification**:
 Authentication latency:
   Per-signature: 55µs (CPU single-threaded)
   Per-block: 400 tx × 1-3 sigs/tx = 400-1200 µs
-  Per-second: 18k sig/sec ÷ 1.2k worst-case = ~15-20 TPS max
+  Per-second estimate: 18k sig/sec ÷ 1.2k worst-case = ~15-20 TPS max
 ```
 
-Add transaction validation, PoH maintenance, and scheduling → **400 TPS realistic limit**
+Add transaction validation, PoH maintenance, and scheduling → estimated **400 TPS limit**
 
 ## 🚀 Solution: GPU Acceleration
 
@@ -47,7 +47,7 @@ class SolanaSignatureVerifier:
         """Batch-verify 128-512 signatures in parallel on GPU"""
         # Transfer signatures + messages + pubkeys to GPU
         # Launch Ed25519 verify kernel: 128 parallel verifications
-        # Results: 500k+ sig/sec (25x speedup)
+        # Estimated result: 500k+ sig/sec (25x speedup)
 ```
 
 **Key Details**:
@@ -55,7 +55,7 @@ class SolanaSignatureVerifier:
 - **Kernel**: CUDA Ed25519 batch verification (cupy + ed25519-donna)
 - **Throughput**: 
   - GPU: 500,000 sig/sec (25x CPU)
-  - Sustained: 415 TPS for 1000 sig/block
+  - Sustained (estimated): 415 TPS for 1000 sig/block
 - **Latency**: <50ms for 10k signatures
 
 **CUDA Strategy**:
@@ -77,7 +77,7 @@ class SolanaSignatureVerifier:
 class SolanaPoHAccelerator:
     async def compute_poh_chain(num_hashes: int, slot_num: int) -> List[bytes]:
         """Parallel SHA256 chain on GPU"""
-        # Current slot needs ~400k hashes at 400 TPS
+        # Estimated: a current slot needs ~400k hashes at 400 TPS
         # GPU computes 50M+ hashes/sec
         # Completes in <10ms instead of 130ms
 ```
@@ -87,7 +87,7 @@ class SolanaPoHAccelerator:
 - **GPU Solution**: 
   - Stage 1: Hash current + seed in parallel (1M hashes/sec)
   - Stage 2: Merge intermediate results (reduces to serial boundary)
-  - Overall: 15x speedup (3M → 50M hash/sec)
+  - Overall (estimated): 15x speedup (3M → 50M hash/sec)
 - **Memory**: ~100MB for intermediate SHA256 states
 - **Latency**: <10ms per 400k hashes
 
@@ -278,30 +278,35 @@ Transaction Block (1000 tx)
 
 Total block time: ~100ms (CPU-bound validator: ~2.5s)
 Overall speedup: 25x
-TPS improvement: 400 TPS → 10,000 TPS sequential proof
+TPS improvement (projected): 400 TPS → 10,000 TPS sequential proof
 ```
 
 ## ✅ Success Criteria
 
+None of the boxes below is ticked, because none of the criteria has been demonstrated anywhere in
+this repository: there is no `.cu`/`.ptx` kernel, no published artifact, no GPU benchmark of any
+kind, and no result file that P4 produces. The two orphan result files the old checklist implied
+(`day10-validation-results.json`, `day10-hotfix-results.json`) are described in TICKET-099.
+
 ### Minimum ✅ (Must-Have)
-- [x] 100,000+ Ed25519 sig/sec (5x improvement: 18k → 100k)
-- [x] No consensus regression (validator still follows rules)
-- [x] <100ms overhead per block (CPU latency + GPU transfer)
-- [x] Pass Solana protocol test suite
-- [x] Zero signature misvalidations
+- [ ] 100,000+ Ed25519 sig/sec (target: 5x over the 18k CPU baseline)
+- [ ] No consensus regression (validator still follows rules)
+- [ ] <100ms overhead per block (CPU latency + GPU transfer)
+- [ ] Pass Solana protocol test suite
+- [ ] Zero signature misvalidations
 
 ### Target 🎯 (Expected)
-- [x] 500,000 Ed25519 sig/sec (25x improvement)
-- [x] 50,000+ TPS throughput (testnet)
-- [x] 3-5x cost reduction per validator (cheaper GPU << expensive CPU)
-- [x] <50ms total block validation time
-- [x] 99% sig verify uptime
+- [ ] 500,000 Ed25519 sig/sec (target: 25x)
+- [ ] 50,000+ TPS throughput (testnet)
+- [ ] 3-5x cost reduction per validator (cheaper GPU << expensive CPU)
+- [ ] <50ms total block validation time
+- [ ] 99% sig verify uptime
 
 ### Stretch 🚀 (Nice-to-Have)
-- [x] 100,000+ TPS on mainnet
-- [x] 10+ validator adoption (Anza nodes running P4)
-- [x] Ecosystem standard (Solana labs adopts as reference implementation)
-- [x] <25ms block validation (competitive with Jito-style SolannaCore)
+- [ ] 100,000+ TPS on mainnet
+- [ ] 10+ validator adoption (Anza nodes running P4)
+- [ ] Ecosystem standard (Solana labs adopts as reference implementation)
+- [ ] <25ms block validation (competitive with Jito-style SolannaCore)
 
 ## 🧪 Testing Strategy
 
@@ -384,7 +389,7 @@ def benchmark_block_throughput():
 ## 📈 Impact Projection
 
 ### Solana Ecosystem Benefits
-- **Current**: 400 TPS, $5k/mo validator cost, centralized to 2-3 providers
+- **Current (upstream Solana, estimated here)**: 400 TPS, $5k/mo validator cost, centralized to 2-3 providers
 - **With P4**: 100k+ TPS, $1-2k/mo validator cost, decentralized with GPUs
 
 ### Use Cases Enabled
@@ -394,7 +399,7 @@ def benchmark_block_throughput():
 - ✅ Payment networks (Visa-scale throughput)
 
 ### Business Impact
-- 250x faster settlement → Compete with traditional finance
+- 250x faster settlement (target) → Compete with traditional finance
 - 3-5x cost reduction → Sustainable validator economics
 - Ecosystem standard → Drive GPU adoption across validators
 

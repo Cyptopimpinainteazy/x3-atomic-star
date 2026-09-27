@@ -19,6 +19,9 @@
 #   X3_VALIDATOR_COUNT — expected minimum validator count (default: 7)
 #   X3_TESTNET_HOURS   — hours of stable block production to require (default: 72)
 #                        Set to 0 to skip the 72-hour timer check (for CI).
+#   X3_EXPLORER_URL    — where the X3 explorer actually is. Tried before the default ports, and
+#                        the report names the URL criterion 14 passed against, so a launch
+#                        decision never rests on "something was listening on 3000".
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -41,6 +44,36 @@ pass()  { RESULTS["$1"]="PASS";  echo "[PASS] $1"; }
 fail()  { RESULTS["$1"]="FAIL";  OVERALL="FAIL"; echo "[FAIL] $1 — ${2:-}"; }
 skip()  { RESULTS["$1"]="SKIP";  echo "[SKIP] $1 — ${2:-}"; }
 info()  { echo "  [info] $*"; }
+
+# Run one named test per `cargo test` invocation, and require it to have *run*.
+#
+# Two bugs lived here and both made this gate lie. `cargo test` takes a single
+# positional TESTNAME — passing a second one is `error: unexpected argument`, so
+# the gates that named two or three tests could never pass, whatever the tests did
+# ("halt/supply-ledger pallet tests failed", "refund pallet tests failed", measured
+# 2026-09-26 against a live seven-validator network while each test passed on its
+# own). And a filter that matches nothing exits 0 with `0 passed; 0 filtered out`,
+# so a renamed test would have passed silently. One `cargo test` per name, plus a "… ok" line, is the
+# difference between running a test and naming one.
+run_named_tests() {
+    local pkg="$1"; shift
+    local test out
+    for test in "$@"; do
+        # No `--exact`: the harness prints `test tests::name ... ok`, so an exact
+        # match needs the module path, and a bare name with `--exact` matches
+        # nothing at all — which is the same silent pass this helper exists to stop.
+        if ! out="$(cargo test -p "$pkg" "$test" 2>&1)"; then
+            printf '%s\n' "$out" | tail -6 >&2
+            info "$pkg::$test failed to run"
+            return 1
+        fi
+        if ! printf '%s\n' "$out" | grep -qE "^test .*${test} \.\.\. ok"; then
+            info "$pkg::$test reported no result — the filter matched nothing"
+            return 1
+        fi
+    done
+    return 0
+}
 
 # ── Helper: RPC call ──────────────────────────────────────────────────────────
 rpc() {
@@ -76,20 +109,41 @@ if echo "$HEALTH_RESULT" | grep -q '"error"'; then
     fail "min_7_validators" "RPC unreachable at $RPC_URL"
 else
     PEER_COUNT="$(echo "$HEALTH_RESULT" | jq -r '.result.peers // 0')"
-    # system_localListenAddresses for validator count requires separate query
-    # We check via grandpa_roundState or session validators
-    VALIDATOR_LIST="$(rpc_value "state_call" '["GrandpaApi_grandpa_authorities","0x"]')"
-    if [[ -z "$VALIDATOR_LIST" ]]; then
-        # Fallback: count peers + self
-        ACTUAL_VALIDATORS=$(( PEER_COUNT + 1 ))
+    # Two different numbers, and the gate used to report neither. `GrandpaApi_grandpa_authorities`
+    # returns a **hex** SCALE blob; `jq length` on that string is a parse error, so the code fell
+    # through to `peers + 1` and called *that* the validator count (measured 2026-09-26: it
+    # reported "found 6, need 7" on a seven-authority chain that had one validator stopped — the
+    # number was liveness, not the set). Both matter and they are not the same question:
+    #
+    #   * the authority set decides the fault tolerance the testnet is specified for (seven
+    #     authorities: GRANDPA needs five, so two may be lost);
+    #   * the reachable count says whether those authorities are actually up right now.
+    AUTH_HEX="$(rpc_value "state_call" '["GrandpaApi_grandpa_authorities","0x"]')"
+    AUTHORITY_COUNT="$(python3 - "$AUTH_HEX" <<'PY'
+import sys
+raw = sys.argv[1] if len(sys.argv) > 1 else ""
+raw = raw[2:] if raw.startswith("0x") else raw
+if not raw:
+    print(0); raise SystemExit
+first = int(raw[:2], 16)
+if first & 0b11 == 0:
+    print(first >> 2)
+elif first & 0b11 == 1 and len(raw) >= 4:
+    print(int.from_bytes(bytes.fromhex(raw[:4]), "little") >> 2)
+else:
+    print(0)
+PY
+)"
+    REACHABLE=$(( PEER_COUNT + 1 ))
+    info "authority set: ${AUTHORITY_COUNT:-0}, reachable now: $REACHABLE (peers: $PEER_COUNT)"
+    if [[ "${AUTHORITY_COUNT:-0}" -eq 0 ]]; then
+        fail "min_7_validators" "could not read the GRANDPA authority set from $RPC_URL"
+    elif (( AUTHORITY_COUNT < MIN_VALIDATORS )); then
+        fail "min_7_validators" "the chain configures $AUTHORITY_COUNT authorities, need $MIN_VALIDATORS"
+    elif (( REACHABLE < MIN_VALIDATORS )); then
+        fail "min_7_validators" "$AUTHORITY_COUNT authorities configured but only $REACHABLE reachable (peers: $PEER_COUNT)"
     else
-        ACTUAL_VALIDATORS="$(echo "$VALIDATOR_LIST" | jq 'length' 2>/dev/null || echo "$((PEER_COUNT + 1))")"
-    fi
-    info "Detected validators: $ACTUAL_VALIDATORS (peers: $PEER_COUNT)"
-    if (( ACTUAL_VALIDATORS >= MIN_VALIDATORS )); then
         pass "min_7_validators"
-    else
-        fail "min_7_validators" "found $ACTUAL_VALIDATORS, need $MIN_VALIDATORS"
     fi
 fi
 
@@ -163,19 +217,37 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 5] Faucet account separated from treasury..."
 if [[ -f "$CHAIN_SPEC" ]]; then
-    TREASURY_ACCT="$(jq -r '.genesis.runtimeGenesis.config.treasury.account // empty' "$CHAIN_SPEC" 2>/dev/null || echo "")"
-    FAUCET_ACCT="$(jq -r '.genesis.runtimeGenesis.config.faucet.account // .properties.faucetAccount // empty' "$CHAIN_SPEC" 2>/dev/null || echo "")"
-    if [[ -n "$TREASURY_ACCT" ]] && [[ -n "$FAUCET_ACCT" ]] && [[ "$TREASURY_ACCT" != "$FAUCET_ACCT" ]]; then
-        pass "faucet_separated_from_treasury"
-    elif [[ -z "$TREASURY_ACCT" ]] && [[ -z "$FAUCET_ACCT" ]]; then
-        # Check via grep for known treasury patterns
-        if grep -q "faucet\|Faucet" "$CHAIN_SPEC" 2>/dev/null; then
-            pass "faucet_separated_from_treasury"
-        else
-            skip "faucet_separated_from_treasury" "faucet account not found in chain spec — verify manually"
-        fi
+    # The question is whether the account that drips free tokens is one of the accounts
+    # that govern money. This used to compare `.config.treasury.account` with
+    # `.config.faucet.account` — neither of which a real spec has: a spec names the
+    # treasury's *signers* and the runtime derives the pot from a PalletId, so the check
+    # could only ever fall through to `grep faucet` and SKIP. Measured 2026-09-26.
+    #
+    # So: the faucet must exist and must not be a treasury signer, a council member or an
+    # authority. That is the separation an operator can actually verify from the spec, and
+    # it names the accounts it compared rather than the two fields it wished existed.
+    FAUCET_ACCT="$(jq -r '.properties.faucetAccount // .genesis.runtimeGenesis.config.faucet.account // empty' \
+        "$CHAIN_SPEC" 2>/dev/null || echo "")"
+    mapfile -t PRIVILEGED < <(jq -r '
+        [ (.genesis.runtimeGenesis.config.treasury.initialSigners // [])[],
+          (.genesis.runtimeGenesis.config.council.members // [])[],
+          (.genesis.runtimeGenesis.config.aura.authorities // [])[] ]
+        | unique | .[]' "$CHAIN_SPEC" 2>/dev/null || true)
+    if [[ -z "$FAUCET_ACCT" ]]; then
+        skip "faucet_separated_from_treasury" "the chain spec names no faucet account (properties.faucetAccount) — build it with scripts/testnet/build-x3-testnet-spec.py"
     else
-        fail "faucet_separated_from_treasury" "treasury=$TREASURY_ACCT faucet=$FAUCET_ACCT (same or missing)"
+        OVERLAP=""
+        for acct in "${PRIVILEGED[@]}"; do
+            [[ "$acct" == "$FAUCET_ACCT" ]] && OVERLAP="$acct"
+        done
+        if [[ -n "$OVERLAP" ]]; then
+            fail "faucet_separated_from_treasury" "the faucet ($FAUCET_ACCT) is also treasury/council/authority account $OVERLAP"
+        elif [[ "${#PRIVILEGED[@]}" -eq 0 ]]; then
+            skip "faucet_separated_from_treasury" "faucet $FAUCET_ACCT named, but the spec names no treasury/council/authority accounts to compare against"
+        else
+            pass "faucet_separated_from_treasury"
+            info "faucet $FAUCET_ACCT is distinct from ${#PRIVILEGED[@]} treasury/council/authority account(s)"
+        fi
     fi
 else
     skip "faucet_separated_from_treasury" "chain spec not found"
@@ -260,12 +332,10 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 10] Invariant violation halt drill..."
 # Verify via pallet tests that the halt path works
-if cargo test -p pallet-x3-cross-vm-router \
-    test_paused_asset_rejects_transfers \
-    test_closed_route_rejects_transfers \
-    >/dev/null 2>&1 && \
-   cargo test -p pallet-x3-supply-ledger \
-    >/dev/null 2>&1; then
+if run_named_tests pallet-x3-cross-vm-router \
+       test_paused_asset_rejects_transfers \
+       test_closed_route_rejects_transfers \
+   && cargo test -p pallet-x3-supply-ledger >/dev/null 2>&1; then
     pass "invariant_halt_drill"
 else
     fail "invariant_halt_drill" "halt/supply-ledger pallet tests failed"
@@ -275,11 +345,10 @@ fi
 # GATE 11: Refund drill passed
 # ─────────────────────────────────────────────────────────────────────────────
 echo "→ [Gate 11] Refund drill..."
-if cargo test -p pallet-x3-cross-vm-router \
-    test_expired_transfer_refunds_to_source \
-    test_failed_destination_credit_refunds_pending_supply \
-    completion_after_refund_rejected \
-    >/dev/null 2>&1; then
+if run_named_tests pallet-x3-cross-vm-router \
+       test_expired_transfer_refunds_to_source \
+       test_failed_destination_credit_refunds_pending_supply \
+       completion_after_refund_rejected; then
     pass "refund_drill"
 else
     fail "refund_drill" "refund pallet tests failed"
@@ -345,26 +414,98 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # GATE 14: Explorer or dashboard reachable
 # ─────────────────────────────────────────────────────────────────────────────
+# The chain's own finalized head, read over JSON-RPC by this gate. Empty if the RPC does not
+# answer or does not speak `chain_getFinalizedHead`/`chain_getHeader` — in which case criterion
+# 14 cannot cross-check the explorer and says so instead of pretending.
+chain_finalized_head() {
+    local hash header
+    hash="$(curl -sf -m 5 -H 'content-type: application/json' \
+        -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead","params":[]}' \
+        "$RPC_URL" 2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)"
+    [[ -z "$hash" ]] && return 0
+    header="$(curl -sf -m 5 -H 'content-type: application/json' \
+        -d "$(jq -nc --arg h "$hash" '{jsonrpc:"2.0",id:1,method:"chain_getHeader",params:[$h]}')" \
+        "$RPC_URL" 2>/dev/null | jq -r '.result.number // empty' 2>/dev/null || true)"
+    [[ -z "$header" ]] && return 0
+    printf '%d' "$header" 2>/dev/null || true
+}
+
 echo "→ [Gate 14] Explorer/dashboard reachable..."
-EXPLORER_URLS=(
-    "http://localhost:3000"
-    "http://localhost:3001"
-    "http://localhost:8080"
-)
+EXPLORER_URLS=()
+if [[ -n "${X3_EXPLORER_URL:-}" ]]; then
+    # Pinned means pinned. Measured 2026-09-26: with `X3_EXPLORER_URL` only *prepended* to the
+    # list, `scripts/testnet/explorer-gate-drill.sh` served a decoy page on its pinned port and
+    # criterion 14 still passed — on a leftover `next start -p 3010` from an earlier manual run.
+    # A negative control cannot mean anything if the criterion keeps looking elsewhere, and an
+    # operator who names their explorer is stating a fact they want checked, not a preference.
+    EXPLORER_URLS=("$X3_EXPLORER_URL")
+else
+    # No pinned URL: fall back to the conventional dev ports, and name whichever answers.
+    # This is a developer convenience, not a launch configuration — the report prints the URL
+    # criterion 14 reached so nobody has to guess which process satisfied it.
+    EXPLORER_URLS=(
+        "http://localhost:3000"
+        "http://localhost:3001"
+        "http://localhost:3010"
+        "http://localhost:8080"
+    )
+fi
 explorer_ok=false
+EXPLORER_REACHED=""
+EXPLORER_BODY=""
+# Why the criterion refused, in the report row itself: a FAIL that names neither endpoint nor
+# number makes the operator go and re-run the gate by hand to find out what it saw.
+EXPLORER_NOTE=""
 for url in "${EXPLORER_URLS[@]}"; do
-    if curl -sf -m 5 "$url" >/dev/null 2>&1; then
-        info "Explorer/dashboard found at $url"
+    # Something answering on the port is not an explorer. This used to accept *any* HTTP
+    # service on 3000/3001/8080 — the wallet app's own `next dev -p 3001` satisfied it — which
+    # is why an earlier "14 of 15 PASS" run read as a green criterion while nothing was serving
+    # a block explorer. Require the body to be the explorer it claims to be, and say what was
+    # reached.
+    body="$(curl -sf -m 5 "$url" 2>/dev/null || true)"
+    if [[ -z "$body" ]]; then
+        continue
+    fi
+    if grep -qiE "X3 Chain Explorer|X3 Chain Block Explorer|Block explorer for X3" <<<"$body"; then
+        info "Explorer found at $url ($(wc -c <<<"$body" | tr -d '[:space:]') bytes, identifies itself as the X3 Chain Explorer)"
         explorer_ok=true
+        EXPLORER_REACHED="$url"
+        EXPLORER_BODY="$body"
         break
     fi
+    info "$url answered but does not identify itself as the X3 explorer"
 done
 if $explorer_ok; then
-    pass "explorer_or_dashboard"
+    CHAIN_FINALIZED="$(chain_finalized_head)"
+    # What the page says its own head is. This is the attribute the explorer renders, so a page
+    # that shows no chain data at all cannot satisfy the criterion when a chain is available.
+    # Read the digits *inside the quotes*. A plain `grep -oE '[0-9]+'` over the attribute also
+    # matches the `3` in `x3-explorer`, which made this comparison read "3\n4242" and fail a
+    # correct explorer (measured 2026-09-26 by the drill's matching phase).
+    EXPLORER_SHOWN="$(grep -oE 'data-x3-explorer-height="[0-9]+"' <<<"$EXPLORER_BODY" \
+        | sed -E 's/.*="([0-9]+)".*/\1/' | head -1 || true)"
+    if [[ -n "$CHAIN_FINALIZED" ]]; then
+        if [[ -z "$EXPLORER_SHOWN" ]]; then
+            EXPLORER_NOTE=" — it shows no finalized head while $RPC_URL reports #$CHAIN_FINALIZED (serving a title is not exploring)"
+            fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED shows no finalized head (no data-x3-explorer-height in the page) while $RPC_URL reports #$CHAIN_FINALIZED — serving a title is not exploring"
+        elif [[ "$EXPLORER_SHOWN" != "$CHAIN_FINALIZED" ]]; then
+            EXPLORER_NOTE=" — it shows #$EXPLORER_SHOWN while $RPC_URL reports #$CHAIN_FINALIZED"
+            fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED shows finalized head #$EXPLORER_SHOWN but $RPC_URL reports #$CHAIN_FINALIZED — they are reading different chains, or one is stale"
+        else
+            info "the explorer's shown head matches the chain this gate reads (#$CHAIN_FINALIZED)"
+            pass "explorer_or_dashboard"
+        fi
+    elif grep -q 'data-x3-explorer-error="rpc-unreachable"' <<<"$EXPLORER_BODY"; then
+        info "no finalized head available from $RPC_URL, and the explorer states that explicitly rather than showing a number"
+        pass "explorer_or_dashboard"
+    else
+        EXPLORER_NOTE=" — it shows neither a finalized head nor an unreachable-chain marker, and $RPC_URL did not answer"
+        fail "explorer_or_dashboard" "the explorer at $EXPLORER_REACHED neither shows a finalized head nor states that the chain is unreachable, and $RPC_URL did not answer — a page with neither is not an explorer"
+    fi
 else
     # Check if dashboard app exists and has a build script
     if [[ -d "$ROOT_DIR/apps/dashboard" ]] || [[ -d "$ROOT_DIR/apps/explorer" ]]; then
-        fail "explorer_or_dashboard" "app exists but not running — start the explorer/dashboard"
+        fail "explorer_or_dashboard" "nothing on ${EXPLORER_URLS[*]} serves the X3 explorer — start it (apps/explorer: 'npx next start -p 3000' after a build) or point this criterion at the URL that does"
     else
         fail "explorer_or_dashboard" "no explorer or dashboard found at common ports"
     fi
@@ -416,18 +557,40 @@ fi
     echo "| 11 | Refund drill | ${RESULTS[refund_drill]:-NOT_RUN} |"
     echo "| 12 | Indexer/RPC/API smoke | ${RESULTS[indexer_rpc_api_smoke]:-NOT_RUN} |"
     echo "| 13 | Wallet/SDK transfers | ${RESULTS[wallet_sdk_transfer_tests]:-NOT_RUN} |"
-    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN} |"
+    # Name the explorer this criterion actually reached: "PASS" over a port range is the
+    # shape of claim that let an earlier run read as green while nothing served a block
+    # explorer. `X3_EXPLORER_URL` pins it when the operator has one deployed.
+    echo "| 14 | Explorer/dashboard | ${RESULTS[explorer_or_dashboard]:-NOT_RUN}${EXPLORER_REACHED:+ (reached \`$EXPLORER_REACHED\`${EXPLORER_SHOWN:+, showing finalized head #$EXPLORER_SHOWN}, body identifies as the X3 Chain Explorer)}${EXPLORER_NOTE} |"
     echo "| 15 | Production chain spec | ${RESULTS[production_chain_spec]:-NOT_RUN} |"
     echo ""
-    echo "## Missing drills (create these reports to pass their gates)"
-    echo ""
-    echo "- Gate 7: \`reports/drill_node_restart.md\` (must contain \`restart_drill: PASS\`)"
-    echo "- Gate 8: \`reports/drill_validator_removal.md\` (must contain \`validator_removal_drill: PASS\`)"
-    echo ""
+    # Only name the drills that are actually blocking. This section used to print
+    # unconditionally, so a run in which both drills passed still told the operator to go
+    # create their reports.
+    MISSING_DRILLS=""
+    [[ "${RESULTS[forced_node_restart_drill]:-NOT_RUN}" == "PASS" ]] \
+        || MISSING_DRILLS="${MISSING_DRILLS}- Gate 7: \`reports/drill_node_restart.md\` (must contain \`restart_drill: PASS\`) — run \`scripts/drills/node_restart_drill.sh\`\n"
+    [[ "${RESULTS[forced_validator_removal_drill]:-NOT_RUN}" == "PASS" ]] \
+        || MISSING_DRILLS="${MISSING_DRILLS}- Gate 8: \`reports/drill_validator_removal.md\` (must contain \`validator_removal_drill: PASS\`) — run \`scripts/drills/validator_removal_drill.sh\`\n"
+    if [[ -n "$MISSING_DRILLS" ]]; then
+        echo "## Missing drills (create these reports to pass their gates)"
+        echo ""
+        printf '%b' "$MISSING_DRILLS"
+        echo ""
+    fi
     echo "## Gate Decision"
     echo ""
-    if [[ "$OVERALL" == "PASS" ]]; then
-        echo "**public_testnet_gate: PASS** — all criteria met. Proceed to public testnet launch."
+    # A SKIP is not a PASS. Gate 6 is SKIPped whenever `X3_TESTNET_HOURS=0` is used for a CI
+    # run, and a verdict reading "all criteria met" over a skipped 72-hour stability timer is
+    # the overclaim this report exists to prevent. Name what was skipped.
+    SKIPPED=""
+    for key in "${!RESULTS[@]}"; do
+        [[ "${RESULTS[$key]}" == "SKIP" ]] && SKIPPED="${SKIPPED}${key} "
+    done
+    if [[ "$OVERALL" == "PASS" ]] && [[ -z "$SKIPPED" ]]; then
+        echo "**public_testnet_gate: PASS** — all 15 criteria met. Proceed to public testnet launch."
+    elif [[ "$OVERALL" == "PASS" ]]; then
+        echo "**public_testnet_gate: PASS with skipped criteria** — no criterion FAILED, but these"
+        echo "were not evaluated and must be before a public launch: ${SKIPPED}"
     else
         echo "**public_testnet_gate: FAIL** — resolve all FAIL items before opening public participation."
     fi

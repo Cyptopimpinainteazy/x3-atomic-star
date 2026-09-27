@@ -1,0 +1,31 @@
+### no-std focused (after restore)
+test finality::tests::test_a_certificate_at_exactly_the_required_depth_passes ... ok
+test finality::tests::test_a_reported_count_the_anchor_does_not_imply_is_refused ... ok
+test finality::tests::test_a_certificate_for_the_wrong_chain_is_refused ... ok
+test finality::tests::test_a_rewound_anchor_is_refused ... ok
+test finality::tests::test_a_stale_certificate_is_refused ... ok
+test finality::tests::test_an_unpersisted_acceptance_is_not_reported_as_success ... ok
+test finality::tests::test_accepted_tip_survives_a_reload_and_refuses_a_rewind ... ok
+test finality::tests::test_confirmations_at_counts_the_anchored_block ... ok
+test finality::tests::test_solana_finality_uses_the_certificate_commitment ... ok
+test finality::tests::test_witnessed_tip_survives_a_reload ... ok
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 634 filtered out; finished in 0.00s
+
+### std focused (after restore)
+test finality::tests::test_a_certificate_for_the_wrong_chain_is_refused ... ok
+test finality::tests::test_a_certificate_at_exactly_the_required_depth_passes ... ok
+test finality::tests::test_a_reported_count_the_anchor_does_not_imply_is_refused ... ok
+test finality::tests::test_a_rewound_anchor_is_refused ... ok
+test finality::tests::test_a_stale_certificate_is_refused ... ok
+test finality::tests::test_accepted_tip_survives_a_reload_and_refuses_a_rewind ... ok
+test finality::tests::test_an_unpersisted_acceptance_is_not_reported_as_success ... ok
+test finality::tests::test_confirmations_at_counts_the_anchored_block ... ok
+test finality::tests::test_solana_finality_uses_the_certificate_commitment ... ok
+test finality::tests::test_witnessed_tip_survives_a_reload ... ok
+test finality_producer::tests::test_a_block_reported_at_the_wrong_height_is_refused ... ok
+test finality_producer::tests::test_a_receipt_from_another_chain_is_refused_for_the_chain ... ok
+test finality_producer::tests::test_a_receipt_bound_to_its_block_builds_a_certificate ... ok
+test finality_producer::tests::test_a_tip_below_the_anchor_is_refused ... ok
+test finality_producer::tests::test_an_unmined_transaction_is_refused ... ok
+test finality_producer::tests::test_a_receipt_hash_that_is_not_the_block_at_that_height_is_refused ... ok
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 660 filtered out; finished in 0.01s

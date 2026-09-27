@@ -7,6 +7,9 @@ description = "DEX swap router with AI-powered route optimization for X3 Chain"
 
 [dependencies]
 sp-core = { workspace = true, default-features = false, features = ["std"] }
+# The commit-reveal ordering lane lives in a no_std crate so a runtime pallet can enforce the
+# same algorithm; this crate re-exports it rather than keeping a second copy.
+x3-order-window = { path = "../x3-order-window", default-features = false, features = ["std"] }
 sp-std = { workspace = true, default-features = false, features = ["std"] }
 serde = { workspace = true }
 # Note: Would depend on oracle interface when available

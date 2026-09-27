@@ -375,6 +375,46 @@ pub enum CoordinatorError {
     #[error("Insufficient confirmations: {have}/{need}")]
     InsufficientConfirmations { have: u32, need: u32 },
 
+    /// Cross-domain release refused because an external leg is shallower than
+    /// the operator's confirmation policy (see `settlement_finality`). This is
+    /// the cross-domain MEV gate: a reorg-able leg must never be released.
+    #[error(
+        "Cross-domain release refused: {domain} leg on {chain_id} is {observed} block(s) deep, \
+         policy requires {required}"
+    )]
+    LegBelowFinalityDepth {
+        chain_id: String,
+        domain: String,
+        observed: u64,
+        required: u64,
+    },
+
+    /// A release touched a domain the policy does not size. Fail closed: the
+    /// operator must add the domain explicitly rather than inherit a depth.
+    #[error(
+        "Cross-domain release refused: no confirmation policy covers the {domain} leg on {chain_id}"
+    )]
+    FinalityPolicyMissingForDomain { chain_id: String, domain: String },
+
+    /// No bundle for a required domain/operation was present when the finality
+    /// gate ran.
+    #[error(
+        "Cross-domain release refused: no finality evidence for the {domain} leg on {chain_id}: {reason}"
+    )]
+    MissingFinalityEvidence {
+        chain_id: String,
+        domain: String,
+        reason: String,
+    },
+
+    /// A claim envelope would publish the preimage against a leg whose own
+    /// finality evidence says the secret is not yet safe to reveal there.
+    #[error(
+        "Cross-domain claim refused: the {domain} leg on {chain_id} is not safe to reveal the \
+         secret against"
+    )]
+    SecretRevealNotSafe { chain_id: String, domain: String },
+
     #[error("Flashloan provider unavailable: {provider:?} on {vm}")]
     ProviderUnavailable {
         provider: FlashloanProvider,

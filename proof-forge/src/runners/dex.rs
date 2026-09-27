@@ -9,7 +9,14 @@ use std::time::Instant;
 fn expected_attack_tests() -> Vec<&'static str> {
     vec![
         "sandwich_attack_profit_bounded_by_slippage",
-        "liquidation_frontrun_eliminated_by_fair_ordering",
+        // The single test that used to be listed here,
+        // `liquidation_frontrun_eliminated_by_fair_ordering`, asserted `50 > 0` on two locals it
+        // declared itself and would have passed with the batch router ordering by nothing at all
+        // (TICKET-142, closed 2026-09-26). The router now refuses a batch whose vector disagrees
+        // with its own `sequence` fields, and these three are what that is proven by.
+        "a_batch_in_the_order_it_declares_executes",
+        "a_front_runner_cannot_reorder_the_batch_by_handing_it_over_differently",
+        "the_refusal_happens_before_any_output_is_accepted",
     ]
 }
 

@@ -153,6 +153,15 @@ pub enum VMErrorKind {
     #[error("unimplemented opcode 0x{0:02x}")]
     UnimplementedOpcode(u8),
 
+    #[error("storage slot {0} is not a usable slot number")]
+    InvalidStorageSlot(String),
+
+    #[error("value cannot be stored in a 32-byte slot: {0}")]
+    UnencodableStorageValue(String),
+
+    #[error("stored slot payload does not decode: {0}")]
+    CorruptStorageSlot(String),
+
     #[error("instruction pointer out of bounds")]
     InstructionPointerOutOfBounds,
 

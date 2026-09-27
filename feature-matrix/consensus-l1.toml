@@ -7,8 +7,8 @@ subsystem = "consensus_l1"
 source = "master"
 paths = ["scripts/testnet/run-7-validators-local.sh", "scripts/testnet/build-x3-testnet-spec.py", "scripts/local-network-smoke.sh", "scripts/mainnet/make-fixture-live-spec.sh"]
 implemented = 88
-tested = 90
-mainnet_ready = 60
+tested = 95
+mainnet_ready = 73
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -17,6 +17,8 @@ blockers = [
   "Every validator runs on one host: no independent operators, no geographic or administrative separation",
   "No slashing, jailing or equivocation evidence from a multi-operator network — those paths have unit coverage only",
   "The failure drill kills processes on one machine; network partitions, clock skew and a validator rejoining after a long absence under real vote loss are still unexercised",
+  "**2026-09-26 — seven validators, under load, with a removal drill.** The launcher's own seven-authority spec (generated keys, no dev phrase) ran on this host for two hours: one chain throughout, all seven agreeing at heights 9000, 18000 and 27000, +35,938 to +35,940 blocks per validator, peers 6 each, zero stalls beyond 60s, no node lost, worst RSS growth 463.6 MiB against the 1 GiB bound. The same harness now carries load: `LOAD_SECS>0` drives real traffic at the network for the whole window and fails unless it finalized — measured 4 workers, 40,699 finalized transactions, 542.7 finalized TPS, worst error rate 0.0, still one chain and no stall. That closes the row's own open question ('whether a loaded validator can recover') in the direction that matters: a loaded validator kept *up*. The removal drill also passes on seven authorities: the threshold is `n - (n-1)/3` = 5, one validator was killed (verifiably gone) and the observer's finalized height kept advancing — which is the arithmetic that makes seven the specified size, and why a three-validator set cannot lose one at all.",
+  "**And the partition is proven where it means something.** The three-authority test (`partition and recovery`, first half) shows the other side honestly: with three GRANDPA authorities one isolation is a majority loss, so the survivors keep authoring and finality correctly stalls. The second half boots a seven-authority network and isolates one validator at the kernel level while it stays alive: measured, **6 of 7 survivors finalized past the watermark (722) while the isolated validator stayed alive at 685 and fell 39 behind**, then after the heal all seven converged on one hash at 750 and finality resumed (722 -> 750 -> 753). Two facts the test records because they cost it a run each: the spec builder and the launcher must share `P2P_BASE` or the mesh collapses to a star with six validators reporting exactly one peer, and a port-scoped cut is only complete if the isolated validator cannot re-dial from an ephemeral source port — hence the inbound-only restart. The cut is confirmed through peer counts on both sides before anything is asserted, and with the socket reset disabled the cut fails to show and the test fails by name.",
   "Era rotation is unexercised",
   "Two hours on a quiet box now holds — one chain, agreement at three heights, +36,092 blocks per validator, peers 3 throughout, zero peer bans, no stall beyond 60s (`.ai/reports/soak-2h-idle-20260922.md`) — so the earlier failure was load-induced: a starved validator falls behind, repeats one block request, and the peer set bans it out, which turns a lag into a partition. What that experiment does **not** show is whether a loaded validator can recover, and nothing throttles a node that is behind its own import queue",
   "Two hours, four validators, release and debug: consensus holds (one chain, agreement at three heights, +36,146 to +36,159 blocks per validator, peers 3, zero peer bans, no stall beyond 60s) and, with the state cache out of the measurement, memory holds too — worst growth 398 MiB against the 1 GiB bound (`<repo>/.wt-agent/soak-100b`, `.ai/reports/soak-2h-idle-20260922.md`). With the default 1 GiB state cache the same node grows ~1.75 GiB, which is configured memory rather than a leak, and the harness now says which cache size it ran with instead of failing every normally-configured node",
@@ -58,15 +60,28 @@ name = "Runtime upgrade rehearsal"
 subsystem = "consensus_l1"
 source = "master"
 paths = ["pallets/evolution-core"]
-implemented = 60
-tested = 45
-mainnet_ready = 40
+implemented = 75
+tested = 85
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs automated full rehearsal with persisted state"]
+blockers = [
+  "**CLOSED 2026-09-26 — the rehearsal is automated, goes through the chain own upgrade path, and is gated.** `scripts/mainnet/runtime_upgrade_rehearsal.sh` used to hand the swap to `subxt upgrade --suri //Alice`: `subxt` was not installed and the sudo key is unset, so every live step was skipped while the script still printed `PASS — safe to proceed`. It now carries `system.set_code` through `governance.enact_proposal` — the only dispatch in this runtime that reaches `RawOrigin::Root` — on three live validators, and decides its verdict only from checks it prints. Gate: `runtime upgrade through governance` (serial, ~60s). Measured: 13/13 PASS — `governance_upgrade_enacted`, `spec_version_incremented` (20 -> 21), `code_hash_changed` (`:code` 0x519e2ea8... -> 0xf49da82b...), `all_validators_upgraded`, `blocks_and_finality_after_upgrade`, and `post_upgrade_state_operation` (a transfer signed after the swap moves balance) — so the chain state persisted and kept working, which is what this row asked for. Negative control: pointing `X3_UPGRADE_WASM` at the blob the chain already runs makes the chain refuse the swap with `System::SpecVersionNeedsToIncrease` and the run exit 1, so the check that claims the version moved is known to be able to say no.",
+  "Still open: the seven physical validators do not exist, so this is a three-validator network on one host; the operator runbook for upgrading a real testnet is still unwritten, and the rehearsal upgrades a spec_version with no migration work to do (a migration that rewrites keys is a different rehearsal).",
+]
 evidence = ["pallets/evolution-core", "note: Registry requires runtime_upgrade_rehearsal"]
+# The rehearsal is the test, and it is gated: `runtime upgrade through governance` (serial, ~60s).
+# It is the one place in this tree where a code swap actually goes through this runtime's only
+# Root-reaching dispatch, so the numbers quoted here are produced by a run rather than read off a
+# design note. The negative control lives in the same script.
+test_evidence = [
+  "scripts/mainnet/runtime_upgrade_rehearsal.sh",
+  "scripts/mainnet/build_runtime_upgrade_artifact.sh",
+  "scripts/mainnet/runtime_upgrade_governance_driver.cjs",
+  "note: measured 2026-09-26 — 13 checks PASS: the swap went through `governance.enact_proposal`, the spec version moved 20 -> 21, the `:code` hash changed, all three validators reported the new version, blocks and finality continued across the swap, and a transfer signed afterwards moved balance, so state persisted. The artifact it swaps in is built in a detached worktree with the version incremented by exactly one and nothing else touched, and the report records revision, both spec versions and sha256, which is how the 'old' runtime is known to be older. Negative control, also measured: pointing `X3_UPGRADE_WASM` at the blob the chain already runs makes the chain refuse the swap with `System::SpecVersionNeedsToIncrease` and the run exits 1, so the check that claims the version moved is known to be able to say no.",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]
@@ -75,15 +90,23 @@ name = "Runtime upgrade / migration framework"
 subsystem = "consensus_l1"
 source = "master"
 paths = ["pallets/evolution-core"]
-implemented = 65
-tested = 45
-mainnet_ready = 45
+implemented = 78
+tested = 82
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No complete migration dry-run across all runtime variants"]
+blockers = [
+  "**CLOSED 2026-09-26 — every runtime variant is dry-run migrated, in the release gate.** `runtime variant dry-runs` runs `scripts/check-runtime-variants.sh`, and the release gate (`make mainnet-check`) runs the same rehearsal for every `construct_runtime!` variant: measured `dev PASS`, `dev+frontier PASS`, `frontier PASS`, `mainnet-rc1 PASS`, `testnet PASS` — `runtime variant dry-run: all variants passed`. The upgrade path above is what exercises it end to end: the pallets in `Migrations` roll back to version 0, the hooks run, and each must end at the version its code declares.",
+  "Still open: the dry-run proves the migrations *run* against populated state; it does not prove a historical-state upgrade from a published release, because no published release exists to upgrade from on this box.",
+]
 evidence = ["pallets/evolution-core", "note: FEATURE_REGISTRY triforge_runtime = 65%"]
+test_evidence = [
+  "scripts/check-runtime-variants.sh",
+  "scripts/local-ci.sh",
+  "note: measured 2026-09-26 — `runtime variant dry-runs` runs the variant rehearsal for every `construct_runtime!` variant and printed `runtime variant dry-run: all variants passed` (dev PASS, dev+frontier PASS, frontier PASS, mainnet-rc1 PASS, testnet PASS); the release gate runs the same rehearsal. The upgrade path on the row above is what exercises it end to end: the pallets listed in `Migrations` are rolled back to version 0, the hooks run, and each must end at the version its code declares — so a migration that silently does nothing fails the run instead of passing as a no-op.",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]

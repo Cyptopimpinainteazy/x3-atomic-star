@@ -4049,7 +4049,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -6010,7 +6010,7 @@ dependencies = [
  "sp-version",
  "sp-wasm-interface",
  "subxt 0.43.1",
- "subxt-signer",
+ "subxt-signer 0.43.0",
  "thiserror 1.0.69",
  "thousands",
 ]
@@ -6770,7 +6770,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 1.0.69",
- "windows 0.57.0",
+ "windows 0.58.0",
 ]
 
 [[package]]
@@ -10871,15 +10871,20 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "hex",
+ "pallet-northern-swarm",
  "parity-scale-codec",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "sp-core",
+ "subxt 0.50.3",
+ "subxt-signer 0.50.3",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "x3-accel",
 ]
 
 [[package]]
@@ -11826,8 +11831,10 @@ dependencies = [
 name = "pallet-northern-swarm"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-balances",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -11872,18 +11879,22 @@ dependencies = [
 name = "pallet-private-execution"
 version = "0.1.0"
 dependencies = [
+ "curve25519-dalek 4.1.3",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
  "pallet-balances",
  "parity-scale-codec",
+ "rand 0.8.8",
  "scale-info",
  "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-order-window",
+ "x3-threshold-core",
 ]
 
 [[package]]
@@ -12489,6 +12500,9 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-asset-kernel-types",
+ "x3-backend",
+ "x3-common",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
  "x3-packet-schema",
@@ -12729,9 +12743,11 @@ dependencies = [
 name = "pallet-x3-supply-ledger"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
+ "pallet-x3-asset-registry",
  "parity-scale-codec",
  "quickcheck",
  "quickcheck_macros",
@@ -12748,6 +12764,7 @@ dependencies = [
 name = "pallet-x3-token-factory"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-asset-registry",
@@ -12768,6 +12785,7 @@ dependencies = [
 name = "pallet-x3-treasury-policy"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",
@@ -14039,6 +14057,7 @@ dependencies = [
  "tokio-test",
  "tracing",
  "uuid 1.21.0",
+ "x3-threshold-core",
 ]
 
 [[package]]
@@ -22376,6 +22395,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "subxt-signer"
+version = "0.50.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "674031b5bed3c7157a64f44133c38b45fb6bf2cd5cc6b2d6cfd839ea13a82ee2"
+dependencies = [
+ "base64 0.22.1",
+ "bip39",
+ "cfg-if",
+ "crypto_secretbox",
+ "hex",
+ "hmac 0.12.1",
+ "parity-scale-codec",
+ "pbkdf2 0.12.2",
+ "regex",
+ "schnorrkel",
+ "scrypt 0.11.0",
+ "secp256k1 0.30.0",
+ "secrecy 0.10.3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sp-crypto-hashing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "subxt 0.50.3",
+ "thiserror 2.0.20",
+ "zeroize",
+]
+
+[[package]]
 name = "subxt-utils-accountid32"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25765,12 +25812,14 @@ dependencies = [
  "anyhow",
  "chrono",
  "csv",
+ "ed25519-dalek 2.2.0",
  "env_logger 0.10.2",
  "hex",
  "log",
  "prettytable",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "x3-ast",
  "x3-backend",
  "x3-common",
@@ -25919,6 +25968,7 @@ dependencies = [
  "log",
  "pallet-agent-memory",
  "pallet-atomic-trade-engine",
+ "pallet-balances",
  "pallet-collective",
  "pallet-cross-chain-validator",
  "pallet-evm",
@@ -25934,6 +25984,7 @@ dependencies = [
  "pallet-x3-invariants",
  "pallet-x3-kernel",
  "pallet-x3-settlement-engine",
+ "pallet-x3-token-factory",
  "pallet-x3-verifier",
  "pallet-x3-wrapped",
  "parallel-proposer",
@@ -25974,8 +26025,10 @@ dependencies = [
  "substrate-prometheus-endpoint",
  "tempfile",
  "tokio",
+ "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-atomic-trade",
+ "x3-backend",
  "x3-bridge-adapters",
  "x3-chain-runtime",
  "x3-common",
@@ -26939,6 +26992,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-order-window"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-std 14.0.0",
+]
+
+[[package]]
 name = "x3-packet-schema"
 version = "0.1.0"
 dependencies = [
@@ -27127,6 +27190,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpsee",
+ "pallet-atomic-trade-engine",
  "pallet-x3-crosschain-gateway",
  "pallet-x3-kernel",
  "parity-scale-codec",
@@ -27186,13 +27250,16 @@ dependencies = [
  "pallet-cross-chain-validator",
  "pallet-transaction-payment",
  "pallet-x3-agent-law",
+ "pallet-x3-cross-vm-router",
  "pallet-x3-invariants",
  "pallet-x3-kernel",
  "pallet-x3-settlement-engine",
+ "pallet-x3-token-factory",
  "parity-scale-codec",
  "serde_json",
  "sp-core",
  "sp-runtime",
+ "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-chain-runtime",
 ]
@@ -27319,6 +27386,22 @@ dependencies = [
  "sp-core",
  "sp-std 14.0.0",
  "tokio",
+ "x3-order-window",
+]
+
+[[package]]
+name = "x3-threshold-core"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "blake3",
+ "curve25519-dalek 4.1.3",
+ "hkdf",
+ "parity-scale-codec",
+ "rand 0.8.8",
+ "rand_core 0.6.4",
+ "sha2 0.10.9",
+ "sp-std 14.0.0",
 ]
 
 [[package]]

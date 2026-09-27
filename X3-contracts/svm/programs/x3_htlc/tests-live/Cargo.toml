@@ -1,0 +1,20 @@
+[package]
+name = "x3-htlc-tests-live"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Clock-warped in-process SVM lifecycle for the x3_htlc SBF program"
+publish = false
+
+[dev-dependencies]
+# Both are pinned to the same Solana SDK generation as `../client`, so the
+# instruction builders the live validator gate uses are the same ones these
+# tests execute.
+solana-program-test = "=3.0.0"
+solana-sdk = "=3.0.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+x3-htlc-client = { path = "../client" }
+
+# Standalone root: this harness loads the compiled SBF artifact and the real SPL
+# programs, and must never join the root X3 workspace's dependency graph.
+[workspace]

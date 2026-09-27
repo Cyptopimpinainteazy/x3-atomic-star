@@ -10,6 +10,10 @@ use sp_core::H256;
 
 use crate::error::{X3IntegrationError, X3Result};
 use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
+// The `std` path names the type to build each entry from the VM's journal. The `no_std` path takes
+// an already-typed `res.storage_writes` from `mini_x3`, so the import is only needed under `std`.
+#[cfg(feature = "std")]
+use crate::types::X3StorageWrite;
 
 #[cfg(feature = "std")]
 use x3_vm::{BytecodeModule, VMConfig, Verifier, VerifyOptions, VM};
@@ -29,6 +33,14 @@ pub struct X3ExecutorConfig {
     pub gas_config: X3GasConfig,
     /// Allow debug opcodes (NEVER for on-chain)
     pub allow_debug_ops: bool,
+    /// Whether this execution context can offer a private submission channel.
+    ///
+    /// An artifact may *demand* private submission in its own header (the compiled policy,
+    /// AGENTS.md §11). This is the context's half of the contract: when it is `false`, a module
+    /// carrying the demand is refused by the engine rather than executed in the clear. It defaults
+    /// to `false` everywhere, including `simulation()`, because "nobody told me whether a private
+    /// channel exists" must resolve to the refusal and not to the permissive answer.
+    pub allow_private_submission: bool,
 }
 
 impl Default for X3ExecutorConfig {
@@ -40,6 +52,7 @@ impl Default for X3ExecutorConfig {
             trace: false,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: false,
+            allow_private_submission: false,
         }
     }
 }
@@ -54,6 +67,7 @@ impl X3ExecutorConfig {
             trace: false,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: false,
+            allow_private_submission: false,
         }
     }
 
@@ -66,12 +80,23 @@ impl X3ExecutorConfig {
             trace: true,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: true,
+            allow_private_submission: false,
         }
     }
 
     /// Set gas limit
     pub fn with_gas_limit(mut self, limit: u64) -> Self {
         self.gas_limit = limit;
+        self
+    }
+
+    /// Declare that this context really does offer a private submission channel.
+    ///
+    /// The runtime's equivalent is `pallet_private_execution::Enabled`; a caller that sets this
+    /// without such a channel is asserting something the chain does not have, which is why nothing
+    /// sets it by default.
+    pub fn with_private_submission_available(mut self) -> Self {
+        self.allow_private_submission = true;
         self
     }
 }
@@ -94,6 +119,23 @@ impl X3Executor {
         args: &[X3Value],
         config: X3ExecutorConfig,
     ) -> X3Result<X3ExecutionReceipt> {
+        Self::execute_with_slots(bytecode, args, config, &[])
+    }
+
+    /// Execute X3 bytecode with the chain's contract slots visible to the program.
+    ///
+    /// `seeds` is the chain's `X3ContractStorage`: the 32-byte slot keys and the tagged payloads a
+    /// previous execution persisted. They are loaded as inherited state (the VM does not journal
+    /// them and the receipt does not report them), which is what makes a *second* comit able to
+    /// read what the first one wrote. Before this existed the executor was handed no prior state, so
+    /// `evm_sload` answered EVM's zero for every slot and contract state was write-only.
+    #[cfg(feature = "std")]
+    pub fn execute_with_slots(
+        bytecode: &[u8],
+        args: &[X3Value],
+        config: X3ExecutorConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> X3Result<X3ExecutionReceipt> {
         // Step 1: Verify bytecode
         let verify_opts = if config.allow_debug_ops {
             VerifyOptions::default()
@@ -115,7 +157,23 @@ impl X3Executor {
         // (`crates/x3-integration/tests/gas_accounting.rs`).
         let module = BytecodeModule::from_bytes(bytecode)
             .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
-        let mut vm = VM::with_config(
+        // The compiled policy, before anything runs: the artifact says what it requires and this
+        // configuration says what the context can offer. Between the two, the demand is honoured —
+        // a program that asked to be submitted privately must not be executed in the clear, and the
+        // std engine has to agree with `mini_x3` about that or the same bytes would be refused on a
+        // block and accepted off it.
+        if module
+            .features
+            .has(x3_backend::bc_format::FeatureFlags::PRIVATE_SUBMISSION_REQUIRED)
+            && !config.allow_private_submission
+        {
+            return Err(X3IntegrationError::ExecutionFailed(
+                "private submission required by the compiled policy, but this context offers no \
+                 private channel"
+                    .into(),
+            ));
+        }
+        let mut vm = VM::with_config_and_seeds(
             module,
             VMConfig {
                 gas_limit: config.gas_limit,
@@ -123,7 +181,9 @@ impl X3Executor {
                 max_stack_size: config.max_stack_size,
                 trace: config.trace,
             },
-        );
+            seeds,
+        )
+        .map_err(|e| X3IntegrationError::ExecutionFailed(format!("{:?}", e)))?;
 
         // Step 3: Convert arguments to VM values
         let vm_args: Vec<x3_vm::Value> = args
@@ -157,12 +217,30 @@ impl X3Executor {
                     None => vec![],
                 };
 
+                // Drain the slot journal into the receipt's storage channel.
+                //
+                // This is the only place an X3VM slot write becomes visible to the chain: the VM's
+                // `VmStorage` is in-memory and is dropped when this function returns. A write that
+                // an atomic window rolled back is already gone from the journal (`VmStorage::rollback`
+                // truncates it to the snapshot's length), so a reverted window reports no change
+                // rather than a half-applied one.
+                let storage_writes = vm
+                    .drain_storage_journal()
+                    .into_iter()
+                    .map(|write| X3StorageWrite {
+                        key: H256::from(write.key),
+                        old_value: write.old_value,
+                        new_value: write.new_value,
+                    })
+                    .collect();
+
                 Ok(X3ExecutionReceipt {
                     success: true,
                     gas_used,
                     return_data,
                     logs: vec![], // Hostcall log collection deferred to runtime integration
                     state_changes: vec![], // Hostcall state change collection deferred to runtime integration
+                    storage_writes,
                     function_index: 0,
                     // The VM counts these; the field used to say counting needed instrumentation it
                     // already had, so every receipt reported zero instructions (TICKET-130).
@@ -184,6 +262,10 @@ impl X3Executor {
                     return_data: format!("{:?}", vm_err).into_bytes(),
                     logs: vec![],
                     state_changes: vec![],
+                    // Fail closed: a failed execution's partial writes must never be applied, so a
+                    // failure reports no slot writes even though the VM journaled some before it
+                    // failed. `journal` is deliberately not drained here.
+                    storage_writes: vec![],
                     function_index: 0,
                     // The VM counts these; the field used to say counting needed instrumentation it
                     // already had, so every receipt reported zero instructions (TICKET-130).
@@ -193,14 +275,34 @@ impl X3Executor {
         }
     }
 
-    /// Execute X3BC bytecode (no_std): the on-chain engine, see `execute_on_chain`.
+    /// Execute X3BC bytecode (no_std — uses mini_x3 interpreter)
     #[cfg(not(feature = "std"))]
     pub fn execute(
         bytecode: &[u8],
         _args: &[X3Value],
         config: X3ExecutorConfig,
     ) -> X3Result<X3ExecutionReceipt> {
-        Self::execute_on_chain(bytecode, config.gas_limit)
+        Self::execute_with_slots(bytecode, _args, config, &[])
+    }
+
+    /// Execute X3BC bytecode on the engine a block runs, with the chain's slots visible.
+    ///
+    /// Same channel as the `std` arm above: the seeds are the chain's `X3ContractStorage`, loaded
+    /// as inherited state rather than as writes, so a program can read a slot a previous comit
+    /// persisted and a store over one reports the chain's value as its `old_value`.
+    #[cfg(not(feature = "std"))]
+    pub fn execute_with_slots(
+        bytecode: &[u8],
+        _args: &[X3Value],
+        config: X3ExecutorConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> X3Result<X3ExecutionReceipt> {
+        Self::execute_on_chain(
+            bytecode,
+            config.gas_limit,
+            seeds,
+            config.allow_private_submission,
+        )
     }
 
     /// Execute a program the way the chain does, in **every** build.
@@ -213,19 +315,37 @@ impl X3Executor {
     /// between `Err` and an unsuccessful receipt. A test of the native runtime was a test of an
     /// engine no block ever runs. This function is the one engine, whichever way the crate is built.
     ///
+    /// `seeds` are the chain's contract slots, loaded as inherited state, and
+    /// `private_channel_available` is whether the caller can honour an artifact that demands
+    /// private submission (see `mini_x3::execute_x3bc_with_slots_and_policy`).
+    ///
     /// The module is validated first (`verify_on_chain`); a refusal there is `VerificationFailed`.
     /// Running out of gas is an unsuccessful receipt charged the whole limit; any other runtime
     /// fault is `ExecutionFailed`, naming it.
-    pub fn execute_on_chain(bytecode: &[u8], gas_limit: u64) -> X3Result<X3ExecutionReceipt> {
+    pub fn execute_on_chain(
+        bytecode: &[u8],
+        gas_limit: u64,
+        seeds: &[([u8; 32], [u8; 32])],
+        private_channel_available: bool,
+    ) -> X3Result<X3ExecutionReceipt> {
         use crate::mini_x3;
         Self::verify_on_chain(bytecode)?;
-        match mini_x3::execute_x3bc(bytecode, gas_limit) {
+        match mini_x3::execute_x3bc_with_slots_and_policy(
+            bytecode,
+            gas_limit,
+            seeds,
+            private_channel_available,
+        ) {
             Ok(res) => Ok(X3ExecutionReceipt {
                 success: true,
                 gas_used: res.gas_used,
                 return_data: res.return_val.to_bytes(),
                 logs: vec![],
                 state_changes: vec![],
+                // The interpreter journals its slot writes in the key and payload encoding
+                // `crates/x3-vm` uses (`mini_x3::evm_slot_key`): this is the line that carries a
+                // write made by a program running on a block to the kernel.
+                storage_writes: res.storage_writes,
                 function_index: 0,
                 instructions_executed: res.instructions_executed,
             }),
@@ -235,12 +355,28 @@ impl X3Executor {
                 return_data: b"gas exhausted".to_vec(),
                 logs: vec![],
                 state_changes: vec![],
+                storage_writes: vec![],
                 function_index: 0,
                 // Not a stand-in: this interpreter charges exactly one gas per instruction
                 // (`mini_x3::Vm::run`), so at exhaustion the count is the limit.
                 instructions_executed: gas_limit,
             }),
-            Err(e) => Err(X3IntegrationError::ExecutionFailed(format!("{:?}", e))),
+            // A validated program that faults while running (a division by zero, a rolled-back
+            // atomic window, an unsupported opcode reached at run time) is an unsuccessful
+            // receipt naming the fault, the convention `x3-vm` and the kernel's storage channel
+            // use: the caller learns *that* the program ran and failed, and the receipt carries
+            // no slot writes, however many the program journaled before the fault. The
+            // interpreter does not report the gas a faulted run consumed, so none is claimed.
+            Err(e) => Ok(X3ExecutionReceipt {
+                success: false,
+                gas_used: 0,
+                return_data: format!("{:?}", e).into_bytes(),
+                logs: vec![],
+                state_changes: vec![],
+                storage_writes: vec![],
+                function_index: 0,
+                instructions_executed: 0,
+            }),
         }
     }
 
@@ -268,7 +404,7 @@ impl X3Executor {
         Ok(())
     }
 
-    /// Verify bytecode (no_std): the on-chain validator, see `verify_on_chain`.
+    /// Verify bytecode (no_std — uses mini_x3 validator)
     #[cfg(not(feature = "std"))]
     pub fn verify(bytecode: &[u8], _allow_debug_ops: bool) -> X3Result<()> {
         Self::verify_on_chain(bytecode)
@@ -291,7 +427,7 @@ impl X3Executor {
         Ok(gas_estimate)
     }
 
-    /// Estimate gas (no_std): the on-chain estimate, see `estimate_gas_on_chain`.
+    /// Estimate gas (no_std — uses mini_x3 estimator)
     #[cfg(not(feature = "std"))]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
         Ok(Self::estimate_gas_on_chain(bytecode))

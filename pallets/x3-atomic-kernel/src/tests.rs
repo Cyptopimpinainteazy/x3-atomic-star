@@ -44,6 +44,18 @@ fn one_leg_bundle() -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
     .expect("a single leg fits MaxLegsPerBundle")
 }
 
+/// The same shape with a different `amount_in`, so the derived bundle id differs.
+///
+/// The id is derived from the legs, so two submissions of the *same* legs are the same bundle —
+/// which is its own invariant (`BundleAlreadyExists`), and is why a test about the nonce has to
+/// vary the legs to isolate the nonce rule.
+#[allow(dead_code)]
+fn one_leg_bundle_with(amount_in: u128) -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
+    let mut legs = one_leg_bundle();
+    legs[0].amount_in = amount_in;
+    legs
+}
+
 #[test]
 fn economic_halt_blocks_bundle_submission() {
     let halt = economy_open();
@@ -1242,6 +1254,227 @@ fn finalization_happens_once() {
     });
 }
 
+// ── The invariant suite ────────────────────────────────────────────────────────
+//
+// The row's own note said "nine previously claimed invariant tests were removed as fictional;
+// real invariant suite needed". These are the invariants an atomic bundle actually has to hold,
+// asserted directly rather than inferred from the happy path one test at a time: a lifecycle
+// that runs forward once, a bond that settles exactly once, leg receipts that are written once
+// each, and a submission nonce that cannot be spent twice.
+
+/// A settled bundle stays settled: once a bundle has been finalized, rolling it back is not a
+/// "second opinion" — it would move the bond again under a bundle whose receipt is already
+/// committed.
+#[test]
+fn a_finalized_bundle_cannot_be_rolled_back() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 20);
+        let cert = H256::repeat_byte(0xA1);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+        assert_ok!(finalize(bundle_id, root, cert));
+
+        let free_before = Balances::free_balance(ALICE);
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_eq!(
+            Bundles::<Test>::get(bundle_id).expect("record").status,
+            BundleStatus::Finalized,
+            "a refused rollback must leave the status exactly as it was"
+        );
+        assert_eq!(
+            Balances::free_balance(ALICE),
+            free_before,
+            "a refused rollback must not move the bond"
+        );
+    });
+}
+
+/// And the other direction: a rollback is final too. Finalizing afterwards would commit a
+/// receipt for a bundle whose legs were already reverted.
+#[test]
+fn a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 21);
+        let cert = H256::repeat_byte(0xA2);
+        anchor_cert(1, cert);
+        let root = committed_receipt_root(bundle_id, cert, 1);
+
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+        let reserved_after = Balances::reserved_balance(ALICE);
+        assert_eq!(reserved_after, 0, "rollback releases the whole bond");
+
+        assert_noop!(
+            finalize(bundle_id, root, cert),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+        assert_eq!(
+            Balances::reserved_balance(ALICE),
+            reserved_after,
+            "a second rollback must not release (or re-slash) anything a second time"
+        );
+        assert!(
+            !crate::PoaeProofs::<Test>::contains_key(bundle_id),
+            "a rolled-back bundle must never gain a finality proof"
+        );
+    });
+}
+
+/// A leg's receipt is written once. Overwriting it would let a second execution replace the
+/// state diff the bundle is finalized against.
+#[test]
+fn a_leg_receipt_is_written_once_and_keeps_its_first_state_diff() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 22);
+        let first = crate::vm_revert::StateDiff::from_vec_lossy(b"first".to_vec());
+
+        assert_ok!(AtomicKernel::record_leg_execution_receipt(
+            RuntimeOrigin::none(),
+            bundle_id,
+            0,
+            first.clone(),
+        ));
+        assert!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id)[0].executed,
+            "the receipt has to record that the leg ran"
+        );
+
+        assert_noop!(
+            AtomicKernel::record_leg_execution_receipt(
+                RuntimeOrigin::none(),
+                bundle_id,
+                0,
+                crate::vm_revert::StateDiff::from_vec_lossy(b"second".to_vec()),
+            ),
+            Error::<Test>::LegAlreadyExecuted
+        );
+        assert_eq!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id)[0].state_diff,
+            first,
+            "the refused second receipt must leave the first state diff in place"
+        );
+    });
+}
+
+/// A receipt for a leg the bundle does not have is refused. `one_leg_bundle` has one leg, so
+/// index 1 is out of range — and an index that large is what a caller guessing at a bundle's
+/// shape would send.
+#[test]
+fn a_receipt_for_a_leg_outside_the_bundle_is_refused() {
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(100, 23);
+        assert_eq!(
+            crate::BundleLegReceipts::<Test>::get(bundle_id).len(),
+            1,
+            "the receipt vector is sized from the bundle's own legs"
+        );
+        assert_noop!(
+            AtomicKernel::record_leg_execution_receipt(
+                RuntimeOrigin::none(),
+                bundle_id,
+                1,
+                crate::vm_revert::StateDiff::from_vec_lossy(b"out of range".to_vec()),
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+    });
+}
+
+/// A submission nonce is spent once. The rule is `nonce > last_nonce && !used`, so both a
+/// replay and a rewound nonce have to be refused — the second is the one that would let a
+/// submitted bundle be replaced by a different one under the same identity.
+#[test]
+fn a_submission_nonce_cannot_be_spent_twice_or_rewound() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            30,
+        ));
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(),
+            1,
+            "the first submission spends nonce 30"
+        );
+
+        // The same legs again are the *same bundle* — one id, one submission — and that is
+        // refused before the nonce rule is even consulted.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle(),
+                10,
+                1,
+                31,
+            ),
+            Error::<Test>::BundleAlreadyExists
+        );
+
+        // The same nonce again, on a *different* bundle, so the refusal can only be the nonce.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle_with(1_001),
+                10,
+                1,
+                30,
+            ),
+            Error::<Test>::InvalidNonce
+        );
+        // And a nonce below the watermark, which is not in `used_nonces`.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle_with(1_002),
+                10,
+                1,
+                29,
+            ),
+            Error::<Test>::InvalidNonce
+        );
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(),
+            1,
+            "a refused submission must not spend a nonce"
+        );
+
+        // A fresh nonce on a fresh bundle still works.
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle_with(1_003),
+            10,
+            1,
+            31,
+        ));
+        assert_eq!(NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(), 2);
+        assert_eq!(
+            NonceRegistry::<Test>::get(1, ALICE).last_nonce,
+            31,
+            "the watermark tracks the highest nonce spent"
+        );
+    });
+}
+
 #[test]
 fn finalization_has_no_unsigned_entry_point() {
     // TICKET-097. `submit_finalization_result` used to be callable with `RuntimeOrigin::none()`,
@@ -1265,5 +1498,109 @@ fn finalization_has_no_unsigned_entry_point() {
             "an unsigned caller leaves the bundle exactly as it found it"
         );
         assert_ok!(finalize(bundle_id, root, cert));
+    });
+}
+
+// ── the anchor's provenance: a certificate, not a first write ──────────────
+//
+// TICKET-107. `record_flash_finality_anchor` is unsigned, keeps the first value for a height, and
+// `do_finalize_bundle` accepts a bundle only when its `finality_cert` equals that stored value. An
+// anchor whose contents are chosen by the submitter is therefore not evidence — whoever wins the
+// race decides what the chain attests to, and the PoAE proof records it. These tests pin the rule
+// that replaced "first non-zero value wins": the value must be the one the chain derives from the
+// block's own hash, which is the only kind it can check.
+
+/// Give `block` a hash and move the chain past it, the way a running chain has.
+fn chain_with_block_hash(block: u64, hash: H256, head: u64) {
+    frame_system::BlockHash::<Test>::insert(block, hash);
+    System::set_block_number(head);
+}
+
+#[test]
+fn a_fabricated_finality_anchor_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain_with_block_hash(5, H256::repeat_byte(0x11), 6);
+
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                H256::repeat_byte(0xBB), // what a forger would like the chain to attest to
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert!(
+            crate::FinalityCertAnchors::<Test>::get(5).is_none(),
+            "the refusal has to leave the map empty: `do_finalize_bundle` reads whatever is in it"
+        );
+    });
+}
+
+#[test]
+fn only_the_certificate_the_chain_derives_can_be_anchored() {
+    new_test_ext().execute_with(|| {
+        let hash = H256::repeat_byte(0x11);
+        chain_with_block_hash(5, hash, 6);
+
+        let derived = AtomicKernel::derive_finality_cert(5).expect("block 5 has a hash");
+
+        // The claim the proof makes: an external verifier holding block 5's header recomputes
+        // exactly this, and the node and the runtime reach it by one shared definition.
+        assert_eq!(
+            derived,
+            H256::from(sp_io::hashing::blake2_256(hash.as_ref()))
+        );
+        assert_eq!(derived, crate::finality_cert_from_block_hash(hash.as_ref()));
+
+        assert_ok!(AtomicKernel::record_flash_finality_anchor(
+            RuntimeOrigin::none(),
+            5,
+            derived
+        ));
+        assert_eq!(crate::FinalityCertAnchors::<Test>::get(5), Some(derived));
+
+        // The point of the rule: there is no second value to try for this height, so winning the
+        // first-write race buys nothing.
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                H256::repeat_byte(0xCC)
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert_eq!(
+            crate::FinalityCertAnchors::<Test>::get(5),
+            Some(derived),
+            "a refused write leaves the anchor as it was"
+        );
+
+        // It stays an unsigned call: a signed account cannot write this map either.
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(RuntimeOrigin::signed(ALICE), 5, derived),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn an_anchor_for_a_height_the_chain_has_no_hash_for_is_refused() {
+    new_test_ext().execute_with(|| {
+        // Block 5 is a number the chain has no hash for: a height that never existed, a future
+        // one, or one older than the hash window. `blake2_256` of the default hash is what an
+        // implementation without that distinction would accept here, collapsing "no such block"
+        // into "a block whose hash is zero".
+        System::set_block_number(6);
+
+        assert_eq!(AtomicKernel::derive_finality_cert(5), None);
+        assert_noop!(
+            AtomicKernel::record_flash_finality_anchor(
+                RuntimeOrigin::none(),
+                5,
+                crate::finality_cert_from_block_hash(H256::zero().as_ref())
+            ),
+            Error::<Test>::FinalityCertNotDerived
+        );
+        assert!(crate::FinalityCertAnchors::<Test>::get(5).is_none());
     });
 }

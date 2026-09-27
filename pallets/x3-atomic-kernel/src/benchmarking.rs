@@ -7,7 +7,7 @@ use frame_support::traits::{Currency, Get};
 use frame_support::BoundedVec;
 use frame_system::pallet_prelude::BlockNumberFor;
 use frame_system::RawOrigin;
-use parity_scale_codec::Encode;
+use parity_scale_codec::{Decode, Encode};
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
 use sp_runtime::traits::SaturatedConversion;
@@ -193,11 +193,21 @@ benchmarks! {
         assert_eq!(bundle.status, BundleStatus::RolledBack);
     }
 
-    // Benchmark recording a Flash Finality certificate anchor on-chain.
-    // Called by off-chain worker to anchor cert hash for validation.
+    // Benchmark recording a finality certificate anchor on-chain, the call the off-chain worker
+    // makes. The cert is not free-form: the extrinsic stores a value only if it is the one the
+    // chain derives for the height (`FinalityCertNotDerived` otherwise — TICKET-107), so the setup
+    // gives the height a hash and anchors the digest of it.
     record_flash_finality_anchor {
         let block_num = 100u64;
-        let cert = H256::repeat_byte(0x33);
+        let raw = H256::repeat_byte(0x33);
+        let block_hash: <T as frame_system::Config>::Hash =
+            Decode::decode(&mut raw.as_ref()).expect("the mock hash is 32 bytes");
+        let number: BlockNumberFor<T> = block_num.saturated_into();
+        frame_system::BlockHash::<T>::insert(number, block_hash);
+        // Derived, not chosen: the extrinsic stores only what the chain derives, so the
+        // benchmark asks the pallet for that value rather than assembling one itself.
+        let cert = X3AtomicKernel::<T>::derive_finality_cert(block_num)
+            .expect("the height now has a hash");
     }: _(RawOrigin::None, block_num, cert)
     verify {
         let anchored = FinalityCertAnchors::<T>::get(block_num).expect("anchor should be stored");

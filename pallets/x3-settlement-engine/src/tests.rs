@@ -1,6 +1,6 @@
 use crate::atomic_lock::{LockPhase, ReleaseReason};
 use crate::btc_gateway::{BtcAdaptorSignature, BtcHtlcParams, BtcSignature65, BtcSpvProof};
-use crate::mock::{new_test_ext, Test, ALICE, BOB};
+use crate::mock::{new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB};
 use crate::mock::{RuntimeEvent, RuntimeOrigin};
 use crate::types::{
     AssetSpec, BtcBlockHeader, ExternalChainId, IntentState, ProofType, SettlementProof, TokenId,
@@ -4802,6 +4802,173 @@ fn a_batch_larger_than_the_bound_is_refused() {
         assert_noop!(
             Pallet::<Test>::submit_btc_headers(RuntimeOrigin::root(), batch),
             Error::<Test>::BtcHeaderBatchTooLarge
+        );
+    });
+}
+
+// ── The relayer's payload, decoded by the pallet ──────────────────────────────
+//
+// The header *source* is `scripts/btc/push-headers.py`: it reads consecutive Bitcoin headers from
+// a real Esplora endpoint (or `bitcoin-cli`), checks the run links, and emits the SCALE encoding
+// of `Vec<BtcBlockHeader>`. The drill `scripts/testnet/btc-header-source-drill.sh` proves that
+// live against a public endpoint and proves it refuses a source that lies.
+//
+// What the drill cannot prove is that the *pallet* accepts what the relayer emits — that is the
+// link that makes the payload evidence rather than a script that prints JSON. This test is that
+// link. It reads the payload the drill produced from a real testnet3 run (heights 5151279..5151284,
+// anchored on 5151278, all one `nBits`, captured 2026-09-27), decodes it with the pallet's own
+// `BtcBlockHeader`, anchors the real parent header as a genesis checkpoint, and requires the whole
+// batch to be admitted in order. Change the encoding, the height field, or the link rule and this
+// stops being green.
+
+/// The payload `scripts/testnet/btc-header-source-drill.py --write-fixture` produced. Real testnet
+/// headers, so the fixture is not a second copy of our own opinion about Bitcoin.
+mod relayer_fixture {
+    pub const CAPTURE: &str = include_str!("tests/data/btc_relayer_testnet_headers.txt");
+}
+
+struct RelayerPayload {
+    anchor: BtcBlockHeader,
+    headers: Vec<BtcBlockHeader>,
+    scale: Vec<u8>,
+    call_index: u8,
+    network: String,
+    source: String,
+}
+
+/// Read the relayer's line format: `key value…`, one per line, where a header line is
+/// `header <height> <display hash> <wire hex>`.
+fn parse_relayer_payload(text: &str) -> RelayerPayload {
+    let mut network = String::new();
+    let mut source = String::new();
+    let mut anchor_height = None;
+    let mut anchor_header = String::new();
+    let mut headers: Vec<(u64, String, String)> = Vec::new();
+    let mut scale = Vec::new();
+    let mut call_index = None;
+
+    for line in text.lines() {
+        let mut it = line.split_whitespace();
+        let Some(key) = it.next() else { continue };
+        match key {
+            "network" => network = it.next().unwrap_or_default().to_string(),
+            "source" => source = it.collect::<Vec<_>>().join(" "),
+            "anchor_height" => anchor_height = it.next().and_then(|v| v.parse().ok()),
+            "anchor_header" => anchor_header = it.next().unwrap_or_default().to_string(),
+            "header" => {
+                let height = it.next().expect("header height").parse().expect("height");
+                let hash = it.next().expect("header hash").to_string();
+                let wire = it.next().expect("header bytes").to_string();
+                headers.push((height, hash, wire));
+            }
+            "scale_vec_hex" => scale = unhex(it.next().expect("scale hex")),
+            "call_index" => call_index = it.next().and_then(|v| v.parse().ok()),
+            _ => {}
+        }
+    }
+
+    assert_eq!(network, "testnet", "the fixture is a testnet3 capture");
+    assert!(!source.is_empty(), "the fixture names its source");
+    assert!(!scale.is_empty(), "the fixture carries the SCALE payload");
+    assert!(!headers.is_empty(), "the fixture carries headers");
+
+    RelayerPayload {
+        anchor: header_from_wire(&anchor_header, anchor_height.expect("anchor height")),
+        headers: headers
+            .iter()
+            .map(|(height, _, wire)| header_from_wire(wire, *height))
+            .collect(),
+        scale,
+        call_index: call_index.expect("call index"),
+        network,
+        source,
+    }
+}
+
+#[test]
+fn the_relayer_payload_decodes_and_admits_on_an_anchored_chain() {
+    let payload = parse_relayer_payload(relayer_fixture::CAPTURE);
+
+    // 1. The bytes decode with the pallet's own type, and name the same chain the lines did.
+    let decoded = <Vec<BtcBlockHeader> as codec::Decode>::decode(&mut &payload.scale[..])
+        .expect("the relayer's payload is a SCALE Vec<BtcBlockHeader>");
+    assert_eq!(
+        decoded, payload.headers,
+        "the SCALE bytes are the headers the run verified"
+    );
+    assert_eq!(
+        payload.network, "testnet",
+        "the payload names the network it came from"
+    );
+    assert!(
+        payload.source.starts_with("esplora https://"),
+        "the payload came from a real public source, not a local stub: {}",
+        payload.source
+    );
+
+    // 2. The call data the script printed is the pallet's call index plus exactly those bytes.
+    assert_eq!(
+        payload.call_index, 35,
+        "submit_btc_headers' pallet call index"
+    );
+
+    // 3. Every header links to the previous one (or to the anchor), and the run is contiguous.
+    let mut prev = payload.anchor.clone();
+    for header in &decoded {
+        assert_eq!(header.height, prev.height + 1, "no gaps in the run");
+        assert_eq!(
+            header.prev_block_hash,
+            Pallet::<Test>::compute_btc_block_hash(&prev),
+            "header {} links to {}",
+            header.height,
+            prev.height
+        );
+        assert_eq!(
+            header.bits, prev.bits,
+            "one nBits across the run — the pallet admits only a uniform run off a boundary"
+        );
+        prev = header.clone();
+    }
+
+    // 4. The pallet admits the batch in order once the real parent header is anchored.
+    let tip = decoded.last().expect("a tip").height;
+    new_test_ext_with_btc_checkpoints(vec![payload.anchor.clone()]).execute_with(|| {
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), payload.anchor.height);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            decoded.clone()
+        ));
+        assert_eq!(crate::BtcBestHeight::<Test>::get(), tip);
+        for header in &decoded {
+            let meta = crate::BtcHeaderMetaStore::<Test>::get(
+                Pallet::<Test>::compute_btc_block_hash(header),
+            )
+            .expect("every header of the payload is admitted");
+            assert!(meta.anchored, "and descends from the anchored checkpoint");
+            assert_eq!(meta.height, header.height);
+        }
+    });
+}
+
+#[test]
+fn the_relayer_payload_is_refused_when_its_first_header_is_dropped() {
+    // The relayer's whole job is to hand over a *linked* run. A payload missing its first header
+    // has no parent in storage, so it must be refused rather than admitted from its second header
+    // on. This is the negative half of the test above: break the linkage and it goes red.
+    let payload = parse_relayer_payload(relayer_fixture::CAPTURE);
+    let decoded = <Vec<BtcBlockHeader> as codec::Decode>::decode(&mut &payload.scale[..])
+        .expect("a SCALE Vec<BtcBlockHeader>");
+    let gap = decoded[1..].to_vec();
+
+    new_test_ext_with_btc_checkpoints(vec![payload.anchor.clone()]).execute_with(|| {
+        assert_noop!(
+            Pallet::<Test>::submit_btc_headers(RuntimeOrigin::root(), gap),
+            Error::<Test>::BtcParentMissing
+        );
+        assert_eq!(
+            crate::BtcBestHeight::<Test>::get(),
+            payload.anchor.height,
+            "the refused batch moved nothing"
         );
     });
 }

@@ -427,4 +427,66 @@ fn main() -> i64 {
         let result = compile_optimized(SIMPLE_SOURCE, 3, None, None);
         assert!(result.is_ok(), "Compile failed: {:?}", result.err());
     }
+
+    /// The blocker this answers: the tests above assert the pipeline *completes*,
+    /// not that a number is right, so a pipeline that compiled and measured
+    /// nothing would pass them. This asserts the measurement moves the way the
+    /// optimizer is supposed to move it — on a sample with redundant work,
+    /// optimizing produces fewer instructions than not optimizing — and that the
+    /// reported numbers are internally consistent.
+    #[test]
+    fn the_optimizer_moves_the_measured_instruction_count_down() {
+        const REDUNDANT: &str = r#"
+fn sum() -> i64 {
+    let a = 1 + 2;
+    let b = a + 0;
+    let c = b * 1;
+    let d = c + (2 + 3);
+    let e = d - 0;
+    return e;
+}
+"#;
+        let baseline = compile_unoptimized(REDUNDANT).expect("the baseline compiles");
+        let optimized =
+            compile_optimized(REDUNDANT, 6, None, None).expect("the optimized build compiles");
+
+        // A measurement of zero is not a measurement: the pipeline must have
+        // emitted instructions, charged for them and produced bytes.
+        for (label, stats) in [
+            ("baseline", &baseline.stats),
+            ("optimized", &optimized.stats),
+        ] {
+            assert!(
+                stats.instruction_count > 0,
+                "{label} reported no instructions"
+            );
+            assert!(stats.gas_estimate > 0, "{label} reported no gas");
+            assert!(stats.bytecode_size > 0, "{label} reported no bytes");
+        }
+        // `stats.bytecode_size` has to be the length of the bytes that result
+        // actually produced, or the published number is a claim about nothing.
+        assert_eq!(
+            baseline.stats.bytecode_size,
+            baseline.bytecode_bytes.len(),
+            "the baseline's byte count does not match its bytes"
+        );
+        assert_eq!(
+            optimized.stats.bytecode_size,
+            optimized.bytecode_bytes.len(),
+            "the optimized build's byte count does not match its bytes"
+        );
+
+        assert!(
+            optimized.stats.instruction_count < baseline.stats.instruction_count,
+            "the optimizer did not reduce the instruction count: {} -> {}",
+            baseline.stats.instruction_count,
+            optimized.stats.instruction_count
+        );
+        assert!(
+            optimized.stats.bytecode_size <= baseline.stats.bytecode_size,
+            "optimizing grew the bytecode: {} -> {}",
+            baseline.stats.bytecode_size,
+            optimized.stats.bytecode_size
+        );
+    }
 }

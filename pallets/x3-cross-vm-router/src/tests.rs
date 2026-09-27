@@ -13,7 +13,7 @@ use crate::Error;
 use codec::Encode;
 use frame_support::{
     assert_noop, assert_ok, construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, EnsureOrigin},
+    traits::{ConstU32, Currency, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -77,7 +77,7 @@ impl pallet_balances::Config for Test {
     type Balance = u128;
     type RuntimeEvent = RuntimeEvent;
     type DustRemoval = ();
-    type ExistentialDeposit = frame_support::traits::ConstU128<1>;
+    type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type WeightInfo = ();
     type FreezeIdentifier = ();
@@ -137,8 +137,14 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
 
 parameter_types! {
     pub const MaxAssets: u32 = 64;
-    pub const RoutingFeeBps: u16 = 0;
+    // Storage-backed so a test can turn the fee on. It was a `const … = 0`, which is why the
+    // routing-fee branch — the one that made every `xvm_transfer` of more than a few units fail on
+    // `local3` — had no test that could reach it.
+    pub storage RoutingFeeBps: u16 = 0;
     pub const ProtocolTreasury: u64 = 99;
+    // Likewise the deposit floor: a fee only fails to be credited when it is *below* this, so a
+    // test that wants the refusal has to be able to raise it.
+    pub storage ExistentialDeposit: u128 = 1;
     // Low value for testability: epoch rolls over every 5 blocks.
     // Mainnet uses 14_400 (86_400 / 6s block time).
     pub const BlocksPerDay: u32 = 5;
@@ -153,12 +159,15 @@ impl pallet_x3_asset_registry::Config for Test {
 impl pallet_x3_supply_ledger::Config for Test {
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {
     type Registry = Registry;
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
+    // The runtime's own posture: nothing here can verify an external chain's consensus.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = RootOnly;
     type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
@@ -958,6 +967,52 @@ fn only_root_can_toggle_external_bridges() {
     });
 }
 
+/// The root-registration path must ask a *verifier*, not a byte-count.
+///
+/// `register_external_root` used to `ensure!(!proof.is_empty())` and call that "proof against
+/// chain consensus", then write the caller's `root_hash` into `BridgeRoots`, where the bridge
+/// surface reads it as the state of a foreign chain. This pins the replacement: with the
+/// runtime's `RefuseExternalRoots` wired, an enabled bridge surface still cannot establish a
+/// root, and the refusal is the verifier's own error — not `ExternalBridgesDisabled` (that is
+/// the scope-freeze, which is checked earlier and is asserted elsewhere) and not `InvalidProof`
+/// (the data-shape check this replaced). A well-formed 64-byte proof is used, so a check that
+/// merely counted bytes would pass it.
+#[test]
+fn an_external_root_cannot_be_registered_without_a_verifier() {
+    new_test_ext().execute_with(|| {
+        // Open the scope-freeze and the audit gate: the only path to the verifier.
+        assert_ok!(Router::set_external_bridge_audit_gate(RuntimeOrigin::root(), true));
+        assert_ok!(Router::set_external_bridges_enabled(RuntimeOrigin::root(), true));
+        assert!(pallet_x3_cross_vm_router::ExternalBridgesEnabled::<Test>::get());
+
+        let root = H256::repeat_byte(0xAB);
+        let proof = vec![0x11u8; 64];
+
+        assert_noop!(
+            Router::register_external_root(
+                RuntimeOrigin::root(),
+                1u32,
+                root,
+                10u32,
+                proof.clone(),
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+
+        assert!(
+            !pallet_x3_cross_vm_router::BridgeRoots::<Test>::contains_key(1u32),
+            "a refused registration must not write a root, whatever else happened"
+        );
+
+        // The same call with an empty proof fails the same way: the verifier is the gate now,
+        // not the proof's length.
+        assert_noop!(
+            Router::register_external_root(RuntimeOrigin::root(), 1u32, root, 10u32, Vec::new()),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+    });
+}
+
 #[test]
 fn enabling_external_bridges_requires_documented_audit_gate() {
     new_test_ext().execute_with(|| {
@@ -1001,15 +1056,28 @@ fn register_external_root_works_only_after_governance_enables() {
             true
         ));
 
-        // Now it should pass the scope-freeze gate (other validation may still
-        // gate it; here block_number=1 == current block so it is in-range).
-        assert_ok!(Router::register_external_root(
-            RuntimeOrigin::root(),
-            1,
-            H256::repeat_byte(0x11),
-            1,
-            vec![1u8; 8],
-        ));
+        // Now it passes the scope-freeze gate and reaches the *verifier* — which refuses,
+        // because this runtime wires `RefuseExternalRoots`. That is the change: the raw
+        // byte-count check this test used to satisfy with `vec![1u8; 8]` was accepting a
+        // data shape as a proof and writing the caller's root into `BridgeRoots`.
+        //
+        // The governance half of the test is unchanged and still asserted: without the
+        // audit gate and the scope-freeze open, the call fails *earlier*, with
+        // `ExternalBridgesDisabled`.
+        assert_noop!(
+            Router::register_external_root(
+                RuntimeOrigin::root(),
+                1,
+                H256::repeat_byte(0x11),
+                1,
+                vec![1u8; 8],
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalRootVerificationUnavailable
+        );
+        assert!(
+            !pallet_x3_cross_vm_router::BridgeRoots::<Test>::contains_key(1u32),
+            "nothing may be registered while no verifier can check it"
+        );
     });
 }
 
@@ -2699,4 +2767,108 @@ fn edge_xorshift_produces_distinct_values() {
         "xorshift must produce ~unique values; got {} distinct",
         seen.len()
     );
+}
+
+// ── the routing fee: the branch the mock's `RoutingFeeBps = 0` hid ────────────
+//
+// `xvm_transfer` charges `amount * RoutingFeeBps / 10_000` to the signing account and moves it to
+// the protocol treasury. The currency refuses a deposit that would leave the destination below its
+// existential deposit, so on `local3` — where the treasury has never been credited — every transfer
+// whose fee is below the existential deposit failed with `RoutingFeeNotAffordable`. Measured
+// 2026-09-27: the paying gateway held 999_999_999_900_043_000 with nothing frozen, the fee was
+// 2_000, the treasury had no account at all, and the transfer was refused with an error about the
+// payer for a refusal by the destination.
+
+/// Give `who` a free balance. `amount` has to clear the existential deposit or the currency burns
+/// the deposit as dust, which is the same rule this section is about.
+fn fund(who: u64, amount: u128) {
+    let _ = <Balances as Currency<u64>>::deposit_creating(&who, amount);
+}
+
+/// The runtime's `ExistentialDeposit` is `100 * MICRO_ATLAS`; the fee below is 2_000 against it.
+const FEE_ED: u128 = 100_000;
+/// `XvmRoutingFeeBps` at the time of the measurement.
+const FEE_BPS: u16 = 20;
+/// 20 bps of this is 2_000 — positive, and far below `FEE_ED`.
+const FEE_AMOUNT: u128 = 1_000_000;
+/// 20 bps of `FEE_AMOUNT`.
+const FEE_EXPECTED: u128 = 2_000;
+
+#[test]
+fn a_fee_the_treasury_cannot_accept_is_waived_rather_than_failing_the_transfer() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        fund(1, 1_000_000);
+        assert_eq!(
+            Balances::free_balance(ProtocolTreasury::get()),
+            0,
+            "the treasury has to be dead for this to be the refusal under test"
+        );
+
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+        let message_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, FEE_AMOUNT);
+
+        // The transfer landed: the fee was not allowed to fail it.
+        let ledger = Ledger::ledgers(asset_id).unwrap();
+        assert_eq!(ledger.native_supply, 1_000_000_000 - FEE_AMOUNT);
+        assert_eq!(ledger.evm_supply, FEE_AMOUNT);
+        assert_eq!(ledger.pending_supply, 0);
+        // The waiver is recorded, so the uncollected revenue is visible rather than silent …
+        System::assert_has_event(RuntimeEvent::Router(crate::Event::XvmRoutingFeeWaived {
+            message_id,
+            asset_id,
+            fee: FEE_EXPECTED,
+        }));
+        // … and nothing was credited to a treasury the currency would not let receive it.
+        assert_eq!(Balances::free_balance(ProtocolTreasury::get()), 0);
+    });
+}
+
+#[test]
+fn a_fee_the_treasury_can_accept_is_collected() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        fund(1, 1_000_000);
+        // A treasury that already holds its existential deposit can receive any positive fee.
+        fund(ProtocolTreasury::get(), FEE_ED);
+        let before = Balances::free_balance(ProtocolTreasury::get());
+
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+        let message_id = do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, FEE_AMOUNT);
+
+        assert_eq!(
+            Balances::free_balance(ProtocolTreasury::get()),
+            before + FEE_EXPECTED
+        );
+        System::assert_has_event(RuntimeEvent::Router(crate::Event::XvmRoutingFeeCollected {
+            message_id,
+            asset_id,
+            fee: FEE_EXPECTED,
+        }));
+    });
+}
+
+#[test]
+fn a_payer_that_cannot_cover_the_fee_is_still_refused() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(&FEE_ED);
+        RoutingFeeBps::set(&FEE_BPS);
+        let asset_id = bootstrap_x3_asset(1_000_000_000);
+
+        // Account 2 holds nothing, so the refusal is the payer's and stands: the waiver above is
+        // for a destination that will not take a fee, not for a payer that cannot send one.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(2),
+                asset_id,
+                DomainId::X3Evm,
+                addr_for(DomainId::X3Evm),
+                FEE_AMOUNT,
+                System::block_number() + 50,
+            ),
+            Error::<Test>::RoutingFeeNotAffordable
+        );
+    });
 }

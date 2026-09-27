@@ -1,0 +1,11 @@
+{
+  "counts": {
+    "missing-registry-path": 0,
+    "pallet-call-without-weights": 20,
+    "stale-proof-report": 0,
+    "stale-registry-test": 0,
+    "ungated-crate": 0,
+    "unregistered-pallet": 0
+  },
+  "note": "Counts of the finding kinds this scanner owns. Growth fails the `repo scanner` gate; shrinking is always allowed."
+}

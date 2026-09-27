@@ -2,7 +2,7 @@
 
 ## Verdict
 
-PASS
+FAIL
 
 ## Scope
 
@@ -13,11 +13,11 @@ PASS
 
 ## Chain Info
 
-- RPC: ws://127.0.0.1:9944
+- RPC: http://127.0.0.1:9944
 - Chain: X3 Chain Local 3-Validator Testnet
-- Runtime spec version: 9
-- Latest block: 273
-- Finalized block: 269
+- Runtime spec version: 20
+- Latest block: 89
+- Finalized block: 85
 
 ## Initial Supply State
 
@@ -35,12 +35,12 @@ PASS
 
 | Route | Transfer | Finalized | Pending zero | Supply invariant | Result |
 |---|---:|---:|---:|---:|---:|
-| X3Native -> X3Evm | 10 | PASS | PASS | PASS | PASS |
-| X3Native -> X3Svm | 10 | PASS | PASS | PASS | PASS |
-| X3Evm -> X3Native | 10 | PASS | PASS | PASS | PASS |
-| X3Evm -> X3Svm | 10 | PASS | PASS | PASS | PASS |
-| X3Svm -> X3Native | 10 | PASS | PASS | PASS | PASS |
-| X3Svm -> X3Evm | 10 | PASS | PASS | PASS | PASS |
+| X3Native -> X3Evm | 10 | FAIL | FAIL | FAIL | FAIL |
+| X3Native -> X3Svm | 10 | FAIL | FAIL | FAIL | FAIL |
+| X3Evm -> X3Native | 10 | FAIL | FAIL | FAIL | FAIL |
+| X3Evm -> X3Svm | 10 | FAIL | FAIL | FAIL | FAIL |
+| X3Svm -> X3Native | 10 | FAIL | FAIL | FAIL | FAIL |
+| X3Svm -> X3Evm | 10 | FAIL | FAIL | FAIL | FAIL |
 
 ## Negative Tests
 
@@ -61,17 +61,17 @@ PASS
 | Field | Amount |
 |---|---:|
 | canonical_supply | 120 |
-| native_supply | 30 |
-| evm_supply | 50 |
-| svm_supply | 40 |
+| native_supply | 10 |
+| evm_supply | 30 |
+| svm_supply | 20 |
 | external_locked_supply | 0 |
-| pending_supply | 0 |
+| pending_supply | 60 |
 | represented_supply | 120 |
 
 ## Final Invariant
 
 represented_supply == canonical_supply: PASS  
-pending_supply == 0: PASS  
+pending_supply == 0: FAIL  
 external bridges disabled: PASS
 
 ## Blockers

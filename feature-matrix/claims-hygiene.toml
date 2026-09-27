@@ -24,35 +24,90 @@ id = "X3-CLAIM-002"
 name = "MEV-proof marketing claim"
 subsystem = "claims_hygiene"
 source = "claim_risk"
-paths = ["CURRENT_MAINNET_STATUS.md"]
-implemented = 20
-tested = 10
-mainnet_ready = 10
+paths = [
+  "CURRENT_MAINNET_STATUS.md",
+  "apps/x3-desktop/src-tauri/src/crm/outreach_system.rs",
+  "apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs",
+  "docs/testnet-config/RELEASE-NOTES.md",
+  "production/public/x3-ecosystem.html",
+  "production/public/x3-validators.html",
+  "docs/openspec/changes/p4-solana-gpu-acceleration/P4_IMPLEMENTATION_GUIDE.md",
+  ".planning/README.md",
+  "docs/runbooks/testing/VALIDATION_INDEX.md",
+  "scripts/ci/check-claims-hygiene.py",
+]
+implemented = 80
+tested = 75
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "research"
 claim_risk = true
-blockers = ["Rename to MEV-resistant architecture under development"]
-evidence = ["CURRENT_MAINNET_STATUS.md", "note: No complete fair-ordering/encrypted mempool proof"]
+blockers = [
+  "Re-measured 2026-09-26: the row's instruction (\"rename to MEV-resistant architecture under development\") had already been carried out in `CURRENT_MAINNET_STATUS.md` — the file does not mention MEV at all — which is why the row looked half-closed. The claim had moved into the desktop CRM's outbound templates (`apps/x3-desktop/src-tauri/src/crm/`) and grown: \"Deterministic execution guarantees (no MEV/reorg risk)\", \"Sub-300ms cross-chain settlement (vs 12+ seconds standard)\", \"300ms cross-chain finality (vs 12s on Solana)\", \"5,000 TPS baseline\", \"Live in 3 production networks\", \"Compute revenue per GPU: $1200/month (current pilot)\", \"We have 3 regional partners already live\", \"processes cross-chain transactions at 100K TPS with 300ms finality\", \"committed minimum $500K/quarter purchase\", \"X3 provides certified e-waste and IT surplus management services\", \"NIST SP 800-88 compliant\" — plus six seeded contacts naming real people at real organisations (DeepMind, Anthropic, MIT CSAIL, IQC, CoreWeave) with invented personal addresses that the app's own SMTP sender could mail. All of it is rewritten to what the project can show; the seeded contacts are now reserved-`example.com` placeholders.",
+  "The gate is a scanner, not a proof of honesty: `scripts/ci/check-claims-hygiene.py` reads 78 declared claim surfaces (root markdown, `docs/testnet-config`, the CRM) tree-wide for phrases that are false in every context and on surfaces only for figures, skipping lines that qualify themselves. Its surface list is hand-maintained, so a new surface can be added without being scanned.",
+  "TICKET-139 closed 2026-09-26: the surface list is widened to `docs/**`, `production/public/**` and `.planning/**` beside the root markdown and the CRM, and every path the ledger named is *decided in the file*. `benchmarks/`, `.audit/`, `infra-structure/`, `tests_phase4/`, `tests_core/` and `tools/` are declared `EVIDENCE_RECORDS` with a reason each — still listed as surfaces, so deleting an entry re-enables scanning and the gate fails (measured: dropping `benchmarks/` reddens the TPS archive). The widening was not cosmetic: it found a P4 checklist with every `[x]` ticked for a GPU system with no `.cu`/`.ptx`, no artifact and no benchmark; the public site's `zero-fee flashloans`/`sub-200ms finality` hero copy; and the plans' dated `Testnet Live ... 1000 TPS` row. All 41 hits now state the honest state, a target, or a measurement.",
+  "What the widened scanner still does not cover: `apps/**` outside `src-tauri/src/crm` (measured 2026-09-26: `apps/inferstructor-dashboard/src/components/RegisterPage.tsx` 5 unqualified figures, `apps/x3-studio/electron/main.ts` 4, `apps/dashboard/src/panels/docs/AnalyticsReportingPanel.tsx` 2). Decide per app whether its copy is a claim surface or shipped demo text (TICKET-140). The public pages also still carry a `Now live on testnet` hero tag while nothing is deployed, which no rule matches yet (TICKET-141).",
+  "The CRM modules themselves are dead code: `apps/x3-desktop/src-tauri/src/crm/mod.rs` declares only `db`, `models`, `commands`, `smtp` and `agents`, so `outreach_system.rs`, `hardware_acquisition_commands.rs`, `funding*.rs`, `dorks*.rs`, `audit_tournament.rs` and `hardware_sources_db.rs` are neither compiled nor called (the crate is also excluded from the cargo workspace, so nothing type-checks them). Honest text in an unreachable file is still not a working feature; either wire it with tests or delete it (TICKET-138, TESTNET_GAP_LEDGER.md).",
+  "`mainnet_ready` stays below 40 by the matrix's own cap on `claim_risk`/`research` rows, not by measurement: this row briefly carried 55 and `feature matrix check` refused it (`X3-CLAIM-002: claim-risk feature must remain below 40 mainnet readiness`). The hygiene work is real and the removed claim is not coming back; the row is a record that a claim was retracted, so it must never read as a mainnet capability. Do not raise it again without dropping `claim_risk`/`launch_scope = \"research\"` in the same change and saying why.",
+]
+test_evidence = [
+  "note: the `claims hygiene` gate runs scripts/ci/check-claims-hygiene.py in the local-ci default set (see scripts/local-ci.sh); since TICKET-139 it reports `OK - 5482 file(s) scanned, 460 claim surface(s), 520 declared evidence record(s) excluded, no unqualified claim` on this tree",
+  "note: the surface count fell to 460 in the same change because a skipped path with a slash in it was never actually skipped - `SKIP_DIRS` was matched one component at a time, so its `docs/audit` and `docs/superpowers` entries did nothing and those files were scanned while the docstring said they were out of scope. Measured: `--list` named `docs/audit/X3_AGENT_QUEUE.md` and `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md` as claim surfaces; after the fix it names none. The gate was green before and after, so this is a correctness fix to the stated scope, not a way to obtain green",
+  "note: measured load-bearing on the widened scope - a claim placed on a *new* surface fails it (`production/public` probe `<p>Sub-200ms finality at 100,000 TPS.</p>` -> `unqualified throughput figure`), an unchecked `- [ ] 1,000 TPS demonstrated` on the same surface does *not* (a plan item), and ticking it to `- [x]` makes the same line fail (a result claim)",
+  "note: measured load-bearing on the evidence-record list - deleting the `benchmarks/` entry from EVIDENCE_RECORDS reddens `benchmarks/tps-archive-2026-02/README.md:40,44,50` (`529 / 575 / 554 / 499 TPS`, `30.6 TPS`, `1,279-1,480 TPS`), and restoring it returns the gate to OK",
+  "note: measured load-bearing - appending `> MEV-proof ordering with 4,200 TPS finality.` to CURRENT_MAINNET_STATUS.md makes it FAIL with both rules (`ABSOLUTE (MEV protection is not implemented (X3-MEV-001..008))` and `unqualified throughput figure`), and removing the line returns it to OK",
+]
+evidence = [
+  "CURRENT_MAINNET_STATUS.md",
+  "apps/x3-desktop/src-tauri/src/crm/outreach_system.rs",
+  "apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs",
+  "scripts/ci/check-claims-hygiene.py",
+  "note: No complete fair-ordering/encrypted mempool proof, so the claim is removed rather than qualified: the surfaces now state that X3-MEV-007 and X3-MEV-008 are not implemented",
+]
 
 [[feature]]
 id = "X3-CLAIM-003"
 name = "Cross-chain complete claim"
 subsystem = "claims_hygiene"
 source = "claim_risk"
-paths = ["reports/atomic_crossvm_completion_audit.md"]
-implemented = 45
-tested = 30
-mainnet_ready = 30
+# Re-measured 2026-09-27. The row's own audit sentence — "fully coherent internally, not fully
+# integrated externally" — was a distinction nothing in the code made, so a scoreboard with
+# unready external chains pooled into one number with X3's own ready domains and read as
+# complete. `AdapterScoreboard` now reports the two scopes separately and the default view is
+# derived from the adapters instead of a hand-written table that had drifted to 80/100/80.
+paths = [
+  "reports/atomic_crossvm_completion_audit.md",
+  "crates/x3-atomic-swap/src/scoreboard.rs",
+  "crates/x3-atomic-swap/src/adapter.rs",
+]
+implemented = 60
+tested = 70
+mainnet_ready = 38
 priority = "P0"
 confidence = "high"
 launch_scope = "research"
 claim_risk = true
 blockers = [
-  "Distinguish internal cross-VM from external-chain settlement",
+  "**CLOSED 2026-09-27 — the two scopes are separate values now, not a sentence in an audit.** `SettlementScope::{InternalDomain, ExternalChain}` classifies every adapter by `VmType` (EVM/SVM/X3VM are the domains X3 runs; the other thirteen settle on chains X3 does not run), `AdapterScoreboard` carries `internal_score`/`internal_max_score` and `external_score`/`external_max_score` beside the pooled figure, `internal_is_ready()`/`external_is_ready()` are the two bars a completeness claim must clear, and the CLI prints all three lines. `Default for SettlementScope` is `ExternalChain` — fail closed — and it is the `#[serde(default)]`, so a scoreboard serialised before the field existed loads without any entry being silently promoted to an internal domain. Break-it-first, measured: classifying `BitcoinScript` as internal reddens exactly `only_the_three_domains_x3_runs_are_internal`, `an_external_adapter_never_moves_the_internal_score`, `the_pooled_score_is_a_blend_that_hides_whichever_side_is_unready` and `the_default_scoreboard_agrees_with_every_adapters_own_declaration`, and leaves the other scoreboard tests green; restoring the match returns 17/17",
+  "**The default view was a second place the scoreboard fed the claim.** `AdapterScoreboard::default_scoreboard()` hand-wrote sixteen entries and had drifted: `x3-adapter-substrate` 80, `x3-adapter-x3vm` 100, `x3-adapter-bitcoin` 80, while those adapters' own `readiness_score()` declared 60-70 with the missing capabilities named. Nothing tied the table to the code, so nothing could make it disagree. It is now `from_adapters(crate::adapter::all_adapters())` — one inventory, shared with the cross-adapter proof test (`test_all_adapters_produce_consistent_lock_proof_structure`, whose skip for the zk adapter now matches on `VmType::ZkVm` rather than on a display name that was the constructor's chain id) — and `the_default_scoreboard_agrees_with_every_adapters_own_declaration` fails if a score, a vm_type, a scope or a missing-capability count ever drifts from the adapter's own declaration",
+  "**Measured on the derived board, and the opposite of what this row assumed: internal 56, external 60, pooled 60.** X3's own three domains are not the strong side, and neither side is ready, so \"cross-chain complete\" is false on both counts. `mainnet_ready` stays below the claim-risk cap (40) for that reason: the claim is now *scoped* rather than proven",
+  "Still open for a completeness claim, and named in the audit's 2026-09-27 addendum: no external chain is live, no external adapter is proven against a real chain, BTC has no trusted header source, and the legacy adapter family (`evm_htlc.rs`, `bitcoin_htlc.rs`) is still in the crate as a drift hazard even though it is off the live path",
   "**2026-09-26, corrected — the scoreboard fed the claim.** `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, and fourteen adapters declared `event_proof_extraction`, `finality_proof`, `rpc_indexer_support` and `proof_ledger_integration` true while building their lock, claim and refund proofs from `mock_tx_id(..)`, a \"Simulated block number\" and literal \"mock proof\" payloads, with `finality_status` returning a block hash derived from the number 42. All fourteen are corrected now: every adapter whose `finality_status` returns a constant proof declares `finality_proof: false`, the five that declared `proof_ledger_integration` without a ledger write declare it false, and the tests that pinned the inflated totals moved with them (move_vm and bitcoin 80 -> 60, cosmwasm 80/100/80 -> 60/80/60, wasm_l1 90 -> 70, and the rest 70 -> 60). `security/adapter-readiness-claims-baseline.txt` is empty, so `scripts/ci/check-adapter-readiness-claims.py` is a plain gate now rather than a ratchet; `crates/x3-atomic-swap/tests/adapter_readiness_truth.rs` pins the EVM and SVM cases and the integration suite asserts the honest overall rather than `>= 70`. Measured load-bearing: re-declaring `finality_proof: true` on the EVM adapter fails both the checker and the test.",
 ]
+required_tests = [
+  "only_the_three_domains_x3_runs_are_internal",
+  "an_external_adapter_never_moves_the_internal_score",
+  "an_unclassified_entry_is_external_not_internal",
+  "the_default_scoreboard_agrees_with_every_adapters_own_declaration",
+  "the_pooled_score_is_a_blend_that_hides_whichever_side_is_unready",
+  "test_all_adapters_produce_consistent_lock_proof_structure",
+]
 test_evidence = [
+  "note: `cargo test -p x3-atomic-swap --lib scoreboard` — 17 passed, 0 failed (2026-09-27), five of them the internal/external suite added with this row; `cargo test -p x3-atomic-swap --lib` — 676 passed, 0 failed",
+  "note: `cargo clippy -p x3-atomic-swap --all-targets --all-features -- -D warnings` — clean; `cargo fmt -p x3-atomic-swap -- --check` — clean",
+  "note: break-it-first measured — `SettlementScope::of` classifying `VmType::BitcoinScript` as `InternalDomain` reddens exactly the four split tests (`only_the_three_domains_x3_runs_are_internal`, `an_external_adapter_never_moves_the_internal_score`, `the_pooled_score_is_a_blend_that_hides_whichever_side_is_unready`, `the_default_scoreboard_agrees_with_every_adapters_own_declaration`) and leaves the rest green; the restored match returns 17/17",
+  "note: the derived default view is pinned to the adapters, not to numbers: `the_default_scoreboard_agrees_with_every_adapters_own_declaration` compares every entry's score, vm_type, scope and missing-capability count against that adapter's own `readiness_score()`, and asserts the buckets are 300 (three internal domains) and 1300 (thirteen external chains)",
   "note: `test x3-atomic-swap adapter readiness` runs crates/x3-atomic-swap/tests/adapter_readiness_truth.rs; the `adapter readiness claims` gate runs the checker, whose baseline is empty as of 2026-09-26",
   "note: the fourteen adapters' own `test_readiness_score` tests were updated with the declarations (they pinned the inflated scores and the `missing_items()` counts), and `test_e2e_multi_vm_atomic_swap_lifecycle` now asserts the scoreboard reports `finality_proof` missing instead of `overall_score >= 70`",
 ]

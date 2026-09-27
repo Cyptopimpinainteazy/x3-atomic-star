@@ -4,7 +4,9 @@
 
 set -e
 
-WORKSPACE="/home/lojak/Desktop/X3_ATOMIC_STAR"
+# Derived from this script's own location so the orchestrator works from any checkout. Set
+# WORKSPACE=... in the environment to point it elsewhere.
+WORKSPACE="${WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 LOG_DIR="/tmp/x3-testnet-logs"
 mkdir -p "$LOG_DIR"
 

@@ -62,7 +62,7 @@ cat pilot-results/pilot-report-*.md               # Review results
 | Category | Count | Examples |
 |----------|-------|----------|
 | **Functional** | 5 | Scenario 1 PASS, Scenario 2 FAIL, votes match commitments, audit complete |
-| **Performance** | 4 | API < 100ms p95, DB < 50ms p99, CPU < 50%, memory < 500MB |
+| **Performance** | 4 | Acceptance criteria: API < 100ms p95, DB < 50ms p99, CPU < 50%, memory < 500MB |
 | **Reliability** | 5 | 100% uptime, 0 API errors, 0 DB errors, health checks passing |
 | **Security** | 5 | No unauthorized access, tamper-evident logs, no credential leaks |
 | **Compliance** | 1 | All audit requirements met |
@@ -264,4 +264,3 @@ Expected result: **✅ Both scenarios pass** (Scenario 1 = PASS, Scenario 2 = FA
 All components are operational and ready for production pilot testing on staging environment.
 
 Next step: Run `./deploy.sh staging cpu && python3 pilot_executor.py --api-url http://localhost:8000 --scenario all`
-

@@ -1,11 +1,68 @@
 /// Proof Submitter - Submits proofs to X3 runtime via RPC
+use crate::quorum::AuthorizedValidatorSet;
 use crate::types::{EvmProof, SvmProof, ValidatorSignature};
 use anyhow::{anyhow, Result};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use log::{debug, info};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::RwLock;
+
+/// A refusal this pipeline makes on purpose, named rather than reported as an
+/// opaque string.
+///
+/// X3 fails closed: when the relayer cannot establish that it is allowed to do
+/// something, it refuses and says which rule it could not satisfy. Both variants
+/// replace an action a node would have rejected anyway.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum SubmitterError {
+    /// The chain admits a cross-chain proof only from the intent's own maker or
+    /// taker, and this pipeline holds neither key.
+    ///
+    /// The signer that builds `submit_proof` / `submit_cross_domain_proof_set`
+    /// now exists (`x3-runtime-signer`, shared with the node); what is undecided
+    /// is the authority path, and that is a security decision rather than a code
+    /// detail. Until it is decided, a submission signed here would be rejected
+    /// on chain, so it is not made.
+    #[error(
+        "refusing to submit the {leg} proof: the settlement engine records an external proof \
+         through `submit_proof` / `submit_cross_domain_proof_set`, and both require \
+         `who == intent.maker || who == intent.taker`, so a third-party relayer signature is \
+         rejected with `NotAuthorized`. The signer is no longer the missing piece: it is the \
+         `x3-runtime-signer` crate (`sign_submit_proof`, `prepare_cross_domain_proof_set`), \
+         shared with the node. What is undecided is who is authorized to submit. Configured \
+         signing authority: {authority}. Refusing rather than reporting a submission that would \
+         be rejected on chain."
+    )]
+    UnauthorizedSubmitter {
+        /// Which proof leg refused (`evm` or `svm`).
+        leg: &'static str,
+        /// The configured signing authority, for the operator reading the log.
+        authority: String,
+    },
+
+    /// The configured validator set demands more distinct signatures than this
+    /// pipeline can supply.
+    #[error(
+        "refusing to produce an SVM proof: {validator_set} validators are authorized and the \
+         supermajority rule requires {required} distinct signatures, but this submitter can back \
+         it with {available}. Aggregating other validators' signatures has no host in this \
+         workspace yet, so no proof is produced rather than one carrying a quorum it cannot meet."
+    )]
+    SvmQuorumUnreachable {
+        required: u32,
+        available: u32,
+        validator_set: usize,
+    },
+
+    /// Nothing is authorized to attest, so no signature could ever be backed.
+    #[error(
+        "refusing to produce an SVM proof: no authorized validator set is configured, so nothing \
+         can attest external-chain finality and a proof produced here would be unbacked."
+    )]
+    NoAuthorizedValidatorSet,
+}
 
 pub struct RpcSubmitter {
     x3_rpc_url: String,
@@ -22,7 +79,10 @@ pub struct RpcSubmitter {
     #[allow(dead_code)]
     retry_backoff_ms: u64,
     relayer_custody_key_id: Option<String>,
-    svm_required_signatures: u32,
+    /// The authorized validator set, and therefore the quorum, an SVM proof must
+    /// meet. `required_signatures` is derived from this set through the
+    /// workspace's single supermajority rule — never a literal.
+    svm_validators: AuthorizedValidatorSet,
     /// Signing key derived from the relayer seed phrase (if provided).
     /// When custody is enabled, this field holds a zeroed placeholder and
     /// `sign_proof_payload` is not called (custody signer is used externally).
@@ -35,6 +95,7 @@ impl RpcSubmitter {
         relayer_account: String,
         relayer_custody_key_id: Option<String>,
         relayer_seed_phrase: Option<&str>,
+        svm_validator_pubkeys: &[String],
         max_retries: u32,
         retry_backoff_ms: u64,
     ) -> Result<Self> {
@@ -66,6 +127,11 @@ impl RpcSubmitter {
             }
         };
 
+        // A malformed, wrongly sized or repeated key is refused at startup: a
+        // set the operator did not mean must not size the quorum.
+        let svm_validators = AuthorizedValidatorSet::from_hex_keys(svm_validator_pubkeys)
+            .map_err(|err| anyhow!("invalid configured validator set: {err}"))?;
+
         Ok(Self {
             x3_rpc_url,
             nonce: Arc::new(RwLock::new(initial_nonce)),
@@ -73,9 +139,7 @@ impl RpcSubmitter {
             max_retries,
             retry_backoff_ms,
             relayer_custody_key_id,
-            // required_signatures lowered to 1 — the submitter attaches exactly
-            // one signature and quorum enforcement belongs at the aggregator layer.
-            svm_required_signatures: 1,
+            svm_validators,
             signing_key,
         })
     }
@@ -90,39 +154,31 @@ impl RpcSubmitter {
         SigningKey::from_bytes(&hash)
     }
 
-    pub async fn submit_evm_proof(&self, proof: EvmProof) -> Result<String> {
+    /// Refused, by name: see [`SubmitterError::UnauthorizedSubmitter`].
+    ///
+    /// The proof is consumed so that a caller cannot mistake a refusal for a
+    /// submission, and the error is a typed variant rather than a string a caller
+    /// would have to match on.
+    pub async fn submit_evm_proof(&self, proof: EvmProof) -> Result<String, SubmitterError> {
         let _ = proof;
-        let authority = self.signing_authority();
-        let label = authority
-            .get("type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
-        Err(anyhow!(
-            "this pipeline cannot submit a proof with its own key. The settlement engine records \
-             an external proof through `submit_proof` / `submit_cross_domain_proof_set`, and both \
-             require `who == intent.maker || who == intent.taker` \
-             (pallets/x3-settlement-engine/src/lib.rs:1420 and :1656), so a third-party relayer \
-             signature is rejected with `NotAuthorized`. The signer that builds those calls is no \
-             longer the missing piece: it is the `x3-runtime-signer` crate (`sign_submit_proof`, \
-             `prepare_cross_domain_proof_set`), shared with the node, which is the piece this \
-             pipeline was waiting on. What is still missing is the authority path — either the \
-             intent party signs the submission and this \
-             pipeline only transports it, or the pallet grows a delegation an operator can be \
-             authorized for — and that is a security decision rather than a code detail. \
-             Configured signing authority: {label}. Refusing rather than reporting a submission \
-             that would be rejected on chain."
-        ))
+        Err(self.unauthorized_submitter("evm"))
     }
 
-    pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String> {
+    /// Refused, by name, for the same reason as the EVM leg — and because the
+    /// payload this path used to post was a JSON blob rather than a hex-encoded
+    /// SCALE extrinsic the settlement engine can decode.
+    pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String, SubmitterError> {
         let _ = proof;
-        Err(anyhow!(
-            "the SVM leg is refused for the same reason as the EVM leg: the proof this pipeline \
-             used to post was a JSON payload rather than a hex-encoded SCALE extrinsic, and the \
-             settlement engine accepts a proof only from the intent's maker or taker \
-             (`NotAuthorized` otherwise). Signing is available from the `x3-runtime-signer` crate; \
-             what is undecided is who is authorized to submit."
-        ))
+        Err(self.unauthorized_submitter("svm"))
+    }
+
+    /// The single refusal the submission authority decision produces, shared by
+    /// both proof legs so they cannot drift apart.
+    fn unauthorized_submitter(&self, leg: &'static str) -> SubmitterError {
+        SubmitterError::UnauthorizedSubmitter {
+            leg,
+            authority: self.authority_label(),
+        }
     }
 
     pub async fn is_bridge_paused(&self) -> Result<bool> {
@@ -179,26 +235,55 @@ impl RpcSubmitter {
 
     /// Acquire SVM proof for submission from finalized slot data.
     ///
-    /// Produces a proof with exactly one `validator_signature` and
-    /// `required_signatures = 1`.  Quorum aggregation happens at the
-    /// validator/aggregator layer, not inside the submitter.
+    /// `required_signatures` is the supermajority of the **configured** validator
+    /// set, not a literal and not a value the proof gets to choose for itself.
+    ///
+    /// The submitter attaches the signatures it can actually produce — today that
+    /// is this process's own key, and only when that key is a member of the
+    /// configured set. If the distinct signatures it can produce fall short of
+    /// the derived quorum, no proof is produced: the partial material is dropped
+    /// and the shortfall is returned by name
+    /// ([`SubmitterError::SvmQuorumUnreachable`]), because a proof carrying fewer
+    /// signatures than its rule requires is a proof that only looks like a
+    /// quorum. Aggregating other validators' signatures has no host in this
+    /// workspace yet.
     pub async fn acquire_svm_proof(
         &self,
         domain_id: u32,
         slot: u64,
         blockhash: [u8; 32],
-    ) -> Result<SvmProof> {
+    ) -> Result<SvmProof, SubmitterError> {
         debug!(
             "Acquiring SVM proof for domain {}, slot {}",
             domain_id, slot
         );
 
+        if self.svm_validators.is_empty() {
+            return Err(SubmitterError::NoAuthorizedValidatorSet);
+        }
+
+        let mut validator_signatures = Vec::new();
+        let own_key = self.signing_key.verifying_key().to_bytes();
+        if self.svm_validators.is_authorized(&own_key) {
+            validator_signatures.push(self.sign_proof_payload(slot, &blockhash));
+        }
+
+        let required_signatures = self.svm_validators.required_signatures();
+        let available = self.svm_validators.distinct_signers(&validator_signatures) as u32;
+        if available < required_signatures {
+            return Err(SubmitterError::SvmQuorumUnreachable {
+                required: required_signatures,
+                available,
+                validator_set: self.svm_validators.len(),
+            });
+        }
+
         Ok(SvmProof {
             source_domain: domain_id,
             slot,
             blockhash,
-            validator_signatures: vec![self.sign_proof_payload(slot, &blockhash)],
-            required_signatures: self.svm_required_signatures,
+            validator_signatures,
+            required_signatures,
         })
     }
 
@@ -249,6 +334,19 @@ impl RpcSubmitter {
             serde_json::json!({
                 "type": "seed-derived",
             })
+        }
+    }
+
+    /// `signing_authority()` as a one-line label for refusal messages, read from
+    /// the same report so the two cannot describe different signers.
+    fn authority_label(&self) -> String {
+        match self
+            .signing_authority()
+            .get("key_id")
+            .and_then(|value| value.as_str())
+        {
+            Some(key_id) => format!("custody-service ({key_id})"),
+            None => "seed-derived".to_string(),
         }
     }
 
@@ -365,7 +463,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             relayer_custody_key_id: None,
-            svm_required_signatures: 1,
+            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             signing_key,
         };
         let proof = EvmProof {
@@ -384,6 +482,14 @@ mod tests {
             .submit_evm_proof(proof)
             .await
             .expect_err("no authorized signing key for the intent");
+        // The refusal is a matchable variant, not a string a caller must parse.
+        assert_eq!(
+            error,
+            SubmitterError::UnauthorizedSubmitter {
+                leg: "evm",
+                authority: "seed-derived".to_string(),
+            }
+        );
         let message = error.to_string();
         assert!(
             message.contains("intent.maker"),
@@ -409,7 +515,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             relayer_custody_key_id: None,
-            svm_required_signatures: 1,
+            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             signing_key: key,
         };
 
@@ -431,11 +537,13 @@ mod tests {
         assert!(vk.verify(&payload_hash, &sig).is_ok());
     }
 
-    /// An SVM proof acquired by the submitter must pass the safety pipeline
-    /// unchanged (required_signatures == count of attached signatures).
+    /// The golden path: when this submitter *is* the whole configured validator
+    /// set, the quorum its acquisition derives is one signature, and the proof it
+    /// builds carries exactly that many distinct signatures.
     #[test]
     fn test_acquired_svm_proof_passes_quorum_check() {
         let key = RpcSubmitter::key_from_seed("quorum test seed");
+        let key_hex = hex::encode(key.verifying_key().to_bytes());
         let submitter = RpcSubmitter {
             x3_rpc_url: "http://localhost:9933".to_string(),
             nonce: Arc::new(RwLock::new(0)),
@@ -443,7 +551,7 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             relayer_custody_key_id: None,
-            svm_required_signatures: 1,
+            svm_validators: AuthorizedValidatorSet::from_hex_keys(&[key_hex]).unwrap(),
             signing_key: key,
         };
 
@@ -453,6 +561,13 @@ mod tests {
         let proof = rt
             .block_on(submitter.acquire_svm_proof(200, slot, blockhash))
             .unwrap();
+
+        // The count comes from the rule on the configured set, not from a
+        // literal: one validator means exactly one signature.
+        assert_eq!(
+            proof.required_signatures,
+            x3_validator_attestation::supermajority_threshold(1)
+        );
 
         // required_signatures must match the number of attached signatures.
         assert_eq!(
@@ -468,6 +583,100 @@ mod tests {
         assert!(!proof.validator_signatures.is_empty());
     }
 
+    /// The ugly path this workstream exists for: with three authorized
+    /// validators the rule demands a supermajority (three), and a submitter
+    /// holding one key refuses to produce a proof rather than emitting one that
+    /// claims a quorum it cannot back. The refusal names the shortfall, and the
+    /// partial signature material is dropped — no proof object is handed back.
+    #[test]
+    fn acquire_svm_proof_refuses_a_set_it_cannot_back() {
+        let key = RpcSubmitter::key_from_seed("under-quorum submitter seed");
+        let submitter = RpcSubmitter {
+            x3_rpc_url: "http://localhost:9933".to_string(),
+            nonce: Arc::new(RwLock::new(0)),
+            rpc_client: reqwest::Client::new(),
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            relayer_custody_key_id: None,
+            // Three validators: this key plus two this process cannot sign for.
+            svm_validators: AuthorizedValidatorSet::from_keys(vec![
+                key.verifying_key().to_bytes(),
+                [0x11u8; 32],
+                [0x22u8; 32],
+            ]),
+            signing_key: key,
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let error = rt
+            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .expect_err("one key cannot back a three-of-three quorum");
+
+        assert_eq!(
+            error,
+            SubmitterError::SvmQuorumUnreachable {
+                required: x3_validator_attestation::supermajority_threshold(3),
+                available: 1,
+                validator_set: 3,
+            }
+        );
+        let message = error.to_string();
+        assert!(message.contains("3 distinct signatures"), "got: {message}");
+        assert!(message.contains("back it with 1"), "got: {message}");
+    }
+
+    /// A submitter whose own key is not in the configured set can produce no
+    /// authorized signature at all — it must refuse, not sign as an outsider.
+    #[test]
+    fn acquire_svm_proof_refuses_when_its_key_is_not_authorized() {
+        let key = RpcSubmitter::key_from_seed("unauthorized submitter seed");
+        let submitter = RpcSubmitter {
+            x3_rpc_url: "http://localhost:9933".to_string(),
+            nonce: Arc::new(RwLock::new(0)),
+            rpc_client: reqwest::Client::new(),
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            relayer_custody_key_id: None,
+            svm_validators: AuthorizedValidatorSet::from_keys(vec![[0x33u8; 32]]),
+            signing_key: key,
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let error = rt
+            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .expect_err("an unauthorized key must not produce a proof");
+        assert_eq!(
+            error,
+            SubmitterError::SvmQuorumUnreachable {
+                required: 1,
+                available: 0,
+                validator_set: 1,
+            }
+        );
+    }
+
+    /// With nothing authorized, nothing can attest: refused by name rather than
+    /// producing an unbacked proof.
+    #[test]
+    fn acquire_svm_proof_refuses_with_no_validator_set() {
+        let submitter = RpcSubmitter {
+            x3_rpc_url: "http://localhost:9933".to_string(),
+            nonce: Arc::new(RwLock::new(0)),
+            rpc_client: reqwest::Client::new(),
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            relayer_custody_key_id: None,
+            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
+            signing_key: RpcSubmitter::key_from_seed("no set configured"),
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let error = rt
+            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .expect_err("no authorized validator set must fail closed");
+        assert_eq!(error, SubmitterError::NoAuthorizedValidatorSet);
+    }
+
     /// Custody key ID set, no seed → signing_authority reports custody-service.
     #[test]
     fn test_custody_authority_reported_when_configured() {
@@ -478,12 +687,16 @@ mod tests {
             max_retries: 3,
             retry_backoff_ms: 1000,
             relayer_custody_key_id: Some("custody-key-001".to_string()),
-            svm_required_signatures: 1,
+            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             signing_key: RpcSubmitter::key_from_seed("custody authority test"),
         };
 
         let authority = submitter.signing_authority();
         assert_eq!(authority["type"], "custody-service");
         assert_eq!(authority["key_id"], "custody-key-001");
+        assert_eq!(
+            submitter.authority_label(),
+            "custody-service (custody-key-001)"
+        );
     }
 }

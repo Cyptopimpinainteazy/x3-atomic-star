@@ -5,16 +5,50 @@ id = "X3-RT-001"
 name = "Halt permits recovery/refund paths"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
-implemented = 60
-tested = 20
-mainnet_ready = 35
+paths = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-invariants/src/lib.rs",
+  "runtime/src/tests.rs",
+]
+implemented = 88
+tested = 88
+mainnet_ready = 62
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Required tests not yet proven in canonical registry"]
-evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Registry blocker explicitly calls out refund/recovery tests"]
+blockers = [
+  "**CLOSED 2026-09-26 — the halt permits recovery, and the tests that say so are named here.** The open item was \"required tests not yet proven in canonical registry\". They exist and are gated (`test atomic-kernel`, `test x3-kernel`): `economic_halt_does_not_trap_pending_bundle_funds` halts the economy with a bundle already submitted and requires `rollback_atomic_bundle` to succeed *anyway*, releasing the whole bond while a new submission is still refused with `EconomicHaltActive` — and asserts the balances, the 50% cancel penalty and that total issuance is unchanged (slashed funds move to the treasury rather than being burned). `economic_halt_blocks_bundle_submission` pins the fail-closed half, including that lifting the halt restores work.",
+  "The kernel's own pause gets the same treatment: `emergency_pause_blocks_submit_comit` (refuses), `test_emergency_halt_recovery_restores_functionality` (the same caller and nonce succeed again after `emergency_unpause`), and, added 2026-09-26, `a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact` — a comit accepted before the pause stays byte-identical in storage while paused, a submission the pause refuses leaves the account's nonce untouched, and the same nonce works after resuming. Measured load-bearing: deleting the `ProtocolIsPaused` guard from `submit_comit` turns that test red at its `assert_noop!`, then the file was restored byte-identically.",
+  "**2026-09-26 — both switches were driven together, and then the gate itself turned out to be the trap.** The three named unproven things are measured: `the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` walks `pallet_x3_kernel::emergency_halt` → `RuntimeEmergencyHaltController::trigger` → `pallet_x3_supply_ledger::TransferHalted` → the atomic kernel refusing the bundle the gateway submitted a moment earlier with `EconomicHaltActive`; `a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable` cancels a bundle *while paused* and requires the record to reach `RolledBack`, the bond to come back, the 50% penalty to be kept and total issuance to be unchanged.",
+  "**The recovery path this row is named for did not exist above the dispatch layer, and that was a P0.** `pallet_x3_invariants::InvariantCheck` is in `SignedExtra` and refused *every* signed extrinsic while `Halted` was set — including the halt's own remedy. Measured at the transaction-validity layer (the layer that stops a chain, not dispatch): `runtime/src/tests.rs::a_halted_chain_still_accepts_the_recovery_calls_that_release_funds` builds the same signed extrinsic the node's RPC and signer build, halts through the kernel, and shows `rollback_atomic_bundle`, `clear_halted`, `resume_transfers` and the council motion all refused with `INVARIANT_HALT_CODE` / `Custom(1)`. A pending bundle's bond was unreachable and the flag could not be cleared by any call the chain has: `clear_halted` was named in two doc comments and did not exist. Fixed in `6d7bfc540` — the gate now exempts a short justified list (`clear_halted`, `set_halt_on_violation`, `resume_transfers`, `rollback_atomic_bundle`, `emergency_unpause`, council `propose`/`vote`/`close`/`execute`) and refuses everything else; `clear_halted` now exists. The same test drives both flags to false with the origin `Council::close` produces, requires ordinary traffic to validate again, and requires a `Members(0, 2)` minority to be refused. Load-bearing: deleting the exemption reddens it at \"the bond-releasing rollback must not be refused by the halt\"; restoring the file returns 57/57 runtime tests and 26/26 pallet tests.",
+  "**2026-09-26 — the halt/unhalt cycle now runs on a live three-validator chain.** `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`) trips the halt through a council motion (the only route the chain has), requires `x3Invariants.halted` and `x3SupplyLedger.transferHalted` to be set, and then measures both halves at once: a signed `balances.transferKeepAlive` is refused by the **pool of two different validators** with `1010: Invalid Transaction: Custom error: 1` while the destination balance does not move, and `x3AtomicKernel.rollbackAtomicBundle` on a non-existent bundle **is included in a block** and refused by the pallet (`x3AtomicKernel.BundleNotFound`) — so the bond-releasing call is not blocked by the halt. The remedy then goes in *while the chain is still halted*: council motions for `x3Invariants.clearHalted` and `x3SupplyLedger.resumeTransfers` both execute, the flags read false, and a transfer afterwards is `InBlock` and moves the balance. Load-bearing on the live path: with the exemption check removed the same drill fails at the remedy — `submitExtrinsic` for the motion's own `propose` returns `1010: Invalid Transaction: Custom error: 1`, which is the one-way door (evidence in `.ai/runlogs/halt-recovery-live-20260927T010259Z/`); restoring the file byte-identically returns the PASS.",
+  "Still open: the exemption list is a runtime policy, not a proof — a pallet that holds funds and has no rollback extrinsic would still be trapped, and nothing enumerates the runtime's fund-holding calls against the list (TICKET-153). The halt is cleared only by an explicit governed call; there is no automatic unhalt once the violating invariant is back inside its bound, and no test drives the re-raise sequence (clear while the violation persists). `clear_halted`'s weight is hand-written to `set_halt_on_violation`'s shape, not benchmarked. The live drill halts an idle chain: no bundle is in flight while the halt lands.",
+]
+evidence = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "runtime/src/lib.rs",
+  "note: the registry blocker asked for refund/recovery tests; they are named in blockers and gated by `test atomic-kernel`, `test x3-kernel` and `test x3-invariants`",
+  "note: 2026-09-26 - `RuntimeHaltExemptCalls` is the exemption list and `InvariantCheck` consults it (`&call`, so the signed-extension wire format is unchanged)",
+]
+test_evidence = [
+  "note: `runtime/src/tests.rs::a_halted_chain_still_accepts_the_recovery_calls_that_release_funds` enters through `Executive::validate_transaction`, so the refusal it pins is the pool's, not a dispatch check (2026-09-26)",
+  "note: `pallets/x3-invariants/src/tests.rs::the_halt_gate_refuses_a_call_that_is_not_a_recovery_call` covers the gate's both directions next to the pallet, and `clear_halted_ends_the_halt` pins the origin and the event",
+  "note: 2026-09-26 - the same two directions are measured on a live chain by `scripts/drills/halt_recovery_live.sh`, whose driver refuses to treat an accepted transfer as a pass and asserts the balance did not move",
+]
+required_tests = [
+  "economic_halt_blocks_bundle_submission",
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "emergency_pause_blocks_submit_comit",
+  "test_emergency_halt_recovery_restores_functionality",
+  "a_pause_leaves_committed_state_readable_and_the_nonce_sequence_intact",
+  "the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime",
+  "a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable",
+  "a_halted_chain_still_accepts_the_recovery_calls_that_release_funds",
+  "the_halt_gate_refuses_a_call_that_is_not_a_recovery_call",
+  "clear_halted_ends_the_halt",
+]
 registry_feature = "atomic_kernel"
 
 [[feature]]
@@ -23,19 +57,35 @@ name = "Atomic Kernel pallet"
 subsystem = "runtime_core"
 source = "master"
 paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
-implemented = 75
-tested = 35
-mainnet_ready = 25
+required_tests = [
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "a_finalized_bundle_cannot_be_rolled_back",
+  "a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice",
+  "a_leg_receipt_is_written_once_and_keeps_its_first_state_diff",
+  "a_receipt_for_a_leg_outside_the_bundle_is_refused",
+  "a_submission_nonce_cannot_be_spent_twice_or_rewound",
+  "finalization_happens_once",
+  "a_fabricated_finality_anchor_is_refused",
+  "only_the_certificate_the_chain_derives_can_be_anchored",
+  "an_anchor_for_a_height_the_chain_has_no_hash_for_is_refused",
+]
+test_evidence = [
+  "note: `pallets/x3-atomic-kernel/src/tests.rs::a_fabricated_finality_anchor_is_refused` and `::only_the_certificate_the_chain_derives_can_be_anchored` drive the unsigned extrinsic itself and require the anchor map to be left empty on refusal, which is the property that matters because `do_finalize_bundle` reads whatever is in it; the red control is recorded in commit f1024d3be (2026-09-27)",
+  "note: the generated benchmark suite test for `record_flash_finality_anchor` passes under `--features runtime-benchmarks`, and `pallets/x3-atomic-kernel/src/benchmarking.rs` now derives its certificate instead of fabricating one, so the benchmark is subject to the same rule it measures; `cargo clippy -p pallet-x3-atomic-kernel --all-targets --features runtime-benchmarks` is clean",
+]
+implemented = 84
+tested = 80
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = true
 blockers = [
   "**Closed 2026-09-23 — bundle finalization is authorized now.** The unsigned `submit_finalization_result` extrinsic was removed: it was `ensure_none`, its off-chain marker (`x3fin:`) had no writer anywhere in this repository, and `do_finalize_bundle`'s certificate check compared the caller's input with the caller's own earlier input, so any account could finalize any `Executing` bundle. Finalization is the signed `finalize_atomic_bundle` (`X3LangOrigin`, an account the chain's genesis-authorized custody registry names) or `finalize_with_settlement` (`SettlementOrigin`). Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`; five tests in the pallet drive the finalization core, plus one that an unsigned origin cannot reach it at all.",
-  "Nine previously claimed invariant tests were removed as fictional; real invariant suite needed",
-  "The signed path's certificate still comes from an unsigned per-block anchor, which any peer can write first — the honest service can be made to finalize with a fabricated certificate (TICKET-107)",
+  "**CLOSED 2026-09-26 — the invariant suite exists, and it is asserted directly rather than inferred from the happy path.** Five tests, each one an invariant the bundle lifecycle has to hold: `a_finalized_bundle_cannot_be_rolled_back` (and the bond and status are unchanged after the refusal), `a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice` (no second release, no finality proof), `a_leg_receipt_is_written_once_and_keeps_its_first_state_diff` (a replayed receipt is refused and the first diff survives), `a_receipt_for_a_leg_outside_the_bundle_is_refused`, and `a_submission_nonce_cannot_be_spent_twice_or_rewound` (replay, rewind, and the fact that a *refused* submission spends no nonce — with `BundleAlreadyExists` asserted as its own rule, since the bundle id derives from the legs). Measured load-bearing: removing the `LegAlreadyExecuted` guard turns the receipt test red at its own assertion, then the file was restored byte-identically. The suite runs under the `test atomic-kernel` gate: 71 lib tests plus the e2e/loom/miri/proptest targets, all green.",
+  "**CLOSED 2026-09-27 — the anchor is a value the chain derives, so winning the first-write race chooses nothing (TICKET-107).** `record_flash_finality_anchor` is unsigned, keeps the first value for a height, and `do_finalize_bundle` accepts a bundle only when `finality_cert` equals that stored value — so whatever was in the map *was* the certificate, and a peer who got there first chose what the chain would attest to in the PoAE proof. The extrinsic now stores a value only if it is `derive_finality_cert(block_num)`, which is `blake2_256` of the block's own hash — the same digest the node's GRANDPA path computes, reached through one shared definition (`finality_cert_from_block_hash`) so the node and the runtime cannot drift. A height the chain holds no hash for is refused instead of being folded into a digest of zeros, so missing a block and a block hashing to zero stay distinguishable. `do_finalize_bundle` is unchanged: the equality rule is the same rule, and only the set of values reachable through the anchor shrank to one. The Flash branch in `node/src/service.rs` no longer anchors the Flash certificate's own hash, which no runtime can verify because that needs the voter's keys; it logs it and says why. Measured load-bearing: with the `ensure!(cert == derived)` line removed, `a_fabricated_finality_anchor_is_refused` and `only_the_certificate_the_chain_derives_can_be_anchored` both go red with `left: Ok(())` — the fabricated anchor is accepted — and the file was restored byte-identically. Still open on this row: no certificate has been anchored on a live network (that is X3-RT-005's multi-validator proof), and the Flash certificate hash is kept off chain only, so a runtime-side verifier for it does not exist",
 ]
-evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: FEATURE_REGISTRY corrected readiness to 40%"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "pallets/x3-atomic-kernel/src/benchmarking.rs", "node/src/service.rs", "note: FEATURE_REGISTRY corrected readiness to 40%", "note: 2026-09-27 - the anchor's provenance is the fix; the row's mainnet_ready deliberately stays at 35 because nothing on it has run against a network"]
 registry_feature = "atomic_kernel"
 
 [[feature]]
@@ -45,14 +95,29 @@ subsystem = "runtime_core"
 source = "master"
 paths = ["runtime/src/lib.rs"]
 implemented = 75
-tested = 55
-mainnet_ready = 50
+tested = 78
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Historical status documents show verification churn; exact-head proof still required"]
-evidence = ["runtime/src/lib.rs", "note: Feature wired through node/runtime and production gate"]
+blockers = [
+  "**2026-09-27 — the `mainnet-rc1` variant did not compile, and the default gate set was red from `ed798764d` until this fix.** `crates/x3-compiler` and the runtime gained a private-submission demand in `ed798764d`: `RuntimePrivateSubmissionChannel` (runtime/src/lib.rs) answered `pallet_private_execution::Enabled::<Runtime>::get()`, and `pallet-private-execution` is *not* in the `mainnet-rc1` `construct_runtime!` block — the scope lock excludes it. `Runtime: pallet_private_execution::Config` was therefore unimplemented and the storage item's `get()` did not resolve (E0599 at that line), so `bash scripts/check-runtime-variants.sh mainnet-rc1` failed in 36 s on the variant mainnet is meant to run. `clippy runtime rc1` is in `GATES_FAST` and builds exactly that feature set, so a plain `bash scripts/local-ci.sh` was failing too; `cargo check --workspace` cannot see it, because it compiles the runtime once with default features and never touches the other five `construct_runtime!` blocks. The rc6 sequence's stage 5 also claims a migration dry-run for every variant; it had not been re-run since that commit.",
+  "**CLOSED 2026-09-27 — the reference is cfg-aware and the whole six-variant set is green.** That variant answers a constant `false`, which is the fact the derived version would have reported there — a chain with no private channel refuses a program whose compiled policy demands one — so the fail-closed posture is unchanged. Measured: `bash scripts/check-runtime-variants.sh` — full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s. Break-it-first: the undivided reference is what failed, so the gate's own red log (`runtime-variant-20260927T075116Z-mainnet-rc1.log`, FAIL 36s, E0599) is the before and the PASS run is the after.",
+  "Still open, and why `mainnet_ready` stops at 58: a *build* of the rc1 variant is not a *chain* of it. No rc1-featured runtime has ever been booted, no genesis for it exists in `chain-specs/`, and its migration dry-run is in-process rather than against a live state. The gate proves the variant compiles and its `OnRuntimeUpgrade` work fits in a block; it does not prove an rc1 network runs.",
+]
+evidence = [
+  "runtime/src/lib.rs",
+  "note: Feature wired through node/runtime and production gate",
+  "note: 2026-09-27 — the six-variant dry-run gate now passes on every variant, including `mainnet-rc1`, which had not been built since the private-submission wiring landed",
+]
+required_tests = [
+  "runtime_upgrade_rehearsal",
+  "runtime_upgrade_rehearsal_storage_versions",
+]
+test_evidence = [
+  "note: `bash scripts/check-runtime-variants.sh` — all six variants PASS (2026-09-27); the gate is auto-selected by `scripts/local-ci.sh` when a `runtime/*` path changes, which is how this variant's breakage is supposed to be caught",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]
@@ -60,31 +125,86 @@ id = "X3-RT-004"
 name = "Canonical state ledger updates"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-kernel/src/lib.rs"]
+# Re-measured 2026-09-27. The blocker was a proof gap, not a behaviour gap: the pallet's answer to
+# "what happens to the writes a refused comit already made?" was a comment ("returning error rolls
+# back all storage"), and two chaos tests named for rollback injected no failure at all — one
+# submitted a *successful* comit and asserted the nonce advanced, the other asserted that the mock
+# succeeded. The mechanism is real (`frame-support`'s pallet macro wraps every dispatchable in
+# `with_storage_layer`), and the write-then-refuse order in `submit_comit_v2` is now proven rather
+# than asserted: nonce -> adapters -> fee burn -> root check -> receipt/comit inserts -> ledger
+# update -> slot channel, with a refusal after the fee burn and another after the ledger write.
+paths = [
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-kernel/src/failure_path_conservation.rs",
+  "pallets/x3-kernel/src/chaos_tests.rs",
+  "pallets/x3-kernel/src/mock.rs",
+]
 implemented = 78
-tested = 50
-mainnet_ready = 52
+tested = 72
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Supply conservation across all failure paths needs stronger proof"]
-evidence = ["pallets/x3-kernel/src/lib.rs", "note: Kernel persists cross-VM state into canonical view"]
+blockers = [
+  "**CLOSED 2026-09-27 — the failure paths that write before they refuse now have a conservation test, and it is load-bearing.** `pallets/x3-kernel/src/failure_path_conservation.rs` drives three refusals *through `submit_comit_v2`* (never through the helpers, whose own refusals were already covered) and asserts, after each, that total issuance, the caller's balance, all three canonical-ledger legs, the `X3ContractStorage` slot count, the nonce, the comit record, the stored X3 receipt, the decode-failure counter and the event log are exactly where they started: a wrong `prepare_root` (refused *after* the fee is withdrawn), a ledger channel one entry past `MAX_STATE_CHANGES`, and a slot channel one write past it — the last of which fires only after the fee is burned, the comit and its receipt are recorded, and the canonical ledger has been updated for all three domains. Each refusal is paired with the same call succeeding on a fresh chain, asserting that the fee *is* burned and all three legs *do* land, so \"nothing changed\" cannot pass because the call does nothing. Break-it-first, measured: widening `MAX_STATE_CHANGES` to 2000 turns exactly the three bound-dependent tests red (`Ok(())` where `TooManyStateChanges`/`TooManyStorageWrites` was required) and leaves the other three green; restoring 1000 returns all six to green",
+  "**Fixed in the same change:** `chaos_tests::cross_vm::evm_failure_causes_full_rollback` submitted a comit that succeeded and asserted the nonce advanced, and `svm_failure_after_evm_success_rolls_back` asserted that the mock executed successfully — neither could fail if rollback were broken, and the second one's name described a scenario its body never created. Both now inject a real failure (an EVM payload the adapter refuses by name; a failing third VM after two usable receipts) and assert the full no-trace set, including the event log. A third test in that module, `comit_v2_triple_vm_atomicity`, wrapped its only assertion in `if result.is_ok()`, so a comit that failed every check passed it; it now requires the call to succeed and pins all three ledger legs, the single nonce and the burned fee",
+  "Still open on this row: the proof is pallet-level with the mock adapters, so it establishes that the *pallet's* writes are rolled back — not that a real adapter's own state is. That half is the documented contract (\"Runtime VM adapters MUST be transactional\") and belongs to the adapter suites (`tests/x3_adapter_route.rs`, the wasm adapters), not to this row. Nothing here has run on a multi-validator network; the distributed-traffic half is X3-ECO-002's `node/tests/supply_invariant_distributed.rs`",
+]
+evidence = [
+  "pallets/x3-kernel/src/lib.rs",
+  "pallets/x3-kernel/src/failure_path_conservation.rs",
+  "note: Kernel persists cross-VM state into canonical view",
+  "note: 2026-09-27 — the rollback this row relies on is `frame_support`'s `with_storage_layer`, which the pallet macro wraps around every dispatchable body (SDK checkout: `substrate/frame/support/procedural/src/pallet/expand/call.rs`). That is what makes an `Err` return discard the nonce increment, the fee withdrawal, the receipt and comit inserts and the canonical-ledger writes made earlier in the same call",
+  "note: 2026-09-27 — the `0xFE`/`0xFD` markers in `mock::TestX3Adapter` exist so the extrinsic can be driven into the two bound refusals with real writes behind them; a well-behaved adapter produces neither receipt, and the helper-level refusals are covered separately in `tests.rs`",
+]
+test_evidence = [
+  "note: `cargo test -p pallet-x3-kernel --lib` — 234 passed, 0 failed (2026-09-27), including the six tests in `failure_path_conservation` and the two rewritten chaos tests",
+  "note: `cargo test -p pallet-x3-kernel --lib failure_path_conservation` — 6 passed; `cargo test -p pallet-x3-kernel --lib chaos_tests::cross_vm` — 3 passed",
+  "note: `cargo clippy -p pallet-x3-kernel --all-targets -- -D warnings` — clean",
+  "note: break-it-first measured, not asserted — `MAX_STATE_CHANGES` 1000 -> 2000 reddens `an_over_wide_ledger_channel_is_refused_after_the_fee_is_withdrawn_and_rolls_it_back`, `an_over_wide_slot_channel_is_refused_after_the_ledger_is_written_and_rolls_it_back` and `a_refused_slot_channel_write_set_does_not_reach_chain_storage` with `left: Ok(())`, and only those three; 1000 restores 6/6 green",
+]
+required_tests = [
+  "a_comit_that_passes_every_check_burns_the_fee_and_writes_all_three_ledger_legs",
+  "a_wrong_prepare_root_is_refused_after_the_fee_is_withdrawn_and_leaves_no_trace",
+  "a_failure_in_the_last_vm_leaves_the_fee_and_the_earlier_receipts_unapplied",
+  "an_over_wide_ledger_channel_is_refused_after_the_fee_is_withdrawn_and_rolls_it_back",
+  "an_over_wide_slot_channel_is_refused_after_the_ledger_is_written_and_rolls_it_back",
+  "a_refused_slot_channel_write_set_does_not_reach_chain_storage",
+  "evm_failure_causes_full_rollback",
+  "a_failure_in_the_last_vm_rolls_back_the_nonce_and_the_fee",
+  "test_canonical_supply_invariant_sequential",
+  "test_global_supply_reconciliation",
+  "test_no_balance_drift_on_operations",
+]
 
 [[feature]]
 id = "X3-RT-005"
 name = "Atomic bundle submission"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+paths = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "scripts/drills/halt_recovery_live.sh",
+]
 implemented = 80
-tested = 55
-mainnet_ready = 55
+tested = 75
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs multi-validator adversarial lifecycle proof"]
+blockers = [
+  "**CLOSED 2026-09-27 — the bundle lifecycle now has a multi-validator adversarial proof, and it found the case nobody had measured.** The blocker was one sentence; the drill `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS 27s) boots three real validators, submits a real bundle as `//x3-atomic-gateway` (`submit_atomic_bundle` is gated on `EnsureX3LangGateway`), records its bond as reserved, and then requires — **while the chain is halted** — that (a) a new bundle is refused *by the pool* (`submit_atomic_bundle` is deliberately not on `RuntimeHaltExemptCalls`), (b) the in-flight bundle's `rollback_atomic_bundle` is **included** (it is exempt) and its stored status becomes `RolledBack`, (c) the submitter's reserved balance returns to exactly its pre-bundle value, and (d) after the remedy a fresh bundle is accepted again. Measured: `bundle 0x8faa7708… RolledBack at block 52, reserved back to 0`, `a new bundle while halted: refused by the pool — 1010: Custom error: 1`, `a fresh bundle is accepted after the remedy — 0xd045536a… at block 78`, and no supply minted with both validators agreeing at one finalized block. Before this, every halt/rollback proof was against an **idle** chain or a bundle id that does not exist, so \"the valve leaves the way out open\" had never been measured for a bundle that was actually holding funds",
+  "Still open on this row: no independent audit of the bond-accounting change, and no run on an rc1-featured or public network — `mainnet_ready` moves to 65 on the strength of the live three-validator evidence, not on deployment",
+]
+required_tests = [
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "a_finalized_bundle_cannot_be_rolled_back",
+  "a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice",
+]
 evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real submit_atomic_bundle path with EconomicHalt guard"]
 
 [[feature]]
@@ -92,16 +212,32 @@ id = "X3-RT-006"
 name = "Economic Halt safety valve"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
-implemented = 82
-tested = 35
-mainnet_ready = 55
+paths = ["pallets/x3-atomic-kernel/src/lib.rs", "runtime/src/tests.rs"]
+implemented = 88
+tested = 84
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Dedicated halt invariant tests incomplete"]
-evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real fail-closed guard exists and is reused across economic modules"]
+blockers = [
+  "**CLOSED 2026-09-26 — the valve is proven end to end instead of by reading three files.** The blocker was \"Dedicated halt invariant tests incomplete\". The chain the halt travels is now measured at runtime level: `the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` trips `pallet_x3_kernel::emergency_halt`, requires the runtime's `RuntimeEmergencyHaltController` to have set `pallet_x3_supply_ledger::TransferHalted`, which is what `T::EconomicHalt::is_halted` returns for the atomic kernel, and requires the bundle submitted a moment earlier to be refused with `EconomicHaltActive`. That distinction matters because `EconomicHalt` has a blanket no-op impl for `()`: a mock configured with `()` would let every \"the halt works\" test pass while a real chain accepted bundles.",
+  "**The valve had a hole above the dispatch layer.** `pallet_x3_invariants::InvariantCheck` (in `SignedExtra`) refused every signed extrinsic while `Halted` was set, so a tripped valve also refused `rollback_atomic_bundle` and the call that lifts it — the safety valve could not be closed again. Measured at the transaction-validity layer and fixed in `6d7bfc540`; see X3-RT-001 for the test and the load-bearing check. `clear_halted` now exists (it was named in two doc comments and implemented nowhere).",
+  "**The live drill covers the valve on a network.** `scripts/drills/halt_recovery_live.sh` trips the valve through `atlasKernel.emergencyHalt` on three validators, requires both flags, requires two validators' pools to refuse an ordinary transfer with the runtime's halt code, and requires the remedy to land and traffic to resume. Still open: `clear_halted`'s weight is hand-written to the shape of `set_halt_on_violation` rather than benchmarked, the valve stays tripped after remediation until governance explicitly clears it (no automatic close once the violated bound is back in range), and no test drives the re-raise sequence.",
+]
+evidence = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "runtime/src/lib.rs",
+  "note: Real fail-closed guard exists and is reused across economic modules",
+  "note: 2026-09-26 - the controller, the supply-ledger flag and the atomic kernel's refusal are one chain, proven by `runtime/src/tests.rs`",
+]
+test_evidence = [
+  "note: `runtime/src/tests.rs::the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` asserts the flag flip and the `EconomicHaltActive` refusal, not just that the extrinsic returned Ok (2026-09-26)",
+]
+required_tests = [
+  "the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime",
+  "a_halted_chain_still_accepts_the_recovery_calls_that_release_funds",
+]
 registry_feature = "atomic_kernel"
 
 [[feature]]
@@ -109,16 +245,33 @@ id = "X3-RT-007"
 name = "Halt blocks new atomic bundles"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
-implemented = 85
-tested = 30
-mainnet_ready = 55
+paths = ["pallets/x3-atomic-kernel/src/lib.rs", "runtime/src/tests.rs"]
+implemented = 88
+tested = 84
+mainnet_ready = 60
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs explicit regression test"]
-evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: ensure! EconomicHalt guard in bundle submission"]
+blockers = [
+  "**CLOSED 2026-09-26 — the regression test exists at both layers.** \"Needs explicit regression test\" is answered by `runtime/src/tests.rs::the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime` (a bundle accepted before the halt is refused with `EconomicHaltActive` afterwards, through the real controller) and `a_halted_chain_still_accepts_the_recovery_calls_that_release_funds` (at the pool: a signed user call is refused with `INVARIANT_HALT_CODE` while the bond-releasing rollback is not). The pallet-level half is `economic_halt_blocks_bundle_submission`, and `a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable` pins that the *routine* pause is a different switch and does not by itself stop a bundle from being cancelled and refunded.",
+  "**The live drill measures the fail-closed half.** On three validators, the pool of two different nodes refuses an ordinary signed call with `1010: Invalid Transaction: Custom error: 1` and the destination balance does not move, while the value-carrying rollback for a non-existent bundle is still *included* and refused by the pallet instead — the halt blocks new work without blocking the way out. Still open: no live bundle is in flight when the halt lands (so \"the pending bundle's bond is released on a live chain\" is proven at runtime level, not on a node), and the two switches (kernel `ProtocolPaused` vs. the economic halt) are deliberately independent — a chain operator who trips only the pause still accepts new atomic bundles.",
+]
+evidence = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "runtime/src/lib.rs",
+  "note: ensure! EconomicHalt guard in bundle submission",
+  "note: 2026-09-26 - the runtime-level test measures the refusal, and the pool-level test measures that the halt does not also refuse the remedy",
+]
+test_evidence = [
+  "note: the halt's fail-closed half and its escape hatch are asserted in one test each, so the pair cannot drift into \"refuses everything\" (2026-09-26)",
+  "note: 2026-09-26 - on a live chain the refusal is `1010: Invalid Transaction: Custom error: 1` from two validators, and the bond-releasing rollback is included and refused by `x3AtomicKernel` instead (`scripts/drills/halt_recovery_live.sh`)",
+]
+required_tests = [
+  "economic_halt_blocks_bundle_submission",
+  "the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime",
+  "a_halted_chain_still_accepts_the_recovery_calls_that_release_funds",
+]
 registry_feature = "atomic_kernel"
 
 [[feature]]
@@ -208,3 +361,60 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs broader governance/adversarial coverage"]
 evidence = ["pallets/x3-agent-law", "note: Status document records privacy tightening and passing tests"]
+
+[[feature]]
+id = "X3-RT-013"
+name = "Autonomic control plane"
+subsystem = "runtime_core"
+source = "master"
+paths = [
+  "x3-autonomic-core/crates/x3-autonomic-types",
+  "x3-autonomic-core/crates/x3-live-auditor",
+  "x3-autonomic-core/crates/x3-shadow-runner",
+  "x3-autonomic-core/crates/x3-regression-engine",
+  "x3-autonomic-core/crates/x3-judge-agent",
+  "x3-autonomic-core/crates/x3-benchmark-oracle",
+  "x3-autonomic-core/crates/x3-autonomic-cli",
+]
+implemented = 55
+tested = 55
+mainnet_ready = 10
+priority = "P2"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = true
+# No row covered `x3-autonomic-core` until 2026-09-27, and the reason is now clear: the workspace
+# had never compiled, so nothing could cover it. Everything below was found by making it build.
+blockers = [
+  "**CLOSED 2026-09-27 — the workspace could not resolve, let alone compile.** `x3-autonomic-types` asked for a `chrono` feature (`derive`) that no 0.4 version has, so `cargo metadata` on the workspace failed; its SCALE import named `parity_scale_codec` while the manifest declares `scale = { package = \"parity-scale-codec\" }`; five members declared `#![cfg_attr(not(feature = \"std\"), no_std)]` with no `std` feature, so they were permanently no_std while using `Vec`, `String`, `format!` and `std::io`. Resolution, import and the attribute are fixed; `cargo check --workspace` finishes clean.",
+  "**CLOSED 2026-09-27 — three types could not be SCALE-decoded, and two are pallet storage.** `InvariantDefinition.name`/`description` were `&'static str` (no `Decode` impl) and `HealthMetricDefinition`'s thresholds were `f64` (SCALE has no float), so `register_invariant` and `register_metric` took arguments no transaction could carry. Strings are owned `Vec<u8>` now and thresholds are basis points; a round-trip test pins both.",
+  "**CLOSED 2026-09-27 — four fabricated or unbuildable behaviours.** `LiveAuditor::check_invariants` returned `(id, true, severity)` for everything under a \"Placeholder\" comment (a live auditor reporting every invariant passing); `ShadowRunner::execute_shadow_block` returned `state_root_matches: true` without executing anything; `verify_shadow_result` returned `true` for every input; `JudgeAgent::evaluate` ignored its proposal argument entirely. Each refuses or answers from its input now, and the CLI (which printed \"Setting autonomy level to: X\" and performed nothing) refuses with a non-zero status like the wallet CLI does.",
+  "**CLOSED 2026-09-27 — three references to variants that do not exist.** `AutonomyLevel::{Automatic, SelfImproving, SelfGoverning}` (in two crates), `AuditEvent::Error` and `Severity::High` were all named by code that could not compile. The ladder answers via `AutonomyLevel::allows_autonomous_change()`, `AuditEvent` gained the `Error` variant its `From` impl needed, and the severity is the ladder's `Critical`.",
+  "**OPEN — nothing here is wired into anything.** No runtime registers either autonomic pallet, no node runs the auditor or shadow runner, and the CLI has no client. The two pallets in this workspace (`pallet-x3-invariants`, `pallet-x3-health`) are parked out of the member list: they pin FRAME to a 2023 substrate revision, still use `#[pallet::generate_store]` and declare no call weights, and they are orphans — the chain's invariant pallet is `pallets/x3-invariants`, a different crate. Porting or deleting them is a scheduled decision.",
+  "**OPEN — the audit and shadow paths have no chain data source.** `check_invariants` and `execute_shadow_block` refuse precisely because there is nothing to read or replay; a real autonomic loop needs a node client plus the invariants it should read.",
+]
+required_tests = [
+  "the_storage_types_round_trip_through_scale",
+  "the_autonomy_ladder_says_when_it_may_change_itself",
+  "an_audit_event_can_carry_a_component_failure",
+  "checking_invariants_refuses_without_a_state_source",
+  "the_configured_cadence_gates_a_pass",
+  "shadow_execution_refuses_without_an_isolated_runtime",
+  "verification_compares_roots_and_refuses_when_there_are_none",
+  "autonomous_action_follows_the_autonomy_ladder",
+  "a_critical_proposal_goes_to_a_human_even_at_full_autonomy",
+  "a_manual_autonomy_level_always_needs_a_human",
+  "confidence_is_basis_points_and_clamped_at_certainty",
+  "automatic_generation_follows_the_autonomy_ladder",
+  "the_autonomy_argument_parses_names_and_numbers",
+]
+test_evidence = [
+  "note: `cargo test --workspace --manifest-path x3-autonomic-core/Cargo.toml` -> 15 passed, 0 failed; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --all --check` clean (2026-09-27). Before this pass none of those commands could run at all.",
+  "note: break-it-first: restoring `Ok(true)` in `verify_shadow_result` reddens verification_compares_roots_and_refuses_when_there_are_none.",
+]
+evidence = [
+  "x3-autonomic-core/Cargo.toml",
+  "x3-autonomic-core/crates/x3-autonomic-types/src/lib.rs",
+  "x3-autonomic-core/crates/x3-live-auditor/src/lib.rs",
+  "note: 2026-09-27 - the workspace resolved to nothing; `cargo metadata` failed on a chrono feature that does not exist",
+]

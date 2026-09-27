@@ -1,0 +1,32 @@
+### cargo clippy -p x3-atomic-swap --all-targets --all-features -- -D warnings
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/xxxstar-main/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/xxxstar-main/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+    Checking ff v0.13.1
+    Checking crypto-common v0.1.7 (/home/lojak/Desktop/xxxstar-main/patches/crypto-common)
+    Checking crypto-bigint v0.5.5
+    Checking serde_json v1.0.151
+    Checking rustls v0.23.45
+    Checking rand v0.8.8
+    Checking idna_adapter v1.2.1 (/home/lojak/Desktop/xxxstar-main/patches/idna_adapter)
+    Checking group v0.13.0
+    Checking digest v0.10.7 (/home/lojak/Desktop/xxxstar-main/patches/digest)
+    Checking hmac v0.12.1
+    Checking signature v2.2.0
+    Checking sha2 v0.10.9
+    Checking blake2 v0.10.6
+    Checking sha3 v0.10.9
+    Checking idna v1.1.0
+    Checking rfc6979 v0.4.0
+    Checking url v2.5.8
+    Checking elliptic-curve v0.13.8
+    Checking ecdsa v0.16.9
+    Checking k256 v0.13.4
+    Checking ureq v2.12.1
+    Checking x3-atomic-swap v0.1.0 (/home/lojak/Desktop/xxxstar-main/crates/x3-atomic-swap)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 55s
+clippy exit: 0

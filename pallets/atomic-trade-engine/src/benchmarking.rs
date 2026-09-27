@@ -14,6 +14,7 @@
 
 use super::*;
 use frame_benchmarking::v2::*;
+use frame_support::traits::EnsureOrigin;
 use frame_system::RawOrigin;
 use sp_core::H256;
 
@@ -228,6 +229,124 @@ mod benchmarks {
         let checkpoints = Checkpoints::<T>::get(batch_id);
         assert!(!checkpoints.is_empty());
 
+        Ok(())
+    }
+
+    /// Benchmark: Register (or upsert) an on-chain liquidity pool.
+    ///
+    /// The four `AmmRegistrarOrigin` calls (`register_liquidity_pool`,
+    /// `update_liquidity_pool`, `sync_pool_price`, `submit_price_observation`) charged
+    /// hand-written literal weights until these benchmarks existed: the pallet ships a
+    /// generated `weights.rs`, and none of the four was in it.
+    #[benchmark]
+    fn register_liquidity_pool() -> Result<(), BenchmarkError> {
+        let origin = T::AmmRegistrarOrigin::try_successful_origin()
+            .map_err(|_| BenchmarkError::Weightless)?;
+
+        #[extrinsic_call]
+        register_liquidity_pool(
+            origin,
+            AmmProtocol::UniswapV2,
+            VmType::Evm,
+            H256::from_low_u64_be(1),
+            H256::from_low_u64_be(2),
+            1_000_000_000_000_000_000u128,
+            2_000_000_000_000_000_000u128,
+            30u32,
+            vec![0xab; 20],
+        );
+
+        assert_eq!(LiquidityPools::<T>::iter().count(), 1);
+        Ok(())
+    }
+
+    /// Benchmark: Update the reserves of an already registered pool.
+    #[benchmark]
+    fn update_liquidity_pool() -> Result<(), BenchmarkError> {
+        let origin = T::AmmRegistrarOrigin::try_successful_origin()
+            .map_err(|_| BenchmarkError::Weightless)?;
+        let token_a = H256::from_low_u64_be(1);
+        let token_b = H256::from_low_u64_be(2);
+
+        Pallet::<T>::register_liquidity_pool(
+            origin.clone(),
+            AmmProtocol::UniswapV2,
+            VmType::Evm,
+            token_a,
+            token_b,
+            1_000_000_000_000_000_000u128,
+            2_000_000_000_000_000_000u128,
+            30u32,
+            vec![0xab; 20],
+        )?;
+        let pool_id = LiquidityPools::<T>::iter_keys()
+            .next()
+            .ok_or(BenchmarkError::Weightless)?;
+
+        #[extrinsic_call]
+        update_liquidity_pool(
+            origin,
+            pool_id,
+            3_000_000_000_000_000_000u128,
+            4_000_000_000_000_000_000u128,
+        );
+
+        let pool = LiquidityPools::<T>::get(pool_id).ok_or(BenchmarkError::Weightless)?;
+        assert_eq!(pool.reserve_a, 3_000_000_000_000_000_000u128);
+        assert_eq!(pool.reserve_b, 4_000_000_000_000_000_000u128);
+        Ok(())
+    }
+
+    /// Benchmark: Sync one pool's spot price into the TWAP oracle.
+    #[benchmark]
+    fn sync_pool_price() -> Result<(), BenchmarkError> {
+        let origin = T::AmmRegistrarOrigin::try_successful_origin()
+            .map_err(|_| BenchmarkError::Weightless)?;
+        let token_a = H256::from_low_u64_be(1);
+        let token_b = H256::from_low_u64_be(2);
+
+        Pallet::<T>::register_liquidity_pool(
+            origin.clone(),
+            AmmProtocol::UniswapV2,
+            VmType::Evm,
+            token_a,
+            token_b,
+            1_000_000_000_000_000_000u128,
+            2_000_000_000_000_000_000u128,
+            30u32,
+            vec![0xab; 20],
+        )?;
+        let pool_id = LiquidityPools::<T>::iter_keys()
+            .next()
+            .ok_or(BenchmarkError::Weightless)?;
+
+        #[extrinsic_call]
+        sync_pool_price(origin, pool_id);
+
+        // A pool sync writes both directions of the pair.
+        assert!(PriceObservations::<T>::contains_key((token_a, token_b)));
+        assert!(PriceObservations::<T>::contains_key((token_b, token_a)));
+        Ok(())
+    }
+
+    /// Benchmark: Submit a price observation for the TWAP oracle.
+    #[benchmark]
+    fn submit_price_observation() -> Result<(), BenchmarkError> {
+        let origin = T::AmmRegistrarOrigin::try_successful_origin()
+            .map_err(|_| BenchmarkError::Weightless)?;
+        let token_a = H256::from_low_u64_be(1);
+        let token_b = H256::from_low_u64_be(2);
+
+        #[extrinsic_call]
+        submit_price_observation(
+            origin,
+            token_a,
+            token_b,
+            1_500_000_000_000_000_000u128,
+            AmmProtocol::UniswapV2,
+        );
+
+        assert!(PriceObservations::<T>::contains_key((token_a, token_b)));
         Ok(())
     }
 

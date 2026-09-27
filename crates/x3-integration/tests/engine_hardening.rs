@@ -202,10 +202,6 @@ fn opcodes_without_an_implementation_are_refused_not_faked() {
         ("emit", vec![0xA2, 0, 0, 0, 0, 0, 0], 0xA2),
         // LoadIndex: 0.
         ("load_index", vec![0x14, 0, 1, 2], 0x14),
-        // Inc: implemented here, unimplemented in x3-vm, so the engines disagreed on it.
-        ("inc", vec![0x26, 0, 0], 0x26),
-        // AtomicCheck: `false`.
-        ("atomic_check", vec![0x93, 0], 0x93),
     ];
     for (name, instr, op) in cases {
         let mut code = load_imm(0, 1);
@@ -214,12 +210,12 @@ fn opcodes_without_an_implementation_are_refused_not_faked() {
         let bytes = module(&[(0, 16, 0)], &[], code);
         assert_eq!(
             validates(&bytes),
-            Err(X3Error::UnimplementedOpcode(*op)),
+            Err(X3Error::UnsupportedOpcode(*op)),
             "{name}: validator"
         );
         assert_eq!(
             on_kernel(&bytes),
-            Err(X3Error::UnimplementedOpcode(*op)),
+            Err(X3Error::UnsupportedOpcode(*op)),
             "{name}: mini_x3"
         );
         assert!(on_std(&bytes).is_err(), "{name}: x3-vm reported success");

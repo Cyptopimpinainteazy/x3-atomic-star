@@ -55,16 +55,44 @@ id = "X3-LANG-002"
 name = "Economic replay validation in receipts"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/vm/src/trading.rs", "x3-lang/crates/x3-tools/src/bin/x3c.rs"]
-implemented = 70
-tested = 70
-mainnet_ready = 30
+paths = [
+  "x3-lang/vm/src/trading.rs",
+  "x3-lang/vm/tests/trading_receipts.rs",
+  "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/crates/x3-tools/src/bin/x3c.rs",
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+]
+implemented = 85
+tested = 85
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["`x3c replay` re-checks the receipt's own economic figures (operation sequence, per-asset deltas, balances, costs, debt lifecycle, profit against the outcome) and refuses a receipt that is about another artifact, naming both hashes; it names what the pair cannot decide — the risk ceilings the run enforced (the compiled policy does not travel beside the receipt), the finality references and the host inputs — which is what keeps this row short of COMPLETE"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
+blockers = [
+  "Re-measured 2026-09-26 (TICKET-150). The previous note described checks the command did not run: `cmd_replay` called `verify_receipt` — the hash and the accounting invariants — while printing that the economics had been checked, and `receipt verify` promised \"hash + economic invariants\" in its own text without calling `verify_receipt_economics` either. Both now run the economic replay, and `replay` first binds the receipt's operation sequence to the artifact's compiled program (`decode_trading_program`), which is what makes the floors and ceilings inside it the artifact's rather than figures the receipt chose: a receipt re-hashed with a 900 bps ceiling against an artifact compiling 30 used to replay as ok.",
+  "The floors and ceilings are now re-derived from the receipt's own figures: `AssertMinNetProfit` and the policy's `minimum_net_profit` are enforced against the delta of the asset each is denominated in (`ProfitBelowCompiledFloor`, `ProfitFloorWithoutAsset`), `max_slippage_bps` against each leg's recorded realized slippage (receipt format 3; a missing figure is refused, not read as zero), `max_flash_fee_bps` against each debt's principal and fee, and the pre-existing quote-freshness, price-impact, MEV-leakage and cost-kind checks stay. `basis_points_of` is now the single place the fee and slippage ratios are computed, so the figure execution enforces and the figure a receipt carries cannot drift.",
+  "What a receipt and an artifact still cannot decide, and what the command prints as unchecked rather than passing over: the finality references, the host inputs (a receipt records what happened, not what was asked), and the balances behind the `state_commitment` (a receipt carries the commitment, not the state it commits to). The per-run cost the host reports is re-derived only for the ceilings the receipt carries, so the `max_gas` and oracle-deviation halves of \"correct risk checks\" remain unreproducible from the pair.",
+]
+required_tests = [
+  "receipt_below_its_compiled_profit_floor_fails_economic_replay",
+  "profit_floor_in_an_asset_the_receipt_never_touched_fails_economic_replay",
+  "receipt_that_exactly_meets_its_compiled_profit_floor_replays",
+  "replay_refuses_a_receipt_whose_leg_slipped_past_the_compiled_ceiling",
+  "replay_refuses_a_receipt_that_dropped_a_legs_slippage_figure",
+  "replay_refuses_a_receipt_whose_flash_fee_exceeds_the_compiled_ceiling",
+  "cli_replay_refuses_a_receipt_whose_policy_is_not_the_artifacts",
+  "cli_replay_enforces_the_artifacts_profit_floor",
+  "cli_receipt_verify_refuses_a_receipt_whose_figures_contradict_themselves",
+]
+test_evidence = [
+  "x3-lang/vm/tests/trading_receipts.rs",
+  "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+  "note: 20 tests in trading_receipts (was 18), 68 in trading_execution (was 62), 71 in the x3c CLI (was 68); green. Break-it-first measured on both halves: with the floor check removed the two floor tests fail, and with the artifact-binding loop removed `cli_replay_refuses_a_receipt_whose_policy_is_not_the_artifacts` fails while the binary prints `x3c replay: ok — CrossDexArb replays against …` for the forged receipt.",
+  "note: `cargo test --workspace` in x3-lang -> 165 + 14 + 20 + 71 + 9 + 42 … passed, 0 failed; `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets` clean",
+]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9", "note: TICKET-150 in TESTNET_GAP_LEDGER.md"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/crates/x3-common/src/capability.rs, x3-lang/crates/x3-ast/src/trading.rs
@@ -91,8 +119,8 @@ subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration", "pallets/x3-kernel/src", "pallets/x3-kernel/tests", "runtime/src/tests.rs", "node/tests/x3vm_live_lifecycle.rs", "node/tests/x3lang_network_receipt.rs"]
 implemented = 80
-tested = 90
-mainnet_ready = 30
+tested = 92
+mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -118,6 +146,7 @@ required_tests = [
   "a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded",
   "a_corrupted_x3_program_is_refused_by_the_runtime_path",
   "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
+  "a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it",
   "the_current_artifact_runs_on_the_loader_the_chain_uses",
   "a_patch_bump_stays_readable",
   "a_newer_minor_is_refused_by_name",
@@ -152,16 +181,40 @@ id = "X3-LANG-005"
 name = "Chain/capability version enforcement"
 subsystem = "language_trading"
 source = "master"
-paths = ["x3-lang/compiler"]
-implemented = 65
-tested = 65
-mainnet_ready = 30
+paths = [
+  "x3-lang/compiler",
+  "x3-lang/vm/src/trading.rs",
+  "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/crates/x3-tools/src/bin/x3c.rs",
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+]
+implemented = 80
+tested = 80
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Re-measured 2026-09-24: the gates exist and refuse by name with tests — the compiled-policy version is checked against the host's before any host call (CapabilityVersionMismatch, and the test asserts the host transaction never began), unknown economic-object versions fail closed (UnsupportedVersion { object, version }), capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability), and the envelope's version/min-version are enforced by both readers (X3-LANG-010). What is not exercised is a live upgrade: an old artifact against a newer VM on a running chain"]
-evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
+blockers = [
+  "Re-measured 2026-09-26 (TICKET-151). The rule the row is about — a compiled policy is checked against the host before any host call (CapabilityChainMismatch, CapabilityVersionMismatch, PrivateSubmissionRequired), an economic object's version fails closed (UnsupportedVersion { object, version }), and capability manifests are checked per operation (a borrow's provider, a swap's venue, a bridge's adapter; UnknownCapability) — is implemented and enforced in `TradingVm::execute_atomic` before the first host call. What the row did *not* have was a caller whose host could disagree: `x3c receipt execute` built the manifest out of the artifact it was checking (`chain: policy.chain`, `private_submission: policy.require_private_submission`, providers/venues/bridges collected off the operations, and `version` formatted from the artifact's own `policy_version`), so through that command none of the refusals could fire. Measured: `receipt execute --chain base` against a program compiled for ethereum, with no private lane and no venues declared, reported `trade 'CrossDexArb' committed, receipt verified`.",
+  "The host is declared now (--chain required, --private-submission, repeatable --provider/--venue/--bridge; the fixture host's policy version is its own constant), and the refusals are exercised through the CLI by name. Still not exercised: a live upgrade — an old artifact against a newer VM on a running chain — which is what the envelope's version bounds exist for and which needs the seven-node network and a runtime upgrade rather than a unit test.",
+  "The envelope's version/min-version enforcement and its reader parity belong to X3-LANG-010; this row cites it rather than duplicating it.",
+]
+required_tests = [
+  "cli_receipt_execute_refuses_a_host_on_another_chain",
+  "cli_receipt_execute_refuses_a_venue_the_host_does_not_offer",
+  "cli_receipt_execute_refuses_a_policy_needing_a_lane_the_host_lacks",
+  "cli_receipt_execute_refuses_a_provider_the_host_does_not_offer",
+  "cli_receipt_execute_requires_the_host_chain_to_be_named",
+  "cli_receipt_execute_runs_against_a_host_that_declares_what_it_offers",
+  "production_rejects_fixture_capabilities",
+]
+test_evidence = [
+  "x3-lang/crates/x3-tools/tests/cli.rs",
+  "note: six tests, green: four refusals by name (chain, venue, provider, private lane), one that the declaration is required rather than defaulted, one that a host declaring what it offers still runs the program. cargo test -p x3-tools -> cli 77 passed (was 71), cli_integration 9 passed; cargo clippy --workspace --all-targets clean",
+  "note: break-it-first measured - with the manifest's chain and private-submission fields reverted to the artifact's own policy values, a receipt execute run declaring chain base against a program compiled for ethereum prints 'trade CrossDexArb committed, receipt verified'; restored, it refuses with 'compiled policy chain ethereum does not match host chain base'",
+]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7", "note: TICKET-151 in TESTNET_GAP_LEDGER.md"]
 
 [[feature]]
 # Re-measured 2026-09-24 (TICKET-131): the connection this row calls incomplete now has evidence.
@@ -174,24 +227,55 @@ id = "X3-LANG-006"
 name = "Decoded bytecode → TradingVm execution"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration", "crates/x3-vm"]
-implemented = 55
-tested = 60
-mainnet_ready = 25
+paths = [
+  "crates/x3-integration",
+  "crates/x3-vm",
+  "pallets/x3-kernel",
+  "node/tests/x3vm_live_lifecycle.rs",
+  "node/tests/x3lang_network_receipt.rs",
+]
+implemented = 82
+tested = 88
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Both engines decode and execute the compiler's fixture corpus to the source's values; not yet driven from the kernel, and not proven beyond those shapes"]
+blockers = [
+  "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
+  "**2026-09-26 — the two halves are joined on a live chain, and the join is asserted with a control.** `node/tests/x3lang_network_receipt.rs` now drives four comits through the real extrinsic on three validators: a control read of slot 0 before anything stored one (which must return the interpreter's zero, and the chain must hold no slot), a comit whose hand-assembled `evm_sstore` program writes 7 to slot 0 (whose slot must then be readable from the *observer* node's chain storage, and whose receipt must carry a state change), and a third comit whose program reads slot 0 and returns 7 while its own receipt claims no write. Measured: the gate `X3Lang across validators` PASSes in 153 s on a three-validator local3 network, printing the store hash and the read value, with all three validators finalizing the same blocks. Without the seeding half the third comit returns 0, so the assertion is load-bearing rather than incidental.",
+  "What that still does not establish: the `.x3` *language* cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip on the live chain uses hand-assembled X3BC rather than compiled source; and no public network, independent operator or generated-program campaign has exercised any of it.",
+  "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
+  "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. Still not joined: no validator network has finalized a state-carrying program and read its state from a second node, and the `.x3` *language* still cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip is proven with hand-assembled X3BC rather than compiled source.",
+]
 required_tests = [
-  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
+  "a_compiled_x3_program_is_finalized_and_its_receipt_is_readable",
   "compile_encode_decode_execute_receipt_end_to_end",
+  "a_store_reaches_chain_storage_through_the_receipt",
+  "a_reverted_atomic_window_writes_no_chain_state",
+  "a_failed_execution_does_not_report_the_writes_it_journaled",
+  "a_second_comit_reads_the_slot_the_first_one_wrote",
+  "a_comit_reads_zero_from_a_slot_the_chain_never_wrote",
+  "an_x3_execution_is_refused_when_the_slot_map_exceeds_the_priced_bound",
+  "both_engines_read_the_seeded_slot_and_report_it_as_the_old_value",
+  "the_compiler_fixture_corpus_executes_to_the_value_its_source_states",
 ]
 test_evidence = [
+  "note: the live state round trip is the `X3Lang across validators` gate (`env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3lang_network_receipt -- --ignored --nocapture --test-threads=1`) -> PASS 153s on three validators: control read 0, store of 7 readable from the observer node, later read returns 7 with no write claimed",
   "crates/x3-integration/tests/compiler_bridge.rs",
+  "node/tests/x3lang_network_receipt.rs",
+  "pallets/x3-kernel/tests/x3_storage_channel.rs",
+  "note: the live half is the `X3Lang across validators` gate (three validators, submitter Alice, observer Charlie, identical receipt bytes at the same finalized block); the kernel half was re-run by the primary agent - cargo test -p pallet-x3-kernel --test x3_storage_channel -> 9 passed, 0 failed (6 before), including a_second_comit_reads_the_slot_the_first_one_wrote",
+  "note: the read path is measured load-bearing - passing an empty slot view at the comit call site in `pallets/x3-kernel/src/lib.rs` reddens a_second_comit_reads_the_slot_the_first_one_wrote with `left: [0; 8] right: [7, 0, 0, 0, 0, 0, 0, 0]`; restoring returns 9/9",
+  "note: engine parity - cargo test -p x3-x3-integration --test interpreter_agreement -> 4 passed, including both_engines_read_the_seeded_slot_and_report_it_as_the_old_value, which requires both engines to report the same seeded old_value and each to report `None` without the seed",
   "note: the corpus test runs each fixture on both engines and requires the same value",
 ]
-evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "note: Trading Core v1 gap #4"]
+evidence = [
+  "crates/x3-integration/tests/compiler_bridge.rs",
+  "note: Trading Core v1 gap #4",
+  "note: Trading Core v1 gap #10",
+  "note: TICKET-147 in TESTNET_GAP_LEDGER.md",
+]
 
 [[feature]]
 # Re-measured 2026-09-24 (TICKET-134): the verifier this row says is needed exists —
@@ -208,14 +292,30 @@ name = "Stateful trading IR verifier"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler"]
-implemented = 70
-tested = 70
-mainnet_ready = 30
+implemented = 80
+tested = 85
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs real stateful verifier"]
+blockers = [
+  "Re-measured 2026-09-26: the row's blocker (\"Needs real stateful verifier\") was stale. `verify_trading_sequences` (x3-lang/compiler/src/verify.rs) walks the flat operation list with `open_debts`/`closed_debts` and refuses, by name, a commit with an open debt, a close for a debt that was never opened, a second close of one debt, a repay before its borrow, and an operation after the commit. It is called from `verify_ir`, which `ir_level_errors` calls from `run_pre_emission_layers_with_context` and from lowering, so it guards the real compile path and nested `atomic` bodies — it is not test-only.",
+  "What that does not establish: the rule set is one hand-written state machine with no independent second implementation to disagree with it, no property/fuzz test over generated operation sequences, and no proof that the same refusal happens when a hostile IR arrives from a network peer rather than from the local compiler.",
+]
+required_tests = [
+  "rejects_commit_with_an_open_debt",
+  "rejects_close_debt_before_it_was_opened",
+  "rejects_close_debt_twice",
+  "rejects_repay_before_borrow",
+  "rejects_swap_after_bridge",
+  "the_operations_a_hyperarb_lowers_to_pass_the_structural_verifier",
+]
+test_evidence = [
+  "x3-lang/compiler/tests/test_ir_verifier.rs",
+  "note: 42 tests pass; the three debt-sequence cases above assert *which* rule fired by matching the verifier's diagnostic message, so they cannot pass because of an unrelated refusal",
+  "note: `cargo test --manifest-path x3-lang/Cargo.toml -p x3-lang-compiler --test test_ir_verifier` -> test result: ok. 42 passed; 0 failed; 0 ignored",
+]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #3"]
 
 [[feature]]
@@ -251,16 +351,16 @@ id = "X3-LANG-009"
 name = "Checksum-verified bytecode decoder"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration"]
+paths = ["crates/x3-integration", "node/tests/x3vm_live_lifecycle.rs"]
 implemented = 60
-tested = 70
-mainnet_ready = 30
+tested = 78
+mainnet_ready = 38
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["**Nothing here is authenticated.** Corrected 2026-09-24 against the code: the envelope does carry a digest - `x3-common::bytecode::checksum` over the body, written by `x3-backend` and verified by both the std and the no-std reader - but an unkeyed checksum is a corruption check and not authentication, since anyone can recompute it over a forged module. The row's **name no longer claims more than the code does** (it was renamed from 'Authenticated bytecode decoder' to 'Checksum-verified bytecode decoder' on 2026-09-24), but the gap it names is real: there is no signature and no attestation, and no phase of the spec asks for one over the envelope. What the decoder does validate is structure, magic, version bounds, the checksum and gas accounting. TICKET-108"]
-required_tests = ["test_invalid_magic", "test_parse_minimal_module"]
+blockers = ["**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. What remains open is the case this note names: a `.x3`/X3BC artifact distributed out of band has no signature or attestation of its own, and no phase of the spec asks for one."]
+required_tests = ["test_invalid_magic", "test_parse_minimal_module", "a_tampered_artifact_cannot_be_executed_under_the_original_signature"]
 test_evidence = ["note: the no-std decoder is crates/x3-integration/src/mini_x3.rs::parse_module, whose tests are test_invalid_magic / test_parse_minimal_module / test_execute_returns_42 / test_gas_exhausted; measured on master 2026-09-23"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
 
@@ -271,14 +371,14 @@ name = "Versioned runtime bytecode envelope"
 subsystem = "language_trading"
 source = "master"
 paths = ["crates/x3-integration"]
-implemented = 80
-tested = 80
-mainnet_ready = 45
+implemented = 85
+tested = 86
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) — the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009)."]
+blockers = ["Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) — the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009). Added 2026-09-26 (TICKET-148, CLOSED): the envelope's second reader is also a second *interpreter*, and it was answering 44 opcodes it had no implementation for (see the test_evidence note and `.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`). That class is closed - nothing is fabricated any more. Added 2026-09-26 (TICKET-149, part 1 CLOSED): slot storage is the one divergence that was resolved rather than recorded. `mini_x3` - the interpreter a block runs - implements `evm_sstore`/`evm_sload` (0xB4/0xB3) against the same key and payload encoding `crates/x3-vm` journals (EVM domain tag + little-endian slot, then tag + length + at most 30 bytes), the atomic window unwinds a rolled-back window's writes in reverse, and `crates/x3-integration/tests/interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key for key and value for value instead of asserting that both merely work. What remains of TICKET-149: the two interpreters still differ on aggregates, `inc`/`dec`, `mod_f`, the numeric conversions and `ctx_gas`, and the verifier still admits those at intake rather than refusing them at validation."]
 required_tests = [
     "test_invalid_magic",
     "test_execute_returns_42",
@@ -292,6 +392,12 @@ required_tests = [
     "a_global_stored_and_loaded_means_the_same_thing_to_both_readers",
     "trailing_debug_info_and_metadata_do_not_change_what_runs",
     "a_module_from_a_newer_compiler_or_needing_a_newer_loader_is_refused_by_both_readers",
+    "the_on_chain_interpreter_refuses_every_instruction_it_cannot_execute",
+    "atomic_check_reports_the_window_it_is_in",
+    "an_atomic_window_with_nothing_open_is_refused",
+    "neither_interpreter_executes_an_opcode_the_other_one_refuses",
+    "both_engines_execute_the_same_supported_program",
+    "slot_storage_is_implemented_by_both_engines_and_names_the_same_slot",
 ]
-test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)", "note: cross-decoder parity for the whole body added 2026-09-24 (constant pool, function table, global table, trailing sections, version bounds) — six tests in `crates/x3-integration/tests/bc_const_pool_parity.rs`; they found the patch-version divergence of TICKET-137"]
+test_evidence = ["note: the format is defined in crates/x3-backend/src/bc_format.rs and re-implemented for no-std in crates/x3-integration/src/mini_x3.rs; measured on master 2026-09-23 (TICKET-101 third pass)", "note: cross-decoder parity for the whole body added 2026-09-24 (constant pool, function table, global table, trailing sections, version bounds) — six tests in `crates/x3-integration/tests/bc_const_pool_parity.rs`; they found the patch-version divergence of TICKET-137", "note: INTERPRETER parity added 2026-09-26 (TICKET-148/149). The second implementation of the format is also a second implementation of the opcodes, and `mini_x3` is the one a block runs. It used to *answer* 44 opcodes it had no implementation for (aggregate loads/stores, the array and tuple family, every context read including a hard-coded `chain_id = 3375`, the atomic window, `emit`, and all EVM/SVM/GPU intrinsics as `I64(0)` after a six-byte skip). All 44 now refuse with `X3Error::UnsupportedOpcode(byte)`, and the atomic window is real (globals snapshot/restore, `AtomicAborted` on rollback, nesting bounded by `MAX_ATOMIC_DEPTH`). Measured: `cargo test -p x3-x3-integration --features compile` — 13 + 6 + 5 + 8 + 6 + 3 + 3 + 5 passed, 0 failed; break-it-first 18/44 red with the aggregate/context/agent arms restored and 26/44 red with the intrinsic arm restored; `interpreter_agreement.rs` holds both engines to the same refusals, and as of 2026-09-26 it pins slot storage as *agreeing* rather than diverging: `evm_sstore`/`evm_sload` are implemented in both engines against the same key and payload encoding, and the test compares the two journals key for key and value for value. Measured independently by the primary agent: `cargo test -p x3-x3-integration --features std` -> 17 + 6 + 5 + 3 + 3 + 9 passed, 0 failed. Proof artifact `.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`."]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]

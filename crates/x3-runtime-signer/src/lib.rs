@@ -166,7 +166,11 @@ impl X3RuntimeSigner {
         Ok(H256::from_slice(&bytes))
     }
 
-    fn account_nonce(&self) -> Result<u32, SwapError> {
+    /// The account's next nonce, read from the node's pool (`system_accountNextIndex`), i.e. the
+    /// index the *next* signed extrinsic from this account will carry. Public because a caller that
+    /// paces submissions on inclusion — rather than firing them blind — has to be able to tell a
+    /// gap in the pool from a slow block.
+    pub fn account_nonce(&self) -> Result<u32, SwapError> {
         let account = self.account().to_ss58check();
         let result = self.rpc_call("system_accountNextIndex", vec![Value::String(account)])?;
         let nonce = if let Some(n) = result.as_u64() {
@@ -490,6 +494,90 @@ impl X3RuntimeSigner {
             length_bound,
         });
         self.signed_extrinsic(council_call)
+    }
+
+    /// Create an asset through the token factory, signed by this account.
+    ///
+    /// `X3TokenFactory::create_token` takes `EnsureSigned`, so unlike the council and
+    /// header-submitter paths it needs no proposal — and it is the only signed call in this
+    /// tree that gives `pallet-x3-supply-ledger` an asset record. Without one, the per-asset
+    /// conservation identity (`native + evm + svm + external_locked + pending <= canonical`)
+    /// has nothing to check on a live chain: the kernel's comits write the kernel's own
+    /// `CanonicalLedger`, not the supply ledger. This method exists so the distributed supply
+    /// test can create the record it then asserts on every validator.
+    ///
+    /// Genesis validation in the pallet is not repeated here — the pallet's own checks
+    /// (`canonical_decimals`, supported class, enabled domains) are the authority, and a call
+    /// this method builds that they refuse will fail with the pallet's error rather than a
+    /// locally invented one.
+    pub fn sign_token_factory_create(
+        &self,
+        config: pallet_x3_token_factory::TokenFactoryConfig,
+    ) -> Result<String, SwapError> {
+        let call =
+            RuntimeCall::X3TokenFactory(pallet_x3_token_factory::Call::<Runtime>::create_token {
+                config,
+            });
+        self.signed_extrinsic(call)
+    }
+
+    /// Initiate a cross-VM transfer out of the `X3Native` domain.
+    ///
+    /// `X3CrossVmRouter::xvm_transfer` is gated on `T::X3LangOrigin` — `EnsureX3LangGateway`
+    /// on this runtime, i.e. an account authorized for `GatewayRole::X3Lang` in
+    /// `pallet-x3-custody`'s registry. On the dev/local/testnet specs that is the account of
+    /// `//x3-atomic-gateway`, so a signer built with any other URI produces an extrinsic the
+    /// pool accepts and the runtime refuses with `BadOrigin`.
+    ///
+    /// This call is one of only two signed paths that move the supply ledger's
+    /// `pending_supply`: it debits the source domain's leg and adds the same amount to
+    /// `pending_supply`, which stays there until [`Self::sign_complete_xvm_transfer`] credits the
+    /// destination leg or `cancel_expired_xvm_transfer` refunds the source. `expires_at` is an
+    /// absolute block number and the runtime requires it to be in the future.
+    pub fn sign_xvm_transfer(
+        &self,
+        asset_id: x3_asset_kernel_types::AssetId,
+        destination: x3_asset_kernel_types::DomainId,
+        recipient: x3_asset_kernel_types::AccountBytes,
+        amount: x3_asset_kernel_types::Balance,
+        expires_at: u32,
+    ) -> Result<String, SwapError> {
+        let call = RuntimeCall::X3CrossVmRouter(
+            pallet_x3_cross_vm_router::Call::<Runtime>::xvm_transfer {
+                asset_id,
+                destination,
+                recipient,
+                amount,
+                expires_at,
+            },
+        );
+        self.signed_extrinsic(call)
+    }
+
+    /// Complete a cross-VM transfer that is currently in `SourceDebited`, crediting the
+    /// destination domain's ledger leg out of `pending_supply` and driving the record to
+    /// `DestinationCredited`/`Finalized`.
+    ///
+    /// Same `X3LangOrigin` gate as [`Self::sign_xvm_transfer`]. For a `TrustedInternal` route the
+    /// kernel itself is the proof, so this is not a privileged call beyond the gateway origin.
+    pub fn sign_complete_xvm_transfer(&self, message_id: H256) -> Result<String, SwapError> {
+        let call = RuntimeCall::X3CrossVmRouter(
+            pallet_x3_cross_vm_router::Call::<Runtime>::complete_xvm_transfer { message_id },
+        );
+        self.signed_extrinsic(call)
+    }
+
+    /// Sign an arbitrary runtime call with this signer's key.
+    ///
+    /// The typed `sign_*` helpers cover the calls the node and the relayer submit in production,
+    /// and they are the ones to use. This exists for everything else — a `pallet_balances`
+    /// transfer that endows a gateway account, say — so that a caller who needs a call this crate
+    /// has no helper for still signs it with the runtime's one correct `SignedExtra` layout
+    /// instead of hand-rolling a second encoder. That is the mistake the module doc describes:
+    /// `crates/x3-relayer` used to carry its own encoder, and its payload could never have
+    /// verified against this runtime.
+    pub fn sign_call(&self, call: RuntimeCall) -> Result<String, SwapError> {
+        self.signed_extrinsic(call)
     }
 
     /// Enroll external-header submitters, through the council.

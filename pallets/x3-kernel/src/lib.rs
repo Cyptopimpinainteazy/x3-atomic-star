@@ -140,7 +140,11 @@ use x3_cross_vm_bridge::{
     CrossVmStatus, VmId,
 };
 
-pub const EXECUTION_RECEIPT_VERSION: u32 = 1;
+/// Schema version of the stored `ExecutionReceipt`.
+///
+/// 1 -> 2: added the typed `storage_writes` channel (X3VM slot writes), which the balance-shaped
+/// `state_changes` field could not carry without being decoded as (account, asset, balance).
+pub const EXECUTION_RECEIPT_VERSION: u32 = 2;
 
 /// Represents a Comit transaction submitted to the X3 Kernel.
 #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
@@ -202,6 +206,13 @@ pub struct ExecutionReceipt {
     pub logs: Vec<ExecutionLog>,
     /// State changes resulting from execution.
     pub state_changes: Vec<StateChange>,
+    /// X3VM storage-slot writes drained from the execution journal.
+    ///
+    /// Deliberately separate from `state_changes`, which the kernel decodes as balance changes
+    /// (`address` -> account, `key` -> asset id, `value` -> balance). A slot write pushed through
+    /// that field is not a balance and must not be counted as one; these entries are applied to
+    /// `X3ContractStorage` instead.
+    pub storage_writes: Vec<StorageWrite>,
     /// Protocol version emitted by the executor implementation.
     pub protocol_version: u32,
     /// Ordered migration markers applied before this receipt was produced.
@@ -238,6 +249,22 @@ pub struct StateChange {
     pub key: H256,
     /// New value at the storage slot.
     pub value: H256,
+}
+
+/// A single X3VM storage-slot write carried by an execution receipt.
+///
+/// `old_value` is the value the slot held in the executing VM's view before the write (`None` = the
+/// slot was empty in that view); `new_value` is the value after the write (`None` = the slot was
+/// cleared). A successful execution's journal has already dropped any write an atomic window rolled
+/// back, and a failed execution carries no writes at all.
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+pub struct StorageWrite {
+    /// 32-byte storage slot key.
+    pub key: H256,
+    /// Value in the slot before the write (`None` = the slot was empty).
+    pub old_value: Option<[u8; 32]>,
+    /// Value after the write (`None` = the slot was cleared).
+    pub new_value: Option<[u8; 32]>,
 }
 
 /// Unified state representation for the X3 Chain.
@@ -547,6 +574,20 @@ pub mod pallet {
         #[pallet::constant]
         type RequireCrossVmProof: Get<bool>;
 
+        /// Whether this chain can actually offer a private submission channel.
+        ///
+        /// The other half of the compiled-capability contract: an artifact may *demand* private
+        /// submission (the bit in its header), and this says whether the chain can *meet* it. A
+        /// program whose compiled policy demands privacy is refused at intake when this is false,
+        /// because the alternative is running a program that asked not to be public in the clear.
+        ///
+        /// The runtime binds this to the pallet that owns the private channel
+        /// (`pallet_private_execution::Enabled`) rather than to a constant, so the switch that
+        /// enables private execution on chain is the same switch this intake check reads — one
+        /// posture, two readers, no way for them to disagree.
+        #[pallet::constant]
+        type PrivateSubmissionChannel: Get<bool>;
+
         /// Weight information provider for extrinsics.
         type WeightInfo: WeightInfo;
 
@@ -561,6 +602,15 @@ pub mod pallet {
         /// X3 VM execution adapter (runtime-configurable)
         /// Implement X3ExecutorAdapter trait for X3 bytecode execution
         type X3Adapter: X3ExecutorAdapter;
+
+        /// Most X3VM contract slots one X3 execution may be handed.
+        ///
+        /// `X3ContractStorage` is unbounded and every entry is a database read the block pays for,
+        /// so an execution's view of it is bounded and priced (see `submit_comit_v2`'s weight).
+        /// Exceeding this refuses the execution (`X3StorageViewTooLarge`) instead of running the
+        /// program against a partial view it cannot tell from an empty slot.
+        #[pallet::constant]
+        type MaxX3StorageSlots: Get<u32>;
 
         /// Cross-chain proof verification hook.
         type CrossChainProofVerifier: CrossChainProofVerifier<Self::AccountId>;
@@ -681,6 +731,19 @@ pub mod pallet {
     #[pallet::getter(fn x3_execution_receipt)]
     pub type X3ExecutionReceipts<T: Config> =
         StorageMap<_, Blake2_128Concat, H256, ExecutionReceipt, OptionQuery>;
+
+    /// X3VM contract storage, keyed by the 32-byte slot key.
+    ///
+    /// This is the chain-visible destination for the `storage_writes` channel of an X3 execution
+    /// receipt. It is a distinct keyspace from `CanonicalLedger` on purpose: `CanonicalLedger` is
+    /// balance-shaped and keyed by (account, asset id), and decoding a slot write as a balance is
+    /// exactly the corruption this channel exists to prevent. Before this map existed,
+    /// `drain_storage_journal` had no caller, so a contract's slot survived only inside the
+    /// in-memory VM that wrote it and was gone when execution returned.
+    #[pallet::storage]
+    #[pallet::getter(fn x3_contract_slot)]
+    pub type X3ContractStorage<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, [u8; 32], OptionQuery>;
 
     /// EVM transactions keyed by transaction hash (keccak256 of raw tx).
     /// Stores full transaction data (including gas and input) for RPC compatibility.
@@ -898,6 +961,12 @@ pub mod pallet {
             comit_id: H256,
             changes_applied: u32,
         },
+        /// X3VM contract slots were written from an execution receipt's storage channel.
+        ///
+        /// Emitted only when at least one slot changed, so a verifier can tell an execution that
+        /// touched storage from one that did not. The applied values live in `X3ContractStorage`;
+        /// this event is the index, not the record.
+        X3StorageUpdated { comit_id: H256, writes_applied: u32 },
         /// Cross-VM bridge operation was executed.
         CrossVmOperationExecuted {
             comit_id: H256,
@@ -1009,6 +1078,18 @@ pub mod pallet {
         InvalidSymbolFormat,
         /// Too many state changes in execution receipts.
         TooManyStateChanges,
+        /// An execution receipt carried more X3VM storage writes than the kernel will apply.
+        TooManyStorageWrites,
+        /// The chain holds more X3VM contract slots than the kernel will load into one execution.
+        ///
+        /// Reading the slot map is work the block pays for, so the read is bounded. Exceeding the
+        /// bound refuses the execution rather than handing the program a *partial* view: a slot
+        /// missing from a partial view is indistinguishable from a slot that was never written, and
+        /// that is the one answer a program must not be given about state the chain holds.
+        X3StorageViewTooLarge,
+        /// A failed execution reported storage writes. Partial writes from a failed execution must
+        /// never reach chain state, so a receipt in this shape is refused rather than trusted.
+        StorageWritesOnFailedExecution,
         /// Arithmetic overflow in fee calculation.
         FeeOverflow,
         /// Comit ID has already been submitted.
@@ -1041,6 +1122,13 @@ pub mod pallet {
         SettlementMismatch,
         /// State inconsistency detected across VM branches.
         StateInconsistency,
+        /// A compiled program requires private submission and this chain cannot offer it.
+        ///
+        /// The demand comes from the artifact's own header (AGENTS.md §11), not from a parameter
+        /// the caller could omit, so the refusal is the program's compiled policy being honoured
+        /// rather than a submission-time option. It is raised at intake, before the adapter runs,
+        /// so a program that requires privacy never executes in the clear.
+        PrivateSubmissionUnavailable,
         /// An X3 call asked for more gas than `DefaultX3GasLimit`, the most one extrinsic's weight
         /// pays for.
         X3GasBudgetExceedsLimit,
@@ -1089,7 +1177,7 @@ pub mod pallet {
         /// Activate emergency pause — halts all user-facing extrinsics.
         /// Only callable by `GovernanceOrigin` (root or council).
         #[pallet::call_index(40)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_pause())]
         pub fn emergency_pause(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
@@ -1101,7 +1189,7 @@ pub mod pallet {
         /// Deactivate emergency pause — resumes normal operation.
         /// Only callable by `GovernanceOrigin` (root or council).
         #[pallet::call_index(41)]
-        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_unpause())]
         pub fn emergency_unpause(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             // Only unpause if currently paused (nothing to do otherwise)
@@ -1126,7 +1214,7 @@ pub mod pallet {
         /// Use emergency_pause for routine operational pauses.
         /// Use emergency_halt for invariant violations requiring immediate asset freeze.
         #[pallet::call_index(42)]
-        #[pallet::weight(Weight::from_parts(15_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::emergency_halt())]
         pub fn emergency_halt(origin: OriginFor<T>) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             T::EmergencyHaltController::trigger();
@@ -1664,12 +1752,24 @@ pub mod pallet {
         /// are rolled back. Runtime VM adapters MUST be transactional to guarantee rollback
         /// for VM state as well.
         #[pallet::call_index(9)]
-        // `submit_comit_v2`'s benchmark predates the X3 receipt write below, so that write is
-        // declared here rather than absorbed silently: an undeclared storage write is exactly the
-        // under-count that lets a block be built past its own limit.
+        // `submit_comit_v2`'s benchmark predates two storage writes added below: the persisted X3
+        // execution receipt (`X3ExecutionReceipts`) and this comit's X3VM slot writes
+        // (`X3ContractStorage`). One write each is declared here rather than absorbed silently: an
+        // undeclared storage write is exactly the under-count that lets a block be built past its
+        // own limit. The slot count is bounded by `MAX_STATE_CHANGES`; pricing each one against
+        // `DbWeight` (as `CanonicalLedger` updates are not, today) is recorded as a remaining
+        // weight-precision gap rather than claimed here.
+        //
+        // 3: an X3 execution is handed the chain's contract slots before it runs, which is a read
+        // per slot. The read is bounded by `MaxX3StorageSlots`, so the bound is priced here even
+        // for a comit with no X3 payload at all — an over-charge on the empty case rather than an
+        // under-charge on the one that reads the map.
         #[pallet::weight(
             <T as Config>::WeightInfo::submit_comit_v2()
-                .saturating_add(T::DbWeight::get().writes(1))
+                .saturating_add(T::DbWeight::get().writes(2))
+                .saturating_add(
+                    T::DbWeight::get().reads(T::MaxX3StorageSlots::get().saturating_add(1) as u64)
+                )
                 .saturating_add(if x3_payload.is_empty() {
                     Weight::zero()
                 } else {
@@ -1720,6 +1820,10 @@ pub mod pallet {
                 // every non-empty X3 payload failed with `X3ExecutionFailed` on a chain whose
                 // adapter is real. Validation now asks the component that will do the work.
                 T::X3Adapter::validate(&x3_payload).map_err(|_| Error::<T>::InvalidX3VmPacket)?;
+                // The program's compiled policy comes next, before any state is touched: an
+                // artifact that demands private submission is refused on a chain that cannot
+                // offer it rather than executed in the clear.
+                Self::ensure_private_submission_available(&x3_payload)?;
             }
 
             Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
@@ -1798,7 +1902,16 @@ pub mod pallet {
             };
 
             let x3_receipt = if let Some(ref tx) = x3_tx {
-                match T::X3Adapter::execute(tx, x3_gas_limit) {
+                // The chain's own slots, read before execution: a program that reads a slot an
+                // earlier comit persisted must see that value, and a program that writes over one
+                // must report it as the write's `old_value`.
+                let slots = Self::x3_storage_view()?;
+                match T::X3Adapter::execute_with_slots_and_policy(
+                    tx,
+                    x3_gas_limit,
+                    &slots,
+                    T::PrivateSubmissionChannel::get(),
+                ) {
                     Ok(receipt) => Some(receipt),
                     Err(_e) => {
                         return Err(Self::fail_with_reason(
@@ -1947,6 +2060,17 @@ pub mod pallet {
                 Self::deposit_event(Event::CanonicalLedgerUpdated {
                     comit_id,
                     changes_applied,
+                });
+            }
+
+            // The X3VM slots are a separate channel from the balance-shaped ledger update above:
+            // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
+            let writes_applied = Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref())?;
+
+            if writes_applied > 0 {
+                Self::deposit_event(Event::X3StorageUpdated {
+                    comit_id,
+                    writes_applied,
                 });
             }
 
@@ -2357,6 +2481,33 @@ pub mod pallet {
             }
             if !svm_payload.is_empty() {
                 T::SvmAdapter::validate(svm_payload).map_err(|_| Error::<T>::InvalidSvmPacket)?;
+            }
+            Ok(())
+        }
+
+        /// Refuse an X3 program whose compiled policy demands private submission that this chain
+        /// cannot offer.
+        ///
+        /// The demand is read from the artifact's own feature word — the compiler records it
+        /// (AGENTS.md §11: policy comes from the compiled artifact, never from a caller-supplied
+        /// parameter) — and the answer to "can this chain meet it?" is the runtime's
+        /// `PrivateSubmissionChannel`. Both directions are load-bearing: with the demand present
+        /// and the channel absent the program is refused, and with the channel present the same
+        /// bytes run. A check that only ever refused would be indistinguishable from an adapter
+        /// that cannot execute X3BC at all, which is why the pallet's tests drive both.
+        ///
+        /// A payload that is not a readable X3BC header is *not* judged here: that answer belongs
+        /// to `T::X3Adapter`, whose `validate` names a non-module refusal, and every caller below
+        /// runs it. Answering `false` for "I could not read a header" is therefore not a fail-open
+        /// path — the bytes still have to get past the adapter, which refuses them by name.
+        fn ensure_private_submission_available(x3_payload: &[u8]) -> DispatchResult {
+            if x3_payload.is_empty() {
+                return Ok(());
+            }
+            if x3_common::bytecode::requires_private_submission(x3_payload)
+                && !T::PrivateSubmissionChannel::get()
+            {
+                return Err(Error::<T>::PrivateSubmissionUnavailable.into());
             }
             Ok(())
         }
@@ -2807,6 +2958,7 @@ pub mod pallet {
                 return_data: result.output,
                 logs: Vec::new(),
                 state_changes: bridge_state_changes,
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -3442,6 +3594,75 @@ pub mod pallet {
             Ok(changes_applied)
         }
 
+        /// This chain's X3VM contract slots, for an execution to start from.
+        ///
+        /// The read is bounded by [`Config::MaxX3StorageSlots`] and refuses by name past it — see
+        /// `Error::X3StorageViewTooLarge` for why a partial view would be worse than a refusal.
+        /// `submit_comit_v2`'s weight pays for the bound, so a block cannot be made to read an
+        /// unbounded map here.
+        fn x3_storage_view() -> Result<Vec<(H256, [u8; 32])>, DispatchError> {
+            let limit = T::MaxX3StorageSlots::get() as usize;
+            let mut view: Vec<(H256, [u8; 32])> = Vec::new();
+            for (key, value) in X3ContractStorage::<T>::iter() {
+                if view.len() >= limit {
+                    return Err(Error::<T>::X3StorageViewTooLarge.into());
+                }
+                view.push((key, value));
+            }
+            Ok(view)
+        }
+
+        /// Apply an X3 execution receipt's slot writes to `X3ContractStorage`.
+        ///
+        /// This is the destination for the receipt's typed `storage_writes` channel. It is kept out
+        /// of `apply_canonical_ledger_update_v2` on purpose: that function decodes every entry as an
+        /// (account, asset, balance) triple for `CanonicalLedger`, and a slot write is none of those.
+        /// Routing slots through it would both corrupt the ledger and inflate `DecodeFailureCount`.
+        ///
+        /// Fail-closed rules:
+        /// * a failed execution reports no writes, and a receipt that claims writes on a failure is
+        ///   refused by name rather than applied;
+        /// * the write count is bounded by the same `MAX_STATE_CHANGES` limit the balance channel
+        ///   uses, so a receipt cannot make the block pay unbounded storage cost.
+        // `pub(crate)` only so the pallet's own tests can drive the refusal paths that a
+        // well-behaved adapter never produces. It is not part of the pallet's public API; the only
+        // production caller is `submit_comit_v2`.
+        pub(crate) fn apply_x3_storage_writes(
+            _comit_id: H256,
+            x3_receipt: Option<&ExecutionReceipt>,
+        ) -> Result<u32, DispatchError> {
+            let receipt = match x3_receipt {
+                Some(receipt) => receipt,
+                None => return Ok(0),
+            };
+
+            if !receipt.success {
+                if !receipt.storage_writes.is_empty() {
+                    return Err(Error::<T>::StorageWritesOnFailedExecution.into());
+                }
+                return Ok(0);
+            }
+
+            if receipt.storage_writes.len() > Self::MAX_STATE_CHANGES {
+                return Err(Error::<T>::TooManyStorageWrites.into());
+            }
+
+            let mut writes_applied = 0u32;
+            for write in receipt.storage_writes.iter() {
+                match write.new_value {
+                    Some(value) => {
+                        X3ContractStorage::<T>::insert(write.key, value);
+                    }
+                    None => {
+                        X3ContractStorage::<T>::remove(write.key);
+                    }
+                }
+                writes_applied = writes_applied.saturating_add(1);
+            }
+
+            Ok(writes_applied)
+        }
+
         /// Execute dual-VM transactions and return the unified state
         #[allow(dead_code)]
         fn do_execute_dual_tx(
@@ -3456,6 +3677,7 @@ pub mod pallet {
                 return_data: Vec::new(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -3471,6 +3693,7 @@ pub mod pallet {
                 return_data: Vec::new(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -3768,7 +3991,23 @@ pub mod pallet {
             if call.gas_budget > T::DefaultX3GasLimit::get() {
                 return Err(Error::<T>::X3GasBudgetExceedsLimit.into());
             }
-            let receipt = T::X3Adapter::execute(call.payload.as_slice(), call.gas_budget)?;
+            // The chain's slots, so a cross-VM X3VM call reads the same state a direct comit does.
+            // Its slot *writes* are deliberately not applied here: this path returns a receipt to a
+            // caller that may still roll the whole cross-VM operation back, so applying storage at
+            // this point would commit state an aborted caller was entitled to abandon (TICKET-152).
+            //
+            // The compiled policy is checked on this path too, because a cross-VM call reaches the
+            // adapter without passing `submit_comit_v2`'s intake: an artifact that demands private
+            // submission must be refused here as well, or the demand would hold on one route into
+            // the VM and not on another.
+            Pallet::<T>::ensure_private_submission_available(call.payload.as_slice())?;
+            let slots = Pallet::<T>::x3_storage_view()?;
+            let receipt = T::X3Adapter::execute_with_slots_and_policy(
+                call.payload.as_slice(),
+                call.gas_budget,
+                &slots,
+                T::PrivateSubmissionChannel::get(),
+            )?;
             let result = if receipt.success {
                 CrossVmResult::success(receipt.return_data, receipt.gas_used)
             } else {
@@ -4494,6 +4733,24 @@ sp_api::decl_runtime_apis! {
         /// Get the total issuance (total supply) of the native currency.
         fn get_total_issuance() -> Balance;
 
+        /// Per-asset supply ledger for `asset_id`, as the ledger pallet stores it.
+        ///
+        /// `None` means the asset has no ledger entry — which is *not* "zero supply": the
+        /// ledger's rule is that a missing record is an unknown asset, and the conservation
+        /// identity `native + evm + svm + external_locked + pending <= canonical` only has a
+        /// meaning once a record exists. This is a read surface for the invariant, so a
+        /// validator's own view of it can be checked over RPC without guessing storage keys:
+        /// before it, the per-asset identity had no read path at all and only the *native*
+        /// supply could be checked on a live network.
+        ///
+        /// The id is the **ledger's** `AssetId` (`H256`), not this API's `AssetId` (`u32`):
+        /// `pallet-x3-supply-ledger` keys its records by the 32-byte asset key. Both id spaces
+        /// exist in this tree, and naming the wrong one here is a compile error rather than a
+        /// silent miss — which is why the parameter type is spelled out.
+        fn get_asset_supply_ledger(
+            asset_id: x3_asset_kernel_types::AssetId,
+        ) -> Option<x3_asset_kernel_types::SupplyLedger>;
+
         /// Native balance held by protocol-controlled accounts (treasury et al.)
         /// that is not in free circulation. Protocol-locked supply; a caller may
         /// derive circulating supply as `get_total_issuance() - native_locked_supply()`.
@@ -4518,6 +4775,18 @@ mod tests;
 
 #[cfg(test)]
 mod chaos_tests;
+
+// The failure paths that mutate before they refuse: fee burn, ledger write and the X3 slot
+// channel, each driven through the extrinsic. See the module docs for why the pallet's
+// "returning an error rolls back storage" claim needed a test rather than a comment.
+#[cfg(test)]
+mod failure_path_conservation;
+
+// The compiled private-submission policy, read at intake (X3-MEV-002). The demand travels in the
+// artifact's feature word and the chain's answer is its own `PrivateSubmissionChannel`; both
+// directions are driven through `submit_comit_v2`.
+#[cfg(test)]
+mod private_submission_intake;
 
 #[cfg(test)]
 mod packet_integration_tests;

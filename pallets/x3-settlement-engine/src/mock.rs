@@ -131,11 +131,13 @@ impl pallet_x3_kernel::Config for Test {
     type EvmAdapter = pallet_x3_kernel::MockEvmAdapter;
     type SvmAdapter = pallet_x3_kernel::MockSvmAdapter;
     type X3Adapter = pallet_x3_kernel::MockX3Adapter;
+    type MaxX3StorageSlots = ConstU32<256>;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;
     type MaxPreparedOpsPerBlock = ConstU32<8>;
     type RequireCrossVmProof = ConstBool<false>;
+    type PrivateSubmissionChannel = ConstBool<false>;
     type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
     type BridgeEvmEscrow = MockBridgeEvmEscrow;
     type BridgeSvmEscrow = MockBridgeSvmEscrow;
@@ -268,9 +270,11 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         System::set_block_number(1);
         Timestamp::set_timestamp(1_000);
         // Permissive, like a dev/local genesis: the mock has no external chain to
-        // prove against, so the lifecycle tests drive the bookkeeping path. Tests
-        // that exercise the strict rule (the production/testnet posture) set this
-        // to false themselves — see `allow_unattested_cross_domain_proofs_is_false_by_default_in_live_genesis`.
+        // prove against, so the lifecycle tests drive the bookkeeping path. Tests that
+        // exercise the strict rule (the production/testnet posture) set this to false
+        // themselves; that every live chain spec is *born* with it false is enforced by
+        // `scripts/ci/check-external-paths-disabled.py`, not by a test named here —
+        // this comment used to cite one that does not exist anywhere in the tree.
         crate::AllowUnattestedCrossDomainProofs::<Test>::put(true);
     });
     ext

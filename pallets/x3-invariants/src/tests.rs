@@ -429,3 +429,201 @@ fn canonical_truth_roundtrip() {
         assert!(crate::get_canonical_source::<Test>(domain_id).is_none());
     });
 }
+
+// ── InvariantCheck: the halt gate and its one exemption ───────────────────────
+
+/// The gate must refuse a halted chain's ordinary calls, and must not refuse the
+/// recovery call that ends the halt.
+///
+/// Before this was fixed the gate refused *everything*, which made `Halted` a
+/// one-way flag: clearing it needs a signed extrinsic, so refusing all of them
+/// meant the chain could only be un-halted by a runtime upgrade. The mock's
+/// allowlist contains `clear_halted` and nothing else, so both halves are visible
+/// here: the exempt call passes and a non-exempt one is refused with the halt code.
+#[test]
+fn the_halt_gate_refuses_a_call_that_is_not_a_recovery_call() {
+    use sp_runtime::traits::TransactionExtension;
+    use sp_runtime::transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidityError,
+    };
+
+    new_test_ext().execute_with(|| {
+        use sp_runtime::traits::TxBaseImplication;
+
+        let ext = crate::InvariantCheck::<Test>::new();
+        let info = frame_support::dispatch::DispatchInfo {
+            call_weight: frame_support::weights::Weight::zero(),
+            extension_weight: frame_support::weights::Weight::zero(),
+            class: frame_support::dispatch::DispatchClass::Normal,
+            pays_fee: frame_support::dispatch::Pays::No,
+        };
+        let halted: TransactionValidityError = TransactionValidityError::Invalid(
+            InvalidTransaction::Custom(crate::INVARIANT_HALT_CODE),
+        );
+        // `Executive` hands the first extension the call itself as the base implication.
+        let base = TxBaseImplication(());
+
+        // Control: while not halted, the gate lets calls through.
+        assert!(
+            ext.validate(
+                RuntimeOrigin::root(),
+                &RuntimeCall::Invariants(crate::Call::set_halt_on_violation { halt: true }),
+                &info,
+                0,
+                (),
+                &base,
+                TransactionSource::External,
+            )
+            .is_ok(),
+            "an un-halted chain must not have its calls refused"
+        );
+
+        crate::Halted::<Test>::put(true);
+
+        assert_eq!(
+            ext.validate(
+                RuntimeOrigin::root(),
+                &RuntimeCall::Invariants(crate::Call::set_halt_on_violation { halt: false }),
+                &info,
+                0,
+                (),
+                &base,
+                TransactionSource::External,
+            )
+            .unwrap_err(),
+            halted,
+            "a call that is not on the recovery list must stay refused while halted"
+        );
+
+        assert!(
+            ext.validate(
+                RuntimeOrigin::root(),
+                &RuntimeCall::Invariants(crate::Call::clear_halted {}),
+                &info,
+                0,
+                (),
+                &base,
+                TransactionSource::External,
+            )
+            .is_ok(),
+            "the recovery call must stay dispatchable while halted"
+        );
+    });
+}
+
+/// `clear_halted` clears the flag, needs the update origin, and emits the event.
+#[test]
+fn clear_halted_ends_the_halt() {
+    new_test_ext().execute_with(|| {
+        init_block(5);
+        crate::Halted::<Test>::put(true);
+
+        assert_noop!(
+            Invariants::clear_halted(RuntimeOrigin::signed(99)),
+            sp_runtime::DispatchError::BadOrigin
+        );
+        assert!(crate::Halted::<Test>::get());
+
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+        assert!(!crate::Halted::<Test>::get());
+        System::assert_last_event(crate::Event::HaltCleared { block: 5 }.into());
+    });
+}
+
+/// Clearing the halt does not silently re-arm or disarm the *policy* flag: they are
+/// separate switches, and the halt ends without touching `HaltOnViolation`.
+#[test]
+fn clear_halted_leaves_the_violation_policy_alone() {
+    new_test_ext().execute_with(|| {
+        crate::Halted::<Test>::put(true);
+        HaltOnViolation::<Test>::put(true);
+
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+
+        assert!(!crate::Halted::<Test>::get());
+        assert!(
+            HaltOnViolation::<Test>::get(),
+            "clearing a halt must not change whether future violations halt the chain"
+        );
+    });
+}
+
+/// Run `enforce_all` on a block that violates an invariant while `HaltOnViolation` is armed.
+///
+/// The halt branch ends with `frame_support::defensive!`, which expands to `debug_assert!(false)` —
+/// so it panics in any build with debug assertions on, tests included, while a release runtime only
+/// logs. That panic is a test-build artifact of the S0-6 "log + halt instead of panic" change, not
+/// the behaviour under test; the behaviour is the `Halted` flag and the `ChainHaltRequested` event
+/// the branch leaves behind. Catch the panic, require it to be the defensive one (so an unrelated
+/// panic cannot be mistaken for the expected path), and let the caller read the state. Same idiom as
+/// `pallets/x3-supply-ledger/src/tests_conservation.rs`.
+fn enforce_all_arming_the_halt(block: u64) {
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        Invariants::enforce_all(block)
+    }));
+    let payload = outcome.expect_err(
+        "a violation under the armed policy must trip the defensive assertion in a debug build",
+    );
+    let text = payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default();
+    assert!(
+        text.contains("Defensive failure"),
+        "expected the invariant's defensive assertion, got a different panic: {text}"
+    );
+}
+
+/// TICKET-153 item 4: clearing the halt does not fix the violation, so with the policy still armed
+/// the next block's `enforce_all` re-raises the flag. Only after remediation — the observed value
+/// back inside the bound — does a clear stick. Nothing else asserted this *sequence*: the other halt
+/// tests each check one transition, and the other `enforce_all` tests use the default unarmed policy,
+/// so a `clear_halted` that quietly disarmed `HaltOnViolation` would have passed them all.
+#[test]
+fn the_halt_re_raises_while_the_violation_persists_and_sticks_after_remediation() {
+    new_test_ext().execute_with(|| {
+        // Arm the policy: any violation from here on raises `Halted`.
+        assert_ok!(Invariants::set_halt_on_violation(
+            RuntimeOrigin::root(),
+            true
+        ));
+
+        // Block 1 — issuance above the genesis bound (1B tokens, 18 decimals).
+        init_block(1);
+        LastObservedIssuance::<Test>::put(2_000_000_000_000_000_000u128);
+        enforce_all_arming_the_halt(1);
+        assert!(
+            crate::Halted::<Test>::get(),
+            "a violation under the armed policy must raise the halt"
+        );
+
+        // Governance clears the flag while the violation is still present. That is allowed — but it
+        // is not a fix, and the chain must not pretend otherwise.
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+        assert!(!crate::Halted::<Test>::get());
+
+        // Block 2 — the check runs again against the unchanged, still-violating state and re-raises.
+        init_block(2);
+        enforce_all_arming_the_halt(2);
+        assert!(
+            crate::Halted::<Test>::get(),
+            "the armed policy must re-raise the halt for as long as the violation persists"
+        );
+
+        // Remediation: bring the observed value back inside the bound, then clear against a state
+        // that actually holds the invariant.
+        LastObservedIssuance::<Test>::put(999_999_999_000_000_000u128);
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+
+        // Block 3 — the check passes and the cleared flag sticks.
+        init_block(3);
+        Invariants::enforce_all(3u64);
+        assert!(
+            !crate::Halted::<Test>::get(),
+            "once the bound holds, the cleared halt must stay cleared"
+        );
+        // Exactly the two violating blocks contributed; the remediated block did not.
+        assert_eq!(ViolationCount::<Test>::get(), 2);
+    });
+}

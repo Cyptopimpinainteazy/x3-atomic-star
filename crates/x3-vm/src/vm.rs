@@ -35,7 +35,7 @@ use crate::hostcall::HostcallRegistry;
 use crate::isolation::IsolationContext;
 use crate::jit_compiler::{JitCompiler, JitConfig, JitStats};
 use crate::state::{StateMachine, VmState};
-use crate::storage::{VmStorage, WriteRecord};
+use crate::storage::{StorageValue, VmStorage, WriteRecord};
 
 /// Maximum register count.
 pub const MAX_REGISTERS: usize = 256;
@@ -217,6 +217,22 @@ impl VM {
 
     /// Create a new VM with custom configuration.
     pub fn with_config(module: BytecodeModule, config: VMConfig) -> Self {
+        Self::with_config_and_seeds(module, config, &[])
+            .expect("no seeds cannot exceed the storage key limit")
+    }
+
+    /// Create a VM with custom configuration and the chain's contract slots already loaded.
+    ///
+    /// `seeds` is the chain's contract storage: the 32-byte slot keys and the payloads a previous
+    /// execution persisted. They are loaded as state the execution inherited — not journaled, not
+    /// reported as writes — which is what lets a later `evm_sload` read what an earlier execution
+    /// stored, and what makes a subsequent `evm_sstore` report the chain's value as its
+    /// `old_value`. Fails rather than silently dropping a seed the storage limit refuses.
+    pub fn with_config_and_seeds(
+        module: BytecodeModule,
+        config: VMConfig,
+        seeds: &[([u8; 32], [u8; 32])],
+    ) -> VMResult<Self> {
         // initialize globals from module (use const pool initializers where present)
         let mut globals: Vec<Value> = Vec::new();
         for g in &module.globals {
@@ -234,7 +250,14 @@ impl VM {
         // enforce a private constant of 10 while the configuration said 32, so a program the
         // executor admitted was refused nine calls in (TICKET-131).
         let isolation_depth = config.max_call_depth as u32;
-        Self {
+        let mut storage = VmStorage::new();
+        for (key, value) in seeds {
+            storage.seed_slot(*key, *value).map_err(|err| {
+                VMError::without_ip(VMErrorKind::HostcallError(format!("seed refused: {err:?}")))
+            })?;
+        }
+
+        Ok(Self {
             module,
             regs: vec![Value::Unit; MAX_REGISTERS],
             stack: Vec::with_capacity(config.max_stack_size),
@@ -249,9 +272,9 @@ impl VM {
             state_machine: StateMachine::new(),
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
-            storage: VmStorage::new(),
+            storage,
             jit: JitCompiler::new(JitConfig::default()),
-        }
+        })
     }
 
     /// Create a VM from raw bytes.
@@ -1174,6 +1197,64 @@ impl VM {
             }
 
             // ================================================================
+            // Contract storage (the EVM slot keyspace)
+            //
+            // These two opcodes are the only way a program can persist a value
+            // across calls: `StoreGlobal` writes a module-scoped global into the
+            // storage map under the *global* keyspace, and until these arms
+            // existed nothing in the interpreter wrote a contract slot at all —
+            // `evm_sstore` reached the `_` arm and returned `UnimplementedOpcode`,
+            // so a deployed X3VM program could not carry state between blocks.
+            //
+            // Operand encoding is the one `x3-backend`'s emitters use:
+            //   evm_sload  dst:reg slot:reg
+            //   evm_sstore slot:reg val:reg
+            // Both operands are registers; the slot register must hold a
+            // non-negative integer.
+            // ================================================================
+            Opcode::EvmSload => {
+                let dst = self.read_u8(ip + 1)? as usize;
+                let slot_reg = self.read_u8(ip + 2)? as usize;
+                let slot_r = self.resolve_reg_checked(slot_reg, ip)?;
+                let slot = slot_number(&self.regs[slot_r])
+                    .map_err(|reason| self.error_at(ip, VMErrorKind::InvalidStorageSlot(reason)))?;
+                // A slot that was never written reads as zero. That is the EVM's
+                // own rule and it is a defined value, not an uncertainty: the key
+                // space is disjoint from the global key space (see `evm_slot_key`),
+                // so "absent" cannot be confused with a global's value.
+                let value = match self.storage.get(&evm_slot_key(slot)) {
+                    Some(payload) => decode_slot_payload(payload).map_err(|reason| {
+                        self.error_at(ip, VMErrorKind::CorruptStorageSlot(reason))
+                    })?,
+                    None => Value::I64(0),
+                };
+                let dst_r = self.resolve_reg_checked(dst, ip)?;
+                self.regs[dst_r] = value;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::EvmSstore => {
+                let slot_reg = self.read_u8(ip + 1)? as usize;
+                let val_reg = self.read_u8(ip + 2)? as usize;
+                let slot_r = self.resolve_reg_checked(slot_reg, ip)?;
+                let val_r = self.resolve_reg_checked(val_reg, ip)?;
+                let slot = slot_number(&self.regs[slot_r])
+                    .map_err(|reason| self.error_at(ip, VMErrorKind::InvalidStorageSlot(reason)))?;
+                // Refuse rather than truncate: `value_to_storage_value` silently
+                // clips anything longer than 32 bytes, which for a contract write
+                // would persist a different value than the program handed us.
+                let payload = encode_slot_payload(&self.regs[val_r]).map_err(|reason| {
+                    self.error_at(ip, VMErrorKind::UnencodableStorageValue(reason))
+                })?;
+                self.storage
+                    .set(evm_slot_key(slot), Some(payload))
+                    .map_err(|err| {
+                        self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
+                    })?;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            // ================================================================
             // Debug Operations (no-op in production)
             // ================================================================
             Opcode::DebugPrint => {
@@ -1434,6 +1515,10 @@ impl VM {
             Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
             Opcode::AtomicBegin | Opcode::AtomicCommit => 5,
             Opcode::AtomicRollback => 10,
+            // Same figures as the verifier's table (`verifier::opcode_gas_cost`), so
+            // the bound a module is verified against is the bound it is charged.
+            Opcode::EvmSload => 200,
+            Opcode::EvmSstore => 5000,
             // GPU intrinsics — expensive (real CUDA kernel launch)
             Opcode::GpuSha256Batch
             | Opcode::GpuEd25519Verify
@@ -1462,6 +1547,144 @@ fn storage_key_for_global(idx: usize) -> [u8; 32] {
     let mut key = [0u8; 32];
     key[..8].copy_from_slice(&(idx as u64).to_le_bytes());
     key
+}
+
+/// Domain tag that separates the EVM slot keyspace from the global-variable keyspace
+/// inside the one storage map the interpreter owns.
+///
+/// `storage_key_for_global` writes a global index into the first eight bytes and leaves
+/// bytes 8..32 zero; the interpreter reads global indices as `u32` (`LoadGlobal` reads a
+/// `u32`), so no global can address a key whose first eight bytes are this tag. The
+/// disjointness is asserted by a test, because "the slot was never written" (reads zero)
+/// must never be reachable for a key a global owns.
+const EVM_SLOT_DOMAIN: u64 = 0x5833_4556_4D5F_534C; // "X3EVM_SL"
+
+/// Storage key for one EVM slot: domain tag, then the slot number, then zeros.
+fn evm_slot_key(slot: u64) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&EVM_SLOT_DOMAIN.to_le_bytes());
+    key[8..16].copy_from_slice(&slot.to_le_bytes());
+    key
+}
+
+// Slot payload tags. A slot holds a tag byte, a length byte and at most 30 bytes of data,
+// which is what makes a store/load round trip exact: the alternative (the untagged layout
+// `value_to_storage_value` uses) cannot tell `Bytes([1, 2, 3])` from `I64(197_121)`, and a
+// zero-padded variable-length payload cannot tell `Bytes([1, 2])` from `Bytes([1, 2, 0])`,
+// so either layout would hand a program back a value it never stored.
+const SLOT_TAG_INT: u8 = 1;
+const SLOT_TAG_BOOL: u8 = 2;
+const SLOT_TAG_F64: u8 = 3;
+const SLOT_TAG_ADDR: u8 = 4;
+const SLOT_TAG_BYTES: u8 = 5;
+const SLOT_TAG_STRING: u8 = 6;
+
+/// Bytes of data a slot can carry: the 32-byte word minus the tag and length bytes.
+const SLOT_PAYLOAD_MAX: usize = 30;
+
+/// Read the slot number out of a slot operand.
+///
+/// Slots are addressed by a non-negative integer. A negative or non-integer operand is
+/// refused by name rather than coerced: `-1 as u64` would silently become slot
+/// 18446744073709551615, which is a different slot than the program asked for.
+fn slot_number(value: &Value) -> Result<u64, String> {
+    match value {
+        Value::I64(n) if *n >= 0 => Ok(*n as u64),
+        Value::I64(n) => Err(format!("negative slot {n}")),
+        other => Err(format!("non-integer slot {:?}", other)),
+    }
+}
+
+/// Encode a value into a 32-byte slot payload, refusing anything that does not fit.
+fn encode_slot_payload(value: &Value) -> Result<[u8; 32], String> {
+    let (tag, data): (u8, Vec<u8>) = match value {
+        Value::I64(n) => (SLOT_TAG_INT, n.to_le_bytes().to_vec()),
+        Value::Bool(b) => (SLOT_TAG_BOOL, vec![u8::from(*b)]),
+        Value::F64(f) => (SLOT_TAG_F64, f.to_bits().to_le_bytes().to_vec()),
+        Value::Addr(a) => (SLOT_TAG_ADDR, a.to_le_bytes().to_vec()),
+        Value::Bytes(bytes) => {
+            if bytes.len() > SLOT_PAYLOAD_MAX {
+                return Err(format!(
+                    "{} bytes of byte-string, slot holds {SLOT_PAYLOAD_MAX}",
+                    bytes.len()
+                ));
+            }
+            (SLOT_TAG_BYTES, bytes.clone())
+        }
+        Value::String(text) => {
+            let bytes = text.as_bytes();
+            if bytes.len() > SLOT_PAYLOAD_MAX {
+                return Err(format!(
+                    "{} bytes of string, slot holds {SLOT_PAYLOAD_MAX}",
+                    bytes.len()
+                ));
+            }
+            (SLOT_TAG_STRING, bytes.to_vec())
+        }
+        // Unlike `StoreGlobal`, which ignores a Unit write, a contract store of Unit is
+        // refused: ignoring it would report success for a write the program asked for and
+        // did not get. Deleting a slot is not spelled this way.
+        Value::Unit => return Err("unit is not a storable value".to_string()),
+    };
+    let mut out = [0u8; 32];
+    out[0] = tag;
+    out[1] = data.len() as u8;
+    out[2..2 + data.len()].copy_from_slice(&data);
+    Ok(out)
+}
+
+/// The payload bytes, which must be exactly `width` long for a fixed-width kind.
+fn fixed_width_payload(body: &[u8], width: usize) -> Result<&[u8], String> {
+    if body.len() == width {
+        Ok(body)
+    } else {
+        Err(format!(
+            "payload carries {} bytes where {width} are required",
+            body.len()
+        ))
+    }
+}
+
+/// Decode a slot payload back into the exact value that was stored.
+///
+/// An unknown tag is refused rather than guessed at: a payload that this ISA did not
+/// write is not evidence of anything. The dispatcher therefore fails closed on state
+/// written by a different (or corrupted) producer.
+fn decode_slot_payload(payload: &StorageValue) -> Result<Value, String> {
+    let len = payload[1] as usize;
+    if len > SLOT_PAYLOAD_MAX {
+        return Err(format!("payload length {len} exceeds {SLOT_PAYLOAD_MAX}"));
+    }
+    let body = &payload[2..2 + len];
+    match payload[0] {
+        SLOT_TAG_INT => Ok(Value::I64(i64::from_le_bytes(
+            fixed_width_payload(body, 8)?
+                .try_into()
+                .map_err(|_| "bad integer payload".to_string())?,
+        ))),
+        SLOT_TAG_BOOL => match fixed_width_payload(body, 1)?[0] {
+            0 => Ok(Value::Bool(false)),
+            1 => Ok(Value::Bool(true)),
+            other => Err(format!("boolean payload byte {other} is not 0 or 1")),
+        },
+        SLOT_TAG_F64 => Ok(Value::F64(f64::from_bits(u64::from_le_bytes(
+            fixed_width_payload(body, 8)?
+                .try_into()
+                .map_err(|_| "bad float payload".to_string())?,
+        )))),
+        SLOT_TAG_ADDR => Ok(Value::Addr(u64::from_le_bytes(
+            fixed_width_payload(body, 8)?
+                .try_into()
+                .map_err(|_| "bad address payload".to_string())?,
+        ))),
+        SLOT_TAG_BYTES => Ok(Value::Bytes(body.to_vec())),
+        SLOT_TAG_STRING => {
+            let text = String::from_utf8(body.to_vec())
+                .map_err(|e| format!("string payload is not UTF-8: {e}"))?;
+            Ok(Value::String(text))
+        }
+        tag => Err(format!("unknown slot payload tag {tag}")),
+    }
 }
 
 fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
@@ -2041,5 +2264,356 @@ mod tests {
             result.instruction_count >= 5,
             "at least 5 instructions executed"
         );
+    }
+
+    // ========================================================================
+    // Contract storage: `evm_sstore` / `evm_sload`
+    //
+    // Before these arms existed, both opcodes were declared in the ISA
+    // (`x3-backend/src/opcode.rs`), emitted by the backend
+    // (`emit_evm_sstore`/`emit_evm_sload`), decoded and gas-priced by the verifier
+    // (`verifier.rs`), and priced by this interpreter's table — and both reached the
+    // `_` arm and returned `UnimplementedOpcode`. A deployed X3VM program therefore
+    // could not carry a single value from one call to the next, and the atomic
+    // window's storage rollback (measured on 2026-09-26 to have dropped pre-window
+    // writes) could only be proven at the storage unit level, because nothing in the
+    // interpreter wrote a key.
+    // ========================================================================
+
+    /// Build a one-function X3BC module from a hand-assembled instruction stream.
+    ///
+    /// `BytecodeModule::to_bytes` writes the envelope and its checksum, so these
+    /// fixtures are as valid as compiled bytecode — the reader rejects a wrong
+    /// checksum (TICKET-108).
+    fn storage_module(code: Vec<u8>, param_count: u8, local_count: u16) -> Vec<u8> {
+        use x3_backend::bc_format::{BytecodeModule, FunctionEntry};
+
+        let mut module = BytecodeModule::new();
+        module.functions.push(FunctionEntry {
+            name: "main".to_string(),
+            entry_point: 0,
+            param_count,
+            local_count,
+            max_stack: 8,
+            return_type_tag: 1,
+        });
+        module.code = code;
+        module.to_bytes()
+    }
+
+    fn load_imm(dst: u8, value: i8) -> Vec<u8> {
+        vec![Opcode::LoadImm as u8, dst, value as u8]
+    }
+
+    fn sstore(slot_reg: u8, val_reg: u8) -> Vec<u8> {
+        vec![Opcode::EvmSstore as u8, slot_reg, val_reg]
+    }
+
+    fn sload(dst: u8, slot_reg: u8) -> Vec<u8> {
+        vec![Opcode::EvmSload as u8, dst, slot_reg]
+    }
+
+    fn ret(reg: u8) -> Vec<u8> {
+        vec![Opcode::Ret as u8, reg]
+    }
+
+    fn atomic(opcode: Opcode, id: u16) -> Vec<u8> {
+        let mut out = vec![opcode as u8];
+        out.extend_from_slice(&id.to_le_bytes());
+        out
+    }
+
+    /// `main(value: r0) { sstore(0, r0); r2 = sload(0); return r2; }`
+    fn store_then_load(value_operand: u8) -> Vec<u8> {
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 0)); // slot 0
+        code.extend(sstore(1, value_operand));
+        code.extend(sload(2, 1));
+        code.extend(ret(2));
+        code
+    }
+
+    #[test]
+    fn evm_store_and_load_round_trip_every_value_kind() {
+        let cases = [
+            Value::I64(0),
+            Value::I64(7),
+            Value::I64(-1),
+            Value::I64(i64::MIN),
+            Value::I64(i64::MAX),
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::F64(1.5),
+            Value::F64(-0.0),
+            Value::Bytes(vec![]),
+            Value::Bytes(vec![1, 2, 3]),
+            // Trailing zeros are the reason the slot layout carries a length: a
+            // zero-padded payload cannot tell these two apart.
+            Value::Bytes(vec![1, 2, 0]),
+            Value::Bytes(vec![0; 30]),
+            Value::String("x3".to_string()),
+            Value::Addr(9),
+        ];
+
+        for input in cases {
+            let bytes = storage_module(store_then_load(0), 1, 4);
+            let mut vm = VM::from_bytes(&bytes).expect("module should load");
+            let result = vm
+                .call_function(0, std::slice::from_ref(&input))
+                .unwrap_or_else(|e| panic!("store/load of {input:?} failed: {e:?}"));
+            assert_eq!(
+                result.value,
+                Some(input.clone()),
+                "slot did not round trip {input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn evm_load_of_an_unwritten_slot_reads_zero() {
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 42)); // never written
+        code.extend(sload(2, 1));
+        code.extend(ret(2));
+        let bytes = storage_module(code, 0, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+
+        let result = vm.call_function(0, &[]).expect("read should succeed");
+        assert_eq!(result.value, Some(Value::I64(0)));
+        assert!(
+            vm.storage.get(&evm_slot_key(42)).is_none(),
+            "a load must not create the slot it read"
+        );
+    }
+
+    #[test]
+    fn evm_store_refuses_a_negative_slot() {
+        let mut code = Vec::new();
+        code.extend(load_imm(1, -1));
+        code.extend(sstore(1, 0));
+        code.extend(ret(0));
+        let bytes = storage_module(code, 1, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+
+        let err = vm
+            .call_function(0, &[Value::I64(7)])
+            .expect_err("a negative slot must be refused");
+        assert!(
+            matches!(err.kind, VMErrorKind::InvalidStorageSlot(_)),
+            "expected InvalidStorageSlot, got {:?}",
+            err.kind
+        );
+        assert_eq!(vm.storage.len(), 0, "a refused store writes nothing");
+    }
+
+    #[test]
+    fn evm_store_refuses_a_non_integer_slot() {
+        let mut code = Vec::new();
+        code.extend(sstore(0, 0)); // r0 is both slot and value
+        code.extend(ret(0));
+        let bytes = storage_module(code, 1, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+
+        let err = vm
+            .call_function(0, &[Value::Bytes(vec![1])])
+            .expect_err("a byte-string slot must be refused");
+        assert!(
+            matches!(err.kind, VMErrorKind::InvalidStorageSlot(_)),
+            "expected InvalidStorageSlot, got {:?}",
+            err.kind
+        );
+    }
+
+    #[test]
+    fn evm_store_refuses_a_payload_that_does_not_fit_a_slot() {
+        let bytes = storage_module(store_then_load(0), 1, 4);
+
+        // 30 payload bytes fit; 31 do not, and must be refused rather than
+        // truncated to something the program never asked to store.
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        vm.call_function(0, &[Value::Bytes(vec![7; 30])])
+            .expect("30 payload bytes fit a slot");
+
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        let err = vm
+            .call_function(0, &[Value::Bytes(vec![7; 31])])
+            .expect_err("31 payload bytes must be refused");
+        assert!(
+            matches!(err.kind, VMErrorKind::UnencodableStorageValue(_)),
+            "expected UnencodableStorageValue, got {:?}",
+            err.kind
+        );
+        assert_eq!(vm.storage.len(), 0, "a refused store writes nothing");
+    }
+
+    #[test]
+    fn evm_store_refuses_unit() {
+        let bytes = storage_module(store_then_load(0), 1, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+
+        let err = vm
+            .call_function(0, &[Value::Unit])
+            .expect_err("unit is not a storable value");
+        assert!(
+            matches!(err.kind, VMErrorKind::UnencodableStorageValue(_)),
+            "expected UnencodableStorageValue, got {:?}",
+            err.kind
+        );
+    }
+
+    #[test]
+    fn evm_load_fails_closed_on_a_payload_this_isa_did_not_write() {
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 0));
+        code.extend(sload(2, 1));
+        code.extend(ret(2));
+        let bytes = storage_module(code, 0, 4);
+
+        // Unknown tag.
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        vm.storage
+            .set(evm_slot_key(0), Some([0xFF; 32]))
+            .expect("raw write");
+        let err = vm
+            .call_function(0, &[])
+            .expect_err("an unknown payload tag must fail closed");
+        assert!(
+            matches!(err.kind, VMErrorKind::CorruptStorageSlot(_)),
+            "expected CorruptStorageSlot, got {:?}",
+            err.kind
+        );
+
+        // Known tag, wrong width for that tag (integer carrying 3 bytes).
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        let mut payload = [0u8; 32];
+        payload[0] = 1; // integer tag
+        payload[1] = 3; // ...but only three payload bytes
+        vm.storage
+            .set(evm_slot_key(0), Some(payload))
+            .expect("raw write");
+        let err = vm
+            .call_function(0, &[])
+            .expect_err("a payload shorter than its kind must fail closed");
+        assert!(
+            matches!(err.kind, VMErrorKind::CorruptStorageSlot(_)),
+            "expected CorruptStorageSlot, got {:?}",
+            err.kind
+        );
+    }
+
+    #[test]
+    fn evm_store_inside_a_rolled_back_window_is_abandoned() {
+        // sstore(0, r0=7); atomic begin; sstore(0, r1=9); rollback
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 0)); // slot 0
+        code.extend(sstore(1, 0)); // 7 outside the window
+        code.extend(atomic(Opcode::AtomicBegin, 0));
+        code.extend(load_imm(2, 9));
+        code.extend(sstore(1, 2)); // 9 inside the window
+        code.extend(atomic(Opcode::AtomicRollback, 0));
+        code.extend(ret(0));
+        let bytes = storage_module(code, 1, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+
+        let err = vm
+            .call_function(0, &[Value::I64(7)])
+            .expect_err("the rollback aborts the call");
+        assert!(matches!(err.kind, VMErrorKind::AtomicAborted));
+
+        let stored = vm
+            .storage
+            .get(&evm_slot_key(0))
+            .expect("the pre-window write must survive the rollback");
+        assert_eq!(
+            decode_slot_payload(stored).expect("decodable"),
+            Value::I64(7),
+            "the window's write must be abandoned and the earlier one kept"
+        );
+
+        // The journal is the write delta for cross-VM sync: the abandoned write
+        // must not appear in it, and the surviving one must.
+        let journal = vm.drain_storage_journal();
+        assert_eq!(
+            journal.len(),
+            1,
+            "the rolled-back write must not be part of the delta"
+        );
+        assert_eq!(journal[0].key, evm_slot_key(0));
+        assert_eq!(
+            journal[0].new_value,
+            Some(encode_slot_payload(&Value::I64(7)).unwrap())
+        );
+    }
+
+    #[test]
+    fn evm_store_journals_the_write_for_cross_vm_sync() {
+        let bytes = storage_module(store_then_load(0), 1, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        vm.call_function(0, &[Value::I64(7)])
+            .expect("store and load");
+
+        let journal = vm.drain_storage_journal();
+        assert_eq!(journal.len(), 1, "one store, one journal record");
+        assert_eq!(journal[0].key, evm_slot_key(0));
+        assert_eq!(journal[0].old_value, None);
+        assert_eq!(
+            journal[0].new_value,
+            Some(encode_slot_payload(&Value::I64(7)).unwrap())
+        );
+        assert!(
+            vm.drain_storage_journal().is_empty(),
+            "draining the journal empties it"
+        );
+    }
+
+    #[test]
+    fn evm_storage_is_charged_the_verifier_table_cost() {
+        // LoadImm(1) + LoadImm(1) + EvmSstore(5000) + Ret(2)
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 0));
+        code.extend(load_imm(2, 7));
+        code.extend(sstore(1, 2));
+        code.extend(ret(2));
+        let bytes = storage_module(code, 0, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        let result = vm.call_function(0, &[]).expect("store");
+        assert_eq!(result.gas_used, 5004, "a store costs the verifier's 5000");
+
+        // LoadImm(1) + EvmSload(200) + Ret(2)
+        let mut code = Vec::new();
+        code.extend(load_imm(1, 0));
+        code.extend(sload(2, 1));
+        code.extend(ret(2));
+        let bytes = storage_module(code, 0, 4);
+        let mut vm = VM::from_bytes(&bytes).expect("module should load");
+        let result = vm.call_function(0, &[]).expect("load");
+        assert_eq!(result.gas_used, 203, "a load costs the verifier's 200");
+    }
+
+    #[test]
+    fn evm_slot_keys_are_disjoint_from_global_keys() {
+        // A global index is read as a `u32` (`LoadGlobal`/`StoreGlobal`), so the
+        // largest key the global keyspace can name has this in its first eight bytes;
+        // the slot tag is larger, which is what makes the two keyspaces disjoint.
+        assert_ne!(
+            u32::MAX as u64,
+            EVM_SLOT_DOMAIN,
+            "no addressable global may produce a slot-domain key"
+        );
+
+        for slot in [0u64, 1, 255, 65_535, u32::MAX as u64, u64::MAX] {
+            for global in [0usize, 1, 255, u32::MAX as usize] {
+                assert_ne!(
+                    evm_slot_key(slot),
+                    storage_key_for_global(global),
+                    "slot {slot} collides with global {global}"
+                );
+            }
+        }
+
+        // Distinct slots are distinct keys, and slot 0 is not the all-zero key a
+        // default-initialised map would hand back.
+        assert_ne!(evm_slot_key(0), evm_slot_key(1));
+        assert_ne!(evm_slot_key(0), [0u8; 32]);
     }
 }

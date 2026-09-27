@@ -1,0 +1,38 @@
+# btc-header-source live drill — 2026-09-27T13:22:29Z
+$ bash scripts/testnet/btc-header-source-drill.sh
+
+[btc-source-drill] https://blockstream.info/testnet/api unusable: source unreachable: GET https://blockstream.info/testnet/api/blocks/tip/height: HTTP Error 429: Too Many Requests
+[btc-source-drill] endpoint https://mempool.space/testnet/api
+[btc-source-drill] tip height 5151296
+[btc-source-drill] verifying 6 headers from 5151284 (anchor 5151283)
+    anchor 5151283 0000000000e2ff61dc4b66424ae6ab22c043710e9230ef8a0ca5bdda4fe41b34 (checkpoint this run must link to)
+    height 5151284 0000000000322d6fdb54c3c7b58bc33379b85ae100f2a5cc198bc2712a231b87 prev→5151283 link-ok
+  PASS  height 5151284 links to 5151283
+    height 5151285 000000000000106894f22eb2769d6ccb15d26b3aee87470ec22fbd6d7867e7c7 prev→5151284 link-ok
+  PASS  height 5151285 links to 5151284
+    height 5151286 0000000000757fa9869afe28a81dc4df3f4efbe6598aba7167176928c6f3afcb prev→5151285 link-ok
+  PASS  height 5151286 links to 5151285
+    height 5151287 000000000014fbbf49f16846eef5e3559a29c386c161bcca7be0aa8dff0138c4 prev→5151286 link-ok
+  PASS  height 5151287 links to 5151286
+    height 5151288 0000000000b01b2d99a5a867d6ee2fc5306330e001d63cd1610cf261f119d263 prev→5151287 link-ok
+  PASS  height 5151288 links to 5151287
+    height 5151289 0000000000b96446a2a6a1a60faf3b0ad6a9c67391e4de8b27482239a2af5278 prev→5151288 link-ok
+  PASS  height 5151289 links to 5151288
+  PASS  the fetcher emitted a payload
+  PASS  payload is compact(len) + 88*count bytes
+  PASS  payload header 0 carries height 5151284
+  PASS  payload header 1 carries height 5151285
+  PASS  payload header 2 carries height 5151286
+  PASS  payload header 3 carries height 5151287
+  PASS  payload header 4 carries height 5151288
+  PASS  payload header 5 carries height 5151289
+  PASS  call_data is call index 35 plus the same Vec
+    payload 6 headers, tip 5151289 0000000000b96446a2a6a1a60faf3b0ad6a9c67391e4de8b27482239a2af5278, 529 bytes
+  PASS  no source named is refused (the relayer is off by default)
+  PASS  gap at height 5151286 is refused non-zero and names it
+    gap     → REFUSED: height 5151286: prev_blockhash 000000000014fbbf49f16846eef5e3559a29c386c161bcca7be0aa8dff0138c4 is not the hash 000000000000106894f22eb2769d6ccb15d26b3aee87470ec22fbd6d7867e7c7 of height 5151285 — the run is not linked (gap or reorg)
+  PASS  a source disagreeing with itself at height 5151286 is refused and names it
+    disagree→ REFUSED: height 5151286: the source said 0000000000757fa9869afe28a81dc4df3f4efbe6598aba7167176928c6f3afcb but the 80 header bytes it returned hash to a956300863d36dfc3ce6e26395833be3878c8cb7444a0c0cbc93113def5111c1 — the source disagrees with itself
+  PASS  a refused run emits no payload
+[btc-source-drill] PASS — the relayer followed a real public chain and refused a lie
+DRILL_EXIT=0

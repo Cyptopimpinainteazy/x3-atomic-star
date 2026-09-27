@@ -133,7 +133,7 @@ This checklist must be completed and signed-off **before** any deployment action
   
 - [ ] **Staging metrics are healthy** - No performance degradation
   - Expected: CPU <60%, Memory <50%, Network <70%
-  - Database queries: <100ms p99
+  - Database queries: <100ms p99 (acceptance threshold)
   
 - [ ] **Staging logs show no errors** - Systemwide error monitoring
   - Command: `kubectl logs -n staging --all-containers --since=1h | grep -i error`

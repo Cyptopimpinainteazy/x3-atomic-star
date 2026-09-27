@@ -2,6 +2,7 @@
 //!
 //! Complete pipeline: Source → Lexer → Parser → HIR → MIR → Optimizer → Bytecode
 
+use x3_backend::bc_format::FeatureFlags;
 use x3_backend::BytecodeModule;
 use x3_hir::{HirLowerer, HirModule};
 use x3_mir::{MirLowerer, MirModule};
@@ -182,9 +183,10 @@ impl Compiler {
         if options.verbose {
             eprintln!("  [6/6] Generating bytecode...");
         }
-        let bytecode =
+        let mut bytecode =
             x3_backend::MirBytecodeCompiler::compile_with_options(&mir_optimized, options.debug)
                 .map_err(|e| CompilerError::Backend(format!("{:?}", e)))?;
+        Self::record_compiled_capabilities(&mut bytecode, &options);
 
         if options.verbose {
             eprintln!("  ✓ Compilation complete");
@@ -250,11 +252,32 @@ impl Compiler {
         let (optimized_mir, _stats) = Self::optimize_mir(mir, &options)?;
 
         // Emit optimized bytecode
-        let bytecode =
+        let mut bytecode =
             x3_backend::MirBytecodeCompiler::compile_with_options(&optimized_mir, options.debug)
                 .map_err(|e| CompilerError::Backend(format!("{:?}", e)))?;
+        Self::record_compiled_capabilities(&mut bytecode, &options);
 
         Ok(bytecode)
+    }
+
+    /// Record the capabilities the compiled policy demands into the module's feature word.
+    ///
+    /// The pipeline above compiles *what the program does*; this records *what the program
+    /// requires* to be allowed to run at all. Keeping it separate matters: an artifact that states
+    /// a demand is only worth anything if the loader that reads the header refuses when the chain
+    /// cannot meet it, which is the runtime's half of the contract
+    /// (`x3-integration::mini_x3` on a block, `x3-vm` off it) and `pallet-x3-kernel`'s at intake.
+    ///
+    /// `features.set` is used rather than `set_features` on purpose: the latter recomputes
+    /// `min_version` from the flag word, and this demand is not a format change — raising the
+    /// required version would make the module unreadable by the very loader that is supposed to
+    /// interpret the demand.
+    fn record_compiled_capabilities(bytecode: &mut BytecodeModule, options: &CompilationOptions) {
+        if options.require_private_submission {
+            bytecode
+                .features
+                .set(FeatureFlags::PRIVATE_SUBMISSION_REQUIRED);
+        }
     }
 
     /// Analyze contract for gas costs and safety

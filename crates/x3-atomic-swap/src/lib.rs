@@ -85,6 +85,12 @@ pub mod evm_live;
 pub use evm_live::LiveEvmExecutor;
 
 #[cfg(feature = "std")]
+pub mod finality_producer;
+
+#[cfg(feature = "std")]
+pub use finality_producer::{EvmChainReader, EvmFinalityProducer, FileFinalityTipStore};
+
+#[cfg(feature = "std")]
 pub mod btc_live;
 
 #[cfg(feature = "std")]
@@ -148,7 +154,10 @@ pub use event_watcher::{
 pub use evm_htlc::{
     EvmAdapter, EvmClaimedEvent, EvmHtlcAdapter, EvmHtlcContract, EvmLockedEvent, EvmRefundedEvent,
 };
-pub use finality::{FinalityCheckData, FinalityConfig, FinalityOracle, InMemoryFinalityOracle};
+pub use finality::{
+    is_confirmation_based, FinalityCertificate, FinalityConfig, FinalityOracle,
+    InMemoryFinalityOracle, DEFAULT_CERTIFICATE_STALENESS_BLOCKS,
+};
 pub use fuel_htlc::{FuelHtlcAdapter, FuelNetwork, FuelPredicate, StatefulFuelAdapter};
 pub use intent::{
     AtomicIntent, AtomicIntentBuilder, AtomicSwapStatus, ChainKind, FinalityLevel,
@@ -173,7 +182,9 @@ pub use rpc_client::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcClient, R
 pub use rpc_quorum::{
     ConsensusResult, ConsolidatedQuorum, RpcProvider, RpcQuorumOracle, RpcVote, SimpleRpcQuorum,
 };
-pub use scoreboard::{AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SwapScoreboard};
+pub use scoreboard::{
+    AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SettlementScope, SwapScoreboard,
+};
 pub use secret_release::{
     SecretReleaseEvidence, SecretReleaseFirewall, SecretReleasePermit, SecretReleaseRequirement,
 };

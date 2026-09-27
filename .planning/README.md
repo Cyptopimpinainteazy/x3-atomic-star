@@ -309,7 +309,7 @@ Before Sprint 0 begins (by Apr 28), verify:
 | **Sprint 5 Complete** | Aug 1 | 6-chain gateway with witness quorum |
 | **Sprint 6 Complete** | Aug 15 | Oracle, VRF, automation, keepers integrated |
 | **Sprint 7 Complete** | Sep 5 | Parallel executor proven equivalent to serial |
-| **Testnet Live** | Sep 15 | Public testnet running 100+ nodes, 1000 TPS |
+| **Testnet (target)** | Sep 15 | Public testnet at 100+ nodes / 1,000 TPS — a target; nothing is deployed (see TESTNET_GAP_LEDGER.md) |
 
 ---
 
@@ -358,7 +358,7 @@ These documents are **living**. Update them when:
 
 **Investment:** ~23,000 LOC, ~50 developer-weeks effort
 
-**Outcome:** Production-grade testnet for 100+ nodes, 1,000 TPS capability
+**Outcome (target, not measured):** Production-grade testnet for 100+ nodes, 1,000 TPS capability
 
 **Go/No-go Decision:** Ready to proceed ✅
 

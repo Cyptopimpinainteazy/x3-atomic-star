@@ -30,6 +30,122 @@
 use sp_std::vec;
 use sp_std::vec::Vec;
 
+use sp_std::collections::btree_map::BTreeMap;
+
+use crate::types::X3StorageWrite;
+
+// ---------------------------------------------------------------------------
+// Contract slot storage
+// ---------------------------------------------------------------------------
+
+/// Domain tag that keeps the storage-slot keyspace disjoint from the global keyspace.
+///
+/// `LoadGlobal`/`StoreGlobal` read their index as a `u32`, so the largest key they can name is
+/// `u32::MAX`. This tag is larger, which is what makes the two keyspaces provably disjoint. The
+/// value is the same one `crates/x3-vm/src/vm.rs` uses, so both interpreters name the same slot for
+/// the same index; `tests/interpreter_agreement.rs` holds them to it.
+const EVM_SLOT_DOMAIN: u64 = 0x5833_4556_4D5F_534C; // "X3EVM_SL" little-endian
+
+/// Bytes of data a slot can carry: the 32-byte word minus the tag and length bytes.
+const SLOT_PAYLOAD_MAX: usize = 30;
+
+/// Slot payload tags, matching `crates/x3-vm/src/vm.rs`.
+///
+/// A tag is what makes a store/load round trip exact. Without it a payload cannot tell
+/// `Bytes([1, 2])` from `Bytes([1, 2, 0])`, or either from `I64(197_121)`.
+const SLOT_TAG_INT: u8 = 1;
+const SLOT_TAG_BOOL: u8 = 2;
+const SLOT_TAG_F64: u8 = 3;
+const SLOT_TAG_BYTES: u8 = 5;
+
+fn evm_slot_key(slot: u64) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&EVM_SLOT_DOMAIN.to_le_bytes());
+    key[8..16].copy_from_slice(&slot.to_le_bytes());
+    key
+}
+
+/// A slot index is a non-negative integer. Refusing anything else by name keeps a negative or
+/// fractional "slot" from being reinterpreted as some other key.
+fn slot_number(value: &MiniValue) -> X3Result<u64> {
+    match value {
+        MiniValue::I64(n) if *n >= 0 => Ok(*n as u64),
+        MiniValue::I64(_) => Err(X3Error::InvalidStorageSlot("negative slot index")),
+        _ => Err(X3Error::InvalidStorageSlot("slot index is not an integer")),
+    }
+}
+
+/// Encode a value into a 32-byte slot payload, refusing anything that does not fit.
+///
+/// `crates/x3-vm` records why this is a refusal and not a truncation: a byte-string longer than the
+/// slot is a value the program asked to persist and cannot, so reporting success would persist
+/// something else. `Unit` is refused for the same reason (`StoreGlobal` ignores it, which is a
+/// different, also-wrong behaviour).
+fn encode_slot_payload(value: &MiniValue) -> X3Result<[u8; 32]> {
+    let (tag, data): (u8, Vec<u8>) = match value {
+        MiniValue::I64(n) => (SLOT_TAG_INT, n.to_le_bytes().to_vec()),
+        MiniValue::Bool(b) => (SLOT_TAG_BOOL, vec![u8::from(*b)]),
+        MiniValue::F64(f) => (SLOT_TAG_F64, f.to_bits().to_le_bytes().to_vec()),
+        MiniValue::Bytes(bytes) => {
+            if bytes.len() > SLOT_PAYLOAD_MAX {
+                return Err(X3Error::UnencodableStorageValue(
+                    "byte-string is longer than a slot holds",
+                ));
+            }
+            (SLOT_TAG_BYTES, bytes.clone())
+        }
+        MiniValue::Unit => {
+            return Err(X3Error::UnencodableStorageValue(
+                "unit is not a storable value",
+            ))
+        }
+    };
+    let mut out = [0u8; 32];
+    out[0] = tag;
+    out[1] = data.len() as u8;
+    out[2..2 + data.len()].copy_from_slice(&data);
+    Ok(out)
+}
+
+/// Decode a slot payload back into the exact value that was stored.
+///
+/// An unknown tag, a length past the slot's capacity or a fixed-width kind with the wrong width is
+/// refused rather than guessed at: a payload this ISA did not write is not evidence of anything, so
+/// the read fails closed instead of handing the program a fabricated value.
+fn decode_slot_payload(payload: &[u8; 32]) -> X3Result<MiniValue> {
+    let len = payload[1] as usize;
+    if len > SLOT_PAYLOAD_MAX {
+        return Err(X3Error::CorruptStorageSlot);
+    }
+    let body = &payload[2..2 + len];
+    let width = |w: usize| -> X3Result<&[u8]> {
+        if body.len() == w {
+            Ok(body)
+        } else {
+            Err(X3Error::CorruptStorageSlot)
+        }
+    };
+    match payload[0] {
+        SLOT_TAG_INT => {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(width(8)?);
+            Ok(MiniValue::I64(i64::from_le_bytes(bytes)))
+        }
+        SLOT_TAG_BOOL => match width(1)?[0] {
+            0 => Ok(MiniValue::Bool(false)),
+            1 => Ok(MiniValue::Bool(true)),
+            _ => Err(X3Error::CorruptStorageSlot),
+        },
+        SLOT_TAG_F64 => {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(width(8)?);
+            Ok(MiniValue::F64(f64::from_bits(u64::from_le_bytes(bytes))))
+        }
+        SLOT_TAG_BYTES => Ok(MiniValue::Bytes(body.to_vec())),
+        _ => Err(X3Error::CorruptStorageSlot),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------------
@@ -49,6 +165,32 @@ pub enum X3Error {
     /// malformed rather than truncated, and the module must not be executed.
     InvalidConstTag(u8),
     InvalidOpcode(u8),
+    /// A defined opcode that this interpreter has no implementation for.
+    ///
+    /// The distinction from [`X3Error::InvalidOpcode`] is the point: `InvalidOpcode` means the byte
+    /// is not an opcode at all, while this means the byte *is* one — the parser, the verifier and
+    /// the compiler all agree on its encoding — and the runtime still cannot execute it. Refusing
+    /// by name is the only honest answer; answering a placeholder would put a fabricated value into
+    /// consensus state. The `std` VM refuses the same bytes with
+    /// `x3_vm::VMErrorKind::UnimplementedOpcode` (`crates/x3-vm/src/vm.rs`).
+    UnsupportedOpcode(u8),
+    /// `AtomicCommit` with no window open.
+    AtomicEndWithoutBegin,
+    /// `AtomicRollback` with no window open.
+    AtomicRollbackWithoutBegin,
+    /// An atomic window rolled back: the window's writes are undone and the execution stops, which
+    /// is what `crates/x3-vm` does (`VMErrorKind::AtomicAborted`).
+    AtomicAborted,
+    /// More atomic windows were opened than [`MAX_ATOMIC_DEPTH`] allows. Each open window holds a
+    /// copy of the module's globals, so an unbounded nesting in a loop is a memory amplification a
+    /// hostile program could ask for; the limit refuses it instead.
+    AtomicDepthExceeded,
+    /// `evm_sstore`/`evm_sload` with a slot register that does not hold a non-negative integer.
+    InvalidStorageSlot(&'static str),
+    /// A value that cannot be carried by a 32-byte slot, refused rather than truncated.
+    UnencodableStorageValue(&'static str),
+    /// A slot payload whose tag, length or width this ISA did not write, so it carries no value.
+    CorruptStorageSlot,
     DivisionByZero,
     GasExhausted,
     StackOverflow,
@@ -60,17 +202,19 @@ pub enum X3Error {
     RegisterOutOfBounds,
     /// A call passed a different number of arguments than the callee declares parameters.
     ArgumentCountMismatch,
-    /// An opcode this engine has no implementation for (it is refused, never approximated).
-    UnimplementedOpcode(u8),
-    /// An atomic commit or rollback with no atomic block open.
-    AtomicEndWithoutBegin,
-    /// The program rolled back an atomic block, which aborts the execution.
-    AtomicAborted,
     /// The module is well-formed but not admissible on chain (see `validate_x3bc`).
     ForbiddenOnChain(u8),
     /// A jump or call target, or a function entry, that is not the start of an instruction.
     InvalidJumpTarget(u32),
     UserPanic,
+    /// The artifact's compiled policy requires private submission and this execution context has no
+    /// private channel to offer it.
+    ///
+    /// Refused rather than run: the alternative is executing a program that asked not to be public
+    /// in the clear, which is the one direction a compiled privacy policy must never take. It is the
+    /// engine's own copy of the check `pallet-x3-kernel` performs at intake, so an artifact that
+    /// reaches this interpreter by any route is still refused.
+    PrivateSubmissionRequired,
 }
 
 pub type X3Result<T> = Result<T, X3Error>;
@@ -154,6 +298,12 @@ struct MiniModule {
     functions: Vec<MiniFunc>,
     globals: Vec<MiniGlobal>,
     code: Vec<u8>,
+    /// The compiled policy's demands, read from the header rather than skipped.
+    ///
+    /// This field is here because the reader used to read the feature word and *discard* it
+    /// (`let _features = ...`), which made the artifact's policy a value nobody in the runtime
+    /// consulted. A demand the engine cannot see is a demand the engine cannot honour.
+    requires_private_submission: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +416,9 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
     let _flags = r.read_u32()?;
     let checksum = r.read_u32()?;
     let min_version = r.read_u32()?;
-    let _features = r.read_u32()?;
+    let features = r.read_u32()?;
+    let requires_private_submission =
+        features & x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED != 0;
 
     if !x3_common::bytecode::version_is_readable(version) {
         return Err(X3Error::UnsupportedVersion(version));
@@ -380,6 +532,7 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
         functions,
         globals,
         code,
+        requires_private_submission,
     })
 }
 
@@ -442,6 +595,13 @@ pub struct X3ExecResult {
     /// plausible while reporting a gas figure under an instruction name; the two are counted
     /// separately now (TICKET-130).
     pub instructions_executed: u64,
+    /// Slot writes the execution left behind, in order.
+    ///
+    /// A write abandoned by a rolled-back atomic window is not here at all, and a failed execution
+    /// returns `Err` rather than a partial journal, so every entry is a write that survived. Slot
+    /// keys are the 32-byte EVM-domain keys (`evm_slot_key`), disjoint from the global keyspace, so
+    /// the kernel can apply them to its contract-storage map instead of the balance ledger.
+    pub storage_writes: Vec<X3StorageWrite>,
 }
 
 // ---------------------------------------------------------------------------
@@ -462,14 +622,41 @@ struct CallFrame {
 const MAX_REGS: usize = 256;
 const MAX_DEPTH: usize = 64;
 
+/// Deepest nesting of atomic windows the runtime interpreter will track.
+///
+/// Every open window holds a copy of the module's globals, so this bounds the memory a program can
+/// make the interpreter hold on the chain's behalf.
+const MAX_ATOMIC_DEPTH: usize = 32;
+
+/// One open atomic window: what it has to undo if it rolls back.
+struct AtomicFrame {
+    /// The module's globals when the window opened.
+    globals: Vec<MiniValue>,
+    /// Index into `writes` of this window's first write.
+    first_write: usize,
+    /// Index into `undo_log` of this window's first undo entry.
+    first_undo: usize,
+}
+
 struct Vm<'m> {
     module: &'m MiniModule,
     regs: Vec<MiniValue>,
     call_stack: Vec<CallFrame>,
     globals: Vec<MiniValue>,
+    /// This execution's view of the contract slots, keyed by the same 32-byte key `crates/x3-vm`
+    /// uses. It starts as the chain's `X3ContractStorage` ([`execute_x3bc_with_slots`] seeds it),
+    /// so a slot a *previous* comit wrote reads back as that value rather than EVM's zero, and an
+    /// entry's `old_value` is the value the execution started from. Seeded entries are not
+    /// journaled: they are the state this execution inherited, not a change it made.
+    slots: BTreeMap<[u8; 32], [u8; 32]>,
+    /// Every slot write this execution has made, in order.
+    writes: Vec<X3StorageWrite>,
+    /// `(key, previous)` for every write, so a rolled-back window is undone in reverse without
+    /// copying the whole slot map for each window.
+    undo_log: Vec<([u8; 32], Option<[u8; 32]>)>,
+    /// Open atomic windows, innermost last.
+    atomic_frames: Vec<AtomicFrame>,
     gas_used: u64,
-    /// Open atomic blocks.
-    atomic_depth: u32,
     /// Instructions executed, counted next to gas rather than inferred from it.
     instructions_executed: u64,
     gas_limit: u64,
@@ -500,10 +687,27 @@ impl<'m> Vm<'m> {
             regs: vec![MiniValue::Unit; MAX_REGS],
             call_stack: Vec::with_capacity(MAX_DEPTH),
             globals,
+            slots: BTreeMap::new(),
+            writes: Vec::new(),
+            undo_log: Vec::new(),
+            atomic_frames: Vec::new(),
             gas_used: 0,
-            atomic_depth: 0,
             instructions_executed: 0,
             gas_limit,
+        }
+    }
+
+    /// Load the chain's contract slots into this execution's view.
+    ///
+    /// Deliberately not a write: nothing is appended to `writes` or `undo_log`, so a receipt never
+    /// reports the chain's own state as a change this program made, and an atomic window that rolls
+    /// back restores the seeded value rather than deleting the slot. A payload the chain holds that
+    /// this ISA did not write is *not* rejected here — it is rejected when a program reads it
+    /// (`CorruptStorageSlot`), so an execution that never touches a corrupt slot still succeeds
+    /// while an execution that reads one fails closed.
+    fn seed_slots(&mut self, seeds: &[([u8; 32], [u8; 32])]) {
+        for (key, payload) in seeds {
+            self.slots.insert(*key, *payload);
         }
     }
 
@@ -1133,6 +1337,187 @@ impl<'m> Vm<'m> {
                 Ok(Step::Continue(ip + 3))
             }
 
+            // -------- Type Conversions --------
+            0x60 | 0x61 => {
+                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
+                let v = self.regs[reg!(s)].as_i64()?;
+                self.regs[reg!(d)] = MiniValue::I64(v);
+                Ok(Step::Continue(ip + 3))
+            }
+            0x62 | 0x63 => {
+                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
+                let v = self.regs[reg!(s)].as_f64()?;
+                self.regs[reg!(d)] = MiniValue::F64(v);
+                Ok(Step::Continue(ip + 3))
+            }
+            0x64 | 0x65 => {
+                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
+                let v = self.regs[reg!(s)].as_f64()? as i64;
+                self.regs[reg!(d)] = MiniValue::I64(v);
+                Ok(Step::Continue(ip + 3))
+            }
+            0x66 | 0x67 => {
+                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
+                let v = self.regs[reg!(s)].as_f64()?;
+                self.regs[reg!(d)] = MiniValue::F64(v);
+                Ok(Step::Continue(ip + 3))
+            }
+            0x68 => {
+                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
+                let v = self.regs[reg!(s)].as_bool()?;
+                self.regs[reg!(d)] = MiniValue::Bool(v);
+                Ok(Step::Continue(ip + 3))
+            }
+
+            // -------- Aggregates: refused --------
+            //
+            // `LoadIndex`/`StoreIndex`/`LoadField`/`StoreField` and the array/tuple opcodes used to
+            // answer `I64(0)`/`Unit` and skip their operands. That is a fabricated value in
+            // consensus state: a program reading `array[0]` got `0`, one storing into an array
+            // changed nothing and reported success, and `ArrayLen` answered `0` for any array. The
+            // interpreter has no aggregate representation, so the only honest answer is a refusal
+            // that names the opcode.
+            0x14 | 0x15 | 0x16 | 0x17 | 0x70..=0x75 => Err(X3Error::UnsupportedOpcode(op)),
+
+            // -------- Context reads --------
+            // `ctx_gas` is real — the interpreter knows its own budget. The rest have no source of
+            // truth in the runtime: nothing hands `mini_x3` a sender, a block height, a timestamp,
+            // a value or the chain id, so answering one invents it. `0x85` used to answer a
+            // hard-coded `3375`, which is a magic constant pretending to be chain identity.
+            0x84 => {
+                let d = self.r8(ip + 1)? as usize;
+                set!(
+                    d,
+                    MiniValue::I64(self.gas_limit as i64 - self.gas_used as i64)
+                );
+                Ok(Step::Continue(ip + 2))
+            } // ctx_gas
+            0x80..=0x83 | 0x85 => Err(X3Error::UnsupportedOpcode(op)),
+
+            // -------- Atomic windows --------
+            //
+            // These were skipped while claiming to be tracked, so an atomic block that failed still
+            // committed whatever it had written. The only state this interpreter can revert is the
+            // module's globals, and it now does exactly that, mirroring `crates/x3-vm/src/vm.rs`:
+            // begin snapshots, commit discards, rollback restores and aborts the execution.
+            0x90 => {
+                self.r16(ip + 1)?; // the window id, validated like the `std` VM validates it
+                if self.atomic_frames.len() >= MAX_ATOMIC_DEPTH {
+                    return Err(X3Error::AtomicDepthExceeded);
+                }
+                let frame = AtomicFrame {
+                    globals: self.globals.clone(),
+                    first_write: self.writes.len(),
+                    first_undo: self.undo_log.len(),
+                };
+                self.atomic_frames.push(frame);
+                Ok(Step::Continue(ip + 3))
+            }
+            0x91 => {
+                self.r16(ip + 1)?;
+                if self.atomic_frames.pop().is_none() {
+                    return Err(X3Error::AtomicEndWithoutBegin);
+                }
+                Ok(Step::Continue(ip + 3))
+            }
+            0x92 => {
+                self.r16(ip + 1)?;
+                let frame = match self.atomic_frames.pop() {
+                    Some(frame) => frame,
+                    None => return Err(X3Error::AtomicRollbackWithoutBegin),
+                };
+                // A write the window rolled back must never reach the journal a receipt is built
+                // from, so the slots it touched are restored in reverse order and the entries it
+                // added are dropped. Undoing and forgetting are one step on purpose: a caller that
+                // only reset the map would still report the writes.
+                while self.undo_log.len() > frame.first_undo {
+                    if let Some((key, previous)) = self.undo_log.pop() {
+                        match previous {
+                            Some(value) => {
+                                self.slots.insert(key, value);
+                            }
+                            None => {
+                                self.slots.remove(&key);
+                            }
+                        }
+                    }
+                }
+                self.writes.truncate(frame.first_write);
+                self.globals = frame.globals;
+                Err(X3Error::AtomicAborted)
+            }
+            0x93 => {
+                let d = self.r8(ip + 1)? as usize;
+                set!(d, MiniValue::Bool(!self.atomic_frames.is_empty()));
+                Ok(Step::Continue(ip + 2))
+            }
+
+            // -------- Agents and events: refused --------
+            // There is no agent registry in the runtime interpreter, and no event sink: `0xA0` used
+            // to answer `Unit` (an invented identity) and `0xA2` dropped the event while reporting
+            // success. A dropped event is lost evidence, so it is refused instead.
+            0xA0..=0xA2 => Err(X3Error::UnsupportedOpcode(op)),
+
+            // -------- Contract slot storage --------
+            //
+            // `evm_sstore` / `evm_sload` are the only way an `.x3` program carries a value from one
+            // execution to the next, and this interpreter used to refuse both — so no program
+            // running on a block could change chain state at all, and the kernel's storage-write
+            // channel had no producer on the canonical path. They are implemented here against the
+            // same key derivation and the same tagged payload layout `crates/x3-vm` uses, so a slot
+            // written off chain and one written on chain name the same 32 bytes.
+
+            // EvmSstore: [op][slot_reg:u8][value_reg:u8]
+            0xB4 => {
+                let slot_reg = self.r8(ip + 1)? as usize;
+                let value_reg = self.r8(ip + 2)? as usize;
+                let slot = slot_number(&self.regs[reg!(slot_reg)])?;
+                let payload = encode_slot_payload(&self.regs[reg!(value_reg)])?;
+                let key = evm_slot_key(slot);
+                let previous = self.slots.insert(key, payload);
+                self.undo_log.push((key, previous));
+                self.writes.push(X3StorageWrite {
+                    key: key.into(),
+                    old_value: previous,
+                    new_value: Some(payload),
+                });
+                Ok(Step::Continue(ip + 3))
+            }
+
+            // EvmSload: [op][dst_reg:u8][slot_reg:u8]
+            0xB3 => {
+                let dst_reg = self.r8(ip + 1)? as usize;
+                let slot_reg = self.r8(ip + 2)? as usize;
+                let slot = slot_number(&self.regs[reg!(slot_reg)])?;
+                let key = evm_slot_key(slot);
+                // EVM's rule for a slot that was never written: it reads as zero. The interpreter
+                // starts with no state, so "never written" is the only empty case it can have, and
+                // a payload it did not write is refused rather than decoded loosely.
+                let value = match self.slots.get(&key) {
+                    Some(payload) => decode_slot_payload(payload)?,
+                    None => MiniValue::I64(0),
+                };
+                set!(dst_reg, value);
+                Ok(Step::Continue(ip + 3))
+            }
+
+            // -------- Cross-VM and GPU intrinsics: refused --------
+            //
+            // `AGENTS.md` §18 — an accelerator must never be accepted merely because it returned —
+            // and §5 — uncertainty must not become success. These arms answered `I64(0)` and
+            // skipped six bytes, which was also the wrong width for most of them
+            // (`SvmCreateAccount` is seven), so a program that contained one could have the *next*
+            // instruction decoded from the middle of its operands. No host for any of these exists
+            // in the runtime build; each is refused by name.
+            0xB0..=0xB2 | 0xB5..=0xB9 | 0xC0..=0xC7 | 0xD0..=0xD7 => {
+                Err(X3Error::UnsupportedOpcode(op))
+            }
+
+            // Debug ops
+            0xF0 | 0xF1 => {
+                self.r8(ip + 1)?;
+                Ok(Step::Continue(ip + 2))
+            } // DebugPrint, Breakpoint
             0xF2 => {
                 // Assert
                 let cond = self.r8(ip + 1)? as usize;
@@ -1144,54 +1529,18 @@ impl<'m> Vm<'m> {
             }
             0xF3 => Err(X3Error::UserPanic), // Panic
 
-            // -------- Atomic blocks --------
-            // The semantics `x3-vm` gives them: a begin opens a block, a commit closes the innermost
-            // one (and is refused outside any), and a rollback aborts the execution — the whole
-            // program's effects are discarded, which is what undoing the block amounts to here.
-            // These arms used to be no-ops, so an explicit rollback carried on and committed.
-            0x90 => {
-                self.r16(ip + 1)?;
-                self.atomic_depth += 1;
-                Ok(Step::Continue(ip + 3))
+            // ModF (0x34)
+            0x34 => {
+                let (d, a, b) = (
+                    self.r8(ip + 1)? as usize,
+                    self.r8(ip + 2)? as usize,
+                    self.r8(ip + 3)? as usize,
+                );
+                let vb = self.regs[reg!(b)].as_f64()?;
+                let v = self.regs[reg!(a)].as_f64()? % vb;
+                self.regs[reg!(d)] = MiniValue::F64(v);
+                Ok(Step::Continue(ip + 4))
             }
-            0x91 => {
-                self.r16(ip + 1)?;
-                if self.atomic_depth == 0 {
-                    return Err(X3Error::AtomicEndWithoutBegin);
-                }
-                self.atomic_depth -= 1;
-                Ok(Step::Continue(ip + 3))
-            }
-            0x92 => {
-                self.r16(ip + 1)?;
-                if self.atomic_depth == 0 {
-                    return Err(X3Error::AtomicEndWithoutBegin);
-                }
-                Err(X3Error::AtomicAborted)
-            }
-
-            // -------- Opcodes with no implementation in this engine --------
-            // Arrays, fields and indexing, conversions, `Inc`/`Dec`, float modulo, execution
-            // context, agents, events, cross-VM calls and GPU intrinsics. Every one of them used to
-            // "succeed" here with a made-up result — a zero, a unit, a zero address, a hard-coded
-            // chain id, `false` — so a program that called into the EVM, read the sender or emitted
-            // an event ran to a successful receipt without any of it having happened. The engine
-            // has no host to give them meaning, so they are refused by name. The set implemented
-            // is the set `x3-vm` implements, so the two engines agree on what runs.
-            0x14..=0x17
-            | 0x26
-            | 0x27
-            | 0x34
-            | 0x60..=0x68
-            | 0x70..=0x75
-            | 0x80..=0x85
-            | 0x93
-            | 0xA0..=0xA2
-            | 0xB0..=0xB9
-            | 0xC0..=0xC7
-            | 0xD0..=0xD7
-            | 0xF0
-            | 0xF1 => Err(X3Error::UnimplementedOpcode(op)),
 
             _ => Err(X3Error::InvalidOpcode(op)),
         }
@@ -1216,11 +1565,57 @@ fn mini_value_from_const(c: &MiniConst) -> MiniValue {
 /// `payload` must be a valid X3BC binary.
 /// `gas_limit` caps execution; `GasExhausted` is returned if exceeded.
 pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Error> {
+    execute_x3bc_with_slots(payload, gas_limit, &[])
+}
+
+/// Execute the first (entry) function in an X3BC module with the chain's contract slots visible.
+///
+/// `seeds` is the chain's `X3ContractStorage`: the 32-byte slot keys and the payloads a previous
+/// execution persisted. Seeding them is what lets a *second* comit read what the first one wrote —
+/// without it `evm_sload` saw the interpreter's own empty map and answered EVM's zero for a slot
+/// the chain had held a value in since an earlier block, so contract state existed on the chain and
+/// was invisible to the contract that owned it.
+///
+/// The seeds carry no authority of their own: a payload whose tag, length or width this ISA did not
+/// write is refused with [`X3Error::CorruptStorageSlot`] when a program reads it, and a seeded slot
+/// a program does not touch costs it nothing.
+pub fn execute_x3bc_with_slots(
+    payload: &[u8],
+    gas_limit: u64,
+    seeds: &[([u8; 32], [u8; 32])],
+) -> Result<X3ExecResult, X3Error> {
+    execute_x3bc_with_slots_and_policy(payload, gas_limit, seeds, false)
+}
+
+/// Execute an X3BC module, honouring the compiled policy in its header.
+///
+/// `private_channel_available` is the *execution context's* answer to "can this program be
+/// submitted privately here?" — for a block that is the chain's own posture
+/// (`pallet-x3-kernel::Config::PrivateSubmissionChannel`, bound in the runtime to
+/// `pallet_private_execution::Enabled`). A module whose header demands private submission is
+/// refused with [`X3Error::PrivateSubmissionRequired`] when the answer is `false`, and runs when it
+/// is `true`.
+///
+/// The [`execute_x3bc_with_slots`] wrapper above passes `false`, which is the fail-closed default: a
+/// caller that has not said it can offer a private channel has not offered one.
+pub fn execute_x3bc_with_slots_and_policy(
+    payload: &[u8],
+    gas_limit: u64,
+    seeds: &[([u8; 32], [u8; 32])],
+    private_channel_available: bool,
+) -> Result<X3ExecResult, X3Error> {
     let module = parse_module(payload)?;
+    if module.requires_private_submission && !private_channel_available {
+        return Err(X3Error::PrivateSubmissionRequired);
+    }
+    if module.functions.is_empty() {
+        return Err(X3Error::FunctionNotFound);
+    }
     // Execution admits exactly what validation admits: the runtime validates before it executes,
     // and so does this, so no caller can run a module the validator would refuse.
     verify_code(&module)?;
     let mut vm = Vm::new(&module, gas_limit);
+    vm.seed_slots(seeds);
     let func_entry = module.functions[0].entry as usize;
     vm.call_stack.push(CallFrame {
         ret_dst: 0,
@@ -1234,6 +1629,7 @@ pub fn execute_x3bc(payload: &[u8], gas_limit: u64) -> Result<X3ExecResult, X3Er
         return_val: ret.unwrap_or(MiniValue::Unit),
         gas_used: vm.gas_used,
         instructions_executed: vm.instructions_executed,
+        storage_writes: vm.writes,
     })
 }
 
@@ -1268,10 +1664,12 @@ pub fn validate_x3bc(payload: &[u8]) -> Result<(), X3Error> {
 /// The length of the instruction at `ip`, or an error if it is not one this engine implements.
 fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
     let op = *code.get(ip).ok_or(X3Error::UnexpectedEof)?;
+    // One row per arm of `Vm::exec`: the implemented opcodes with their widths, the opcodes it
+    // refuses by name, and everything else is not an opcode.
     let len = match op {
         0x00 | 0x06 | 0x07 | 0xF3 => 1,
-        0x05 | 0x19..=0x1B => 2,
-        0x11 | 0x18 | 0x25 | 0x35 | 0x53 | 0x5A | 0x90..=0x92 => 3,
+        0x05 | 0x19..=0x1B | 0x84 | 0x93 | 0xF0 | 0xF1 => 2,
+        0x11 | 0x18 | 0x25 | 0x35 | 0x53 | 0x5A | 0x60..=0x68 | 0x90..=0x92 | 0xB3 | 0xB4 => 3,
         0x20..=0x24 | 0x30..=0x34 | 0x40..=0x4B | 0x50..=0x52 | 0x54..=0x56 | 0x58 | 0x59 => 4,
         0x01 => 5,
         0x02 | 0x03 | 0x10 | 0x12 | 0x13 | 0xF2 => 6,
@@ -1283,18 +1681,14 @@ fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
             8 + argc
         }
         0x14..=0x17
-        | 0x26
-        | 0x27
-        | 0x60..=0x68
         | 0x70..=0x75
-        | 0x80..=0x85
-        | 0x93
+        | 0x80..=0x83
+        | 0x85
         | 0xA0..=0xA2
-        | 0xB0..=0xB9
+        | 0xB0..=0xB2
+        | 0xB5..=0xB9
         | 0xC0..=0xC7
-        | 0xD0..=0xD7
-        | 0xF0
-        | 0xF1 => return Err(X3Error::UnimplementedOpcode(op)),
+        | 0xD0..=0xD7 => return Err(X3Error::UnsupportedOpcode(op)),
         _ => return Err(X3Error::InvalidOpcode(op)),
     };
     if ip + len > code.len() {
@@ -1385,6 +1779,8 @@ fn verify_code(module: &MiniModule) -> Result<(), X3Error> {
             // so the engines gave different reasons for one policy (the `compile_and_run` fuzz
             // target, on a program taking `%` of floats).
             0x30..=0x34 => return Err(X3Error::ForbiddenOnChain(op)),
+            // DebugPrint, Breakpoint: `x3-vm`'s on-chain verifier forbids them too.
+            0xF0 | 0xF1 => return Err(X3Error::ForbiddenOnChain(op)),
             _ => {}
         }
         ip += len;
@@ -1561,5 +1957,261 @@ mod tests {
         let at = x3_common::bytecode::CHECKSUM_OFFSET;
         b[at..at + 4].copy_from_slice(&checksum.to_le_bytes());
         b
+    }
+
+    /// A module with one `main` holding exactly `code`, written by the real envelope writer so a
+    /// test only has to name the instructions it is about.
+    fn module_bytes(code: &[u8]) -> Vec<u8> {
+        let mut module = x3_backend::BytecodeModule::new();
+        module.functions.push(x3_backend::FunctionEntry {
+            name: "main".to_string(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 16,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = code.to_vec();
+        module.to_bytes()
+    }
+
+    /// Drive the interpreter directly and hand the finished `Vm` to `check`, so a test can inspect
+    /// state a caller never receives (the slot map and the journal after an aborted window).
+    fn inspect<F: FnOnce(&Vm<'_>)>(code: &[u8], check: F) -> X3Result<Option<MiniValue>> {
+        let bytes = module_bytes(code);
+        let module = parse_module(&bytes).expect("the module parses");
+        let mut vm = Vm::new(&module, 1_000_000);
+        vm.call_stack.push(CallFrame {
+            ret_dst: 0,
+            ip: module.functions[0].entry as usize,
+            base: 0,
+            ret_addr: usize::MAX,
+            func_idx: 0,
+        });
+        let outcome = vm.run();
+        check(&vm);
+        outcome
+    }
+
+    #[test]
+    fn a_payload_round_trips_exactly_and_an_oversized_one_is_refused() {
+        // The two cases an untagged or zero-padded layout cannot tell apart. If either collapsed,
+        // a program would read back a value it never stored.
+        for value in [
+            MiniValue::I64(-5),
+            MiniValue::I64(197_121),
+            MiniValue::Bool(true),
+            MiniValue::F64(1.5),
+            MiniValue::Bytes(vec![1, 2]),
+            MiniValue::Bytes(vec![1, 2, 0]),
+        ] {
+            let payload = encode_slot_payload(&value).expect("a representable value encodes");
+            assert_eq!(
+                decode_slot_payload(&payload).unwrap(),
+                value,
+                "a store/load round trip must be exact"
+            );
+        }
+
+        assert_eq!(
+            encode_slot_payload(&MiniValue::Bytes(vec![7u8; SLOT_PAYLOAD_MAX + 1])).unwrap_err(),
+            X3Error::UnencodableStorageValue("byte-string is longer than a slot holds")
+        );
+        assert_eq!(
+            encode_slot_payload(&MiniValue::Unit).unwrap_err(),
+            X3Error::UnencodableStorageValue("unit is not a storable value")
+        );
+
+        // A payload this ISA did not write carries no value, so it is refused rather than guessed.
+        let mut unknown_tag = [0u8; 32];
+        unknown_tag[0] = 0x7F;
+        assert_eq!(
+            decode_slot_payload(&unknown_tag).unwrap_err(),
+            X3Error::CorruptStorageSlot
+        );
+    }
+
+    #[test]
+    fn slot_keys_live_outside_the_global_keyspace_and_slots_are_integers() {
+        // `LoadGlobal`/`StoreGlobal` read their index as a `u32`, so a domain tag above `u32::MAX`
+        // is what makes the two keyspaces disjoint rather than merely unlikely to collide.
+        assert!(EVM_SLOT_DOMAIN > u32::MAX as u64);
+        assert_ne!(evm_slot_key(0), evm_slot_key(1));
+
+        assert_eq!(
+            slot_number(&MiniValue::I64(-1)).unwrap_err(),
+            X3Error::InvalidStorageSlot("negative slot index")
+        );
+        assert_eq!(
+            slot_number(&MiniValue::Bool(true)).unwrap_err(),
+            X3Error::InvalidStorageSlot("slot index is not an integer")
+        );
+        assert_eq!(slot_number(&MiniValue::I64(4)).unwrap(), 4);
+    }
+
+    #[test]
+    fn a_rolled_back_window_restores_the_slot_it_wrote() {
+        // The rollback aborts, so a caller never sees this state — but the interpreter's own state
+        // has to agree with the journal it would have reported, or the `storage_writes` field's
+        // promise ("a write abandoned by a reverted window is not here") rests on nothing.
+        let outcome = inspect(
+            &[
+                0x90, 0x00, 0x00, // AtomicBegin 0
+                0x18, 0x01, 0x00, // LoadImm r1, 0  (slot)
+                0x18, 0x02, 0x07, // LoadImm r2, 7  (value)
+                0xB4, 0x01, 0x02, // EvmSstore slot=r1 value=r2
+                0x92, 0x00, 0x00, // AtomicRollback 0
+            ],
+            |vm| {
+                assert!(
+                    vm.slots.is_empty(),
+                    "the slot the window wrote must be gone"
+                );
+                assert!(
+                    vm.writes.is_empty(),
+                    "an undone write must not be journaled"
+                );
+                assert!(vm.undo_log.is_empty(), "the undo records are consumed");
+            },
+        );
+        assert_eq!(outcome.unwrap_err(), X3Error::AtomicAborted);
+    }
+
+    #[test]
+    fn a_committed_window_keeps_the_slot_it_wrote() {
+        let outcome = inspect(
+            &[
+                0x90, 0x00, 0x00, // AtomicBegin 0
+                0x18, 0x01, 0x00, // LoadImm r1, 0
+                0x18, 0x02, 0x07, // LoadImm r2, 7
+                0xB4, 0x01, 0x02, // EvmSstore
+                0x91, 0x00, 0x00, // AtomicCommit 0
+                0x06, // RetVoid
+            ],
+            |vm| {
+                let payload = encode_slot_payload(&MiniValue::I64(7)).expect("7 is storable");
+                assert_eq!(
+                    vm.slots.get(&evm_slot_key(0)),
+                    Some(&payload),
+                    "a committed window leaves its write in the slot map"
+                );
+                assert_eq!(
+                    vm.writes.len(),
+                    1,
+                    "and in the journal a receipt is built from"
+                );
+                assert_eq!(vm.writes[0].new_value, Some(payload));
+                assert_eq!(
+                    vm.writes[0].old_value, None,
+                    "the slot was empty in this view"
+                );
+            },
+        );
+        assert!(outcome.is_ok(), "a committed window runs to the end");
+    }
+
+    /// The chain's own slots, as `X3ContractStorage` holds them: key → tagged payload.
+    fn chain_slots(entries: &[(u64, MiniValue)]) -> Vec<([u8; 32], [u8; 32])> {
+        entries
+            .iter()
+            .map(|(slot, value)| {
+                (
+                    evm_slot_key(*slot),
+                    encode_slot_payload(value).expect("the test value is storable"),
+                )
+            })
+            .collect()
+    }
+
+    /// `evm_sload r0 <- slot r1` then `ret r0`, with the slot index in the middle operand.
+    fn load_slot(slot: u8) -> Vec<u8> {
+        vec![
+            0x18, 0x01, slot, // LoadImm r1, slot
+            0xB3, 0x00, 0x01, // EvmSload dst=r0 slot=r1
+            0x05, 0x00, // Ret r0
+        ]
+    }
+
+    #[test]
+    fn a_slot_a_previous_comit_wrote_reads_back_as_that_value() {
+        // The gap this closes: the chain persisted a slot and the contract could not read it, so a
+        // second comit saw EVM's zero for state its own first comit had written.
+        let bytes = module_bytes(&load_slot(0));
+        let seeds = chain_slots(&[(0, MiniValue::I64(42))]);
+
+        let seeded = execute_x3bc_with_slots(&bytes, 100_000, &seeds).expect("the load runs");
+        assert_eq!(
+            seeded.return_val,
+            MiniValue::I64(42),
+            "the chain's value, not the interpreter's empty default"
+        );
+        assert!(
+            seeded.storage_writes.is_empty(),
+            "reading the chain's state is not a write"
+        );
+    }
+
+    #[test]
+    fn a_chain_holding_no_slot_still_reads_zero() {
+        // The control for the test above: the same program on the same view shape, with no seed,
+        // must answer EVM's zero — so the assertion above is about the seed and not about the
+        // opcode returning a constant.
+        let bytes = module_bytes(&load_slot(0));
+        let empty = execute_x3bc_with_slots(&bytes, 100_000, &[]).expect("the load runs");
+        assert_eq!(empty.return_val, MiniValue::I64(0));
+    }
+
+    #[test]
+    fn a_store_over_a_seeded_slot_reports_the_chain_value_as_its_old_value() {
+        // `old_value` is what the kernel's receipt channel carries, and what a cross-VM delta sync
+        // reads. Reporting `None` over a slot the chain held a value in would describe a change
+        // from "nothing" — a state transition that did not happen.
+        let code = [
+            0x18, 0x01, 0x00, // LoadImm r1, 0  (slot)
+            0x18, 0x02, 0x05, // LoadImm r2, 5  (new value)
+            0xB4, 0x01, 0x02, // EvmSstore slot=r1 value=r2
+            0x06, // RetVoid
+        ];
+        let bytes = module_bytes(&code);
+        let seeds = chain_slots(&[(0, MiniValue::I64(42))]);
+
+        let result = execute_x3bc_with_slots(&bytes, 100_000, &seeds).expect("the store runs");
+        assert_eq!(result.storage_writes.len(), 1);
+        assert_eq!(
+            result.storage_writes[0].old_value,
+            Some(encode_slot_payload(&MiniValue::I64(42)).unwrap()),
+            "the value the chain held, not None"
+        );
+        assert_eq!(
+            result.storage_writes[0].new_value,
+            Some(encode_slot_payload(&MiniValue::I64(5)).unwrap())
+        );
+    }
+
+    #[test]
+    fn a_seeded_payload_this_isa_did_not_write_is_refused_when_read() {
+        // A payload the chain holds that this ISA cannot decode must not become a value: the read
+        // fails closed rather than handing the program a guess.
+        let mut unknown_tag = [0u8; 32];
+        unknown_tag[0] = 0x7F;
+        let bytes = module_bytes(&load_slot(0));
+
+        let outcome = execute_x3bc_with_slots(&bytes, 100_000, &[(evm_slot_key(0), unknown_tag)]);
+        assert_eq!(outcome.unwrap_err(), X3Error::CorruptStorageSlot);
+    }
+
+    #[test]
+    fn an_execution_that_never_reads_a_corrupt_slot_still_succeeds() {
+        // The mirror of the test above, and the reason the refusal lives at the read rather than in
+        // `seed_slots`: one contract's undecodable slot must not stop a program that never touches
+        // it from running.
+        let mut unknown_tag = [0u8; 32];
+        unknown_tag[0] = 0x7F;
+        let code = [0x18, 0x00, 0x07, 0x05, 0x00]; // LoadImm r0, 7 + Ret r0
+        let bytes = module_bytes(&code);
+
+        let result = execute_x3bc_with_slots(&bytes, 100_000, &[(evm_slot_key(0), unknown_tag)])
+            .expect("the program never reads the corrupt slot");
+        assert_eq!(result.return_val, MiniValue::I64(7));
     }
 }

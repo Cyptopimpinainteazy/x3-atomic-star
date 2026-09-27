@@ -28,9 +28,18 @@ sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 log = { workspace = true, default-features = false }
+# The commit–reveal ordering lane, `no_std`, so the chain can enforce the same
+# algorithm the lane's own tests verify instead of a second implementation of it.
+x3-order-window = { path = "../../crates/x3-order-window", default-features = false }
+x3-threshold-core = { path = "../../crates/x3-threshold-core", default-features = false }
 
 [dev-dependencies]
 sp-io = { workspace = true }
+# The tests build real submissions: a real committee secret, its group key, and a ciphertext
+# encrypted to it. A hardcoded `vec![0xBB; 32]` group key cannot be used any more, which is the
+# point of the change below.
+curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
+rand = "0.8"
 
 [features]
 default = ["std"]
@@ -46,6 +55,8 @@ std = [
     "sp-runtime/std",
     "serde/std",
     "log/std",
+    "x3-order-window/std",
+    "x3-threshold-core/std",
     "frame-benchmarking?/std",
 ]
 runtime-benchmarks = [

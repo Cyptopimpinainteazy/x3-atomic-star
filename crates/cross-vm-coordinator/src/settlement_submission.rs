@@ -50,6 +50,7 @@ impl SettlementSubmissionEnvelope {
         runtime_intent_id: [u8; 32],
         proof_set: CrossDomainProofSet,
         required_domains: &[(ChainId, VmType)],
+        finality: &crate::SettlementFinalityPolicy,
     ) -> Result<Self, CoordinatorError> {
         proof_set
             .verify_runtime_binding(runtime_intent_id)
@@ -65,6 +66,12 @@ impl SettlementSubmissionEnvelope {
                     "claim submission proof set is incomplete or invalid: {e}"
                 ))
             })?;
+        crate::settlement_finality::enforce_settlement_finality(
+            finality,
+            SettlementProofPurpose::Claim,
+            &proof_set,
+            required_domains,
+        )?;
 
         Ok(Self {
             runtime_intent_id,
@@ -78,6 +85,7 @@ impl SettlementSubmissionEnvelope {
         runtime_intent_id: [u8; 32],
         proof_set: CrossDomainProofSet,
         required_domains: &[(ChainId, VmType)],
+        finality: &crate::SettlementFinalityPolicy,
     ) -> Result<Self, CoordinatorError> {
         proof_set
             .verify_runtime_binding(runtime_intent_id)
@@ -93,6 +101,12 @@ impl SettlementSubmissionEnvelope {
                     "refund submission proof set is incomplete or invalid: {e}"
                 ))
             })?;
+        crate::settlement_finality::enforce_settlement_finality(
+            finality,
+            SettlementProofPurpose::Refund,
+            &proof_set,
+            required_domains,
+        )?;
 
         Ok(Self {
             runtime_intent_id,
@@ -200,6 +214,14 @@ mod tests {
         .unwrap()
     }
 
+    /// The depth the operator's own config declares; these bundles are 12 blocks
+    /// deep, which is the default EVM requirement.
+    fn finality() -> crate::SettlementFinalityPolicy {
+        crate::SettlementFinalityPolicy::from_confirmations(
+            &crate::config::ConfirmationConfig::default(),
+        )
+    }
+
     #[test]
     fn claim_envelope_encodes_runtime_call_arguments() {
         let intent = intent();
@@ -223,6 +245,7 @@ mod tests {
             runtime,
             set,
             &[("eth-mainnet".into(), VmType::Evm)],
+            &finality(),
         )
         .unwrap();
 
@@ -263,6 +286,7 @@ mod tests {
                 runtime,
                 claim_set,
                 &[("eth-mainnet".into(), VmType::Evm)],
+                &finality(),
             )
             .is_err()
         );
@@ -292,6 +316,7 @@ mod tests {
                 [0xeeu8; 32],
                 set,
                 &[("eth-mainnet".into(), VmType::Evm)],
+                &finality(),
             )
             .is_err()
         );

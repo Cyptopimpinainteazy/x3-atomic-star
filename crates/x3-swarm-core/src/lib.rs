@@ -17,13 +17,14 @@ pub mod policy;
 pub mod report;
 pub mod scheduler;
 pub mod scoreboard;
+pub mod sensitive;
 pub mod spawn;
 pub mod task;
 
 pub use agent::{AgentKind, AgentPermissionTier};
 pub use approval::ApprovalGate;
 pub use audit::{AuditCategory, AuditEntry, AuditLog};
-pub use authority::{AuthorityError, SwarmAuthority};
+pub use authority::{AuthorityError, DispatchRefusal, SwarmAuthority};
 pub use events::SwarmEvent;
 pub use genesis::{
     AgentId, BlockHeight, GenesisError, GenesisRecord, GenesisStore, SupervisionMode,
@@ -37,6 +38,9 @@ pub use policy::{default_agent_policies, AgentPolicy, ApprovalRequirement};
 pub use report::SwarmReport;
 pub use scheduler::SwarmScheduler;
 pub use scoreboard::SwarmScoreboard;
+pub use sensitive::{
+    required_requirement, SensitiveAction, SensitiveRefusal, SensitiveRequest, SENSITIVE_DOMAIN,
+};
 pub use spawn::{max_spawn_depth, SpawnError, SpawnGuard, DEFAULT_MAX_DIRECT_SPAWNS};
 // `RiskLevel` is a public field of `AgentTask` (`pub risk: RiskLevel`), so it
 // has to be nameable by callers; without this they cannot construct a task.

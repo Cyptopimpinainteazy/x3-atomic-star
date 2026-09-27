@@ -1,5 +1,6 @@
 /// Relayer Service - Main orchestrator for proof acquisition and submission
 extern crate alloc;
+use crate::quorum::AuthorizedValidatorSet;
 use crate::submitter::RpcSubmitter;
 use crate::types::*;
 use crate::watchers::{EvmHeaderWatcher, SvmHeaderWatcher};
@@ -45,7 +46,12 @@ struct RelayerSafetyPipeline {
     /// `AttestationSet` from this field rather than a second, independent
     /// list, so the router-level check and the attestation-level check can
     /// never silently disagree about who's authorized.
-    svm_authorized_validators: Vec<[u8; 32]>,
+    ///
+    /// It is also the only source of the required quorum. The count is derived
+    /// from the set through the workspace's single supermajority rule, so a
+    /// proof cannot lower its own bar by declaring a smaller
+    /// `required_signatures`.
+    svm_quorum: AuthorizedValidatorSet,
 }
 
 struct RelayerInternalState {
@@ -96,6 +102,7 @@ impl RelayerService {
             config.x3.relayer_account.clone(),
             config.x3.relayer_custody_key_id.clone(),
             config.x3.relayer_seed_phrase.as_deref(),
+            &config.validator_set.svm_validator_pubkeys,
             config.submission.max_retries,
             config.submission.retry_backoff_ms,
         )
@@ -606,17 +613,34 @@ impl RelayerSafetyPipeline {
                 x3_verification_router::evm_receipt::NoEvmHeaderAnchor,
             >(12),
         ));
+        // The authorized validator set, and with it the quorum, comes from
+        // configuration. A malformed entry is refused at startup by
+        // `RpcSubmitter::new_with_retry_config`, which decodes the same list;
+        // here a set that cannot be decoded degrades to the empty set and every
+        // SVM proof is refused, rather than to a set nobody configured.
+        let svm_quorum = match AuthorizedValidatorSet::from_hex_keys(
+            &config.validator_set.svm_validator_pubkeys,
+        ) {
+            Ok(set) => set,
+            Err(err) => {
+                warn!("refusing every SVM proof: configured validator set is invalid: {err}");
+                AuthorizedValidatorSet::from_keys(Vec::new())
+            }
+        };
+
         // Production: register the real Solana finalized-proof verifier
         // (issue #351 — this used to be a permissive stub,
-        // `SolanaFinalizationVerifier`, that accepted any non-empty
-        // payload). No governance-controlled SVM validator set is wired
-        // into this pipeline's config yet, so this constructs the verifier
-        // with an empty authorized set: `SolanaFinalizedVerifier::empty()`
-        // fails closed on every SVM proof rather than accepting a forged
-        // one. Swap in `SolanaFinalizedVerifier::new(validators, threshold)`
-        // once a real validator set is sourced for this relayer's context.
+        // `SolanaFinalizationVerifier`, that accepted any non-empty payload).
+        // With no validators configured the set is empty and the verifier fails
+        // closed on every SVM proof; with a configured set, the threshold is the
+        // supermajority of that set — the same rule the attestation stage below
+        // applies, so the two checks cannot disagree about how many signatures
+        // are enough.
         verification_router.register_verifier(Arc::new(
-            x3_verification_router::SolanaFinalizedVerifier::empty(),
+            x3_verification_router::SolanaFinalizedVerifier::new(
+                svm_quorum.keys().to_vec(),
+                svm_quorum.required_signatures(),
+            ),
         ));
 
         Self {
@@ -625,7 +649,7 @@ impl RelayerSafetyPipeline {
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
-            svm_authorized_validators: Vec::new(),
+            svm_quorum,
         }
     }
 
@@ -673,7 +697,7 @@ impl RelayerSafetyPipeline {
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
-            svm_authorized_validators,
+            svm_quorum: AuthorizedValidatorSet::from_keys(svm_authorized_validators),
         }
     }
 
@@ -756,7 +780,7 @@ impl RelayerSafetyPipeline {
         // can never silently disagree about who's authorized.
         let mut attestations = AttestationSet::with_authorized_validators(
             signed_message,
-            self.svm_authorized_validators.iter().copied(),
+            self.svm_quorum.keys().iter().copied(),
         );
         for signature in proof.validator_signatures.iter() {
             let attestation = Attestation {
@@ -778,12 +802,45 @@ impl RelayerSafetyPipeline {
             }
         }
 
-        let quorum_met = attestations.has_quorum(proof.required_signatures as u64);
+        // `proof.required_signatures` is caller-supplied, so it is a floor the
+        // prover may raise but must never be allowed to lower. A proof asking for
+        // fewer signatures than the configured set's supermajority is refused by
+        // name before any count is compared — before this check the field *was*
+        // the policy, and the submitter wrote a literal `1` into it.
+        let policy_required = self.svm_quorum.required_signatures();
+        if proof.required_signatures < policy_required {
+            return self.raise_dispute(
+                proof_id,
+                proof.slot,
+                format!(
+                    "attestation_quorum_below_policy: proof required_signatures={} is below the \
+                     supermajority of the {} authorized validators ({} signatures)",
+                    proof.required_signatures,
+                    self.svm_quorum.len(),
+                    policy_required
+                ),
+            );
+        }
+
+        // Two bars, both must be met: the policy's supermajority over distinct
+        // authorized validators (the workspace's single rule definition), and the
+        // count the proof itself claims to carry (so a proof claiming more
+        // signatures than it attached is still refused).
+        let policy_met = attestations.has_supermajority(self.svm_quorum.len());
+        let claim_met = attestations.has_quorum(proof.required_signatures as u64);
+        let quorum_met = policy_met && claim_met;
         if !quorum_met {
             return self.raise_dispute(
                 proof_id,
                 proof.slot,
-                "attestation_quorum_not_met".to_string(),
+                format!(
+                    "attestation_quorum_not_met: distinct_attestations={}, proof required={}, \
+                     policy supermajority={} of {}",
+                    attestations.unique_validators(),
+                    proof.required_signatures,
+                    policy_required,
+                    self.svm_quorum.len()
+                ),
             );
         }
 
@@ -984,6 +1041,7 @@ mod tests {
                 slot_poll_interval_ms: 400,
                 max_concurrent_requests: 5,
             }],
+            validator_set: ValidatorSetConfig::default(),
             submission: SubmissionConfig::default(),
             governance: GovernanceConfig::default(),
             logging: LoggingConfig::default(),
@@ -1001,6 +1059,7 @@ mod tests {
             },
             evm_chains: vec![],
             svm_clusters: vec![],
+            validator_set: ValidatorSetConfig::default(),
             submission: SubmissionConfig {
                 batch_size: 1,
                 timeout_secs: 60,
@@ -1032,6 +1091,7 @@ mod tests {
             },
             evm_chains: vec![],
             svm_clusters: vec![],
+            validator_set: ValidatorSetConfig::default(),
             submission: SubmissionConfig {
                 batch_size: 1,
                 timeout_secs: 60,
@@ -1062,6 +1122,7 @@ mod tests {
             },
             evm_chains: vec![],
             svm_clusters: vec![],
+            validator_set: ValidatorSetConfig::default(),
             submission: Default::default(),
             governance: Default::default(),
             logging: Default::default(),
@@ -1292,6 +1353,131 @@ mod tests {
     }
 
     // ── Cross-side proof: what the relayer signs, the router verifies ───────
+
+    fn validator_keys(seeds: &[u8]) -> Vec<ed25519_dalek::SigningKey> {
+        seeds
+            .iter()
+            .map(|seed| ed25519_dalek::SigningKey::from_bytes(&[*seed; 32]))
+            .collect()
+    }
+
+    fn pubkeys_of(keys: &[ed25519_dalek::SigningKey]) -> Vec<[u8; 32]> {
+        keys.iter()
+            .map(|key| key.verifying_key().to_bytes())
+            .collect()
+    }
+
+    /// The gap `X3-XCHAIN-003` records, as a test: three validators are
+    /// authorized, one of them signs, and the proof declares
+    /// `required_signatures: 1`. Before this workstream the declared number *was*
+    /// the policy — the submitter wrote the literal `1` into it and the pipeline
+    /// compared against it — so a proof the counterparty wrote for itself
+    /// satisfied its own claim. It is refused, by name, as a claim below policy.
+    #[test]
+    fn safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied() {
+        let keys = validator_keys(&[1, 2, 3]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        // Router threshold 1 so the proof clears router verification and reaches
+        // the attestation stage this test is actually about.
+        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
+        let proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: vec![signed_validator(&keys[0], slot, &blockhash)],
+            required_signatures: 1,
+        };
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, 0)
+            .expect_err("one of three authorized validators is not a supermajority");
+        assert!(
+            err.contains("attestation_quorum_below_policy"),
+            "the refusal must name the policy downgrade, got: {err}"
+        );
+        assert!(
+            err.contains("supermajority of the 3 authorized validators"),
+            "and say what the policy actually required, got: {err}"
+        );
+        assert!(err.contains("dispute_status=Accepted"));
+    }
+
+    /// A second, independent way the same shortfall shows up: the proof declares
+    /// the *policy* count honestly (three) but carries only one signature, and
+    /// the router is permissive enough to pass it through. The policy bar over
+    /// distinct authorized attestations is what stops it.
+    #[test]
+    fn safety_pipeline_refuses_a_proof_that_carries_fewer_signatures_than_policy() {
+        let keys = validator_keys(&[1, 2, 3]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
+        let proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: vec![signed_validator(&keys[0], slot, &blockhash)],
+            required_signatures: 3,
+        };
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, 0)
+            .expect_err("one signature cannot meet a three-validator supermajority");
+        assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
+        assert!(err.contains("of 3"), "got: {err}");
+    }
+
+    /// The golden path, so the refusals above are not satisfied by refusing
+    /// everything: three authorized validators, three distinct signatures and an
+    /// honest claim of three.
+    #[test]
+    fn safety_pipeline_accepts_a_three_of_three_proof() {
+        let keys = validator_keys(&[1, 2, 3]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 3);
+        let proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: keys
+                .iter()
+                .map(|key| signed_validator(key, slot, &blockhash))
+                .collect(),
+            required_signatures: 3,
+        };
+
+        assert!(
+            pipeline.evaluate_svm_proof(&proof, 0).is_ok(),
+            "a full supermajority must be accepted"
+        );
+    }
+
+    /// A proof may raise its claim; it may not pretend to carry more than it
+    /// does.
+    #[test]
+    fn safety_pipeline_refuses_a_claim_above_the_signatures_it_carries() {
+        let keys = validator_keys(&[1, 2, 3]);
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
+        let proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: vec![
+                signed_validator(&keys[0], slot, &blockhash),
+                signed_validator(&keys[1], slot, &blockhash),
+            ],
+            required_signatures: 4,
+        };
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, 0)
+            .expect_err("two distinct signatures cannot satisfy a claim of four");
+        assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
+    }
 
     /// Sign with the same construction as `Submitter::sign_proof_payload` but
     /// using a key the test controls.

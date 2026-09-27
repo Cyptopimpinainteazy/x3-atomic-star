@@ -23,6 +23,7 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
         with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
           workspaces: x3-lang
 
       - name: Run focused Trading Core v1 tests

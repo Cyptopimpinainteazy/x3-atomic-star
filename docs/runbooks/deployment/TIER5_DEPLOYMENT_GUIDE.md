@@ -738,7 +738,7 @@ kubectl logs -f deployment/x3-governance -n production | grep "CRITICAL"
 # Expected: No output
 ```
 
-✅ **Sub-300ms latency (p99)**
+**Latency acceptance check: sub-300ms p99**
 ```bash
 curl -H "Accept: application/json" \
   https://api.x3.chain/metrics | grep http_request_duration_seconds | grep p99

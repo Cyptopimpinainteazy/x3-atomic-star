@@ -119,6 +119,7 @@ impl pallet_x3_asset_registry::Config for Test {
 impl pallet_x3_supply_ledger::Config for Test {
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {
@@ -126,6 +127,11 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Ledger = Ledger;
     type Currency = ();
     type ExternalExecutorOrigin = RootOrAny;
+    // The router's root-registration path now asks a verifier instead of counting proof
+    // bytes, and this test runtime has nothing that can bind a foreign chain's block root
+    // to that chain's consensus. Same posture as the pallet's own tests and the runtime:
+    // the registration is refused rather than accepted on a data-shape check.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = RootOrAny;
     type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
@@ -144,9 +150,10 @@ impl pallet_x3_token_factory::Config for Test {
     type Ledger = Ledger;
     type EconomicHalt = Ledger;
     type Sentinel = Sentinel;
+    type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Test>;
 }
 
-fn new_test_ext() -> sp_io::TestExternalities {
+pub fn new_test_ext() -> sp_io::TestExternalities {
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();

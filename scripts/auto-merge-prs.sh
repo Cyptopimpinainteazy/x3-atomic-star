@@ -8,8 +8,10 @@
 # GitHub's native auto-merge, which has nothing to wait on here.
 set -uo pipefail
 
-cd /home/lojak/Desktop/xxxstar-main
-LOG="/home/lojak/Desktop/xxxstar-main/.ai/reports/auto-merge-$(date +%Y%m%d).log"
+# Run from this checkout, wherever it lives, instead of a hardcoded desktop path.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+LOG="$ROOT/.ai/reports/auto-merge-$(date +%Y%m%d).log"
 mkdir -p "$(dirname "$LOG")"
 
 # Prevent overlapping runs: if a previous invocation is still mid-build

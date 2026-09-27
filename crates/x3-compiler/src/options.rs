@@ -43,6 +43,14 @@ pub struct CompilationOptions {
     pub analyze_gas: bool,
     /// Verify contract safety (forbidden ops, determinism, etc.)
     pub verify_contract: bool,
+
+    /// Compile the program so its artifact *demands* private submission.
+    ///
+    /// This is the compiler-side half of a compiled capability (AGENTS.md §11): the demand is
+    /// recorded in the module's feature word, and the runtime that loads the module refuses to run
+    /// it unless the chain actually offers a private channel. It is off by default because it is a
+    /// policy decision about a specific deployment, not a property of the language.
+    pub require_private_submission: bool,
 }
 
 impl Default for CompilationOptions {
@@ -58,6 +66,7 @@ impl Default for CompilationOptions {
             emit_format: EmitFormat::default(),
             analyze_gas: false,
             verify_contract: false,
+            require_private_submission: false,
         }
     }
 }
@@ -114,6 +123,12 @@ impl CompilationOptions {
 
     pub fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
+        self
+    }
+
+    /// Compile an artifact whose policy requires private submission.
+    pub fn with_private_submission_required(mut self) -> Self {
+        self.require_private_submission = true;
         self
     }
 

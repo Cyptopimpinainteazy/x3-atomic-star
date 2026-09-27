@@ -69,7 +69,8 @@ impl CudaExecutor {
             gpu_hostcalls: Arc::new(Mutex::new(None)),
             #[cfg(feature = "x3-runtime")]
             bytecode_cache: Arc::new(Mutex::new(LruCache::new(
-                std::num::NonZeroUsize::new(512).unwrap(),
+                // 512 is non-zero by construction; MIN is the unreachable fallback.
+                std::num::NonZeroUsize::new(512).unwrap_or(std::num::NonZeroUsize::MIN),
             ))),
             #[cfg(feature = "x3-runtime")]
             verified_bytecode_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),

@@ -34,6 +34,8 @@ jobs:
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
 
       - name: Build distributed chaos harness
         # `--locked`: the crate has its own committed lockfile (see

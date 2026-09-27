@@ -35,6 +35,19 @@ pub struct ConfirmationConfig {
     pub x3: u32,
 }
 
+impl Default for ConfirmationConfig {
+    /// The depths `CoordinatorConfig::default()` already used, in the one place
+    /// they were written down. `settlement_finality` derives the release policy
+    /// from this, so the number an operator reads here is the number enforced.
+    fn default() -> Self {
+        Self {
+            evm: 12,
+            svm: 50,
+            x3: 1,
+        }
+    }
+}
+
 /// Timelock configuration (in seconds).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimelockConfig {
@@ -109,6 +122,17 @@ impl CoordinatorConfig {
             VmTarget::Svm => self.confirmations.svm,
             VmTarget::X3Vm => self.confirmations.x3,
         }
+    }
+
+    /// The release-time finality policy this configuration describes.
+    ///
+    /// [`Self::confirmations_for`] reports a number; this is the same number in
+    /// the form the cross-domain release path enforces, so an operator who sets
+    /// `confirmations.evm = 12` gets a release gate at 12 rather than a field
+    /// nothing reads. Domains this configuration does not size stay uncovered
+    /// and are refused at release time instead of inheriting a depth.
+    pub fn finality_policy(&self) -> crate::SettlementFinalityPolicy {
+        crate::SettlementFinalityPolicy::from_confirmations(&self.confirmations)
     }
 
     /// Select the best flashloan provider for a given VM.

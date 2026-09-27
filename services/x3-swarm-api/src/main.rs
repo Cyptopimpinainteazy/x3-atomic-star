@@ -4,15 +4,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use tower_http::cors::{Any, CorsLayer};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
+use tower_http::cors::{Any, CorsLayer};
 use x3_swarm_core::{
-    AgentKind, AgentTask, ApprovalRequirement, RiskLevel, SwarmMemoryEntry, TaskStatus,
+    AgentKind, AgentTask, ApprovalRequirement, RiskLevel, SwarmMemoryEntry, SwarmScheduler,
+    TaskStatus,
 };
 
 const MAX_MEMORY: usize = 1_000;
@@ -28,7 +29,10 @@ struct SwarmEvent {
 
 #[derive(Debug, Clone)]
 struct AppState {
-    tasks: BTreeMap<String, AgentTask>,
+    /// The one task lifecycle. `x3_swarm_core::SwarmScheduler` owns every task
+    /// and every status; the service stores nothing about a task itself, so a
+    /// second, divergent task registry cannot reappear here.
+    scheduler: SwarmScheduler,
     memory: VecDeque<SwarmMemoryEntry>,
     events: VecDeque<SwarmEvent>,
     kill_switch: bool,
@@ -39,7 +43,7 @@ struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            tasks: BTreeMap::new(),
+            scheduler: SwarmScheduler::new(),
             memory: VecDeque::new(),
             events: VecDeque::new(),
             kill_switch: false,
@@ -57,7 +61,7 @@ async fn main() {
 
     let mut initial = AppState::default();
     for task in default_tasks() {
-        initial.tasks.insert(task.id.clone(), task);
+        initial.scheduler.enqueue(task);
     }
 
     let state: SharedState = Arc::new(Mutex::new(initial));
@@ -89,7 +93,9 @@ async fn main() {
         .await
         .expect("bind x3-swarm-api listener");
     println!("x3-swarm-api listening on http://127.0.0.1:8787");
-    axum::serve(listener, app).await.expect("serve x3-swarm-api");
+    axum::serve(listener, app)
+        .await
+        .expect("serve x3-swarm-api");
 }
 
 fn now() -> String {
@@ -159,7 +165,7 @@ async fn status(State(state): State<SharedState>) -> Json<serde_json::Value> {
         "status": "running",
         "mode": "GUARDED_TESTNET",
         "kill_switch": state.kill_switch,
-        "tasks": state.tasks.len(),
+        "tasks": state.scheduler.count_tasks(),
         "memory_entries": state.memory.len(),
     }))
 }
@@ -185,7 +191,11 @@ async fn agents() -> Json<Vec<AgentKind>> {
 
 async fn list_tasks(State(state): State<SharedState>) -> Json<Vec<AgentTask>> {
     let state = state.lock().await;
-    Json(state.tasks.values().cloned().collect())
+    // Deterministic order by id: the response body must not depend on the
+    // scheduler's insertion history.
+    let mut tasks: Vec<AgentTask> = state.scheduler.tasks().cloned().collect();
+    tasks.sort_by(|a, b| a.id.cmp(&b.id));
+    Json(tasks)
 }
 
 #[derive(Debug, Deserialize)]
@@ -265,7 +275,9 @@ async fn create_task(
     };
 
     emit_event(&mut state, "task_created", format!("{} created", task.id));
-    state.tasks.insert(task.id.clone(), task.clone());
+    // The scheduler is the only place a task lives; `enqueue` returns the
+    // previous value for a re-used id rather than colliding silently.
+    let _previous = state.scheduler.enqueue(task.clone());
     Ok((StatusCode::CREATED, Json(task)))
 }
 
@@ -275,19 +287,26 @@ async fn get_task(
 ) -> Result<Json<AgentTask>, StatusCode> {
     let state = state.lock().await;
     state
-        .tasks
+        .scheduler
         .get(&id)
         .cloned()
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-fn update_status(state: &mut AppState, id: &str, status: TaskStatus) -> Result<AgentTask, StatusCode> {
-    let Some(task) = state.tasks.get_mut(id) else {
+fn update_status(
+    state: &mut AppState,
+    id: &str,
+    status: TaskStatus,
+) -> Result<AgentTask, StatusCode> {
+    if !state.scheduler.update_status(id, status) {
         return Err(StatusCode::NOT_FOUND);
-    };
-    task.status = status;
-    let out = task.clone();
+    }
+    let out = state
+        .scheduler
+        .get(id)
+        .cloned()
+        .ok_or(StatusCode::NOT_FOUND)?;
     emit_event(state, "task_status", format!("{} -> {:?}", id, out.status));
     Ok(out)
 }
@@ -337,22 +356,22 @@ async fn reject_task(
 
 async fn scoreboard(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let state = state.lock().await;
-    let total = state.tasks.len() as f64;
+    let total = state.scheduler.count_tasks() as f64;
     let passed = state
-        .tasks
-        .values()
+        .scheduler
+        .tasks()
         .filter(|task| task.status == TaskStatus::Passed)
         .count() as f64;
     let failed = state
-        .tasks
-        .values()
+        .scheduler
+        .tasks()
         .filter(|task| task.status == TaskStatus::Failed)
         .count();
 
     let success_rate = if total > 0.0 { passed / total } else { 0.0 };
     Json(json!({
         "service": "x3-swarm-api",
-        "tasks_total": state.tasks.len(),
+        "tasks_total": state.scheduler.count_tasks(),
         "tasks_passed": passed as usize,
         "tasks_failed": failed,
         "success_rate": success_rate,
@@ -395,7 +414,11 @@ async fn create_memory(
     while state.memory.len() > MAX_MEMORY {
         state.memory.pop_back();
     }
-    emit_event(&mut state, "memory_recorded", format!("{} recorded", entry.id));
+    emit_event(
+        &mut state,
+        "memory_recorded",
+        format!("{} recorded", entry.id),
+    );
     Ok((StatusCode::CREATED, Json(entry)))
 }
 
@@ -429,4 +452,121 @@ async fn kill_switch(
         format!("kill switch set to {enabled} ({reason})"),
     );
     Json(json!({ "kill_switch": state.kill_switch }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::State;
+
+    fn fresh_state() -> SharedState {
+        Arc::new(Mutex::new(AppState::default()))
+    }
+
+    fn request(title: &str) -> NewTaskRequest {
+        NewTaskRequest {
+            title: title.to_string(),
+            feature: "swarm_core_consolidation".to_string(),
+            agent: AgentKind::TestBuilder,
+            permission_tier: x3_swarm_core::AgentPermissionTier::DocsTestsReports,
+            allowed_paths: vec![],
+            forbidden_paths: vec![],
+            required_commands: vec![],
+            approval_required: ApprovalRequirement::HumanReview,
+            risk: "low".to_string(),
+        }
+    }
+
+    /// The service holds a created task in `SwarmScheduler`, so the crate's
+    /// scheduler is the single task registry rather than a second map that
+    /// happens to agree today.
+    #[tokio::test]
+    async fn a_created_task_is_held_by_the_crate_scheduler() {
+        let state = fresh_state();
+        let (http, Json(created)) = create_task(State(state.clone()), Json(request("one")))
+            .await
+            .expect("a known risk level cannot fail to create a task");
+        assert_eq!(http, StatusCode::CREATED);
+
+        let held = state.lock().await;
+        assert!(
+            held.scheduler.get(&created.id).is_some(),
+            "the task must be readable from the crate's SwarmScheduler"
+        );
+        assert_eq!(held.scheduler.count_tasks(), 1);
+    }
+
+    /// start -> complete is a status transition on the scheduler's own record.
+    #[tokio::test]
+    async fn the_start_and_complete_transitions_land_in_the_scheduler() {
+        let state = fresh_state();
+        let (_, Json(created)) = create_task(State(state.clone()), Json(request("two")))
+            .await
+            .expect("create cannot fail");
+
+        let Json(started) = start_task(Path(created.id.clone()), State(state.clone()))
+            .await
+            .expect("a pending task can be started");
+        assert_eq!(started.status, TaskStatus::Running);
+
+        let Json(completed) = complete_task(Path(created.id.clone()), State(state.clone()))
+            .await
+            .expect("a running task can be completed");
+        assert_eq!(completed.status, TaskStatus::Passed);
+
+        let held = state.lock().await;
+        assert_eq!(
+            held.scheduler.get(&created.id).map(|task| task.status),
+            Some(TaskStatus::Passed),
+            "the scheduler's record, not a copy, must carry the final status"
+        );
+    }
+
+    /// The kill switch refuses a start without moving the task, and the refusal
+    /// is observable in the scheduler (still `Pending`).
+    #[tokio::test]
+    async fn the_kill_switch_refuses_a_start_and_leaves_the_task_pending() {
+        let state = fresh_state();
+        let (_, Json(created)) = create_task(State(state.clone()), Json(request("three")))
+            .await
+            .expect("create cannot fail");
+
+        {
+            let mut held = state.lock().await;
+            held.kill_switch = true;
+        }
+
+        let refused = start_task(Path(created.id.clone()), State(state.clone())).await;
+        assert!(
+            matches!(refused, Err(StatusCode::LOCKED)),
+            "the kill switch must refuse the start with 423 Locked"
+        );
+
+        let held = state.lock().await;
+        assert_eq!(
+            held.scheduler.get(&created.id).map(|task| task.status),
+            Some(TaskStatus::Pending),
+            "a refused start must not have moved the task to Running"
+        );
+    }
+
+    /// The listing is a deterministic, id-ordered projection of the scheduler.
+    #[tokio::test]
+    async fn the_listing_is_id_ordered_and_matches_the_scheduler() {
+        let state = fresh_state();
+        for title in ["c", "a", "b"] {
+            let _ = create_task(State(state.clone()), Json(request(title)))
+                .await
+                .expect("create cannot fail");
+        }
+
+        let Json(listed) = list_tasks(State(state.clone())).await;
+        let ids: Vec<&str> = listed.iter().map(|task| task.id.as_str()).collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        assert_eq!(ids, sorted, "the HTTP listing must be sorted by id");
+
+        let held = state.lock().await;
+        assert_eq!(listed.len(), held.scheduler.count_tasks());
+    }
 }

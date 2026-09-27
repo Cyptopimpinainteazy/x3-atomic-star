@@ -31,12 +31,31 @@ pub struct HardwareSigningRequest {
     pub timeout_block: u64,
 }
 
+/// What has actually been established about a [`HardwareSignature`].
+///
+/// This replaced a `verified: bool` that `approve_signature` set to `true` the moment the device
+/// handed back any non-empty bytes with an in-range recovery id. A device approval is a *report from
+/// the device*, not a verification: nothing had checked the bytes against a transaction, and the
+/// field's name said the opposite. The two states below cannot be confused, and only a real verifier
+/// can produce [`SignatureVerification::Verified`] — which nothing can yet, because the device
+/// signing convention is undefined here and [`HardwareWalletEngine::verify_signature`] refuses every
+/// input rather than inventing one.
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
+pub enum SignatureVerification {
+    /// The device produced these bytes for this request and the user approved it on the device.
+    /// Nothing in this repository has checked them.
+    DeviceApprovedOnly,
+    /// A verifier checked the bytes against a defined convention and accepted them. No code path
+    /// produces this yet, and that is the honest state.
+    Verified,
+}
+
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct HardwareSignature {
     pub signature: Vec<u8>,
     pub public_key: Vec<u8>,
     pub signing_request_id: [u8; 32],
-    pub verified: bool,
+    pub verification: SignatureVerification,
     pub recovery_id: u8,
 }
 
@@ -184,7 +203,8 @@ impl HardwareWalletEngine {
             signature: signature_data.to_vec(),
             public_key: vec![],
             signing_request_id: request.request_id,
-            verified: true,
+            // The device approved the request. Nothing verified the bytes.
+            verification: SignatureVerification::DeviceApprovedOnly,
             recovery_id,
         })
     }
@@ -304,7 +324,7 @@ mod tests {
             signature: vec![],
             public_key: vec![],
             signing_request_id: [0u8; 32],
-            verified: false,
+            verification: SignatureVerification::DeviceApprovedOnly,
             recovery_id: 0,
         };
         let result = HardwareWalletEngine::verify_signature(&sig, [0u8; 32]);
@@ -319,7 +339,7 @@ mod tests {
             signature: vec![1; 64],
             public_key: vec![1, 2, 3],
             signing_request_id: [0u8; 32],
-            verified: false,
+            verification: SignatureVerification::DeviceApprovedOnly,
             recovery_id: 0,
         };
         let result = HardwareWalletEngine::verify_signature(&sig, [9u8; 32]);
@@ -339,7 +359,7 @@ mod tests {
             signature: vec![1; 64],
             public_key: vec![1, 2, 3],
             signing_request_id: [0u8; 32],
-            verified: false,
+            verification: SignatureVerification::DeviceApprovedOnly,
             recovery_id: 5, // invalid, should be 0-3
         };
         let result = HardwareWalletEngine::verify_signature(&sig, [0u8; 32]);
@@ -361,7 +381,11 @@ mod tests {
         assert!(result.is_ok());
         let sig = result.unwrap();
         assert_eq!(sig.recovery_id, 0);
-        assert!(sig.verified);
+        assert_eq!(
+            sig.verification,
+            SignatureVerification::DeviceApprovedOnly,
+            "a device approval is not a verification, and the type has to say so"
+        );
     }
 
     #[test]
@@ -435,5 +459,35 @@ mod tests {
         let id1 = HardwareWalletEngine::derive_request_id(&wallet_id, &tx_hash, 100);
         let id2 = HardwareWalletEngine::derive_request_id(&wallet_id, &tx_hash, 100);
         assert_eq!(id1, id2);
+    }
+}
+
+#[cfg(test)]
+mod approval_is_not_verification {
+    use super::*;
+
+    /// The row's open item, closed at the type level: what an approval produces is
+    /// `DeviceApprovedOnly`, and the only path to `Verified` (a real verifier) still refuses every
+    /// input. The two facts are asserted together so neither can be satisfied by accident.
+    #[test]
+    fn an_approved_signature_is_recorded_as_unverified_and_verification_still_refuses() {
+        let wallet =
+            HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+        let request =
+            HardwareWalletEngine::request_signature(&wallet, [7u8; 32], b"Confirm", 100).unwrap();
+
+        let approved =
+            HardwareWalletEngine::approve_signature(&request, &[9u8; 64], 1).expect("approval");
+        assert_eq!(
+            approved.verification,
+            SignatureVerification::DeviceApprovedOnly,
+            "an approval must not be recorded as a verification"
+        );
+
+        // And nothing can promote it: the verifier refuses, so `Verified` is unreachable here.
+        assert!(
+            HardwareWalletEngine::verify_signature(&approved, [7u8; 32]).is_err(),
+            "verification is unimplemented, so no signature may come back verified"
+        );
     }
 }

@@ -1,0 +1,11 @@
+Reproduction: a raw genesis spec whose System::Number is the *producing* chain's
+height panics on every block it tries to author. A real raw genesis does not
+carry the key at all (checked: absent in `x3-chain-node build-spec --dev --raw`),
+which is exactly what `restore --regenesis` restores.
+
+$ grep -c 'Block number must be strictly increasing' node.log
+124
+
+assertion `left == right` failed: Block number must be strictly increasing.
+  left: 6
+ right: 1

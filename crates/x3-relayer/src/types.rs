@@ -16,6 +16,11 @@ pub struct RelayerConfig {
     pub x3: X3Config,
     pub evm_chains: Vec<EvmChainConfig>,
     pub svm_clusters: Vec<SvmClusterConfig>,
+    /// The authorized validator set a proof's attestation quorum is derived
+    /// from. `#[serde(default)]` keeps configurations written before this field
+    /// existed loadable, and the default is the fail-closed empty set.
+    #[serde(default)]
+    pub validator_set: ValidatorSetConfig,
     pub submission: SubmissionConfig,
     pub governance: GovernanceConfig,
     pub logging: LoggingConfig,
@@ -54,6 +59,26 @@ pub struct SvmClusterConfig {
     pub slot_poll_interval_ms: u64,
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent_requests: u32,
+}
+
+/// The validator set authorized to attest external-chain finality.
+///
+/// The number of signatures an SVM finalized-slot proof must carry is a
+/// supermajority of this set — `floor(2n/3) + 1` distinct signers, the single
+/// definition in `x3_validator_attestation::supermajority_threshold`. It is
+/// derived from the set, never configured separately, so a set cannot be paired
+/// with a threshold that does not belong to it.
+///
+/// An empty list is the fail-closed default: with no authorized validators,
+/// nothing can attest, so every SVM proof is refused and the relayer refuses to
+/// produce one.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ValidatorSetConfig {
+    /// Hex-encoded Ed25519 public keys of the authorized validators, with or
+    /// without a `0x` prefix. Malformed, wrongly sized or repeated entries are
+    /// refused at startup rather than silently dropped.
+    #[serde(default)]
+    pub svm_validator_pubkeys: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

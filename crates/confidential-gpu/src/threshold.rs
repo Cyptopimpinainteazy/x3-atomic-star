@@ -41,6 +41,13 @@ pub struct DkgManager {
     validator_index: u32,
     threshold: u32,
     committee_size: u32,
+    /// The ceremony this manager's shares belong to.
+    ///
+    /// Recorded on every [`private_mempool::DecryptionShare`] this manager
+    /// produces, and required of every share it combines, so a share from an
+    /// earlier ceremony is refused with a named error instead of being
+    /// interpolated into a point that belongs to no committee.
+    dkg_epoch: u64,
     /// Our secret polynomial coefficients.
     secret_coefficients: Vec<Scalar>,
     /// Received shares from other validators.
@@ -55,11 +62,12 @@ pub struct DkgManager {
 }
 
 impl DkgManager {
-    pub fn new(validator_index: u32, threshold: u32, committee_size: u32) -> Self {
+    pub fn new(validator_index: u32, threshold: u32, committee_size: u32, dkg_epoch: u64) -> Self {
         Self {
             validator_index,
             threshold,
             committee_size,
+            dkg_epoch,
             secret_coefficients: Vec::new(),
             received_shares: Vec::new(),
             peer_commitments: std::collections::HashMap::new(),
@@ -248,7 +256,7 @@ impl DkgManager {
         &self,
         shares: &[private_mempool::DecryptionShare],
     ) -> Result<[u8; 32], ConfidentialGpuError> {
-        private_mempool::encryption::combine_shares(shares, self.threshold)
+        private_mempool::encryption::combine_shares(shares, self.threshold, self.dkg_epoch)
             .map_err(|e| ConfidentialGpuError::DkgFailed(e.to_string()))
     }
 
@@ -261,6 +269,11 @@ impl DkgManager {
     pub fn is_complete(&self) -> bool {
         self.complete
     }
+
+    /// The ceremony this manager's shares belong to.
+    pub fn dkg_epoch(&self) -> u64 {
+        self.dkg_epoch
+    }
 }
 
 #[cfg(test)]
@@ -270,7 +283,7 @@ mod tests {
     #[test]
     fn dkg_ceremony_flow() {
         // 3-of-5 DKG
-        let mut validators: Vec<DkgManager> = (0..5).map(|i| DkgManager::new(i, 3, 5)).collect();
+        let mut validators: Vec<DkgManager> = (0..5).map(|i| DkgManager::new(i, 3, 5, 1)).collect();
 
         // Phase 1: Generate commitments
         let commitments: Vec<DkgCommitment> = validators
@@ -307,16 +320,40 @@ mod tests {
     /// # Invariant: PRIV-EXEC-003
     #[test]
     fn combine_requires_threshold() {
-        let mgr = DkgManager::new(0, 3, 5);
+        let mgr = DkgManager::new(0, 3, 5, 1);
 
         let shares = vec![private_mempool::DecryptionShare {
             validator_index: 0,
             share: vec![0x01; 32],
             proof: vec![],
+            dkg_epoch: 1,
         }];
 
         // Only 1 share, need 3
         let result = mgr.combine_decryption_shares(&shares);
         assert!(result.is_err());
+    }
+
+    /// # Invariant: PRIV-EXEC-003
+    #[test]
+    fn a_share_from_another_ceremony_is_refused_by_name() {
+        let mgr = DkgManager::new(0, 3, 5, 7);
+        assert_eq!(mgr.dkg_epoch(), 7);
+
+        let shares: Vec<private_mempool::DecryptionShare> = (0..3)
+            .map(|index| private_mempool::DecryptionShare {
+                validator_index: index + 1,
+                share: vec![0x01; 32],
+                proof: vec![],
+                dkg_epoch: 6, // the ceremony before this one
+            })
+            .collect();
+
+        let err = mgr.combine_decryption_shares(&shares).unwrap_err();
+        let message = err.to_string();
+        assert!(
+            message.contains("epoch 7") && message.contains("epoch 6"),
+            "a share from an earlier ceremony must be refused by naming both epochs, got: {message}"
+        );
     }
 }

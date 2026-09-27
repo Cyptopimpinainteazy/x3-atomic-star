@@ -61,6 +61,20 @@ impl crate::Config for Test {
     type DefaultMaxProposalDepth = DefaultMaxProposalDepth;
     type WeightInfo = ();
     type SecurityHook = x3_security_events::NoOpHook;
+    type HaltExemptCalls = TestHaltExemptCalls;
+}
+
+/// The mock's recovery allowlist: only the remedy itself, so a test can show the
+/// gate refusing a call that is not on it.
+pub struct TestHaltExemptCalls;
+
+impl frame_support::traits::Contains<RuntimeCall> for TestHaltExemptCalls {
+    fn contains(call: &RuntimeCall) -> bool {
+        matches!(
+            call,
+            RuntimeCall::Invariants(crate::Call::clear_halted { .. })
+        )
+    }
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

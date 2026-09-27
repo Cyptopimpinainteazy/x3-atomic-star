@@ -83,13 +83,26 @@ for field in (
     "spec_version",
     "impl_version",
     "transaction_version",
-    "state_version",
 ):
     mm = re.search(rf"{field}\s*:\s*(\d+)", block)
     if not mm:
         errors.append(f"RuntimeVersion.{field} missing")
         continue
     version[field] = int(mm.group(1))
+
+# `state_version` was removed from `sp_version::RuntimeVersion` and
+# `system_version` added in the pinned polkadot-sdk revision, so this gate could
+# no longer parse the block it exists to pin: it exited with
+# `RuntimeVersion.state_version missing` on every run, and because nothing ran
+# it, nothing noticed. Both are now recorded when present and required only if
+# the source carries them. Appearing and disappearing are still drift: the
+# comparison walks the source's key set first and then the baseline's, so a
+# field that comes back is reported as a `current` value the baseline lacks,
+# and a baseline field the source dropped is reported as disappeared.
+for field in ("state_version", "system_version"):
+    mm = re.search(rf"{field}\s*:\s*(\d+)", block)
+    if mm:
+        version[field] = int(mm.group(1))
 
 # ---- 2. construct_runtime! variants ----
 #

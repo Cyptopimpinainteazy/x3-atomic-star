@@ -29,6 +29,8 @@ jobs:
       
       - name: ⚡ Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       
       - name: 🔨 Build proof binary
         run: cargo build -p x3-proof --release

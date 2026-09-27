@@ -30,6 +30,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
           shared-key: four-validator-mesh
 
       - name: Install subkey

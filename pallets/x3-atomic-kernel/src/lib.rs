@@ -45,13 +45,14 @@
 //!   bundle_id:       H256         — unique bundle identifier
 //!   receipt_root:    H256         — Merkle root of execution receipts
 //!   finalized_block: BlockNumber  — block number where bundle was finalized
-//!   finality_cert:   H256         — GRANDPA justification hash or Flash cert hash
+//!   finality_cert:   H256         — blake2_256 of that block's hash
 //! }
 //! ```
 //!
 //! A verifier on an external chain checks:
 //! 1. `receipt_root` commits to the claimed execution outcomes.
-//! 2. `finality_cert` is a valid GRANDPA justification for `finalized_block`.
+//! 2. `finality_cert` is `blake2_256(block_hash(finalized_block))`, which it recomputes from
+//!    `finalized_block`'s own header.
 //! 3. The bundle inclusion proof links `bundle_id` to that block.
 //!
 //! ## Audit Alignment
@@ -85,6 +86,28 @@ pub mod vm_revert;
 // Re-export weights for runtime integration
 pub mod weights;
 pub use weights::WeightInfo;
+
+/// The finality certificate the chain is able to *check*, for a given block hash.
+///
+/// `do_finalize_bundle` accepts a bundle only when its `finality_cert` equals the anchored value,
+/// so the anchor is where "finality is proven" either happens or does not. It did not: until
+/// 2026-09-27 `record_flash_finality_anchor` was unsigned, took the first non-zero hash for a
+/// height, and stored whatever the submitter sent — so any peer who won that race chose the
+/// certificate the chain would later attest to (TICKET-107).
+///
+/// A runtime cannot verify a Flash-Finality certificate: that needs the voter's keys, which a
+/// runtime does not hold. The only certificate it can accept is therefore one it derives from
+/// finalized chain state it already has, and this is that derivation — `blake2_256` over the
+/// block's own hash, which is exactly what the node's GRANDPA path computes before submitting.
+/// Any submitter that sends this digest sends the correct value; a submitter that sends anything
+/// else is refused by name. It is checkable *off* chain by anyone holding the block header, which
+/// is what makes the PoAE proof's `finality_cert` evidence rather than a claim.
+///
+/// One definition, shared by the runtime and the node (`node/src/service.rs`), so the two cannot
+/// drift into computing different digests.
+pub fn finality_cert_from_block_hash(block_hash: &[u8]) -> sp_core::H256 {
+    sp_core::H256::from(sp_io::hashing::blake2_256(block_hash))
+}
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -225,11 +248,13 @@ pub mod pallet {
         ValueQuery,
     >;
 
-    /// On-chain anchors for Flash-Finality certificates, keyed by block number
-    /// (as LE-encoded u64).  The off-chain worker writes an entry here (via an
-    /// unsigned extrinsic `record_flash_finality_anchor`) whenever it observes
-    /// a valid certificate in off-chain local storage.  `do_finalize_bundle`
-    /// checks this map when the caller supplies a non-zero `finality_cert`.
+    /// On-chain anchors for finality certificates, keyed by block number.
+    ///
+    /// Written by the off-chain worker's unsigned `record_flash_finality_anchor`, and read by
+    /// `do_finalize_bundle`, which accepts a bundle only when the caller's `finality_cert` equals
+    /// the anchored value. The extrinsic stores the certificate only if it is the one this chain
+    /// derives for that block ([`Pallet::derive_finality_cert`]), so this map cannot hold a value
+    /// chosen by whoever submitted first — see [`crate::finality_cert_from_block_hash`].
     #[pallet::storage]
     pub type FinalityCertAnchors<T: Config> = StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
 
@@ -452,6 +477,13 @@ pub mod pallet {
         /// finalized block.  Submitted cert differs from the one written by
         /// the Flash Finality voter.
         InvalidFinalityCert,
+        /// The certificate offered to `record_flash_finality_anchor` is not the one the
+        /// chain derives for that block, or the block has no hash this chain can read.
+        ///
+        /// The anchor is the value `do_finalize_bundle` compares against, and the rule
+        /// that decides whether an anchor may be written is the difference between a
+        /// finality certificate and a value whoever wrote first happened to choose.
+        FinalityCertNotDerived,
         /// Bundle data is invalid or malformed (S0-005 consistency check).
         /// Examples: zero legs_hash, invalid leg count.
         InvalidBundleData,
@@ -805,13 +837,18 @@ pub mod pallet {
             Self::do_finalize_bundle(bundle_id, receipt_root, finality_cert, finalized_block)
         }
 
-        /// Store an on-chain anchor for a Flash Finality certificate.
+        /// Store an on-chain anchor for a finality certificate.
         ///
-        /// Submitted as an **unsigned** transaction by the off-chain worker
-        /// whenever a non-zero cert is found in off-chain local storage.
-        /// Once anchored, `do_finalize_bundle` uses this to verify the
-        /// `finality_cert` supplied via the signed `finalize_atomic_bundle`
-        /// extrinsic, preventing submission of fabricated cert hashes.
+        /// Submitted as an **unsigned** transaction by the off-chain worker whenever a non-zero
+        /// cert is found in off-chain local storage. Once anchored, `do_finalize_bundle` uses this
+        /// to verify the `finality_cert` supplied via the signed `finalize_atomic_bundle`
+        /// extrinsic.
+        ///
+        /// Being unsigned is why the value is not taken on trust: the certificate must equal
+        /// [`Pallet::derive_finality_cert`] for `block_num`, which the chain computes from its own
+        /// finalized block hash. Anything else is `FinalityCertNotDerived`. Without that check this
+        /// extrinsic *was* the fabrication it was meant to prevent — an unsigned call, first write
+        /// wins, arbitrary value (TICKET-107).
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::record_flash_finality_anchor())]
         pub fn record_flash_finality_anchor(
@@ -821,8 +858,16 @@ pub mod pallet {
         ) -> DispatchResult {
             ensure_none(origin)?;
             ensure!(cert != H256::zero(), Error::<T>::InvalidFinalityCert);
-            // Only store the first cert seen for each block — the Flash-Finality voter
-            // derives a deterministic cert per block, so the first non-zero one wins.
+
+            // The cert must be the one the chain derives for that block. This is what makes
+            // "first non-zero cert wins" below harmless: there is only one value any submitter
+            // can send that this extrinsic will store, so winning the race buys nothing.
+            let derived =
+                Self::derive_finality_cert(block_num).ok_or(Error::<T>::FinalityCertNotDerived)?;
+            ensure!(cert == derived, Error::<T>::FinalityCertNotDerived);
+
+            // Only store the first cert seen for each block. Kept as a rule — the value is
+            // already unique per block — so a repeat submission is a no-op rather than a write.
             if !FinalityCertAnchors::<T>::contains_key(block_num) {
                 FinalityCertAnchors::<T>::insert(block_num, cert);
                 log::info!(
@@ -1015,6 +1060,13 @@ pub mod pallet {
                 // reasonable window of the current chain head.  This prevents
                 // attackers from planting anchors for far-future blocks or for
                 // ancient blocks that are no longer relevant.
+                //
+                // The certificate's *value* is checked at dispatch
+                // (`FinalityCertNotDerived`), not here, and deliberately so: this runs on every
+                // node that sees the transaction, against that node's own view, and a node one
+                // block behind cannot yet read the hash of the block being anchored. Refusing
+                // there would stop propagation of an honest anchor, so the pool filter stays the
+                // weaker one and the block author's state is what decides.
                 let current_block: u64 = <frame_system::Pallet<T>>::block_number()
                     .try_into()
                     .unwrap_or(0u64);
@@ -1248,6 +1300,23 @@ pub mod pallet {
 
                 Ok(())
             })
+        }
+
+        /// The certificate this chain will anchor, and therefore the only value
+        /// `do_finalize_bundle` can be made to accept for `block_num`.
+        ///
+        /// `None` when the chain holds no hash for the height: a block number in the future, one
+        /// that never existed, or one older than `frame_system`'s `BlockHashCount` window. A
+        /// missing hash is not evidence of anything, so it is refused rather than folded into a
+        /// digest of zeros — otherwise "the block is ancient" and "the block exists and hashes to
+        /// zero" would be the same input.
+        pub fn derive_finality_cert(block_num: u64) -> Option<H256> {
+            let number: BlockNumberFor<T> = block_num.try_into().ok()?;
+            let hash = <frame_system::Pallet<T>>::block_hash(number);
+            if hash == <T as frame_system::Config>::Hash::default() {
+                return None;
+            }
+            Some(crate::finality_cert_from_block_hash(hash.as_ref()))
         }
 
         /// Verify bundle record consistency before finalization (S0-005).

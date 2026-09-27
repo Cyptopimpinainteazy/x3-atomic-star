@@ -85,6 +85,11 @@ const COMIT_FEE: u128 = 1_000_000;
 /// receipt read is keyed rather than a constant).
 const COMIT_ID_SEED: u64 = 0x0078_336c_616e_6731;
 const UNSENT_COMIT_ID_SEED: u64 = 0x0078_336c_616e_6732;
+/// Comit ids for the state half: a read before anything was stored, the store itself, and the read
+/// that must see it.
+const LOAD_BEFORE_COMIT_ID_SEED: u64 = 0x0078_336c_616e_6733;
+const STORE_COMIT_ID_SEED: u64 = 0x0078_336c_616e_6734;
+const LOAD_AFTER_COMIT_ID_SEED: u64 = 0x0078_336c_616e_6735;
 
 /// `X3VmAdapter::execute` stamps every X3 receipt with this protocol version
 /// (`pallets/x3-kernel/src/adapters.rs`). Naming it here means the assertion fails loudly if the
@@ -233,6 +238,98 @@ fn x3_receipt_storage_key(comit_id: H256) -> String {
     key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
     key.extend_from_slice(&encoded);
     format!("0x{}", hex::encode(key))
+}
+
+/// `main() { sstore(slot: 0, value: 7); return; }`, assembled with the compiler's own envelope
+/// writer.
+///
+/// The `.x3` front end has no storage primitive yet, so the program that exercises the state
+/// channel is assembled rather than compiled — the same fixture the kernel's own end-to-end test
+/// uses, kept in step with it by assertion rather than by copy: the slot key and the payload the
+/// chain must hold are both recomputed here from the layout.
+fn module_with_code(code: Vec<u8>) -> Vec<u8> {
+    let mut module = x3_backend::BytecodeModule::new();
+    module.functions.push(x3_backend::FunctionEntry {
+        name: "main".to_string(),
+        entry_point: 0,
+        param_count: 0,
+        local_count: 8,
+        max_stack: 8,
+        return_type_tag: 1,
+    });
+    module.code = code;
+    module.to_bytes()
+}
+
+fn store_seven_in_slot_zero() -> Vec<u8> {
+    module_with_code(vec![
+        0x18, 0x01, 0x00, // LoadImm r1, 0  (slot)
+        0x18, 0x02, 0x07, // LoadImm r2, 7  (value)
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x06, // RetVoid
+    ])
+}
+
+fn load_slot_zero() -> Vec<u8> {
+    module_with_code(vec![
+        0x18, 0x01, 0x00, // LoadImm r1, 0 (slot)
+        0xB3, 0x00, 0x01, // EvmSload dst=r0 slot=r1
+        0x05, 0x00, // Ret r0
+    ])
+}
+
+/// The slot key the VM derives for slot `n`: `"X3EVM_SL"` little-endian, then the slot number.
+const EVM_SLOT_DOMAIN: u64 = 0x5833_4556_4D5F_534C; // "X3EVM_SL"
+
+fn evm_slot_key(slot: u64) -> H256 {
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&EVM_SLOT_DOMAIN.to_le_bytes());
+    key[8..16].copy_from_slice(&slot.to_le_bytes());
+    H256::from(key)
+}
+
+/// The 32-byte payload the VM writes for `Value::I64(7)`: tag 1 (int), length 8, then the digits.
+fn encoded_i64_payload(value: i64) -> [u8; 32] {
+    let mut payload = [0u8; 32];
+    payload[0] = 1;
+    payload[1] = 8;
+    payload[2..10].copy_from_slice(&value.to_le_bytes());
+    payload
+}
+
+/// The storage key of the kernel's `X3ContractStorage` entry for `slot_key`.
+fn x3_contract_slot_storage_key(slot_key: H256) -> String {
+    let mut key =
+        frame_support::storage::storage_prefix(b"AtlasKernel", b"X3ContractStorage").to_vec();
+    let encoded = slot_key.encode();
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&encoded);
+    format!("0x{}", hex::encode(key))
+}
+
+/// Read a contract slot from one validator, at one block. `None` means the chain holds no slot
+/// there, which is different from an RPC failure and is distinguished for that reason.
+fn x3_contract_slot_at(port: u16, slot_key: H256, at: &str) -> Option<[u8; 32]> {
+    let value = rpc_try(
+        port,
+        "state_getStorage",
+        vec![
+            Value::String(x3_contract_slot_storage_key(slot_key)),
+            Value::String(at.to_string()),
+        ],
+    )
+    .ok()?;
+    let hex = value.as_str()?;
+    let bytes = hex::decode(hex.trim_start_matches("0x")).ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let mut slot = [0u8; 32];
+    if bytes.len() != 32 {
+        return None;
+    }
+    slot.copy_from_slice(&bytes);
+    Some(slot)
 }
 
 /// Read a comit's X3 receipt from one validator, at one block. `None` means that chain stored no
@@ -811,5 +908,83 @@ fn a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it() {
         best_number(ALICE_RPC),
         best_number(BOB_RPC),
         best_number(CHARLIE_RPC),
+    );
+
+    // ── the state half: a slot one comit writes, read back by the next comit ──────────────────
+    //
+    // Everything above proves a *return value* survives consensus. This proves state does: the
+    // first comit below stores 7 in slot 0, the chain holds it in `X3ContractStorage`, and the
+    // third comit's program reads slot 0 and returns it. The read before the store is the control
+    // — without it, a reader that answered 7 regardless of chain state would look like a pass.
+    let slot_key = evm_slot_key(0);
+
+    let load_before_id = H256::from_low_u64_be(LOAD_BEFORE_COMIT_ID_SEED);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(load_before_id, load_slot_zero(), COMIT_FEE)
+        .expect("sign the control read");
+    submit_to(ALICE_RPC, &signed);
+    let (_n, hash) = wait_finalized(CHARLIE_RPC, &signed, FINALITY_TIMEOUT);
+    let control = x3_receipt_at(CHARLIE_RPC, load_before_id, &hash)
+        .expect("Charlie stored the control read's receipt");
+    assert_eq!(
+        control.return_data,
+        0i64.to_le_bytes().to_vec(),
+        "a slot no comit has written must read as the interpreter's zero"
+    );
+    assert!(
+        x3_contract_slot_at(CHARLIE_RPC, slot_key, &hash).is_none(),
+        "the chain held a slot before anything stored one"
+    );
+    println!(
+        "[x3-lang-net] control: a read before any store returned 0, and the chain holds no slot"
+    );
+
+    let store_id = H256::from_low_u64_be(STORE_COMIT_ID_SEED);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(store_id, store_seven_in_slot_zero(), COMIT_FEE)
+        .expect("sign the storing comit");
+    submit_to(ALICE_RPC, &signed);
+    let (_n, store_hash) = wait_finalized(CHARLIE_RPC, &signed, FINALITY_TIMEOUT);
+    let store_receipt =
+        x3_receipt_at(CHARLIE_RPC, store_id, &store_hash).expect("the store's receipt is stored");
+    assert!(store_receipt.success, "the storing comit must succeed");
+    assert!(
+        !store_receipt.storage_writes.is_empty(),
+        "a slot write must be reported as a state change on the receipt"
+    );
+    assert_eq!(
+        x3_contract_slot_at(CHARLIE_RPC, slot_key, &store_hash),
+        Some(encoded_i64_payload(7)),
+        "the writing comit's slot must be readable from chain storage on the observer"
+    );
+    println!(
+        "[x3-lang-net] the store landed: slot 0 of comit {store_id:?} holds the encoded 7 at {store_hash}"
+    );
+
+    let load_after_id = H256::from_low_u64_be(LOAD_AFTER_COMIT_ID_SEED);
+    let signed = alice
+        .sign_kernel_submit_comit_v2(load_after_id, load_slot_zero(), COMIT_FEE)
+        .expect("sign the reading comit");
+    submit_to(ALICE_RPC, &signed);
+    let (_n, read_hash) = wait_finalized(CHARLIE_RPC, &signed, FINALITY_TIMEOUT);
+    let read_receipt = x3_receipt_at(CHARLIE_RPC, load_after_id, &read_hash)
+        .expect("the read's receipt is stored");
+    assert_eq!(
+        read_receipt.return_data,
+        7i64.to_le_bytes().to_vec(),
+        "a later comit must read the slot the earlier one wrote, from chain state"
+    );
+    assert!(
+        read_receipt.storage_writes.is_empty(),
+        "reading chain state must not be reported as a state change"
+    );
+    assert_eq!(
+        x3_contract_slot_at(CHARLIE_RPC, slot_key, &read_hash),
+        Some(encoded_i64_payload(7)),
+        "the read must leave the slot as the writer left it"
+    );
+    println!(
+        "[x3-lang-net] the read landed: comit {load_after_id:?} returned 7 from the slot comit \
+         {store_id:?} wrote, and its receipt claims no write of its own"
     );
 }

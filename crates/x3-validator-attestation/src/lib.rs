@@ -24,6 +24,41 @@ pub const PUBLIC_KEY_LEN: usize = 32;
 /// Length of an Ed25519 signature, in bytes.
 pub const SIGNATURE_LEN: usize = 64;
 
+/// Numerator of the workspace's supermajority rule (see
+/// [`supermajority_threshold`]).
+pub const SUPERMAJORITY_NUMERATOR: u64 = 2;
+/// Denominator of the workspace's supermajority rule (see
+/// [`supermajority_threshold`]).
+pub const SUPERMAJORITY_DENOMINATOR: u64 = 3;
+
+/// The number of **distinct** validators that must attest for a validator set of
+/// `total_validators` members to have reached a supermajority.
+///
+/// The rule is *strictly more than two thirds*: `floor(2 * n / 3) + 1`.
+///
+/// This is the single definition of the rule in the workspace. A producer that
+/// decides how many signatures a proof must carry (the relayer) and a consumer
+/// that decides whether an attestation set is enough (a verifier, or
+/// [`AttestationSet::has_supermajority`]) must both call this function, so the
+/// two can never drift into disagreeing about what "supermajority" means.
+///
+/// Fail-closed properties, both load-bearing:
+///
+/// * the result is never `0` — at least one distinct attestation is always
+///   required, so an empty (or unconfigured) validator set can never reach
+///   quorum by supplying zero signatures;
+/// * it is monotonically non-decreasing in `total_validators`, so adding a
+///   validator never lowers the bar.
+///
+/// `total_validators` above `u32::MAX * 3 / 2` saturates at `u32::MAX` rather
+/// than wrapping.
+pub fn supermajority_threshold(total_validators: usize) -> u32 {
+    let total = total_validators as u128;
+    let threshold =
+        (SUPERMAJORITY_NUMERATOR as u128 * total) / SUPERMAJORITY_DENOMINATOR as u128 + 1;
+    threshold.min(u32::MAX as u128) as u32
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ValidatorId(pub String);
 
@@ -160,6 +195,18 @@ impl AttestationSet {
 
     pub fn has_quorum(&self, required_weight: u64) -> bool {
         self.total_weight >= required_weight
+    }
+
+    /// Whether this set carries attestations from a supermajority of a
+    /// `total_validators`-member validator set.
+    ///
+    /// Counts **distinct** validators (`unique_validators`), not raw signatures
+    /// and not weight: two attestations from one validator are one validator,
+    /// which is what stops a single signer from filling an N-of-M quorum by
+    /// repeating itself. The bar itself comes from
+    /// [`supermajority_threshold`], the workspace's single definition.
+    pub fn has_supermajority(&self, total_validators: usize) -> bool {
+        self.unique_validators() >= supermajority_threshold(total_validators) as usize
     }
 
     pub fn validators(&self) -> HashSet<ValidatorId> {
@@ -329,5 +376,65 @@ mod tests {
         assert_eq!(set.total_weight(), 75);
         assert!(set.has_quorum(67));
         assert!(!set.has_quorum(80));
+    }
+
+    #[test]
+    fn supermajority_is_strictly_more_than_two_thirds() {
+        // floor(2n/3) + 1 is the smallest k with k > 2n/3.
+        assert_eq!(supermajority_threshold(0), 1);
+        assert_eq!(supermajority_threshold(1), 1);
+        assert_eq!(supermajority_threshold(2), 2);
+        assert_eq!(supermajority_threshold(3), 3);
+        assert_eq!(supermajority_threshold(4), 3);
+        assert_eq!(supermajority_threshold(5), 4);
+        assert_eq!(supermajority_threshold(6), 5);
+        assert_eq!(supermajority_threshold(7), 5);
+        assert_eq!(supermajority_threshold(9), 7);
+        // The canonical 67-of-100 case.
+        assert_eq!(supermajority_threshold(100), 67);
+    }
+
+    /// The rule must never return 0, or an unconfigured validator set would
+    /// reach quorum with no signatures at all.
+    #[test]
+    fn supermajority_never_admits_an_empty_set() {
+        for total in 0..64usize {
+            assert!(
+                supermajority_threshold(total) >= 1,
+                "a {total}-member set must still require at least one signature"
+            );
+        }
+        assert_eq!(supermajority_threshold(0), 1);
+    }
+
+    #[test]
+    fn supermajority_is_monotonic_in_the_set_size() {
+        for total in 1..256usize {
+            assert!(
+                supermajority_threshold(total) >= supermajority_threshold(total - 1),
+                "adding a validator must never lower the threshold ({total})"
+            );
+        }
+    }
+
+    #[test]
+    fn has_supermajority_counts_distinct_validators_from_the_single_rule() {
+        let mut set = AttestationSet::new([7; 32]);
+        assert!(!set.has_supermajority(3), "no attestations is not a quorum");
+
+        set.add_attestation(signed_attestation("alice", [7; 32], 1, 30))
+            .unwrap();
+        // One of three is not more than two thirds of three.
+        assert!(!set.has_supermajority(3));
+
+        set.add_attestation(signed_attestation("bob", [7; 32], 1, 31))
+            .unwrap();
+        // Two of three is still not *more* than two thirds.
+        assert!(!set.has_supermajority(3));
+
+        set.add_attestation(signed_attestation("carol", [7; 32], 1, 32))
+            .unwrap();
+        assert!(set.has_supermajority(3));
+        assert_eq!(supermajority_threshold(3), 3);
     }
 }

@@ -29,7 +29,6 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 use alloc::format;
 use alloc::string::{String, ToString};
-use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::adapter::{VmType, X3VmAdapter};
@@ -373,10 +372,65 @@ impl SwapScoreboard {
     }
 }
 
+/// Which chain an adapter settles on.
+///
+/// This is the distinction the "cross-chain complete" claim kept losing. X3 *runs* EVM, SVM and
+/// X3VM as its own execution domains, so their readiness is X3's own and is proven by X3's
+/// validators. Every other adapter settles on a chain X3 does not run, where readiness has to be
+/// proven against that chain; a perfect internal score says nothing about it. Pooling the two
+/// produced one number that read as "cross-chain complete" no matter which side was unready.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum SettlementScope {
+    /// A domain X3 executes itself: EVM, SVM or X3VM.
+    InternalDomain,
+    /// A chain X3 does not run; settlement there needs that chain's own proof.
+    ExternalChain,
+}
+
+impl Default for SettlementScope {
+    /// Fail closed: an adapter nobody classified is *not* counted as one of X3's own domains.
+    fn default() -> Self {
+        SettlementScope::ExternalChain
+    }
+}
+
+impl SettlementScope {
+    /// The scope of a VM type. Only the three domains X3 itself executes are internal.
+    pub fn of(vm_type: VmType) -> Self {
+        match vm_type {
+            VmType::Evm | VmType::Svm | VmType::X3Vm => SettlementScope::InternalDomain,
+            _ => SettlementScope::ExternalChain,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            SettlementScope::InternalDomain => "internal domain (X3 runs it)",
+            SettlementScope::ExternalChain => "external chain (X3 does not run it)",
+        }
+    }
+}
+
+/// A `(earned, max)` pair as a percentage, or 0 when the bucket is empty.
+fn percent(bucket: (u32, u32)) -> u32 {
+    if bucket.1 > 0 {
+        (bucket.0 * 100) / bucket.1
+    } else {
+        0
+    }
+}
+
 /// Per-adapter score entry
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AdapterScoreEntry {
     pub vm_type: VmType,
+    /// Whether this adapter is one of X3's own execution domains or an external chain.
+    ///
+    /// `#[serde(default)]` so a scoreboard serialised before this field existed still loads, and the
+    /// default is [`SettlementScope::ExternalChain`]: an entry nobody classified is never silently
+    /// counted as an internal domain.
+    #[serde(default)]
+    pub scope: SettlementScope,
     pub adapter_name: String,
     pub score: u32,
     pub max_score: u32, // always 100
@@ -387,8 +441,20 @@ pub struct AdapterScoreEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AdapterScoreboard {
     pub entries: Vec<AdapterScoreEntry>,
+    /// Pooled across both scopes. **Not** a cross-chain-completeness claim — read
+    /// [`AdapterScoreboard::internal_score`] and [`AdapterScoreboard::external_score`] for that.
     pub overall_score: u32,
     pub max_overall_score: u32,
+    /// X3's own execution domains (EVM/SVM/X3VM) only.
+    #[serde(default)]
+    pub internal_score: u32,
+    #[serde(default)]
+    pub internal_max_score: u32,
+    /// External chains only.
+    #[serde(default)]
+    pub external_score: u32,
+    #[serde(default)]
+    pub external_max_score: u32,
     pub timestamp: u64,
 }
 
@@ -404,6 +470,10 @@ impl AdapterScoreboard {
             entries: Vec::new(),
             overall_score: 0,
             max_overall_score: 100,
+            internal_score: 0,
+            internal_max_score: 0,
+            external_score: 0,
+            external_max_score: 0,
             timestamp: 0,
         }
     }
@@ -414,8 +484,10 @@ impl AdapterScoreboard {
             .iter()
             .map(|a| {
                 let rs = a.readiness_score();
+                let vm_type = a.vm_type();
                 AdapterScoreEntry {
-                    vm_type: a.vm_type(),
+                    vm_type,
+                    scope: SettlementScope::of(vm_type),
                     adapter_name: a.adapter_name().to_string(),
                     score: rs.score(),
                     max_score: 100,
@@ -428,206 +500,74 @@ impl AdapterScoreboard {
             })
             .collect();
 
-        let total: u32 = entries.iter().map(|e| e.score).sum();
-        let max_total: u32 = (entries.len() as u32) * 100;
-        let overall = if max_total > 0 {
-            (total * 100) / max_total
-        } else {
-            0
-        };
-
-        Self {
+        let mut board = Self {
             entries,
-            overall_score: overall,
+            overall_score: 0,
             max_overall_score: 100,
+            internal_score: 0,
+            internal_max_score: 0,
+            external_score: 0,
+            external_max_score: 0,
             timestamp,
-        }
+        };
+        board.recompute();
+        board
     }
 
-    /// Generate a default scoreboard depending on all 16 VM types with honest scores
-    pub fn default_scoreboard() -> Self {
-        let entries = vec![
-            AdapterScoreEntry {
-                vm_type: VmType::Evm,
-                adapter_name: "x3-adapter-evm".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::Svm,
-                adapter_name: "x3-adapter-svm".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::Substrate,
-                adapter_name: "x3-adapter-substrate".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::BitcoinScript,
-                adapter_name: "x3-adapter-bitcoin".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::X3Vm,
-                adapter_name: "x3-adapter-x3vm".into(),
-                score: 100,
-                max_score: 100,
-                missing_capabilities: vec![],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::MoveVm,
-                adapter_name: "x3-adapter-move".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::CosmWasm,
-                adapter_name: "x3-adapter-cosmwasm".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::CairoVm,
-                adapter_name: "x3-adapter-cairo".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::PlutusEutxo,
-                adapter_name: "x3-adapter-plutus".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::TonTvm,
-                adapter_name: "x3-adapter-ton-tvm".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::FuelVm,
-                adapter_name: "x3-adapter-fuelvm".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::NearWasm,
-                adapter_name: "x3-adapter-near-wasm".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::SorobanWasm,
-                adapter_name: "x3-adapter-soroban".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::WasmL1,
-                adapter_name: "x3-adapter-wasm-l1".into(),
-                score: 80,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::InkWasm,
-                adapter_name: "x3-adapter-ink".into(),
-                score: 70,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "event_proof_extraction".into(),
-                    "rpc_indexer_support".into(),
-                    "proof_ledger_integration".into(),
-                ],
-            },
-            AdapterScoreEntry {
-                vm_type: VmType::ZkVm,
-                adapter_name: "x3-adapter-zkvm".into(),
-                score: 60,
-                max_score: 100,
-                missing_capabilities: vec![
-                    "lock_path".into(),
-                    "claim_path".into(),
-                    "refund_path".into(),
-                    "event_proof_extraction".into(),
-                ],
-            },
-        ];
-        let count = entries.len();
-        let total: u32 = entries.iter().map(|e| e.score).sum();
-        let max_total = (count as u32) * 100;
-        let overall = if max_total > 0 {
+    /// Recompute every aggregate from [`Self::entries`].
+    ///
+    /// The pooled figure stays for compatibility, but it is not the claim: a chain with three
+    /// perfect internal domains and twelve 60%-ready external adapters pools to something that
+    /// reads as "mostly ready". `internal_score` and `external_score` are the two numbers a claim
+    /// of cross-chain completeness has to cite.
+    fn recompute(&mut self) {
+        let total: u32 = self.entries.iter().map(|e| e.score).sum();
+        let max_total: u32 = (self.entries.len() as u32) * 100;
+        self.overall_score = if max_total > 0 {
             (total * 100) / max_total
         } else {
             0
         };
-        Self {
-            entries,
-            overall_score: overall,
-            max_overall_score: 100,
-            timestamp: 0,
+
+        let mut internal = (0u32, 0u32);
+        let mut external = (0u32, 0u32);
+        for entry in &self.entries {
+            let bucket = match entry.scope {
+                SettlementScope::InternalDomain => &mut internal,
+                SettlementScope::ExternalChain => &mut external,
+            };
+            bucket.0 = bucket.0.saturating_add(entry.score);
+            bucket.1 = bucket.1.saturating_add(entry.max_score);
         }
+        self.internal_score = percent(internal);
+        self.internal_max_score = internal.1;
+        self.external_score = percent(external);
+        self.external_max_score = external.1;
+    }
+
+    /// Whether every adapter X3 runs itself is fully ready. Says nothing about external chains.
+    pub fn internal_is_ready(&self) -> bool {
+        self.internal_max_score > 0 && self.internal_score == 100
+    }
+
+    /// Whether every external-chain adapter is fully ready — the bar "cross-chain complete" needs.
+    pub fn external_is_ready(&self) -> bool {
+        self.external_max_score > 0 && self.external_score == 100
+    }
+
+    /// The chain's default adapter view, **derived from the adapters themselves**.
+    ///
+    /// This used to be a hand-written table of 16 entries, and by 2026-09-27 it had drifted into
+    /// advertising capabilities the adapters no longer declare: `x3-adapter-substrate` at 80,
+    /// `x3-adapter-x3vm` at 100 and `x3-adapter-bitcoin` at 80, while those adapters'
+    /// `readiness_score()` had been corrected to 60/70 with the missing capabilities named. Nothing
+    /// tied the table to the code, so nothing could make it disagree — the same "the scoreboard
+    /// feeds the claim" defect this row is about, one layer up. There is one source now:
+    /// [`crate::adapter::all_adapters`], the same inventory the cross-adapter proof tests use.
+    pub fn default_scoreboard() -> Self {
+        let adapters = crate::adapter::all_adapters();
+        let refs: Vec<&dyn X3VmAdapter> = adapters.iter().map(|a| a.as_ref()).collect();
+        Self::from_adapters(&refs, 0)
     }
 
     /// Format the scoreboard as a display string (CLI output)
@@ -653,7 +593,19 @@ impl AdapterScoreboard {
         let overall_bar = Self::progress_bar(self.overall_score);
         output.push_str(&format!(
             "{:<20} {} {:>3}/100\n",
-            "Overall", overall_bar, self.overall_score
+            "Overall (pooled)", overall_bar, self.overall_score
+        ));
+        // The pooled line is not a cross-chain claim; these two are. Printing only "Overall" is how
+        // a board with unready external chains still read as complete.
+        let internal_bar = Self::progress_bar(self.internal_score);
+        output.push_str(&format!(
+            "{:<20} {} {:>3}/100  internal domains\n",
+            "X3's own domains", internal_bar, self.internal_score
+        ));
+        let external_bar = Self::progress_bar(self.external_score);
+        output.push_str(&format!(
+            "{:<20} {} {:>3}/100  external chains\n",
+            "External chains", external_bar, self.external_score
         ));
         output
     }
@@ -793,5 +745,194 @@ mod tests {
         assert!(scoreboard
             .missing_proofs
             .contains(&"source_lock_tx".to_string()));
+    }
+
+    // ── Internal domains versus external chains ─────────────────────────────
+    //
+    // X3-CLAIM-003's blocker: "cross-chain complete" pooled the three domains X3 runs itself with
+    // every external-chain adapter, so a board with unready external chains still read as complete.
+
+    #[test]
+    fn only_the_three_domains_x3_runs_are_internal() {
+        for vm_type in [VmType::Evm, VmType::Svm, VmType::X3Vm] {
+            assert_eq!(
+                SettlementScope::of(vm_type),
+                SettlementScope::InternalDomain,
+                "{vm_type:?} is a domain X3 executes"
+            );
+        }
+        for vm_type in [
+            VmType::Substrate,
+            VmType::BitcoinScript,
+            VmType::MoveVm,
+            VmType::CosmWasm,
+            VmType::CairoVm,
+            VmType::PlutusEutxo,
+            VmType::TonTvm,
+            VmType::FuelVm,
+            VmType::NearWasm,
+            VmType::SorobanWasm,
+            VmType::PolkadotPvm,
+            VmType::InkWasm,
+            VmType::WasmL1,
+            VmType::ZkVm,
+        ] {
+            assert_eq!(
+                SettlementScope::of(vm_type),
+                SettlementScope::ExternalChain,
+                "{vm_type:?} settles on a chain X3 does not run"
+            );
+        }
+    }
+
+    /// The load-bearing one: adding an external adapter must not move the internal score, and vice
+    /// versa. Numbers come from the adapters' own declarations, not from this test.
+    #[test]
+    fn an_external_adapter_never_moves_the_internal_score() {
+        let evm = crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20]);
+        let btc =
+            crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
+
+        let internal_only = AdapterScoreboard::from_adapters(&[&evm], 1);
+        let with_external = AdapterScoreboard::from_adapters(&[&evm, &btc], 1);
+
+        assert_eq!(internal_only.internal_score, evm.readiness_score().score());
+        assert_eq!(internal_only.internal_max_score, 100);
+        assert_eq!(
+            internal_only.external_max_score, 0,
+            "no external adapter yet"
+        );
+
+        assert_eq!(
+            with_external.internal_score, internal_only.internal_score,
+            "an external adapter's readiness must not raise or lower X3's own domains"
+        );
+        assert_eq!(with_external.internal_max_score, 100);
+        assert_eq!(with_external.external_max_score, 100);
+        assert_eq!(
+            with_external.external_score,
+            btc.readiness_score().score(),
+            "the external bucket holds exactly the external adapter"
+        );
+    }
+
+    #[test]
+    fn an_unclassified_entry_is_external_not_internal() {
+        // The serde default is what a scoreboard written before the field existed deserialises to,
+        // and it must fail closed.
+        assert_eq!(
+            SettlementScope::default(),
+            SettlementScope::ExternalChain,
+            "an entry nobody classified must not be counted as one of X3's own domains"
+        );
+        let json = r#"{
+            "entries": [{
+                "vm_type": "X3Vm",
+                "adapter_name": "an-old-entry",
+                "score": 100,
+                "max_score": 100,
+                "missing_capabilities": []
+            }],
+            "overall_score": 100,
+            "max_overall_score": 100,
+            "timestamp": 0
+        }"#;
+        let board: AdapterScoreboard = serde_json::from_str(json).expect("old shape must load");
+        assert_eq!(board.entries[0].scope, SettlementScope::ExternalChain);
+        assert_eq!(
+            board.internal_max_score, 0,
+            "a legacy entry must not populate the internal bucket just because its vm_type is X3VM"
+        );
+    }
+
+    /// The default view cannot disagree with the adapters, because it *is* the adapters' view.
+    #[test]
+    fn the_default_scoreboard_agrees_with_every_adapters_own_declaration() {
+        let board = AdapterScoreboard::default_scoreboard();
+        let adapters = crate::adapter::all_adapters();
+        assert_eq!(
+            board.entries.len(),
+            adapters.len(),
+            "one entry per adapter, no hand-written extras"
+        );
+
+        for entry in &board.entries {
+            let adapter = adapters
+                .iter()
+                .find(|a| a.adapter_name() == entry.adapter_name)
+                .unwrap_or_else(|| panic!("{} is not an adapter", entry.adapter_name));
+            let declared = adapter.readiness_score();
+            assert_eq!(
+                entry.score,
+                declared.score(),
+                "{} advertises {} but declares {}",
+                entry.adapter_name,
+                entry.score,
+                declared.score()
+            );
+            assert_eq!(entry.vm_type, adapter.vm_type());
+            assert_eq!(entry.scope, SettlementScope::of(adapter.vm_type()));
+            assert_eq!(
+                entry.missing_capabilities.len(),
+                declared.missing_items().len(),
+                "{} lists different missing capabilities than it declares",
+                entry.adapter_name
+            );
+        }
+
+        // Three internal domains (EVM, SVM, X3VM) and thirteen external chains.
+        assert_eq!(board.internal_max_score, 300);
+        assert_eq!(board.external_max_score, 1_300);
+        assert!(
+            !board.external_is_ready(),
+            "no external-chain adapter is fully ready, so the board must not claim it"
+        );
+        assert!(
+            !board.internal_is_ready(),
+            "and X3's own domains are not fully ready either"
+        );
+        // Measured 2026-09-27, and the opposite of what this test first assumed: internal 56,
+        // external 60. X3's own three domains are *not* the strong side of this board — the
+        // corrected external adapters declare 60-80 while EVM/SVM/X3VM declare the same kind of
+        // gaps. The assertion is the shape (both sides reported, neither ready), not the numbers,
+        // because those belong to the adapters.
+        assert!(
+            board.internal_score < 100 && board.external_score < 100,
+            "internal {} and external {} must both be reported and both be short of 100",
+            board.internal_score,
+            board.external_score
+        );
+    }
+
+    /// The pooled figure is exactly the thing the claim must not cite on its own.
+    #[test]
+    fn the_pooled_score_is_a_blend_that_hides_whichever_side_is_unready() {
+        let evm = crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20]);
+        let btc =
+            crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
+        let board = AdapterScoreboard::from_adapters(&[&evm, &btc], 1);
+
+        let internal = board.internal_score;
+        let external = board.external_score;
+        let pooled = board.overall_score;
+
+        assert_eq!(internal, evm.readiness_score().score());
+        assert_eq!(external, btc.readiness_score().score());
+        assert!(
+            pooled >= internal.min(external) && pooled <= internal.max(external),
+            "the pooled figure must sit between the two sides it blends: pooled {pooled}, \
+             internal {internal}, external {external}"
+        );
+        if internal != external {
+            assert!(
+                pooled != external && pooled != internal,
+                "pooling the two sides must not reproduce either one: pooled {pooled}, \
+                 internal {internal}, external {external}"
+            );
+        }
+        assert!(
+            !board.external_is_ready(),
+            "the external side is not ready, and the pooled line cannot say otherwise"
+        );
     }
 }

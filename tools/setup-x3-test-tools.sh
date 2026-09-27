@@ -49,6 +49,19 @@ check_installed "python3" "Python 3"
 check_installed "node" "Node.js"
 check_installed "npm" "npm"
 check_installed "pip3" "pip"
+# `java` is not optional for the release gates: `scripts/run-security-gates.sh`
+# runs `x3-proof security-gate`, which shells out to
+# `java -cp tools/tla2tools.jar tlc2.TLC` for the four specs under
+# `formal-proofs/tla/**`. The jar is in the repository, the JRE is not — and with
+# no JRE on PATH the S0 gate reported `formal_verification_blocked` with only
+# `TLA+ invocation error … No such file or directory (os error 2)` to explain it
+# (measured 2026-09-27). `apt-get install default-jre-headless`, or any JRE on
+# PATH, is enough.
+check_installed "java" "Java (TLA+ model check for the S0/S1 security gates)" || true
+if ! command -v java >/dev/null 2>&1; then
+    echo "  → without 'java', scripts/run-security-gates.sh fails with" | tee -a "$INSTALL_LOG"
+    echo "    'S0 gate could not run: no JRE on PATH for the TLA+ model check'." | tee -a "$INSTALL_LOG"
+fi
 
 echo "" | tee -a "$INSTALL_LOG"
 

@@ -1,28 +1,57 @@
 {
-  "alerts": [
+  "groups": [
     {
-      "alert": "GPUMemoryLeak",
-      "expr": "gpu_memory_used_bytes > 7500000000",
-      "for": "10m",
-      "annotation": "GPU memory usage exceeds 93% - possible leak"
-    },
-    {
-      "alert": "ValidatorOutOfSync",
-      "expr": "solana_validator_fork_distance_slots > 3",
-      "for": "5m",
-      "annotation": "Validator fork distance > 3 slots"
-    },
-    {
-      "alert": "LowTPSPerformance",
-      "expr": "rate(solana_validator_confirmed_transactions_total[1m]) < 100000",
-      "for": "2m",
-      "annotation": "TPS fallen below 100k threshold"
-    },
-    {
-      "alert": "GPUKernelFailure",
-      "expr": "gpu_kernel_errors_total > 0",
-      "for": "1m",
-      "annotation": "CUDA kernel errors detected"
+      "name": "x3-validator",
+      "rules": [
+        {
+          "alert": "X3NoFinality",
+          "expr": "increase(substrate_block_height{status=\"finalized\"}[10m]) == 0",
+          "for": "10m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "No finalized block for ten minutes",
+            "description": "substrate_block_height{status=\"finalized\"} has not moved in ten minutes. On a chain with a GRANDPA quorum this means finality is stopped, not slow: check peer counts and whether enough authorities are reachable."
+          }
+        },
+        {
+          "alert": "X3BlockProductionStalled",
+          "expr": "increase(substrate_block_height{status=\"best\"}[5m]) == 0",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "No block produced for five minutes",
+            "description": "The best block height has not moved in five minutes while the process is up: authoring or the transaction pool is wedged."
+          }
+        },
+        {
+          "alert": "X3ValidatorPeerLoss",
+          "expr": "substrate_sub_libp2p_peers_count < 1",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "A validator has no peers",
+            "description": "An isolated validator cannot take part in finality. Compare against substrate_node_roles to tell a validator from an observer."
+          }
+        },
+        {
+          "alert": "X3TargetDown",
+          "expr": "up == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Prometheus cannot scrape a target",
+            "description": "One of the scraped endpoints has been unreachable for two minutes: the metrics port is down, or the node is."
+          }
+        }
+      ]
     }
   ]
 }

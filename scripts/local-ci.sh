@@ -188,7 +188,29 @@ GATES_FAST=(
   "agent guards:make guard"
   "make gate exit codes:make check-make-gates"
   "script syntax:bash scripts/check-script-syntax.sh"
+  # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
+  # machine it was written on — one such script mkdir'd the missing root and then reported a
+  # "missing" test crate. The operator is about to bring up seven validator servers, so this holds
+  # the line: derive the root from BASH_SOURCE, or name an explicit, documented override.
+  "bring-up paths:bash scripts/check-no-hardcoded-desktop-paths.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
+  # 24 `Swatinem/rust-cache` steps across 17 workflows, and not one of them said
+  # `cache-bin: false`. That action's save step unlinks every regular file in
+  # `$CARGO_HOME/bin` that existed before the build, which is harmless on a
+  # disposable hosted runner and destroys the shared toolchain on this box,
+  # where the GitHub Actions runner service and the developer shells share
+  # `$HOME`. `rustup`, `subkey`, `cargo-audit`, `cargo-deny` and `srtool` were
+  # deleted twice on 2026-09-26 that way (the `-> rustup` shims are symlinks, so
+  # they survived — `cleanBin` only unlinks `dirent.isFile()` entries). See
+  # GAP-TOOLCHAIN-WIPE in TESTNET_GAP_LEDGER.md; this gate holds the line.
+  "cargo home safety:python3 scripts/check-cargo-home-safety.py"
+  # `impl WeightInfo for ()` returns `Weight::zero()`, so a runtime config that sets
+  # `type WeightInfo = ();` for a pallet whose calls do storage work removes that pallet from
+  # block-weight accounting entirely. Eighteen configs were in that state on 2026-09-27 while their
+  # pallets shipped non-zero `SubstrateWeight` values (31 pallets have generated weights, 29 declare
+  # the module, and the runtime pointed at none of them). The gate also fails on a generated
+  # `weights.rs` that is not a module of its pallet, and its exception list may only shrink.
+  "runtime weights wired:python3 scripts/check-runtime-weights-wired.py"
   "workspace membership:python3 scripts/check-workspace-membership.py"
   # PHASE 43 is a prohibition, not a feature: a value that becomes a balance, a reward, a slash or a
   # settlement amount must be computed exactly. `x3-lang` has had this check for its own two crates for
@@ -218,6 +240,20 @@ GATES_FAST=(
   # modules counted as production and the release gate read 570 against a 516
   # baseline. This pins the classification and the empty result for runtime/src.
   "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
+  # The two detectors `AGENTS.md` names under "Forbidden" had never completed: they walked build
+  # output and vendored trees (`x3fronend/out/_next`, `*/node_modules`, a `.wt-*` worktree's
+  # `tauri-vendor/cc`) and died at the 240 s timeout, so a mandated check read as satisfied while it
+  # had never run. `scripts/x3_fake_code_scan.py` bounds the walk (~1 s and ~3 s here) and ratchets
+  # against `docs/reports/fake-code-baseline.json` and `test-cheat-baseline.json`, so the gates fail
+  # on a *new* finding rather than on the years-old annotations that are already counted.
+  "fake-code scan:python3 scripts/x3_fake_code_scan.py stubs"
+  "test-cheat scan:python3 scripts/x3_fake_code_scan.py cheats"
+  # The runtime-hash check exempts files that cannot reach the wasm target
+  # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
+  # not demand a ten-minute double srtool rebuild. An exemption that is too wide
+  # would let a real runtime change through, so its classification is pinned in
+  # both directions.
+  "runtime hash exemption self-test:python3 scripts/check-runtime-hash-freshness.py --self-test"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   # `check-readiness-consistency.sh` validates `required_tests` in FEATURE_REGISTRY.toml. The matrix
   # fragments carry the same field and nothing checked them: X3-XVM-006 could cite
@@ -268,6 +304,12 @@ GATES_FAST=(
   # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
   # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
   "advisory scope:python3 scripts/check-advisory-scope.py"
+  # Every KV of the EVM/SVM *external* surface has to be either proven against a real
+  # testnet or explicitly closed. None can be proven here, so this checks the closure:
+  # the gate in the code, the behavioural refusal test behind it, and the flag in
+  # TESTNET_FEATURE_FLAGS.toml — and it fails if one of those refusal suites runs in no
+  # gate, which is how `x3-external-chains` was found running nowhere at all.
+  "external paths disabled:python3 scripts/ci/check-external-paths-disabled.py"
   # The dependency gate `.cargo/audit.toml` and `deny.toml` were written for, and which no gate
   # ever ran. `.cargo/audit.toml` carries a long ignore list with a reason per entry; nothing
   # verified it, nothing noticed a new advisory, and nothing noticed an ignore that had gone
@@ -304,6 +346,14 @@ GATES_FAST=(
   # times in a day, so this is the cheap early warning: if the outgoing diff
   # touches any package in the runtime's dependency graph, the record has to
   # move in the same change (`./scripts/update-runtime-hashes.sh`).
+  #
+  # There are two ways in: the outgoing diff against `--base`, and — since
+  # commits land straight on `master`, where `--base origin/master` and `HEAD`
+  # are the same commit and the first check compares a revision to itself — the
+  # revision the record itself names. Measured 2026-09-26: forty-two files in
+  # the runtime's graph had changed since that revision while this gate printed
+  # "nothing to check" and only the ten-minute stage 6b could have caught it.
+  # A record that cannot be tied to a revision fails here too.
   "runtime hash freshness:python3 scripts/check-runtime-hash-freshness.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"
   "clippy workspace:cargo clippy --workspace --all-targets -- -D warnings"
@@ -321,6 +371,24 @@ GATES_FAST=(
   # not exist: this one would have caught the packet-vs-program payload defect if anything had run it
   # with a real adapter, and it is where the 1 -> 2 storage migration's own test lives.
   "test x3-kernel:cargo test -p pallet-x3-kernel"
+  # `pallet-x3-invariants` owns the constitutional halt flag and the signed-extension gate
+  # (`InvariantCheck`) that reads it. Its 26 tests were in no gate; the halt tests cited by
+  # X3-RT-001/006/007 live here, and the gate's exemption list is what keeps `emergency_halt`
+  # from refusing its own remedy. Sub-second suite.
+  "test x3-invariants:cargo test -p pallet-x3-invariants"
+  # `InvariantCheck` refuses every signed extrinsic while the chain is halted *except* the calls in
+  # `RuntimeHaltExemptCalls`. Both directions of drift in that list are silent: a missing entry is
+  # how `emergency_halt` became a one-way door (`6d7bfc540`), and an undocumented entry lets a call
+  # through a halt without review. This compares the runtime's list with
+  # `security/halt-exemptions.toml` and requires every entry to resolve to a real dispatchable.
+  "halt exemptions:python3 scripts/ci/check-halt-exemptions.py"
+  # The exemption list above can only be as complete as the inventory of calls that hold funds, and
+  # nothing built that inventory: a pallet that reserves a bond, escrow or deposit with no halt-
+  # reachable release is invisible to it (TICKET-153). This parses every runtime-wired pallet for
+  # dispatchables that reach `reserve`/`hold`/`set_lock`, compares them with
+  # `security/halt-fund-holding.toml`, and fails on an unclassified call, a stale entry, or a
+  # disposition the code does not support.
+  "halt fund holding:python3 scripts/ci/check-halt-fund-holding.py"
   # `x3-packet-schema` is the comit path's wire format: `pallet-x3-kernel`'s packet adapters call
   # `Packet::from_wire_format` on bytes a transaction carries. It was in no fast gate — a root
   # workspace member, so `test workspace` covered it, but only under `--deep`. Its own 58 tests plus
@@ -369,6 +437,59 @@ GATES_FAST=(
   # files it reports on, so a new over-claim fails here.
   "adapter readiness claims:python3 scripts/ci/check-adapter-readiness-claims.py"
   "test x3-atomic-swap adapter readiness:cargo test -p x3-atomic-swap --test adapter_readiness_truth"
+  # `northern_swarm_reactor` cited `crates/northern-swarm` in FEATURE_REGISTRY.toml
+  # while no gate ran its tests — the same gap `registry tests are gated` was
+  # written for, caught by that checker on 2026-09-27. Both halves of the swarm
+  # release surface are gated together because the gate that guards the feature
+  # (`scripts/mainnet/swarm_reactor_gate.py`) fails on either half, and because a
+  # pallet whose on-chain reward/quorum path is only compiled, never executed,
+  # is exactly the shape of claim this repository keeps finding months later.
+  "test northern-swarm:cargo test -p northern-swarm"
+  "test pallet-northern-swarm:cargo test -p pallet-northern-swarm --all-targets"
+  # `scripts/ci/verify_runtime_identity_baseline.sh` pins the three consensus surfaces that
+  # live in one Rust file: `RuntimeVersion` (spec_name/impl_name/authoring_version/spec_version/
+  # impl_version/transaction_version), the `construct_runtime!` pallet order that decides every
+  # pallet index, and the `SignedExtra` tuple order that is part of every signed payload. It
+  # existed, held a baseline (`docs/reports/runtime-identity.baseline.json`) and was called by
+  # nothing — so nothing noticed either that it could no longer run, or that its baseline had
+  # been sitting at `spec_version: 10` for ten versions. Measured 2026-09-27 before the fix:
+  # every invocation exited 1 with `::error::RuntimeVersion.state_version missing`, a field the
+  # pinned polkadot-sdk revision removed. It runs here now, and the baseline was regenerated at
+  # the current runtime with `accepted_reasons` naming why each value is what it is.
+  #
+  # 2026-09-27: the record moved out of `runtime/` to `docs/reports/`, beside the WASM hash
+  # record. `runtime hash freshness` counts *every* file under a package in the runtime's
+  # dependency graph, because a file there can reach the wasm through `include_bytes!` — which
+  # is real in this package (`runtime/src/lib.rs` embeds `genesis-presets/*.json`). A record of
+  # the runtime's identity is not an input to the build, though: nothing includes it, the gate
+  # below re-derives the identity from `runtime/src/lib.rs` on every run and fails if the record
+  # disagrees, and stage 6b of `make mainnet-check` rebuilt the runtime after this file changed
+  # and matched the recorded hashes (`0x22ce9050…` / `0x7c3b8721…`) — so the file cannot alter
+  # the attested bytes, and leaving it inside the graph meant every correction to it demanded a
+  # forty-minute double `srtool` rebuild that provably could not change anything. The freshness
+  # gate keeps its full strictness; only the record's home moved.
+  "runtime identity baseline:bash scripts/ci/verify_runtime_identity_baseline.sh runtime/src/lib.rs docs/reports/runtime-identity.baseline.json"
+  # `X3-CLAIM-002` scored 20/10/10 against a claim that had already been renamed out of
+  # `CURRENT_MAINNET_STATUS.md` — because it had moved somewhere nothing checked: the desktop
+  # CRM's outbound templates, which asserted "300ms cross-chain finality (vs 12s on Solana)",
+  # "no MEV/reorg risk", "5,000 TPS baseline", "Live in 3 production networks" and
+  # "$1200/month (current pilot)", alongside seeded contacts naming real people at real
+  # organisations with invented personal addresses. The checker reads the surfaces a human
+  # reads or copies (root docs, docs/testnet-config, the CRM), tree-wide for phrases that are
+  # false in every context and surface-only for figures, and skips lines that qualify
+  # themselves. It is load-bearing: re-adding "MEV-proof" to CURRENT_MAINNET_STATUS.md fails it.
+  "claims hygiene:python3 scripts/ci/check-claims-hygiene.py"
+  # The operator artifacts the repository hands an operator: the Prometheus config, the alert rules
+  # and the Grafana dashboards. Nothing validated them. Measured 2026-09-26: `alert-rules.json` was
+  # not a rule file at all — its shape was `{"alerts": [...]}` and `promtool check rules` refused it
+  # (`field alerts not found in type rulefmt.RuleGroups`), so an operator starting the monitoring
+  # stack from it got a Prometheus that would not load its rules — while the row and the runbooks
+  # counted alerting as configured. The expressions were also written for a Solana GPU validator
+  # (`solana_validator_fork_distance_slots`, `gpu_memory_used_bytes`), none of which this chain
+  # exports, so they could not have fired even in the right shape. The gate checks shape, asks
+  # promtool to load both artifacts when it is installed, and requires every expression to name a
+  # metric the node really publishes.
+  "ops artifacts:bash scripts/monitoring/check-ops-artifacts.sh"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition
@@ -408,6 +529,33 @@ GATES_FAST=(
   # for the same reason `nested workspaces` names one: a second workspace sharing the root target
   # walks cargo through rebuilds it does not need.
   "test x3-htlc:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
+  # The nested `x3_htlc` tree did have *one* thing the root never ran even after the line above: the
+  # live broadcaster client in `programs/x3_htlc/client`. It is its own workspace (like the
+  # `x3_atomic_swap` client) and it holds the instruction layout that both the validator gate and the
+  # program-test expiry suite drive, so its tests are gated explicitly rather than implied.
+  "test x3-htlc client:env CARGO_TARGET_DIR=/tmp/x3-htlc-client cargo test --locked --manifest-path X3-contracts/svm/programs/x3_htlc/client/Cargo.toml"
+  # `scripts/swarm/swarm_scan.sh` dumped every `TODO|FIXME|unwrap(` line and a list of filenames whose
+  # name contained a subsystem word: no severity, no symbol, no fix, no gate — and the registry cited a
+  # test for it (`swarm_scan_generates_report`) that existed nowhere, which the readiness gate never
+  # noticed because that row's target is a script, not a directory. The scanner now emits a finding
+  # schema and a ratchet (`docs/reports/repo-scan-baseline.json`), and these two gates run it. Measured
+  # 2026-09-27: it is what found 13 registered pallets charging invented literal weights and two
+  # `launch_gate` citations that name tests nobody wrote.
+  "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
+  "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
+  # The S0/S1 security gate — the formal TLA+ check plus the catastrophic and critical blocker
+  # checks — ran only in CI. Nothing on this box ran it, which is why a *missing java* went
+  # unnoticed for as long as it did: every TLA+ spec errored out, the wrapper looked at exit codes
+  # that were already 0, and the gate reported green over its own red report. The wrapper now reads
+  # the report and fails on a remaining blocker, and this gate makes the same failure local.
+  # Measured 2026-09-27: 69s, S0 VERIFIED 100.0%, all six catastrophic and three critical blockers
+  # pass, S1 verifies five modules.
+  "security gates S0 S1:bash scripts/run-security-gates.sh"
+  # `x3-autonomic-core` had no gate because it had never compiled: `cargo metadata` on the
+  # workspace failed on a `chrono` feature that does not exist at any 0.4 version. With that,
+  # the SCALE import, five bogus `no_std` attributes and the pallet types repaired, the
+  # workspace's 15 tests run here — so the next break is visible instead of silent.
+  "test autonomic core:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-autonomic cargo test --locked --workspace --manifest-path x3-autonomic-core/Cargo.toml"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:
@@ -433,6 +581,11 @@ GATES_FAST=(
   # itself, its 81-test suite was in no gate list. `pallet-x3-asset-registry` gates every route and
   # asset lifecycle decision those two depend on.
   "test x3-cross-vm-router:cargo test -p pallet-x3-cross-vm-router"
+  # The crate that holds every external EVM adapter and the settlement verifier had no
+  # gate, so its refusals (`AdapterUnimplemented`, `VerificationUnavailable`, `Ok(false)`
+  # for a mismatch) ran nowhere and were not evidence. `external paths disabled` requires
+  # this gate to exist before it will pass.
+  "test x3-external-chains:cargo test -p x3-external-chains"
   "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
   # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`mini_x3` and the
   # adapters `pallets/x3-kernel` calls). Its suite — the compiler bridge, the cross-decoder body
@@ -472,6 +625,28 @@ GATES_FAST=(
   # murder-test matrix (wrong chain, stale, wrong state root, corrupt /
   # reordered / missing chunk) is cheap, so it belongs in the gate set of record.
   "test state snapshot:cargo test -p x3-state-snapshot"
+  # The zero-downtime snapshot's exporter. Its refusals (a key the enumeration
+  # returned whose value read is null, a page walk that never advances, an anchor
+  # that is not canonical, a pruned anchor, a child trie) are the whole point of
+  # it, and each one is a case against a real loopback JSON-RPC server.
+  "snapshot export unit tests:python3 tests/test_snapshot_rpc_export.py"
+  # The ceremony manifest's operator attestations: SS58 and SCALE decoding, the
+  # ed25519 derivation the node's own CLI produces, the threshold rule, and every
+  # way a signature can be wrong. The live four-validator half is the
+  # `testnet-ceremony-drill` gate in the --testnet set.
+  "ceremony attestation unit tests:python3 tests/test_ceremony_attestations.py"
+  # The two release-candidate gates. Neither had ever been checked by anything:
+  # the testnet one ran every check as `... || true` and named a chain-spec
+  # generator that was never created, and the mainnet one died on that missing
+  # script. This drives both through a fixture root — a failing prerequisite must
+  # redden them, a missing one must fail rather than skip, and no check may
+  # discard its status. Cheap: 18 checks, no build.
+  "rc gate scripts:python3 tests/test_rc_gates.py"
+  # The promotion record: what ties a passing RC run to the genesis it promotes.
+  # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
+  # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
+  # `verify` re-hashes every artifact after the fact. Cheap: 10 checks, no build.
+  "launch record:python3 tests/test_launch_record.py"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob
@@ -490,7 +665,14 @@ GATES_FAST=(
   # box keeps losing ~/.cargo (shims, srtool and the registry cache have all
   # disappeared mid-session). Offline, the fetch fails and the test still runs
   # against whatever cache exists - cold cache surfaces as BLOCKED, never green.
-  "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # The default-feature run above does not compile the canonical cross-domain
+  # proof types at all (`x3-atomic-swap` is optional behind `canonical-proofs`),
+  # so it silently skipped the whole settlement release path — including the
+  # finality gate in `settlement_finality.rs`, which refuses to release a
+  # settlement whose external leg is shallower than the configured confirmation
+  # depth. The second run compiles and exercises it (`--offline --locked` for the
+  # same reasons as above).
+  "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml --features canonical-proofs"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
@@ -519,12 +701,14 @@ GATES_FAST=(
   # its types, which pulls the runtime — this check needs the types, not the
   # embedded blob, and the blob is built by the root workspace gates anyway.
   # One entry per workspace, not a loop over four. A loop hides both things a gate list is for:
-  # which crate failed when it fails, and what it covers when a reader asks. The three on `check`
-  # have nothing to run — `x3-swarm-api` and `x3-swarm-worker` declare no tests, and
-  # `x3-solvency-sidecar`'s suite has `state::tests::record_fill_time_ema_after_window`, still running
-  # after 60 seconds — while `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in
-  # seconds and are tested for real.
-  "check x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo check --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
+  # which crate failed when it fails, and what it covers when a reader asks. The two on `check`
+  # have nothing to run — `x3-swarm-worker` declares no tests, and `x3-solvency-sidecar`'s suite has
+  # `state::tests::record_fill_time_ema_after_window`, still running after 60 seconds — while
+  # `x3-swarm-api` (its create/start/complete/reject lifecycle on `x3-swarm-core::SwarmScheduler`),
+  # `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in seconds and are tested for real.
+  # `x3-swarm-api` moved from `check` to `test` because it now has those tests: it stores every task
+  # in the crate's scheduler rather than a private map, and four tests drive the handlers to prove it.
+  "test x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo test --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
   "check x3-swarm-worker:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-worker cargo check --locked --all-targets --manifest-path services/x3-swarm-worker/Cargo.toml"
   "check x3-solvency-sidecar:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-solvency-sidecar cargo check --locked --all-targets --manifest-path services/x3-solvency-sidecar/Cargo.toml"
   "test x3-sidecar:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml"
@@ -569,6 +753,29 @@ GATES_FAST=(
   "test verification router:cargo test -p x3-verification-router"
   # The opt-in permissive path that the plumbing tests use.
   "test verification router test-verifier:cargo test -p x3-verification-router --features test-verifier"
+  # Criterion 14 is the one public-testnet criterion that depends on something outside the
+  # chain, and it has now been wrong in both directions on this box: it passed while nothing
+  # served a block explorer (any HTTP service on 3000/3001/8080 satisfied it, including the
+  # wallet app's own `next dev -p 3001`), and it then failed on a healthy seven-validator
+  # network because nothing starts `apps/explorer`. The drill serves a decoy page on a pinned
+  # port and requires criterion 14 to refuse it, then serves the real explorer and requires
+  # criterion 14 to pass *and name the URL it reached*. Measured 2026-09-26: the drill's first
+  # run failed its own decoy phase, because `X3_EXPLORER_URL` was only tried first and a
+  # leftover `next start -p 3010` satisfied the criterion on another port — which is why the
+  # URL is a pin now. It needs no chain: the other fourteen criteria are expected to fail.
+  "explorer gate drill:bash scripts/testnet/explorer-gate-drill.sh"
+  # Two suites the repo scanner found running nowhere (kind `ungated-crate`, 2026-09-27). Both pass;
+  # the point of adding them is that nothing ran them before, so a regression in either would have
+  # shipped silently. The scanner proposes this exact gate line as a patch; applying it dropped its
+  # `ungated-crate` count and the ratchet was re-baselined in the same commit.
+  "test x3-svm-client:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-client cargo test --locked --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml -p x3-svm-client"
+  "test svm counter:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-counter cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml"
+  # The Tauri operator console is its own cargo workspace and had never been built, let alone tested:
+  # measured 2026-09-27, no test attribute existed anywhere under apps/tauri-os, and the crate did not
+  # compile (tauri.conf.json was in the wrong directory and there were no icons). The wrapper carries
+  # the box's pkg-config reality — see its header — and names the package, so the repo scanner's
+  # `ungated-crate` finds it. The live half is in the live set below.
+  "tauri-os operator console:bash apps/tauri-os/src-tauri/run-tests.sh"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).
@@ -591,17 +798,105 @@ GATES_LIVE=(
   # without a log filter emits only warnings, so the check sets the level explicitly and
   # asserts on what the stream says rather than on a file existing.
   "logging across validators:bash scripts/monitoring/local3-logging-check.sh --self-test"
+  # The same two questions at testnet scale: a generated seven-authority network, seven
+  # exporters each identifying its own validator, seven collected log streams, and one
+  # aggregate query that has to reach all seven. `--self-test` holds a validator out of
+  # both collections and requires both checks to fail.
+  # `X3_OBSERVABILITY_REQUIRE_REAL=1` makes the three real halves mandatory — Prometheus,
+  # Grafana and a Fluent Bit collector — so this gate's green means "a metrics server scraped
+  # all seven, a dashboard rendered them, and a collector ingested every stream", not "the
+  # binaries were missing so the phases skipped". Without the flag the check still runs the
+  # endpoint-level proofs and says loudly what it skipped.
+  "observability across seven validators:env X3_OBSERVABILITY_REQUIRE_REAL=1 bash scripts/monitoring/testnet7-observability-check.sh --self-test"
+  # The launch gate itself, run against a real network instead of remembered from one
+  # recorded run: a generated seven-authority network, then criterion 1 required to report
+  # the chain's own authority set *and* how many of those authorities are reachable (the
+  # two numbers that used to be one wrong one, `peers + 1`), then one validator stopped and
+  # the same criterion required to FAIL. It owns the criteria that are about the chain
+  # (1 and 12) and requires the verdict not to claim a clean sweep while criterion 6 is
+  # skipped; the criteria that read a dashboard or a wallet app on this box are printed
+  # rather than asserted, and the drill says so in its output.
+  "public testnet gate across seven validators:bash scripts/testnet/public-testnet-gate-drill.sh --self-test"
   # The snapshot bullet: export a running chain, restore it into a fresh base path,
   # and require the finalized height, the canonical hash at that height and every
   # storage entry to come back — with a control node on an empty database required
   # to disagree, so the same check cannot pass for an empty chain.
   "snapshot restore across a live chain:bash scripts/snapshot-live-restore-proof.sh"
+  # The snapshot bullet's other half: take the snapshot *without stopping the
+  # node*. The archive path above refuses a live database (correctly), so this
+  # exports the running chain's state over RPC at a finalized, justified block,
+  # requires the recomputed trie root to equal the state root the chain published
+  # in that block's header, builds and verifies the snapshot with the chain's own
+  # GRANDPA justification, then restores it into a spec, boots it as an authority
+  # and requires it to finalize blocks. Four controls have to refuse: a
+  # one-key-short export, a wrong anchor, an unaltered genesis spec, and an anchor
+  # whose state a bounded node has already pruned.
+  "snapshot zero downtime export:bash scripts/snapshot-zero-downtime-proof.sh"
+  # The upgrade path this chain actually has: three live validators on `local3`,
+  # council governance carrying `system.set_code` to Root, the new spec_version read
+  # back over RPC from every validator, and a transfer after the swap. Self-contained;
+  # it builds the next-runtime artifact once and caches it under target/upgrade-artifact/.
+  # Pointing X3_UPGRADE_WASM at the blob the chain already runs makes it FAIL, which is
+  # how the "the version changed" check is known to be able to say no.
+  "runtime upgrade through governance:bash scripts/mainnet/runtime_upgrade_rehearsal.sh"
+  # The commit-reveal ordering window, on a live three-validator chain. X3-MEV-006 and X3-MEV-008
+  # carried "no live-node run" for two rounds, and the reason was not scheduling: window open and
+  # commit required private execution *and* the confidential-validator quorum, while this runtime
+  # refuses every attestation by policy (`AttestationVerifier = RefuseAllAttestations`), so that
+  # quorum can never be met and no window could ever be opened. `c917917d6` gave the lane its own
+  # switch; this gate turns it on with a council motion, drives the whole lifecycle, and then makes
+  # the driver recompute the canonical order from the stored beacon and require the chain's settled
+  # order to equal it. Measured: the first live run found a real defect — the settle weight was
+  # charged for the window's *capacity* (1 MiB + 1024 commitments), which exceeds the block budget,
+  # so the settle extrinsic was refused by the pool and a window could be committed into and never
+  # settled. It is charged for the window's actual contents now, and the runtime caps were reduced
+  # so even a full window fits.
+  "ordering window on a live chain:bash scripts/drills/ordering_window_live.sh"
+  # The wallet pallet's biometric registration and social recovery, on a live three-validator chain.
+  # `X3-ECO-001`/`X3-ECO-004` were P0/core rows proven only against the pallet's mock — and before
+  # `d85f79c85` that mock's recovery test had to seed a guardian record straight into storage,
+  # because no extrinsic created one. This drives the real extrinsics: a profile that names its
+  # signer, an unsupported type refused by name, guardians registered, a guardian-initiated request
+  # with a delay, two approvals, a finalize refused before the delay and refused again for a
+  # non-owner cancel, and a finalize that changes the *stored* recovery owner.
+  "wallet recovery on a live chain:bash scripts/drills/wallet_recovery_live.sh"
+  # `[x3_sentinel]`'s one blocker was "no live governance simulation". This drill runs the
+  # simulation on three validators and the answer is worse than missing evidence: the governance
+  # gate is real (a signed account is refused with `BadOrigin` twice over, and the freeze map stays
+  # empty), but the privileged path the pallet documents is *unreachable* — the runtime wires
+  # `x3Sentinel::FreezeOrigin = EnsureRoot` in the single shared `Config` impl, and the three
+  # non-dev runtime variants have no sudo, so no extrinsic can arrive as root. The gate pins both
+  # halves, so a wiring change or a regression in the refusal is visible.
+  "sentinel privileged origin:bash scripts/drills/sentinel_privileged_origin_live.sh"
+  # `X3-RT-001`/`X3-RT-006`/`X3-RT-007` and `TICKET-153`: the economic halt had never been tripped
+  # on a network, so every claim about it was a single-process claim. This trips it through a
+  # council motion on three validators, requires the pool of two different validators to refuse a
+  # transfer with the runtime's halt code (with no balance change), submits the council motion that
+  # clears it *while still halted*, and requires traffic to resume afterwards.
+  "halt recovery on a live chain:bash scripts/drills/halt_recovery_live.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
   # behind the pinned toolchain directory on purpose. Put the shim back in front
   # for this gate, or the build dies with "no such command: `+…`".
   "SVM contract lifecycle:env PATH=\"$HOME/.cargo/bin:$PATH\" programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
+  # The *other* SVM HTLC tree, `X3-contracts/svm/programs/x3_htlc`, finally gets the same treatment:
+  # `cargo build-sbf`, deployed at the address its `declare_id!` fixes, a real SPL mint and real token
+  # accounts on the real token program, and 52 assertions decoded from raw account bytes. It covers
+  # the lock/claim path, wrong-preimage, wrong-recipient, double-claim, early refund, wrong-authority
+  # refund, the three rejected lock shapes, re-lock, and supply conservation. The escrow's 1-hour
+  # minimum timelock means a live validator cannot reach the post-expiry refund (its clock advances
+  # with wall time; `--warp-slot` moves the slot, not the clock), so that branch is the gate below.
+  "SVM HTLC x3_htlc lifecycle:env PATH=\"$HOME/.cargo/bin:$PATH\" bash X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh"
+  # The expiry branch, against the same compiled artifact, in `solana-program-test` with an overridden
+  # clock sysvar: refund-before-expiry refused, refund-after-expiry moving real tokens back to the
+  # initiator, double refund refused, claim-after-refund refused, and the late-claim rule asserted.
+  "SVM HTLC x3_htlc expiry:env PATH=\"$HOME/.cargo/bin:$PATH\" bash X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh"
+  # The console's own reads against a real node: boots `x3-chain-node --dev` on free ports, waits for
+  # finality past genesis, then runs the `live-node`-feature suite, which reads system_health,
+  # chain_getFinalizedHead/chain_getHeader, system_name/version/chain and system_nodeRoles through the
+  # same client the commands use. A node that does not answer is an error there, not a skipped test.
+  "tauri-os live operator console:bash apps/tauri-os/src-tauri/run-live-test.sh"
 )
 
 GATES_VARIANTS=(
@@ -666,6 +961,12 @@ GATES_TESTNET=(
 # operator run — set MINUTES=60 for a real duration check.
 GATES_SOAK=(
   "consensus soak:bash scripts/testnet/consensus-soak.sh"
+  # The soak above is idle. An idle network is the easy case: the recorded open question
+  # against the multi-validator row is whether a *loaded* validator keeps up, because a
+  # starved one falls behind, repeats a block request, and can be banned out by its peers —
+  # a lag that becomes a partition. This drives real traffic at the network for the whole
+  # window and requires it to have finalized: seven validators, 15 minutes, load for 12.
+  "load soak across validators:env COUNT=7 LOAD_SECS=720 MINUTES=15 bash scripts/testnet/consensus-soak.sh"
 )
 
 # Validator key rotation is operator-driven, and the on-chain custody registry is
@@ -700,6 +1001,17 @@ GATES_CROSS=(
   # different one, which finalized the same block. The single-node lifecycle above
   # cannot say anything about agreement between validators.
   "X3Lang across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3lang_network_receipt -- --ignored --nocapture --test-threads=1"
+  # Supply conservation under distributed traffic: three validators, concurrent comits,
+  # and the identity `sum(free + reserved) == TotalIssuance` read from *each* validator's
+  # own state at a finalized block — with an injected unit in a scratch ledger required to
+  # make the same check fail, so it is not a tautology.
+  "supply invariant across validators:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test supply_invariant_distributed -- --ignored --nocapture --test-threads=1"
+  # A partition, not a crash: one validator cut off from the others while it stays alive,
+  # then healed and required to converge. The cut is confirmed through peer counts (the test
+  # fails if the cut does not show), and at three authorities the honest result is that the
+  # survivors keep *authoring* while nothing finalizes — GRANDPA's `n-(n-1)/3` threshold is
+  # all three — which is what the test asserts rather than pretending otherwise.
+  "partition and recovery:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test partition_recovery -- --ignored --nocapture --test-threads=1"
   "cross-domain EVM:bash scripts/cross-domain-evm-gate.sh"
   # Same reason as the `SVM contract lifecycle` gate above: this one also runs
   # `cargo build-sbf`, which shells out to `cargo +1.89.0-sbpf-solana-v1.54` and
@@ -1049,10 +1361,20 @@ SERIAL_GATES=(
   "local network smoke"
   "monitoring across validators"
   "logging across validators"
+  "observability across seven validators"
+  "public testnet gate across seven validators"
   "snapshot restore across a live chain"
+  "snapshot zero downtime export"
+  "runtime upgrade through governance"
+  "ordering window on a live chain"
+  "wallet recovery on a live chain"
+  "halt recovery on a live chain"
+  "load soak across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
   "X3-native lifecycles"
+  "supply invariant across validators"
+  "partition and recovery"
   "cross-domain EVM"
   "cross-domain SVM"
   "cross-domain EVM (strict posture)"

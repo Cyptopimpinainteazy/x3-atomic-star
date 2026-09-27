@@ -28,58 +28,18 @@
 //! - PRIV-EXEC-001: TX content never exposed outside enclave
 //! - PRIV-EXEC-003: No single validator can decrypt
 
-pub mod encryption;
+// The committee crypto and the records it operates on live in `x3-threshold-core` now: that crate
+// is `no_std` (with `alloc`), so `pallet-private-execution` can link it and validate a private
+// submission at the door, which it could not do while the scheme lived here (this crate is
+// std-only: tokio, chrono, parking_lot, `rand` with default features). Everything below is
+// re-exported rather than re-implemented — one definition, one set of tests.
+pub use x3_threshold_core::{
+    encryption, threshold, DecryptionShare, EncryptedTransaction, MempoolError, ThresholdPublicKey,
+};
+
 pub mod queue;
-pub mod threshold;
 
 use std::time::{SystemTime, UNIX_EPOCH};
-
-/// An encrypted transaction in the private mempool.
-#[derive(Debug, Clone)]
-pub struct EncryptedTransaction {
-    /// Unique transaction identifier (hash of ciphertext).
-    pub id: [u8; 32],
-    /// Encrypted payload (AES-256-GCM ciphertext).
-    pub ciphertext: Vec<u8>,
-    /// Ephemeral public key for ECDH: a compressed Ristretto point, not an
-    /// X25519 key — see [`crate::threshold`] for why.
-    pub ephemeral_pk: [u8; 32],
-    /// AES-GCM nonce (12 bytes).
-    pub nonce: [u8; 12],
-    /// Sender's public key (for fee attribution).
-    pub sender_pk: [u8; 32],
-    /// Priority fee commitment (Pedersen commitment).
-    pub fee_commitment: [u8; 32],
-    /// Timestamp when submitted.
-    pub submitted_at: u64,
-    /// DKG epoch this TX was encrypted for.
-    pub dkg_epoch: u64,
-}
-
-/// Threshold public key for the confidential validator committee.
-#[derive(Debug, Clone)]
-pub struct ThresholdPublicKey {
-    /// The combined group public key: a compressed Ristretto point
-    /// (`secret * G`), not an X25519 key — see [`threshold`] for why.
-    pub group_key: [u8; 32],
-    /// DKG epoch number.
-    pub epoch: u64,
-    /// Threshold (t in t-of-n).
-    pub threshold: u32,
-    /// Total committee size (n).
-    pub committee_size: u32,
-}
-
-/// A decryption share from one validator.
-#[derive(Debug, Clone)]
-pub struct DecryptionShare {
-    /// Validator index in the committee.
-    pub validator_index: u32,
-    /// The partial decryption share.
-    pub share: Vec<u8>,
-    /// Proof of correct decryption (DLEQ proof).
-    pub proof: Vec<u8>,
-}
 
 /// Configuration for the private mempool.
 #[derive(Debug, Clone)]
@@ -199,25 +159,6 @@ pub struct MempoolStats {
     pub total_decrypted: u64,
     pub total_pruned: u64,
     pub capacity: usize,
-}
-
-/// Errors from the private mempool.
-#[derive(Debug, thiserror::Error)]
-pub enum MempoolError {
-    #[error("Mempool is full (capacity: {capacity})")]
-    Full { capacity: usize },
-
-    #[error("No committee key set")]
-    NoCommitteeKey,
-
-    #[error("TX encrypted for wrong epoch (expected {expected}, got {got})")]
-    WrongEpoch { expected: u64, got: u64 },
-
-    #[error("Duplicate transaction")]
-    Duplicate,
-
-    #[error("Encryption error: {0}")]
-    EncryptionError(String),
 }
 
 #[cfg(test)]

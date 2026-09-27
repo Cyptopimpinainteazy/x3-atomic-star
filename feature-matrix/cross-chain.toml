@@ -6,17 +6,18 @@ name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
-implemented = 80
-tested = 85
-mainnet_ready = 45
+implemented = 85
+tested = 90
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "Regtest is now real, testnet and mainnet are not: a live Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`, `.ai/reports/btc-regtest-capture-20260922.json`), but no coin has ever moved on a network anyone else can see, and no header from testnet or mainnet has been anchored",
-  "A chain can now be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12, including a live node serving the anchor and refusing a spec that lies) — but no *public* network has one pinned, and the header still arrives by an operator copying a hash rather than from a header source",
-  "The sender runs unattended now (`push-headers.mjs --loop --cursor …`: batch pushes, an atomic cursor, catch-up after restarts, and it **stops** rather than skipping a refused range — the drill requires all of it, 6/6), but nothing runs against a public network yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
+  "Regtest is real and the header source now runs against public testnet; mainnet and a live deposit are not: a Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`), `scripts/btc/push-headers.py` reads real testnet3 headers and `scripts/testnet/btc-header-source-drill.sh` proves it live and proves it refuses a tampered answer — but no X3 chain has admitted a public-network header and no coin has ever moved on a network anyone else can see",
+  "A chain can be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) — and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
+  "The sender runs unattended (`push-headers.mjs --loop --cursor …`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
+  "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks — which alternate `nBits` mid-epoch after a twenty-minute gap — are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
   "No BTC signer quorum for withdrawals",
   "BTC mainnet disabled by feature flag; no external audit",
 ]
@@ -27,8 +28,8 @@ blockers = [
 # header chain and proof-of-work check beside it, `crates/x3-bitcoin-vault`
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
 # and SPV modules.
-evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"]
-test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, and four tests over data a real Bitcoin Core v28.1.0 regtest node produced — its block 121 header hashes to the hash the node reported, its merkle path reconstructs its root and a tampered sibling does not, blocks 121/122 anchor and extend through the pallet's rules, and a real transaction's proof is refused until its block is anchored and accepted after) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine` = 148 + 23 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
+evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "scripts/btc/push-headers.py", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "pallets/x3-settlement-engine/src/tests/data/btc_relayer_testnet_headers.txt", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "scripts/testnet/btc-header-source-drill.sh", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, four tests over data a real Bitcoin Core v28.1.0 regtest node produced, the `submit_btc_headers` batch tests, and two tests that decode the relayer's own payload from a real testnet3 run and admit it on an anchored chain while refusing it with its first header dropped) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; the drill follows public testnet live and refuses a tampered answer with a non-zero exit naming the height"]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -64,26 +65,43 @@ id = "X3-XCHAIN-003"
 name = "Relayer framework"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/watchers", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs"]
-implemented = 70
-tested = 50
-mainnet_ready = 35
+paths = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/quorum.rs", "crates/x3-relayer/src/watchers", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs"]
+implemented = 85
+tested = 80
+mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "The relayer signs with a single key and says so: `svm_required_signatures: 1` with the comment that quorum enforcement \"belongs at the aggregator layer\" — and no aggregator exists in this workspace, so the production path is one signature",
+  "**CLOSED 2026-09-26 — the single-key quorum is gone, and the crate refuses what it cannot back.** `svm_required_signatures: 1` (with the comment that quorum enforcement \"belongs at the aggregator layer\") is deleted. `x3-validator-attestation` now owns the one definition of the bar — `supermajority_threshold(n) = floor(2n/3)+1`, never zero, monotonic in `n` — and `crates/x3-relayer` has an `AuthorizedValidatorSet` that decodes the configured keys (optional `0x`, malformed / wrong-length / repeated entries refused at startup rather than trimmed), derives the required signature count from the set, and counts *distinct authorized* signers. `acquire_svm_proof` refuses with typed `SvmQuorumUnreachable` / `NoAuthorizedValidatorSet` instead of emitting a proof it cannot back, and both proof legs refuse with `UnauthorizedSubmitter`. Measured: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed; with the policy check removed, `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` fails by accepting a one-of-three proof, and restoring it returns 9/9.",
   "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) — the authority path is an open decision",
   "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
-  "No multi-operator relayer set: quorum is verified on the *verification* side (x3-validator-attestation, x3-bridge supermajority tests) but nothing in this crate produces one",
+  "No multi-operator relayer set *in production*: the quorum policy is enforced in the library and refuses an unreachable bar, but `RelayerService` has no production constructor in this workspace — `node` and `x3-gateway` depend on the crate and consume only its types — and signature aggregation across validators still has no host. That is why mainnet readiness moves **down** (35 -> 25) even as implementation and tests move up: the previous 35 credited a single-signature path that could not have produced a quorum at all.",
+  "`crates/x3-relayer/src/main.rs` is a separate monolith with its own config and SVM path whose proof signer defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`); it does not use `RpcSubmitter`/`RelayerService` and was not rewritten (TICKET-148).",
 ]
 # The row used to cite `crates/x3-atomic-swap/src/relayer.rs`, a second watcher
 # implementation used by the node-side swap tests. The production relayer is the
 # `x3-relayer` crate; this points at it now, and at the crates that actually verify
 # attestation quorum.
 evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/watchers/evm.rs", "crates/x3-relayer/src/watchers/svm.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"]
-test_evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "crates/x3-verification-router/tests", "crates/x3-relayer/src/evm_receipt_proof.rs", "note: `cargo test -p x3-relayer --lib` covers the refusal path, the SVM attestation signature and the quorum check on an acquired proof; the bridge has supermajority threshold tests (exactly-at, one-below, duplicate-signature rejection); the receipt proof producer has an anvil-backed inclusion test"]
+test_evidence = [
+  "crates/x3-relayer/src/submitter.rs",
+  "crates/x3-relayer/src/quorum.rs",
+  "crates/x3-validator-attestation/src/lib.rs",
+  "note: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed, 0 failed (re-run by the primary agent on the pushed commit); `cargo clippy -p x3-relayer -p x3-validator-attestation --all-targets -- -D warnings` clean; the crate still builds `--no-default-features`",
+  "note: measured load-bearing - removing the policy check makes `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` accept a one-of-three proof; restoring it returns 9/9. Proof runs under `.ai/runlogs/round8-relayer-quorum-20260926T202731Z/`",
+]
+required_tests = [
+  "safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied",
+  "the_quorum_is_the_supermajority_of_the_set_size",
+  "an_empty_set_still_requires_one_signature",
+  "a_malformed_key_is_named_not_trimmed",
+  "a_duplicated_key_is_refused_and_cannot_inflate_the_set",
+  "distinct_signers_ignores_unauthorized_and_repeated_keys",
+  "supermajority_is_strictly_more_than_two_thirds",
+  "supermajority_never_admits_an_empty_set",
+]
 
 [[feature]]
 id = "X3-XCHAIN-004"
@@ -91,8 +109,8 @@ name = "Ethereum bridge adapter"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs"]
-implemented = 75
-tested = 60
+implemented = 80
+tested = 70
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
@@ -100,11 +118,21 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
-  "`burn_wrapped` takes the account to debit as an argument and verifies nothing about who is asking — the origin check has to come from whatever calls it, and nothing does; it is a theft primitive waiting for a caller",
   "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
   "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
   "No external audit",
 ]
+# The theft primitive the row recorded is closed: `EthereumBridge::burn_wrapped`
+# took the account to debit as an argument and checked nothing about who was asking,
+# so any caller could destroy any holder's wrapped balance (measured on 2026-09-26:
+# a call naming Alice's account halved it, with no identity anywhere in the call).
+# It now takes the caller and debits only that account — there is no parameter
+# through which one account can name another's — which is the off-chain shape of the
+# pallet's `ensure_signed`. `execute_mint` had the same shape of defect on the other
+# side of the same key: it `insert`ed the new amount over the old one, so a second
+# deposit of a token to one recipient destroyed the first. Both are pinned by tests
+# that fail when the guard is removed. What remains open on this row is unchanged:
+# the model still has no production consumer, no public-chain run and no audit.
 # Two real defects were fixed here on 2026-09-22. `create_bridge_message` claimed
 # `keccak256(deposit_id || amount || token || recipient)` and computed
 # `hash[i] ^= deposit_id.as_bytes()[i]` — no hash function, and none of the amount,
@@ -114,23 +142,47 @@ blockers = [
 # deposit now carries `x3_recipient`, the message hash is keccak over all four fields,
 # and the mint must match the recorded recipient.
 evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs", "note: the 5-of-7 path verifies real ECDSA — 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused — and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"]
-test_evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 122 x3-bridge lib tests pass, including bridge_message_hash_covers_the_economic_terms (a different recipient or amount must change what validators sign, and the hash must not be the deposit id XORed) and mint_to_an_account_other_than_the_recorded_recipient_is_refused (fails when the recipient binding is removed — negative control run); the EVM receipt producer and verifier have anvil-backed inclusion tests"]
+test_evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 124 x3-bridge lib tests pass, including bridge_message_hash_covers_the_economic_terms (a different recipient or amount must change what validators sign, and the hash must not be the deposit id XORed), mint_to_an_account_other_than_the_recorded_recipient_is_refused (fails when the recipient binding is removed — negative control run), and the burn/mint accounting pair added 2026-09-26 (a_burn_debits_only_the_callers_own_account fails when the burn key is not the caller; a_second_deposit_adds_to_the_wrapped_balance pins accumulation); the EVM receipt producer and verifier have anvil-backed inclusion tests"]
+required_tests = [
+    "test_burn_wrapped",
+    "a_burn_debits_only_the_callers_own_account",
+    "a_second_deposit_adds_to_the_wrapped_balance",
+    "mint_to_an_account_other_than_the_recorded_recipient_is_refused",
+]
 
 [[feature]]
 id = "X3-XCHAIN-005"
 name = "Finality proof model"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-atomic-swap/src/finality.rs"]
-implemented = 68
-tested = 45
-mainnet_ready = 42
+paths = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "crates/x3-atomic-swap/src/error.rs"]
+implemented = 85
+tested = 78
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Cross-chain finality certificate wiring incomplete"]
-evidence = ["crates/x3-atomic-swap/src/finality.rs", "note: Finality modules exist; older status flags GRANDPA cert gap"]
+blockers = [
+  "**CLOSED 2026-09-26 — a finality claim is a certificate, not two numbers.** `verify_finality(chain, current_confirms, commitment)` took caller-supplied integers and `FinalityCheckData::block_height` was never read, so a swap's safety rested on a value the counterparty chose; `Relayer::verify_finality(required, current, chain_name)` compared two such numbers to each other. `FinalityCertificate` now carries `{ chain, block_height, block_hash, tx_id, confirmations, observed_at }` with private fields and two constructors, and `confirmations` is *derived* (`observed_at - block_height + 1`, the anchored block counting as one) — a reported count its own anchor does not imply is refused with `CertificateConfirmationsDisagree`, and an anchor above the tip it claims to be observed at with `CertificateBlockAfterObservation`. The verification path re-derives the depth rather than trusting the field, because a decoded certificate has not been through a constructor.",
+  "**CLOSED 2026-09-26 — the oracle can refuse a rollback.** `FinalityOracle::verify_finality`/`is_finalized` take `&mut self` and the certificate. A certificate for another chain is refused (`CertificateChainMismatch`); a tip below the tallest tip this oracle already accepted is refused as a rewind (`CertificateRewindsAcceptedAnchor`) instead of being re-read as fresh; a tip more than the configured window behind the tallest tip the oracle has *witnessed* is refused as stale (`CertificateStale`, `DEFAULT_CERTIFICATE_STALENESS_BLOCKS`, overridable per chain). Witnessing is separate from accepting on purpose: a certificate refused for being too shallow still tells the oracle how far the chain has come, which is what makes a later, older certificate refusable as stale. The bare-count entry point on the swap path is gone — `Relayer::verify_finality` takes the certificate and delegates to an owned oracle, so the relayer inherits every refusal, with `min_confirmations` kept as a floor on top of the chain's rule.",
+  "Still open, and it is the reason `mainnet_ready` does not follow `implemented`: nothing *produces* a certificate from a real chain. `block_hash` has to be bound to `chain` by a reader — an RPC quorum, a light client, a receipt proof — and no such producer is wired on this row, so what is proven is the shape and the refusals, not that the anchor is the chain's. The hash is believed.",
+  "The oracle's tip memory is in the oracle, in memory. It does not survive a restart, so a rewind that spans a process restart is not caught; persisting the accepted tip belongs with the proof ledger.",
+  "No public-chain run: the certificate stops at the crate's local gates. There is also no test that a real Ethereum or Bitcoin reorg produces a `CertificateRewindsAcceptedAnchor` from live data — only that a rewound certificate is refused once presented.",
+]
+evidence = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "crates/x3-atomic-swap/src/error.rs", "note: `cargo test -p x3-atomic-swap` -> 668 + 2 + 31 + 44 passed, 0 failed, 0 ignored; `cargo clippy -p x3-atomic-swap --all-targets` adds no warning in finality.rs (lib warnings 49 -> 44, the five removed being finality.rs's own unused imports); `cargo fmt -p x3-atomic-swap -- --check` clean; the three in-workspace dependents that link the crate (x3-runtime-signer, x3-chain-health-daemon, x3-bitcoin-vault) still check", "note: `FinalityCheckData` is deleted rather than deprecated — it was the type whose `block_height` nobody read — and no crate outside x3-atomic-swap referenced the finality items it replaced (checked with rg over the workspace)"]
+test_evidence = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "note: measured load-bearing, each control run with the check removed and restored, logs under `.ai/runlogs/round8-finality-cert-*`: removing the count check reddens `test_a_reported_count_the_anchor_does_not_imply_is_refused`; removing the rewind check reddens `test_a_rewound_anchor_is_refused` with `left: Ok(true)` — the rewound certificate is *accepted*; removing the staleness check reddens `test_a_stale_certificate_is_refused` with `left: Ok(true)`; removing the chain check reddens `test_a_certificate_for_the_wrong_chain_is_refused`, which then answers with the wrong reason (`FinalityNotMet` for a Bitcoin certificate asked about Ethereum)", "note: the two existing integration suites were converted rather than deleted — `test_source_chain_reorg` and `test_chaos_source_chain_reorg` now express a reorg honestly (the tip does not move, the anchor does: sixteen deep before, three after) and the oracle section of `atomic_swap_integration` builds certificates, so the same three properties are still asserted with a depth the caller cannot choose"]
+required_tests = [
+  "test_a_certificate_at_exactly_the_required_depth_passes",
+  "test_a_reported_count_the_anchor_does_not_imply_is_refused",
+  "test_a_certificate_for_the_wrong_chain_is_refused",
+  "test_a_rewound_anchor_is_refused",
+  "test_a_stale_certificate_is_refused",
+  "test_solana_finality_uses_the_certificate_commitment",
+  "test_confirmations_at_counts_the_anchored_block",
+  "test_relayer_verifies_finality",
+  "test_relayer_cannot_claim_without_finality",
+]
 
 [[feature]]
 id = "X3-XCHAIN-006"
@@ -197,14 +249,17 @@ name = "RPC quorum oracle"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
-implemented = 78
-tested = 55
+implemented = 85
+tested = 60
 mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs Byzantine provider and partition tests"]
+blockers = [
+  "Needs Byzantine provider and partition tests",
+  "**CLOSED 2026-09-27 \u2014 the in-memory oracle no longer manufactures a quorum.** `SimpleRpcQuorum::collect_votes` returned `TxStatus::Confirmed` with `agreement_count: 1` for every provider it was handed, with the comment \u201cSimulate a successful Confirmed response at block 1\u201d. It has no transport, so it had observed nothing, and a caller that wired it up would have got a 2-of-3 consensus out of an empty network. It now reports `Unknown` with a count of zero \u2014 what \u201cI do not know\u201d looks like to `verify_consensus`, which then fails closed and names every unobserved provider as a disagreement. Two tests that *required* the fabrication were rewritten rather than deleted: `rpc_quorum::tests::test_collect_votes_returns_proof_per_provider` and the `test_new_modules_integration` block in `crates/x3-atomic-swap/tests/atomic_swap_integration.rs` both used to assert that all three votes came back `Confirmed` and that the oracle therefore reached consensus. They now assert the honest contract (one vote per provider, none claiming an observation, no consensus) and say in the test why the old assertion was the problem.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
 
 [[feature]]
@@ -249,13 +304,16 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
 implemented = 82
-tested = 62
+tested = 70
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs live heterogeneous provider evidence"]
+blockers = [
+  "Needs live heterogeneous provider evidence",
+  "**CLOSED 2026-09-27 \u2014 the only consumer of quorum evidence no longer lets the evidence set its own bar, and a disagreement cannot be padded into agreement.** The secret-release firewall compared `item.rpc_quorum.provider_count` against `item.rpc_quorum.required_quorum` \u2014 two fields of the same caller-supplied struct \u2014 so `provider_count: 3, required_quorum: 2` written by hand satisfied a security gate, and listing one provider three times satisfied it too. The bar now lives on `SecretReleaseRequirement::min_providers` (policy, and refused when it is zero), the attestation carries provider *ids* rather than a count, and the firewall counts distinct non-empty ids itself.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
 
 [[feature]]
@@ -265,14 +323,18 @@ name = "Secret-release firewall"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
-implemented = 85
-tested = 78
-mainnet_ready = 68
+implemented = 92
+tested = 88
+mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No live external-chain proof of the release path (TICKET-095): these tests exercise the chain-side firewall against constructed evidence, not a real EVM/SVM/BTC release"]
+blockers = [
+  "**NARROWED 2026-09-27 \u2014 the constructed part that mattered is gone; the live runs are real and the identities are not.** The evidence for this row *was* constructed in the place that decided the outcome: the quorum attestation carried its own `provider_count` and `required_quorum`, so the firewall's RPC-quorum gate was satisfied by numbers the evidence chose for itself, and the live EVM/SVM tests typed `provider_count: 3, required_quorum: 2` against a single anvil or solana-test-validator endpoint. The bar is now `SecretReleaseRequirement::min_providers` (policy; zero refused) and the attestation is a list of distinct provider ids the firewall counts itself \u2014 so the failure modes are duplicates, blank ids, and a policy bar the evidence cannot lower, all four of which have tests (`the_evidence_cannot_set_its_own_quorum_bar`, `one_provider_listed_twice_is_one_provider`, `an_unnamed_provider_does_not_count`, `a_zero_provider_policy_is_refused`). The live lifecycles still run against real chains and real contracts (`real_x3vm_evm_lock_claim_atomic_lifecycle`, `real_local_node_lock_finalized_claim_lifecycle`, and the SVM pair), and their requirements now say `min_providers: 1` with a comment, because one endpoint is what exists in those harnesses \u2014 the honest number instead of a typed two-of-three.",
+  "Still open on TICKET-095: the provider ids are **unauthenticated**. A caller can name three providers that never answered and clear `min_providers: 3`; what stops that is a signature over each observation from a key the verifier knows, which is the relayer's `x3-validator-attestation` model and is not wired here. The finality side has the same shape in miniature: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
+  "No live BTC release: the EVM and SVM paths have live lifecycles, Bitcoin does not.",
+]
 required_tests = [
   "authorizes_only_when_all_required_domains_are_finalized",
   "rejects_reused_proof_across_required_domains",

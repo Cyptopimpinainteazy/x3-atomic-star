@@ -28,7 +28,10 @@ use crate::event_watcher::HtlcEvent;
 #[cfg(feature = "std")]
 use crate::evm_htlc::EvmHtlcContract;
 use crate::evm_htlc::{EvmClaimedEvent, EvmHtlcAdapter, EvmLockedEvent};
-use crate::intent::{AtomicIntent, AtomicSwapStatus};
+use crate::finality::{
+    is_confirmation_based, FinalityCertificate, FinalityOracle, InMemoryFinalityOracle,
+};
+use crate::intent::{AtomicIntent, AtomicSwapStatus, ChainKind};
 use crate::ledger::ProofLedger;
 use crate::scoreboard::SwapScoreboard;
 use crate::svm_htlc::{SvmClaimedEvent as SvmClaimedEvt, SvmHtlcAdapter, SvmLockedEvent};
@@ -211,10 +214,12 @@ pub fn scan_for_alerts(
 pub struct Relayer {
     /// Relayer identifier.
     pub relayer_id: String,
-    /// Minimum number of confirmations for finality.
+    /// Minimum number of confirmations for finality, on the confirmation-based chains.
     pub min_confirmations: u32,
     /// Proof ledger for recording swap steps.
     pub ledger: ProofLedger,
+    /// Chain-parameterised finality checks, including the tip memory that makes a rewind refusable.
+    finality: InMemoryFinalityOracle,
 }
 
 impl Relayer {
@@ -224,6 +229,7 @@ impl Relayer {
             relayer_id,
             min_confirmations,
             ledger: ProofLedger::new(),
+            finality: InMemoryFinalityOracle::new(),
         }
     }
 
@@ -369,21 +375,29 @@ impl Relayer {
         source_hashlock == dest_hashlock
     }
 
-    /// Verify that finality has been reached for a given chain.
+    /// Verify that a finality certificate reaches this relayer's floor for `chain`.
     ///
-    /// `current_confirmations` is the number of confirmations observed.
-    /// Returns Ok if >= required, Err otherwise.
+    /// There is deliberately no bare-count form. This used to take
+    /// `(required_confirmations, current_confirmations, chain_name)` — two numbers the caller
+    /// chose, compared against each other — so a relayer could be told a depth the transaction's
+    /// own block did not have. It now takes a [`FinalityCertificate`], whose `confirmations` field
+    /// is derived from its anchor (`observed_at - block_height + 1`) and re-derived here, and it
+    /// additionally refuses a certificate for another chain, one that rewinds below a tip already
+    /// accepted, and one that is stale for the configured window — all through the oracle below.
+    ///
+    /// `min_confirmations` is a floor on top of the chain's own rule and applies only to the
+    /// confirmation-based chains; Solana, X3 and Cosmos are decided by the oracle's rule for them.
     pub fn verify_finality(
-        &self,
-        required_confirmations: u32,
-        current_confirmations: u32,
-        chain_name: &str,
+        &mut self,
+        chain: ChainKind,
+        certificate: &FinalityCertificate,
     ) -> Result<(), SwapError> {
-        if current_confirmations < required_confirmations {
+        self.finality.verify_finality(chain, certificate)?;
+        if is_confirmation_based(chain) && certificate.confirmations() < self.min_confirmations {
             return Err(SwapError::FinalityNotMet {
-                chain: chain_name.into(),
-                required: required_confirmations,
-                current: current_confirmations,
+                chain: chain.as_str().to_string(),
+                required: self.min_confirmations,
+                current: certificate.confirmations(),
             });
         }
         Ok(())
@@ -747,31 +761,42 @@ mod tests {
 
     #[test]
     fn test_relayer_verifies_finality() {
-        let relayer = Relayer::new("relayer-1".into(), 12);
+        let mut relayer = Relayer::new("relayer-1".into(), 12);
 
-        // Sufficient confirmations
-        assert!(relayer.verify_finality(12, 15, "eth").is_ok());
+        // Sufficient: 1000..=1015 is sixteen blocks deep.
+        let deep =
+            FinalityCertificate::observe(ChainKind::Ethereum, 1000, [0x11; 32], [0x22; 32], 1015)
+                .expect("valid anchor");
+        assert_eq!(deep.confirmations(), 16);
+        assert!(relayer.verify_finality(ChainKind::Ethereum, &deep).is_ok());
 
-        // Insufficient
-        let result = relayer.verify_finality(12, 5, "eth");
-        assert!(result.is_err());
-        if let Err(SwapError::FinalityNotMet {
-            required, current, ..
-        }) = result
-        {
-            assert_eq!(required, 12);
-            assert_eq!(current, 5);
-        } else {
-            panic!("expected FinalityNotMet");
+        // Insufficient: the same tip, an anchor only five blocks deep. The depth comes from the
+        // certificate, so the caller cannot report a deeper one.
+        let shallow =
+            FinalityCertificate::observe(ChainKind::Ethereum, 1011, [0x11; 32], [0x22; 32], 1015)
+                .expect("valid anchor");
+        assert_eq!(shallow.confirmations(), 5);
+        match relayer.verify_finality(ChainKind::Ethereum, &shallow) {
+            Err(SwapError::FinalityNotMet {
+                required, current, ..
+            }) => {
+                assert_eq!(required, 12);
+                assert_eq!(current, 5);
+            }
+            other => panic!("expected FinalityNotMet, got {:?}", other),
         }
     }
 
     #[test]
     fn test_relayer_cannot_claim_without_finality() {
-        let relayer = Relayer::new("relayer-1".into(), 12);
+        let mut relayer = Relayer::new("relayer-1".into(), 12);
 
-        // Must have finality before considering a swap valid
-        let result = relayer.verify_finality(12, 3, "eth");
+        // Must have finality before considering a swap valid: three blocks deep.
+        let shallow =
+            FinalityCertificate::observe(ChainKind::Ethereum, 1012, [0x33; 32], [0x44; 32], 1014)
+                .expect("valid anchor");
+        assert_eq!(shallow.confirmations(), 3);
+        let result = relayer.verify_finality(ChainKind::Ethereum, &shallow);
         assert!(
             result.is_err(),
             "relayer must refuse to proceed without finality"

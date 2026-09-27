@@ -9,6 +9,8 @@ pub mod evm_receipt_proof;
 /// `EvmProof` without pulling in tokio. The service modules (`relayer`,
 /// `submitter`, `watchers`) require the `std` feature.
 #[cfg(feature = "std")]
+pub mod quorum;
+#[cfg(feature = "std")]
 pub mod relayer;
 #[cfg(feature = "std")]
 pub mod submitter;
@@ -16,6 +18,8 @@ pub mod types;
 #[cfg(feature = "std")]
 pub mod watchers;
 
+#[cfg(feature = "std")]
+pub use quorum::{AuthorizedValidatorSet, ValidatorSetError};
 #[cfg(feature = "std")]
 pub use relayer::RelayerService;
 #[cfg(feature = "std")]

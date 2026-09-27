@@ -80,6 +80,7 @@ impl pallet_x3_treasury_policy::Config for Test {
     /// Any signed origin acts as the operator in tests.
     type OperatorOrigin = EnsureSigned<u64>;
     type MaxInsuranceReserve = MaxInsuranceReserve;
+    type WeightInfo = pallet_x3_treasury_policy::weights::SubstrateWeight<Test>;
 }
 
 /// Convenience account ID used for operator calls in tests.

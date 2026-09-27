@@ -2564,7 +2564,9 @@ async fn run_grandpa_finality_anchor(
                 attempts = 0;
             }
 
-            let cert_hash = sp_core::blake2_256(&hash);
+            // The chain anchors only a certificate it can recompute, so the digest is taken from
+            // the pallet's one definition rather than re-derived here (TICKET-107).
+            let cert_hash = pallet_x3_atomic_kernel::finality_cert_from_block_hash(&hash).0;
             observed_certs.record(number, H256(cert_hash));
             let call = RuntimeCall::X3AtomicKernel(
                 pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
@@ -2646,13 +2648,24 @@ async fn run_flash_finality_voter<Client, Block>(
 
                 // Try to get a Flash-Finality certificate for this block
                 if let Some(cert) = gadget.get_certificate(hash).await {
-                    // --- Write cert_hash to off-chain local storage ---
+                    // --- Write the anchorable certificate to off-chain local storage ---
                     // Key: "x3ff:" + block_number (LE u64) = 13 bytes
                     // Value: cert_hash (32 bytes)
                     // The pallet-x3-atomic-kernel OCW reads this to populate
                     // `finality_cert` in PoAE proofs instead of H256::zero().
                     {
-                        let cert_hash = cert.cert_hash();
+                        // What goes under `x3ff:` is the certificate the *chain* accepts for this
+                        // block: `blake2_256` of the finalized block's own hash, which a runtime
+                        // can recompute and a third party can check against the header. The Flash
+                        // certificate's own hash is not that value and the chain cannot verify it —
+                        // it needs the voter's keys, which a runtime does not hold — so anchoring
+                        // it would be the forged-anchor hole of TICKET-107 with the honest voter as
+                        // the forger. The Flash hash is logged instead, so the gadget's view stays
+                        // observable; if it is ever to be the attested value, the runtime needs a
+                        // verifier for it first.
+                        let flash_cert_hash = cert.cert_hash();
+                        let cert_hash =
+                            pallet_x3_atomic_kernel::finality_cert_from_block_hash(&hash).0;
                         let mut key = b"x3ff:".to_vec();
                         key.extend_from_slice(&number.to_le_bytes());
                         sp_io::offchain::local_storage_set(
@@ -2662,9 +2675,11 @@ async fn run_flash_finality_voter<Client, Block>(
                         );
                         observed_certs.record(number, H256(cert_hash));
                         log::info!(
-                            "⚡ [FlashFinality] cert stored at key x3ff:{} → cert_hash=0x{}",
+                            "⚡ [FlashFinality] cert stored at key x3ff:{} → cert_hash=0x{} \
+                             (flash cert 0x{} is not anchored: the runtime cannot verify it)",
                             number,
-                            hex::encode(&cert_hash[..8])
+                            hex::encode(&cert_hash[..8]),
+                            hex::encode(&flash_cert_hash[..8])
                         );
                     }
 
@@ -2692,9 +2707,10 @@ async fn run_flash_finality_voter<Client, Block>(
                     );
                 } else {
                     // No Flash certificate — derive the cert hash from the GRANDPA-finalized
-                    // block hash. The pallet OCW anchors this under `x3ff:`, and the atomic
+                    // block hash, through the pallet's one definition so the node and the runtime
+                    // cannot drift. The pallet OCW anchors this under `x3ff:`, and the atomic
                     // gateway service then signs `finalize_atomic_bundle` with it.
-                    let cert_hash = sp_core::blake2_256(&hash);
+                    let cert_hash = pallet_x3_atomic_kernel::finality_cert_from_block_hash(&hash).0;
                     let mut key = b"x3ff:".to_vec();
                     key.extend_from_slice(&number.to_le_bytes());
                     sp_io::offchain::local_storage_set(

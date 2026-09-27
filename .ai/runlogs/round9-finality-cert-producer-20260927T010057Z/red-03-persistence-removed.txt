@@ -1,0 +1,6 @@
+test finality::tests::test_accepted_tip_survives_a_reload_and_refuses_a_rewind ... FAILED
+thread 'finality::tests::test_accepted_tip_survives_a_reload_and_refuses_a_rewind' panicked at crates/x3-atomic-swap/src/finality.rs:956:9:
+assertion `left == right` failed: the accepted tip must reload from the store
+  left: None
+ right: Some(1011)
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 670 filtered out; finished in 0.00s

@@ -155,10 +155,10 @@ impl ArbitrageStrategy {
             if let (Some((buy_venue, buy_price)), Some((sell_venue, sell_price))) = (
                 venue_prices
                     .iter()
-                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()),
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)),
                 venue_prices
                     .iter()
-                    .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()),
+                    .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)),
             ) {
                 if buy_venue != sell_venue && sell_price > buy_price {
                     let profit_bps = ((*sell_price - *buy_price) / *buy_price * 10000.0) as u32;

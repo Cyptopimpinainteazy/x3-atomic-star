@@ -1,3 +1,6 @@
+# This is a user unit, so `%h` expands to the invoking user's home. The checkout is addressed as
+# %h/Desktop/xxxstar-main rather than the old hardcoded layout; update the ExecStart path if you
+# move the checkout.
 [Unit]
 Description=X3 HTML frontend site
 After=network.target
@@ -9,7 +12,7 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=10
-ExecStart=/usr/bin/env bash /home/lojak/Desktop/X3_ATOMIC_STAR/scripts/systemd/start-x3fronend.sh
+ExecStart=/usr/bin/env bash %h/Desktop/xxxstar-main/scripts/systemd/start-x3fronend.sh
 Environment=CI=
 StandardOutput=journal
 StandardError=journal

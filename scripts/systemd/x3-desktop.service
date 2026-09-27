@@ -1,3 +1,6 @@
+# This is a user unit, so `%h` expands to the invoking user's home. The checkout
+# is addressed as %h/Desktop/xxxstar-main instead of the old /home/lojak/Desktop/X3_ATOMIC_STAR
+# layout; if you move the checkout, update the WorkingDirectory path below.
 [Unit]
 Description=X3 Desktop Vite dev server
 After=network.target
@@ -7,7 +10,7 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=10
-WorkingDirectory=%h/Desktop/X3_ATOMIC_STAR/apps/x3-desktop
+WorkingDirectory=%h/Desktop/xxxstar-main/apps/x3-desktop
 ExecStart=/usr/bin/env bash -lc 'npm run dev'
 Environment=PORT=5173
 Environment=CI=

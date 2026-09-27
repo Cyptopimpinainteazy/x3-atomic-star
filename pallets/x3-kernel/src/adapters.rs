@@ -41,6 +41,41 @@ pub trait X3ExecutorAdapter {
     /// Execute X3 bytecode and return execution receipt
     fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError>;
 
+    /// Execute X3 bytecode with the chain's contract slots visible to the program.
+    ///
+    /// `slots` is the chain's `X3ContractStorage`, read by the caller before execution; an empty
+    /// slice means the chain holds no slot for this program. There is deliberately no default
+    /// implementation: an adapter that cannot see chain storage must say so where it is written,
+    /// because an adapter that silently ignores this argument produces receipts for a program that
+    /// read zeros instead of the chain's state.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError>;
+
+    /// Execute X3 bytecode with the chain's private-submission posture as well as its slots.
+    ///
+    /// The artifact's compiled policy can *demand* private submission, and the chain's
+    /// `Config::PrivateSubmissionChannel` says whether it can meet the demand. The pallet has
+    /// already refused a demanding program when the chain cannot meet it, so this argument exists for
+    /// the other direction: an adapter that really executes the bytes must tell its engine that a
+    /// private channel exists, or the engine's own fail-closed default would refuse the very program
+    /// the chain just accepted.
+    ///
+    /// The default implementation ignores the argument and delegates, which is fail closed: an
+    /// adapter that does not implement this still hands its engine a context with no private channel,
+    /// so a demanding artifact is refused rather than run in the clear.
+    fn execute_with_slots_and_policy(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+        private_channel_available: bool,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        let _ = private_channel_available;
+        Self::execute_with_slots(payload, gas_limit, slots)
+    }
+
     /// Validate X3 bytecode without execution
     fn validate(payload: &[u8]) -> Result<(), DispatchError>;
 
@@ -71,6 +106,7 @@ impl EvmExecutorAdapter for MockEvmAdapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -105,6 +141,7 @@ impl EvmExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -146,6 +183,7 @@ impl SvmExecutorAdapter for MockSvmAdapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -182,6 +220,7 @@ impl EvmExecutorAdapter for FailingMockEvmAdapter {
                 return_data: b"revert".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -222,6 +261,7 @@ impl SvmExecutorAdapter for FailingMockSvmAdapter {
                 return_data: b"program error".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -251,6 +291,7 @@ impl SvmExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -270,6 +311,17 @@ pub struct MockX3Adapter;
 
 impl X3ExecutorAdapter for MockX3Adapter {
     fn execute(payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_with_slots(payload, _gas_limit, &[])
+    }
+
+    /// The mock has no chain storage: it reports the state changes it synthesizes and nothing else,
+    /// which is what makes it a mock. Stated here rather than defaulted on the trait so a
+    /// production adapter cannot inherit "ignores the chain's slots" by accident.
+    fn execute_with_slots(
+        payload: &[u8],
+        _gas_limit: u64,
+        _slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
         // Mock execution: hash payload to generate deterministic state changes
         let state_root = if payload.is_empty() {
             H256::zero()
@@ -288,6 +340,7 @@ impl X3ExecutorAdapter for MockX3Adapter {
                 key: state_root,
                 value: state_root,
             }],
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -336,6 +389,7 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
                 return_data: b"x3 fault".to_vec(),
                 logs: Vec::new(),
                 state_changes: Vec::new(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -345,7 +399,20 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
             });
         }
 
-        MockX3Adapter::execute(payload, gas_limit)
+        MockX3Adapter::execute_with_slots(payload, gas_limit, &[])
+    }
+
+    /// `execute`s fault injection, with the same stance on chain storage as `MockX3Adapter`.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        if payload.first() == Some(&0xFF) {
+            return Err(DispatchError::Other("X3 execution failed (simulated)"));
+        }
+
+        MockX3Adapter::execute_with_slots(payload, gas_limit, slots)
     }
 
     fn validate(payload: &[u8]) -> Result<(), DispatchError> {
@@ -371,6 +438,7 @@ impl X3ExecutorAdapter for () {
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -382,6 +450,16 @@ impl X3ExecutorAdapter for () {
 
     fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
+    }
+
+    /// Test-only adapter: it synthesizes a success receipt and cannot see chain storage, which is
+    /// why it is confined to test and `dev-mock` builds.
+    fn execute_with_slots(
+        payload: &[u8],
+        gas_limit: u64,
+        _slots: &[(H256, [u8; 32])],
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        <() as X3ExecutorAdapter>::execute(payload, gas_limit)
     }
 
     fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
@@ -458,6 +536,7 @@ pub mod real_adapters {
                         value: canonical_balance_value(update.lamports as u128),
                     })
                     .collect(),
+                storage_writes: Vec::new(),
                 protocol_version: 1,
                 migration_history: Vec::new(),
                 compatibility_flags: 0,
@@ -484,6 +563,30 @@ pub mod real_adapters {
         fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
             <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute(
                 payload, gas_limit,
+            )
+        }
+
+        fn execute_with_slots(
+            payload: &[u8],
+            gas_limit: u64,
+            slots: &[(H256, [u8; 32])],
+        ) -> Result<ExecutionReceipt, DispatchError> {
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute_with_slots(
+                payload, gas_limit, slots,
+            )
+        }
+
+        fn execute_with_slots_and_policy(
+            payload: &[u8],
+            gas_limit: u64,
+            slots: &[(H256, [u8; 32])],
+            private_channel_available: bool,
+        ) -> Result<ExecutionReceipt, DispatchError> {
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute_with_slots_and_policy(
+                payload,
+                gas_limit,
+                slots,
+                private_channel_available,
             )
         }
 

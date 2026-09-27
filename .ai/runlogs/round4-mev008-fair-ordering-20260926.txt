@@ -1,0 +1,154 @@
+Round 4 / Workstream B — X3-MEV-008 fair transaction ordering — evidence log
+Agent: /root/round4_mev002
+Date: 2026-09-26
+Artifact under test: crates/x3-swap-router/src/mev_protection/fair_ordering.rs
+sha256 at completion: 96e0f42d7f9c655aa31099b8e948fbad7bf187d932915b034f61e6f87c145fbc
+  (fb9c8beed78e35c8945fa9414a5ac637b72740bc3b15a4680b9ea6accaa2f3d9 is the same
+   file during the break-it-first controls, before one documentation-only edit that
+   makes the beacon-provenance risk explicit in install_beacon's doc comment.)
+
+===============================================================================
+1. BASELINE — what the lane is wired into
+===============================================================================
+
+$ cargo tree -i x3-swap-router --workspace
+x3-swap-router v0.1.0 (/home/lojak/Desktop/xxxstar-main/crates/x3-swap-router)
+
+  -> No consumer. The crate is not reachable from any node/runtime/pallet path.
+
+$ rg -n "MEVProtector|MEVProtectionConfig|mev_protection::" --glob '!target' --glob '!.wt-*' .
+./crates/x3-swap-router/src/tests.rs:2:use crate::mev_protection::MEVProtectionError;
+./crates/x3-swap-router/src/tests.rs:219:    let protector = MEVProtector::new().unwrap().with_overhead_limit(0); // force error
+./crates/x3-swap-router/src/routing.rs:1:use crate::mev_protection::{Hop, Route};
+./crates/x3-swap-router/src/lib.rs:22:pub use mev_protection::{ ... MEVProtector, ... };
+
+  -> The pre-existing MEV protector is consumed by its own crate's tests only.
+
+===============================================================================
+2. TESTS — cargo test -p x3-swap-router
+===============================================================================
+
+$ cargo test -p x3-swap-router
+running 38 tests
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+running 25 tests
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo test -p x3-swap-router --lib fair_ordering      # 26 tests, all fair_ordering
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 4.13s
+
+The 26 named tests:
+  a_beacon_installed_while_the_window_is_open_is_refused
+  a_beacon_reorders_and_the_order_stays_recomputable_from_the_settlement
+  a_bond_below_the_minimum_is_refused
+  a_closed_window_settles_in_canonical_key_order
+  a_commit_outside_the_window_is_refused
+  a_commitment_that_never_reveals_is_excluded_and_its_bond_reported
+  a_reveal_after_the_window_closes_is_refused_and_never_ordered
+  a_reveal_before_the_window_opens_is_refused
+  a_reveal_from_a_different_sender_is_refused
+  a_reveal_that_does_not_hash_to_its_commit_is_refused
+  a_reveal_without_a_commit_is_refused
+  a_second_reveal_of_the_same_commitment_is_refused
+  a_settled_window_accepts_no_further_commits_or_reveals
+  a_window_beyond_its_capacity_is_refused
+  an_attacker_cannot_substitute_its_payload_for_a_victims_commitment
+  an_inverted_window_is_refused
+  an_oversized_reveal_is_refused
+  one_sender_may_not_commit_twice_in_a_window
+  reveals_landing_at_different_blocks_still_order_by_key
+  settling_before_the_window_closes_is_refused
+  settling_twice_is_refused
+  the_commitment_hash_binds_sender_plaintext_and_nonce
+  the_reveal_block_within_the_window_does_not_change_the_sequence
+  the_same_commit_hash_from_two_senders_is_refused
+  the_sequence_does_not_depend_on_arrival_order
+  the_sequence_is_the_key_order_and_not_the_arrival_order
+
+===============================================================================
+3. GATES
+===============================================================================
+
+$ cargo clippy -p x3-swap-router --all-targets -- -D warnings
+    Checking x3-swap-router v0.1.0 (/home/lojak/Desktop/xxxstar-main/crates/x3-swap-router)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.75s
+  (exit 0; the manifest/patch warnings printed are pre-existing and belong to
+   pallets/pallet-x3-control and the [patch] table, not to this crate.)
+
+$ cargo fmt --all -- --check
+  (exit 0, no diff)
+
+===============================================================================
+4. BREAK-IT-FIRST CONTROLS
+   Each rule was disabled in turn, the affected test re-run, the red recorded,
+   then the file restored and verified byte-identical
+   (diff /tmp/fair_ordering.rs.good ... -> RESTORED-IDENTICAL) .
+===============================================================================
+
+--- Control 1: order by arrival block instead of the order key -------------------
+    Mutation: settle() sorts by (reveal.revealed_at_block, order_key, commit_hash)
+    Result:
+test mev_protection::fair_ordering::tests::reveals_landing_at_different_blocks_still_order_by_key ... FAILED
+thread '...reveals_landing_at_different_blocks_still_order_by_key' panicked at
+  crates/x3-swap-router/src/mev_protection/fair_ordering.rs:800:9:
+assertion `left == right` failed: the order is the key order, whatever block each commit and reveal landed in
+  left: [0xf195f96d…, 0xe73d36c7…, 0x8037b87b…]
+ right: [0x8037b87b…, 0xe73d36c7…, 0xf195f96d…]
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out
+
+    -> A first-come / arrival-block implementation publishes the reverse of the
+       canonical order and is caught. Note the earlier arrival-order test still
+       passed under this mutation because every reveal in it shared one block —
+       which is exactly why reveals_landing_at_different_blocks_still_order_by_key
+       was added.
+
+--- Control 2: drop the reveal-after-deadline rule ---------------------------------
+    Mutation: removed the `current_block > window.close_block` refusal in reveal()
+    Result:
+test mev_protection::fair_ordering::tests::a_reveal_after_the_window_closes_is_refused_and_never_ordered ... FAILED
+thread '...a_reveal_after_the_window_closes_is_refused_and_never_ordered' panicked at
+  crates/x3-swap-router/src/mev_protection/fair_ordering.rs:883:18:
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out
+
+--- Control 3: drop the sender binding on reveal -----------------------------------
+    Mutation: removed the `commitment.sender != sender` refusal in reveal()
+    Result:
+test mev_protection::fair_ordering::tests::a_reveal_from_a_different_sender_is_refused ... FAILED
+test mev_protection::fair_ordering::tests::an_attacker_cannot_substitute_its_payload_for_a_victims_commitment ... FAILED
+test result: FAILED. 24 passed; 2 failed; 0 ignored; 0 measured; 12 filtered out
+
+--- Control 4: drop the hash binding on reveal ------------------------------------
+    Mutation: removed the `commitment_hash(sender, plaintext, nonce) != commit_hash` refusal
+    Result:
+test mev_protection::fair_ordering::tests::a_reveal_that_does_not_hash_to_its_commit_is_refused ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out
+
+--- Restore verification ----------------------------------------------------------
+$ diff /tmp/fair_ordering.rs.good crates/x3-swap-router/src/mev_protection/fair_ordering.rs
+RESTORED-IDENTICAL
+$ sha256sum crates/x3-swap-router/src/mev_protection/fair_ordering.rs
+fb9c8beed78e35c8945fa9414a5ac637b72740bc3b15a4680b9ea6accaa2f3d9   # controls era
+96e0f42d7f9c655aa31099b8e948fbad7bf187d932915b034f61e6f87c145fbc   # final
+
+--- Post-restore re-run -----------------------------------------------------------
+$ cargo test -p x3-swap-router --lib fair_ordering
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 4.13s
+
+===============================================================================
+5. NO-FAKE-GREEN SCAN OF THE CHANGED SURFACE
+===============================================================================
+
+  - No test was deleted, renamed away, `#[ignore]`d, or loosened.
+  - No assertion was softened: the ordering tests compare full H256 sequences
+    against an independently constructed expectation, and the beacon test proves
+    non-vacuity by searching for a beacon that actually reorders the fixture.
+  - No mock stands in for the lane: the tests drive the real CommitRevealLane.
+  - Production code in the new module has no `unwrap()`; the three `expect()`s in
+    settle() carry the invariant that makes them unreachable, and the capacity
+    bound (MAX_COMMITMENTS) is what makes the u32 position conversion total.
+  - Reported, not fixed (outside this workstream's ownership):
+      crates/x3-dex/src/tests/attack_liquidation_frontrun.rs::
+        liquidation_frontrun_eliminated_by_fair_ordering asserts 50 > 0 on two
+        locals and calls it a fair-ordering invariant.

@@ -419,8 +419,8 @@ impl Auditor {
         // Calculate trend from history
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            .map(|elapsed| elapsed.as_secs())
+            .unwrap_or(0);
 
         if self.profit_history.len() >= 10 {
             let recent: Vec<f64> = self
@@ -480,8 +480,8 @@ impl Auditor {
         let mut threats = Vec::new();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            .map(|elapsed| elapsed.as_secs())
+            .unwrap_or(0);
 
         // Check for anomaly escalation
         let recent_anomalies: Vec<_> = self

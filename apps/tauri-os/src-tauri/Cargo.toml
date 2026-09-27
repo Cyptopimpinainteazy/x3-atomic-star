@@ -29,9 +29,21 @@ uuid = { version = "1", features = ["v4", "serde"] }
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# The live half of the console suite needs a running node. It is compiled only
+# when `run-live-test.sh` asks for it, so a machine that cannot start a node
+# never reports it as an ignored (i.e. green) test.
+live-node = []
+
+[lib]
+# The commands, the clients and the models live in the library so `tests/` can
+# link against them: a desktop binary alone cannot be tested from the outside.
+# `main.rs` is the entry point and calls `tauri_os_backend::run()`.
+name = "tauri_os_backend"
+path = "src/lib.rs"
+
 [[bin]]
-# Desktop-only Tauri app: all logic lives in src/main.rs. A [lib] target is
-# intentionally not declared here (no src/lib.rs exists) so cargo can resolve
-# the single binary crate.
+# Desktop-only Tauri app. The bin and the lib share the crate's name (`[lib]` is
+# the underscored form); together they build one application.
 name = "tauri-os-backend"
 path = "src/main.rs"

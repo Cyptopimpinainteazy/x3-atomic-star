@@ -33,6 +33,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
           cache-directories: target
           cache-all-crates: true
       - name: Build ProofForge
@@ -124,6 +125,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Run S0 Security Gate
@@ -166,6 +169,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Run Extended Security Checks
@@ -202,6 +207,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Run Testnet Gate
@@ -238,6 +245,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Run Mainnet Gate
@@ -298,6 +307,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Run Complete Proof Suite
@@ -346,6 +357,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false  # shared self-hosted HOME: rust-cache's save step unlinks $CARGO_HOME/bin files it did not create
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
       - name: Generate Dashboard

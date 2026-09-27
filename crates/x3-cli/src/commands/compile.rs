@@ -47,6 +47,14 @@ pub struct CompileArgs {
     #[arg(long)]
     pub stats: bool,
 
+    /// Compile the artifact so its policy demands private submission.
+    ///
+    /// This is a property of the *artifact*, not of the invocation that runs it: the demanded
+    /// capability is compiled in, and a chain with no private channel refuses the program at intake
+    /// rather than executing it in the clear.
+    #[arg(long)]
+    pub require_private_submission: bool,
+
     /// Emit optimized MIR alongside bytecode
     #[arg(long)]
     pub emit_mir_opt: bool,
@@ -109,6 +117,7 @@ pub async fn execute(args: CompileArgs) -> Result<()> {
         emit_format,
         analyze_gas: false,
         verify_contract: false,
+        require_private_submission: args.require_private_submission,
     };
 
     if args.verbose {

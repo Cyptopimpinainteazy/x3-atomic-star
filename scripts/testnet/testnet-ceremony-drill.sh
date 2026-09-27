@@ -97,12 +97,26 @@ python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" record "$SPEC" \
 [[ -s "$MANIFEST" ]] || fail "manifest not written"
 pass "manifest: $MANIFEST"
 
-info "verifying the running network against the manifest"
+# A record that only exists on the machine that produced it is a file, not a
+# ceremony. Each validator signs the manifest with the ed25519 key its GRANDPA
+# authority *is*, so the agreement is checkable from the manifest alone.
+info "signing the manifest with every validator's GRANDPA key"
+python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" sign "$MANIFEST" \
+  | sed 's/^/[ceremony-drill]   /' || fail "could not sign the manifest"
+SIGNED_THRESHOLD="$(python3 - "$MANIFEST" <<'PY'
+import json, sys
+attestations = json.load(open(sys.argv[1]))["attestations"]
+print(f"{attestations['obtained']}/{attestations['authority_set_size']} (threshold {attestations['required']})")
+PY
+)"
+pass "signed by $SIGNED_THRESHOLD authorities"
+
+info "verifying the running network against the signed manifest"
 if ! python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" verify "$MANIFEST" \
     --rpc "$PORTS" --node-bin "$NODE_BIN" --min-finalized 5 | sed 's/^/[ceremony-drill]   /'; then
   fail "the network does not match its own manifest"
 fi
-pass "every check passes against the launched network"
+pass "every check passes against the launched network, attestations included"
 
 # Negative control: a verifier that has never failed proves nothing.
 TAMPERED="$BASE_DIR/ceremony-tampered.json"
@@ -119,7 +133,164 @@ if python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" verify "$TAMPERED" \
 fi
 grep -q "genesis hash" "$BASE_DIR/tampered-verify.log" \
   || fail "the tampered manifest was rejected, but not for the genesis hash"
-pass "a tampered manifest is rejected (wrong genesis hash)"
+# The signature covers the manifest, so the same edit also breaks the attestation:
+# one tamper, two independent refusals.
+grep -q "verifies over the manifest" "$BASE_DIR/tampered-verify.log" \
+  || fail "the tampered manifest was rejected for the hash but the signature check did not notice"
+pass "a tampered manifest is rejected (wrong genesis hash and a signature that no longer covers it)"
+
+# The attestation layer's own refusals, each on a copy of the good manifest.
+info "negative controls: the attestation checks must fail when they should"
+CONTROLS="$BASE_DIR/controls"
+mkdir -p "$CONTROLS"
+
+unsigned_manifest() { # unsigned_manifest <out>
+  python3 - "$MANIFEST" "$1" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+manifest.pop("attestations", None)
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+}
+
+expect_refusal() { # expect_refusal <label> <manifest> <grep-pattern> [extra args...]
+  local label="$1" candidate="$2" pattern="$3"
+  shift 3
+  local log="$CONTROLS/$(basename "$candidate").log"
+  if python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" verify "$candidate" \
+      --rpc "$PORTS" --node-bin "$NODE_BIN" --min-finalized 5 "$@" >"$log" 2>&1; then
+    fail "$label was accepted"
+  fi
+  grep -q "$pattern" "$log" \
+    || { sed 's/^/[ceremony-drill]   /' "$log" >&2; fail "$label was rejected, but not for: $pattern"; }
+  pass "$label is rejected ($pattern)"
+}
+
+# 1. An unsigned record is not a ceremony.
+unsigned_manifest "$CONTROLS/unsigned.json"
+expect_refusal "an unsigned manifest" "$CONTROLS/unsigned.json" "carries operator attestations"
+# ... and the escape hatch is real and named, so an operator who means it can still check
+# a boot-strapping network's technical claims.
+if ! python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" verify "$CONTROLS/unsigned.json" \
+    --rpc "$PORTS" --node-bin "$NODE_BIN" --min-finalized 5 --allow-unsigned \
+    >"$CONTROLS/unsigned-allowed.log" 2>&1; then
+  fail "--allow-unsigned did not accept an unsigned manifest"
+fi
+grep -q "skip  operator attestations" "$CONTROLS/unsigned-allowed.log" \
+  || fail "--allow-unsigned accepted the manifest without saying it skipped the signatures"
+pass "--allow-unsigned accepts it and says so"
+
+# 2. Fewer signatures than the threshold.
+python3 - "$MANIFEST" "$CONTROLS/below-threshold.json" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+attestations = manifest["attestations"]
+# Leave one short of the bar the manifest declares.
+keep = max(0, attestations["required"] - 1)
+attestations["authorities"] = attestations["authorities"][:keep]
+attestations["obtained"] = keep
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+expect_refusal "a manifest below its own threshold" "$CONTROLS/below-threshold.json" \
+  "reached the threshold"
+
+# 3. A signature from a key that is not an authority, even though it is a valid
+#    ed25519 signature over the very same bytes.
+python3 - "$MANIFEST" "$CONTROLS/foreign-signer.json" \
+    "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" <<'PY'
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("ceremony", sys.argv[3])
+ceremony = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ceremony)
+manifest = json.load(open(sys.argv[1]))
+foreign_seed = bytes(range(64, 96))
+signature = ceremony.ed25519_sign(foreign_seed, ceremony.canonical_manifest_bytes(manifest))
+manifest["attestations"]["authorities"][0] = {
+    "index": 0,
+    "public_key": "0x" + ceremony.ed25519_pubkey_from_seed(foreign_seed).hex(),
+    "signature": "0x" + signature.hex(),
+}
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+expect_refusal "a signature from a key outside the authority set" "$CONTROLS/foreign-signer.json" \
+  "is an authority key"
+
+# 4. One byte of one signature flipped.
+python3 - "$MANIFEST" "$CONTROLS/flipped-signature.json" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+entry = manifest["attestations"]["authorities"][0]
+raw = bytearray.fromhex(entry["signature"].removeprefix("0x"))
+raw[-1] ^= 0x01
+entry["signature"] = "0x" + raw.hex()
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+expect_refusal "a flipped signature byte" "$CONTROLS/flipped-signature.json" \
+  "verifies over the manifest"
+
+# 5. A manifest that declares a lower bar for itself than the authority set implies.
+python3 - "$MANIFEST" "$CONTROLS/lowered-threshold.json" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+manifest["attestations"]["required"] = 1
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+expect_refusal "a manifest that lowers its own threshold" "$CONTROLS/lowered-threshold.json" \
+  "workspace rule"
+
+# 6. The same key signing twice, with the manifest's count unchanged.
+python3 - "$MANIFEST" "$CONTROLS/duplicate-signer.json" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+entries = manifest["attestations"]["authorities"]
+entries[1] = dict(entries[0], index=entries[1]["index"])
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+expect_refusal "the same authority signing twice" "$CONTROLS/duplicate-signer.json" \
+  "distinct signer"
+
+# 7. The ceremony shape itself: `attest` adds one operator's signature to a
+#    manifest others have already signed, and the result still verifies.
+KEYS_DIR="${KEYS_DIR:-$(dirname "$SPEC")/validator-keys}"
+LAST_SEED="$(awk -F= '/^grandpa=/{print $2}' "$KEYS_DIR/validator-$COUNT.suri" | tr -d '[:space:]')"
+[[ -n "$LAST_SEED" ]] || fail "could not read validator-$COUNT's seed from $KEYS_DIR"
+python3 - "$MANIFEST" "$CONTROLS/partial.json" "$COUNT" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+entries = manifest["attestations"]["authorities"]
+manifest["attestations"]["authorities"] = entries[:-1]
+manifest["attestations"]["obtained"] = len(entries) - 1
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+print(f"  left {len(entries) - 1} of {sys.argv[3]} signatures on the copy")
+PY
+info "attesting the last authority onto a copy that is one signature short"
+python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" attest "$CONTROLS/partial.json" \
+  --key "$LAST_SEED" | sed 's/^/[ceremony-drill]   /' \
+  || fail "attest refused to add a missing authority's signature"
+if ! python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" verify "$CONTROLS/partial.json" \
+    --rpc "$PORTS" --node-bin "$NODE_BIN" --min-finalized 5 >"$CONTROLS/attested.log" 2>&1; then
+  sed 's/^/[ceremony-drill]   /' "$CONTROLS/attested.log" >&2
+  fail "the manifest assembled by attest does not verify"
+fi
+pass "attest assembles the ceremony one operator at a time, and the result verifies"
+
+# 8. Attesting onto a manifest that has been edited since it was signed.
+python3 - "$CONTROLS/partial.json" "$CONTROLS/stale.json" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+entries = manifest["attestations"]["authorities"]
+manifest["attestations"]["authorities"] = entries[:-1]
+manifest["attestations"]["obtained"] = len(entries) - 1
+manifest["chain"] = "a chain nobody signed for"
+json.dump(manifest, open(sys.argv[2], "w"), indent=2)
+PY
+if python3 "$ROOT_DIR/scripts/testnet/testnet-ceremony.py" attest "$CONTROLS/stale.json" \
+    --key "$LAST_SEED" >"$CONTROLS/stale.log" 2>&1; then
+  fail "attest added a signature to a manifest whose existing signatures are stale"
+fi
+grep -q "no longer verifies" "$CONTROLS/stale.log" \
+  || { sed 's/^/[ceremony-drill]   /' "$CONTROLS/stale.log" >&2; fail "stale attestation was refused without saying why"; }
+pass "attest refuses a manifest edited since it was signed (stale signatures)"
 
 cleanup
 # `pgrep` exits 1 when nothing matches; under `set -o pipefail` that would abort the

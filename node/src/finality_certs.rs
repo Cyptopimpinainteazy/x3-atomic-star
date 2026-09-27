@@ -1,18 +1,24 @@
 //! The finality certificates **this node** observed, and the rule for using them.
 //!
 //! `FinalityCertAnchors` on chain is written by `record_flash_finality_anchor`, which is an
-//! unsigned call that stores the first non-zero certificate for a height — any peer can write it
-//! first, and it cannot be replaced afterwards. The atomic gateway service used to take the
-//! certificate for its signed `finalize_atomic_bundle` straight out of that map, so a peer who
-//! planted a certificate could make this node **sign a finalization committing to a certificate no
-//! voter ever produced** (TICKET-107).
+//! unsigned call that stores the first certificate for a height and cannot be replaced afterwards.
+//! The atomic gateway service used to take the certificate for its signed `finalize_atomic_bundle`
+//! straight out of that map, so a peer who planted a certificate could make this node **sign a
+//! finalization committing to a certificate no voter ever produced** (TICKET-107).
 //!
-//! The fix is here rather than on chain: the node keeps the certificate *it* observed for each
-//! finalized block (the flash-finality voter's certificate, or the GRANDPA-derived hash it anchors
-//! itself), and finalizes with that. The chain's anchor is then a cross-check: if it disagrees with
-//! what this node observed, the node refuses to finalize rather than signing the planted value,
-//! which turns forgery into a bounded liveness failure that names the block and both hashes in the
-//! log.
+//! There are two halves to the fix, and neither is sufficient alone.
+//!
+//! **On chain** (2026-09-27): the extrinsic stores a certificate only if it is the one the chain
+//! derives for that block — `blake2_256` of the block's own hash, via
+//! `pallet_x3_atomic_kernel::derive_finality_cert`. There is then exactly one value any submitter
+//! can anchor, so winning the first-write race buys nothing, and the value is checkable by anyone
+//! holding the block header.
+//!
+//! **Here**: the node keeps the certificate *it* observed for each finalized block and finalizes
+//! with that, using the chain's anchor only as a cross-check. If the two disagree the node refuses
+//! to finalize rather than signing the anchored value, which turns any residue of forgery into a
+//! bounded liveness failure that names the block and both hashes in the log. This also survives
+//! being pointed at a chain that has not been upgraded yet.
 
 use sp_core::H256;
 use std::collections::BTreeMap;

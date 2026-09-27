@@ -366,7 +366,8 @@ impl ModelTrainingJob {
                         .unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .cloned()
-                .unwrap_or_else(|| checkpoints.last().cloned().unwrap())
+                // `checkpoints` is non-empty (checked above), so `min_by` always yields.
+                .unwrap_or_else(|| checkpoints[checkpoints.len() - 1].clone())
         };
 
         let final_metrics = if let Some(m) = history.last().cloned() {

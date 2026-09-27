@@ -83,6 +83,12 @@ parameter_types! {
     pub const ConfidentialValidatorShareBps: u16 = 6_000; // 60%
     pub const PrivateBurnShareBps: u16 = 2_500;            // 25%
     pub const PrivateStakerShareBps: u16 = 1_500;          // 15%
+    pub const MinOrderingBond: u128 = 1_000;
+    // Small on purpose: the window-capacity refusal is a real code path that
+    // should be exercised, and a large mock capacity would mean registering
+    // hundreds of funded accounts to reach it.
+    pub const MaxOrderingCommits: u32 = 4;
+    pub const MaxOrderingWindowBytes: u32 = 1_000;
 }
 
 /// The test verifier: recognises the labelled fixture this crate's tests build, and
@@ -117,6 +123,9 @@ impl pallet_private_execution::Config for Test {
     type PrivateBurnShareBps = PrivateBurnShareBps;
     type PrivateStakerShareBps = PrivateStakerShareBps;
     type AttestationVerifier = TestAttestationVerifier;
+    type MinOrderingBond = MinOrderingBond;
+    type MaxOrderingCommits = MaxOrderingCommits;
+    type MaxOrderingWindowBytes = MaxOrderingWindowBytes;
     type WeightInfo = ();
 }
 
@@ -131,6 +140,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (2, 1_000_000),   // validator 2
             (3, 1_000_000),   // validator 3
             (10, 10_000_000), // user
+            (11, 1_000_000),  // ordering participant
+            (12, 1_000_000),  // ordering participant
+            (13, 1_000_000),  // ordering participant
+            (14, 1_000_000),  // ordering participant
         ],
         dev_accounts: None,
     }

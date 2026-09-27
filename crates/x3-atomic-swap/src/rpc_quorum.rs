@@ -161,20 +161,28 @@ impl RpcQuorumOracle for SimpleRpcQuorum {
         tx_hash: &str,
         intent_id: u64,
     ) -> Vec<RpcQuorumProof> {
+        // This implementation has no transport, so it has observed nothing — and
+        // it says so. It used to return `TxStatus::Confirmed` with
+        // `agreement_count: 1` for every provider ("Simulate a successful
+        // Confirmed response at block 1"), which meant the in-memory oracle
+        // manufactured agreement for endpoints it never contacted: a caller that
+        // wired it up would have got a quorum out of an empty network. An oracle
+        // that cannot observe must not report an observation; `Unknown` with a
+        // count of zero is what "I do not know" looks like to `verify_consensus`,
+        // which then fails closed.
+        //
+        // A real oracle implements this trait with a transport and records what
+        // the endpoint actually said, including its failures.
+        let _ = (tx_hash, providers);
         providers
             .iter()
-            .map(|provider| {
-                // Simulate a successful Confirmed response at block 1.
-                // Real implementations would call the provider's RPC.
-                let _ = tx_hash;
-                RpcQuorumProof {
-                    intent_id,
-                    provider: provider.provider_id.clone(),
-                    block_height: 1,
-                    tx_status: TxStatus::Confirmed,
-                    agreement_count: 1,
-                    required_quorum: 1,
-                }
+            .map(|provider| RpcQuorumProof {
+                intent_id,
+                provider: provider.provider_id.clone(),
+                block_height: 0,
+                tx_status: TxStatus::Unknown,
+                agreement_count: 0,
+                required_quorum: 1,
             })
             .collect()
     }
@@ -407,9 +415,23 @@ mod tests {
         let proofs = oracle.collect_votes(&providers, "0xdeadbeef", 0);
 
         assert_eq!(proofs.len(), 3);
+        // One proof per provider, each naming the provider it belongs to — that
+        // part is what this test is for and it has not changed.
+        let names: Vec<&str> = proofs.iter().map(|proof| proof.provider.as_str()).collect();
+        assert_eq!(names, vec!["alchemy-eth", "infura-eth", "quicknode-eth"]);
+
+        // What *has* changed: this test used to require `block_height == 1` and
+        // `tx_status == Confirmed` for every provider, i.e. it pinned the in-memory
+        // oracle's simulation of three endpoints it never contacted. Holding that
+        // assertion is what made "an empty network produces a quorum" look like
+        // correct behaviour, so it is replaced by the honest contract — an oracle
+        // with no transport reports that it observed nothing, and nothing it
+        // returns counts as agreement.
         for proof in &proofs {
-            assert_eq!(proof.block_height, 1);
-            assert_eq!(proof.tx_status, TxStatus::Confirmed);
+            assert_eq!(proof.block_height, 0, "no block was observed");
+            assert_eq!(proof.tx_status, TxStatus::Unknown);
+            assert_eq!(proof.agreement_count, 0);
+            assert!(!proof.agreed());
         }
     }
 
@@ -522,6 +544,39 @@ mod tests {
             ConsensusResult::ConsensusAchieved {
                 agreement: 1,
                 required: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn an_oracle_without_a_transport_observes_nothing() {
+        // The in-memory implementation cannot reach an endpoint, so every vote it
+        // collects is "unknown" — never "confirmed". This used to be the other way
+        // round, which handed a caller a quorum out of an empty network.
+        let oracle = SimpleRpcQuorum::new();
+        let providers = vec![
+            RpcProvider::new("provider-a", "http://a.invalid", ChainKind::Ethereum),
+            RpcProvider::new("provider-b", "http://b.invalid", ChainKind::Ethereum),
+            RpcProvider::new("provider-c", "http://c.invalid", ChainKind::Ethereum),
+        ];
+
+        let votes = oracle.collect_votes(&providers, "0xtx", 7);
+        assert_eq!(votes.len(), 3);
+        for vote in &votes {
+            assert_eq!(vote.tx_status, TxStatus::Unknown);
+            assert_eq!(vote.agreement_count, 0);
+            assert!(!vote.agreed(), "an unobserved vote is not an agreement");
+        }
+        assert_eq!(
+            oracle.verify_consensus(&votes, 2).unwrap(),
+            ConsensusResult::ConsensusNotAchieved {
+                agreement: 0,
+                required: 2,
+                disagreements: vec![
+                    "provider-a".into(),
+                    "provider-b".into(),
+                    "provider-c".into(),
+                ],
             }
         );
     }

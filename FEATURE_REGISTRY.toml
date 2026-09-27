@@ -42,11 +42,31 @@ required_tests = [
 # the row's score is *not* re-measured by this edit, and the absence of a written
 # proof report is part of why it sits where it sits.
 proof_report = ""
-readiness_score = 35
+# Re-measured 2026-09-27. Derived on this registry's own formula
+# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 60 — unchanged tonight; the bundle lifecycle (submit, assign, rollback with
+#     per-reason penalties, finalize through the settlement engine) is what it was.
+#   tested 70 — every blocker of the *testing* kind is now closed and measured: the halt path runs
+#     on three real validators, and a bundle **in flight** when the halt lands is rolled back while
+#     halted with its bond returned to the submitter
+#     (`scripts/drills/halt_recovery_live.sh`, gate `halt recovery on a live chain`, PASS 27s).
+#   mainnet_ready 40 — multi-validator evidence exists; no rc1-featured or public network has run
+#     it, and the bond-accounting change still has no independent audit.
+# 60*0.35 + 70*0.25 + 40*0.40 = 21 + 17.5 + 16 = 54.5 -> 55.
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   82 — authorized finalization, a chain-derived certificate anchor, atomic bundle
+#                      lifecycle with rollback and correct bond accounting per reason
+#   tested        80 — 74 pallet lib tests (re-run 2026-09-27) plus the three-validator halt/rollback
+#                      drill, which was re-run the same day: `halt recovery on a live chain` PASS 27s
+#   mainnet_ready 20 — no independent audit of the rollback accounting and no run on an
+#                      rc1-featured or public network; the kernel is consensus-critical
+#   0.35*82 + 0.25*80 + 0.40*20 = 28.7 + 20 + 8 = 56.7 -> 57
+readiness_score = 57
 blockers = [
-  "**CLOSED 2026-09-23 — bundle finalization is authorized, and the unauthorised entry point is gone.** `submit_finalization_result` was `ensure_none` and its off-chain marker (`x3fin:`) had no writer anywhere in this repository; together with an equally unsigned certificate anchor it let any account finalize any `Executing` bundle with a proof nobody produced (TICKET-097). The call, its pool validation, its OCW branch, its weight entry, its benchmark and the settlement engine's marker path were removed. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin` — a genesis-named gateway account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`), and the pallet's finalization tests drive that core. Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`. The score below is *not* re-measured here: raising it is TICKET-101's re-measurement, not an edit made in passing. Still open on this row: the signed path's certificate comes from an unsigned anchor any peer can write first (TICKET-107), and the halt/rollback paths have never been exercised on a multi-validator network.",
-  "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
-  "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
+  "**CLOSED 2026-09-23 — bundle finalization is authorized, and the unauthorised entry point is gone.** `submit_finalization_result` was `ensure_none` and its off-chain marker (`x3fin:`) had no writer anywhere in this repository; together with an equally unsigned certificate anchor it let any account finalize any `Executing` bundle with a proof nobody produced (TICKET-097). The call, its pool validation, its OCW branch, its weight entry, its benchmark and the settlement engine's marker path were removed. Finalization is now only `finalize_atomic_bundle` (`X3LangOrigin` — a genesis-named gateway account since spec 19) and `finalize_with_settlement` (`SettlementOrigin`), and the pallet's finalization tests drive that core. Evidence: `.ai/reports/unsigned-finalization-removed-20260923.md`. The two items this note left open were both closed later and were re-verified by hand on 2026-09-27: the certificate anchor now stores only a value the chain derives (`record_flash_finality_anchor` requires `cert == derive_finality_cert(block_num)`; `cargo test -p pallet-x3-atomic-kernel --lib` is 74 passed including `a_fabricated_finality_anchor_is_refused` and `only_the_certificate_the_chain_derives_can_be_anchored`), and the halt/rollback paths now run on three validators — see the next blocker.",
+  "**CLOSED 2026-09-27 — the halt path runs on a multi-validator network, including the case nobody had measured.** `scripts/drills/halt_recovery_live.sh` trips the halt by council motion on three real validators and requires two different nodes' pools to refuse an ordinary transfer with the runtime's halt code while the destination balance does not move; it requires the remedy to be submittable *while still halted*; and it now also requires a bundle **in flight** when the halt lands to be rolled back with its bond released (`reserved back to 0`) while a *new* bundle is refused by the pool. Measured 2026-09-27, exit 0, `[PASS] halt_and_recovery_on_a_live_chain`",
+  "**CLOSED 2026-09-27 — the multi-validator half of this blocker is answered; the audit is not.** Bond accounting on rollback was fixed on 2026-09-18 and has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. The live three-validator drill now measures the bond returning in full from a rollback performed *while the chain is halted*, with no supply minted and both validators agreeing at one finalized block. Still outstanding: an independent audit of this change, and a run on an rc1-featured or public network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
 
@@ -151,13 +171,29 @@ required_tests = [
   "genesis_refuses_a_checkpoint_that_is_not_a_real_bitcoin_block",
   "genesis_refuses_a_checkpoint_easier_than_the_networks_pow_limit",
   "genesis_refuses_two_checkpoints_at_one_height",
+  # The header *source* (TICKET-095's missing half). `scripts/btc/push-headers.py` reads a run
+  # of consecutive headers from a real Esplora endpoint (or `bitcoin-cli`), checks that the run
+  # links and that the source agrees with itself, and emits the SCALE `Vec<BtcBlockHeader>`
+  # `submit_btc_headers` decodes; `scripts/testnet/btc-header-source-drill.sh` proves it live
+  # against public testnet and proves it refuses a tampered answer. The fixture these two tests
+  # decode is that script's own output from a real testnet3 run (heights 5151279..5151284,
+  # anchored on 5151278), so the pallet is proven to admit what the relayer emits — not merely
+  # that both compile.
+  "the_relayer_payload_decodes_and_admits_on_an_anchored_chain",
+  "the_relayer_payload_is_refused_when_its_first_header_is_dropped",
 ]
 # `reports/btc_gateway_report.md` does not exist; citation cleared.
 proof_report = ""
-readiness_score = 45
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40 = 85*0.35 + 90*0.25 + 50*0.40 = 72.
+# The relayer's source half is now real and the drill runs it against a public endpoint, which
+# moves implemented/tested; `mainnet_ready` stays low because no public chain has a checkpoint
+# pinned, the push still needs a root origin (`BtcHeaderOrigin = EnsureRoot`), no coin has moved
+# and there is no audit — a public-network *chain* run is what would lift it.
+readiness_score = 72
 blockers = [
-  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, but nothing has run against testnet or mainnet and the deposit/withdrawal path has never moved a coin",
-  "The header chain bootstraps from a checkpoint (spec_version 14/15): `anchor_btc_checkpoint` pins one by root call, and a spec can now carry one in genesis (`btc_checkpoints`), so a chain can be born anchored and the live gate proves it (`scripts/testnet/btc-checkpoint-genesis-drill.sh`). No public network has one pinned, and the header still arrives by an operator copying a hash — there is no header source and no peer-sourced sync",
+  "No live Bitcoin run beyond regtest: a real Bitcoin Core v28.1.0 regtest node produced the blocks, transaction and merkle path the pallet's tests now verify, and a header source now reads real testnet3 headers (`scripts/btc/push-headers.py`, drilled live in `scripts/testnet/btc-header-source-drill.sh`) — but no X3 chain has admitted a public-network header and the deposit/withdrawal path has never moved a coin",
+  "A header source exists now, but a public chain does not run it: the header chain bootstraps from a checkpoint (spec_version 14/15) and `anchor_btc_checkpoint`/genesis `btc_checkpoints` pins one, yet no public network has one pinned, the relayer is a script an operator runs rather than a node feature, and nothing bonds it for withholding — TICKET-095 stays open until there is more than one",
+  "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks (which alternate `nBits` mid-epoch whenever twenty minutes pass) are refused. The relayer therefore only emits a uniform-`nBits` run, and tracking testnet for real needs the network's own rule modelled",
   "No BTC signer quorum: withdrawals have no production multi-signer policy",
   "BTC mainnet disabled by feature flag",
   "No external audit of the gateway, the vault or the header check",
@@ -208,10 +244,32 @@ mode = "GUARDED_TESTNET"
 crate_or_service = "pallets/x3-sentinel"
 tauri_app = "Sentinel"
 required_tests = ["sentinel_checks_mint_authority", "sentinel_checks_freeze_authority"]
-proof_report = "reports/testnet_readiness_report.md"
-readiness_score = 50
+# The live simulation now exists and answered the blocker with a defect rather than a gap:
+# `bash scripts/drills/sentinel_privileged_origin_live.sh` (the `sentinel privileged origin` gate)
+# boots three validators on `local3`, creates a `CappedMintable` token through the real
+# `x3TokenFactory`, mints as the mint authority, then tries to freeze that authority as Alice and as
+# Bob. Both are refused with `BadOrigin` and the `frozenAccounts` map stays empty — the governance
+# gate is real. But the privileged path is **unreachable on this chain**: `FreezeOrigin` is
+# `EnsureRoot` in the single shared `Config` impl, and the three non-dev runtime variants have no
+# sudo, so no extrinsic can arrive as root. Measured 2026-09-27: finalized #17 with 2 peers, asset
+# `0x9bada2470ed719195842d4832b95b8c4893c92fbbb002710cf72c931f48866e8`, verdict
+# `privileged_path=unreachable`. Full write-up: `.ai/reports/sentinel-origin-reachability-20260927.md`.
+proof_report = ".ai/reports/sentinel-origin-reachability-20260927.md"
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   60 — the pallet and its guard are real and the token factory consults them before
+#                      every supply-changing authority op; the privileged calls cannot be reached
+#                      on a chain without sudo
+#   tested        70 — the pallet's unit tests plus a live three-validator simulation of the gate and
+#                      the gap, run by a gate that fails if either half changes
+#   mainnet_ready 20 — a security control that cannot be engaged on the launch chain is a mainnet
+#                      blocker, not a hardening item
+# 0.35*60 + 0.25*70 + 0.40*20 = 21 + 17.5 + 8 = 46.5 -> 47
+# Re-measured *down* from 50 on purpose: the live run turned "missing evidence" into "the control is
+# unreachable", which is a worse state than the row assumed.
+readiness_score = 47
 blockers = [
-  "No live governance simulation"
+  "The freeze/review/approval power cannot be engaged on any shipped chain: `x3Sentinel::FreezeOrigin = EnsureRoot` (the one shared Config impl, so all six runtime variants) and the three non-dev variants have no sudo, so nothing can arrive as root. Operator decision required: wire `EnsureRootOrHalfCouncil` (the origin five other pallets in this runtime use, and what the pallet's own doc contemplates) and re-attest the runtime, or document the pallet as a root-callable primitive that is outside the launch chain's live control surface. Evidence: `.ai/reports/sentinel-origin-reachability-20260927.md`, gate `sentinel privileged origin`",
+  "The guard is inert while nothing can be frozen, so its refusal path (`AuthorityFrozenBySentinel`) has never run on a chain; the drill takes that branch only when a privileged path exists",
 ]
 dangerous_paths = ["freeze authority", "upgradeability"]
 
@@ -219,33 +277,68 @@ dangerous_paths = ["freeze authority", "upgradeability"]
 mode = "LIVE_TESTNET"
 crate_or_service = "crates/x3-bench"
 tauri_app = "Reactor"
-required_tests = ["create_and_compare_reports", "test_compile_optimized"]
+required_tests = [
+  "create_and_compare_reports",
+  "test_compile_optimized",
+  "the_optimizer_moves_the_measured_instruction_count_down",
+  "a_strict_registry_refuses_an_unattested_report",
+  "a_signed_attestation_publishes_and_reverifies",
+  "a_report_that_is_not_what_the_attester_measured_is_refused",
+  "an_attestation_for_another_revision_or_job_is_refused",
+  "a_signature_from_an_untrusted_key_is_refused",
+  "a_tampered_attestation_does_not_verify",
+  "the_local_registry_publishes_and_reports_that_it_is_unattested",
+]
 # `reports/reactor_benchmark_report.md` does not exist; citation cleared. The row
 # already records that its benchmark is not in the CI critical path.
 proof_report = ""
-readiness_score = 40
+readiness_score = 49
+# 2026-09-27: the Northern Swarm/Reactor hard gate
+# (`scripts/mainnet/swarm_reactor_gate.py`) is named "reactor" but does **not**
+# reach this crate — it checks `pallets/northern-swarm` and
+# `crates/northern-swarm` only. Nothing here changed, so the 40 and the three
+# blockers below still describe this tree; do not read the new gate as covering
+# `crates/x3-bench`.
 blockers = [
   "Benchmark infrastructure not in CI critical path",
   "GPU benchmark path depends on optional sidecar",
-  "No test covers a benchmark job submit/publish path: the previously cited benchmark_job_submits / benchmark_result_publishes never existed anywhere in the repository. The crate's real tests cover report comparison and the compile pipeline only."
+  "**CLOSED 2026-09-27 — a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` is a real job path with a publish step and a once-only guarantee, run by the `test x3-bench` gate.",
+  "**CLOSED 2026-09-27 — publication carries a proof about the run, not just about the job.** `RunAttestation` commits to the job id, the revision, the host, a configuration digest and the report's content digest, signed with ed25519; `ReportRegistry::trusting(attesters)` makes an attestation *mandatory* (an unattested `publish` is refused with `Unattested`), and `publish_attested` refuses a claim about another job (`AttestedJobMismatch`), another revision (`RevisionMismatch`), another measurement (`SamplesDigestMismatch`), an untrusted key (`UntrustedSigner`) or a tampered field (`BadSignature`). The local registry still publishes and now says `attestation: None` rather than looking attested. Seven tests drive it; break-it-first: deleting the samples-digest check reddens `a_report_that_is_not_what_the_attester_measured_is_refused`, and the file was restored byte-identically.",
+  "**CLOSED 2026-09-27 — the measurement is asserted, not just the compilation.** `the_optimizer_moves_the_measured_instruction_count_down` runs the pipeline on a redundant fixture both ways and requires the optimized instruction count to be strictly lower, every reported figure to be non-zero, and each result's byte count to equal the bytes it actually emitted — the old tests only asserted that compilation succeeded,",
+  "The two halves of the Reactor are still unjoined: the placement scheduler lives in `crates/northern-swarm/src/reactor.rs` (where the backends are) and this crate owns benchmark submission and publication, so a published report cannot yet say which backend ran the job."
 ]
-dangerous_paths = ["gpu benchmark", "concurrency"]
+dangerous_paths = ["gpu benchmark", "concurrency", "benchmark attestation keys"]
 
 [tauri_os]
 mode = "GUARDED_TESTNET"
 crate_or_service = "apps/tauri-os"
 tauri_app = "AtomicConsole"
-required_tests = []
-# `reports/tauri_e2e_report.md` does not exist. `reports/tauri_desktop_gap_report.md`
-# does, but it is a gap report, not the end-to-end proof this field names, so the
-# citation is cleared rather than repointed at something close enough.
-proof_report = ""
-readiness_score = 15
+required_tests = [
+  "a_node_that_is_not_there_is_a_typed_error_not_an_empty_status",
+  "the_console_reads_the_chain_off_a_real_jsonrpc_conversation",
+  "the_console_calls_the_routes_the_swarm_service_actually_serves",
+  "a_dead_endpoint_is_reported_as_unreachable",
+  "live_operator_console_reads_a_running_node"
+]
+# The lane's own report: what was wrong, what changed, the live read against a
+# booted dev chain, and the break-it-first log path.
+# `reports/tauri_e2e_report.md` still does not exist; this is not it.
+proof_report = "reports/tauri-os-operator-console-20260927.md"
+# implemented 0.60*0.35 + tested 0.70*0.25 + mainnet_ready 0.10*0.40 = 42.
+# implemented — the read path is real for the four panels that exist (chain
+#   status, validator health, hardware, swarm task queue); six domains the lane
+#   named (agents, compute providers, benchmarks, settlement, logs, alerts) have
+#   no command at all.
+# tested — 42 unit + 6 integration tests, a live test against a booted dev chain,
+#   and a break-it-first run; the frontend has no tests of its own.
+# mainnet_ready — no packaged/notarised app and no public-testnet run.
+readiness_score = 42
 blockers = [
   "Desktop UI only — not part of blockchain runtime",
-  "Dead buttons imply incomplete wiring",
-  "No CI gate; E2E report is manual",
-  "No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts"
+  "Six console domains have no command: agents, compute providers, benchmarks, settlement, logs, alerts",
+  "launch_node / stop_node were deleted (they returned a fabricated success); a real spawn with a tracked child handle is unwritten",
+  "No packaged app (bundle / notarise) and no public-testnet run of the console",
+  "The swarm path is proven against the service's real bodies and routes by a local server, not against a booted x3-swarm-api"
 ]
 dangerous_paths = ["dead buttons", "Tauri wiring"]
 
@@ -253,12 +346,78 @@ dangerous_paths = ["dead buttons", "Tauri wiring"]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/mainnet/mainnet_rc_gate.sh"
 tauri_app = "LaunchGate"
-required_tests = ["testnet_rc_gate", "mainnet_rc_gate"]
+# CLOSED 2026-09-27. Both citations used to be bare names that resolved to
+# nothing; they are now `path::function` citations of gates that exist and fail
+# closed. `scripts/testnet/testnet_rc_gate.sh` did exist, but every one of its
+# checks ended in `|| true` and it printed "COMPLETED", so it exited 0 whatever
+# happened — and `scripts/x3/yolo_autoprove.sh` runs it. It also called
+# `scripts/testnet/generate_testnet_chain_spec.sh`, which was never created in
+# this repository, so `mainnet_rc_gate.sh` died at exit 127 on its third line
+# and could never pass. Both gate bodies are now functions (the citation form the
+# scanner's `stale-registry-test` resolution asks for), both resolve every
+# prerequisite before running it, and `scripts/testnet/runtime_upgrade_rehearsal.sh`
+# now fails when its delegate is missing instead of printing a hand-off line and
+# exiting 0. The generator is real: `scripts/testnet/generate_testnet_chain_spec.sh`
+# resolves `build-x3-testnet-spec.py`, which derives keys with the node's own CLI
+# and loads the artifact back through `build-spec`. `scripts/testnet/testnet_genesis_lint.sh`
+# was a directory-presence check that printed a hand-off line; it now parses a
+# real spec, checks the Aura/GRANDPA authority sets agree, checks a Live spec
+# publishes a joinable bootnode, and refuses a spec the node's own loader rejects.
+required_tests = [
+  "scripts/testnet/testnet_rc_gate.sh::testnet_rc_gate",
+  "scripts/mainnet/mainnet_rc_gate.sh::mainnet_rc_gate",
+]
 # `reports/mainnet_readiness_report.md` does not exist; citation cleared.
 proof_report = ""
-readiness_score = 55
+# Re-measured 2026-09-27. Derived, not asserted, on this registry's own formula
+# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 60 — the two gates exist as real orchestrators: prerequisites are
+#     resolved before the first check runs, every check names its own failure, and
+#     the four scripts behind them (spec generator, genesis lint, rehearsal
+#     wrapper, panic ratchet) do real work. Held at 60 because four of the eight
+#     JSON-RPC/console-side launch criteria still live in `public_testnet_gate.sh`
+#     and the launch ceremony itself stays a manual approval.
+#   tested 60 — `tests/test_rc_gates.py` drives both gates through a fixture root:
+#     18 checks, among them that a failing prerequisite reddens each gate, that a
+#     missing prerequisite fails with its path named, that a failing `cargo` step
+#     reddens each gate, that no check in either gate can discard its status, and
+#     that the two script-cited names resolve to functions in the cited files.
+#     It is itself gated by `rc gate scripts` in `scripts/local-ci.sh`. Not higher:
+#     neither gate has been run end to end against a live validator set here,
+#     because that needs the 7 servers.
+#   mainnet_ready 15 — unchanged, and it is the honest number: no public testnet
+#     has been opened, no mainnet rehearsal has run, and the gate's own launch
+#     criteria (7 validators, 72 stable hours, explorer, faucet) are all unmet.
+# 60*0.35 + 60*0.25 + 15*0.40 = 21 + 15 + 6 = 42.
+#
+# Re-measured again 2026-09-27, after the second blocker was closed. The record
+# that ties a passing run to the genesis now exists (`scripts/mainnet/launch_record.py`):
+# `build` refuses without a named operator, a clean tree, a `Live` spec whose Aura
+# authority set is exactly the expected validator count, a raw twin and an RC log
+# that carries the gate's own `PASSED` marker; `verify` re-hashes the artifacts and
+# the log and fails on the first mismatch. So:
+#
+#   implemented 68 — the gate and its promotion record are real and fail closed.
+#     Still not higher: four of the eight JSON-RPC/console-side launch criteria
+#     live in `public_testnet_gate.sh`, and the approval is human by design.
+#   tested 70 — `tests/test_rc_gates.py` (18 checks) plus
+#     `tests/test_launch_record.py` (10 checks: refusal for a wrong validator set,
+#     a non-Live spec, an RC log without the marker, a missing operator, a missing
+#     artifact, a dirty tree; verification of a changed genesis and a changed log).
+#     Both run under `local-ci` gates. No live run has produced a record yet.
+#   mainnet_ready 15 — unchanged: nothing here has run against 7 real validators.
+# 68*0.35 + 70*0.25 + 15*0.40 = 23.8 + 17.5 + 6 = 47.3 -> 47.
+readiness_score = 47
 blockers = [
-  "mainnet_rc_gate is manual approval, not automated"
+  "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`",
+  # CLOSED 2026-09-27 — the phantom citation is gone; kept here because the *gate*
+  # still cannot pass without the 7 physical servers, the 72-hour stability window
+  # and a public explorer/faucet, so the row's `mainnet_ready` stays at 15.
+  "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`",
+  # CLOSED 2026-09-27 — a green RC run is now bound to the genesis it promotes by a record an
+  # independent reader can re-check (`launch_record.py verify`). The remaining half of the
+  # original blocker is the live run itself, tracked above.
 ]
 dangerous_paths = ["mainnet deployment", "approval gates"]
 
@@ -268,37 +427,235 @@ crate_or_service = "crates/x3-swarm-core"
 tauri_app = "SwarmCommand"
 # `reports/swarm_health_report.md` does not exist; citation cleared.
 proof_report = ""
-readiness_score = 25
+# Re-measured 2026-09-27 (second pass). Derived, not asserted, on this registry's
+# own formula `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 68 — the crate gained a real authorization model rather than a
+#     permission constant: `src/sensitive.rs` (290 lines) classifies the five
+#     production actions the release prompt forbids an agent from taking on its own
+#     (mainnet runtime upgrade, supply change, validator key replacement, genesis
+#     change, critical settlement-rule change), and `approval.rs`/`permissions.rs`
+#     were hardened around it (commit `4dd1f3470`). The scheduler now owns the
+#     service's tasks: `services/x3-swarm-api` holds every task in
+#     `x3_swarm_core::SwarmScheduler` instead of a private map, so the lifecycle
+#     `Agent -> Task -> Scheduler -> Executor -> ...` has one task store, and the
+#     two stale, never-compiled service copies under
+#     `crates/x3-swarm-core/services/` were deleted. Kept below 70 because nothing
+#     proves a multi-agent race or partition yet.
+#   tested 60 — `cargo test --locked --all-targets --manifest-path
+#     crates/x3-swarm-core/Cargo.toml` is 75 lib (two new scheduler accessor tests)
+#     + 6 agent_lifecycle + 15 guard_tests + 11 sensitive_actions = **107 passed,
+#     0 failed, 0 ignored**, run by the gate `test x3-swarm-core`; the API service
+#     gained four tests that drive its handlers through the scheduler and is now
+#     gated by `test x3-swarm-api` (was `check`, because it had no tests). The
+#     multi-agent race/partition evidence the second blocker asks for is still in
+#     flight, which is why this is not higher.
+#   mainnet_ready 15 — unchanged: the crate is excluded from the root workspace and
+#     absent from the runtime dependency graph, so none of this is on the deployed
+#     path. That is a wiring decision, not a code-quality one.
+#
+# Third pass, 2026-09-27 — the race/partition blocker below is answered, and the
+# pass found a real defect while answering it:
+#
+#   * Dispatching used to be a **peek, not a claim.** `SwarmScheduler::claim_next_for` (then named `next_task_for`)
+#     returned a `Pending` task without marking it, so two consecutive calls handed
+#     the same task to two callers (measured: `("t-1", Ok(t-1))` on the second call;
+#     the probe is now the regression test `a_claimed_task_is_never_handed_out_twice`).
+#     It is replaced by `claim_next_for(&mut self, ..)`, which asks the authority,
+#     marks the task `Running` and stamps the holder in one operation, and returns an
+#     owned clone so a caller cannot hold the queue.
+#   * A claim now **outlives nothing**: `claim_of`/`claims()` make the holder visible
+#     (in enqueue order, so two reads agree), `release_claim`/`release_claims_of` put
+#     work back when its holder is killed — without which work taken by an agent that
+#     then dies was stuck `Running` forever — and re-queuing (the reject path) drops
+#     the stale stamp so `claim_of` cannot name the agent that lost the task.
+#   * Work that carries an approval requirement is **no longer dispatchable** before
+#     the approval exists: `ApprovalRequirement::is_satisfied_legacy()` gates the
+#     handout, and the new `DispatchRefusal::AwaitingApproval { agent_id, task_id,
+#     requirement }` distinguishes "nothing to do" from "your work is held back".
+#   * Race and partition evidence: `tests/race_and_partition.rs` claims a 32-task
+#     queue from 8 threads through one lock and requires the claimed set to equal a
+#     sequential reference run over the same queue (exactly once each); builds two
+#     replicas of one queue, has both claim the same task, and asserts the conflict
+#     is *visible* through `claims()` and recoverable through `release_claim`; and
+#     drives a 64-step enqueue/claim/release cycle asserting no stamped task is ever
+#     non-`Running` and claims never outnumber tasks.
+#   * Break-it-first: with the `task.status = Running` line removed,
+#     `a_claimed_task_is_never_handed_out_twice`, `a_clean_agent_is_handed_its_task`
+#     and `releasing_a_dead_holders_claim_puts_the_work_back` all go red (the first
+#     with the double handout itself), and the file was restored byte-identically.
+#
+#   implemented 65 — an atomic claim with a visible holder, an approval gate on the
+#     handout and a release path; the crate is still an off-chain control plane.
+#   tested 72 — 79 lib + 6 agent_lifecycle + 15 guard_tests + 3 race_and_partition +
+#     11 sensitive_actions = **114 passed, 0 failed, 0 ignored** in `test x3-swarm-core`,
+#     plus the service's 4 in `test x3-swarm-api`. No live-node or fleet-scale run.
+#   mainnet_ready 25 — nothing here is deployed; it is the local control plane.
+#   0.35*65 + 0.25*72 + 0.40*25 = 22.75 + 18 + 10 = 50.75 -> 51
+readiness_score = 51
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names previously
 # listed here existed as real test functions anywhere under crates/x3-swarm-core,
 # so they were removed rather than left as citations. Closed 2026-09-26: all four
 # are real tests in crates/x3-swarm-core/tests/agent_lifecycle.rs and they execute
 # in the fast set through the `test x3-swarm-core` gate in scripts/local-ci.sh
-# (`cargo test --locked --all-targets`). Measured: crate suite 73 passed, 0
-# failed, 0 ignored.
+# (`cargo test --locked --all-targets`).
+#
+# Extended 2026-09-26 with the two tests that make the kill switch reach the task
+# queue, not just the spawn guard and the ledger: `a_killed_agent_is_not_handed_work`
+# and `an_unregistered_agent_is_not_handed_work`. Measured on the committed bytes:
+# crate suite 83 passed (62 lib + 6 agent_lifecycle + 15 guard_tests), 0 failed,
+# 0 ignored; with the dispatch check removed on purpose, the first of the two fails
+# by receiving the killed agent's task.
 required_tests = [
   "swarm_agent_can_receive_task",
   "swarm_agent_cannot_touch_forbidden_files",
   "swarm_memory_records_lesson",
   "swarm_kill_switch_stops_agents",
+  "a_killed_agent_is_not_handed_work",
+  "an_unregistered_agent_is_not_handed_work",
+  "a_claimed_task_is_never_handed_out_twice",
+  "work_waiting_on_an_approval_is_not_dispatched",
+  "a_requeued_task_can_be_claimed_again_and_the_stamp_moves",
+  "releasing_a_dead_holders_claim_puts_the_work_back",
+  "parallel_claims_match_the_sequential_reference",
+  "a_partitioned_replica_pair_reports_its_conflict",
+  "claim_stamps_never_outnumber_the_queue",
 ]
 blockers = [
   "Experimental — its crate tests do run in the fast set (`test x3-swarm-core`), but crates/x3-swarm-core is excluded from the root workspace and is absent from the runtime dependency graph cargo metadata reports for x3-chain-runtime, so the swarm control plane is not on the deployed blockchain path",
-  "No multi-agent race-condition or partition-tolerance testing"
+  "Partition settlement has no reconciler: two replicas of one queue can both claim the same task, and while the conflict is now visible (`claims()`) and recoverable (`release_claim`), nothing diffs the replicas automatically — the arbiter is `pallet-northern-swarm`'s exclusive `claim_task`, and a second executor is refused there, not here",
+  "No live-node or fleet-scale run: the authority the scheduler consults is a local data structure; nothing drives this control plane from a real chain or a real worker fleet",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
+
+
+[northern_swarm_reactor]
+mode = "GUARDED_TESTNET"
+crate_or_service = "crates/northern-swarm"
+tauri_app = "SwarmCommand"
+# Only crate tests are cited here: `check-readiness-consistency.sh` resolves
+# every `required_tests` name *under this row's `crate_or_service`*, and that is
+# `crates/northern-swarm`. The on-chain half's tests
+# (`quorum_requires_matching_results`, `task_reward_moves_reserved_balance_to_winner`,
+# `task_reward_preserves_total_issuance`,
+# `full_nonmatching_commit_set_enters_dispute_without_payout`,
+# `resolve_disputed_task_refunds_submitter_and_preserves_issuance`,
+# `resolve_disputed_task_cannot_be_replayed`) are cited in the
+# matrix rows X3-SWARM-001 / X3-SWARM-002, whose `paths` cover both crates.
+required_tests = [
+  "same_input_produces_same_hash",
+  "different_inputs_produce_different_hashes",
+  "result_status_is_success",
+  "sha256_hex_is_stable",
+  "fidelity_first_places_work_on_the_canonical_cpu",
+  "throughput_first_places_work_on_the_accelerator",
+  "accelerator_only_work_is_refused_when_no_accelerator_is_advertised",
+  "ceilings_and_reputation_disqualify_with_the_numbers",
+  "a_kind_no_backend_serves_is_refused_for_that_kind",
+  "a_tie_breaks_on_the_backend_id_and_the_decision_is_evidence",
+  "a_descriptor_advertising_other_serves_every_other_variant",
+  "the_execution_receipt_names_the_backend_the_reactor_chose",
+  "work_that_needs_an_accelerator_is_refused_by_an_accelerator_less_executor",
+]
+proof_report = ""
+# 2026-09-27 reconciliation. The previous 30 described a tree that no longer
+# exists: its six blockers named a hard-coded `PendingTasks` key, an unsigned
+# `author_submitExtrinsic` with pallet index 82, no mock.rs/tests.rs, no
+# benchmark weights, `on_finalize` single-result auto-finalization and a missing
+# ComputeBackend. All six are false now (see the blockers below for what is
+# actually still open). The score is derived rather than asserted, on the
+# matrix formula `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`
+# (FEATURE_MATRIX.toml `[meta] scoring`) with implemented=75, tested=60,
+# mainnet_ready=15 at the first reconciliation. Bumped 2026-09-27: the
+# disputed-task refund path (implemented=80, tested=65, mainnet_ready=15 ->
+# 50.25, recorded as 50), then the AutoBackend parity/quarantine path
+# (implemented=82, tested=72, mainnet_ready=16 -> 28.7 + 18 + 6.4 = 53.1,
+# recorded as 53), then the executor submitter boundary tests (implemented=83,
+# tested=78, mainnet_ready=17 -> 29.05 + 19.5 + 6.8 = 55.35, recorded as 55).
+# Bumped again 2026-09-27: the reactor's placement scheduler exists
+# (implemented=86, tested=82, mainnet_ready=18 -> 30.1 + 20.5 + 7.2 = 57.8,
+# recorded as 58).
+# Still capped below 70 because nothing on this row has ever run against a node.
+# Measured on the committed bytes 2026-09-27 (x3star1): `cargo test -p
+# pallet-northern-swarm --all-targets` 10 passed / 0 failed / 0 ignored;
+# `cargo test -p northern-swarm --all-targets` 31 passed / 0 failed (22 + 7
+# reactor + 2 executor-placement);
+# `python3 scripts/mainnet/swarm_reactor_gate.py` PASS.
+readiness_score = 58
+blockers = [
+  "Closed 2026-09-27 - the four blocking contract defects are gone. The watcher derives the real `NorthernSwarm::Tasks` prefix from canonical Twox128 pallet/item names and decodes the pallet's own `TaskRecord`/`TaskKind`/`TaskStatus` (the fabricated `PendingTasks` key is gone); `result_submitter.rs` encodes Subxt `DynamicPayload`s by pallet and call *name* and signs with the executor's sr25519 key via `sign_and_submit_then_watch_default` (no unsigned shortcut, no pallet index 82); `TaskPayload` carries `TaskKind`; `on_finalize` no longer finalizes anything - quorum is evaluated in `submit_result` against `QuorumThreshold`. `python3 scripts/mainnet/swarm_reactor_gate.py` PASS (2026-09-27).",
+  "Closed 2026-09-27 - weights are benchmark output, not constants. `pallets/northern-swarm/src/weights.rs` was written by `BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm` on x3star1 and carries real proof sizes (`claim_task` Estimated 4149, `submit_result` Estimated 11402). Getting there needed the stale `.maintain/frame-weight-template.hbs` to be replaced with the pinned polkadot-sdk revision: the old template read `{{cmd.execution}}`/`{{benchmark.base_proof_size}}`, which this CLI no longer populates, so it emitted `Weight::from_parts(N, )` - eight E0061 errors, recorded in `.ai/runlogs/swarm-bench-build.log`.",
+  "No live-node integration test. The executor/chain contract is proven at the boundary only - encoder/decoder, signer selection, restart recovery - never against a running node. The crate cannot currently reach a live chain in CI, and the row stays below 50 for that reason.",
+  "Accepted results are decided by hash equality, not verification. `finalise_with_quorum` pays an M-of-N set that agrees on a self-reported `result_hash`; nothing re-executes the work, so a colluding quorum can finalize a wrong result and be paid. No fraud proof, no verifiable computation, no challenge window.",
+  "Closed 2026-09-27 - a disputed task can no longer strand the submitter's bond. `pallets/northern-swarm` gained `resolve_disputed_task(task_id)` (call_index 8, weight `T::WeightInfo::resolve_disputed_task`): it accepts only a task in `TaskStatus::Disputed`, zeroes the record's reward, moves the task to the new terminal `TaskStatus::Refunded`, unreserves the exact reward back to the submitter, and emits `DisputedTaskRefunded`. It is deliberately permissionless (it can only move the submitter's own reserved funds). Three tests drive the real dispatchables: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` (reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged, all three executor stakes still 100, event emitted), `resolve_disputed_task_rejects_tasks_that_are_not_disputed` (Pending and Finalised -> `TaskNotDisputed`, unknown id -> `TaskNotFound`) and `resolve_disputed_task_cannot_be_replayed` (second call refused, no second refund). Weights regenerated by the benchmark CLI (`resolve_disputed_task` = 96_270_000 ps, proof 4149). Break-it-first: deleting the status guard reddens exactly the two negative tests; restoring the file byte-identically (sha256 af76769b8d0fc0c80f28336a245e5f51885692beb49d77f6aae2709e62a16e4b) reddens none. `SlashReason::QuorumMismatch` still has no constructor - hashes cannot prove which executor was wrong, so no stake is slashed on a dispute.",
+  "Closed 2026-09-27 - accelerator selection no longer trusts the device. `crates/northern-swarm/src/backend.rs` gained `AutoBackend`, which always computes the CPU reference, compares any accelerator output byte-for-byte against it, returns the accelerator result only on agreement, and on divergence quarantines the device (storing both hashes in `Divergence`), records it in `BackendTelemetry`, and returns the CPU result. A refusal/error is a separate, counted fallback, not a divergence. `TaskExecutor` now executes through `AutoBackend` instead of accepting a GPU result directly, and `AutoBackend::execute` fails closed on a kind it does not support (`AiInference`). Four tests: parity (`auto_backend_agrees_with_the_cpu_reference_on_supported_work`), fallback (`..._falls_back_to_cpu_when_the_accelerator_refuses`), quarantine with a deliberately divergent fake accelerator that must not change the result and must not be consulted again (`..._quarantines_a_divergent_accelerator_and_returns_the_cpu_result`), and fail-closed on an unsupported kind. Break-it-first: removing the `candidate == reference` comparison returns the fake's `0xDEADBEEF` and reddens the quarantine test; restoring the file byte-identically reddens none.",
+  "Advertised hardware capabilities remain self-declared and have no benchmark/attestation evidence binding a registered executor to the claimed hardware.",
+  "Closed 2026-09-27 - the reactor places work deterministically, and its decisions are evidence. `crates/northern-swarm/src/reactor.rs` turns the release prompt's `TaskKind -> requirements -> scheduler -> CPU/GPU/NPU/FPGA` into code: a candidate must serve the kind, be available, clear the reputation floor and fit the cost/latency ceilings, and every rejection is reported with its numbers (`TooExpensive { got, limit }`, `ReputationTooLow { got, needed }`, ...). Eligibility is ordered by a documented total order - preference tier, then reputation desc, cost asc, latency asc, id asc - so two runs over the same inputs agree. `must_accelerate` disqualifies the CPU, and if that leaves nothing the reactor *refuses* (`ScheduleRefusal::AcceleratorUnavailable`, whose Display names every candidate's reason) instead of quietly running accelerator-only work on the reference, which is the optional-sidecar dependency turned into a typed refusal. `TaskExecutor::execute` now places before it runs, fails closed on a refusal, and records `backend_id` + `accelerator` in the `ProofBundle`, so an execution receipt says which backend ran the work. Seven reactor tests plus two executor tests; break-it-first: deleting the `AcceleratorRequired` disqualification reddens `accelerator_only_work_is_refused_when_no_accelerator_is_advertised` and `work_that_needs_an_accelerator_is_refused_by_an_accelerator_less_executor`, and the file was restored byte-identically.",
+  "The reactor schedules over descriptors a node advertises in its own list, and those descriptors are still self-declared (availability, reputation, cost, latency are inputs, not measurements). Binding a descriptor to attested hardware is the same open item as the advertised-hardware blocker above."
+]
+dangerous_paths = [
+  "pallets/northern-swarm",
+  "crates/northern-swarm",
+  "swarm rewards",
+  "executor slashing",
+  "executor signing keys",
+  "gpu acceleration",
+  "task settlement"
+]
 
 [repo_scanner_agent]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/swarm/swarm_scan.sh"
 tauri_app = "SwarmCommand"
-# `reports/swarm_scan_report.md` does not exist; citation cleared.
-proof_report = ""
-readiness_score = 25
-required_tests = ["swarm_scan_generates_report"]
+# Rebuilt 2026-09-27. The old script dumped every `TODO|FIXME|unwrap(` line plus a list of filenames
+# whose name contained a subsystem word: no severity, no symbol, no fix, no gate, no test — and the
+# row above cited `swarm_scan_generates_report`, a test that existed nowhere. Nothing caught that,
+# because the readiness gate only resolves citations whose `crate_or_service` is a directory of `.rs`
+# files, and this row points at a script. That is now the scanner's own first finding class.
+#
+# What it is now (`scripts/swarm/x3_repo_scan.py`, wrapped by `scripts/swarm/swarm_scan.sh`):
+#   * every finding carries id, severity, kind, path, line, symbol, why, suggested_fix,
+#     test_required and gate_affected — asserted field-by-field by the fixture test;
+#   * sorted by severity/kind/path/line, so two runs over one tree are byte-identical;
+#   * `reports/swarm_scan_report.md` for a person, `reports/swarm_scan_findings.json` for a program;
+#   * a ratchet over the kinds it owns (`docs/reports/repo-scan-baseline.json`), so growth fails and
+#     shrinkage is always allowed;
+#   * `--patches` writes a real unified diff to `.ai/patches/<id>.patch` for the classes whose fix is
+#     mechanical (`ungated-crate`: one gate line); nothing is ever applied to the tree.
+#
+# It does not re-report what the existing ratchets own: `TODO`/stub markers and test cheats belong to
+# `scripts/x3_fake_code_scan.py`, reachable panics to `scripts/audit/panic_unwrap_scan.py`. It runs
+# both and folds their verdicts into the report's gate summary instead of duplicating their debt.
+#
+# First live run, 2026-09-27 (36 findings; 32 after two of the ungated crates were gated the same
+# session — the scanner proposed the gate lines as patches and applying them dropped its own count):
+# 13 registered pallets charge invented literal weights
+# (`Weight::from_parts(10_000, 0)`) while shipping generated weights — the class the PR #519 weights
+# incident belongs to; `launch_gate` cites two tests nobody wrote; 4 crates still have suites no gate
+# runs (2 fuzz, 3 under the nested `x3-autonomic-core` workspace whose dependency graph does not
+# resolve at all, and the SVM broadcaster); `pallets/pallet-x3-control` is not registered. Those are
+# recorded in the baseline as debt, not repaired here.
+proof_report = "reports/swarm_scan_report.md"
+readiness_score = 58
+required_tests = [
+  "swarm_scan_generates_report",
+  "test_swarm_scan_generates_report",
+  "test_clean_tree_produces_no_findings",
+  "test_patch_context_matches_the_file_it_patches",
+  "test_scanner_is_the_registry_citation",
+]
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   80 — real detectors, schema, ratchet, report and patch emission, wired into two
+#                      gates; the detector set is the part that could still grow
+#   tested        70 — 4 fixture-driven tests (one of them the cited name) plus a live run; the
+#                      negative control proves the scanner is not asserting a constant. No
+#                      property/fuzz coverage of the parsers, no long-duration run
+#   mainnet_ready 30 — operational tooling, not part of the runtime; it runs in the default gate set
+# 0.35*80 + 0.25*70 + 0.40*30 = 28 + 17.5 + 12 = 57.5 -> 58
 blockers = [
   "Dev-ops tooling — not part of blockchain runtime",
-  "Single test; no CI gate"
+  "It finds and records; it does not repair: the 32 open findings sit in docs/reports/repo-scan-baseline.json as ratcheted debt (two crates it flagged were gated the same day)",
+  "The `ungated-crate` standard follows this repository's own (a workspace-wide `cargo test` counts as coverage for root-workspace members), so a root suite that only the opt-in `--deep` run reaches is not reported",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
 
@@ -313,13 +670,24 @@ required_tests = [
   "mint_tokens_authorized_only",
   "add_remove_minter_root_only",
   "register_biometric_works",
-  "initiate_recovery_works"
+  # `initiate_recovery_works` was replaced on 2026-09-26. It called `initiate_recovery` as the
+  # account being recovered, against a `GuardianAccount` the test inserted straight into storage
+  # (nothing in the pallet ever wrote one), and asserted only that an event was emitted — the
+  # extrinsic changed no state. The two names below are the replacement: the owner is refused,
+  # and a guardian-driven request runs to an actual owner change. Coverage went up, not sideways.
+  "the_account_owner_cannot_initiate_recovery",
+  "recovery_runs_from_guardian_request_to_owner_change",
+  "register_recovery_guardians_applies_the_library_rules",
+  "register_biometric_refuses_an_unsupported_type",
+  "register_biometric_refuses_an_empty_template_hash",
+  "register_biometric_refuses_an_empty_pin_hash",
 ]
 # `reports/wallet_pallet_report.md` does not exist; citation cleared.
 proof_report = ""
 readiness_score = 55
 blockers = [
-  "Biometric template and recovery logic have no security review"
+  "Biometric template and recovery logic have no security review",
+  "Measured 2026-09-26: the pallet's biometric registration validated nothing and its recovery extrinsic changed nothing. Both now delegate to the `x3-wallet` library's managers (`BiometricManager::create_profile`, `SocialRecoveryManager`), which is where the type/template/PIN rules and the guardian/quorum/delay model live. Still open on those paths: nothing consumes the biometric attempt counter, the recovery owner is a 32-byte address rather than a `T::AccountId` binding, and a pending request never expires"
 ]
 dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
 
@@ -399,18 +767,64 @@ dangerous_paths = ["pallets/x3-wrapped", "runtime", "bridge authority", "council
 mode = "SIM_TESTNET"
 crate_or_service = "X3-contracts/svm/programs/x3_htlc"
 tauri_app = ""
-# This tree is a member of the nested `X3-contracts/svm` workspace, and nothing in the root
-# repository calls it. The SVM HTLC
-# that IS on the live cross-VM path is `programs/svm/x3_atomic_swap`, which
-# `scripts/cross-domain-svm-gate.sh` builds with `cargo build-sbf`, deploys to a
-# real `solana-test-validator`, and exercises end to end — and which
-# `programs/svm/x3_atomic_swap/test-live-lifecycle.sh` pins with 15 assertions
-# (0 failed, 2026-09-22) including the wrong-preimage, double-claim,
-# refund-before-timeout and wrong-authority rejections. See the matrix rows
-# X3-XVM-005 / X3-XVM-009 / X3-XVM-015 and the `svm_atomic_swap_htlc` row below.
+# This tree is a member of the nested `X3-contracts/svm` workspace. It has its own
+# lifecycle now (2026-09-27): a live `solana-test-validator` gate and a
+# clock-warped in-process expiry suite, both pointed at the compiled SBF artifact.
 #
-# The score here stays low on purpose: it is a statement about THIS tree, which
-# still has no localnet lifecycle for itself.
+# Measured 2026-09-27, first-hand this session:
+#   * `bash X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh` (the
+#     `SVM HTLC x3_htlc lifecycle` local-ci gate) — **61 assertions, 0 failed**,
+#     PASS 160s. Real `cargo build-sbf`, deployed at the id `declare_id!` fixes,
+#     real SPL mint and token accounts on the real token program, then lock /
+#     wrong-preimage claim / wrong-recipient claim / correct claim / double-claim
+#     / claim-after-claim refund / refund-before-timelock / wrong-authority refund
+#     / amount-0 / timelock-too-short / timelock-too-long / re-lock, with every
+#     escrow, vault and token balance read straight out of raw account bytes. It
+#     then restarts the validator on the same ledger and requires the funded
+#     escrow, its vault balance and its timelock rule to come back from durable
+#     state before it can pass.
+#   * `bash X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh` (the
+#     `SVM HTLC x3_htlc expiry` local-ci gate) — 1 test, PASS. The same compiled
+#     artifact in `solana-program-test` with an overridden clock sysvar, because a
+#     live validator cannot reach this branch: the program demands a timelock at
+#     least an hour out and wants `--warp-slot` to move the slot counter, not the
+#     clock. Refund-before-expiry is refused with `TimelockNotExpired` (6006);
+#     refund-after-expiry drains the vault, returns exactly `amount` to the
+#     initiator and leaves the preimage zeroed; a second refund is refused (6005);
+#     a claim after the refund is refused (6004). It also runs the program's
+#     read-only view, so `get_htlc_status` is exercised rather than merely
+#     compiled: Funded(1) before the timelock, Expired(4) for a still-funded
+#     escrow past it, Refunded(3) after the refund and Claimed(2) after the
+#     late claim, all decoded from the instruction's return data.
+#   * `test x3-htlc client` (local-ci) — 10 tests over the instruction layout the
+#     other two gates drive: the Anchor discriminator known-answer, data layout
+#     offsets, escrow/vault PDA binding, and that a compiled message hands the
+#     program the accounts in the declared order with the declared writability.
+#
+# This tree is still NOT the SVM HTLC on the live cross-VM path. That is
+# `programs/svm/x3_atomic_swap`, which `scripts/cross-domain-svm-gate.sh` builds,
+# deploys and exercises end to end and which `programs/svm/x3_atomic_swap/
+# test-live-lifecycle.sh` pins with 15 assertions (0 failed, 2026-09-22). See the
+# matrix rows X3-XVM-005 / X3-XVM-009 / X3-XVM-015 and the
+# `svm_atomic_swap_htlc` row below.
+#
+# One semantic to review, found by the expiry suite and asserted there rather
+# than hidden: `claim_htlc` gates on escrow status, not on the clock, so a
+# funded-but-expired escrow can still be claimed by the recipient until the
+# refund lands. The escrow can never be paid twice, but the two paths are not
+# mutually exclusive by timelock alone.
+#
+# 2026-09-25 correction: this comment used to say "no script, workflow or crate in
+# the repo builds or runs" this tree, and in the same breath cited
+# `.github/workflows/svm-htlc.yml` as its enforcement. Both halves were wrong in
+# opposite directions. The workflow is not in this tree at all — it lived on the
+# unmerged `fix/svm-htlc-native-custody-master` branch, per
+# `.ai/runlogs/repo-consolidation-20260917_inventory.log` — and the tests were
+# running nowhere in the local gate set. `test x3-htlc` now runs them
+# (`cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc`: 7 tests,
+# measured green 2026-09-25), which `registry tests are gated` requires. The
+# workflow that does exist here, `.github/workflows/x3vm-svm-live-lifecycle.yml`,
+# gates the live `programs/svm/x3_atomic_swap` program, not this one.
 # 2026-09-25 correction: this comment used to say "no script, workflow or crate in
 # the repo builds or runs" this tree, and in the same breath cited
 # `.github/workflows/svm-htlc.yml` as its enforcement. Both halves were wrong in
@@ -434,15 +848,36 @@ required_tests = [
   "timelock_cannot_exceed_seven_days",
   "timelock_must_be_more_than_one_hour_out",
   "htlc_pda_is_deterministic_and_distinct",
-  "htlc_vault_pda_derives_from_escrow_account"
+  "htlc_vault_pda_derives_from_escrow_account",
+  "discriminator_matches_anchor_known_answer",
+  "instruction_discriminators_are_distinct_and_stable",
+  "create_htlc_data_layout_is_48_bytes_after_discriminator",
+  "claim_and_refund_data_layouts_match_program",
+  "claim_and_refund_target_the_named_escrow_not_the_signer",
+  "escrow_pda_binds_initiator_recipient_and_hashlock",
+  "compiled_message_preserves_program_account_order",
+  "load_payer_fails_closed_without_a_keypair_path",
+  "program_id_constant_is_the_declared_id",
+  "status_instruction_is_a_readonly_view_of_the_escrow",
+  "expiry_lifecycle_on_the_compiled_program"
 ]
 proof_report = ""
-readiness_score = 30
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   60 — program, SPL escrow, client and both gates are real; it is
+#                      not wired into the runtime or any cross-VM route
+#   tested        70 — 7 program unit tests, 9 client tests, 52 live-validator
+#                      assertions and the clock-warped expiry suite; nothing has
+#                      been run against a devnet or a second validator
+#   mainnet_ready 15 — local validator / in-process SVM only, no audit, no route
+# 0.35*60 + 0.25*70 + 0.40*15 = 21 + 17.5 + 6 = 44.5 -> 45
+readiness_score = 45
 blockers = [
-  "Unit-tested pure logic only (timelock/preimage/PDA math) — no localnet/devnet on-chain integration test exercising a deployed program",
-  "Not wired into any live cross-VM route — no caller in the atomic router or cross-vm-coordinator yet"
+  "Not wired into any live cross-VM route — no caller in the atomic router or crates/cross-vm-coordinator; the live SVM route runs the sibling programs/svm/x3_atomic_swap program",
+  "Local validator and in-process SVM only — no devnet or mainnet deployment has been performed",
+  "No external audit of the program or its client",
+  "claim_htlc does not check the timelock, so a funded-but-expired escrow is still claimable until the refund lands (asserted by expiry_lifecycle_on_the_compiled_program; a decision to review, not a double-spend — status still prevents paying twice)",
 ]
-dangerous_paths = ["X3-contracts/svm/programs/x3_htlc", "SVM domain", "timelock logic"]
+dangerous_paths = ["X3-contracts/svm/programs/x3_htlc", "X3-contracts/svm/programs/x3_htlc/client", "SVM domain", "hashlock and timelock logic", "PDA authority checks"]
 
 [svm_atomic_swap_htlc]
 mode = "LIVE_TESTNET"

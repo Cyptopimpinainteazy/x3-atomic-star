@@ -209,6 +209,17 @@ pub mod pallet {
     pub type EmergencyCommittee<T: Config> =
         StorageValue<_, BoundedVec<T::AccountId, ConstU32<10>>, ValueQuery>;
 
+    /// Accounts allowed to act as an `Operator`.
+    ///
+    /// Empty by default, which is the fail-closed direction: the `Operator` authority used to be
+    /// satisfied by *any* signed account (`ensure_signed(origin)?` and nothing more), so on a chain
+    /// that wired this pallet up, any account at all could pause or resume any domain on a
+    /// ten-block cooldown — a liveness lever anyone could pull. Authorising an operator is the
+    /// governance call below, and it has to name the account.
+    #[pallet::storage]
+    pub type ControlOperators<T: Config> =
+        StorageValue<_, BoundedVec<T::AccountId, ConstU32<50>>, ValueQuery>;
+
     /// Governance origin for control actions
     pub type EnsureGovernance<T> = frame_system::EnsureRoot<<T as frame_system::Config>::AccountId>;
 
@@ -289,6 +300,21 @@ pub mod pallet {
             EmergencyCommittee::<T>::put(members);
             Ok(())
         }
+
+        /// Set the accounts allowed to act as an `Operator` (governance only).
+        ///
+        /// An empty list is accepted and means "no operator may act", which is also the genesis
+        /// state, so a chain that has not made this call has no operators rather than all of them.
+        #[pallet::call_index(2)]
+        #[pallet::weight(T::WeightInfo::set_control_operators())]
+        pub fn set_control_operators(
+            origin: OriginFor<T>,
+            operators: BoundedVec<T::AccountId, ConstU32<50>>,
+        ) -> DispatchResult {
+            EnsureGovernance::<T>::ensure_origin(origin)?;
+            ControlOperators::<T>::put(operators);
+            Ok(())
+        }
     }
 
     /// Helper functions
@@ -297,8 +323,9 @@ pub mod pallet {
         /// the call.
         ///
         /// `Root`/`Governance` require the root origin; `EmergencyCommittee`
-        /// requires a signed account on the committee; `Operator` requires any
-        /// signed account. An operator is limited by `ensure_action_allowed`
+        /// requires a signed account on the committee; `Operator` requires a signed account *on
+        /// the operator list* that governance sets — not just any signature. An operator is
+        /// limited by `ensure_action_allowed`
         /// (pause/resume only) and by the per-domain cooldown.
         fn authorize(origin: OriginFor<T>, authority: ControlAuthority) -> DispatchResult {
             match authority {
@@ -314,7 +341,12 @@ pub mod pallet {
                     );
                 }
                 ControlAuthority::Operator => {
-                    ensure_signed(origin)?;
+                    let caller = ensure_signed(origin)?;
+                    let operators = ControlOperators::<T>::get();
+                    ensure!(
+                        operators.contains(&caller),
+                        Error::<T>::InsufficientAuthority
+                    );
                 }
             }
             Ok(())
@@ -390,6 +422,7 @@ pub mod weights {
     pub trait WeightInfo {
         fn execute_control_action() -> Weight;
         fn set_emergency_committee() -> Weight;
+        fn set_control_operators() -> Weight;
     }
 
     /// Default weight implementation
@@ -402,6 +435,11 @@ pub mod weights {
 
         fn set_emergency_committee() -> Weight {
             Weight::from_parts(5_000_000, 0)
+        }
+
+        /// One `BoundedVec` write, bounded by the fifty-entry operator list this pallet accepts.
+        fn set_control_operators() -> Weight {
+            Weight::from_parts(5_000_000, 50 * 32)
         }
     }
 }

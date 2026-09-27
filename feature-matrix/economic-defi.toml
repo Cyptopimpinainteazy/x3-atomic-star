@@ -6,15 +6,33 @@ name = "Biometric wallet registration"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-wallet-pallet"]
-implemented = 60
-tested = 45
-mainnet_ready = 30
+implemented = 72
+tested = 72
+mainnet_ready = 40
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Biometric template handling unaudited"]
-evidence = ["pallets/x3-wallet-pallet", "note: Registry explicitly flags biometric security review"]
+blockers = [
+  "**2026-09-26 — the door is now exercised on a live chain.** `scripts/drills/wallet_recovery_live.sh` boots three validators and registers a profile through the real extrinsic; the stored profile names the *signer* as owner (the value this row used to hardcode as `[0u8; 32]`), and an unsupported biometric type is refused live with `x3WalletPallet.InvalidBiometricType`. Gate `wallet recovery on a live chain` PASS 26 s.",
+  "Re-measured 2026-09-26: the pallet's `register_biometric` validated nothing and did not call the library that does. It built the `BiometricProfile` by hand — any `biometric_type`, an all-zero template hash, an all-zero PIN hash — and hardcoded `owner: [0u8; 32]`, so the stored profile did not name the account that registered it. `crates/x3-wallet`'s `BiometricManager::create_profile` had rejected all three of those the whole time. The extrinsic now calls it and maps its refusals onto named pallet errors (`InvalidBiometricType`, `EmptyTemplateHash`, `EmptyPinHash`, with `InvalidBiometricProfile` as the unnamed fallback), and the stored profile carries the signer's 32-byte address. Measured load-bearing: disabling the library's template check makes `register_biometric_refuses_an_empty_template_hash` fail, which is the delegation proof.",
+  "Still unexercised: nothing consumes `attempts_remaining` or `locked_until_block`. There is no verify-unlock extrinsic in this pallet, so the lockout counters are stored and never spent, and a re-registration resets them. A lockout that nothing updates is not a lockout.",
+  "No independent security review of the template handling, and no decision recorded about whether a template hash belongs on chain at all (the profile's `attempts_remaining`/`locked_until_block` design assumes a verifier that does not exist here).",
+]
+test_evidence = [
+  "scripts/drills/wallet_recovery_live.sh",
+  "note: the live half is the `wallet recovery on a live chain` gate - a profile registered through the real extrinsic names its signer as owner, and an unsupported type is refused by name",
+  "pallets/x3-wallet-pallet/src/tests.rs",
+  "note: cargo test -p pallet-x3-wallet -> 23 passed, 0 failed; cargo clippy -p pallet-x3-wallet --all-targets -- -D warnings and cargo fmt -p pallet-x3-wallet -- --check are clean; cargo check -p x3-chain-runtime compiles the pallet into all runtime variants",
+  "note: measured load-bearing - removing the `template_hash == [0u8; 32]` check from crates/x3-wallet's `BiometricManager::create_profile` makes `register_biometric_refuses_an_empty_template_hash` FAIL in the pallet's suite, proving the pallet refuses because the library refuses",
+]
+required_tests = [
+  "register_biometric_works",
+  "register_biometric_refuses_an_unsupported_type",
+  "register_biometric_refuses_an_empty_template_hash",
+  "register_biometric_refuses_an_empty_pin_hash",
+]
+evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/biometric_unlock.rs", "note: Registry explicitly flags biometric security review; the pallet now delegates to the library's validator instead of re-implementing it"]
 registry_feature = "x3_wallet_pallet"
 
 [[feature]]
@@ -22,24 +40,30 @@ id = "X3-ECO-002"
 name = "Pending supply returns-to-zero invariant"
 subsystem = "economic_defi"
 source = "master"
-paths = ["pallets/x3-supply-ledger/src/lib.rs"]
-implemented = 60
-tested = 78
-mainnet_ready = 35
+paths = [
+  "pallets/x3-supply-ledger/src/lib.rs",
+  "node/tests/supply_invariant_distributed.rs",
+]
+implemented = 65
+tested = 90
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-25 — the invariant is proven on the transitions, not on a struct.** The pallet had no mock runtime, so `SupplyLedgerWrite` (`debit_source_to_pending`, `credit_destination_from_pending`, `refund_pending_to_source`) — the three calls every cross-domain operation goes through — had no test at all; the S0-1 file builds `SupplyLedger` values by hand and says in a note that it needs a runtime. `pallets/x3-supply-ledger/src/mock.rs` supplies one, and `tests_conservation.rs` drives the real paths: pending returns to zero after every settle or refund (`pending_supply_returns_to_zero_when_every_leg_is_resolved`), and 200 random leg sequences never leave it accumulating (`prop_random_leg_sequences_conserve_supply`). A refused transition leaves the ledger byte-for-byte identical, so a failed leg cannot strand or duplicate supply.",
-  "Still open on this row: the invariant is proven for one ledger view in one process — not under concurrent cross-domain traffic on a multi-validator network, and not against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set.",
-]
+  "**CLOSED 2026-09-27 — proven under concurrent cross-domain traffic on a three-validator network, on every validator's own view.** `node/tests/supply_invariant_distributed.rs` boots the built-in three-validator `local3` chain, drives fee-burning X3 comits into all three validators at once (one thread per validator, no two threads sharing an account nonce), and reads the conservation identity **on each validator separately at one finalized block**: sum over `System::Account(free + reserved)` equals `AtlasKernelRuntimeApi::get_total_issuance()`, both sides read with that block hash as `at`. Measured 2026-09-27 (exit 0, 271s, one frozen binary for every node): all three validators conserved at block 119 (accounted 9999999998338644985 == TotalIssuance 9999999998338644985 on each), the pending phase carried 6,000,000 on all three (native 999,994,000,000 from 1,000,000,000,000 with the destination leg untouched), and after resolution block 191 reads native 999,994,000,000 / evm 6,000,000 / pending 0 on all three — every leg resolved, every validator agreeing. The corrupted-chain control still refuses: a scratch chain with one unit added to `Balances::TotalIssuance` is reported as a violation with the delta named",
+  "**A driver defect this row found, fixed in the same change.** The completion phase signed every `complete_xvm_transfer` up front and then submitted them, so `sign_complete_xvm_transfer` — which reads the gateway account's nonce from the node — gave them all the *same* nonce. The pool refused all but the first with `1014: Priority is too low: (419 vs 419)`, whose SDK description is \"too low priority to replace another transaction already in the pool\". That reads like pool backpressure and is a nonce collision; the fix is to wait for each completion's effect before signing the next, exactly as the transfer loop above it already documented and did. Nothing about the chain was wrong",
+  "Still open on this row: nothing here has run against a *public* network or the seven physical validators, and the invariant is not yet checked against each bridge's own observation path (that is X3-XVM-002). The pallet's suite also ran in no gate until 2026-09-25, when `test x3-supply-ledger` was added to the fast set",]
 required_tests = [
-  "pending_supply_returns_to_zero_when_every_leg_is_resolved",
+  "supply_is_conserved_on_every_validator_under_distributed_traffic",
   "prop_random_leg_sequences_conserve_supply",
   "a_refused_transition_does_not_mutate_the_ledger",
+  "pending_supply_returns_to_zero_when_every_leg_is_resolved",
 ]
 test_evidence = [
+  "note: 2026-09-27 - `env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test supply_invariant_distributed -- --ignored --nocapture --test-threads=1` exits 0 in 271s and prints the per-validator conservation lines quoted in the blocker above; the negative control (a scratch chain with one unit added to `Balances::TotalIssuance`) is part of the same run",
   "note: all three are in pallets/x3-supply-ledger/src/tests_conservation.rs, run by the `test x3-supply-ledger` gate (2026-09-25)",
 ]
 evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Registry corrections call out missing supply invariant tests", "note: 2026-09-25 - the transitions are now driven by a real test runtime and a property suite"]
@@ -51,15 +75,17 @@ subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-supply-ledger/src/lib.rs"]
 implemented = 65
-tested = 72
-mainnet_ready = 35
+tested = 88
+mainnet_ready = 52
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-25 at the ledger level.** The conservation law is `represented() = native + evm + svm + external_locked + pending` never exceeding the canonical ceiling, and every transition being a relabelling rather than a creation: debit moves source -> pending, credit moves pending -> destination, refund moves pending -> source. `tests_conservation.rs` asserts exactly that after every step of the success path (native -> EVM), the external route (native -> `external_locked`), the rollback path (debit then refund restores the ledger bit-for-bit), the duplicate-settle case (a replayed settle is refused), the halt/pause cases (new legs refused, refunds still allowed), and 200 random leg sequences. The mint path's own conservation is covered too: a governance mint raises the ceiling with the supply, and a replayed nonce moves neither.",
-  "Still open, and why `mainnet_ready` does not move: this is one asset ledger in one process. Nothing here exercises a *real* external bridge observation (a lock on another chain being seen and recorded), concurrent cross-domain traffic under a multi-validator network, or the router's own accounting against the ledger — the row's original 'end-to-end supply conservation remains P0' is only half closed, and the other half is X3-XVM-002's.",
+  "**HALF CLOSED 2026-09-26 — concurrent traffic on a multi-validator network now has a conservation proof, for native balances.** That was one of this row's three open items ('concurrent cross-domain traffic under a multi-validator network'). `node/tests/supply_invariant_distributed.rs` (gate: `supply invariant across validators`, ~200s, serial — it binds node ports) boots the three-validator `local3` chain from one frozen node binary, drives five comits per account into all three validators concurrently — each one required to have an execution receipt on a validator that never received it — and then, at one finalized block, reads the conservation identity from **each validator's own state**: `sum(free + reserved)` over every `System::Account` enumerated with `state_getKeys` at that block hash versus the runtime's own `AtlasKernelRuntimeApi::get_total_issuance()` at the same hash. Measured: baseline 8 accounts, 8000000000000000000 == 8000000000000000000 on all three; after traffic, finalized block 107, all three report accounted 7999999998338644985 == TotalIssuance 7999999998338644985, and the fall in account balances equals the fall in issuance exactly (each account paid 553785005). Load-bearing: injecting one unit into `Balances::TotalIssuance` in a scratch genesis makes the same check fail by exactly that unit (`delta 1`).",
+  "**CLOSED 2026-09-26 — the per-asset identity is asserted on every validator, over a record that exists.** The previous note said the per-asset half had no read surface. It has one now: `AtlasKernelRuntimeApi_get_asset_supply_ledger(asset_id)` returns the ledger pallet's own `SupplyLedger`, and the distributed test reads it at one finalized block on each of three validators, enumerating the ledger's key set from the pallet's own storage prefix rather than hard-coding a key. The record has to *exist*: the test now creates one through `X3TokenFactory::create_token` (the signed path, via a new `sign_token_factory_create` in `x3-runtime-signer`) and **fails** if no record appears within 120s, so the assertion cannot pass over an empty map. Measured: asset `0xcbd7f754…` reads `native 1000000000000, evm 0, svm 0, external_locked 0, pending 0, canonical 1000000000000` — identity holds, all three validators identical — while the native conservation numbers are unchanged from before the extension (7,999,999,998,338,644,985 on all three) and the injected-unit control still fails by exactly one.",
+  "Still open, and why `mainnet_ready` moves by 7 and not more: this proves the identity over **one** asset on a three-validator local chain, with the `evm`/`svm`/`external_locked` legs at zero — a real bridge lock moving `external_locked` and a cross-VM transfer moving `evm`/`svm` are still unexercised, and the seven-validator network has not been used for this check.",
 ]
 required_tests = [
   "every_leg_of_the_lifecycle_conserves_the_represented_total",
@@ -78,15 +104,35 @@ name = "Wallet recovery flow"
 subsystem = "economic_defi"
 source = "master"
 paths = ["pallets/x3-wallet-pallet"]
-implemented = 65
-tested = 50
-mainnet_ready = 40
+implemented = 80
+tested = 80
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Recovery logic security review pending"]
-evidence = ["pallets/x3-wallet-pallet", "note: Registry required initiate_recovery_works"]
+blockers = [
+  "**2026-09-26 — the flow runs on a live chain, and the live run is what the row was missing.** `scripts/drills/wallet_recovery_live.sh` (gate `wallet recovery on a live chain`, PASS 26 s) registers two guardians with threshold 2, has a guardian initiate a delayed request, takes both approvals, requires a finalize *before* the delay to be refused with `x3WalletPallet.RecoveryNotReady` and a cancel from a non-owner to be refused with `x3WalletPallet.NotRecoveryOwner`, then finalizes after the delay and asserts the **stored** recovery owner changed to the new owner. Two driver bugs were found and fixed by running it: a three-block delay was outrun by the approvals (so the 'early' finalize was legitimately late and the test was wrong, not the pallet), and the expected refusal names needed the runtime's `x3WalletPallet` metadata prefix.",
+  "Re-measured 2026-09-26: recovery was an announcement, not a flow. `initiate_recovery(origin, new_owner)` required only that `RecoveryAccounts[caller]` existed, then emitted `RecoveryInitiated { account, new_owner }` — no guardian check, no quorum, no delay, and no state change. Worse, nothing in the pallet ever *wrote* `RecoveryAccounts`, so the only registered extrinsic could never pass (`WalletNotFound` on every chain), and its own test seeded the record by inserting into storage directly.",
+  "Closed with the library's own model (`crates/x3-wallet/social_recovery.rs`, unused before this change): `register_recovery_guardians` (owner-only; the set is built by `SocialRecoveryManager::create_recovery_account`, so the 1-to-30 guardian and threshold rules apply) → `initiate_recovery(account_id, new_owner)` by a *guardian* (the account is named explicitly; keying it off the caller looks up the wrong record) recording a delayed request → `approve_recovery` by guardians with a duplicate approval refused → `finalize_recovery` only when the threshold is met *and* the delay has elapsed, which is the single place the stored recovery owner changes → `cancel_recovery` by the recovery owner. Every refusal has a named test, and two controls were measured: disabling the library's delay check plus the pallet's own `ensure!` lets an early finalize through, and an earlier version of the fix reported `previous_owner == new_owner` in the executed event until the event captured the owner before the move.",
+  "What the owner change is *not*: the recovery owner is a `[u8; 32]` address in the recovery record. It is the authority for future guardian operations, but no `T::AccountId` binding, balance, or `HardwareWallets` entry follows it, so 'recovery' currently recovers the right to manage a guardian set rather than control of an account. Closing that needs a decision about what an account's owner means on this chain.",
+  "Still open: no security review, no expiry for an abandoned request (a pending request blocks a new one until the owner cancels), no guardian-initiated cancel, and no test that a request survives a runtime upgrade.",
+]
+test_evidence = [
+  "scripts/drills/wallet_recovery_live.sh",
+  "note: the live half is the `wallet recovery on a live chain` gate - guardians registered, a guardian-initiated delayed request approved twice, a finalize refused before the delay, a non-owner cancel refused, and after the delay the stored recovery owner changes",
+  "pallets/x3-wallet-pallet/src/tests.rs",
+  "note: cargo test -p pallet-x3-wallet -> 23 passed, 0 failed (was 13 before this change); the lifecycle test walks request -> threshold -> delay -> owner change and asserts the stored state at each step, not just the events",
+  "note: measurement that replaced the old test - the removed test called initiate_recovery as the account being recovered, against a storage-seeded guardian record, and asserted only that an event was emitted. It is replaced by `the_account_owner_cannot_initiate_recovery` (the owner is refused) plus `recovery_runs_from_guardian_request_to_owner_change` (a completed, state-changing lifecycle), so coverage went up rather than sideways",
+]
+required_tests = [
+  "register_recovery_guardians_applies_the_library_rules",
+  "the_account_owner_cannot_initiate_recovery",
+  "recovery_runs_from_guardian_request_to_owner_change",
+  "the_owner_can_cancel_a_pending_recovery",
+  "initiate_recovery_fails_without_guardian",
+]
+evidence = ["pallets/x3-wallet-pallet", "crates/x3-wallet/src/social_recovery.rs", "note: The registry required the old recovery-initiation test; that test is replaced by a real lifecycle (see the blockers)"]
 registry_feature = "x3_wallet_pallet"
 
 [[feature]]

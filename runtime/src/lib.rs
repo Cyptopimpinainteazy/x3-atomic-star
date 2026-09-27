@@ -412,6 +412,15 @@ parameter_types! {
     pub const MaxEvmPayloadLength: u32 = 64 * 1024;  // 64 KB for EVM payloads
     pub const MaxSvmPayloadLength: u32 = 64 * 1024;  // 64 KB for SVM payloads
     pub const MaxX3PayloadLength: u32 = 64 * 1024;  // 64 KB for X3 payloads
+    /// Most X3VM contract slots one X3 execution may be handed, as its view of chain state.
+    ///
+    /// The slot map is unbounded and every entry is a database read the block pays for, so the view
+    /// is bounded and `submit_comit_v2`'s weight prices the bound. Past it the execution is refused
+    /// (`X3StorageViewTooLarge`) rather than run against a partial view — a slot missing from a
+    /// partial view is indistinguishable from a slot that was never written, which is the one
+    /// answer a program must not be given about state the chain holds. Per-contract keying plus a
+    /// declared read set is the fix that removes the bound (TICKET-153).
+    pub const MaxX3StorageSlots: u32 = 1024;
     pub const MaxCombinedPayloadLength: u32 = 128 * 1024;  // 128 KB combined limit
     pub const MaxCombinedPayloadLengthV2: u32 = 192 * 1024;  // 192 KB combined (EVM+SVM+X3)
     pub const MaxAuthorities: u32 = 100;  // Maximum 100 authorities
@@ -671,16 +680,17 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
-        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
 // ── mainnet-rc1: narrowed pallet set ─────────────────────────────────────────
-// Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
-// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
-// DePIN marketplace, private execution).
+// Excludes the legacy experimental Swarm plus DEX, flashloan, launchpad,
+// auction, meme, evolution, compute market, automation, oracle, VRF, DA,
+// sequencer, DePIN marketplace, and private execution. NorthernSwarm is part
+// of the guarded launch surface and is release-gated separately.
 #[cfg(all(
     not(feature = "dev"),
     not(feature = "frontier"),
@@ -739,6 +749,7 @@ construct_runtime!(
         X3JuryAnchor: pallet_x3_jury_anchor,
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -817,6 +828,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -895,6 +907,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -954,6 +967,56 @@ pub type SignedExtra = (
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 
+/// The calls that stay dispatchable while `pallet_x3_invariants::Halted` is set.
+///
+/// `InvariantCheck` refuses every signed extrinsic while the chain is halted. That is
+/// what a halt is for, but a gate that refuses everything also refuses the halt's own
+/// remedy — and then `emergency_halt` (which sets `Halted` *and* the supply ledger's
+/// `TransferHalted`) is a one-way door: a pending atomic bundle's bond stays locked
+/// and no extrinsic can clear either flag.
+///
+/// The list is deliberately short and every entry is load-bearing:
+///
+/// * `clear_halted` — ends the halt. `set_halt_on_violation(false)` only stops future
+///   violations from re-raising it; it does not clear the flag.
+/// * `resume_transfers` — ends the economy freeze the same controller raised.
+/// * `rollback_atomic_bundle` — the only path that releases a pending bundle's bond,
+///   so without it a halt strands funds.
+/// * `emergency_unpause` — lifting the routine operational pause.
+/// * Council `propose` / `vote` / `close` / `execute` — the only *transaction-reachable*
+///   origin for the calls above (`UpdateOrigin`/`SupplyGovernance` are
+///   `EnsureRootOrHalfCouncil`, and a mainnet-rc1 chain has no sudo), so the remedy
+///   needs the motion that carries it. A motion still has to clear the council's
+///   threshold to dispatch anything.
+///
+/// Everything else — every transfer, mint, swap, bridge and ordinary user call — stays
+/// refused. Exempt means "not blocked by the halt"; each call still enforces its own
+/// origin check.
+pub struct RuntimeHaltExemptCalls;
+
+impl frame_support::traits::Contains<RuntimeCall> for RuntimeHaltExemptCalls {
+    fn contains(call: &RuntimeCall) -> bool {
+        matches!(
+            call,
+            RuntimeCall::X3Invariants(pallet_x3_invariants::Call::clear_halted { .. })
+                | RuntimeCall::X3Invariants(
+                    pallet_x3_invariants::Call::set_halt_on_violation { .. }
+                )
+                | RuntimeCall::X3SupplyLedger(
+                    pallet_x3_supply_ledger::Call::resume_transfers { .. }
+                )
+                | RuntimeCall::X3AtomicKernel(
+                    pallet_x3_atomic_kernel::Call::rollback_atomic_bundle { .. }
+                )
+                | RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::emergency_unpause { .. })
+                | RuntimeCall::Council(pallet_collective::Call::propose { .. })
+                | RuntimeCall::Council(pallet_collective::Call::vote { .. })
+                | RuntimeCall::Council(pallet_collective::Call::close { .. })
+                | RuntimeCall::Council(pallet_collective::Call::execute { .. })
+        )
+    }
+}
+
 // ===== Config Impls (after construct_runtime!) =====
 
 parameter_types! {
@@ -972,7 +1035,7 @@ impl pallet_x3_oracle::Config for Runtime {
     type MinSubmissionsForMedian = MinSubmissionsForMedian;
     type MaxSubmissionAge = MaxSubmissionAge;
     type UpdateOrigin = EnsureRootOrHalfCouncil;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_oracle::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -991,7 +1054,7 @@ impl pallet_x3_vrf::Config for Runtime {
     type FeePerByte = FeePerByte;
     type MaxSeedLength = MaxSeedLength;
     type FulfillerOrigin = EnsureRootOrHalfCouncil;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_vrf::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -1001,7 +1064,7 @@ parameter_types! {
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_dex::weights::SubstrateWeight<Runtime>;
     type EconomicHalt = X3SupplyLedger;
 }
 
@@ -1019,7 +1082,7 @@ impl pallet_x3_automation::Config for Runtime {
     type BaseRegistrationFee = BaseRegistrationFee;
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
     type Oracle = pallet_x3_automation::NoopOracle;
     type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
 }
@@ -1095,7 +1158,7 @@ impl pallet_timestamp::Config for Runtime {
     type Moment = Moment;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
-    type WeightInfo = ();
+    type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_aura::Config for Runtime {
@@ -1110,6 +1173,8 @@ impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type KeyOwnerProof = MembershipProof;
     type EquivocationReportSystem = X3EquivocationReportSystem;
+    // The SDK's GRANDPA weights are not publicly reachable (`mod default_weights;` is private in
+    // `substrate/frame/grandpa/src/lib.rs`), so there is nothing to point at from a runtime.
     type WeightInfo = ();
     type MaxAuthorities = MaxAuthorities;
     type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
@@ -1331,6 +1396,38 @@ impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowStorage {
         pallet_x3_kernel::BridgeSvmEscrow::<Runtime>::get()
     }
 }
+
+/// The chain's private-submission posture, as `pallet_x3_kernel`'s intake check reads it.
+///
+/// Deliberately *derived* from the pallet that owns the private channel rather than a constant:
+/// `pallet_private_execution::Enabled` is the switch governance flips to turn private execution on,
+/// so binding the X3VM intake to it means there is exactly one answer to "can this chain offer a
+/// private submission channel?" instead of two that can drift apart. With private execution off —
+/// the shipped posture — a program whose compiled policy demands private submission is refused at
+/// intake instead of executed in the clear.
+///
+/// `mainnet-rc1` is the exception, and it has to be spelled out because the reference above cannot
+/// compile there: the scope lock does **not** include `pallet-private-execution`, so
+/// `Runtime: pallet_private_execution::Config` is not implemented and the storage item's `get()`
+/// does not resolve. Answering a constant `false` on that variant is not a workaround — it is the
+/// fact the derived version would have reported, and it keeps the fail-closed posture: a program
+/// whose compiled policy demands private submission is refused at intake because this chain has no
+/// private channel to submit it through. Measured 2026-09-27: without this, `runtime variant
+/// dry-runs` failed to build the `mainnet-rc1` variant outright (E0599 at this line), which is the
+/// variant mainnet is meant to run.
+pub struct RuntimePrivateSubmissionChannel;
+impl frame_support::traits::Get<bool> for RuntimePrivateSubmissionChannel {
+    #[cfg(not(feature = "mainnet-rc1"))]
+    fn get() -> bool {
+        pallet_private_execution::Enabled::<Runtime>::get()
+    }
+
+    #[cfg(feature = "mainnet-rc1")]
+    fn get() -> bool {
+        false
+    }
+}
+
 parameter_types! {
     pub const MaxReplayPruneItemsPerBlock: u32 = 64u32;
 }
@@ -1624,6 +1721,7 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
     type SecurityHook = FailClosedSecurityHook;
+    type HaltExemptCalls = RuntimeHaltExemptCalls;
 }
 
 impl pallet_x3_agent_law::Config for Runtime {
@@ -1666,6 +1764,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type MaxPreparedCrossVmOps = MaxPreparedCrossVmOps;
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type RequireCrossVmProof = RequireCrossVmProof;
+    type PrivateSubmissionChannel = RuntimePrivateSubmissionChannel;
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:
@@ -1683,6 +1782,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type SvmAdapter = pallet_x3_kernel::wasm_adapters::WasmSvmAdapter;
     #[cfg(not(all(feature = "std", feature = "frontier")))]
     type X3Adapter = pallet_x3_kernel::wasm_adapters::WasmX3Adapter;
+    type MaxX3StorageSlots = MaxX3StorageSlots;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type CrossChainProofVerifier = SubstrateProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowStorage;
@@ -1867,7 +1967,7 @@ mod native_vm_adapters {
                 let state_changes =
                     collect_evm_balance_changes(source, None, &info.logs, &pre_balances);
                 return Ok(ExecutionReceipt {
-                    version: 1,
+                    version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
                     success,
                     gas_used: info.used_gas.standard.unique_saturated_into(),
                     return_data: info.value.as_bytes().to_vec(),
@@ -1883,6 +1983,7 @@ mod native_vm_adapters {
                         })
                         .collect(),
                     state_changes,
+                    storage_writes: Vec::new(),
                     protocol_version: 1,
                     migration_history: Vec::new(),
                     compatibility_flags: 0,
@@ -1979,7 +2080,7 @@ mod native_vm_adapters {
         let success = matches!(info.exit_reason, ExitReason::Succeed(_));
         let state_changes = collect_evm_balance_changes(source, target, &info.logs, pre_balances);
         ExecutionReceipt {
-            version: 1,
+            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success,
             gas_used: info.used_gas.standard.unique_saturated_into(),
             return_data: info.value,
@@ -1995,6 +2096,7 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -2092,7 +2194,7 @@ mod native_vm_adapters {
             })
             .collect();
         ExecutionReceipt {
-            version: 1,
+            version: pallet_x3_kernel::EXECUTION_RECEIPT_VERSION,
             success: result.success,
             gas_used: result.compute_units_used,
             return_data: result.output,
@@ -2108,6 +2210,7 @@ mod native_vm_adapters {
                 })
                 .collect(),
             state_changes,
+            storage_writes: Vec::new(),
             protocol_version: 1,
             migration_history: Vec::new(),
             compatibility_flags: 0,
@@ -2252,7 +2355,7 @@ impl pallet_scheduler::Config for Runtime {
     type MaximumWeight = MaximumSchedulerWeight;
     type ScheduleOrigin = EnsureRootOrHalfCouncil;
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
-    type WeightInfo = ();
+    type WeightInfo = pallet_scheduler::weights::SubstrateWeight<Runtime>;
     type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
     type Preimages = Preimage;
     type BlockNumberProvider = frame_system::Pallet<Runtime>;
@@ -2267,7 +2370,7 @@ parameter_types! {
 
 impl pallet_preimage::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
+    type WeightInfo = pallet_preimage::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     type ManagerOrigin = EnsureRootOrHalfCouncil;
     // RC-1: no per-byte deposit; preimage costs governed by extrinsic weight only.
@@ -2312,7 +2415,7 @@ impl pallet_governance::Config for Runtime {
     type MaxVotes = MaxVotes;
     type MaxDelegations = MaxDelegations;
     type ConvictionPeriod = ConvictionPeriod;
-    type WeightInfo = ();
+    type WeightInfo = pallet_governance::weights::SubstrateWeight<Runtime>;
 
     // ============================================================================
     // AI Governance Configuration
@@ -2357,7 +2460,7 @@ impl pallet_treasury::Config for Runtime {
     type LargeSpendLimit = LargeSpendThreshold;
     type ProposalBond = ProposalBond;
     type ProposalBondMinimum = ProposalBondMinimum;
-    type WeightInfo = ();
+    type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
     // X3 (stable2512): local pallet-treasury Config does not declare BlockNumberProvider.
 }
 
@@ -2383,7 +2486,7 @@ impl pallet_agent_accounts::Config for Runtime {
     type DefaultGasPerEpoch = DefaultGasPerEpoch;
     type DefaultComputePerEpoch = DefaultComputePerEpoch;
     type BlocksPerEpoch = BlocksPerEpoch;
-    type WeightInfo = ();
+    type WeightInfo = pallet_agent_accounts::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Agent Memory Pallet Configuration =====
@@ -2405,7 +2508,7 @@ impl pallet_agent_memory::Config for Runtime {
     type PruneOrigin = EnsureRootOrHalfCouncil;
     type MemoryRetentionBlocks = MemoryRetentionBlocks;
     type MemoryConsensusThreshold = MemoryConsensusThreshold;
-    type WeightInfo = ();
+    type WeightInfo = pallet_agent_memory::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Evolution Core Pallet Configuration =====
@@ -2495,6 +2598,7 @@ impl pallet_x3_asset_registry::Config for Runtime {
 impl pallet_x3_supply_ledger::Config for Runtime {
     type SupplyGovernance = EnsureRootOrHalfCouncil;
     type Registry = X3AssetRegistry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Runtime>;
 }
 
 // ── Protocol fee parameters ──────────────────────────────────────────────────
@@ -2513,6 +2617,11 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
+    // Refuses every external root: nothing in this runtime can bind a foreign chain's block
+    // root to that chain's consensus, and `register_external_root` writes a value the bridge
+    // surface later trusts. Wire a per-chain light client here and the extrinsic becomes usable;
+    // until then it fails closed with `ExternalRootVerificationUnavailable`.
+    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = EnsureX3LangGateway;
     type X3LangOrigin = EnsureX3LangGateway;
     type EconomicHalt = X3SupplyLedger;
@@ -2530,6 +2639,7 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
     type Sentinel = X3Sentinel;
+    type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -2709,21 +2819,26 @@ impl pallet_swarm::Config for Runtime {
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
 }
 
-// ===== Northern Swarm Pallet Configuration (dev-only; guarded until RC2) =====
-#[cfg(feature = "dev")]
+// ===== Northern Swarm Pallet Configuration =====
+// Guarded by the Swarm/Reactor mainnet release gate; available in dev and
+// production runtime variants so the launch binary can actually host the market.
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
-    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
+    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~48 minutes at 200ms blocks
     pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
+    pub const NorthernSwarmQuorumThreshold: u32 = 2;
+    pub const NorthernSwarmMaxExecutorsPerTask: u32 = 3;
 }
 
-#[cfg(feature = "dev")]
 impl pallet_northern_swarm::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MinExecutorStake = NorthernSwarmMinExecutorStake;
     type DeregistrationCooldown = NorthernSwarmDeregistrationCooldown;
     type MaxClaimedTasksPerExecutor = NorthernSwarmMaxClaimedTasksPerExecutor;
+    type QuorumThreshold = NorthernSwarmQuorumThreshold;
+    type MaxExecutorsPerTask = NorthernSwarmMaxExecutorsPerTask;
+    type WeightInfo = pallet_northern_swarm::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== DePIN Marketplace Pallet Configuration =====
@@ -2753,7 +2868,7 @@ impl pallet_depin_marketplace::Config for Runtime {
     type MaxJobDuration = MaxJobDuration;
     type MaxPendingOrders = MaxPendingOrders;
     type SlashFraction = DepinSlashFraction;
-    type WeightInfo = ();
+    type WeightInfo = pallet_depin_marketplace::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Private Execution Pallet Configuration =====
@@ -2768,6 +2883,20 @@ parameter_types! {
     pub const ConfidentialValidatorShareBps: u16 = 6000;  // 60% to validators
     pub const PrivateBurnShareBps: u16 = 2500;            // 25% burn
     pub const PrivateStakerShareBps: u16 = 1500;          // 15% to stakers
+    /// Bond a commitment to an ordering window must post. A commitment that never
+    /// reveals forfeits it, so this is what a silent commit costs.
+    pub const MinOrderingBond: Balance = 10 * DOLLARS;
+    /// Commitments one ordering window accepts. Bounds both the storage a window
+    /// can occupy and the work settling it does.
+    ///
+    /// Bounded by what a *settle* can be charged: settling replays the window, and a weight that
+    /// exceeds the block budget is a window that can be committed into and never settled — measured
+    /// on local3 on 2026-09-26, where the previous 1024 (with a 1 MiB byte ceiling) put the settle
+    /// extrinsic over the block limit and the pool refused it outright.
+    pub const MaxOrderingCommits: u32 = 256;
+    /// Total revealed plaintext one ordering window may hold. Settling reads all
+    /// of it in one transaction, so this is what keeps every window settlable.
+    pub const MaxOrderingWindowBytes: u32 = 262_144;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -2791,7 +2920,10 @@ impl pallet_private_execution::Config for Runtime {
     type ConfidentialValidatorShareBps = ConfidentialValidatorShareBps;
     type PrivateBurnShareBps = PrivateBurnShareBps;
     type PrivateStakerShareBps = PrivateStakerShareBps;
-    type WeightInfo = ();
+    type MinOrderingBond = MinOrderingBond;
+    type MaxOrderingCommits = MaxOrderingCommits;
+    type MaxOrderingWindowBytes = MaxOrderingWindowBytes;
+    type WeightInfo = pallet_private_execution::weights::SubstrateWeight<Runtime>;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -2862,7 +2994,7 @@ parameter_types! {
 
 impl pallet_x3_atomic_kernel::Config for Runtime {
     type Currency = Balances;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_atomic_kernel::weights::SubstrateWeight<Runtime>;
     type MinBond = AtomicKernelMinBond;
     type MaxLegsPerBundle = AtomicKernelMaxLegsPerBundle;
     type BundleDeadlineBlocks = AtomicKernelBundleDeadlineBlocks;
@@ -3028,6 +3160,7 @@ impl pallet_x3_treasury_policy::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type OperatorOrigin = EnsureRootOrHalfCouncil;
     type MaxInsuranceReserve = MaxInsuranceReserve;
+    type WeightInfo = pallet_x3_treasury_policy::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Custody Configuration =====
@@ -3104,7 +3237,7 @@ impl pallet_x3_auction::Config for Runtime {
     type MaxActiveAuctions = AuctionMaxActiveAuctions;
     type AuctionDepositAmount = AuctionDepositAmount;
     type MinBidIncrementBps = AuctionMinBidIncrementBps;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_auction::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 LP Locker Configuration =====
@@ -3242,6 +3375,11 @@ impl pallet_x3_launchpad::Config for Runtime {
     type Dex = LaunchpadDexBridge;
     type LpLocker = LaunchpadLpLockerBridge;
     type QuoteAssetId = LaunchpadQuoteAssetId;
+    // `pallets/x3-launchpad/src/weights.rs` exists but is not a module of the pallet (`lib.rs`
+    // declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`),
+    // so there is nothing to point at. Wiring it needs the pallet to implement its own trait for the
+    // generated struct; until then `()` is the only thing that compiles, and the gate
+    // `runtime weights wired` fails on the dead file rather than on this line.
     type WeightInfo = ();
 }
 
@@ -3288,7 +3426,7 @@ impl pallet_x3_compute_market::Config for Runtime {
     type MaxSessionsPerProvider = ComputeMarketMaxSessionsPerProvider;
     type SessionExpiryBlocks = ComputeMarketSessionExpiryBlocks;
     type MinStakeForProvider = ComputeMarketMinStakeForProvider;
-    type WeightInfo = ();
+    type WeightInfo = pallet_x3_compute_market::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Flash Loan Configuration =====
@@ -3316,7 +3454,7 @@ impl pallet_svm_runtime::Config for Runtime {
     type MaxAccountDataSize = SvmMaxAccountDataSize;
     type MaxProgramSize = SvmMaxProgramSize;
     type MaxComputeUnits = SvmMaxComputeUnits;
-    type WeightInfo = ();
+    type WeightInfo = pallet_svm_runtime::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Jury Anchor Configuration =====
@@ -3339,7 +3477,7 @@ parameter_types! {
 
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_meme_overlord::Config for Runtime {
-    type WeightInfo = ();
+    type WeightInfo = pallet_meme_overlord::weights::SubstrateWeight<Runtime>;
     type MaxTemplateNameLength = MemeMaxTemplateNameLength;
     type MaxMemeDataLength = MemeMaxMemeDataLength;
     type MaxAchievements = MemeMaxAchievements;
@@ -3383,6 +3521,8 @@ mod benches {
     #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     #[allow(unused_imports)]
+    use pallet_northern_swarm::Pallet as NorthernSwarm;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
     #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
@@ -3394,13 +3534,40 @@ mod benches {
     // answered "No benchmarks found which match your input".
     #[allow(unused_imports)]
     use pallet_x3_kernel::Pallet as AtlasKernel;
+    // Added 2026-09-27: `pallet-atomic-trade-engine` ships a generated `weights.rs` and a
+    // `benchmarking.rs`, but four of its calls (register/update liquidity pool, sync pool price,
+    // submit price observation) charged literal weights written by hand — and nothing could
+    // re-measure them, because the pallet was not registered here: the CLI answered
+    // "No benchmarks found which match your input".
+    #[allow(unused_imports)]
+    use pallet_atomic_trade_engine::Pallet as AtomicTradeEngine;
+    // Added 2026-09-27: `pallet-x3-supply-ledger` charged literals for a governance mint, a burn
+    // and three switches while its own `Ledgers` map was the real cost, and nothing could re-measure
+    // them because the pallet was not registered here.
+    #[allow(unused_imports)]
+    use pallet_x3_supply_ledger::Pallet as X3SupplyLedger;
+    // Added 2026-09-27: `pallet-x3-treasury-policy` charged literals for all eight calls — a vault
+    // funding at 80,000,000 picoseconds — behind a `runtime-benchmarks` feature that had nothing in
+    // it and that this list did not enable either, so the pallet could not be measured at all.
+    #[allow(unused_imports)]
+    use pallet_x3_treasury_policy::Pallet as X3TreasuryPolicy;
+    // Added 2026-09-27: `pallet-x3-token-factory` charged literals for a token launch, a mint, a
+    // burn and an authority handover, behind a `runtime-benchmarks` feature that had nothing in it
+    // and a runtime feature list that did not enable it either.
+    #[allow(unused_imports)]
+    use pallet_x3_token_factory::Pallet as X3TokenFactory;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_token_factory, X3TokenFactory]
+        [pallet_x3_treasury_policy, X3TreasuryPolicy]
+        [pallet_x3_supply_ledger, X3SupplyLedger]
+        [pallet_atomic_trade_engine, AtomicTradeEngine]
         [pallet_x3_atomic_kernel, X3AtomicKernel]
         [pallet_x3_kernel, AtlasKernel]
         [pallet_x3_settlement_engine, X3SettlementEngine]
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]
+        [pallet_northern_swarm, NorthernSwarm]
     );
 }
 
@@ -3747,6 +3914,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3781,6 +3949,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3815,6 +3984,7 @@ impl_runtime_apis! {
                                 })
                                 .collect(),
                             state_changes: Vec::new(),
+                            storage_writes: Vec::new(),
                             protocol_version: 1,
                             migration_history: Vec::new(),
                             compatibility_flags: 0,
@@ -3841,6 +4011,7 @@ impl_runtime_apis! {
                         return_data: b"EVM runner call failed".to_vec(),
                         logs: Vec::new(),
                         state_changes: Vec::new(),
+                        storage_writes: Vec::new(),
                         protocol_version: 1,
                         migration_history: Vec::new(),
                         compatibility_flags: 0,
@@ -4283,6 +4454,19 @@ impl_runtime_apis! {
 
         fn get_total_issuance() -> Balance {
             pallet_balances::TotalIssuance::<Runtime>::get()
+        }
+
+        /// The per-asset supply ledger, read straight out of the ledger pallet.
+        ///
+        /// The ledger is the thing that enforces `native + evm + svm + external_locked +
+        /// pending <= canonical` per asset, and until this existed nothing could check that
+        /// identity on a running chain — the distributed supply proof covered only the native
+        /// currency. Reading the pallet's own storage means the API cannot report a shape the
+        /// ledger does not hold.
+        fn get_asset_supply_ledger(
+            asset_id: x3_asset_kernel_types::AssetId,
+        ) -> Option<x3_asset_kernel_types::SupplyLedger> {
+            pallet_x3_supply_ledger::Ledgers::<Runtime>::get(asset_id)
         }
 
         fn native_locked_supply() -> u128 {

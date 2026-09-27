@@ -68,6 +68,66 @@ fn settlement_intent_creation_is_wired_through_the_runtime() {
     });
 }
 
+/// A window the chain can open must also be a window it can *settle*, in one block, as one
+/// transaction.
+///
+/// This is the invariant a live run found the hard way: the ordering lane could be opened,
+/// committed into and revealed on a three-validator chain, and then the settle was refused by the
+/// transaction pool with `Invalid Transaction: Transaction would exhaust the block limits` — a
+/// window whose bonds can never be released. The pool rejects a transaction whose declared weight
+/// does not fit the block, and the settle weight is a function of what the window holds, so the
+/// capacity and the byte ceiling the runtime configures have to be settlable in one transaction.
+/// A test at the pallet level cannot see this: it needs the runtime's own `BlockWeights`.
+///
+/// `#[cfg(not(feature = "mainnet-rc1"))]` because the pallet it exercises is: the runtime's
+/// `impl pallet_private_execution::Config for Runtime` carries that same cfg, so without this the
+/// `mainnet-rc1` build of this test file does not compile (measured: `clippy runtime rc1` failed
+/// with `the trait bound Runtime: pallet_private_execution::Config is not satisfied`).
+#[cfg(not(feature = "mainnet-rc1"))]
+#[test]
+fn a_full_ordering_window_is_settlable_in_one_block() {
+    use frame_support::weights::Weight;
+    use pallet_private_execution::WeightInfo;
+
+    let weights = BlockWeights::get();
+    let normal = weights.get(dispatch_class_normal());
+    let limit: Weight = normal
+        .max_total
+        .expect("with_sensible_defaults sets a max_total for the normal class");
+
+    // The worst case the runtime allows: every commitment slot taken and the whole plaintext budget
+    // revealed. If this does not fit, the runtime has configured a window it can never settle.
+    let worst = <Runtime as pallet_private_execution::Config>::WeightInfo::settle_ordering_window(
+        <Runtime as pallet_private_execution::Config>::MaxOrderingCommits::get(),
+        <Runtime as pallet_private_execution::Config>::MaxOrderingWindowBytes::get(),
+    );
+
+    assert!(
+        worst.all_lte(limit),
+        "settling a full ordering window weighs {worst:?}, which does not fit the normal class's \
+         {limit:?}: the pool would refuse every settle and the window's bonds could never be \
+         released. Lower MaxOrderingCommits/MaxOrderingWindowBytes, or price the settle."
+    );
+
+    // The control, and the reason this test exists: the capacity this runtime *used* to configure
+    // (1024 commitments and a 1 MiB plaintext ceiling) does not fit, which is the failure a live
+    // three-validator run hit — the window opened, was committed into and revealed, and every
+    // settle was refused by the pool with `Invalid Transaction: Transaction would exhaust the
+    // block limits`. If that configuration is ever restored, this test says so before a drill does.
+    let previously_configured = <() as WeightInfo>::settle_ordering_window(1024, 1_048_576);
+    assert!(
+        !previously_configured.all_lte(limit),
+        "1024 commitments and 1 MiB of revealed plaintext weigh {previously_configured:?}, which \
+         is inside the normal class's {limit:?} — either this test's arithmetic is wrong or the \
+         block budget grew, and the live drill's failure needs re-deriving before that number is \
+         trusted."
+    );
+}
+
+fn dispatch_class_normal() -> frame_support::dispatch::DispatchClass {
+    frame_support::dispatch::DispatchClass::Normal
+}
+
 /// Settlement intents are per-account, so an unsigned origin must be refused
 /// rather than attributed to some default account.
 #[test]
@@ -315,6 +375,139 @@ fn a_bundle_nonce_cannot_be_replayed() {
     });
 }
 
+// ── the two halt switches, and whether they meet ─────────────────────────────────────────────
+//
+// X3-RT-001's row named three things that were "read from the code, not proven by a test": the
+// atomic-kernel's economic halt and the kernel's routine pause are independent switches, nothing
+// drove both at once, and the runtime's `EmergencyHaltController` wiring had no runtime-level
+// test. `RuntimeEmergencyHaltController::trigger()` sets
+// `pallet_x3_supply_ledger::TransferHalted`, which is exactly what the atomic kernel's
+// `T::EconomicHalt::is_halted()` returns — a chain of three pallets that no test had walked end
+// to end. These two do.
+
+/// The nuclear halt reaches the atomic kernel, through the runtime's own controller.
+///
+/// `EmergencyHaltController` has a blanket no-op impl for `()`, so a mock that configured `()`
+/// would let every "the halt works" test pass while a real chain kept accepting bundles. The
+/// assertion is therefore not "the extrinsic succeeded" but the two links the wiring consists of:
+/// the flag the atomic kernel reads has flipped, and the bundle the gateway was authorized to
+/// submit a moment ago is now refused by name.
+#[test]
+fn the_emergency_halt_reaches_the_atomic_kernel_through_the_runtime() {
+    use frame_support::BoundedVec;
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+
+        assert!(
+            !pallet_x3_supply_ledger::TransferHalted::<Runtime>::get(),
+            "the atomic kernel's halt flag must be clear in genesis, or the rest proves nothing"
+        );
+
+        // The gateway is authorized and funded: this submission would be accepted as it stands.
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_halt(
+            RuntimeOrigin::root()
+        ));
+
+        assert!(
+            pallet_x3_supply_ledger::TransferHalted::<Runtime>::get(),
+            "`emergency_halt` must flip the flag the atomic kernel's `EconomicHalt` reads; the \
+             controller is otherwise the no-op impl for `()`"
+        );
+
+        assert_err!(
+            crate::X3AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(gateway),
+                BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+                100,
+                ATOMIC_CHAIN_ID,
+                ATOMIC_NONCE + 1,
+            ),
+            pallet_x3_atomic_kernel::Error::<Runtime>::EconomicHaltActive
+        );
+    });
+}
+
+/// A routine pause must not strand the bond an atomic bundle is already holding.
+///
+/// The two switches are independent: the pause lives in `pallet_x3_kernel` and its guards are on
+/// that pallet's own extrinsic paths, while `submit_atomic_bundle` and `rollback_atomic_bundle`
+/// live in `pallet_x3_atomic_kernel` and consult `EconomicHalt`, not `ProtocolPaused`. That is the
+/// safe direction — a pause can never make a pending bundle unrecoverable — but it was an
+/// argument made from reading two files, so it is measured here: the bundle is submitted, the
+/// chain is paused, and the submitter cancels it *while paused*, with the bond released in full
+/// and total issuance unchanged.
+#[test]
+fn a_kernel_pause_leaves_a_pending_atomic_bundle_recoverable() {
+    use frame_support::BoundedVec;
+    use pallet_x3_atomic_kernel::{BundleRollbackReason, BundleStatus, Bundles};
+
+    atomic_test_ext().execute_with(|| {
+        let gateway = atomic_gateway();
+        let balances = pallet_balances::Pallet::<Runtime>::free_balance(gateway.clone());
+        let issuance_before = pallet_balances::Pallet::<Runtime>::total_issuance();
+
+        assert_ok!(crate::X3AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            BoundedVec::try_from(vec![atomic_leg()]).expect("within MaxLegsPerBundle"),
+            100,
+            ATOMIC_CHAIN_ID,
+            ATOMIC_NONCE,
+        ));
+        let (bundle_id, _) = Bundles::<Runtime>::iter()
+            .next()
+            .expect("the submitted bundle is stored");
+        assert!(
+            pallet_balances::Pallet::<Runtime>::reserved_balance(gateway.clone()) > 0,
+            "the bundle must be holding a bond, or there is nothing to strand"
+        );
+
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_pause(
+            RuntimeOrigin::root()
+        ));
+        assert!(
+            pallet_x3_kernel::ProtocolPaused::<Runtime>::get(),
+            "the pause the recovery below has to survive must actually be in force"
+        );
+
+        assert_ok!(crate::X3AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(gateway.clone()),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+
+        assert_eq!(
+            Bundles::<Runtime>::get(bundle_id)
+                .expect("the record survives rollback")
+                .status,
+            BundleStatus::RolledBack
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::reserved_balance(gateway.clone()),
+            0,
+            "a pause must not leave the bundle's bond reserved"
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::free_balance(gateway.clone()),
+            balances - crate::AtomicKernelMinBond::get() / 2,
+            "a voluntary cancel costs exactly the 50% penalty and returns the rest"
+        );
+        assert_eq!(
+            pallet_balances::Pallet::<Runtime>::total_issuance(),
+            issuance_before,
+            "the penalty moves to the treasury rather than being burned"
+        );
+    });
+}
+
 // ── the X3 domain, driven through the runtime's own dispatch ────────────────────────────────
 
 /// A genesis with one funded account, authorized to submit comits to the kernel.
@@ -474,4 +667,272 @@ fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
             "and it must not leave a receipt claiming a program it never ran"
         );
     });
+}
+
+// ── The emergency halt must not brick the chain ───────────────────────────────
+//
+// `pallet_x3_invariants::InvariantCheck` is wired into `SignedExtra`, and while
+// `Halted` is true it refuses *every* signed extrinsic. `RuntimeEmergencyHaltController`
+// (the kernel's `emergency_halt`) sets that flag, and the supply ledger's
+// `TransferHalted` with it. The recovery calls the halt is supposed to permit —
+// `rollback_atomic_bundle` to release a pending bundle's bond, and the governance
+// path that clears the flag — are ordinary signed calls in the same tuple, so if
+// the gate does not exempt them the chain has no route back: no extrinsic can
+// enter a block, and every validator's pool refuses the halt's own remedy.
+//
+// These tests enter through the transaction-validity API the pool calls, because
+// that — not the dispatch layer — is what stops the chain.
+
+/// A signed extrinsic built exactly the way the runtime's clients build one.
+///
+/// The tuple order is consensus-critical, so this mirrors
+/// `node/src/rpc.rs`, `node/src/atomic_gateway.rs` and `crates/x3-runtime-signer`
+/// rather than approximating them.
+fn signed_xt(call: RuntimeCall, pair: &sp_core::sr25519::Pair, nonce: u32) -> UncheckedExtrinsic {
+    use sp_core::Pair as _;
+
+    let genesis_hash = System::block_hash(0);
+    let extra: SignedExtra = (
+        frame_system::CheckNonZeroSender::<Runtime>::new(),
+        frame_system::CheckSpecVersion::<Runtime>::new(),
+        frame_system::CheckTxVersion::<Runtime>::new(),
+        frame_system::CheckGenesis::<Runtime>::new(),
+        frame_system::CheckEra::<Runtime>::from(sp_runtime::generic::Era::Immortal),
+        frame_system::CheckNonce::<Runtime>::from(nonce),
+        frame_system::CheckWeight::<Runtime>::new(),
+        pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
+        pallet_x3_invariants::InvariantCheck::<Runtime>::new(),
+        Decode::decode(&mut &[][..]).expect("the agent-law extension decodes from empty bytes"),
+    );
+    let payload = SignedPayload::from_raw(
+        call.clone(),
+        extra.clone(),
+        (
+            (),
+            VERSION.spec_version,
+            VERSION.transaction_version,
+            genesis_hash,
+            genesis_hash,
+            (),
+            (),
+            (),
+            (),
+            (),
+        ),
+    );
+    let signature = Signature::from(pair.sign(payload.encode().as_slice()));
+    UncheckedExtrinsic::new_signed(call, Address::Id(account_from(pair)), signature, extra)
+}
+
+fn account_from(pair: &sp_core::sr25519::Pair) -> AccountId {
+    use sp_core::Pair as _;
+    use sp_runtime::traits::IdentifyAccount;
+    pair.public().into_account().into()
+}
+
+/// Ask the pool's own validity API what it thinks of `call`.
+fn pool_validity(
+    pair: &sp_core::sr25519::Pair,
+    call: RuntimeCall,
+) -> sp_runtime::transaction_validity::TransactionValidity {
+    let xt = signed_xt(call, pair, System::account_nonce(account_from(pair)));
+    // `Executive::validate_transaction` is what the runtime's
+    // `TaggedTransactionQueue` implementation calls, so this is the pool's own gate.
+    Executive::validate_transaction(
+        sp_runtime::transaction_validity::TransactionSource::External,
+        xt,
+        System::block_hash(0),
+    )
+}
+
+fn halt_test_ext() -> sp_io::TestExternalities {
+    use sp_core::Pair as _;
+    use sp_runtime::BuildStorage;
+
+    let who = account_from(&sp_core::sr25519::Pair::from_string("//Alice", None).unwrap());
+    let storage = RuntimeGenesisConfig {
+        balances: BalancesConfig {
+            balances: vec![(who, 10_000 * X3)],
+            dev_accounts: None,
+        },
+        ..Default::default()
+    }
+    .build_storage()
+    .expect("the halt test genesis must build");
+
+    let mut ext: sp_io::TestExternalities = storage.into();
+    ext.execute_with(|| {
+        System::set_block_number(1);
+    });
+    ext
+}
+
+/// A halted chain must keep the recovery path open.
+///
+/// Before this was fixed, the gate refused everything, so the halt's own remedy was
+/// unreachable: the bond of a pending bundle could not be released, and no extrinsic
+/// could clear the flag. That made `emergency_halt` a one-way door — a governance
+/// call that bricks the chain until a runtime upgrade.
+#[test]
+fn a_halted_chain_still_accepts_the_recovery_calls_that_release_funds() {
+    use sp_core::Pair as _;
+
+    let pair = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
+
+    halt_test_ext().execute_with(|| {
+        let remark = RuntimeCall::System(frame_system::Call::remark { remark: Vec::new() });
+
+        // Control: before the halt the same call shape is valid, so a later refusal
+        // is the halt and not a broken fixture.
+        assert!(
+            pool_validity(&pair, remark.clone()).is_ok(),
+            "the control call must be valid before the halt"
+        );
+
+        // Governance trips the halt through the kernel, exactly as it would on chain.
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_halt(
+            RuntimeOrigin::root()
+        ));
+        assert!(pallet_x3_invariants::Halted::<Runtime>::get());
+        assert!(pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+
+        let halted_code = Err(
+            sp_runtime::transaction_validity::TransactionValidityError::Invalid(
+                sp_runtime::transaction_validity::InvalidTransaction::Custom(
+                    pallet_x3_invariants::INVARIANT_HALT_CODE,
+                ),
+            ),
+        );
+
+        assert_eq!(
+            pool_validity(&pair, remark),
+            halted_code,
+            "a user call must be refused while halted"
+        );
+
+        // The calls the halt exists to leave open.
+        let rollback =
+            RuntimeCall::X3AtomicKernel(pallet_x3_atomic_kernel::Call::rollback_atomic_bundle {
+                bundle_id: H256::zero(),
+                reason: pallet_x3_atomic_kernel::BundleRollbackReason::SubmitterCancelled,
+            });
+        assert!(
+            pool_validity(&pair, rollback).is_ok(),
+            "the bond-releasing rollback must not be refused by the halt"
+        );
+
+        let clear = RuntimeCall::X3Invariants(pallet_x3_invariants::Call::clear_halted {});
+        assert!(
+            pool_validity(&pair, clear).is_ok(),
+            "the halt must have a reachable remedy"
+        );
+
+        // The remedy is governance-gated (`UpdateOrigin`/`SupplyGovernance` are
+        // `EnsureRootOrHalfCouncil`) and a mainnet-rc1 chain has no sudo, so the
+        // transaction that reaches it is a council motion. Those calls must be
+        // submittable too, or the remedy exists on paper only.
+        let motion = RuntimeCall::Council(pallet_collective::Call::propose {
+            threshold: 2,
+            proposal: Box::new(RuntimeCall::X3Invariants(
+                pallet_x3_invariants::Call::clear_halted {},
+            )),
+            length_bound: 1_000,
+        });
+        assert!(
+            pool_validity(&pair, motion).is_ok(),
+            "the council motion that carries the remedy must be submittable while halted"
+        );
+
+        let resume =
+            RuntimeCall::X3SupplyLedger(pallet_x3_supply_ledger::Call::resume_transfers {});
+        assert!(
+            pool_validity(&pair, resume).is_ok(),
+            "the economy freeze the same controller raised must be liftable"
+        );
+
+        // And the remedy does what it says when it runs. `Members(2, 2)` is the origin
+        // `Council::close` produces once two of two members have approved a motion.
+        let council_origin: RuntimeOrigin =
+            pallet_collective::RawOrigin::<AccountId, CouncilCollective>::Members(2, 2).into();
+        assert_ok!(pallet_x3_invariants::Pallet::<Runtime>::clear_halted(
+            council_origin.clone()
+        ));
+        assert_ok!(pallet_x3_supply_ledger::Pallet::<Runtime>::resume_transfers(council_origin));
+
+        assert!(!pallet_x3_invariants::Halted::<Runtime>::get());
+        assert!(!pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+        assert!(
+            pool_validity(
+                &pair,
+                RuntimeCall::System(frame_system::Call::remark { remark: Vec::new() })
+            )
+            .is_ok(),
+            "once the halt is cleared, normal traffic must be valid again"
+        );
+
+        // Negative control: below the council threshold the remedy is not reachable,
+        // so this is a governed recovery and not an open door.
+        pallet_x3_invariants::Halted::<Runtime>::put(true);
+        let minority: RuntimeOrigin =
+            pallet_collective::RawOrigin::<AccountId, CouncilCollective>::Members(0, 2).into();
+        assert!(
+            pallet_x3_invariants::Pallet::<Runtime>::clear_halted(minority).is_err(),
+            "a minority of the council must not be able to clear the halt"
+        );
+        assert!(
+            pallet_x3_invariants::Halted::<Runtime>::get(),
+            "the refusal must leave the halt in place"
+        );
+    });
+}
+
+/// A pallet wired into this runtime must charge something for its calls.
+///
+/// `impl WeightInfo for ()` returns `Weight::zero()` for every call, which drops the pallet out of
+/// block-weight accounting entirely: the weight-based limit never sees its dispatchables, so an
+/// attacker can pack blocks with them. Eighteen configs in this file were in that state until
+/// 2026-09-27 even though their pallets shipped non-zero, read/write-counted `SubstrateWeight`
+/// values. `scripts/check-runtime-weights-wired.py` holds the config line ("no `()` where weights
+/// are reachable", with a shrink-only exception list); this asserts the *runtime's own* choice
+/// returns real weight, so reverting one to `()` fails here with a number rather than with a grep.
+///
+/// Only pallets present in every feature set are named, so the test does not need a `cfg` of its own.
+#[test]
+fn a_wired_pallet_charges_more_than_nothing() {
+    use frame_support::weights::Weight;
+    use pallet_timestamp::weights::WeightInfo as _;
+    use pallet_x3_atomic_kernel::weights::WeightInfo as _;
+
+    fn assert_charged(label: &str, weight: Weight) {
+        assert!(
+            weight.ref_time() > 0 || weight.proof_size() > 0,
+            "{label} charges {weight:?} — a pallet wired to () charges Weight::zero() and its \
+             dispatchables are invisible to the block weight limit"
+        );
+    }
+
+    // Only pallets this runtime carries in *every* feature set, so the test needs no cfg of its own;
+    // x3-auction, x3-oracle and private-execution are `#[cfg(not(feature = "mainnet-rc1"))]` and are
+    // covered by the test below.
+    assert_charged(
+        "x3-atomic-kernel finalize_atomic_bundle",
+        <Runtime as pallet_x3_atomic_kernel::Config>::WeightInfo::finalize_atomic_bundle(),
+    );
+    assert_charged(
+        "timestamp set",
+        <Runtime as pallet_timestamp::Config>::WeightInfo::set(),
+    );
+}
+
+/// The same claim for the pallets the `mainnet-rc1` feature set removes from the runtime.
+#[cfg(not(feature = "mainnet-rc1"))]
+#[test]
+fn a_wired_rc1_excluded_pallet_charges_more_than_nothing() {
+    use pallet_x3_auction::weights::WeightInfo as _;
+
+    let weight = <Runtime as pallet_x3_auction::Config>::WeightInfo::create_auction();
+    assert!(
+        weight.ref_time() > 0 || weight.proof_size() > 0,
+        "x3-auction create_auction charges {weight:?} — a pallet wired to () charges Weight::zero()"
+    );
 }

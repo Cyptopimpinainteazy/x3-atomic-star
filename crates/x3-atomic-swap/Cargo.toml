@@ -33,3 +33,8 @@ required-features = ["std"]
 name = "x3-evm-broadcast"
 path = "src/bin/x3_evm_broadcast.rs"
 required-features = ["std"]
+
+[[bin]]
+name = "x3-finality-cert"
+path = "src/bin/x3_finality_cert.rs"
+required-features = ["std"]

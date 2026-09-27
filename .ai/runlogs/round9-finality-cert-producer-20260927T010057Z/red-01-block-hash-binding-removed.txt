@@ -1,0 +1,3 @@
+test finality_producer::tests::test_a_receipt_hash_that_is_not_the_block_at_that_height_is_refused ... FAILED
+thread 'finality_producer::tests::test_a_receipt_hash_that_is_not_the_block_at_that_height_is_refused' panicked at crates/x3-atomic-swap/src/finality_producer.rs:328:22:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 703 filtered out; finished in 0.00s

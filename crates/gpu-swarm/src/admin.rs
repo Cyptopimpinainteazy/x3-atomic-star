@@ -243,10 +243,7 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
             // Serve SPA
             if url == "/" && method == Method::Get {
                 let html = include_str!("../static/index.html");
-                let response = Response::from_string(html).with_header(
-                    Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..])
-                        .unwrap(),
-                );
+                let response = typed_response(html.to_string(), "text/html; charset=utf-8");
                 let _ = request.respond(response);
                 continue;
             }
@@ -267,9 +264,7 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
                     } else {
                         "text/plain"
                     };
-                    let response = Response::from_string(data).with_header(
-                        Header::from_bytes(&b"Content-Type"[..], ct.as_bytes()).unwrap(),
-                    );
+                    let response = typed_response(data, ct);
                     let _ = request.respond(response);
                     continue;
                 }
@@ -279,9 +274,7 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
             if url == "/api/state" && method == Method::Get {
                 let s = runtime_fetch_state(&state);
                 let body = serde_json::to_string(&s).unwrap_or_else(|_| "{}".to_string());
-                let response = Response::from_string(body).with_header(
-                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
-                );
+                let response = typed_response(body, "application/json");
                 let _ = request.respond(response);
                 continue;
             }
@@ -297,20 +290,14 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
                             // create a session token with expiry
                             let (session_id, expires) = create_session();
                             let body = serde_json::json!({"ok": true, "session": session_id, "expires": expires}).to_string();
-                            let response = Response::from_string(body).with_header(
-                                Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                                    .unwrap(),
-                            );
+                            let response = typed_response(body, "application/json");
                             let _ = request.respond(response);
                             continue;
                         }
                     }
                 }
-                let response = Response::from_string("{\"ok\":false}")
-                    .with_status_code(401)
-                    .with_header(
-                        Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
-                    );
+                let response = typed_response("{\"ok\":false}".to_string(), "application/json")
+                    .with_status_code(401);
                 let _ = request.respond(response);
                 continue;
             }
@@ -350,9 +337,7 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
                     "address": address,
                 })
                 .to_string();
-                let response = Response::from_string(response_body).with_header(
-                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
-                );
+                let response = typed_response(response_body, "application/json");
                 let _ = request.respond(response);
                 continue;
             }
@@ -377,13 +362,11 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
                 }
 
                 if !authorized {
-                    let response =
-                        Response::from_string("{\"ok\":false,\"error\":\"unauthorized\"}")
-                            .with_status_code(401)
-                            .with_header(
-                                Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                                    .unwrap(),
-                            );
+                    let response = typed_response(
+                        "{\"ok\":false,\"error\":\"unauthorized\"}".to_string(),
+                        "application/json",
+                    )
+                    .with_status_code(401);
                     let _ = request.respond(response);
                     continue;
                 }
@@ -408,15 +391,11 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
                     });
                     let body =
                         serde_json::to_string(&payload_clone).unwrap_or_else(|_| "{}".to_string());
-                    let response = Response::from_string(body).with_header(
-                        Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
-                    );
+                    let response = typed_response(body, "application/json");
                     let _ = request.respond(response);
                     continue;
                 } else {
-                    let response = Response::from_string("invalid json").with_header(
-                        Header::from_bytes(&b"Content-Type"[..], &b"text/plain"[..]).unwrap(),
-                    );
+                    let response = typed_response("invalid json".to_string(), "text/plain");
                     let _ = request.respond(response);
                     continue;
                 }
@@ -429,15 +408,33 @@ pub async fn run_admin(state: SharedState, listen_addr: SocketAddr) {
     });
 }
 
+/// Build a response with a `Content-Type`, or a 500 if the bytes are not valid HTTP header syntax.
+///
+/// `tiny_http::Header::from_bytes` is fallible, and the previous code called `.unwrap()` on it at
+/// ten sites in this file — inside a request loop that runs on the admin server's thread, so a
+/// failure would take that thread down rather than answer the request. Every call site here passes
+/// either a literal (`Content-Type`) or one of three content-type strings chosen by extension, so
+/// the error arm is unreachable *by construction*; it is written as a refusal anyway, because
+/// "unreachable" is the claim a panic makes and the response is what a client can act on.
+fn typed_response(body: String, content_type: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    match Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()) {
+        Ok(header) => Response::from_string(body).with_header(header),
+        Err(_) => Response::from_string("{\"error\":\"invalid content type\"}".to_string())
+            .with_status_code(500),
+    }
+}
+
 fn runtime_fetch_state(state: &SharedState) -> AdminState {
-    let rt = tokio::runtime::Builder::new_current_thread()
+    match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap();
-    rt.block_on(async {
-        let s = state.lock().await.clone();
-        s
-    })
+    {
+        Ok(rt) => rt.block_on(async { state.lock().await.clone() }),
+        // A current-thread runtime fails to build only when the process cannot spawn it. Reading the
+        // admin state is not worth panicking inside a request handler; the caller renders the
+        // default view, which says "no data" rather than taking the server down.
+        Err(_) => AdminState::default(),
+    }
 }
 
 /// Simple prototype mnemonic generator: picks 12 words from a built-in small wordlist.

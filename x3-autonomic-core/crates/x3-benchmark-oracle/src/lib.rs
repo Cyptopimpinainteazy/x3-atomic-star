@@ -1,16 +1,22 @@
 //! X3 Benchmark Oracle
-//! 
+//!
 //! Performance benchmark oracle that tracks and reports system performance metrics
 //! for the X3 Autonomic Core.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// Off-chain tooling: no `std` feature is declared here, so the `no_std` attribute this crate
+// carried made it permanently no_std while the code uses `Vec`, `String` and `format!`. It
+// never compiled. Off-chain tooling is std.
 
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use x3_autonomic_types::{AutonomyLevel, HealthStatus, PerformanceMetrics};
 
 /// Configuration for the benchmark oracle
-#[derive(Debug, Clone, Encode, Decode, TypeInfo)]
+// Off-chain oracle configuration. `threshold_multiplier` is an `f64`, and SCALE has no float
+// representation (`scale-info` has no `TypeInfo` for it), so this carried derives it could never
+// satisfy — the crate has not compiled since it was written. The oracle is off-chain tooling;
+// the config is serde JSON, not a chain type.
+#[derive(Debug, Clone)]
 pub struct BenchmarkConfig {
     /// Sampling interval in milliseconds
     pub sampling_interval_ms: u64,

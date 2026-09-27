@@ -99,7 +99,11 @@ pub struct OpcodeCost {
 /// transaction needs — and a limit one unit under is a transaction that runs out of gas rather than
 /// one that is provisioned for 25% more. A *limit* rounds up, which is the rule a fee ceiling and a
 /// compensation share in this repository already follow (TICKET-094).
-fn gas_limit_with_margin(total_gas: u64) -> u64 {
+/// The gas limit a caller should attach to a transaction estimated at `total_gas`.
+///
+/// Public because the node's runtime-backed estimators (`x3_estimateGas`,
+/// `eth_estimateGas`) answer with the same margin rule rather than inventing a second one.
+pub fn gas_limit_with_margin(total_gas: u64) -> u64 {
     total_gas.saturating_add(total_gas.div_ceil(4))
 }
 
@@ -340,14 +344,17 @@ impl GasEstimationRPC {
                 MAX_CALLDATA_LEN
             ));
         }
-        let est = self.estimator.estimate_gas(tx);
-
-        if matches!(est.status, ExecutionStatus::Success) {
-            // Deterministic simulation output: echo calldata as the synthetic return.
-            Ok(tx.data.clone())
-        } else {
-            Err("Call reverted".to_string())
-        }
+        // **Refused, not fabricated.** This returned `Ok(tx.data.clone())`: the caller's own
+        // calldata, echoed back as the output of a read-only call, with an execution status of
+        // `Success`. A wallet reading a contract value through it would read its own question.
+        // A read-only call has to execute the EVM, and this crate has no client and no
+        // dry-run: the node serves `eth_call` (and now `x3_call`) through
+        // `AtlasKernelRuntimeApi::call_evm`, which is the only implementation that answers.
+        Err(
+            "a read-only EVM call is not implemented here: this crate has no execution backend; \
+             the node answers eth_call and x3_call through the runtime's call_evm"
+                .to_string(),
+        )
     }
 
     /// Internal simulation-only base fee hint.
@@ -523,20 +530,30 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// The test this replaces asserted `Ok` for `call` and would pass with the calldata echo:
+    /// `assert!(result.is_ok())` cannot tell an execution from an echo. The rule now is the
+    /// opposite — this crate has no execution backend, so it must refuse and say where the real
+    /// implementation is.
     #[test]
-    fn test_rpc_call_simulation() {
+    fn a_read_only_call_is_refused_without_an_execution_backend() {
         let rpc = GasEstimationRPC::new();
         let tx = RPCTransaction {
             from: "0xabc".to_string(),
             to: Some("0xdef".to_string()),
             value: 0,
-            data: vec![],
+            data: vec![0xde, 0xad, 0xbe, 0xef],
             gas_price: 20_000_000_000,
             max_fee_per_gas: None,
         };
 
-        let result = rpc.call(&tx);
-        assert!(result.is_ok());
+        let error = rpc
+            .call(&tx)
+            .expect_err("a call with no execution backend must be refused");
+        assert!(error.contains("not implemented here"), "{error}");
+        assert!(
+            error.contains("call_evm"),
+            "the refusal must name the real implementation: {error}"
+        );
     }
 
     #[test]

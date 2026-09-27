@@ -27,7 +27,7 @@ pub fn setup_tracing() -> Result<(), Box<dyn Error>> {
         )
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".parse().unwrap()),
+                .map_or_else(|_| tracing_subscriber::EnvFilter::default(), |f| f),
         )
         .init();
 

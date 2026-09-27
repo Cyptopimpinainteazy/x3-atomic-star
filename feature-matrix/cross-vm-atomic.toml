@@ -290,18 +290,30 @@ name = "X3 → EVM route"
 subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
-implemented = 92
-tested = 82
-mainnet_ready = 82
+implemented = 94
+tested = 89
+mainnet_ready = 85
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["External boundary proof remains separate"]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
+blockers = [
+  "External boundary proof remains separate",
+  "**2026-09-27 — `xvm_transfer` was unusable below `ED * 10_000 / bps` and the error blamed the payer.** The routing fee is `amount * RoutingFeeBps / 10_000` (2_000 on a 1_000_000 transfer at `XvmRoutingFeeBps = 20`), and the currency refuses any deposit that would leave the *destination* below the existential deposit (`pallet-balances` `can_deposit` → `BelowMinimum`; the SDK checkout is `substrate/frame/balances/src/impl_fungible.rs`). The protocol treasury account has never existed on a dev/local chain — the runtime's own transaction fees do not go to it — so every transfer whose fee is below `ExistentialDeposit = 100 * MICRO_ATLAS` was refused with `RoutingFeeNotAffordable`. Measured on `local3`: the signing gateway held 999_999_999_900_043_000 with `frozen = 0` and no locks, the fee was 2_000, the treasury had no `System::Account` key at all, and `xvm_transfer` failed. The message was about the *payer* for a refusal by the *destination*, so topping the payer up could never fix it. The pallet's own suite could not see it: the mock wired `RoutingFeeBps = 0`, so the branch never ran.",
+  "**CLOSED 2026-09-27 — a fee the treasury cannot accept is waived, not fatal.** `do_initiate_transfer` now asks the payer's own balance which side refused: if the funds are there, the refusal is the destination's and the fee is waived with its own `XvmRoutingFeeWaived` event (a waived fee is uncollected revenue and has to be visible, not silent); if they are not, `RoutingFeeNotAffordable` stands unchanged. `RoutingFeeBps` and `ExistentialDeposit` are storage-backed in the mock so all three branches are reachable: `a_fee_the_treasury_cannot_accept_is_waived_rather_than_failing_the_transfer`, `a_fee_the_treasury_can_accept_is_collected`, `a_payer_that_cannot_cover_the_fee_is_still_refused`. Break-it-first measured: `Err(_) if payer_covers_it` → `Err(_) if false && payer_covers_it` reddens exactly the waiver test (at `do_xvm`'s `xvm_transfer` expect) and leaves the other two green; restoring byte-identically returns 85/85.",
+  "Still open on this row, and why `mainnet_ready` stops at 85: the waiver means protocol revenue is not accrued whenever the treasury cannot take a dust fee, and nobody has decided whether the operator should instead be required to keep the treasury funded (a documented operational requirement) or the fee should round up to the deposit floor. The pallet-level proof is three tests in `pallets/x3-cross-vm-router/src/tests.rs`; the live half is `node/tests/supply_invariant_distributed.rs`, which drives the same call through a three-validator chain and was being re-run when this row was measured.",
+]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests", "note: 2026-09-27 — the fee branch's three outcomes are now named tests, and the branch is reachable because the mock's `RoutingFeeBps`/`ExistentialDeposit` are storage-backed"]
+required_tests = [
+  "a_fee_the_treasury_cannot_accept_is_waived_rather_than_failing_the_transfer",
+  "a_fee_the_treasury_can_accept_is_collected",
+  "a_payer_that_cannot_cover_the_fee_is_still_refused",
+  "test_x3_native_evm_svm_roundtrip_preserves_supply",
+]
 test_evidence = [
   "note: named tests, measured 2026-09-26 — node/tests/x3vm_evm_live.rs runs real_x3vm_evm_lock_claim_atomic_lifecycle, real_x3vm_evm_timeout_refund_atomic_lifecycle, real_evm_header_attestation_populates_the_verifiers_anchor, real_evm_receipt_proof_is_accepted_against_the_attested_header, real_evm_a_claim_with_the_wrong_secret_is_refused, real_evm_a_second_claim_on_the_same_lock_is_refused and real_evm_an_early_refund_is_refused_and_succeeds_once_expired against anvil with a deployed AtlasHTLC and a real local X3 node; scripts/cross-domain-evm-gate.sh runs all seven (gate `cross-domain EVM`, PASS 224s) and the same gate with X3_STRICT_CROSS_DOMAIN_PROOFS=1 (PASS 334s)",
   "note: the contract-level half is X3-contracts/evm/test-live-lifecycle.sh (gate `EVM contract lifecycle`, 11 passed / 0 failed — double-claim rejected, premature refund rejected, wrong-authority refund rejected); it calls the contract directly, while the node-level tests above are the same refusals through the executor the product path uses",
+  "note: `cargo test -p pallet-x3-cross-vm-router` — 85 passed, 0 failed (2026-09-27), including the three fee-branch tests; `cargo clippy -p pallet-x3-cross-vm-router --all-targets -- -D warnings` clean",
 ]
 
 [[feature]]
@@ -361,13 +373,16 @@ subsystem = "cross_vm_atomic"
 source = "master"
 paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
 implemented = 95
-tested = 90
+tested = 93
 mainnet_ready = 90
 priority = "P1"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Operational governance activation process still required"]
+blockers = [
+  "**CLOSED 2026-09-26 — the root-registration path asks a verifier, not a byte count.** `register_external_root` did `ensure!(!proof.is_empty())` under a comment saying a production version \"would verify SPV proofs, Merkle roots, etc.\", and then wrote the caller's `root_hash` into `BridgeRoots`, where the bridge surface reads it as the state of a foreign chain — a well-formed byte string treated as a proof, the same class as the settlement verifier's fabricated acceptance and worse in consequence. It now calls `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so no root can be established at all until a per-chain light client exists; the refusal is its own error (`ExternalRootVerificationUnavailable`), distinct from the scope-freeze (`ExternalBridgesDisabled`, checked earlier) and from the data-shape `InvalidProof` it replaced. Pinned by `an_external_root_cannot_be_registered_without_a_verifier` (an enabled bridge surface, a 64-byte proof, `BridgeRoots` still untouched) and by `register_external_root_works_only_after_governance_enables`, whose second half now asserts the verifier's refusal where it used to assert a raw `vec![1u8; 8]` was accepted. Load-bearing, measured: restoring the byte-count check turns the first test red on the error variant, then the file was restored byte-identically.",
+  "Operational governance activation process still required",
+]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: ExternalBridgesEnabled defaults false and is dispatch-gated"]
 required_tests = [
   "external_bridges_are_paused_at_genesis",

@@ -150,6 +150,22 @@ try-runtime = [
 # The live tests compile real `.x3` source with the same bridge the node uses, so a
 # program under test is an artifact the compiler produced rather than a fixture.
 x3-x3-integration = { path = "../crates/x3-integration", features = ["std", "compile"] }
+# The live state half assembles a real X3BC module with the envelope writer the compiler uses
+# (`BytecodeModule`), so the module the node runs has a real checksum rather than a hand-rolled
+# header. The `.x3` front end cannot emit `evm_sstore` yet, which is why it is assembled here.
+x3-backend = { path = "../crates/x3-backend", features = ["std"] }
+# `supply_invariant_distributed` reads `System::Account` back out of chain state, so it decodes the
+# runtime's real `frame_system::AccountInfo<Nonce, pallet_balances::AccountData<Balance>>` instead
+# of a hand-copied byte layout. Same crate the runtime already links.
+pallet-balances = { workspace = true, features = ["std"] }
+# The per-asset half of `supply_invariant_distributed` decodes the pallet's own
+# `SupplyLedger` out of `AtlasKernelRuntimeApi_get_asset_supply_ledger`, so it names the
+# ledger's type rather than a hand-copied field order. Same crate the runtime already links.
+x3-asset-kernel-types = { path = "../crates/x3-asset-kernel-types", features = ["std"] }
+# The per-asset half also *creates* the record it checks (`X3TokenFactory::create_token`, the
+# only signed path that gives the supply ledger an asset), so the test names the pallet's own
+# `TokenFactoryConfig` rather than restating its fields.
+pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false, features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 tempfile = { workspace = true }
 # The producer: this test boots an anvil, has the relayer build the receipt

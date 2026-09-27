@@ -39,6 +39,13 @@ x3-svm-integration = { path = "../../crates/svm-integration", default-features =
 x3-x3-integration = { path = "../../crates/x3-integration", default-features = false }
 x3-cross-vm-bridge = { path = "../../crates/cross-vm-bridge", default-features = false }
 x3-packet-schema = { path = "../../crates/x3-packet-schema", default-features = false }
+# The per-asset supply ledger's own type, so the runtime API below returns the shape the
+# ledger stores instead of a tuple whose field order callers have to remember.
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
+# The X3BC header's shared definition (`MAGIC`, the feature word, the private-submission bit). The
+# intake check below reads the artifact's own feature word, and it has to be the *same* definition
+# the two decoders use, not a second opinion about the header's layout.
+x3-common = { path = "../../crates/x3-common", default-features = false }
 
 [features]
 default = ["std"]
@@ -55,6 +62,7 @@ std = [
     "sp-core/std",
     "sp-io/std",
     "sp-runtime/std",
+    "x3-asset-kernel-types/std",
     "serde/std",
     "minicbor/std",
     "hex/std",
@@ -64,6 +72,7 @@ std = [
     "x3-x3-integration/std",
     "x3-cross-vm-bridge/std",
     "x3-packet-schema/std",
+    "x3-common/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking",
@@ -86,3 +95,7 @@ proptest = "1.4"
 # pulls the compiler in, and the kernel never compiles source — it executes artifacts. The route test
 # below needs it to produce the artifact the production adapter is then driven with (X3-LANG-004).
 x3-x3-integration = { path = "../../crates/x3-integration", default-features = false, features = ["std", "compile"] }
+# Envelope writer for hand-assembled X3BC fixtures. The X3VM slot-channel test needs a module whose
+# `main` performs a real `evm_sstore`, which the `.x3` compiler cannot emit yet, so the test builds
+# the module with the writer the compiler itself uses rather than embedding opaque bytes.
+x3-backend = { path = "../../crates/x3-backend" }
