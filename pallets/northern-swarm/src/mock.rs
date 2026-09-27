@@ -15,6 +15,9 @@ construct_runtime!(
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
     type Block = Block;
+    // Without this the derived default is `()`, so every `deposit_event` is
+    // discarded and no test can assert on the pallet's events.
+    type RuntimeEvent = RuntimeEvent;
     type AccountData = pallet_balances::AccountData<u64>;
 }
 
@@ -60,7 +63,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .assimilate_storage(&mut storage)
     .expect("balances genesis builds");
 
-    storage.into()
+    let mut ext: sp_io::TestExternalities = storage.into();
+    // `frame_system::Pallet::deposit_event` deliberately drops every event at
+    // block zero ("don't populate events on genesis"). Start at block 1 so the
+    // pallet's events are observable in tests.
+    ext.execute_with(|| System::set_block_number(1));
+    ext
 }
 
 pub fn hardware() -> crate::HardwareProfile {

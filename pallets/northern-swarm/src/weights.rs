@@ -62,6 +62,7 @@ pub trait WeightInfo {
 	fn claim_task() -> Weight;
 	fn submit_result() -> Weight;
 	fn slash_executor() -> Weight;
+	fn resolve_disputed_task() -> Weight;
 }
 
 /// Weights for `pallet_northern_swarm` using the Substrate node and recommended hardware.
@@ -73,8 +74,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `142`
 		//  Estimated: `3567`
-		// Minimum execution time: 82_935_000 picoseconds.
-		Weight::from_parts(90_536_000, 3567)
+		// Minimum execution time: 84_273_000 picoseconds.
+		Weight::from_parts(102_526_000, 3567)
 			.saturating_add(T::DbWeight::get().reads(1_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -86,8 +87,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `267`
 		//  Estimated: `3567`
-		// Minimum execution time: 87_464_000 picoseconds.
-		Weight::from_parts(96_349_000, 3567)
+		// Minimum execution time: 48_400_000 picoseconds.
+		Weight::from_parts(68_793_000, 3567)
 			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -97,8 +98,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `271`
 		//  Estimated: `3567`
-		// Minimum execution time: 87_568_000 picoseconds.
-		Weight::from_parts(161_341_000, 3567)
+		// Minimum execution time: 82_136_000 picoseconds.
+		Weight::from_parts(128_636_000, 3567)
 			.saturating_add(T::DbWeight::get().reads(1_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -108,8 +109,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `267`
 		//  Estimated: `3567`
-		// Minimum execution time: 81_476_000 picoseconds.
-		Weight::from_parts(89_882_000, 3567)
+		// Minimum execution time: 48_529_000 picoseconds.
+		Weight::from_parts(49_926_000, 3567)
 			.saturating_add(T::DbWeight::get().reads(1_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -119,8 +120,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 128_321_000 picoseconds.
-		Weight::from_parts(156_178_000, 0)
+		// Minimum execution time: 70_197_000 picoseconds.
+		Weight::from_parts(94_451_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 	/// Storage: `NorthernSwarm::Executors` (r:1 w:0)
@@ -137,8 +138,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `421`
 		//  Estimated: `4149`
-		// Minimum execution time: 136_249_000 picoseconds.
-		Weight::from_parts(164_045_000, 4149)
+		// Minimum execution time: 89_700_000 picoseconds.
+		Weight::from_parts(111_693_000, 4149)
 			.saturating_add(T::DbWeight::get().reads(5_u64))
 			.saturating_add(T::DbWeight::get().writes(4_u64))
 	}
@@ -158,8 +159,8 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `1043`
 		//  Estimated: `11402`
-		// Minimum execution time: 216_932_000 picoseconds.
-		Weight::from_parts(271_228_000, 11402)
+		// Minimum execution time: 249_612_000 picoseconds.
+		Weight::from_parts(427_016_000, 11402)
 			.saturating_add(T::DbWeight::get().reads(9_u64))
 			.saturating_add(T::DbWeight::get().writes(5_u64))
 	}
@@ -171,8 +172,21 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `407`
 		//  Estimated: `3593`
-		// Minimum execution time: 93_946_000 picoseconds.
-		Weight::from_parts(109_133_000, 3593)
+		// Minimum execution time: 102_908_000 picoseconds.
+		Weight::from_parts(104_609_000, 3593)
+			.saturating_add(T::DbWeight::get().reads(2_u64))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
+	/// Storage: `NorthernSwarm::Tasks` (r:1 w:1)
+	/// Proof: `NorthernSwarm::Tasks` (`max_values`: None, `max_size`: Some(684), added: 3159, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
+	fn resolve_disputed_task() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `548`
+		//  Estimated: `4149`
+		// Minimum execution time: 92_667_000 picoseconds.
+		Weight::from_parts(96_270_000, 4149)
 			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
@@ -186,8 +200,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `142`
 		//  Estimated: `3567`
-		// Minimum execution time: 82_935_000 picoseconds.
-		Weight::from_parts(90_536_000, 3567)
+		// Minimum execution time: 84_273_000 picoseconds.
+		Weight::from_parts(102_526_000, 3567)
 			.saturating_add(RocksDbWeight::get().reads(1_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
@@ -199,8 +213,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `267`
 		//  Estimated: `3567`
-		// Minimum execution time: 87_464_000 picoseconds.
-		Weight::from_parts(96_349_000, 3567)
+		// Minimum execution time: 48_400_000 picoseconds.
+		Weight::from_parts(68_793_000, 3567)
 			.saturating_add(RocksDbWeight::get().reads(2_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
@@ -210,8 +224,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `271`
 		//  Estimated: `3567`
-		// Minimum execution time: 87_568_000 picoseconds.
-		Weight::from_parts(161_341_000, 3567)
+		// Minimum execution time: 82_136_000 picoseconds.
+		Weight::from_parts(128_636_000, 3567)
 			.saturating_add(RocksDbWeight::get().reads(1_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
@@ -221,8 +235,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `267`
 		//  Estimated: `3567`
-		// Minimum execution time: 81_476_000 picoseconds.
-		Weight::from_parts(89_882_000, 3567)
+		// Minimum execution time: 48_529_000 picoseconds.
+		Weight::from_parts(49_926_000, 3567)
 			.saturating_add(RocksDbWeight::get().reads(1_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
@@ -232,8 +246,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 128_321_000 picoseconds.
-		Weight::from_parts(156_178_000, 0)
+		// Minimum execution time: 70_197_000 picoseconds.
+		Weight::from_parts(94_451_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 	/// Storage: `NorthernSwarm::Executors` (r:1 w:0)
@@ -250,8 +264,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `421`
 		//  Estimated: `4149`
-		// Minimum execution time: 136_249_000 picoseconds.
-		Weight::from_parts(164_045_000, 4149)
+		// Minimum execution time: 89_700_000 picoseconds.
+		Weight::from_parts(111_693_000, 4149)
 			.saturating_add(RocksDbWeight::get().reads(5_u64))
 			.saturating_add(RocksDbWeight::get().writes(4_u64))
 	}
@@ -271,8 +285,8 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `1043`
 		//  Estimated: `11402`
-		// Minimum execution time: 216_932_000 picoseconds.
-		Weight::from_parts(271_228_000, 11402)
+		// Minimum execution time: 249_612_000 picoseconds.
+		Weight::from_parts(427_016_000, 11402)
 			.saturating_add(RocksDbWeight::get().reads(9_u64))
 			.saturating_add(RocksDbWeight::get().writes(5_u64))
 	}
@@ -284,8 +298,21 @@ impl WeightInfo for () {
 		// Proof Size summary in bytes:
 		//  Measured:  `407`
 		//  Estimated: `3593`
-		// Minimum execution time: 93_946_000 picoseconds.
-		Weight::from_parts(109_133_000, 3593)
+		// Minimum execution time: 102_908_000 picoseconds.
+		Weight::from_parts(104_609_000, 3593)
+			.saturating_add(RocksDbWeight::get().reads(2_u64))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	/// Storage: `NorthernSwarm::Tasks` (r:1 w:1)
+	/// Proof: `NorthernSwarm::Tasks` (`max_values`: None, `max_size`: Some(684), added: 3159, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
+	fn resolve_disputed_task() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `548`
+		//  Estimated: `4149`
+		// Minimum execution time: 92_667_000 picoseconds.
+		Weight::from_parts(96_270_000, 4149)
 			.saturating_add(RocksDbWeight::get().reads(2_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}

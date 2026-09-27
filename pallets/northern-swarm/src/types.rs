@@ -80,7 +80,16 @@ pub struct TaskRecord<AccountId, Balance, BlockNumber, Hash> {
 
 /// Task lifecycle state.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum TaskStatus {
@@ -90,6 +99,10 @@ pub enum TaskStatus {
     Finalised,
     Disputed,
     Expired,
+    /// A disputed task whose reserved reward has been returned to the
+    /// submitter. Terminal: a disputed task has no winner, so the only
+    /// possible settlement is the submitter's bond coming back out of reserve.
+    Refunded,
 }
 
 /// Reason for a slash event.

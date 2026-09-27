@@ -204,6 +204,10 @@ def check_pallet_contract() -> None:
         "quorum_requires_matching_results",
         "task_reward_moves_reserved_balance_to_winner",
         "task_reward_preserves_total_issuance",
+        # A disputed task must not strand the submitter's bond.
+        "full_nonmatching_commit_set_enters_dispute_without_payout",
+        "resolve_disputed_task_refunds_submitter_and_preserves_issuance",
+        "resolve_disputed_task_cannot_be_replayed",
     )
     test_sources = ""
     for rel in ("pallets/northern-swarm/src/tests.rs", "pallets/northern-swarm/src/lib.rs"):
@@ -215,6 +219,20 @@ def check_pallet_contract() -> None:
             fail(f"missing required pallet behavior test: {test_name}")
         else:
             ok(f"pallet behavior test exists: {test_name}")
+
+    # A disputed task must have an on-chain refund path, wired with a
+    # benchmark-derived weight and a deposit so the settlement is observable.
+    if not re.search(r"pub fn resolve_disputed_task\s*\(", pallet):
+        fail(
+            "a disputed task has no refund extrinsic; the submitter's reserved "
+            "bond would be stranded"
+        )
+    elif "T::WeightInfo::resolve_disputed_task()" not in pallet:
+        fail("resolve_disputed_task is not wired to a WeightInfo weight")
+    elif "DisputedTaskRefunded" not in pallet:
+        fail("resolve_disputed_task emits no DisputedTaskRefunded event")
+    else:
+        ok("a disputed task has a weight-priced refund path with an event")
 
 
 def check_chain_executor_contract() -> None:

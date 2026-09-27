@@ -32,6 +32,7 @@
 //! | `submit_task`         | Any        | Post a new task; locks task bond         |
 //! | `claim_task`          | Executor   | Claim exclusive execution rights        |
 //! | `submit_result`       | Executor   | Commit result hash for claimed task      |
+//! | `resolve_disputed_task` | Any      | Refund a disputed task's reserved reward |
 //! | `slash_executor`      | Root/sudo  | Slash a misbehaving executor             |
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -164,8 +165,7 @@ pub mod pallet {
     /// Number of distinct claim slots consumed for a task.
     #[pallet::storage]
     #[pallet::getter(fn task_claim_slots)]
-    pub type TaskClaimSlots<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::Hash, u32, ValueQuery>;
+    pub type TaskClaimSlots<T: Config> = StorageMap<_, Blake2_128Concat, T::Hash, u32, ValueQuery>;
 
     /// Number of tasks claimed per executor (enforces MaxClaimedTasksPerExecutor).
     #[pallet::storage]
@@ -214,6 +214,12 @@ pub mod pallet {
         },
         /// Every available result slot was consumed without a matching quorum.
         TaskDisputed { task_id: T::Hash },
+        /// A disputed task's reserved reward was returned to its submitter.
+        DisputedTaskRefunded {
+            task_id: T::Hash,
+            submitter: T::AccountId,
+            amount: BalanceOf<T>,
+        },
         /// An executor was slashed for misbehaviour.
         ExecutorSlashed {
             executor: T::AccountId,
@@ -271,6 +277,8 @@ pub mod pallet {
         InvalidQuorumConfig,
         /// Reserved reward could not be moved completely to a winning executor.
         RewardSettlementFailed,
+        /// Task is not in a disputed state, so it has no reward to refund.
+        TaskNotDisputed,
     }
 
     // -----------------------------------------------------------------------
@@ -541,7 +549,10 @@ pub mod pallet {
             Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
                 let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
                 ensure!(
-                    matches!(task.status, TaskStatus::Claimed | TaskStatus::ResultCommitted),
+                    matches!(
+                        task.status,
+                        TaskStatus::Claimed | TaskStatus::ResultCommitted
+                    ),
                     Error::<T>::TaskNotClaimable,
                 );
                 task.status = TaskStatus::ResultCommitted;
@@ -579,6 +590,54 @@ pub mod pallet {
                 Self::deposit_event(Event::TaskDisputed { task_id });
             }
 
+            Ok(())
+        }
+
+        /// Resolve a disputed task by returning the submitter's reserved reward.
+        ///
+        /// When a task fills every executor slot with non-matching result
+        /// hashes, no witness can be shown wrong from hashes alone, so the
+        /// executors' stakes stay intact — but the submitter's bond must not be
+        /// stranded in reserve forever. This refunds the full reserved reward
+        /// and moves the task to [`TaskStatus::Refunded`].
+        ///
+        /// Permissionless by design: the call can only ever move the
+        /// submitter's own reserved funds back to the submitter, so gating it on
+        /// governance would itself be a way to strand funds. A task can only be
+        /// refunded once; the state transition to `Refunded` makes a second
+        /// attempt fail with [`Error::TaskNotDisputed`].
+        ///
+        /// Emits [`Event::DisputedTaskRefunded`].
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::resolve_disputed_task())]
+        pub fn resolve_disputed_task(origin: OriginFor<T>, task_id: T::Hash) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+
+            let mut task = Tasks::<T>::get(task_id).ok_or(Error::<T>::TaskNotFound)?;
+            ensure!(
+                task.status == TaskStatus::Disputed,
+                Error::<T>::TaskNotDisputed,
+            );
+
+            // No quorum ever formed, so `task.reward` is exactly what is still
+            // reserved for this task. Refund it in full and zero the record so a
+            // replayed call cannot move anything even if the status guard is
+            // ever weakened.
+            let refund = task.reward;
+            task.reward = Zero::zero();
+            task.status = TaskStatus::Refunded;
+            let submitter = task.submitter.clone();
+            Tasks::<T>::insert(task_id, &task);
+
+            if !refund.is_zero() {
+                T::Currency::unreserve(&submitter, refund);
+            }
+
+            Self::deposit_event(Event::DisputedTaskRefunded {
+                task_id,
+                submitter,
+                amount: refund,
+            });
             Ok(())
         }
 
@@ -669,8 +728,9 @@ pub mod pallet {
         }
 
         fn clear_remaining_claims(task_id: T::Hash) {
-            let claimants: Vec<T::AccountId> =
-                TaskClaims::<T>::iter_prefix(task_id).map(|(account, ())| account).collect();
+            let claimants: Vec<T::AccountId> = TaskClaims::<T>::iter_prefix(task_id)
+                .map(|(account, ())| account)
+                .collect();
             for account in claimants {
                 TaskClaims::<T>::remove(task_id, &account);
                 ClaimedTaskCount::<T>::mutate(&account, |c| *c = c.saturating_sub(1));

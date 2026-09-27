@@ -63,7 +63,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 61,
+      "composite": 63,
       "confidence": "high",
       "evidence": [
         "crates/x3-swarm-core",
@@ -72,25 +72,26 @@
         "note: `mainnet_ready` is deliberately unchanged at 35. The row's first blocker (the crate is absent from the runtime dependency graph and its own service does not call the scheduler) is untouched by this change, and a boundary enforced in a crate nothing calls is still not load-bearing in production."
       ],
       "id": "X3-AGENT-003",
-      "implemented": 74,
+      "implemented": 78,
       "launch_scope": "dev_tooling",
       "live_tested": "GUARDED_TESTNET",
       "mainnet_ready": 35,
       "missing_work": [
         "Re-measured 2026-09-26: the sanction ladder was real and tested, but it reached only one of the two dispatch surfaces. `SpawnGuard` consults the genesis record, so a killed agent cannot spawn a child \u2014 but the scheduler's only route to work was `next_task(AgentKind)`, which compared the agent's class and never asked the authority anything. Measured: with `Sanction::Kill` on record and a pending task queued, the killed agent was handed the task. Closed: `SwarmAuthority::may_dispatch` (no genesis record / terminated / expired / quarantined / suspended / killed -> `DispatchRefusal`) is now called by `SwarmScheduler::next_task_for`, which is the only public route to a task; `next_task` is gone, so a caller cannot bypass it. An unregistered agent is refused too \u2014 the dispatcher fails closed on an identity it cannot check rather than reading 'no record' as 'no violations'.",
-        "The crate is still not on the deployed path: `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, and its own service (`crates/x3-swarm-core/services/x3-swarm-api`) does not call the scheduler at all. A kill switch that stops a dispatch nothing performs is enforced but not yet load-bearing in production \u2014 that is the same gap as REG-x3_swarm_core-1, not something this change closes.",
+        "Re-measured 2026-09-27: the crate is still not on the deployed path \u2014 `crates/x3-swarm-core` is excluded from the root workspace and absent from the runtime dependency graph, so the control plane is enforced but not load-bearing for the deployed chain (the same gap as REG-x3_swarm_core-1). Closed in this change: the 'its own service does not call the scheduler' half. `services/x3-swarm-api` now holds every task in `x3_swarm_core::SwarmScheduler` instead of a private `BTreeMap`, so create/start/complete/fail/approve/reject are transitions on one scheduler, and the two stale, never-compiled service copies under `crates/x3-swarm-core/services/` were deleted rather than left as a second, disagreeing lifecycle.",
         "Sanctions escalate only; there is no governance reset path, so an agent that reaches Kill is permanently gone. That is intentional per AGENT_LAW \u00a73, but it has never been exercised on a live multi-agent run, and there is still no race-condition or partition-tolerance testing for the control plane."
       ],
       "name": "Agent kill-switch concept",
       "paths": [
-        "crates/x3-swarm-core"
+        "crates/x3-swarm-core",
+        "services/x3-swarm-api"
       ],
       "priority": "P3",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "agents_experimental",
-      "tested": 84,
+      "tested": 88,
       "tests": "6 named tests in FEATURE_REGISTRY"
     },
     {
@@ -4687,22 +4688,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 50,
+      "composite": 54,
       "confidence": "medium",
       "evidence": [
         "pallets/northern-swarm/src/lib.rs",
         "pallets/northern-swarm/src/weights.rs",
         "runtime/src/lib.rs",
-        "note: measured 2026-09-27 on the committed bytes - `cargo test -p pallet-northern-swarm --all-targets` 7 passed / 0 failed / 0 ignored; `cargo test -p pallet-northern-swarm --features runtime-benchmarks` compiles the benchmark suite",
-        "note: the Merkle-free correctness argument is `finalise_with_quorum`'s `ensure!(winner_count >= QuorumThreshold)` plus `repatriate_reserved(..., BalanceStatus::Free)` with `ensure!(remaining.is_zero())`, so a share that cannot be moved fails the whole call instead of paying part of the set"
+        "note: measured 2026-09-27 on the committed bytes - `cargo test -p pallet-northern-swarm --all-targets` 10 passed / 0 failed / 0 ignored; `cargo test -p pallet-northern-swarm --features runtime-benchmarks` 19 passed / 0 failed (including `bench_resolve_disputed_task`); `cargo clippy -p pallet-northern-swarm --all-targets -- -D warnings` clean",
+        "note: the Merkle-free correctness argument is `finalise_with_quorum`'s `ensure!(winner_count >= QuorumThreshold)` plus `repatriate_reserved(..., BalanceStatus::Free)` with `ensure!(remaining.is_zero())`, so a share that cannot be moved fails the whole call instead of paying part of the set",
+        "note: `swarm_reactor_gate.py` now requires the three dispute/refund test names and the `resolve_disputed_task` extrinsic with a `WeightInfo` weight and a `DisputedTaskRefunded` event, so removing the path reddens the release gate rather than only the unit suite"
       ],
       "id": "X3-SWARM-001",
-      "implemented": 78,
+      "implemented": 82,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 12,
+      "mainnet_ready": 15,
       "missing_work": [
-        "A `TaskStatus::Disputed` task has no resolution path. When every claim slot is filled and no set of commits matches, `submit_result` marks the task `Disputed`, clears the remaining claims and pays nobody \u2014 but the submitter's reserved reward is never refunded and no stake is touched. `SlashReason::QuorumMismatch` exists as a variant and no code path constructs it; `slash_executor` is root-only with an operator-supplied amount. Funds in a disputed task are stranded until governance acts, and nothing tests that they are not.",
+        "Closed 2026-09-27 \u2014 a `Disputed` task no longer strands funds. `resolve_disputed_task` (call_index 8) refunds the submitter's exact reserved reward and moves the task to the new terminal `TaskStatus::Refunded`; it is permissionless because it can only move the submitter's own reserve, and it refuses any task not in `Disputed`. Evidence: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` (reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged, three executor stakes still 100, `DisputedTaskRefunded` emitted), `resolve_disputed_task_rejects_tasks_that_are_not_disputed` (Pending/Finalised -> `TaskNotDisputed`) and `resolve_disputed_task_cannot_be_replayed`. `SlashReason::QuorumMismatch` still has no constructor: hashes alone cannot prove which executor was wrong, so no stake is slashed on a dispute.",
         "Accepted work is decided by hash equality, not verification. `finalise_with_quorum` pays an M-of-N set that agrees on a self-reported `result_hash`; nothing re-executes the work, so a quorum that agrees on a wrong hash is paid. There is no fraud proof, no verifiable computation and no challenge window. This is the difference between 'the executors agree' and 'the result is right', and the row's mainnet_ready reflects it.",
         "Weights are measured but host-specific. `BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm` on x3star1 (Xeon E5-2620 v4) produced the committed file with real proof sizes; a second run on the same host the same day moved `register_executor` between 78.998 ms and 90.536 ms of ref_time, so the reference hardware is not pinned in the repository."
       ],
@@ -4715,8 +4717,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "swarm_compute",
-      "tested": 72,
-      "tests": "tested score 72% (no named test list on this row)"
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4757,11 +4759,11 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "69e485f1d9fe52fb3a3374d3c9be37faf7c3b1f2712182d9e649885e68cf6f78",
+    "source_digest": "7dca7250b39b04785d1002b31b821aa776141bf90b3c15bcbc9b27d3b1f3446d",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "702a2197587dc3e0747c48e8364c654cc7c9e6761e7bbfdff540ae01865d81b5",
-      "feature-matrix/agents-experimental.toml": "943e0b023757ee84a2bf868881690cc9e08ca47397538f1ec7c67bc5d79edcd8",
+      "FEATURE_REGISTRY.toml": "5920511107931c253b588a14fe29bc2dc129017d34b35fb28ad28a05df61178a",
+      "feature-matrix/agents-experimental.toml": "4ed010856541483ca68e8cac535751c20f56581235b7190d194e860189d974b8",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "dda586ca67a2f7bfd098247b402c419107e0bc0db67376ab860c1d499710374f",
@@ -4943,7 +4945,7 @@
         "Closed 2026-09-27 - weights are benchmark output, not constants. `pallets/northern-swarm/src/weights.rs` was written by `BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm` on x3star1 and carries real proof sizes (`claim_task` Estimated 4149, `submit_result` Estimated 11402). Getting there needed the stale `.maintain/frame-weight-template.hbs` to be replaced with the pinned polkadot-sdk revision: the old template read `{{cmd.execution}}`/`{{benchmark.base_proof_size}}`, which this CLI no longer populates, so it emitted `Weight::from_parts(N, )` - eight E0061 errors, recorded in `.ai/runlogs/swarm-bench-build.log`.",
         "No live-node integration test. The executor/chain contract is proven at the boundary only - encoder/decoder, signer selection, restart recovery - never against a running node. The crate cannot currently reach a live chain in CI, and the row stays below 50 for that reason.",
         "Accepted results are decided by hash equality, not verification. `finalise_with_quorum` pays an M-of-N set that agrees on a self-reported `result_hash`; nothing re-executes the work, so a colluding quorum can finalize a wrong result and be paid. No fraud proof, no verifiable computation, no challenge window.",
-        "A `Disputed` task has no resolution path. When every claim slot is used with no matching set the task becomes `Disputed` and pays nobody, but the submitter's reserved bond is never refunded and the executors' stakes are untouched. `SlashReason::QuorumMismatch` exists as a variant and no code path constructs it; `slash_executor` is root-only and operator-supplied.",
+        "Closed 2026-09-27 - a disputed task can no longer strand the submitter's bond. `pallets/northern-swarm` gained `resolve_disputed_task(task_id)` (call_index 8, weight `T::WeightInfo::resolve_disputed_task`): it accepts only a task in `TaskStatus::Disputed`, zeroes the record's reward, moves the task to the new terminal `TaskStatus::Refunded`, unreserves the exact reward back to the submitter, and emits `DisputedTaskRefunded`. It is deliberately permissionless (it can only move the submitter's own reserved funds). Three tests drive the real dispatchables: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` (reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged, all three executor stakes still 100, event emitted), `resolve_disputed_task_rejects_tasks_that_are_not_disputed` (Pending and Finalised -> `TaskNotDisputed`, unknown id -> `TaskNotFound`) and `resolve_disputed_task_cannot_be_replayed` (second call refused, no second refund). Weights regenerated by the benchmark CLI (`resolve_disputed_task` = 96_270_000 ps, proof 4149). Break-it-first: deleting the status guard reddens exactly the two negative tests; restoring the file byte-identically (sha256 af76769b8d0fc0c80f28336a245e5f51885692beb49d77f6aae2709e62a16e4b) reddens none. `SlashReason::QuorumMismatch` still has no constructor - hashes cannot prove which executor was wrong, so no stake is slashed on a dispute.",
         "Accelerator selection is unfinished. `GpuBackend` is fail-closed (it returns an error when `x3_accel` reports a divergent hash) and `CpuBackend` is the deterministic reference, but there is no `AutoBackend` that detects hardware, selects, verifies, records telemetry and falls back to CPU, and no parity/quarantine test.",
         "Advertised hardware capabilities remain self-declared and have no benchmark/attestation evidence binding a registered executor to the claimed hardware."
       ],
@@ -4951,7 +4953,7 @@
       "feature": "northern_swarm_reactor",
       "mode": "GUARDED_TESTNET",
       "proof_report": "",
-      "readiness_score": 45,
+      "readiness_score": 50,
       "required_tests": [
         "same_input_produces_same_hash",
         "different_inputs_produce_different_hashes",
@@ -5146,7 +5148,7 @@
       "feature": "x3_swarm_core",
       "mode": "GUARDED_TESTNET",
       "proof_report": "",
-      "readiness_score": 40,
+      "readiness_score": 45,
       "required_tests": [
         "swarm_agent_can_receive_task",
         "swarm_agent_cannot_touch_forbidden_files",
@@ -5244,7 +5246,7 @@
     "matrix_features": 149,
     "registry_features": 22,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 57.09,
+    "registry_mean_readiness": 57.55,
     "registry_min_readiness": 15
   }
 }

@@ -2,7 +2,7 @@
 
 **Canonical source: `FEATURE_REGISTRY.toml`** — all readiness scores and blockers derive from it. Run `scripts/check-readiness-consistency.sh` to validate.
 
-**Overall readiness: ~55.5%** (55.5% arithmetic mean across the 22 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-27 when `northern_swarm_reactor` moved 30 → 45 on evidence). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+**Overall readiness: ~57.5%** (57.5% arithmetic mean across the 22 currently scored entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-27 against the current registry; `northern_swarm_reactor` moved 45 → 50 when the disputed-task refund path landed). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
 
 ## Gate commands
 
@@ -35,7 +35,7 @@ Required before PASS:
 - `TaskKind` survives into execution routing, with a typed compute-backend abstraction, a GPU backend, and an explicit CPU fallback.
 - Accelerator use changes performance only. Consensus correctness and deterministic work must retain a CPU-verifiable path.
 
-Current canonical score: `northern_swarm_reactor = 45` in `FEATURE_REGISTRY.toml`, derived on the matrix formula (`implemented*0.35 + tested*0.25 + mainnet_ready*0.40`) with implemented=75, tested=60, mainnet_ready=15, then rounded down because nothing on the row has run against a node. Passing the structural gate alone does not raise a score; evidence and tests must justify any readiness change, and the row's blockers name what is still open (no live-node test, hash-equality-only result acceptance, a `Disputed` task with no refund path, no `AutoBackend`, self-declared hardware).
+Current canonical score: `northern_swarm_reactor = 50` in `FEATURE_REGISTRY.toml`, derived on the matrix formula (`implemented*0.35 + tested*0.25 + mainnet_ready*0.40`) with implemented=80, tested=65, mainnet_ready=15 -> 50.25, recorded as 50, still capped below 70 because nothing on the row has run against a node. Passing the structural gate alone does not raise a score; evidence and tests must justify any readiness change, and the row's blockers name what is still open (no live-node test, hash-equality-only result acceptance, no `AutoBackend`, self-declared hardware, host-specific weights).
 
 The gate reaches the pallet and the executor crate only. It does **not** reach `crates/x3-bench`
 (`[x3_reactor]`), so its name is not a claim about the Reactor benchmark crate.

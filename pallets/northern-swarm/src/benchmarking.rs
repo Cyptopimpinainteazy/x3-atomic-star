@@ -40,10 +40,7 @@ fn register<T: Config>(account: &T::AccountId) {
     ));
 }
 
-fn submit_compute_task<T: Config>(
-    submitter: &T::AccountId,
-    reward: BalanceOf<T>,
-) -> T::Hash {
+fn submit_compute_task<T: Config>(submitter: &T::AccountId, reward: BalanceOf<T>) -> T::Hash {
     fund::<T>(submitter);
     let payload: BoundedVec<u8, ConstU32<512>> =
         BoundedVec::truncate_from(b"hex:0102030405060708".to_vec());
@@ -112,8 +109,7 @@ mod benchmarks {
         let caller: T::AccountId = whitelisted_caller();
         fund::<T>(&caller);
         let reward = T::MinExecutorStake::get();
-        let payload: BoundedVec<u8, ConstU32<512>> =
-            BoundedVec::truncate_from(vec![0x42; 512]);
+        let payload: BoundedVec<u8, ConstU32<512>> = BoundedVec::truncate_from(vec![0x42; 512]);
 
         #[extrinsic_call]
         submit_task(
@@ -190,12 +186,56 @@ mod benchmarks {
         let amount = T::MinExecutorStake::get();
 
         #[extrinsic_call]
-        slash_executor(
-            RawOrigin::Root,
-            executor,
-            amount,
-            SlashReason::Governance,
-        );
+        slash_executor(RawOrigin::Root, executor, amount, SlashReason::Governance);
+    }
+
+    #[benchmark]
+    fn resolve_disputed_task() {
+        // Set up a fully-committed task with no matching quorum so the measured
+        // call sees the real disputed state (reserved reward still held).
+        let submitter: T::AccountId = frame_benchmarking::account("submitter", 0, 0);
+        let caller: T::AccountId = whitelisted_caller();
+        let other_a: T::AccountId = frame_benchmarking::account("executor", 1, 0);
+        let other_b: T::AccountId = frame_benchmarking::account("executor", 2, 0);
+
+        register::<T>(&caller);
+        register::<T>(&other_a);
+        register::<T>(&other_b);
+
+        let reward = T::MinExecutorStake::get().saturating_mul(3u32.into());
+        let task_id = submit_compute_task::<T>(&submitter, reward);
+
+        assert_ok!(NorthernSwarm::<T>::claim_task(
+            RawOrigin::Signed(other_a.clone()).into(),
+            task_id,
+        ));
+        assert_ok!(NorthernSwarm::<T>::claim_task(
+            RawOrigin::Signed(other_b.clone()).into(),
+            task_id,
+        ));
+        assert_ok!(NorthernSwarm::<T>::claim_task(
+            RawOrigin::Signed(caller.clone()).into(),
+            task_id,
+        ));
+
+        assert_ok!(NorthernSwarm::<T>::submit_result(
+            RawOrigin::Signed(other_a).into(),
+            task_id,
+            T::Hashing::hash(b"benchmark-result-a"),
+        ));
+        assert_ok!(NorthernSwarm::<T>::submit_result(
+            RawOrigin::Signed(other_b).into(),
+            task_id,
+            T::Hashing::hash(b"benchmark-result-b"),
+        ));
+        assert_ok!(NorthernSwarm::<T>::submit_result(
+            RawOrigin::Signed(caller.clone()).into(),
+            task_id,
+            T::Hashing::hash(b"benchmark-result-c"),
+        ));
+
+        #[extrinsic_call]
+        resolve_disputed_task(RawOrigin::Signed(caller), task_id);
     }
 
     impl_benchmark_test_suite!(

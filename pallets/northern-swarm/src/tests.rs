@@ -1,6 +1,6 @@
 use crate::{
-    mock::*,
-    ClaimedTaskCount, ResultCommits, TaskClaimSlots, TaskClaims, TaskKind, TaskStatus, Tasks,
+    mock::*, ClaimedTaskCount, ResultCommits, TaskClaimSlots, TaskClaims, TaskKind, TaskStatus,
+    Tasks,
 };
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 use sp_core::H256;
@@ -14,8 +14,10 @@ fn register(executor: u64) {
 }
 
 fn submit_task(reward: u64) -> H256 {
-    let payload: BoundedVec<u8, frame_support::traits::ConstU32<512>> =
-        b"hex:01020304".to_vec().try_into().expect("bounded fixture");
+    let payload: BoundedVec<u8, frame_support::traits::ConstU32<512>> = b"hex:01020304"
+        .to_vec()
+        .try_into()
+        .expect("bounded fixture");
     assert_ok!(NorthernSwarm::submit_task(
         RuntimeOrigin::signed(1),
         payload,
@@ -74,7 +76,10 @@ fn quorum_requires_matching_results() {
             task_id,
             hash_a,
         ));
-        assert_eq!(Tasks::<Test>::get(task_id).unwrap().status, TaskStatus::ResultCommitted);
+        assert_eq!(
+            Tasks::<Test>::get(task_id).unwrap().status,
+            TaskStatus::ResultCommitted
+        );
 
         assert_ok!(NorthernSwarm::submit_result(
             RuntimeOrigin::signed(3),
@@ -189,9 +194,159 @@ fn full_nonmatching_commit_set_enters_dispute_without_payout() {
             ));
         }
 
-        assert_eq!(Tasks::<Test>::get(task_id).unwrap().status, TaskStatus::Disputed);
+        assert_eq!(
+            Tasks::<Test>::get(task_id).unwrap().status,
+            TaskStatus::Disputed
+        );
         assert_eq!(Balances::reserved_balance(1), 90);
         assert_eq!(Balances::free_balance(1), submitter_free_after_reserve);
         assert_eq!(TaskClaimSlots::<Test>::get(task_id), 0);
+    });
+}
+
+/// Drive a task to `Disputed` with three mutually distinct result hashes.
+fn disputed_task_with_reward(reward: u64) -> H256 {
+    register(2);
+    register(3);
+    register(4);
+    let task_id = submit_task(reward);
+    for executor in [2, 3, 4] {
+        assert_ok!(NorthernSwarm::claim_task(
+            RuntimeOrigin::signed(executor),
+            task_id,
+        ));
+    }
+    for (executor, byte) in [(2, 1u8), (3, 2u8), (4, 3u8)] {
+        assert_ok!(NorthernSwarm::submit_result(
+            RuntimeOrigin::signed(executor),
+            task_id,
+            H256::repeat_byte(byte),
+        ));
+    }
+    assert_eq!(
+        Tasks::<Test>::get(task_id).unwrap().status,
+        TaskStatus::Disputed
+    );
+    task_id
+}
+
+#[test]
+fn resolve_disputed_task_refunds_submitter_and_preserves_issuance() {
+    new_test_ext().execute_with(|| {
+        let issuance_before = Balances::total_issuance();
+        let task_id = disputed_task_with_reward(90);
+        let submitter_free_after_reserve = Balances::free_balance(1);
+        let executor_stake_2 = Balances::reserved_balance(2);
+
+        // The dispute alone must not settle anything: the bond is still trapped.
+        assert_eq!(Balances::reserved_balance(1), 90);
+        assert_eq!(executor_stake_2, 100);
+
+        // A third party (5) can release the bond: the call can only ever move the
+        // submitter's own reserved funds back to the submitter.
+        assert_ok!(NorthernSwarm::resolve_disputed_task(
+            RuntimeOrigin::signed(5),
+            task_id,
+        ));
+
+        let task = Tasks::<Test>::get(task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::Refunded);
+        assert_eq!(
+            task.reward, 0,
+            "reward zeroed so a replay cannot move funds"
+        );
+        assert_eq!(Balances::reserved_balance(1), 0);
+        assert_eq!(
+            Balances::free_balance(1),
+            submitter_free_after_reserve + 90,
+            "the full reserved reward must return to the submitter",
+        );
+        assert_eq!(Balances::total_issuance(), issuance_before);
+        // No executor was provably wrong from hashes alone, so no stake may move.
+        assert_eq!(Balances::reserved_balance(2), executor_stake_2);
+        assert_eq!(Balances::reserved_balance(3), 100);
+        assert_eq!(Balances::reserved_balance(4), 100);
+
+        let events = frame_system::Pallet::<Test>::events();
+        assert!(
+            events.iter().any(|record| matches!(
+                &record.event,
+                RuntimeEvent::NorthernSwarm(crate::Event::DisputedTaskRefunded {
+                    task_id: id,
+                    amount,
+                    ..
+                }) if *id == task_id && *amount == 90
+            )),
+            "a DisputedTaskRefunded event carrying the refunded amount must be emitted",
+        );
+    });
+}
+
+#[test]
+fn resolve_disputed_task_rejects_tasks_that_are_not_disputed() {
+    new_test_ext().execute_with(|| {
+        register(2);
+        register(3);
+        let task_id = submit_task(90);
+
+        // Pending: nothing has been committed yet.
+        assert_noop!(
+            NorthernSwarm::resolve_disputed_task(RuntimeOrigin::signed(2), task_id),
+            crate::Error::<Test>::TaskNotDisputed,
+        );
+
+        // Finalised: a quorum formed, so the reward was already settled.
+        assert_ok!(NorthernSwarm::claim_task(RuntimeOrigin::signed(2), task_id));
+        assert_ok!(NorthernSwarm::claim_task(RuntimeOrigin::signed(3), task_id));
+        let hash = H256::repeat_byte(0x55);
+        assert_ok!(NorthernSwarm::submit_result(
+            RuntimeOrigin::signed(2),
+            task_id,
+            hash,
+        ));
+        assert_ok!(NorthernSwarm::submit_result(
+            RuntimeOrigin::signed(3),
+            task_id,
+            hash,
+        ));
+        assert_eq!(
+            Tasks::<Test>::get(task_id).unwrap().status,
+            TaskStatus::Finalised
+        );
+        assert_noop!(
+            NorthernSwarm::resolve_disputed_task(RuntimeOrigin::signed(2), task_id),
+            crate::Error::<Test>::TaskNotDisputed,
+        );
+
+        // Unknown task id.
+        assert_noop!(
+            NorthernSwarm::resolve_disputed_task(
+                RuntimeOrigin::signed(2),
+                H256::repeat_byte(0xEE),
+            ),
+            crate::Error::<Test>::TaskNotFound,
+        );
+    });
+}
+
+#[test]
+fn resolve_disputed_task_cannot_be_replayed() {
+    new_test_ext().execute_with(|| {
+        let task_id = disputed_task_with_reward(90);
+
+        assert_ok!(NorthernSwarm::resolve_disputed_task(
+            RuntimeOrigin::signed(5),
+            task_id,
+        ));
+        let free_after_first = Balances::free_balance(1);
+        let issuance_after_first = Balances::total_issuance();
+
+        assert_noop!(
+            NorthernSwarm::resolve_disputed_task(RuntimeOrigin::signed(5), task_id),
+            crate::Error::<Test>::TaskNotDisputed,
+        );
+        assert_eq!(Balances::free_balance(1), free_after_first);
+        assert_eq!(Balances::reserved_balance(1), 0);
+        assert_eq!(Balances::total_issuance(), issuance_after_first);
     });
 }

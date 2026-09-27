@@ -350,7 +350,9 @@ tauri_app = "SwarmCommand"
 # `crates/northern-swarm`. The on-chain half's tests
 # (`quorum_requires_matching_results`, `task_reward_moves_reserved_balance_to_winner`,
 # `task_reward_preserves_total_issuance`,
-# `full_nonmatching_commit_set_enters_dispute_without_payout`) are cited in the
+# `full_nonmatching_commit_set_enters_dispute_without_payout`,
+# `resolve_disputed_task_refunds_submitter_and_preserves_issuance`,
+# `resolve_disputed_task_cannot_be_replayed`) are cited in the
 # matrix rows X3-SWARM-001 / X3-SWARM-002, whose `paths` cover both crates.
 required_tests = [
   "same_input_produces_same_hash",
@@ -367,19 +369,21 @@ proof_report = ""
 # actually still open). The score is derived rather than asserted, on the
 # matrix formula `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`
 # (FEATURE_MATRIX.toml `[meta] scoring`) with implemented=75, tested=60,
-# mainnet_ready=15 for this surface: 26.25 + 15 + 6 = 47. Rounded down to 45
-# because nothing on this row has ever run against a node.
+# mainnet_ready=15 at the first reconciliation. Bumped 2026-09-27 when the disputed-task
+# refund path landed (see the Closed blocker below): implemented=80,
+# tested=65, mainnet_ready=15 -> 28 + 16.25 + 6 = 50.25, recorded as 50. Still
+# capped below 70 because nothing on this row has ever run against a node.
 # Measured on the committed bytes 2026-09-27 (x3star1): `cargo test -p
-# pallet-northern-swarm --all-targets` 7 passed / 0 failed / 0 ignored;
+# pallet-northern-swarm --all-targets` 10 passed / 0 failed / 0 ignored;
 # `cargo test -p northern-swarm --all-targets` 13 passed / 0 failed;
 # `python3 scripts/mainnet/swarm_reactor_gate.py` PASS.
-readiness_score = 45
+readiness_score = 50
 blockers = [
   "Closed 2026-09-27 - the four blocking contract defects are gone. The watcher derives the real `NorthernSwarm::Tasks` prefix from canonical Twox128 pallet/item names and decodes the pallet's own `TaskRecord`/`TaskKind`/`TaskStatus` (the fabricated `PendingTasks` key is gone); `result_submitter.rs` encodes Subxt `DynamicPayload`s by pallet and call *name* and signs with the executor's sr25519 key via `sign_and_submit_then_watch_default` (no unsigned shortcut, no pallet index 82); `TaskPayload` carries `TaskKind`; `on_finalize` no longer finalizes anything - quorum is evaluated in `submit_result` against `QuorumThreshold`. `python3 scripts/mainnet/swarm_reactor_gate.py` PASS (2026-09-27).",
   "Closed 2026-09-27 - weights are benchmark output, not constants. `pallets/northern-swarm/src/weights.rs` was written by `BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash scripts/run-frame-benchmarks.sh run pallet-northern-swarm` on x3star1 and carries real proof sizes (`claim_task` Estimated 4149, `submit_result` Estimated 11402). Getting there needed the stale `.maintain/frame-weight-template.hbs` to be replaced with the pinned polkadot-sdk revision: the old template read `{{cmd.execution}}`/`{{benchmark.base_proof_size}}`, which this CLI no longer populates, so it emitted `Weight::from_parts(N, )` - eight E0061 errors, recorded in `.ai/runlogs/swarm-bench-build.log`.",
   "No live-node integration test. The executor/chain contract is proven at the boundary only - encoder/decoder, signer selection, restart recovery - never against a running node. The crate cannot currently reach a live chain in CI, and the row stays below 50 for that reason.",
   "Accepted results are decided by hash equality, not verification. `finalise_with_quorum` pays an M-of-N set that agrees on a self-reported `result_hash`; nothing re-executes the work, so a colluding quorum can finalize a wrong result and be paid. No fraud proof, no verifiable computation, no challenge window.",
-  "A `Disputed` task has no resolution path. When every claim slot is used with no matching set the task becomes `Disputed` and pays nobody, but the submitter's reserved bond is never refunded and the executors' stakes are untouched. `SlashReason::QuorumMismatch` exists as a variant and no code path constructs it; `slash_executor` is root-only and operator-supplied.",
+  "Closed 2026-09-27 - a disputed task can no longer strand the submitter's bond. `pallets/northern-swarm` gained `resolve_disputed_task(task_id)` (call_index 8, weight `T::WeightInfo::resolve_disputed_task`): it accepts only a task in `TaskStatus::Disputed`, zeroes the record's reward, moves the task to the new terminal `TaskStatus::Refunded`, unreserves the exact reward back to the submitter, and emits `DisputedTaskRefunded`. It is deliberately permissionless (it can only move the submitter's own reserved funds). Three tests drive the real dispatchables: `resolve_disputed_task_refunds_submitter_and_preserves_issuance` (reserved 90 -> 0, submitter free +90, `TotalIssuance` unchanged, all three executor stakes still 100, event emitted), `resolve_disputed_task_rejects_tasks_that_are_not_disputed` (Pending and Finalised -> `TaskNotDisputed`, unknown id -> `TaskNotFound`) and `resolve_disputed_task_cannot_be_replayed` (second call refused, no second refund). Weights regenerated by the benchmark CLI (`resolve_disputed_task` = 96_270_000 ps, proof 4149). Break-it-first: deleting the status guard reddens exactly the two negative tests; restoring the file byte-identically (sha256 af76769b8d0fc0c80f28336a245e5f51885692beb49d77f6aae2709e62a16e4b) reddens none. `SlashReason::QuorumMismatch` still has no constructor - hashes cannot prove which executor was wrong, so no stake is slashed on a dispute.",
   "Accelerator selection is unfinished. `GpuBackend` is fail-closed (it returns an error when `x3_accel` reports a divergent hash) and `CpuBackend` is the deterministic reference, but there is no `AutoBackend` that detects hardware, selects, verifies, records telemetry and falls back to CPU, and no parity/quarantine test.",
   "Advertised hardware capabilities remain self-declared and have no benchmark/attestation evidence binding a registered executor to the claimed hardware."
 ]
