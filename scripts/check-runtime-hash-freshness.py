@@ -44,12 +44,83 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECORD = "docs/reports/runtime-wasm-hashes.json"
 RUNTIME_PACKAGE = "x3-chain-runtime"
+
+# A file that cannot be linked into the wasm target cannot change the runtime,
+# but the graph this script walks is a set of *directories*, so it counts every
+# `.rs` file under a package the runtime depends on. That misfires on the two
+# shapes below, and each misfire demands a ten-minute double `srtool` rebuild:
+# measured 2026-09-27, `pallets/x3-invariants/src/tests.rs` — a file whose only
+# role is `#[cfg(test)]` — was the sole reason the gate was red, while the WASM
+# it demanded a re-attestation of provably could not have changed.
+CRATE_ROOTS = ("lib.rs", "main.rs")
+
+
+def is_test_only(relative: str, root: pathlib.Path | None = None) -> str | None:
+    """Why `relative` cannot reach the wasm target, or `None` if it can.
+
+    Two shapes, both decided from the tree rather than from the file's name:
+
+    * `<package>/tests/*.rs` is an integration-test target. Cargo never links it
+      into `lib`, whatever the file contains.
+    * `<package>/src/<stem>.rs` declared as `#[cfg(test)] mod <stem>;` in that
+      package's `lib.rs`/`main.rs`. Only an exact `#[cfg(test)]` counts: an
+      attribute like `#[cfg(any(test, feature = "runtime-benchmarks"))]` is a
+      real feature build and stays in scope, which is the fail-closed direction.
+
+    Anything else — an inline test module, a `src/tests/` directory, a `bench` or
+    `example` — is left counted. The exemptions are deliberately narrow enough to
+    be read off the file, and `--self-test` pins each one in both directions.
+    """
+    root = ROOT if root is None else root
+    path = pathlib.Path(relative)
+    if path.suffix != ".rs":
+        return None
+    directory = root / pathlib.Path(*path.parts[:-1])
+    package = directory
+    while package != ROOT and package != package.parent:
+        if (package / "Cargo.toml").exists():
+            break
+        package = package.parent
+    else:
+        return None
+    if not (package / "Cargo.toml").exists():
+        return None
+
+    try:
+        inside = directory.relative_to(package)
+    except ValueError:
+        return None
+
+    # `<package>/tests/*.rs` is an integration-test target. The package root is
+    # located by walking up to the nearest `Cargo.toml`, so a `src/tests/`
+    # module directory is not mistaken for one.
+    if inside.parts[:1] == ("tests",):
+        return "an integration-test target under tests/"
+
+    # `<package>/src/<stem>.rs` declared as `#[cfg(test)] mod <stem>;`.
+    if inside.parts[:1] == ("src",) and path.name not in CRATE_ROOTS:
+        stem = path.stem
+        for crate_root in CRATE_ROOTS:
+            candidate = package / "src" / crate_root
+            if not candidate.exists():
+                continue
+            try:
+                text = candidate.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if re.search(
+                rf"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*mod\s+{re.escape(stem)}\s*;",
+                text,
+            ):
+                return f"`#[cfg(test)] mod {stem};` in src/{crate_root}"
+    return None
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -135,6 +206,68 @@ def runtime_graph_dirs() -> set[pathlib.Path]:
     return dirs
 
 
+def self_test() -> int:
+    """Pin the test-only classification in both directions, on a synthetic crate.
+
+    The exemption exists so a change to a `#[cfg(test)]` module does not demand a
+    ten-minute double `srtool` rebuild. An exemption that is too wide would let a
+    real runtime change through, so every case below is asserted: three shapes
+    that must be ignored, and five that must stay counted.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as work:
+        root = pathlib.Path(work)
+        (root / "src").mkdir()
+        (root / "src" / "tests").mkdir()
+        (root / "tests").mkdir()
+        (root / "src" / "lib.rs").write_text(
+            "#[cfg(test)]\nmod tests;\n"
+            '#[cfg(any(test, feature = "runtime-benchmarks"))]\nmod test_helpers;\n'
+            "#[cfg(test)]\n#[allow(clippy::redundant_clone)]\nmod counted_tests;\n"
+        )
+        for name in ("tests.rs", "test_helpers.rs", "counted_tests.rs", "lib_impl.rs"):
+            (root / "src" / name).write_text("")
+        (root / "src" / "tests" / "deep.rs").write_text("")
+        (root / "tests" / "live.rs").write_text("")
+        (root / "Cargo.toml").write_text("")
+
+        want_ignored = {
+            "src/tests.rs",
+            "src/counted_tests.rs",
+            "tests/live.rs",
+        }
+        want_counted = {
+            "src/lib.rs",
+            "src/test_helpers.rs",
+            "src/lib_impl.rs",
+            "src/tests/deep.rs",
+            "Cargo.toml",
+        }
+        failures = []
+        for rel in sorted(want_ignored):
+            reason = is_test_only(rel, root)
+            if reason is None:
+                failures.append(f"{rel} must be recognised as test-only")
+            else:
+                print(f"  ignored  {rel} — {reason}")
+        for rel in sorted(want_counted):
+            reason = is_test_only(rel, root)
+            if reason is not None:
+                failures.append(f"{rel} must stay counted, but was ignored ({reason})")
+            else:
+                print(f"  counted  {rel}")
+        for failure in failures:
+            print(f"[runtime-hash self-test] FAIL: {failure}", file=sys.stderr)
+        if failures:
+            return 1
+    print(
+        "[runtime-hash self-test] OK — 3 test-only shape(s) ignored, "
+        "5 that can reach the wasm counted"
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -142,7 +275,15 @@ def main() -> int:
         default="origin/master",
         help="ref to diff against (default: origin/master)",
     )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="check the test-only classification against a synthetic crate, then exit",
+    )
     args = parser.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     revision, unattached = recorded_revision()
 
@@ -180,12 +321,21 @@ def main() -> int:
         print(f"[runtime-hash] could not compute the runtime dependency graph: {exc}", file=sys.stderr)
         return 2
 
+    ignored: list[tuple[str, str]] = []
+
     def in_graph(paths: set[str]) -> list[str]:
-        return [
-            path
-            for path in sorted(paths)
-            if any(parent in pathlib.Path(path).parents for parent in graph_dirs)
-        ]
+        found = []
+        for path in sorted(paths):
+            if not any(parent in pathlib.Path(path).parents for parent in graph_dirs):
+                continue
+            reason = is_test_only(path)
+            if reason is not None:
+                # Named, never silently dropped: a check that quietly ignores
+                # input is the failure mode this whole script exists to catch.
+                ignored.append((path, reason))
+                continue
+            found.append(path)
+        return found
 
     # The record's revision is the decisive tripwire: if it was not moved, a
     # runtime change after it is stale, and touching the record's text later
@@ -203,6 +353,13 @@ def main() -> int:
 
     if not offenders:
         detail = f"{len(graph_dirs)} packages"
+        if ignored:
+            print(
+                f"[runtime-hash] {len(ignored)} changed file(s) in the graph cannot reach "
+                f"the wasm target and are not counted:"
+            )
+            for path, reason in sorted(set(ignored)):
+                print(f"    {path} — {reason}")
         if excused:
             print(
                 f"[runtime-hash] {RECORD} moved with {len(excused)} runtime-graph "
