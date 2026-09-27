@@ -155,6 +155,35 @@ fn parse_h256(value: &str, field: &str) -> Result<[u8; 32], NorthernSwarmError> 
 mod tests {
     use super::*;
 
+    fn config(executor_key: &str) -> Config {
+        Config {
+            // Nothing here reaches the network: every case below is decided
+            // before the first RPC call.
+            chain_rpc_url: "ws://127.0.0.1:1".into(),
+            ipfs_gateway: "http://127.0.0.1:1".into(),
+            executor_key: executor_key.into(),
+            parallelism: 1,
+        }
+    }
+
+    fn result(task_id: &str, result_hash: &str, status: ExecutionStatus) -> ExecutionResult {
+        ExecutionResult {
+            task_id: task_id.into(),
+            executor_id: "exec-1".into(),
+            result_hash: result_hash.into(),
+            output: vec![1, 2, 3],
+            proof: ProofBundle {
+                task_id: task_id.into(),
+                executor_id: "exec-1".into(),
+                input_hash: "00".repeat(32),
+                output_hash: result_hash.into(),
+                executed_at: 0,
+                duration_ms: 0,
+            },
+            status,
+        }
+    }
+
     #[test]
     fn h256_parser_rejects_short_ids_instead_of_padding_them() {
         let err = parse_h256("deadbeef", "task_id").unwrap_err();
@@ -169,5 +198,83 @@ mod tests {
             parse_h256(&format!("0x{raw}"), "task_id").unwrap(),
             [0x11; 32]
         );
+    }
+
+    #[test]
+    fn a_malformed_executor_key_is_refused_rather_than_defaulted() {
+        let submitter = ResultSubmitter::new(config("not a valid secret uri"));
+        let err = submitter.signer().unwrap_err();
+        assert!(
+            matches!(err, NorthernSwarmError::Crypto(_)),
+            "a bad key must be a typed crypto error, got: {err}",
+        );
+        // Either the URI is rejected at parse time ("NS_EXECUTOR_KEY") or at
+        // derivation time ("executor key derivation failed"); both must name
+        // the key rather than silently fall back to a default identity.
+        assert!(err.to_string().to_lowercase().contains("key"), "got: {err}");
+    }
+
+    #[test]
+    fn the_dev_shorthand_key_derives_a_real_signer() {
+        // `//Alice` is the development shorthand the runtime endows on local
+        // chains; it must produce a usable sr25519 signer, not fall back.
+        let submitter = ResultSubmitter::new(config("//Alice"));
+        let signer = submitter.signer().expect("//Alice derives a signer");
+        // A real key, not the all-zero placeholder.
+        assert_ne!(signer.public_key().0, [0u8; 32]);
+    }
+
+    /// The chain-side refusals the release prompt names (unregistered key,
+    /// already-claimed task, already-finalised task, duplicate result) are
+    /// produced *by the pallet* and can only be observed against a live node,
+    /// which this crate cannot reach in CI. What it can and does prove here is
+    /// that the boundary refuses malformed input and non-success results
+    /// locally, before any RPC, and never hashes something it then submits as a
+    /// result.
+    #[tokio::test]
+    async fn a_non_success_result_is_not_submitted() {
+        let submitter = ResultSubmitter::new(config("//Alice"));
+        let failed = result(
+            &"11".repeat(32),
+            &"22".repeat(32),
+            ExecutionStatus::Failed("boom".into()),
+        );
+        // Would fail to connect if it tried; it must not try.
+        assert!(submitter.submit(failed).await.is_ok());
+
+        let nondeterministic = result(
+            &"11".repeat(32),
+            &"22".repeat(32),
+            ExecutionStatus::NonDeterministic,
+        );
+        assert!(submitter.submit(nondeterministic).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_bad_task_id_is_refused_before_any_network_call() {
+        let submitter = ResultSubmitter::new(config("//Alice"));
+        let err = submitter
+            .submit(result(
+                "deadbeef",
+                &"22".repeat(32),
+                ExecutionStatus::Success,
+            ))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("exactly 32 bytes"), "got: {err}");
+    }
+
+    #[tokio::test]
+    async fn a_bad_result_hash_is_refused_before_any_network_call() {
+        let submitter = ResultSubmitter::new(config("//Alice"));
+        let err = submitter
+            .submit(result(
+                &"11".repeat(32),
+                "not-hex",
+                ExecutionStatus::Success,
+            ))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("not valid hex"), "got: {err}");
     }
 }

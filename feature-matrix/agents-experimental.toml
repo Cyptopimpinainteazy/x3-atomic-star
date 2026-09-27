@@ -158,8 +158,8 @@ subsystem = "swarm_compute"
 source = "master"
 paths = ["crates/northern-swarm"]
 implemented = 78
-tested = 72
-mainnet_ready = 12
+tested = 78
+mainnet_ready = 13
 priority = "P1"
 confidence = "medium"
 launch_scope = "guarded"
@@ -180,13 +180,20 @@ required_tests = [
   "auto_backend_falls_back_to_cpu_when_the_accelerator_refuses",
   "auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result",
   "auto_backend_refuses_a_kind_it_cannot_serve",
+  "a_non_success_result_is_not_submitted",
+  "a_bad_task_id_is_refused_before_any_network_call",
+  "a_bad_result_hash_is_refused_before_any_network_call",
+  "a_malformed_executor_key_is_refused_rather_than_defaulted",
+  "the_dev_shorthand_key_derives_a_real_signer",
   "storage_prefix_is_32_bytes_and_stable",
   "task_id_is_extracted_from_blake2_concat_map_key",
 ]
 test_evidence = [
   "crates/northern-swarm/src/chain_watcher.rs",
   "crates/northern-swarm/src/backend.rs",
-  "note: measured 2026-09-27 on the committed bytes - `cargo test -p northern-swarm --all-targets` 17 passed / 0 failed / 0 ignored; `cargo clippy -p northern-swarm --all-targets -- -D warnings` clean",
+  "crates/northern-swarm/src/result_submitter.rs",
+  "note: measured 2026-09-27 on the committed bytes - `cargo test -p northern-swarm --all-targets` 22 passed / 0 failed / 0 ignored; `cargo clippy -p northern-swarm --all-targets -- -D warnings` clean",
+  "note: the submitter boundary is proven without a node - `a_bad_task_id_is_refused_before_any_network_call` and `a_bad_result_hash_is_refused_before_any_network_call` encode an unreachable `ws://127.0.0.1:1` so any RPC attempt would fail, and still get the typed parse error; `a_non_success_result_is_not_submitted` proves a `Failed`/`NonDeterministic` result never reaches the chain; `a_malformed_executor_key_is_refused_rather_than_defaulted` and `the_dev_shorthand_key_derives_a_real_signer` pin signer selection. The chain-side refusals the brief names (unregistered key, already-claimed, already-finalised, duplicate result) are pallet-side and are exercised in `pallets/northern-swarm/src/tests.rs`; this crate cannot observe them without a live node, which the row's first blocker records",
   "note: the four AutoBackend tests are the backend contract: parity returns the accelerator result only when it equals the CPU reference, a divergent fake is quarantined and its `0xDEADBEEF` never returned (and the device is not consulted again), a refusing accelerator is a counted fallback rather than a divergence, and an unsupported kind fails closed",
   "note: `storage_prefix_is_32_bytes_and_stable` is the check that the watcher reads the real `NorthernSwarm::Tasks` map rather than a fabricated full key, and `task_id_is_extracted_from_blake2_concat_map_key` pins the 32+16+32 layout the pallet's `StorageMap` produces",
   "note: `ai_inference_is_not_faked_by_hash_backend` asserts the refusal in both backends, which is the check that `TaskKind` is not silently dropped before routing",
