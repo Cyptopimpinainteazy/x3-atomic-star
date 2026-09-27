@@ -15,13 +15,26 @@
 # Steps, all against real extrinsics on a booted chain:
 #
 #   Alice  -> balances.transferKeepAlive(Bob)          (control: traffic works)
+#   gateway -> x3AtomicKernel.submitAtomicBundle(..)   (a bundle *in flight*, bond reserved)
 #   council motion -> atlasKernel.emergencyHalt()      (via propose + 2 votes + close)
 #   driver -> x3Invariants.halted and x3SupplyLedger.transferHalted must both be set
 #   Alice  -> balances.transferKeepAlive(Bob)          (must be refused *by the pool*, on two
 #                                                       different validators, with no balance change)
+#   gateway -> x3AtomicKernel.submitAtomicBundle(..)   (must be refused by the pool: not exempt)
+#   gateway -> x3AtomicKernel.rollbackAtomicBundle(..) (must be *included*: it is exempt, and the
+#                                                       in-flight bond must come back while halted)
 #   council motion -> x3Invariants.clearHalted()       (while still halted — the remedy itself)
 #   council motion -> x3SupplyLedger.resumeTransfers() (the economy freeze)
 #   Alice  -> balances.transferKeepAlive(Bob)          (must land, and move the balance)
+#   gateway -> x3AtomicKernel.submitAtomicBundle(..)   (a fresh bundle is accepted again)
+#   both    -> balances.totalIssuance at one finalized block: no mint, and the two nodes agree
+#
+# The bundle-in-flight phase exists because every earlier halt/rollback proof was against an *idle*
+# chain or a bundle id that does not exist. What the valve has to survive is a bundle already holding
+# someone's bond when it trips: a valve that leaks accepts new work while halted, and one that traps
+# funds refuses the release. Measured 2026-09-27: the new bundle is refused by the pool
+# (`submit_atomic_bundle` is not on the exemption list), the in-flight bundle is rolled back and its
+# bond released while halted, and no supply is minted.
 #
 # Usage: bash scripts/drills/halt_recovery_live.sh
 # ─────────────────────────────────────────────────────────────────────────────

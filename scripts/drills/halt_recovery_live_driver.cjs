@@ -184,6 +184,28 @@ async function freeBalance(address) {
   return BigInt(account.data.free.toString());
 }
 
+async function reservedBalance(address) {
+  const account = await api.query.system.account(address);
+  return BigInt(account.data.reserved.toString());
+}
+
+/// The leg shape the pallet's own tests use (`one_leg_bundle` in
+/// `pallets/x3-atomic-kernel/src/tests.rs`), as plain values polkadot-js can encode.
+function bundleLeg(seed) {
+  return {
+    vmType: 'X3',
+    tokenIn: `0x${String(seed).repeat(2).padEnd(64, '0')}`,
+    tokenOut: `0x${String(seed + 1).repeat(2).padEnd(64, '0')}`,
+    amountIn: 1_000,
+    minAmountOut: 900,
+    deadline: 4_000_000_000,
+    access: {
+      reads: [`0x${String(seed + 2).repeat(2).padEnd(64, '0')}`],
+      writes: [`0x${String(seed + 3).repeat(2).padEnd(64, '0')}`],
+    },
+  };
+}
+
 /// Submit an extrinsic that the *pallet* must refuse, and require the refusal to be a dispatch
 /// error rather than a pool rejection.
 ///
@@ -220,6 +242,10 @@ async function main() {
   keyring.alice = sr.addFromUri('//Alice');
   keyring.bob = sr.addFromUri('//Bob');
   keyring.charlie = sr.addFromUri('//Charlie');
+  // `submit_atomic_bundle` is gated on `T::X3LangOrigin`, which this runtime wires to
+  // `EnsureX3LangGateway`; on a dev/local chain the gateway is `dev_gateway_genesis()`'s
+  // `//x3-atomic-gateway`, and `local3` endows it (chain_spec.rs, 681e2e260).
+  keyring.gateway = sr.addFromUri('//x3-atomic-gateway');
 
   // A second connection is optional but is what separates "chain state" from "a node setting".
   let second;
@@ -264,6 +290,41 @@ async function main() {
     die(`the control transfer did not move the balance (${bobBefore} -> ${bobAfterControl})`);
   }
   record('control transfer landed', { detail: `block ${control.blockNumber}, +${amount}` });
+
+  // ── a bundle in flight, before the halt lands ──────────────────────────────────────────────
+  //
+  // Every halt/rollback proof on this chain has been against an *idle* chain or a bundle id that
+  // does not exist. What the valve actually has to survive is a bundle that is already holding
+  // someone's bond when it trips: if that bond cannot be released while halted, the safety valve has
+  // taken funds hostage.
+  if (!atomicKernel?.submitAtomicBundle) die('x3AtomicKernel.submitAtomicBundle is missing');
+  const minBond = BigInt(api.consts.x3AtomicKernel.minBond.toString());
+  const bundleChainId = 1;
+  const bundleDeadline = (await api.rpc.chain.getHeader()).number.toNumber() + 200;
+  const gatewayReservedBefore = await reservedBalance(keyring.gateway.address);
+  const issuedBefore = BigInt((await api.query.balances.totalIssuance()).toString());
+
+  const bundleSubmitted = await submitAndConfirm(
+    atomicKernel.submitAtomicBundle([bundleLeg(0x11)], bundleDeadline, bundleChainId, 1),
+    keyring.gateway,
+    'submit a bundle before the halt',
+    (event) => api.events.x3AtomicKernel.BundleSubmitted.is(event),
+  );
+  const bundleId = bundleSubmitted.event.data[0].toHex();
+  const gatewayReservedAfter = await reservedBalance(keyring.gateway.address);
+  if (gatewayReservedAfter - gatewayReservedBefore !== minBond) {
+    die(
+      `the bundle's bond was not reserved as expected (${gatewayReservedBefore} -> ` +
+        `${gatewayReservedAfter}, minBond ${minBond})`,
+    );
+  }
+  const bundleRecordWhilePending = await api.query.x3AtomicKernel.bundles(bundleId);
+  if (bundleRecordWhilePending.isNone || !bundleRecordWhilePending.unwrap().status.isPending) {
+    die(`bundle ${bundleId} was not recorded as Pending`);
+  }
+  record('a bundle is in flight with its bond reserved', {
+    detail: `bundle ${bundleId} at block ${bundleSubmitted.blockNumber}, bond ${minBond} reserved`,
+  });
 
   // ── trip the halt, through the only route this chain has ───────────────────────────────────
   await councilDispatch(kernel.emergencyHalt(), 'trip the emergency halt');
@@ -310,6 +371,46 @@ async function main() {
     'x3AtomicKernel.BundleNotFound',
   );
 
+  // ── the in-flight bundle, while the chain is halted ───────────────────────────────────────
+  //
+  // `submit_atomic_bundle` is deliberately NOT on the halt's exemption list, so the pool must
+  // refuse a new one; `rollback_atomic_bundle` IS on it, so the in-flight one must be releasable.
+  // Both halves matter: a valve that leaks accepts new work while halted, and one that traps funds
+  // refuses the release.
+  await poolMustRefuse(
+    api,
+    atomicKernel.submitAtomicBundle([bundleLeg(0x21)], bundleDeadline, bundleChainId, 2),
+    keyring.gateway,
+    'a new bundle while halted',
+  );
+  record('a new bundle is refused while halted', {
+    detail: 'submit_atomic_bundle is not on the exemption list, so the pool refuses it',
+  });
+
+  const rollback = await submitAndConfirm(
+    atomicKernel.rollbackAtomicBundle(bundleId, 'SubmitterCancelled'),
+    keyring.gateway,
+    'roll back the in-flight bundle while halted',
+    (event) => api.events.x3AtomicKernel.BundleRolledBack.is(event),
+  );
+  const bundleRecordAfterRollback = await api.query.x3AtomicKernel.bundles(bundleId);
+  if (
+    bundleRecordAfterRollback.isNone ||
+    !bundleRecordAfterRollback.unwrap().status.isRolledBack
+  ) {
+    die(`bundle ${bundleId} is not RolledBack after the rollback`);
+  }
+  const gatewayReservedFinal = await reservedBalance(keyring.gateway.address);
+  if (gatewayReservedFinal !== gatewayReservedBefore) {
+    die(
+      `the bond was not released by the rollback (${gatewayReservedBefore} -> ` +
+        `${gatewayReservedFinal}) — the halt trapped it`,
+    );
+  }
+  record('the in-flight bundle was rolled back and its bond released while halted', {
+    detail: `bundle ${bundleId} RolledBack at block ${rollback.blockNumber}, reserved back to ${gatewayReservedFinal}`,
+  });
+
   // ── the remedy, submitted while still halted ──────────────────────────────────────────────
   await councilDispatch(invariants.clearHalted(), 'clear the halt');
   await councilDispatch(ledger.resumeTransfers(), 'resume transfers');
@@ -332,6 +433,49 @@ async function main() {
     die(`traffic did not resume (${bobAfterControl} -> ${bobAfterResume})`);
   }
   record('traffic resumed', { detail: `block ${resumed.blockNumber}, +${amount}` });
+
+  const freshDeadline = (await api.rpc.chain.getHeader()).number.toNumber() + 200;
+  const fresh = await submitAndConfirm(
+    atomicKernel.submitAtomicBundle([bundleLeg(0x31)], freshDeadline, bundleChainId, 3),
+    keyring.gateway,
+    'submit a fresh bundle after the remedy',
+    (event) => api.events.x3AtomicKernel.BundleSubmitted.is(event),
+  );
+  record('a fresh bundle is accepted after the remedy', {
+    detail: `bundle ${fresh.event.data[0].toHex()} at block ${fresh.blockNumber}`,
+  });
+
+  // The bond returning must not have *minted* anything, and every validator must agree on the
+  // number. Issuance is not expected to be equal across the phase: every extrinsic above pays a
+  // fee, and `pallet_x3_kernel`'s `charge_fee` burns it, so issuance legitimately falls. What must
+  // never happen here is an increase — a rollback that credited the bond instead of unreserving it
+  // would show up as exactly that.
+  const finalizedA = await api.rpc.chain.getFinalizedHead();
+  const issuedAfterAt = BigInt(
+    (await api.query.balances.totalIssuance.at(finalizedA)).toString(),
+  );
+  if (issuedAfterAt > issuedBefore) {
+    die(
+      `the halt/rollback phase minted supply (${issuedBefore} -> ${issuedAfterAt}); a rollback must ` +
+        'unreserve the bond, never credit it',
+    );
+  }
+  if (second) {
+    const issuedOnB = BigInt(
+      (await second.query.balances.totalIssuance.at(finalizedA)).toString(),
+    );
+    if (issuedOnB !== issuedAfterAt) {
+      die(
+        `the validators disagree on issuance at ${finalizedA.toHex()} ` +
+          `(node A ${issuedAfterAt}, node B ${issuedOnB})`,
+      );
+    }
+    record('no supply was minted, and both validators agree at one finalized block', {
+      detail: `${issuedBefore} -> ${issuedAfterAt} (fees burned), identical on node A and node B`,
+    });
+  } else {
+    record('no supply was minted', { detail: `${issuedBefore} -> ${issuedAfterAt} (fees burned)` });
+  }
 
   evidence.status = 'passed';
   flush();
