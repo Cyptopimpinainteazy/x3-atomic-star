@@ -8891,6 +8891,38 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
 - **Trap to remember**: `git commit -m "…"` with backticks and quotes in the message runs the shell —
   twice now a commit message has been mangled or a command aborted mid-add. Use `git commit -F -` with
   a quoted heredoc for multi-line messages.
+
+## 2026-09-27 (later still) — the fabricated-RPC class, complete for the node surface
+
+The wallet DEX find was not a one-off. Audit of every module in `crates/x3-rpc` and the node's RPC
+registration, with the outcome per file:
+
+| file | state found | action |
+|---|---|---|
+| `wallet_dex_rpc.rs` | 3 fabricated answers (95% "quote", fake `swap_id`, `("pending", 2)`) | fixed (X3-OPS-014) |
+| `wallet_service_rpc.rs` | 11 fabricated answers, worst: **the public test mnemonic as a wallet seed** and addresses sliced out of the mnemonic string | fixed (X3-OPS-015) |
+| `gas_estimation.rs` `call` | returned `Ok(tx.data.clone())` — the caller's calldata as the call's output | fixed (X3-OPS-016) |
+| `validator_rpc.rs` | already repaired by a prior lane: live authority set, zeroed metrics with a note | none |
+| `gateway_rpc.rs` | storage-backed (`get_storage` decodes gateway storage) | none |
+| `benchmark.rs` | refuses: "requires PostgreSQL database — not configured on this node" | none |
+| `rpc_frontier.rs` | real (`call_evm`, runtime dry-run for gas, block-range cap on `eth_getLogs`) | reused as the one call path |
+
+- **`x3_call` was the live one**, registered unconditionally (the wallet RPCs are behind
+  `enable_demo_wallet_rpc = chain_type == Development`). `eth_call` and `x3_call` are now two names
+  for one implementation, `rpc_frontier::evm_call_output`, which is what "consolidate to one path"
+  looks like when the duplicate was the wrong one.
+- **Pattern to keep hunting**: a *second* name for an operation that nobody wired. The fabricated
+  surfaces were all "the X3-native alias" of a real one (`x3_call` vs `eth_call`, `wallet_*` vs the
+  wallet crate). When two names exist for one question, check which one answers honestly.
+- **The three rows were invisible until now.** Nothing in the audit pointed at `crates/x3-rpc`, so
+  whoever reads the composite next should assume other untracked surfaces exist; the cheap test is
+  `grep` for `Ok(` next to a comment containing "In production".
+- **Ratchet side effect**: removing the wallet-service module's `SystemTime::now().unwrap()` calls
+  took the panic/unwrap count 450 → 440; the baseline was lowered with `--update-baseline` so the ten
+  cannot come back unnoticed.
+- **Next seed**: `x3_estimateGas`'s heuristic (`simulate_opcodes` sums base costs linearly and
+  reports `ExecutionStatus::Success` for a transaction it never executed) is labelled simulation-only
+  but still registered; either make its status say "estimated" or route it to `eth_estimateGas`.
   `repo_scanner_v2`) no longer need to be re-checked.
 
 ## 2026-09-27 (later still) — the Tauri operator console reads a real node (15% -> 42%)
