@@ -663,7 +663,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 51,
+      "composite": 60,
       "confidence": "high",
       "evidence": [
         "crates/x3-relayer/src/submitter.rs",
@@ -674,20 +674,22 @@
         "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"
       ],
       "id": "X3-XCHAIN-003",
-      "implemented": 70,
+      "implemented": 85,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 35,
+      "mainnet_ready": 25,
       "missing_work": [
-        "The relayer signs with a single key and says so: `svm_required_signatures: 1` with the comment that quorum enforcement \"belongs at the aggregator layer\" \u2014 and no aggregator exists in this workspace, so the production path is one signature",
+        "**CLOSED 2026-09-26 \u2014 the single-key quorum is gone, and the crate refuses what it cannot back.** `svm_required_signatures: 1` (with the comment that quorum enforcement \"belongs at the aggregator layer\") is deleted. `x3-validator-attestation` now owns the one definition of the bar \u2014 `supermajority_threshold(n) = floor(2n/3)+1`, never zero, monotonic in `n` \u2014 and `crates/x3-relayer` has an `AuthorizedValidatorSet` that decodes the configured keys (optional `0x`, malformed / wrong-length / repeated entries refused at startup rather than trimmed), derives the required signature count from the set, and counts *distinct authorized* signers. `acquire_svm_proof` refuses with typed `SvmQuorumUnreachable` / `NoAuthorizedValidatorSet` instead of emitting a proof it cannot back, and both proof legs refuse with `UnauthorizedSubmitter`. Measured: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed; with the policy check removed, `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` fails by accepting a one-of-three proof, and restoring it returns 9/9.",
         "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) \u2014 the authority path is an open decision",
         "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
-        "No multi-operator relayer set: quorum is verified on the *verification* side (x3-validator-attestation, x3-bridge supermajority tests) but nothing in this crate produces one"
+        "No multi-operator relayer set *in production*: the quorum policy is enforced in the library and refuses an unreachable bar, but `RelayerService` has no production constructor in this workspace \u2014 `node` and `x3-gateway` depend on the crate and consume only its types \u2014 and signature aggregation across validators still has no host. That is why mainnet readiness moves **down** (35 -> 25) even as implementation and tests move up: the previous 35 credited a single-signature path that could not have produced a quorum at all.",
+        "`crates/x3-relayer/src/main.rs` is a separate monolith with its own config and SVM path whose proof signer defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`); it does not use `RpcSubmitter`/`RelayerService` and was not rewritten (TICKET-148)."
       ],
       "name": "Relayer framework",
       "paths": [
         "crates/x3-relayer/src/submitter.rs",
         "crates/x3-relayer/src/relayer.rs",
+        "crates/x3-relayer/src/quorum.rs",
         "crates/x3-relayer/src/watchers",
         "crates/x3-validator-attestation/src/lib.rs",
         "crates/x3-bridge/src/cross_chain_proofs.rs"
@@ -697,8 +699,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 50,
-      "tests": "tested score 50% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4548,14 +4550,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "b2ba407cf79c54c1863aa8400a2c9581bf7fd97b360cb2fd32e75557b5ad697b",
+    "source_digest": "4073fed98d8142d5078391066c605176ed99b5635f212b65a531ec007c925349",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
       "feature-matrix/agents-experimental.toml": "0ab28599c7db3de8bff25a16083a2036b3ce1e5ae405944a0bba2ab8a102b82a",
       "feature-matrix/claims-hygiene.toml": "03b541230c64713f1ec9a2e8f3a8a8ec488488831896c7073b5feabcf390a252",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "ba968045e0f7d00c3223a4a0506ab1d4088b756c60444d8f88376d7be95dfd89",
+      "feature-matrix/cross-chain.toml": "5485f6ef64813d82bec51e35d840b68850960adedc0ab5588754c3ea5524199a",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",
       "feature-matrix/economic-defi.toml": "cc1c338421dcaa20356e9496e581f0b07923a61e014f75ae326667fc6f290b3d",
       "feature-matrix/gpu-performance.toml": "6d09572cd03f441d6e76fd1adda5421c8ec78c41178206280551c17f8831e586",

@@ -1300,3 +1300,24 @@ clippy --workspace --all-targets`.
 Still open on the row: a **live upgrade** — an old artifact executed against a newer VM on a running
 chain — is what the envelope's version bounds exist for and is not exercised by any test here. That
 needs the seven-node network and a runtime upgrade, not a unit test.
+
+**TICKET-148 — the relayer's CLI monolith signs its proofs with a dev key. CLOSED 2026-09-26 (the
+quorum half), and TICKET-148 for what is left.** `crates/x3-relayer/src/submitter.rs` carried
+`svm_required_signatures: 1` with a comment that quorum enforcement "belongs at the aggregator
+layer" — and no aggregator exists here, so the production path was one signature. That is gone:
+`x3-validator-attestation` owns `supermajority_threshold(n) = floor(2n/3)+1` (never zero, monotonic
+in n), `crates/x3-relayer/src/quorum.rs` decodes an `AuthorizedValidatorSet` (refusing malformed,
+wrong-length and repeated keys at startup rather than trimming them) and counts *distinct
+authorized* signers, and the submitter refuses with typed `SvmQuorumUnreachable` /
+`NoAuthorizedValidatorSet` / `UnauthorizedSubmitter` rather than emitting a proof it cannot back.
+Measured: `cargo test -p x3-relayer -p x3-validator-attestation` → 58 + 5 + 15 passed; removing the
+policy check makes `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied`
+accept a one-of-three proof, and restoring it returns 9/9.
+
+Still open, and the reason `X3-XCHAIN-003`'s mainnet readiness moves *down* (35 → 25) while its
+implementation moves up: `RelayerService` has no production constructor in this workspace (`node`
+and `x3-gateway` consume only its types), signature aggregation across validators has no host, the
+authority path is still undecided (the settlement engine accepts a proof only from the intent's
+maker or taker), and `crates/x3-relayer/src/main.rs` is a separate monolith whose proof signer
+defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`) and does not use `RpcSubmitter`/`RelayerService` at
+all. TICKET-148: give the CLI one relayer path, with no dev-key default.

@@ -64,26 +64,43 @@ id = "X3-XCHAIN-003"
 name = "Relayer framework"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/watchers", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs"]
-implemented = 70
-tested = 50
-mainnet_ready = 35
+paths = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/quorum.rs", "crates/x3-relayer/src/watchers", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs"]
+implemented = 85
+tested = 80
+mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "The relayer signs with a single key and says so: `svm_required_signatures: 1` with the comment that quorum enforcement \"belongs at the aggregator layer\" — and no aggregator exists in this workspace, so the production path is one signature",
+  "**CLOSED 2026-09-26 — the single-key quorum is gone, and the crate refuses what it cannot back.** `svm_required_signatures: 1` (with the comment that quorum enforcement \"belongs at the aggregator layer\") is deleted. `x3-validator-attestation` now owns the one definition of the bar — `supermajority_threshold(n) = floor(2n/3)+1`, never zero, monotonic in `n` — and `crates/x3-relayer` has an `AuthorizedValidatorSet` that decodes the configured keys (optional `0x`, malformed / wrong-length / repeated entries refused at startup rather than trimmed), derives the required signature count from the set, and counts *distinct authorized* signers. `acquire_svm_proof` refuses with typed `SvmQuorumUnreachable` / `NoAuthorizedValidatorSet` instead of emitting a proof it cannot back, and both proof legs refuse with `UnauthorizedSubmitter`. Measured: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed; with the policy check removed, `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` fails by accepting a one-of-three proof, and restoring it returns 9/9.",
   "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) — the authority path is an open decision",
   "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
-  "No multi-operator relayer set: quorum is verified on the *verification* side (x3-validator-attestation, x3-bridge supermajority tests) but nothing in this crate produces one",
+  "No multi-operator relayer set *in production*: the quorum policy is enforced in the library and refuses an unreachable bar, but `RelayerService` has no production constructor in this workspace — `node` and `x3-gateway` depend on the crate and consume only its types — and signature aggregation across validators still has no host. That is why mainnet readiness moves **down** (35 -> 25) even as implementation and tests move up: the previous 35 credited a single-signature path that could not have produced a quorum at all.",
+  "`crates/x3-relayer/src/main.rs` is a separate monolith with its own config and SVM path whose proof signer defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`); it does not use `RpcSubmitter`/`RelayerService` and was not rewritten (TICKET-148).",
 ]
 # The row used to cite `crates/x3-atomic-swap/src/relayer.rs`, a second watcher
 # implementation used by the node-side swap tests. The production relayer is the
 # `x3-relayer` crate; this points at it now, and at the crates that actually verify
 # attestation quorum.
 evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/watchers/evm.rs", "crates/x3-relayer/src/watchers/svm.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"]
-test_evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "crates/x3-verification-router/tests", "crates/x3-relayer/src/evm_receipt_proof.rs", "note: `cargo test -p x3-relayer --lib` covers the refusal path, the SVM attestation signature and the quorum check on an acquired proof; the bridge has supermajority threshold tests (exactly-at, one-below, duplicate-signature rejection); the receipt proof producer has an anvil-backed inclusion test"]
+test_evidence = [
+  "crates/x3-relayer/src/submitter.rs",
+  "crates/x3-relayer/src/quorum.rs",
+  "crates/x3-validator-attestation/src/lib.rs",
+  "note: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed, 0 failed (re-run by the primary agent on the pushed commit); `cargo clippy -p x3-relayer -p x3-validator-attestation --all-targets -- -D warnings` clean; the crate still builds `--no-default-features`",
+  "note: measured load-bearing - removing the policy check makes `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` accept a one-of-three proof; restoring it returns 9/9. Proof runs under `.ai/runlogs/round8-relayer-quorum-20260926T202731Z/`",
+]
+required_tests = [
+  "safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied",
+  "the_quorum_is_the_supermajority_of_the_set_size",
+  "an_empty_set_still_requires_one_signature",
+  "a_malformed_key_is_named_not_trimmed",
+  "a_duplicated_key_is_refused_and_cannot_inflate_the_set",
+  "distinct_signers_ignores_unauthorized_and_repeated_keys",
+  "supermajority_is_strictly_more_than_two_thirds",
+  "supermajority_never_admits_an_empty_set",
+]
 
 [[feature]]
 id = "X3-XCHAIN-004"
