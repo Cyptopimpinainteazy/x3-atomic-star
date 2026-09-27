@@ -8822,4 +8822,43 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   `programs/svm/x3_atomic_swap`). Wiring it means a caller in `crates/cross-vm-coordinator` or the
   atomic router plus an X3VM↔SVM lifecycle that uses this program's SPL escrow, and a devnet
   deployment; until then its registry row is capped below 60%.
+
+## 2026-09-27 (later) — the repo scanner, the BTC header source, and two lanes opened
+
+- **`repo_scanner_agent` 25 -> 58.** `scripts/swarm/swarm_scan.sh` was a `rg` dump plus a list of
+  filenames containing a subsystem word, and the registry cited `swarm_scan_generates_report`, a test
+  that existed nowhere. Nothing caught the phantom citation because `scripts/check-readiness-consistency.sh`
+  only resolves `required_tests` when `crate_or_service` is a *directory* holding `.rs` files; a row
+  pointing at a script is skipped entirely. The scanner (`scripts/swarm/x3_repo_scan.py`) now emits a
+  finding schema (id/severity/kind/path/line/symbol/why/fix/test/gate), sorted so two runs are
+  byte-identical, ratchets only the kinds nothing else owns (`docs/reports/repo-scan-baseline.json`),
+  folds the fake-code and panic ratchets' verdicts in instead of duplicating their debt, and emits
+  `.ai/patches/<id>.patch` for the one mechanical class. `stale-registry-test` is now its first check;
+  it immediately found that `launch_gate` cites two tests nobody wrote (`testnet_rc_gate`,
+  `mainnet_rc_gate`) — recorded as a blocker on that row.
+- **Its first live run found a systemic weight defect**: 25 extrinsics charge an invented literal
+  (`#[pallet::weight(Weight::from_parts(10_000, 0))]`), 13 of them in runtime-registered pallets, and
+  several of those pallets have **no `weights.rs` at all**. That is the PR #519 class one step
+  earlier, and it is a lane in flight (`.ai/tasks/2026-09-27-weights/benchmark-derived-weights.md`).
+  Do not "fix" it by re-baselining upward; the fix is a benchmark run.
+- **`ungated-crate` needs the repo's own standard**: a workspace-wide `cargo test --workspace` gate
+  counts as coverage for root-workspace members (that is what `check-crate-tests-are-gated.py` does),
+  so only a nested workspace nothing reaches is a finding. Three of the four remaining ones cannot
+  even resolve: `x3-autonomic-core` fails dependency resolution (`chrono`), and both fuzz workspaces
+  have stale lockfiles that `--locked` refuses. Two suites it flagged (`x3-svm-client`,
+  `integration-tests/svm-counter-test`) were gated and pass; the ratchet was re-baselined downward in
+  the same commit.
+- **`btc_fortress_gateway` 45 -> 72** (lane `btc_header_source`): `scripts/btc/push-headers.py`
+  fetches real headers from a public Esplora endpoint, checks the parent link and the source's own
+  answer for each height, refuses a gap or a lying source with a non-zero exit that names the height,
+  and is off unless a source is named. `scripts/testnet/btc-header-source-drill.sh` verified a real
+  chain (mempool.space testnet; blockstream.info returned 429 — expect that), and the pallet gained a
+  test that decodes the relayer's own bytes and admits them in order. Known open: the pallet's
+  `btc_bits_follow_parent` enforces mainnet's rule, so testnet3's minimum-difficulty blocks are
+  refused; no public spec pins a checkpoint; the push still needs root.
+- **Two lanes opened and running:** pallet weights (above) and the Tauri operator console
+  (`.ai/tasks/2026-09-27-tauri/operator-console.md`, registry row 15% — the lowest, and there is not
+  one test attribute anywhere under `apps/tauri-os` today).
+- **Composite after this turn: registry mean 61.18%** (58.23% at the start of the day), 0 BROKEN rows,
+  149 matrix rows. The fastest route to 75% is still the low rows: 15 / 40 / 45 / 45 / 50 / 55 …
   `repo_scanner_v2`) no longer need to be re-checked.
