@@ -324,7 +324,7 @@ bytes**:
   signed payload. It had been dead: it required `RuntimeVersion.state_version`, a field the
   pinned polkadot-sdk revision removed, so every run exited with
   `::error::RuntimeVersion.state_version missing`, and nothing ran it to notice. It now runs in
-  the default gate set (`runtime identity baseline`), and `runtime/runtime-identity.baseline.json`
+  the default gate set (`runtime identity baseline`), and `docs/reports/runtime-identity.baseline.json`
   was regenerated at the value above with `accepted_reasons` naming why each field reads what it
   reads.
 

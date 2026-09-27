@@ -437,13 +437,25 @@ GATES_FAST=(
   # live in one Rust file: `RuntimeVersion` (spec_name/impl_name/authoring_version/spec_version/
   # impl_version/transaction_version), the `construct_runtime!` pallet order that decides every
   # pallet index, and the `SignedExtra` tuple order that is part of every signed payload. It
-  # existed, held a baseline (`runtime/runtime-identity.baseline.json`) and was called by
+  # existed, held a baseline (`docs/reports/runtime-identity.baseline.json`) and was called by
   # nothing — so nothing noticed either that it could no longer run, or that its baseline had
   # been sitting at `spec_version: 10` for ten versions. Measured 2026-09-27 before the fix:
   # every invocation exited 1 with `::error::RuntimeVersion.state_version missing`, a field the
   # pinned polkadot-sdk revision removed. It runs here now, and the baseline was regenerated at
   # the current runtime with `accepted_reasons` naming why each value is what it is.
-  "runtime identity baseline:bash scripts/ci/verify_runtime_identity_baseline.sh runtime/src/lib.rs runtime/runtime-identity.baseline.json"
+  #
+  # 2026-09-27: the record moved out of `runtime/` to `docs/reports/`, beside the WASM hash
+  # record. `runtime hash freshness` counts *every* file under a package in the runtime's
+  # dependency graph, because a file there can reach the wasm through `include_bytes!` — which
+  # is real in this package (`runtime/src/lib.rs` embeds `genesis-presets/*.json`). A record of
+  # the runtime's identity is not an input to the build, though: nothing includes it, the gate
+  # below re-derives the identity from `runtime/src/lib.rs` on every run and fails if the record
+  # disagrees, and stage 6b of `make mainnet-check` rebuilt the runtime after this file changed
+  # and matched the recorded hashes (`0x22ce9050…` / `0x7c3b8721…`) — so the file cannot alter
+  # the attested bytes, and leaving it inside the graph meant every correction to it demanded a
+  # forty-minute double `srtool` rebuild that provably could not change anything. The freshness
+  # gate keeps its full strictness; only the record's home moved.
+  "runtime identity baseline:bash scripts/ci/verify_runtime_identity_baseline.sh runtime/src/lib.rs docs/reports/runtime-identity.baseline.json"
   # `X3-CLAIM-002` scored 20/10/10 against a claim that had already been renamed out of
   # `CURRENT_MAINNET_STATUS.md` — because it had moved somewhere nothing checked: the desktop
   # CRM's outbound templates, which asserted "300ms cross-chain finality (vs 12s on Solana)",

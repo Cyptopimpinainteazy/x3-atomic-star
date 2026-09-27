@@ -61,6 +61,62 @@ RUNTIME_PACKAGE = "x3-chain-runtime"
 # it demanded a re-attestation of provably could not have changed.
 CRATE_ROOTS = ("lib.rs", "main.rs")
 
+# Non-Rust files: a data file can only reach the wasm if something in the graph
+# reads or embeds it. Manifests and toolchain files are build inputs by
+# construction — `Cargo.toml` decides features, `Cargo.lock` decides revisions —
+# and everything else is decided from the tree: a non-Rust file that no `.rs`
+# file in the graph names cannot be an input to the build.
+BUILD_INPUT_NAMES = frozenset(
+    {
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "rust-toolchain",
+        "rust-toolchain.toml",
+    }
+)
+BUILD_INPUT_DIRS = frozenset({".cargo"})
+
+
+def graph_source_texts(root: pathlib.Path, graph_dirs) -> list[tuple[pathlib.Path, str]]:
+    """Every `.rs` file under the runtime's dependency-graph directories."""
+    texts: list[tuple[pathlib.Path, str]] = []
+    for directory in graph_dirs:
+        base = root / directory
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*.rs")):
+            try:
+                texts.append((path, path.read_text(encoding="utf-8", errors="replace")))
+            except OSError:
+                continue
+    return texts
+
+
+def is_not_build_input(relative: str, root: pathlib.Path | None = None, sources=None) -> str | None:
+    """Why a non-Rust file cannot reach the wasm target, or `None` if it can.
+
+    `runtime/src/lib.rs` really does embed data files (`include_bytes!` of
+    `genesis-presets/dev.json`), so a file under a graph directory is not
+    automatically irrelevant. What makes a file an input is that a source names
+    it: the rule below is read off the tree rather than off the file's extension,
+    and `--self-test` pins both directions — a named JSON stays counted, an
+    unnamed record is ignored, and a manifest is always counted.
+    """
+    root = ROOT if root is None else root
+    path = pathlib.Path(relative)
+    if path.suffix == ".rs":
+        return None
+    if path.name in BUILD_INPUT_NAMES:
+        return None
+    if any(part in BUILD_INPUT_DIRS for part in path.parts[:-1]):
+        return None
+    needle = path.name
+    for _source, text in sources if sources is not None else graph_source_texts(root, [pathlib.Path(".")]):
+        if needle in text:
+            return None
+    return "not a build manifest, and no source in the runtime graph names it"
+
 
 def is_test_only(relative: str, root: pathlib.Path | None = None) -> str | None:
     """Why `relative` cannot reach the wasm target, or `None` if it can.
@@ -261,9 +317,46 @@ def self_test() -> int:
             print(f"[runtime-hash self-test] FAIL: {failure}", file=sys.stderr)
         if failures:
             return 1
+
+        # The second exemption: non-Rust files. Same shape — read off the tree,
+        # pinned in both directions.
+        (root / "src" / "genesis-presets").mkdir()
+        (root / "src" / "genesis-presets" / "dev.json").write_text("{}")
+        (root / "src" / "records").mkdir()
+        (root / "src" / "records" / "identity.baseline.json").write_text("{}")
+        (root / "src" / "NOTES.md").write_text("")
+        (root / "src" / "lib.rs").write_text(
+            (root / "src" / "lib.rs").read_text()
+            + '\nconst DEV: &[u8] = include_bytes!("genesis-presets/dev.json");\n'
+        )
+
+        non_rust_ignored = {"src/records/identity.baseline.json", "src/NOTES.md"}
+        non_rust_counted = {
+            "Cargo.toml",
+            "src/genesis-presets/dev.json",
+            "src/lib.rs",
+            "src/test_helpers.rs",
+        }
+        for rel in sorted(non_rust_ignored):
+            reason = is_not_build_input(rel, root, graph_source_texts(root, [pathlib.Path(".")]))
+            if reason is None:
+                failures.append(f"{rel} must be recognised as not a build input")
+            else:
+                print(f"  ignored  {rel} — {reason}")
+        for rel in sorted(non_rust_counted):
+            reason = is_not_build_input(rel, root, graph_source_texts(root, [pathlib.Path(".")]))
+            if reason is not None:
+                failures.append(f"{rel} must stay counted, but was ignored ({reason})")
+            else:
+                print(f"  counted  {rel}")
+        for failure in failures:
+            print(f"[runtime-hash self-test] FAIL: {failure}", file=sys.stderr)
+        if failures:
+            return 1
     print(
         "[runtime-hash self-test] OK — 3 test-only shape(s) ignored, "
-        "5 that can reach the wasm counted"
+        "5 that can reach the wasm counted; 2 non-build-input file(s) ignored, "
+        "4 that can reach the wasm counted"
     )
     return 0
 
@@ -322,6 +415,13 @@ def main() -> int:
         return 2
 
     ignored: list[tuple[str, str]] = []
+    graph_sources: list[tuple[pathlib.Path, str]] | None = None
+
+    def sources() -> list[tuple[pathlib.Path, str]]:
+        nonlocal graph_sources
+        if graph_sources is None:
+            graph_sources = graph_source_texts(ROOT, graph_dirs)
+        return graph_sources
 
     def in_graph(paths: set[str]) -> list[str]:
         found = []
@@ -329,6 +429,8 @@ def main() -> int:
             if not any(parent in pathlib.Path(path).parents for parent in graph_dirs):
                 continue
             reason = is_test_only(path)
+            if reason is None and pathlib.Path(path).suffix != ".rs":
+                reason = is_not_build_input(path, ROOT, sources())
             if reason is not None:
                 # Named, never silently dropped: a check that quietly ignores
                 # input is the failure mode this whole script exists to catch.
