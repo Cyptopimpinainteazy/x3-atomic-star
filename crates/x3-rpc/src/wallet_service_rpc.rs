@@ -1,19 +1,35 @@
 /// Wallet Service RPC - Phase 3 Implementation
 ///
-/// Provides comprehensive wallet management API endpoints including:
-/// - Wallet creation, import, and backup
-/// - Balance queries and token management
-/// - Transaction signing and submission
-/// - Network selection (mainnet/testnet/local)
-/// - Security features (PIN protection, biometric auth)
-/// - Wallet status monitoring
+/// The endpoint surface a wallet frontend calls: create/import/backup a wallet,
+/// read balances, sign and submit a transaction, list history and status, pick a
+/// network.
+///
+/// # State, 2026-09-27: every method refuses
+///
+/// This module used to answer all of those with invented values, and the worst of
+/// them was `create_wallet`, which returned the **public test mnemonic**
+/// (`"test test test … test"`, twelve words) and an address built by slicing that
+/// string: `format!("0x{}", &mnemonic[0..40])`. A wallet that trusted it would
+/// hand a user an address nobody holds a key for and a seed phrase the whole world
+/// knows. The rest were the same shape — `sign_transaction` returned "signature:
+/// the first 130 characters of the transaction data", `submit_transaction` a hash
+/// sliced out of its own input string, `get_balance` a hardcoded 1250 X3 and 2.45
+/// ETH, `get_transactions` two invented transactions at invented block heights,
+/// `list_wallets` two invented wallets, `get_wallet_status` "synced at block
+/// 1234567" for any id, `get_networks` three invented endpoints.
+///
+/// None of that is fixable in the node: a node does not hold a user's keys, has no
+/// keystore, no wallet index and no transaction-history store, and the runtime API
+/// this module has in scope (`AtlasKernelRuntimeApi`) has no balance query. So the
+/// honest state is a refusal that names what is missing, which is also what
+/// `crates/x3-rpc/src/wallet_dex_rpc.rs` and `crates/x3-wallet`'s hardware
+/// verifier already do. The input validation each method had is kept, so a
+/// malformed request still gets the precise parameter error.
 use jsonrpc_core::{Error, Result};
 use jsonrpc_derive::rpc;
-use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::traits::Block as BlockT;
 use std::sync::Arc;
-use x3_chain_runtime::{AccountId, AssetId, Balance};
 
 // ============================================================================
 // Request/Response Types
@@ -307,304 +323,263 @@ impl<Block, Client> WalletServiceRpc<Block, Client> {
 impl<Block, Client> WalletServiceApi for WalletServiceRpc<Block, Client>
 where
     Block: BlockT,
-    Client: HeaderBackend<Block> + ProvideRuntimeApi<Block> + 'static,
-    <Client as ProvideRuntimeApi<Block>>::Api:
-        pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+    Client: HeaderBackend<Block> + 'static,
 {
     fn create_wallet(&self, request: CreateWalletRequest) -> Result<CreateWalletResponse> {
-        // Input validation
-        if request.wallet_name.is_empty() || request.wallet_name.len() > 64 {
-            return Err(Error::invalid_params("Wallet name must be 1-64 characters"));
-        }
+        validate_create_wallet(&request)?;
 
-        if request.password_hash.len() < 32 {
-            return Err(Error::invalid_params(
-                "Password hash must be at least 32 characters",
-            ));
-        }
-
-        // Generate or use provided mnemonic
-        let mnemonic = request.mnemonic.unwrap_or_else(|| {
-            // In production: use secure random generation
-            "test test test test test test test test test test test test".to_string()
-        });
-
-        // In production: derive addresses from mnemonic for all supported chains
-        let address = format!("0x{}", &mnemonic[0..40]); // Simplified address derivation
-
-        Ok(CreateWalletResponse {
-            wallet_id: format!("wallet_{}", &address[2..10]),
-            address,
-            mnemonic: Some(mnemonic),
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        })
+        // **Refused, not fabricated.** This returned the public test mnemonic and an address
+        // built by slicing it, so every "wallet" it created was the same, unspendable and
+        // world-readable. Key generation and address derivation belong to the client (or to
+        // `crates/x3-wallet` with a real KDF), and a node that claims to have done them is
+        // lying about custody.
+        Err(unwired("Wallet key generation and address derivation"))
     }
 
     fn import_wallet(&self, request: ImportWalletRequest) -> Result<CreateWalletResponse> {
-        // Validate mnemonic
-        let mnemonic_words: Vec<&str> = request.mnemonic.split_whitespace().collect();
-        if mnemonic_words.len() != 12 && mnemonic_words.len() != 24 {
-            return Err(Error::invalid_params("Mnemonic must have 12 or 24 words"));
-        }
+        validate_import_wallet(&request)?;
 
-        // Derive address from mnemonic
-        let address = format!("0x{}", &request.mnemonic[0..40]);
-
-        Ok(CreateWalletResponse {
-            wallet_id: format!("wallet_{}", &address[2..10]),
-            address,
-            mnemonic: None, // Don't return mnemonic on import
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        })
+        // **Refused, not fabricated.** Importing returned an address sliced out of the mnemonic
+        // string, which is not a derivation of anything: the address did not correspond to the
+        // seed the user imported.
+        Err(unwired("Wallet address derivation from a mnemonic"))
     }
 
     fn backup_wallet(&self, request: BackupWalletRequest) -> Result<BackupWalletResponse> {
-        // In production: encrypt wallet data with password hash
-        let backup_data = format!("backup_{}", request.wallet_id);
-        let backup_hash = format!("hash_{}", backup_data);
-
-        Ok(BackupWalletResponse {
-            backup_data,
-            backup_hash,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        })
+        // **Refused, not fabricated.** The "backup" was `format!("backup_{wallet_id}")` and its
+        // "hash" was `format!("hash_{backup_data}")`: no key material, no encryption, and a
+        // checksum that would change if the string did. A user who kept that file as a backup
+        // would have kept nothing.
+        let _ = &request.wallet_id;
+        Err(unwired("Wallet keystore and encrypted backup"))
     }
 
     fn get_balance(&self, request: GetBalanceRequest) -> Result<GetBalanceResponse> {
-        // Query runtime for balances
-        // In production: query actual balances from chain state
-
-        let tokens = vec![
-            TokenBalance {
-                token_id: "0x0000000000000000000000000000000000000000000000000000000000000000"
-                    .to_string(),
-                symbol: "X3".to_string(),
-                name: "X3 Sphere".to_string(),
-                balance: "1250000000000000000000".to_string(), // 1250 X3 with 18 decimals
-                decimals: 18,
-                value_usd: Some("3750.00".to_string()),
-                network: request.network.clone(),
-            },
-            TokenBalance {
-                token_id: "0x0000000000000000000000000000000000000000000000000000000000000001"
-                    .to_string(),
-                symbol: "ETH".to_string(),
-                name: "Ethereum".to_string(),
-                balance: "2450000000000000000".to_string(), // 2.45 ETH
-                decimals: 18,
-                value_usd: Some("8304.50".to_string()),
-                network: request.network.clone(),
-            },
-        ];
-
-        let total_balance_usd = tokens
-            .iter()
-            .filter_map(|t| t.value_usd.as_ref())
-            .map(|v| v.parse::<f64>().unwrap_or(0.0))
-            .sum::<f64>();
-
-        Ok(GetBalanceResponse {
-            wallet_id: request.wallet_id,
-            total_balance_usd: Some(total_balance_usd.to_string()),
-            tokens,
-        })
+        // **Refused, not fabricated.** This answered with 1250 X3 and 2.45 ETH, a USD valuation
+        // for each, and a total — for any wallet id, from no source at all. A wallet UI showing
+        // those numbers is showing constants. The runtime API in scope has no balance query, and
+        // the node has no wallet-to-account mapping to look one up with.
+        let _ = (&request.wallet_id, &request.token_id, &request.network);
+        Err(unwired("Wallet balance query"))
     }
 
     fn sign_transaction(&self, request: SignTransactionRequest) -> Result<SignTransactionResponse> {
-        // Validate password hash
-        if request.password_hash.len() < 32 {
-            return Err(Error::invalid_params("Invalid password hash"));
-        }
+        validate_password_hash(&request.password_hash)?;
 
-        // In production: decrypt wallet, sign transaction with private key
-        let signature = format!("0x{}", &request.transaction_data[0..130]);
-        let signed_transaction = format!("signed_{}", request.transaction_data);
-        let transaction_hash = format!("hash_{}", signed_transaction);
-
-        Ok(SignTransactionResponse {
-            signature,
-            signed_transaction,
-            transaction_hash,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        })
+        // **Refused, not fabricated.** The "signature" was the first 130 characters of the
+        // transaction data and the "hash" was the string `hash_signed_<data>`. A wallet that
+        // submitted that would submit an unsigned transaction with a signature field full of the
+        // message. A node must not sign for a user in any case: it holds no wallet keys.
+        let _ = &request.transaction_data;
+        Err(unwired("Wallet transaction signing"))
     }
 
     fn submit_transaction(
         &self,
         request: SubmitTransactionRequest,
     ) -> Result<SubmitTransactionResponse> {
-        // In production: submit transaction to mempool
-        let transaction_hash = format!("0x{}", &request.signed_transaction[7..71]);
-
-        Ok(SubmitTransactionResponse {
-            transaction_hash,
-            block_hash: None, // Will be populated after confirmation
-            status: "pending".to_string(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        })
+        // **Refused, not fabricated.** It reported `status: "pending"` with a hash sliced out of
+        // its own input string (`&signed_transaction[7..71]`) and never touched the transaction
+        // pool. Nothing was submitted and nothing is pending. The submission surface a wallet
+        // should use is `author_submitExtrinsic`.
+        let _ = &request.signed_transaction;
+        Err(unwired("Wallet transaction submission"))
     }
 
     fn get_transactions(&self, request: GetTransactionsRequest) -> Result<GetTransactionsResponse> {
-        let page = request.page.unwrap_or(1);
-        let page_size = request.page_size.unwrap_or(20);
-
-        let transactions = vec![
-            TransactionInfo {
-                hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                    .to_string(),
-                from: "0x1234567890123456789012345678901234567890".to_string(),
-                to: "0xabcdef1234567890abcdef1234567890abcdef12".to_string(),
-                amount: "1000000000000000000".to_string(), // 1 X3
-                token: "X3".to_string(),
-                status: "confirmed".to_string(),
-                block_number: Some(1234567),
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    - 3600,
-                fee: Some("210000000000000".to_string()),
-            },
-            TransactionInfo {
-                hash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-                    .to_string(),
-                from: "0xabcdef1234567890abcdef1234567890abcdef12".to_string(),
-                to: "0x1234567890123456789012345678901234567890".to_string(),
-                amount: "5000000000000000000".to_string(), // 5 X3
-                token: "X3".to_string(),
-                status: "pending".to_string(),
-                block_number: None,
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    - 1800,
-                fee: Some("210000000000000".to_string()),
-            },
-        ];
-
-        Ok(GetTransactionsResponse {
-            wallet_id: request.wallet_id,
-            transactions,
-            total_count: 2,
-            page,
-            page_size,
-        })
+        // **Refused, not fabricated.** This returned two transactions with made-up hashes
+        // (`0x1234…` / `0xabcd…`), addresses, amounts and block heights, timestamped relative to
+        // now, for any wallet id. Transaction history needs an indexer that this node does not
+        // have; `chain_getBlock` and the explorer's own index are the real surfaces.
+        let _ = (&request.wallet_id, request.page, request.page_size);
+        Err(unwired("Wallet transaction history index"))
     }
 
     fn get_wallet_status(
         &self,
         request: GetWalletStatusRequest,
     ) -> Result<GetWalletStatusResponse> {
-        // In production: query actual wallet status from storage
-        Ok(GetWalletStatusResponse {
-            status: WalletStatus {
-                wallet_id: request.wallet_id,
-                is_connected: true,
-                network: "mainnet".to_string(),
-                last_sync_block: 1234567,
-                sync_status: "synced".to_string(),
-                balance_updated_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            },
-        })
+        // **Refused, not fabricated.** Every id got `is_connected: true`, `network: "mainnet"`,
+        // `last_sync_block: 1234567`, `sync_status: "synced"`. A wallet showing "synced" at a
+        // block that does not exist is worse than one showing nothing.
+        let _ = &request.wallet_id;
+        Err(unwired("Wallet status store"))
     }
 
     fn list_wallets(&self, request: ListWalletsRequest) -> Result<ListWalletsResponse> {
-        let wallets = vec![
-            WalletSummary {
-                wallet_id: "wallet_12345678".to_string(),
-                name: "Main Wallet".to_string(),
-                address: "0x1234567890123456789012345678901234567890".to_string(),
-                network: "mainnet".to_string(),
-                created_at: 1704067200,
-                last_active: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-                total_balance_usd: Some("12054.50".to_string()),
-            },
-            WalletSummary {
-                wallet_id: "wallet_abcdef12".to_string(),
-                name: "Trading Wallet".to_string(),
-                address: "0xabcdef1234567890abcdef1234567890abcdef12".to_string(),
-                network: "testnet".to_string(),
-                created_at: 1704153600,
-                last_active: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    - 86400,
-                total_balance_usd: Some("5000.00".to_string()),
-            },
-        ];
-
-        Ok(ListWalletsResponse {
-            wallets,
-            total_count: 2,
-        })
+        // **Refused, not fabricated.** It returned two invented wallets ("Main Wallet", "Trading
+        // Wallet") with balances, for every caller. A wallet list is the client's own store.
+        let _ = &request.network;
+        Err(unwired("Wallet keystore"))
     }
 
     fn set_network(&self, request: SetNetworkRequest) -> Result<SetNetworkResponse> {
-        // Validate network
-        let valid_networks = ["mainnet", "testnet", "local"];
-        if !valid_networks.contains(&request.network.as_str()) {
-            return Err(Error::invalid_params(format!(
-                "Invalid network. Must be one of: {}",
-                valid_networks.join(", ")
-            )));
-        }
+        validate_network(&request.network)?;
 
-        Ok(SetNetworkResponse {
-            wallet_id: request.wallet_id,
-            network: request.network,
-            success: true,
-        })
+        // **Refused, not fabricated.** The name was validated and then `success: true` was
+        // returned for a selection nothing stored, so a wallet that had asked to switch to
+        // testnet was told it had. Network selection is client state; the node can only report
+        // which chain it is (that is what the system RPC methods are for).
+        let _ = (&request.wallet_id, &request.network);
+        Err(unwired("Wallet network selection store"))
     }
 
     fn get_networks(&self) -> Result<Vec<NetworkConfig>> {
-        Ok(vec![
-            NetworkConfig {
-                name: "X3 Mainnet".to_string(),
-                chain_id: 123456789,
-                rpc_url: "https://rpc.x3chain.io".to_string(),
-                ws_url: Some("wss://rpc.x3chain.io/ws".to_string()),
-                explorer_url: Some("https://explorer.x3chain.io".to_string()),
-                is_testnet: false,
-            },
-            NetworkConfig {
-                name: "X3 Testnet".to_string(),
-                chain_id: 123456788,
-                rpc_url: "https://rpc-testnet.x3chain.io".to_string(),
-                ws_url: Some("wss://rpc-testnet.x3chain.io/ws".to_string()),
-                explorer_url: Some("https://explorer-testnet.x3chain.io".to_string()),
-                is_testnet: true,
-            },
-            NetworkConfig {
-                name: "Local Devnet".to_string(),
-                chain_id: 123456787,
-                rpc_url: "http://localhost:9933".to_string(),
-                ws_url: Some("ws://localhost:9944".to_string()),
-                explorer_url: None,
-                is_testnet: true,
-            },
-        ])
+        // **Refused, not fabricated.** The three entries were invented: chain ids 123456789/88/87
+        // and endpoints (`rpc.x3chain.io`, `explorer.x3chain.io`) that this repository does not
+        // configure anywhere. A wallet that took them would point users at hosts that may not
+        // exist. The node's own identity is available from the system RPC methods.
+        Err(unwired("Wallet network registry"))
+    }
+}
+
+/// A backend this node does not have.
+///
+/// `InternalError` on purpose: the request is well formed and the node cannot serve it, which
+/// is not the caller's fault and must never be reported as success.
+fn unwired(backend: &str) -> Error {
+    let mut error = Error::internal_error();
+    error.message = format!("{backend} is not wired into this node");
+    error
+}
+
+/// Wallet names are 1-64 characters.
+fn validate_wallet_name(name: &str) -> Result<()> {
+    if name.is_empty() || name.len() > 64 {
+        return Err(Error::invalid_params("Wallet name must be 1-64 characters"));
+    }
+    Ok(())
+}
+
+/// The password hash the caller supplies must look like one (32 characters or more).
+fn validate_password_hash(hash: &str) -> Result<()> {
+    if hash.len() < 32 {
+        return Err(Error::invalid_params(
+            "Password hash must be at least 32 characters",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_create_wallet(request: &CreateWalletRequest) -> Result<()> {
+    validate_wallet_name(&request.wallet_name)?;
+    validate_password_hash(&request.password_hash)
+}
+
+fn validate_import_wallet(request: &ImportWalletRequest) -> Result<()> {
+    let words = request.mnemonic.split_whitespace().count();
+    if words != 12 && words != 24 {
+        return Err(Error::invalid_params("Mnemonic must have 12 or 24 words"));
+    }
+    validate_password_hash(&request.password_hash)
+}
+
+/// The names the wallet surface accepts. Validated even though the selection cannot be stored:
+/// a caller that misspells a network should hear that, not "not implemented".
+fn validate_network(name: &str) -> Result<()> {
+    const VALID_NETWORKS: [&str; 3] = ["mainnet", "testnet", "local"];
+    if !VALID_NETWORKS.contains(&name) {
+        return Err(Error::invalid_params(format!(
+            "Invalid network. Must be one of: {}",
+            VALID_NETWORKS.join(", ")
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create(name: &str, password: &str) -> CreateWalletRequest {
+        CreateWalletRequest {
+            wallet_name: name.to_string(),
+            password_hash: password.to_string(),
+            mnemonic: None,
+            network: "local".to_string(),
+        }
+    }
+
+    /// The validations that were always real stay real, so a malformed request gets the
+    /// parameter error rather than "not implemented".
+    #[test]
+    fn validation_rejects_a_malformed_request_before_anything_else() {
+        let long_name = create(&"x".repeat(65), &"p".repeat(32));
+        assert!(validate_create_wallet(&long_name)
+            .unwrap_err()
+            .message
+            .contains("1-64 characters"));
+
+        let short_password = create("wallet", "short");
+        assert!(validate_create_wallet(&short_password)
+            .unwrap_err()
+            .message
+            .contains("at least 32"));
+
+        let bad_mnemonic = ImportWalletRequest {
+            mnemonic: "one two three".to_string(),
+            password_hash: "p".repeat(32),
+            wallet_name: None,
+            network: "local".to_string(),
+        };
+        assert!(validate_import_wallet(&bad_mnemonic)
+            .unwrap_err()
+            .message
+            .contains("12 or 24 words"));
+
+        let good_mnemonic = ImportWalletRequest {
+            mnemonic: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(),
+            password_hash: "p".repeat(32),
+            wallet_name: None,
+            network: "local".to_string(),
+        };
+        assert!(validate_import_wallet(&good_mnemonic).is_ok());
+
+        assert!(validate_network("not-a-network")
+            .unwrap_err()
+            .message
+            .contains("Invalid network"));
+        assert!(validate_network("testnet").is_ok());
+    }
+
+    /// A well-formed request is refused with the *missing backend*, never with invented data.
+    /// Every implementation this module had would fail this: the address came from slicing a
+    /// mnemonic, the balance was a constant, the hash was a slice of its own input.
+    #[test]
+    fn every_unwired_backend_names_itself_and_never_invents_data() {
+        assert!(validate_create_wallet(&create("wallet", &"p".repeat(32))).is_ok());
+
+        for backend in [
+            "Wallet key generation and address derivation",
+            "Wallet address derivation from a mnemonic",
+            "Wallet keystore and encrypted backup",
+            "Wallet balance query",
+            "Wallet transaction signing",
+            "Wallet transaction submission",
+            "Wallet transaction history index",
+            "Wallet status store",
+            "Wallet keystore",
+            "Wallet network selection store",
+            "Wallet network registry",
+        ] {
+            let error = unwired(backend);
+            assert!(error.message.contains(backend), "{}", error.message);
+            assert!(
+                error.message.contains("not wired into this node"),
+                "{}",
+                error.message
+            );
+            assert_ne!(
+                serde_json::to_value(&error.code).unwrap(),
+                serde_json::json!(0),
+                "an unwired backend is never a success"
+            );
+        }
+
+        let refusal = unwired("Wallet key generation and address derivation").message;
+        assert!(
+            !refusal.contains("test test test") && !refusal.contains("0x"),
+            "the refusal must not echo a mnemonic or an address: {refusal}"
+        );
     }
 }

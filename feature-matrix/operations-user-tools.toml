@@ -345,3 +345,43 @@ evidence = [
   "pallets/atomic-trade-engine/src/runtime_api.rs",
   "note: 2026-09-27 - three wallet-facing RPCs returned invented values and no row tracked the file",
 ]
+
+[[feature]]
+id = "X3-OPS-015"
+name = "Wallet service RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-rpc/src/wallet_service_rpc.rs"]
+implemented = 45
+tested = 55
+mainnet_ready = 10
+priority = "P1"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = true
+# Untracked until 2026-09-27, like X3-OPS-014. Registered only for development chain specs
+# (`enable_demo_wallet_rpc = chain_type == ChainType::Development`), which is the only thing that
+# keeps it out of the launch story: the values it returned were fabricated, and the worst of them
+# was a wallet seed.
+blockers = [
+  "**CLOSED 2026-09-27 — `wallet_createWallet` handed out a wallet whose seed phrase is public.** It defaulted the mnemonic to `\"test test test … test\"` (twelve words, the standard public test phrase) and derived the address as `format!(\"0x{}\", &mnemonic[0..40])` — a slice of the mnemonic string, not a derivation of any key. Every \"wallet\" it created was the same, world-readable and unspendable. It refuses now, keeping the real name/password validations.",
+  "**CLOSED 2026-09-27 — `wallet_importWallet` returned an address sliced out of the mnemonic.** Same slice; the address did not correspond to the seed the user imported. It refuses now, after the word-count and password validations.",
+  "**CLOSED 2026-09-27 — `wallet_signTransaction` returned the message as the signature.** `signature = format!(\"0x{}\", &transaction_data[0..130])` and `transaction_hash = format!(\"hash_signed_{data}\")`: an unsigned transaction with a signature field full of its own bytes. A node holds no wallet keys and must not sign for a user. It refuses now.",
+  "**CLOSED 2026-09-27 — `wallet_submitTransaction` reported a submission that never happened.** It answered `status: \"pending\"` with a hash sliced out of its own input and never touched the transaction pool. It refuses now; the real submission surface is `author_submitExtrinsic`.",
+  "**CLOSED 2026-09-27 — the read surfaces returned constants.** `wallet_getBalance` answered 1250 X3 and 2.45 ETH with USD values for any wallet id; `wallet_getTransactions` two invented transactions at invented block heights; `wallet_listWallets` two invented wallets with balances; `wallet_getWalletStatus` `is_connected: true, network: \"mainnet\", last_sync_block: 1234567, sync_status: \"synced\"` for any id; `wallet_getNetworks` three invented endpoints (`rpc.x3chain.io`, chain ids 123456789/88/87). All five refuse now with the missing backend named. `wallet_setNetwork` validated the name and then returned `success: true` for a selection nothing stored; it validates and then refuses. `wallet_backupWallet` returned `backup_<wallet_id>` with `hash_backup_<id>` as its \"backup hash\" — no key material, no encryption; it refuses.",
+  "**OPEN — there is no wallet service.** The node has no keystore, no wallet index, no history index, no network registry and no transaction pool binding in this module, and it must never hold a user's keys. A real implementation is a client-side keystore (`crates/x3-wallet`) plus an indexer, not a node RPC. Until then every method refusing is the honest state, and the wallet UI has no node-side wallet service on a dev chain either.",
+  "**OPEN — the tests call the decisions, not the methods.** The two tests drive the pure validators and the refusal helper; driving `create_wallet`/`sign_transaction` themselves needs a `HeaderBackend` test double that this crate does not have.",
+]
+required_tests = [
+  "validation_rejects_a_malformed_request_before_anything_else",
+  "every_unwired_backend_names_itself_and_never_invents_data",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed (2026-09-27). Break-it-first: disabling the mnemonic word-count check reddens validation_rejects_a_malformed_request_before_anything_else, and the file was restored byte-identically.",
+  "note: removing ten `SystemTime::now().unwrap()` calls from this module dropped the panic/unwrap ratchet 450 -> 440; the baseline was lowered with `--update-baseline` so they cannot come back unnoticed.",
+]
+evidence = [
+  "crates/x3-rpc/src/wallet_service_rpc.rs",
+  "node/src/rpc.rs",
+  "note: 2026-09-27 - eleven wallet-service RPCs answered with fabricated values, including a public test mnemonic as a wallet seed",
+]

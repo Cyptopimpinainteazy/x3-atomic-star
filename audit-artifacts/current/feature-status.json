@@ -3849,6 +3849,42 @@
     },
     {
       "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 34,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-rpc/src/wallet_service_rpc.rs",
+        "node/src/rpc.rs",
+        "note: 2026-09-27 - eleven wallet-service RPCs answered with fabricated values, including a public test mnemonic as a wallet seed"
+      ],
+      "id": "X3-OPS-015",
+      "implemented": 45,
+      "launch_scope": "dev_tooling",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "**CLOSED 2026-09-27 \u2014 `wallet_createWallet` handed out a wallet whose seed phrase is public.** It defaulted the mnemonic to `\"test test test \u2026 test\"` (twelve words, the standard public test phrase) and derived the address as `format!(\"0x{}\", &mnemonic[0..40])` \u2014 a slice of the mnemonic string, not a derivation of any key. Every \"wallet\" it created was the same, world-readable and unspendable. It refuses now, keeping the real name/password validations.",
+        "**CLOSED 2026-09-27 \u2014 `wallet_importWallet` returned an address sliced out of the mnemonic.** Same slice; the address did not correspond to the seed the user imported. It refuses now, after the word-count and password validations.",
+        "**CLOSED 2026-09-27 \u2014 `wallet_signTransaction` returned the message as the signature.** `signature = format!(\"0x{}\", &transaction_data[0..130])` and `transaction_hash = format!(\"hash_signed_{data}\")`: an unsigned transaction with a signature field full of its own bytes. A node holds no wallet keys and must not sign for a user. It refuses now.",
+        "**CLOSED 2026-09-27 \u2014 `wallet_submitTransaction` reported a submission that never happened.** It answered `status: \"pending\"` with a hash sliced out of its own input and never touched the transaction pool. It refuses now; the real submission surface is `author_submitExtrinsic`.",
+        "**CLOSED 2026-09-27 \u2014 the read surfaces returned constants.** `wallet_getBalance` answered 1250 X3 and 2.45 ETH with USD values for any wallet id; `wallet_getTransactions` two invented transactions at invented block heights; `wallet_listWallets` two invented wallets with balances; `wallet_getWalletStatus` `is_connected: true, network: \"mainnet\", last_sync_block: 1234567, sync_status: \"synced\"` for any id; `wallet_getNetworks` three invented endpoints (`rpc.x3chain.io`, chain ids 123456789/88/87). All five refuse now with the missing backend named. `wallet_setNetwork` validated the name and then returned `success: true` for a selection nothing stored; it validates and then refuses. `wallet_backupWallet` returned `backup_<wallet_id>` with `hash_backup_<id>` as its \"backup hash\" \u2014 no key material, no encryption; it refuses.",
+        "**OPEN \u2014 there is no wallet service.** The node has no keystore, no wallet index, no history index, no network registry and no transaction pool binding in this module, and it must never hold a user's keys. A real implementation is a client-side keystore (`crates/x3-wallet`) plus an indexer, not a node RPC. Until then every method refusing is the honest state, and the wallet UI has no node-side wallet service on a dev chain either.",
+        "**OPEN \u2014 the tests call the decisions, not the methods.** The two tests drive the pure validators and the refusal helper; driving `create_wallet`/`sign_transaction` themselves needs a `HeaderBackend` test double that this crate does not have."
+      ],
+      "name": "Wallet service RPC",
+      "paths": [
+        "crates/x3-rpc/src/wallet_service_rpc.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "operations_user_tools",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
       "claim_risk": false,
       "composite": 78,
       "confidence": "high",
@@ -4802,7 +4838,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "d3b1e7773f1f91d390221384f5d7f781d3bfbd3eea803c466993aa95c88bd99e",
+    "source_digest": "09157cd0bbfe5b157215726ea59104cd6c9e87305391abac2c8845de6938ecf9",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "b8f8547e4ce2d80f52822512aadc23e411190ee386574075bce98b5fafdb953c",
@@ -4815,7 +4851,7 @@
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
-      "feature-matrix/operations-user-tools.toml": "395e5b42f1dfda3dba8146bd5874704e3885924b584477ddf56bfc7ca3a281a1",
+      "feature-matrix/operations-user-tools.toml": "cd6992c282f10c41167a145e3420589d8952f9d89147d468e97b07ddca6b88e2",
       "feature-matrix/runtime-core.toml": "d6883d27846f614206d7daeb2645cb5d44d2b8219c926ffb829c28f66ba3a82d",
       "feature-matrix/security-proofgate.toml": "e068bac58eb1ef680f457bcea1d8ad794ba65d89a410c7871b89d5edac2c9f37"
     }
@@ -5341,12 +5377,12 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 62,
-      "NOT INTEGRATED": 6,
+      "NOT INTEGRATED": 7,
       "NOT STARTED": 0,
       "PARTIAL": 71,
       "STUB": 1
     },
-    "matrix_features": 150,
+    "matrix_features": 151,
     "registry_features": 22,
     "registry_max_readiness": 88,
     "registry_mean_readiness": 63.18,
