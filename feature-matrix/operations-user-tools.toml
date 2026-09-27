@@ -84,16 +84,37 @@ id = "X3-OPS-004"
 name = "Telemetry integration"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["docs/reports/FUNCTIONAL_ROADMAP.md"]
-implemented = 40
-tested = 20
-mainnet_ready = 30
+paths = [
+  "docs/reports/FUNCTIONAL_ROADMAP.md",
+  "docs/testnet-config/prometheus-config.json",
+  "docs/testnet-config/alert-rules.json",
+  "docs/testnet-config/grafana-dashboards.json",
+  "scripts/monitoring",
+]
+implemented = 70
+tested = 65
+mainnet_ready = 35
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Roadmap still lists telemetry integration as unfinished"]
-evidence = ["docs/reports/FUNCTIONAL_ROADMAP.md", "note: Functional roadmap identifies telemetry as outstanding"]
+blockers = [
+  "Re-measured 2026-09-26: \"roadmap says unfinished\" no longer describes the tree, and the recorded score (40/20/30) was below what exists. The node's Prometheus exporter is scraped on every validator (`substrate_block_height{status=\"finalized\"}`, `substrate_sub_libp2p_peers_count`, `substrate_node_roles`), the `monitoring across validators`, `logging across validators` and `observability across seven validators` gates require all seven to identify themselves, and the last of those requires a real Prometheus, a real Grafana render and a real Fluent Bit ingest (it fails rather than skipping when the binaries are missing, because `X3_OBSERVABILITY_REQUIRE_REAL=1`).",
+  "**The alerting half was not loadable, and is now — with a gate.** `docs/testnet-config/alert-rules.json` was shaped `{\"alerts\": [...]}`; Prometheus wants `{\"groups\": [{\"name\": ..., \"rules\": [...]}]}` and `promtool check rules` refused it (`field alerts not found in type rulefmt.RuleGroups`). An operator starting the stack from it got a Prometheus that would not load its rules, while the runbooks counted alerting as configured. Its four expressions were also written for a Solana GPU validator (a Solana fork-distance counter, `gpu_memory_used_bytes`, `gpu_kernel_errors_total`), which this chain's exporter does not publish, so they could not have fired even in the right shape. The file is now a valid rule group over metrics this chain exports (no finality for 10 min, no block for 5 min, a validator with no peers, a scrape target down), `promtool check rules` reports `SUCCESS: 4 rules found`, and the new `ops artifacts` gate checks shape, loadability and metric relevance — measured: restoring the old shape fails it on both the shape and the promtool check, and pointing one rule at a Solana metric fails it for naming a metric this chain does not export.",
+  "What is still missing, and why mainnet readiness stays at 35: the stack is single-host (all seven validators on one machine), there is no Alertmanager or any configured notification receiver, no retention or central storage story for a public testnet, no dashboards rendered against production-shaped data, and nothing here has run on independent operators' hardware.",
+]
+test_evidence = [
+  "scripts/monitoring/check-ops-artifacts.sh",
+  "docs/testnet-config/alert-rules.json",
+  "note: `bash scripts/monitoring/check-ops-artifacts.sh` -> PASS: shape check (4 rules, 5 dashboards), `promtool check config` and `promtool check rules` both accepted, and every expression names a metric the node exports",
+  "note: measured load-bearing - restoring the old `{\"alerts\": [...]}` shape fails the gate on the shape check and on `promtool check rules`; pointing one rule at a metric this chain does not publish fails it with `expr names no metric this chain exports`",
+  "note: the live half is the existing gates - `monitoring across validators`, `logging across validators` and `observability across seven validators` (the last requires a real Prometheus, Grafana render and Fluent Bit ingest across all seven)",
+]
+evidence = [
+  "docs/reports/FUNCTIONAL_ROADMAP.md",
+  "scripts/monitoring/check-ops-artifacts.sh",
+  "note: Functional roadmap identified telemetry as outstanding; re-measured 2026-09-26 - the export/scrape/dashboard/log-ingest path exists and is gated across seven validators, the alert rules are now loadable and chain-relevant, and the residuals are the single-host deployment, the missing Alertmanager and the missing retention story",
+]
 
 [[feature]]
 id = "X3-OPS-005"

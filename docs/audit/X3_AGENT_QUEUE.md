@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `a8a3e7e63c054ec6…` — the artifacts move when
+Source digest: `403b2eea2db175e6…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -158,7 +158,7 @@ fails when they do not match.
 | MTX-X3-OPS-001 | operations_user_tools | Genesis ceremony tooling: The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists; The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, an… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
 | MTX-X3-OPS-002 | operations_user_tools | Snapshot / restore tooling: **CLOSED 2026-09-26 — there is a live restore proof, and it is load-bearing.** This row asked for "live restore drills and integrity verification"; the only restore test round-tripped a text file through a tarball, which passes just as well… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 60% (no named test list on this row) | open |
 | MTX-X3-OPS-003 | operations_user_tools | Public testnet gate: There is no public testnet to gate: measured 2026-09-22 — `rpc.testnet.x3-chain.io`, `faucet.testnet.x3-chain.io` and `bootnode.testnet.x3-chain.io` do not resolve (from a host whose DNS reaches github.com), `gh run list --workflow testnet-… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 85% (no named test list on this row) | open |
-| MTX-X3-OPS-004 | operations_user_tools | Telemetry integration: Roadmap still lists telemetry integration as unfinished | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | STUB · tested score 20% (no named test list on this row) | open |
+| MTX-X3-OPS-004 | operations_user_tools | Telemetry integration: Re-measured 2026-09-26: "roadmap says unfinished" no longer describes the tree, and the recorded score (40/20/30) was below what exists. The node's Prometheus exporter is scraped on every validator (`substrate_block_height{status="finalized… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 65% (no named test list on this row) | open |
 | MTX-X3-OPS-005 | operations_user_tools | Load-generation TPS harness: Needs multi-validator load profiles | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 80% (no named test list on this row) | open |
 | MTX-X3-OPS-006 | operations_user_tools | Wallet pallet: Security review of biometric/recovery pending | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · 12 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-OPS-007 | operations_user_tools | Gateway /readyz health check: Needs deployed monitoring/SLO proof | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 65% (no named test list on this row) | open |
