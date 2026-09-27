@@ -311,6 +311,19 @@ bytes**:
   `Weight::from_parts(N, )` and eight E0611-class compile errors; the template is now the pinned
   polkadot-sdk one and every generated weight carries a proof size.
 
+* `4e1f5bdcf` — **a disputed task refunds its submitter, and the runtime import order is
+  formatted.** `pallet-northern-swarm` gains `resolve_disputed_task` (call index 8), so the
+  runtime the launch binary builds has a new call and the bytes move again: compact 8,888,727 bytes
+  (`0x18054a6594839f4d793a62ac221ee8fdb50f45a5a81acbcbc1270a464af55f0e`) — was 8,882,167 — and
+  compressed 1,527,036
+  (`0xba83a129e83dc98b61415bb15110658d53ab4d582ef2c58bee43a848d3955496`) — was 1,524,730. The
+  extrinsic's weight is measured, not hand-written: the first attempt put a
+  `Weight::from_parts(0, 0)` entry into the generated file, and it was replaced by benchmark CLI
+  output (`Measured: 548`, `Estimated: 4149`, `Weight::from_parts(96_270_000, 4149)`). The second
+  half of this revision is cosmetic: the merge had appended
+  `use pallet_northern_swarm::Pallet as NorthernSwarm;` out of order in `mod benches`, which left
+  `cargo fmt --all -- --check` red on master from `975e58eea` until `3707883a8`.
+
   Why no `spec_version` bump here, despite the rule two entries up ("new storage and a new call, so
   `spec_version` moves"): this repository does not bump in-tree for a release. `spec_version` in
   `runtime/src/lib.rs` is the **before** side, and
@@ -328,10 +341,12 @@ bytes**:
   was regenerated at the value above with `accepted_reasons` naming why each field reads what it
   reads.
 
-  The record was written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. It names `c62f93200`; the two revisions after it (`4420f99c1`, `f31686518`) touch a matrix
-  row and `crates/x3-bench`, and `runtime hash freshness` confirms none of the runtime's 131
-  dependency-graph packages changed, so the record still describes `HEAD`.
+  Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
+  agreed. The current one names `4e1f5bdcf`, the revision the runtime's dependency graph last moved
+  at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
+  was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
+  `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
+  `83de5a64a` moved out of the graph's package directory and taught the checker to recognise.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
