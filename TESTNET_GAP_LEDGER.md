@@ -1321,3 +1321,36 @@ authority path is still undecided (the settlement engine accepts a proof only fr
 maker or taker), and `crates/x3-relayer/src/main.rs` is a separate monolith whose proof signer
 defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`) and does not use `RpcSubmitter`/`RelayerService` at
 all. TICKET-148: give the CLI one relayer path, with no dev-key default.
+
+## TICKET-152 — the finality certificate is a shape, not yet a fact about a chain — 2026-09-26
+
+`X3-XCHAIN-005` closed its headline gap: `crates/x3-atomic-swap` no longer decides finality from
+numbers a caller supplies. `FinalityCertificate` carries `{ chain, block_height, block_hash, tx_id,
+confirmations, observed_at }` with private fields and two constructors, `confirmations` is derived
+(`observed_at - block_height + 1`), and `FinalityOracle` refuses a wrong chain, a tip below one it
+already accepted, a tip outside the configured staleness window, and a depth its anchor does not
+imply. `Relayer::verify_finality` takes the certificate instead of `(required, current, chain)`.
+
+What that does **not** yet buy, and what this ticket is for:
+
+1. **No producer.** Nothing builds a certificate from a real chain. `block_hash` has to be bound to
+   `chain` by a reader — an RPC quorum, a light client, a receipts-trie proof — and no such reader
+   is wired on this row. The certificate is therefore a checked *shape*: it cannot invent depth for
+   an anchor, but nothing here proves the anchor is the chain's block.
+2. **No persistence.** The oracle's accepted and witnessed tips live in the oracle's memory. A
+   rewind that spans a process restart is not caught. They belong with the proof ledger.
+3. **No live reorg evidence.** `CertificateRewindsAcceptedAnchor` is proven to be refused once such
+   a certificate is presented; no test drives a real Ethereum or Bitcoin reorg into one.
+
+Acceptance criteria:
+
+* a reader that constructs certificates from chain data, with the `block_hash`-to-`chain` binding
+  proven (reuse the `x3-verification-router` receipt path already exercised against anvil); a
+  certificate whose hash does not match the block at that height is refused, not repaired;
+* the accepted/witnessed tips persisted and reloaded, with a restart test: accept tip `T`, restart,
+  present a certificate at tip `< T`, and require `CertificateRewindsAcceptedAnchor`;
+* one live drill per chain family (EVM at minimum) that produces a certificate, settles on it, then
+  produces a certificate from a rewound fork and requires the refusal from real data.
+
+Validation: `cargo test -p x3-atomic-swap` stays green, the restart test fails with the persistence
+removed, and the reorg drill fails when `CertificateRewindsAcceptedAnchor` is removed.

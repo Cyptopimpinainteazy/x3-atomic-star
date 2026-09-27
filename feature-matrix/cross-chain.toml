@@ -154,16 +154,34 @@ id = "X3-XCHAIN-005"
 name = "Finality proof model"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-atomic-swap/src/finality.rs"]
-implemented = 68
-tested = 45
-mainnet_ready = 42
+paths = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "crates/x3-atomic-swap/src/error.rs"]
+implemented = 85
+tested = 78
+mainnet_ready = 45
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Cross-chain finality certificate wiring incomplete"]
-evidence = ["crates/x3-atomic-swap/src/finality.rs", "note: Finality modules exist; older status flags GRANDPA cert gap"]
+blockers = [
+  "**CLOSED 2026-09-26 — a finality claim is a certificate, not two numbers.** `verify_finality(chain, current_confirms, commitment)` took caller-supplied integers and `FinalityCheckData::block_height` was never read, so a swap's safety rested on a value the counterparty chose; `Relayer::verify_finality(required, current, chain_name)` compared two such numbers to each other. `FinalityCertificate` now carries `{ chain, block_height, block_hash, tx_id, confirmations, observed_at }` with private fields and two constructors, and `confirmations` is *derived* (`observed_at - block_height + 1`, the anchored block counting as one) — a reported count its own anchor does not imply is refused with `CertificateConfirmationsDisagree`, and an anchor above the tip it claims to be observed at with `CertificateBlockAfterObservation`. The verification path re-derives the depth rather than trusting the field, because a decoded certificate has not been through a constructor.",
+  "**CLOSED 2026-09-26 — the oracle can refuse a rollback.** `FinalityOracle::verify_finality`/`is_finalized` take `&mut self` and the certificate. A certificate for another chain is refused (`CertificateChainMismatch`); a tip below the tallest tip this oracle already accepted is refused as a rewind (`CertificateRewindsAcceptedAnchor`) instead of being re-read as fresh; a tip more than the configured window behind the tallest tip the oracle has *witnessed* is refused as stale (`CertificateStale`, `DEFAULT_CERTIFICATE_STALENESS_BLOCKS`, overridable per chain). Witnessing is separate from accepting on purpose: a certificate refused for being too shallow still tells the oracle how far the chain has come, which is what makes a later, older certificate refusable as stale. The bare-count entry point on the swap path is gone — `Relayer::verify_finality` takes the certificate and delegates to an owned oracle, so the relayer inherits every refusal, with `min_confirmations` kept as a floor on top of the chain's rule.",
+  "Still open, and it is the reason `mainnet_ready` does not follow `implemented`: nothing *produces* a certificate from a real chain. `block_hash` has to be bound to `chain` by a reader — an RPC quorum, a light client, a receipt proof — and no such producer is wired on this row, so what is proven is the shape and the refusals, not that the anchor is the chain's. The hash is believed.",
+  "The oracle's tip memory is in the oracle, in memory. It does not survive a restart, so a rewind that spans a process restart is not caught; persisting the accepted tip belongs with the proof ledger.",
+  "No public-chain run: the certificate stops at the crate's local gates. There is also no test that a real Ethereum or Bitcoin reorg produces a `CertificateRewindsAcceptedAnchor` from live data — only that a rewound certificate is refused once presented.",
+]
+evidence = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "crates/x3-atomic-swap/src/error.rs", "note: `cargo test -p x3-atomic-swap` -> 668 + 2 + 31 + 44 passed, 0 failed, 0 ignored; `cargo clippy -p x3-atomic-swap --all-targets` adds no warning in finality.rs (lib warnings 49 -> 44, the five removed being finality.rs's own unused imports); `cargo fmt -p x3-atomic-swap -- --check` clean; the three in-workspace dependents that link the crate (x3-runtime-signer, x3-chain-health-daemon, x3-bitcoin-vault) still check", "note: `FinalityCheckData` is deleted rather than deprecated — it was the type whose `block_height` nobody read — and no crate outside x3-atomic-swap referenced the finality items it replaced (checked with rg over the workspace)"]
+test_evidence = ["crates/x3-atomic-swap/src/finality.rs", "crates/x3-atomic-swap/src/relayer.rs", "note: measured load-bearing, each control run with the check removed and restored, logs under `.ai/runlogs/round8-finality-cert-*`: removing the count check reddens `test_a_reported_count_the_anchor_does_not_imply_is_refused`; removing the rewind check reddens `test_a_rewound_anchor_is_refused` with `left: Ok(true)` — the rewound certificate is *accepted*; removing the staleness check reddens `test_a_stale_certificate_is_refused` with `left: Ok(true)`; removing the chain check reddens `test_a_certificate_for_the_wrong_chain_is_refused`, which then answers with the wrong reason (`FinalityNotMet` for a Bitcoin certificate asked about Ethereum)", "note: the two existing integration suites were converted rather than deleted — `test_source_chain_reorg` and `test_chaos_source_chain_reorg` now express a reorg honestly (the tip does not move, the anchor does: sixteen deep before, three after) and the oracle section of `atomic_swap_integration` builds certificates, so the same three properties are still asserted with a depth the caller cannot choose"]
+required_tests = [
+  "test_a_certificate_at_exactly_the_required_depth_passes",
+  "test_a_reported_count_the_anchor_does_not_imply_is_refused",
+  "test_a_certificate_for_the_wrong_chain_is_refused",
+  "test_a_rewound_anchor_is_refused",
+  "test_a_stale_certificate_is_refused",
+  "test_solana_finality_uses_the_certificate_commitment",
+  "test_confirmations_at_counts_the_anchored_block",
+  "test_relayer_verifies_finality",
+  "test_relayer_cannot_claim_without_finality",
+]
 
 [[feature]]
 id = "X3-XCHAIN-006"
