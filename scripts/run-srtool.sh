@@ -57,6 +57,39 @@ if [[ -n "$SRTOOL_CARGO_GIT_CACHE" ]]; then
   CACHE_MOUNT=(-v "$SRTOOL_CARGO_GIT_CACHE":/home/builder/cargo/git)
 fi
 
+# A build that cannot finish is not allowed to hang the release gate.
+#
+# The image starts with an empty cargo home, so the first thing every build does is
+# `Updating git repository https://github.com/paritytech/polkadot-sdk`. That fetch is where the
+# build sits when the link is slow *or* when a second build is using the same docker cargo volume:
+# measured 2026-09-27, `make mainnet-check` stage 6b spent **52 minutes** in that line with the
+# container at 0% CPU while CI ran its own srtool build, and the host could reach GitHub with
+# `git ls-remote` in four seconds. Nothing in this script bounded it, so the gate simply never
+# finished. A quiet box builds in ~12 minutes; 45 is generous for one under contention.
+#
+# On timeout the container is killed by name (killing the `docker run` client alone leaves the
+# container running) and the script exits non-zero with the reason, so the gate reports a failure
+# instead of hanging. Set `SRTOOL_CARGO_GIT_CACHE` to a world-readable copy of a warm `~/.cargo/git`
+# to take the fetch off the critical path entirely.
+SRTOOL_BUILD_TIMEOUT="${SRTOOL_BUILD_TIMEOUT:-2700}"
+SRTOOL_CONTAINER_NAME="x3-srtool-$$"
+
+on_build_timeout() {
+  warn "the srtool build did not finish in ${SRTOOL_BUILD_TIMEOUT}s — killing it"
+  # `rm -f`, not `kill`: the container may already be exiting, and a name that is gone is not an
+  # error here.
+  docker rm -f "$SRTOOL_CONTAINER_NAME" >/dev/null 2>&1 || true
+  die "srtool build TIMED OUT after ${SRTOOL_BUILD_TIMEOUT}s. The usual cause is the polkadot-sdk git fetch stalling (the container's cargo home starts empty) — often because another srtool build is using the same docker cargo volume. Re-run on a quiet box, or set SRTOOL_CARGO_GIT_CACHE to a world-readable warm ~/.cargo/git, or raise SRTOOL_BUILD_TIMEOUT."
+}
+
+# `timeout` alone is not enough for the docker path: the docker CLI forwards SIGTERM to the
+# container, the container's build ignores it, and `timeout` then waits for the CLI forever — which
+# is how a "5-second timeout" ran for two minutes in testing. `--kill-after` gives the graceful
+# path 30 seconds before SIGKILL reaches the client, and the handler removes the container.
+run_with_budget() {
+  timeout --kill-after=30 "$SRTOOL_BUILD_TIMEOUT" "$@"
+}
+
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[srtool]${NC} $*"; }
 success() { echo -e "${GREEN}[srtool]  ✓${NC} $*"; }
@@ -215,6 +248,10 @@ cmd_build() {
   local mode
   mode=$(check_srtool)
 
+  # `|| exit_code=$?` rather than a bare pipeline: `set -e` (and `pipefail`) would abort the script
+  # at the failing pipeline, so the timeout check below never ran and a killed `timeout` left its
+  # container behind — measured 2026-09-27 with `SRTOOL_BUILD_TIMEOUT=5`.
+  local exit_code=0
   if [[ "$mode" == "srtool" ]]; then
     # ── srtool CLI path ──────────────────────────────────────────────────
     info "Building $PACKAGE with srtool CLI …"
@@ -222,13 +259,13 @@ cmd_build() {
     info "(first run: Docker pull ~2 GB; subsequent runs use cache)"
     echo ""
 
-    srtool build \
+    run_with_budget srtool build \
       --app \
       --json \
       --image "$SRTOOL_IMAGE" \
       -p "$PACKAGE" \
       --runtime-dir "$RUNTIME_DIR" \
-      2>&1 | tee "$REPORT_FILE"
+      2>&1 | tee "$REPORT_FILE" || exit_code=$?
 
   else
     # ── Raw Docker path ──────────────────────────────────────────────────
@@ -236,8 +273,9 @@ cmd_build() {
     info "Image: $SRTOOL_IMAGE"
     echo ""
 
-    docker run \
+    run_with_budget docker run \
       --rm \
+      --name "$SRTOOL_CONTAINER_NAME" \
       -e PACKAGE="$PACKAGE" \
       -e RUNTIME_DIR="$RUNTIME_DIR" \
       -e VERBOSE=1 \
@@ -245,10 +283,13 @@ cmd_build() {
       "${CACHE_MOUNT[@]}" \
       "$SRTOOL_IMAGE" \
       build \
-      2>&1 | tee "$REPORT_FILE"
+      2>&1 | tee "$REPORT_FILE" || exit_code=$?
   fi
 
-  local exit_code=${PIPESTATUS[0]}
+  # 124 is `timeout`'s own exit status; 137 is the SIGKILL `timeout` sends by default.
+  if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
+    on_build_timeout
+  fi
   if [[ $exit_code -ne 0 ]]; then
     die "srtool build FAILED. Check output above."
   fi
@@ -289,11 +330,19 @@ print(d.get('runtimes',{}).get('compact',{}).get('blake2_256','MISSING'))
   mode=$(check_srtool)
   cd "$REPO_ROOT"
 
+  local verify_exit=0
   if [[ "$mode" == "srtool" ]]; then
-    srtool build --app --json -p "$PACKAGE" --runtime-dir "$RUNTIME_DIR" 2>&1 | tee "$tmp_report"
+    run_with_budget srtool build --app --json -p "$PACKAGE" \
+      --runtime-dir "$RUNTIME_DIR" 2>&1 | tee "$tmp_report" || verify_exit=$?
   else
-    docker run --rm -e PACKAGE="$PACKAGE" -e RUNTIME_DIR="$RUNTIME_DIR" \
-      -v "$(pwd)":/build "${CACHE_MOUNT[@]}" "$SRTOOL_IMAGE" build 2>&1 | tee "$tmp_report"
+    run_with_budget docker run --rm --name "$SRTOOL_CONTAINER_NAME" \
+      -e PACKAGE="$PACKAGE" -e RUNTIME_DIR="$RUNTIME_DIR" \
+      -v "$(pwd)":/build "${CACHE_MOUNT[@]}" "$SRTOOL_IMAGE" build 2>&1 | tee "$tmp_report" \
+      || verify_exit=$?
+  fi
+
+  if [[ $verify_exit -eq 124 || $verify_exit -eq 137 ]]; then
+    on_build_timeout
   fi
 
   local new_blake2

@@ -1592,6 +1592,42 @@ the 19 files above, starting with the four that account for 31 of the 43. Do not
 again without a reason in the commit message — the instrument now makes that a deliberate act, which
 is the property that was missing.
 
+## RELEASE-GATE — where it stands after the re-attestation, and the hang that bounded it — 2026-09-27
+
+The gate is `make mainnet-check` (one local-ci gate, `--release --only 'release-gate-(mainnet-check)'`,
+~30 minutes on a quiet box). Its state at `52165c585`, from three runs:
+
+* **Stage 6b — the runtime hash rebuild — PASSED and matched the new record.** Both the compact and
+  compressed hashes rebuilt in `paritytech/srtool:1.93.0-0.18.4` equal
+  `docs/reports/runtime-wasm-hashes.json` (`0xce698445…` / `0x4971c1fc…`). That is the proof the
+  re-attestation of `400985f9e` needed, and the reason this section exists rather than a claim.
+* **Stage 4b — the panic ratchet — was the first run's only failure** (516 -> 519). Fixed under
+  `52165c585`: the instrument bug, the pinned scanner, and a deliberate re-baseline to the corrected
+  520. `bash scripts/mainnet/panic_unwrap_audit.sh` now reports `0/0/520` and PASSes.
+* **The second run's failure reason was lost** — local-ci pruned the per-gate log before it could be
+  read, and its `.reason` file was empty. Do not trust "it failed" as a diagnosis; re-run with the
+  output captured (`make mainnet-check > <file> 2>&1`, not through local-ci) when the reason matters.
+* **The third run hung for 52 minutes in stage 6b** with the srtool container at 0% CPU, on
+  `Updating git repository https://github.com/paritytech/polkadot-sdk` — while a CI job ran its own
+  srtool build from the actions-runner checkout and the host could `git ls-remote` that repo in four
+  seconds. Two builds sharing the docker cargo volume is enough to stall the fetch, and nothing in
+  `run-srtool.sh` bounded it, so the gate never finished.
+
+**Fixed in `run-srtool.sh`:** every build now runs under `timeout --kill-after=30`
+(`SRTOOL_BUILD_TIMEOUT`, default 2700s). The first attempt at this did **not** work and the test
+showed why, twice: `set -e` aborts on the failing pipeline before the check runs (`|| rc=$?` fixes
+it), and `timeout` alone never returns because the docker CLI forwards SIGTERM to a container whose
+build ignores it (the container is now removed by name on the way out). Measured after the fix:
+`SRTOOL_BUILD_TIMEOUT=5 ./scripts/run-srtool.sh build` exits 1 with the reason and leaves no
+container behind.
+
+**Next step, and the only thing between this and "every release gate green":** re-run
+`make mainnet-check` with the box quiet — no `docker ps` srtool container, no `run-srtool.sh` in
+`ps`, and preferably with `SRTOOL_CARGO_GIT_CACHE` pointing at a world-readable copy of a warm
+`~/.cargo/git`, which takes the polkadot-sdk fetch off the critical path entirely (the script's own
+header documents the mount; measured 2026-09-25: 30+ minutes in that fetch versus seconds with the
+cache). Capture the output to a file this time.
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
