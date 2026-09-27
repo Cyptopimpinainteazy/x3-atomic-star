@@ -263,6 +263,16 @@ bytes**:
   Those values are the generated stubs (hand-sized `ref_time` with real read/write counts), not
   benchmarks — `X3-GPU-003` is the row that measures them.
 
+* `d62fecf6b` — the halt-recovery sequence gets a test, and the record moves for it. The only file
+  in the runtime's graph that changed is `pallets/x3-invariants/src/tests.rs` (`#[cfg(test)] mod
+  tests;`, which the WASM build does not compile), so the hashes are **identical to `9125c487a`'s**:
+  compact 8,748,372 bytes (`0xce698445fab88f37b600a71a8708346e5b2aa95869f3b740672279c6e656501a`),
+  compressed 1,512,695 (`0x4971c1fcfc5cce8638054658b7b97957d1ec6c240013ed9f7071ca4badc70462`). Only
+  `recorded_revision` moves — the fourth revision in this list where that happens, and the same
+  property `cc19883faf` records: the freshness gate watches the runtime's dependency graph, so a
+  test file the wasm never compiles is in the graph but not in the artifact. Two from-scratch builds
+  of `d62fecf6b` agree.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.

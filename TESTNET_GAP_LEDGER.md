@@ -1393,9 +1393,18 @@ What that does **not** prove, and what this ticket is for:
    With the exemption check removed the same drill fails at the remedy, which is the one-way door.
 3. **`clear_halted` has no benchmark.** Its weight is hand-copied from `set_halt_on_violation`'s
    shape (one storage write) with a comment saying so.
-4. **There is no automatic unhalt.** After remediation the flag stays set until governance clears it;
-   if an operator clears it while the violating invariant is still out of range, `enforce_all`
-   re-raises it the next block — which is intended, but untested as a sequence.
+4. ~~**There is no automatic unhalt.**~~ **CLOSED 2026-09-27.** The re-raise sequence is now tested
+   (`d62fecf6b`): `pallets/x3-invariants/src/tests.rs::the_halt_re_raises_while_the_violation_persists_and_sticks_after_remediation`
+   arms the policy, violates `MaxSupply`, requires `Halted`; clears it while the violation persists,
+   requires the next `enforce_all` to re-raise it, then remediates the bound and requires the clear
+   to stick (and `ViolationCount` to have counted exactly the two violating blocks). The control —
+   making `clear_halted` also set `HaltOnViolation(false)` — fails the test at the re-raise
+   assertion, then restores green byte-identically
+   (`.ai/runlogs/halt-sequence-test-20260927T060113Z/`). The halt branch ends in `defensive!`, which
+   panics under `debug_assertions` while a release runtime only logs, so the test catches that one
+   panic and requires it to be the defensive failure (the `x3-supply-ledger` idiom). "Automatic
+   unhalt" remains *deliberately absent* — remediation still needs governance — which is the
+   intended design and is what the sequence proves.
 
 Acceptance criteria:
 
@@ -1413,9 +1422,9 @@ Validation: the checker fails on a deliberately-removed exemption; the drill's p
 `InBlock`; the re-benchmarked weight is within the copied value's order of magnitude or the copied
 value is replaced.
 
-**Item 1 status: CLOSED 2026-09-27** (`scripts/ci/check-halt-fund-holding.py`,
-`security/halt-fund-holding.toml`, `scripts/local-ci.sh`). Items 2 (live drill), 3 (`clear_halted`
-re-benchmark) and 4 (halt/remediate/clear sequence test) remain open.
+**Items 1 and 4 status: CLOSED 2026-09-27** (`a91cf63a0`, `d62fecf6b`). Item 2's live drill is
+closed under item 2 above (the pending-bundle-bond half) and item 3 (`clear_halted` re-benchmark,
+hand-copied weight) remains open.
 
 ## TICKET-154 — two pallets reserve an anti-spam fee and never release it — 2026-09-27
 
@@ -1674,6 +1683,43 @@ container behind.
 header documents the mount; measured 2026-09-25: 30+ minutes in that fetch versus seconds with the
 cache). Capture the output to a file this time.
 
+## RC2/RC6 SEQUENCE — seven defects between a red sequence and a truthful one — 2026-09-27
+
+`reports/rc6/*` said **FAIL** and the sequence behind it had never run on this box. Fixing it turned
+up seven distinct defects, each measured rather than guessed. They are listed here because six of
+them are shapes that will recur (a stale absolute path, a launcher that does not produce blocks, a
+cargo target that needs a feature, a spec that pins an old runtime, an authorized-but-unfunded
+account, and a client library that cannot decode the chain).
+
+| # | defect | evidence | fix |
+| --- | --- | --- | --- |
+| 1 | `run_release_gates_rc6.sh` hardcoded `ROOT=/home/lojak/Desktop/X3_ATOMIC_STAR` | that path does not exist; every step `cd`'d into nothing and "failed" instantly — the FAIL in `reports/rc6/*` was the script's own path | derive `ROOT` from `BASH_SOURCE` |
+| 2 | `rc2_mock_and_live_gate.sh` hardcoded the same path | worse: its `mkdir -p "$ROOT/reports/rc2"` **created** the empty directory, then it failed with `manifest path tests/e2e/Cargo.toml does not exist`, which reads like a missing crate | derive `ROOT`; the stray tree (0 files) was removed |
+| 3 | the live suite needs `--features real-chain` | `error: target live_internal_mainnet_e2e in package e2e_tests requires the features: real-chain` | pass the feature |
+| 4 | gates that need finality booted `scripts/start-x3-chain.sh` (`--chain dev`, no session keys) | node log: `Failed to trigger bootstrap: No known peers`; the smoke died with `block height/finality did not advance` | new `scripts/mainnet/local3_lib.sh` boots the three-validator `local3` network and waits for a **finalized** height; both rc2 gates use it and stop only what they started |
+| 5 | the committed `chain-specs/x3-local3-raw.json` is from Sep 25 | it handed the smoke `spec_version 11` while the tree's runtime is 20 — a gate reporting on code it is not running | `local3_lib.sh` builds a raw spec from the **current binary** into its temp dir unless a caller names one |
+| 6 | `local3` genesis *authorized* the gateway accounts but never *endowed* them | `EnsureX3LangGateway` lets `//x3-atomic-gateway` submit `xvmTransfer`, and the call failed with `1010: Invalid Transaction: Inability to pay some fees` | `local3` now extends `atomic_gateway_endowed_accounts()`, as `development_config`, `staging_config` and `testnet_config` already did |
+| 7 | the rc2 smoke's JavaScript driver used `HttpProvider` | `HttpProvider` cannot subscribe, so `signAndSend` callbacks arrive with no `status` → `TypeError: Cannot read properties of undefined (reading 'isInBlock')`; the driver computed a `wsRpc` and never used it | the driver talks WS |
+
+**Retired, not silenced:** the same driver still cannot decode this chain — `createType(ExtrinsicUnknown)::
+Unsupported unsigned extrinsic version 5` for every block, because the runtime's extrinsics are
+version 5 and the pinned `@polkadot/api` in `packages/blockchain-connector` knows version 4. The rc6
+sequence's step 2 is therefore recorded as retired, with that reason, instead of failing every run.
+
+**The ticket this creates.** The JS smoke swept all six internal routes (X3Native/X3Evm/X3Svm pairs)
+plus nine negative cases — external route, wrong recipient per domain, wrong sender type, duplicate
+message, duplicate nonce, refund-after-finalize, refund-before-expiry, completion-after-refund — with
+a supply-invariant check at the end. The Rust live suite that replaces it as evidence
+(`tests/e2e --features real-chain --test live_internal_mainnet_e2e`) has four tests: node progress and
+required RPC methods, bridge-proof crypto and full accounting paths, timeout expiry, and reordered
+delivery / duplicate ack rejection. **Port the route sweep and the negative matrix into the Rust
+suite** (or raise the JS client to a polkadot-js that understands extrinsic v5), then delete the JS
+driver. Until that lands, the sequence's green is not the same breadth of green it used to claim.
+
+Measured after the fixes: `rc2_internal_settlement_smoke.sh` reaches the chain and submits
+transactions; `rc2_mock_and_live_gate.sh` passes both halves (`PASS: mock suite and live suite both
+passed`, 16 + 4 tests).
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
@@ -1684,3 +1730,56 @@ every time.
 --no-modify-path --default-toolchain 1.90.0-x86_64-unknown-linux-gnu`, then copy the three tools
 back into `~/.cargo/bin` from `~/.local/bin`. Do it as one actor: concurrent installers into the
 same directory are what makes this look worse than it is.
+
+---
+
+## GAP-SNAPSHOT-REGENESIS — a restored state snapshot was a chain that panicked on its first block — 2026-09-27
+
+**How it was found.** The snapshot row's last open item was that the archive is cut with the node
+stopped, so `scripts/snapshot-zero-downtime-proof.sh` was written to take it the other way: export a
+*running* node's state over RPC at a finalized, GRANDPA-justified block and build the snapshot from
+that. The export half worked on the first try — `x3-state-snapshot root --from-raw-spec` recomputed
+the trie root from the exported entries and it equalled the `stateRoot` the chain published in that
+block's header — and the drill then booted the restored spec, which is the step nothing had ever
+done. The node answered RPC and then failed every block it tried to author:
+
+```
+assertion `left == right` failed: Block number must be strictly increasing.
+  left: 513
+ right: 1
+```
+
+**The cause.** `x3-state-snapshot restore` wrote the state verbatim into `genesis.raw.top`. A raw
+spec is the state itself, so it carried the *producing* chain's `frame_system` bookkeeping — notably
+`System::Number` = 513 — and `frame_system::initialize` opens every block with
+`assert_eq!(Self::block_number() + 1, *number)`. A genesis is defined by those keys being absent:
+`x3-chain-node build-spec --dev --raw` carries no `System::Number` at all, so the runtime's storage
+default of zero applies. Reproduced on its own in seconds by patching that one key to `0x05000000`
+in an otherwise untouched raw genesis and booting it (124 panics,
+`.ai/runlogs/snapshot-zero-downtime-20260927T0013Z/reproduction-number-not-zero.txt`). This was a
+real defect in the restore path, not a drill artifact: the CLI's own help said "boot a node with
+`--chain <spec>` to build a database from this state", and no node could.
+
+**The fix.** `restore --regenesis` drops the six `frame_system` entries that record where the chain
+*was* (`CHAIN_BOOKKEEPING_ENTRIES`; keys derived with `sp_core::twox_128`, and the `System::Number`
+key is pinned in a test against the well-known `:number` constant every client uses). It is opt-in,
+because the honest default for an existing restore is "verbatim", and it reports *both* roots rather
+than presenting one as the other: the snapshot's declared root and the regenerated genesis root (they
+differ by exactly those keys), plus the list of dropped keys, in the spec's `properties` so the
+provenance travels with the file. With it the restored chain boots as an authority, finalizes, and
+its non-bookkeeping entries are byte-identical to the export.
+
+**What is still open on this row, and why it is not mainnet-ready.** The export reads one RPC call
+per key (1881 keys in ~2.4 s on loopback); no batched or range reader has been written, so the
+multi-GB size class and the wall-clock an operator would spend exporting are both unexercised. The
+anchor must be inside the node's pruning window — the gate demonstrates the *refusal* (a bounded node
+refuses an anchor it pruned, names pruning, and writes no spec) but the operator path that follows
+from it is documented guidance, not automated. `--regenesis` drops a fixed list of six entries;
+nothing enumerates every chain-local key a third-party pallet might keep. And a restore produces a
+*new* chain, not a continuation: state-sync for an existing chain still needs the base-path path or
+warp sync.
+
+**Gate:** `snapshot zero downtime export` (serial, ~4 min; `bash scripts/local-ci.sh --only
+snapshot-zero-downtime-export`). Red evidence for the fix: removing `--regenesis` from the drill's
+restore makes the gate fail
+(`.ai/runlogs/snapshot-zero-downtime-20260927T0013Z/red-without-regenesis.log`).
