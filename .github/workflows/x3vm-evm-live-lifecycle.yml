@@ -43,6 +43,10 @@ jobs:
     # artefacts instead of rebuilding the workspace from scratch each time.
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      # The target dir is outside the checkout, so substrate-wasm-builder cannot find
+      # Cargo.lock by walking up from it and re-resolves the runtime's dependencies
+      # without the lockfile or its patches. Point it at the workspace.
+      WASM_BUILD_WORKSPACE_HINT: ${{ github.workspace }}
       CARGO_BUILD_JOBS: "12"
     # Public repo + fork PRs => keep pull_request on ubuntu-latest. Push (master)
     # and manual dispatch run on the x3 self-hosted runner, which is the only
@@ -98,6 +102,9 @@ jobs:
             curl -sSfL https://foundry.paradigm.xyz | bash
             "$HOME/.foundry/bin/foundryup"
           fi
+          # A runner started outside its service (x3star2 was) does not have ~/.foundry/bin on
+          # PATH, so `anvil` stayed "not installed" for every later step. Export it either way.
+          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
 
       - name: Install forge dependencies (pinned via foundry.lock)
         working-directory: X3-contracts/evm
@@ -138,6 +145,10 @@ jobs:
       cancel-in-progress: false
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      # The target dir is outside the checkout, so substrate-wasm-builder cannot find
+      # Cargo.lock by walking up from it and re-resolves the runtime's dependencies
+      # without the lockfile or its patches. Point it at the workspace.
+      WASM_BUILD_WORKSPACE_HINT: ${{ github.workspace }}
       CARGO_BUILD_JOBS: "12"
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 90
@@ -178,6 +189,9 @@ jobs:
             curl -sSfL https://foundry.paradigm.xyz | bash
             "$HOME/.foundry/bin/foundryup"
           fi
+          # A runner started outside its service (x3star2 was) does not have ~/.foundry/bin on
+          # PATH, so `anvil` stayed "not installed" for every later step. Export it either way.
+          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
 
       - name: Install forge dependencies (pinned via foundry.lock)
         working-directory: X3-contracts/evm
