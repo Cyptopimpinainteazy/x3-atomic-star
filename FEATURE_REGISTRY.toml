@@ -346,20 +346,58 @@ dangerous_paths = ["dead buttons", "Tauri wiring"]
 mode = "LIVE_TESTNET"
 crate_or_service = "scripts/mainnet/mainnet_rc_gate.sh"
 tauri_app = "LaunchGate"
-required_tests = ["testnet_rc_gate", "mainnet_rc_gate"]
+# CLOSED 2026-09-27. Both citations used to be bare names that resolved to
+# nothing; they are now `path::function` citations of gates that exist and fail
+# closed. `scripts/testnet/testnet_rc_gate.sh` did exist, but every one of its
+# checks ended in `|| true` and it printed "COMPLETED", so it exited 0 whatever
+# happened — and `scripts/x3/yolo_autoprove.sh` runs it. It also called
+# `scripts/testnet/generate_testnet_chain_spec.sh`, which was never created in
+# this repository, so `mainnet_rc_gate.sh` died at exit 127 on its third line
+# and could never pass. Both gate bodies are now functions (the citation form the
+# scanner's `stale-registry-test` resolution asks for), both resolve every
+# prerequisite before running it, and `scripts/testnet/runtime_upgrade_rehearsal.sh`
+# now fails when its delegate is missing instead of printing a hand-off line and
+# exiting 0. The generator is real: `scripts/testnet/generate_testnet_chain_spec.sh`
+# resolves `build-x3-testnet-spec.py`, which derives keys with the node's own CLI
+# and loads the artifact back through `build-spec`. `scripts/testnet/testnet_genesis_lint.sh`
+# was a directory-presence check that printed a hand-off line; it now parses a
+# real spec, checks the Aura/GRANDPA authority sets agree, checks a Live spec
+# publishes a joinable bootnode, and refuses a spec the node's own loader rejects.
+required_tests = [
+  "scripts/testnet/testnet_rc_gate.sh::testnet_rc_gate",
+  "scripts/mainnet/mainnet_rc_gate.sh::mainnet_rc_gate",
+]
 # `reports/mainnet_readiness_report.md` does not exist; citation cleared.
 proof_report = ""
-readiness_score = 55
+# Re-measured 2026-09-27. Derived, not asserted, on this registry's own formula
+# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 60 — the two gates exist as real orchestrators: prerequisites are
+#     resolved before the first check runs, every check names its own failure, and
+#     the four scripts behind them (spec generator, genesis lint, rehearsal
+#     wrapper, panic ratchet) do real work. Held at 60 because four of the eight
+#     JSON-RPC/console-side launch criteria still live in `public_testnet_gate.sh`
+#     and the launch ceremony itself stays a manual approval.
+#   tested 60 — `tests/test_rc_gates.py` drives both gates through a fixture root:
+#     18 checks, among them that a failing prerequisite reddens each gate, that a
+#     missing prerequisite fails with its path named, that a failing `cargo` step
+#     reddens each gate, that no check in either gate can discard its status, and
+#     that the two script-cited names resolve to functions in the cited files.
+#     It is itself gated by `rc gate scripts` in `scripts/local-ci.sh`. Not higher:
+#     neither gate has been run end to end against a live validator set here,
+#     because that needs the 7 servers.
+#   mainnet_ready 15 — unchanged, and it is the honest number: no public testnet
+#     has been opened, no mainnet rehearsal has run, and the gate's own launch
+#     criteria (7 validators, 72 stable hours, explorer, faucet) are all unmet.
+# 60*0.35 + 60*0.25 + 15*0.40 = 21 + 15 + 6 = 42.
+readiness_score = 42
 blockers = [
   "mainnet_rc_gate is manual approval, not automated",
-  # 2026-09-27, found by `scripts/swarm/x3_repo_scan.py` (kind `stale-registry-test`): both
-  # `required_tests` entries name things that exist nowhere — `mainnet_rc_gate` is the script in
-  # `crate_or_service`, `testnet_rc_gate` is not in the tree at all — so this row's test evidence has
-  # never existed. `scripts/check-readiness-consistency.sh` skips the whole row because a
-  # `crate_or_service` that is a file, not a directory of `.rs` files, is never resolved. Either write
-  # the two gates as real, runnable checks (they are shell gates, so the registry should cite them as
-  # `path::case`) or drop the citation; the scanner's ratchet keeps the finding visible until then.
-  "required_tests cites two names that no function defines (`testnet_rc_gate`, `mainnet_rc_gate`), and the readiness gate never resolved this row because its target is a script",
+  # CLOSED 2026-09-27 — the phantom citation is gone; kept here because the *gate*
+  # still cannot pass without the 7 physical servers, the 72-hour stability window
+  # and a public explorer/faucet, so the row's `mainnet_ready` stays at 15.
+  "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`",
+  "The launch decision itself is still a human approval; no automated promotion record ties a green RC run to the deployed genesis hash",
 ]
 dangerous_paths = ["mainnet deployment", "approval gates"]
 

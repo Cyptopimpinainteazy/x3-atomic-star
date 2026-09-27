@@ -263,6 +263,46 @@ def test_patch_context_matches_the_file_it_patches(tmp_path: Path) -> None:
     assert any(l.startswith("+") and "lonely-crate" in l for l in lines[3:])
 
 
+def test_a_shell_case_resolves_wherever_it_is_defined(tmp_path: Path) -> None:
+    """`path::case` is the citation form this scanner asks script targets to use.
+
+    The shell arm of `defined_symbols` anchored on `^` without `re.MULTILINE`, so
+    `^` meant the start of the *file* and the only shell function it could ever
+    see was one defined on line 0. Every real gate defines its cases under a
+    shebang, so the citation form the scanner itself documents was unverifiable:
+    a gate that ran, and passed, was still reported as citing a test that resolves
+    nowhere. This is the same fixture read twice — the declaration moves, the
+    finding has to move with it.
+    """
+    clean_fixture(tmp_path)
+    write(
+        tmp_path / "scripts/swarm/swarm_scan.sh",
+        "#!/usr/bin/env bash\nset -euo pipefail\n\nswarm_scan_generates_report() {\n  echo scanned\n}\n",
+    )
+    write(
+        tmp_path / "FEATURE_REGISTRY.toml",
+        "\n".join(
+            [
+                "[shell_gate]",
+                'crate_or_service = "scripts/swarm/swarm_scan.sh"',
+                'required_tests = ["scripts/swarm/swarm_scan.sh::swarm_scan_generates_report"]',
+                "readiness_score = 50",
+                "",
+            ]
+        ),
+    )
+    assert "stale-registry-test" not in [f["kind"] for f in scan_findings(tmp_path)]
+
+    # Negative control: the same shape under a different name is not a resolution
+    # for this citation, so the finding has to come back.
+    write(
+        tmp_path / "scripts/swarm/swarm_scan.sh",
+        "#!/usr/bin/env bash\nset -euo pipefail\n\na_different_case() {\n  echo scanned\n}\n",
+    )
+    stale = by_kind(scan_findings(tmp_path), "stale-registry-test")
+    assert [f["symbol"] for f in stale] == ["shell_gate:swarm_scan_generates_report"], stale
+
+
 def test_scanner_is_the_registry_citation() -> None:
     """Every test `[repo_scanner_agent]` cites must be a function this module defines.
 

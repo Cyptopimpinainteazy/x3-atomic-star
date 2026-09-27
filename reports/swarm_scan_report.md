@@ -3,14 +3,13 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 30
+Findings: 28
 
 ## Counts
 
 | kind | count | ratcheted here |
 |---|---|---|
 | `pallet-call-without-weights` | 25 | yes |
-| `stale-registry-test` | 2 | yes |
 | `ungated-crate` | 2 | yes |
 | `unregistered-pallet` | 1 | yes |
 
@@ -18,7 +17,7 @@ Findings: 30
 
 | gate | status | detail |
 |---|---|---|
-| stub / marker ratchet | pass | critical-marker=443, explicit-stub=74, marker=1187 |
+| stub / marker ratchet | pass | critical-marker=443, explicit-stub=74, marker=1185 |
 | fake-code scan | pass | constant-assert=17, noop-test=2, skip=139 |
 | panic / unwrap ratchet | pass | pallet-call=0, production=440, runtime-hook=0 |
 
@@ -212,24 +211,6 @@ Findings: 30
 - **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
 - **test required:** cargo test -p x3-wrapped --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
-
-### HIGH — `stale-registry-test` — FEATURE_REGISTRY.toml
-
-- **id:** `ca100e7f73b2b24f`
-- **symbol:** `launch_gate:mainnet_rc_gate`
-- **why it matters:** `required_tests` cites a function that exists nowhere in the tree. The readiness gate only resolves citations whose crate_or_service is a directory of .rs files, so a row pointing at a script can cite a test nobody wrote and still pass — which is how this one was found
-- **suggested fix:** implement `mainnet_rc_gate` under scripts/mainnet/mainnet_rc_gate.sh, or correct the citation in [launch_gate]
-- **test required:** mainnet_rc_gate
-- **release gate affected:** readiness consistency
-
-### HIGH — `stale-registry-test` — FEATURE_REGISTRY.toml
-
-- **id:** `d1c5abf1716ae1f6`
-- **symbol:** `launch_gate:testnet_rc_gate`
-- **why it matters:** `required_tests` cites a function that exists nowhere in the tree. The readiness gate only resolves citations whose crate_or_service is a directory of .rs files, so a row pointing at a script can cite a test nobody wrote and still pass — which is how this one was found
-- **suggested fix:** implement `testnet_rc_gate` under scripts/mainnet/mainnet_rc_gate.sh, or correct the citation in [launch_gate]
-- **test required:** testnet_rc_gate
-- **release gate affected:** readiness consistency
 
 ### MEDIUM — `ungated-crate` — pallets/x3-cross-vm-router/fuzz/Cargo.toml
 

@@ -630,6 +630,13 @@ GATES_FAST=(
   # way a signature can be wrong. The live four-validator half is the
   # `testnet-ceremony-drill` gate in the --testnet set.
   "ceremony attestation unit tests:python3 tests/test_ceremony_attestations.py"
+  # The two release-candidate gates. Neither had ever been checked by anything:
+  # the testnet one ran every check as `... || true` and named a chain-spec
+  # generator that was never created, and the mainnet one died on that missing
+  # script. This drives both through a fixture root — a failing prerequisite must
+  # redden them, a missing one must fail rather than skip, and no check may
+  # discard its status. Cheap: 18 checks, no build.
+  "rc gate scripts:python3 tests/test_rc_gates.py"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob

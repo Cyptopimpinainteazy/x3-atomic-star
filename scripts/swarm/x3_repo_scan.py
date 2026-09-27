@@ -276,7 +276,14 @@ def defined_symbols(ctx: ScanContext) -> set[str]:
         re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*[<(]"),
         re.compile(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("),
         re.compile(r"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("),
-        re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{"),
+        # A shell function definition is only a definition at the start of a line,
+        # so this pattern needs MULTILINE. Without it, `^` anchored at the start of
+        # the *file* and the only shell function the scanner ever saw was one
+        # defined on line 0 — which is why a gate script could define `some_case()`
+        # under its shebang, be cited as `scripts/...::some_case` (the citation form
+        # this scanner's own documentation asks for), and still be reported as
+        # citing a test that resolves nowhere.
+        re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{", re.MULTILINE),
     )
     for rel, _ in ctx.files():
         if not rel.endswith((".rs", ".py", ".sh", ".js", ".ts")):

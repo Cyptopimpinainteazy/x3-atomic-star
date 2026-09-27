@@ -3,12 +3,11 @@
   "root": "/home/lojak/Desktop/xxxstar-main",
   "counts": {
     "pallet-call-without-weights": 25,
-    "stale-registry-test": 2,
     "ungated-crate": 2,
     "unregistered-pallet": 1
   },
   "structural_counts": {
-    "stale-registry-test": 2,
+    "stale-registry-test": 0,
     "missing-registry-path": 0,
     "stale-proof-report": 0,
     "unregistered-pallet": 1,
@@ -19,7 +18,7 @@
     {
       "gate": "stub / marker ratchet",
       "status": "pass",
-      "detail": "critical-marker=443, explicit-stub=74, marker=1187"
+      "detail": "critical-marker=443, explicit-stub=74, marker=1185"
     },
     {
       "gate": "fake-code scan",
@@ -304,32 +303,6 @@
       "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
       "test_required": "cargo test -p x3-wrapped --features runtime-benchmarks",
       "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "ca100e7f73b2b24f",
-      "kind": "stale-registry-test",
-      "severity": "high",
-      "path": "FEATURE_REGISTRY.toml",
-      "line": 0,
-      "symbol": "launch_gate:mainnet_rc_gate",
-      "why": "`required_tests` cites a function that exists nowhere in the tree. The readiness gate only resolves citations whose crate_or_service is a directory of .rs files, so a row pointing at a script can cite a test nobody wrote and still pass \u2014 which is how this one was found",
-      "suggested_fix": "implement `mainnet_rc_gate` under scripts/mainnet/mainnet_rc_gate.sh, or correct the citation in [launch_gate]",
-      "test_required": "mainnet_rc_gate",
-      "gate_affected": "readiness consistency",
-      "patch_eligible": false
-    },
-    {
-      "id": "d1c5abf1716ae1f6",
-      "kind": "stale-registry-test",
-      "severity": "high",
-      "path": "FEATURE_REGISTRY.toml",
-      "line": 0,
-      "symbol": "launch_gate:testnet_rc_gate",
-      "why": "`required_tests` cites a function that exists nowhere in the tree. The readiness gate only resolves citations whose crate_or_service is a directory of .rs files, so a row pointing at a script can cite a test nobody wrote and still pass \u2014 which is how this one was found",
-      "suggested_fix": "implement `testnet_rc_gate` under scripts/mainnet/mainnet_rc_gate.sh, or correct the citation in [launch_gate]",
-      "test_required": "testnet_rc_gate",
-      "gate_affected": "readiness consistency",
       "patch_eligible": false
     },
     {
