@@ -8513,6 +8513,36 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
 - **Next seed:** apply A's delta for `X3-MEV-007` when it reports (the reachability wording is already measured:
   `private-mempool` ← `confidential-gpu` as *library* code, and nothing in `runtime/` or `node/` depends on
   `confidential-gpu`), then work TICKET-142, the tautological `x3-dex` fair-ordering test.
+
+- **ROUND 9 — the halt was a one-way door, and that was a P0 (2026-09-26, `6d7bfc540`, `f37f73c51`,
+  `edb3bc516`, `79f6d8ee6`).** Found by doing what `X3-RT-001` asked for. `pallet_x3_invariants::InvariantCheck`
+  is in `SignedExtra` and refused **every** signed extrinsic while `Halted` was set, so the halt also refused its
+  own remedy: `clear_halted` was named in two doc comments and existed nowhere, `set_halt_on_violation(false)`
+  does not clear `Halted`, and on a chain whose only route to either flag is a council motion the motion's own
+  `propose`/`vote`/`close` were refused too. One governance `emergency_halt` therefore bricked the chain until a
+  runtime upgrade, with a pending bundle's bond unreachable. The gate now exempts a short list described by
+  `Config::HaltExemptCalls` (`RuntimeHaltExemptCalls` in the runtime) and refuses everything else.
+  - Proof at three layers, because each alone is weak: `pallets/x3-invariants` (gate both directions, origin,
+    event), `runtime/src/tests.rs` (`Executive::validate_transaction` — the pool, not dispatch), and
+    `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`): three validators, halt through
+    a council motion, transfer refused by the pool of **two different validators** with
+    `1010: Invalid Transaction: Custom error: 1` and no balance move, `rollbackAtomicBundle` **included** and
+    refused by the pallet instead, remedy executed *while still halted*, traffic resumes. Load-bearing on the
+    live path: with the exemption removed the drill dies at the remedy (`.ai/runlogs/halt-recovery-live-20260927T010259Z/`).
+  - **New gates: `test x3-invariants` and `halt exemptions`.** The second compares the runtime's exemption list
+    with `security/halt-exemptions.toml`, so an undocumented entry, a stale entry, a renamed dispatchable or a
+    missing reason all fail. `X3-RT-001/006/007` are 78/76/76.
+  - **Fact for anyone touching the runtime:** the release attestation is stale and cannot be refreshed while a lane
+    holds a dirty file in the runtime graph — `crates/x3-atomic-swap`, `pallets/x3-kernel`, `pallets/x3-atomic-kernel`,
+    `runtime/src/lib.rs` are all in it. Re-attest (`./scripts/update-runtime-hashes.sh`, alone) **after** the last
+    runtime-affecting commit, then run the release gate.
+  - **The recurring toolchain wipe is fixed:** `ab18567f5` — the self-hosted runner's `rust-cache` action was
+    deleting `~/.cargo/bin` (srtool, cargo-audit, cargo-deny). Do not re-diagnose it as something rewriting the
+    directory by hand.
+  - **Next seed:** TICKET-153 remains (no inventory of the runtime's fund-holding calls, so the exemption list's
+    completeness is unchecked; `clear_halted`'s weight is hand-written; no automatic unhalt and no re-raise
+    sequence test), and the live drill halts an idle chain — a bundle in flight when the halt lands is still only
+    proven at runtime level.
 - **ROUND 4/A CLOSED — `X3-MEV-007` (2026-09-26 18:42), commit `dd22bddfd` + row `ed917cb23`.** The defect the brief
   predicted was there: `DecryptionShare` carried no DKG epoch and `combine_shares` took none, so partials from two
   ceremonies could be interpolated into a point belonging to neither, surfacing only as an opaque AES-GCM tag
