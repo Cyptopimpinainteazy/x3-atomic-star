@@ -310,6 +310,14 @@ GATES_FAST=(
   # times in a day, so this is the cheap early warning: if the outgoing diff
   # touches any package in the runtime's dependency graph, the record has to
   # move in the same change (`./scripts/update-runtime-hashes.sh`).
+  #
+  # There are two ways in: the outgoing diff against `--base`, and — since
+  # commits land straight on `master`, where `--base origin/master` and `HEAD`
+  # are the same commit and the first check compares a revision to itself — the
+  # revision the record itself names. Measured 2026-09-26: forty-two files in
+  # the runtime's graph had changed since that revision while this gate printed
+  # "nothing to check" and only the ten-minute stage 6b could have caught it.
+  # A record that cannot be tied to a revision fails here too.
   "runtime hash freshness:python3 scripts/check-runtime-hash-freshness.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"
   "clippy workspace:cargo clippy --workspace --all-targets -- -D warnings"
@@ -385,6 +393,17 @@ GATES_FAST=(
   # false in every context and surface-only for figures, and skips lines that qualify
   # themselves. It is load-bearing: re-adding "MEV-proof" to CURRENT_MAINNET_STATUS.md fails it.
   "claims hygiene:python3 scripts/ci/check-claims-hygiene.py"
+  # The operator artifacts the repository hands an operator: the Prometheus config, the alert rules
+  # and the Grafana dashboards. Nothing validated them. Measured 2026-09-26: `alert-rules.json` was
+  # not a rule file at all — its shape was `{"alerts": [...]}` and `promtool check rules` refused it
+  # (`field alerts not found in type rulefmt.RuleGroups`), so an operator starting the monitoring
+  # stack from it got a Prometheus that would not load its rules — while the row and the runbooks
+  # counted alerting as configured. The expressions were also written for a Solana GPU validator
+  # (`solana_validator_fork_distance_slots`, `gpu_memory_used_bytes`), none of which this chain
+  # exports, so they could not have fired even in the right shape. The gate checks shape, asks
+  # promtool to load both artifacts when it is installed, and requires every expression to name a
+  # metric the node really publishes.
+  "ops artifacts:bash scripts/monitoring/check-ops-artifacts.sh"
   # `pallet-x3-supply-ledger` holds the king invariant — represented supply never exceeds the
   # canonical ceiling — and its suite was in no gate list either. It also had no mock runtime at all
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition
