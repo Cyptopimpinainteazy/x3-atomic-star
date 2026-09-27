@@ -2781,8 +2781,10 @@ impl pallet_swarm::Config for Runtime {
 #[cfg(feature = "dev")]
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
-    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
+    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~48 minutes at 200ms blocks
     pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
+    pub const NorthernSwarmQuorumThreshold: u32 = 2;
+    pub const NorthernSwarmMaxExecutorsPerTask: u32 = 3;
 }
 
 #[cfg(feature = "dev")]
@@ -2792,6 +2794,9 @@ impl pallet_northern_swarm::Config for Runtime {
     type MinExecutorStake = NorthernSwarmMinExecutorStake;
     type DeregistrationCooldown = NorthernSwarmDeregistrationCooldown;
     type MaxClaimedTasksPerExecutor = NorthernSwarmMaxClaimedTasksPerExecutor;
+    type QuorumThreshold = NorthernSwarmQuorumThreshold;
+    type MaxExecutorsPerTask = NorthernSwarmMaxExecutorsPerTask;
+    type WeightInfo = pallet_northern_swarm::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== DePIN Marketplace Pallet Configuration =====
