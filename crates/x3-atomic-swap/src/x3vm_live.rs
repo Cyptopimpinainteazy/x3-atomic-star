@@ -625,6 +625,10 @@ mod tests {
                 // X3 is declared `FinalityLevel::Bft`, which maps to zero
                 // required confirmations in the firewall.
                 min_confirmations: 0,
+                // One endpoint serves this harness. The bar lives in the
+                // requirement so that evidence cannot choose it; a joinable
+                // network sets this from its provider set.
+                min_providers: 1,
             }],
             &[crate::SecretReleaseEvidence {
                 lock: lock.clone(),
@@ -632,8 +636,7 @@ mod tests {
                 rpc_quorum: crate::secret_release::RpcQuorumAttestation {
                     tx_id: lock.tx_id.clone(),
                     block_hash: lock.block_hash.clone(),
-                    provider_count: 3,
-                    required_quorum: 2,
+                    providers: vec![String::from("x3-local")],
                     finalized: true,
                 },
                 refund: crate::secret_release::RefundObservation {

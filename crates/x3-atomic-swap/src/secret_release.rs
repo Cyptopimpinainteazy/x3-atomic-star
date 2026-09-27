@@ -12,6 +12,7 @@ use crate::error::SwapError;
 use crate::intent::{AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, IntentId};
 use alloc::collections::BTreeSet;
 use alloc::string::String;
+use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
 /// One domain that must be safely locked before the secret may be released.
@@ -20,6 +21,17 @@ pub struct SecretReleaseRequirement {
     pub chain_id: ChainId,
     pub vm_type: VmType,
     pub min_confirmations: u64,
+    /// How many **distinct** RPC providers the policy requires to have reported
+    /// the lock.
+    ///
+    /// This is a field of the *requirement* on purpose. It used to exist only on
+    /// the attestation, and the firewall compared the attestation's
+    /// `provider_count` against the attestation's own `required_quorum` — so the
+    /// caller supplying the evidence also chose the bar it had to clear, and
+    /// `provider_count: 3, required_quorum: 2` written by hand satisfied a
+    /// security gate. A bar that the thing being judged gets to set is not a bar.
+    /// `0` is refused: "no providers must agree" is not a quorum.
+    pub min_providers: u32,
 }
 
 /// Quorum attestation produced by the RPC/finality verifier.
@@ -27,9 +39,27 @@ pub struct SecretReleaseRequirement {
 pub struct RpcQuorumAttestation {
     pub tx_id: String,
     pub block_hash: String,
-    pub provider_count: u32,
-    pub required_quorum: u32,
+    /// The providers that reported this observation, by id.
+    ///
+    /// Ids rather than a count, so the firewall counts *distinct* reporters
+    /// itself: the old shape let one provider be listed once while its `count`
+    /// said three. What this still does not establish is that each id really
+    /// observed anything — the identities are unauthenticated, and a signed
+    /// observation per provider is the next step (see the row's residual).
+    pub providers: Vec<String>,
     pub finalized: bool,
+}
+
+impl RpcQuorumAttestation {
+    /// Distinct, non-empty provider ids — the only count the firewall uses.
+    pub fn distinct_providers(&self) -> BTreeSet<&str> {
+        self.providers
+            .iter()
+            .map(String::as_str)
+            .map(str::trim)
+            .filter(|provider| !provider.is_empty())
+            .collect()
+    }
 }
 
 /// Refund observation produced by the chain observer.
@@ -258,8 +288,12 @@ impl SecretReleaseFirewall {
                 });
             }
 
-            if item.rpc_quorum.provider_count < item.rpc_quorum.required_quorum
-                || item.rpc_quorum.required_quorum == 0
+            // The bar is the requirement's; the count is the firewall's own count
+            // of the distinct providers that reported. Neither is read from the
+            // attestation's idea of what the quorum is.
+            let distinct_providers = item.rpc_quorum.distinct_providers().len();
+            if required.min_providers == 0
+                || distinct_providers < required.min_providers as usize
                 || !item.rpc_quorum.finalized
                 || item.rpc_quorum.tx_id != item.lock.tx_id
                 || item.rpc_quorum.block_hash != item.lock.block_hash
@@ -267,9 +301,12 @@ impl SecretReleaseFirewall {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release RPC quorum",
                     reason: alloc::format!(
-                        "RPC quorum attestation is invalid for {} / {}",
+                        "RPC quorum attestation is invalid for {} / {}: {} distinct provider(s) \
+                         reported, the policy requires {}",
                         required.chain_id,
-                        required.vm_type.name()
+                        required.vm_type.name(),
+                        distinct_providers,
+                        required.min_providers
                     ),
                 });
             }
@@ -452,8 +489,11 @@ mod tests {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: tx.into(),
                 block_hash: block_hash.clone(),
-                provider_count: 3,
-                required_quorum: 2,
+                providers: alloc::vec![
+                    String::from("provider-a"),
+                    String::from("provider-b"),
+                    String::from("provider-c"),
+                ],
                 finalized: true,
             },
             refund: RefundObservation {
@@ -469,6 +509,7 @@ mod tests {
             chain_id: chain.into(),
             vm_type: vm,
             min_confirmations,
+            min_providers: 2,
         }
     }
 
@@ -537,7 +578,8 @@ mod tests {
         let preimage = [0x15u8; 32];
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        evm.rpc_quorum.provider_count = 1;
+        // One provider reported; the policy requires two.
+        evm.rpc_quorum.providers = vec!["provider-a".into()];
         assert!(SecretReleaseFirewall::authorize(
             &intent,
             preimage,
@@ -545,6 +587,89 @@ mod tests {
             &[evm]
         )
         .is_err());
+    }
+
+    #[test]
+    fn the_evidence_cannot_set_its_own_quorum_bar() {
+        // The shape this replaced carried `provider_count` *and* `required_quorum`
+        // in the attestation, and the firewall compared them to each other — so a
+        // caller who wrote `provider_count: 3, required_quorum: 2` satisfied the
+        // gate. Now the bar is the requirement's, and three providers cannot clear
+        // a four-provider policy however the evidence describes itself.
+        let preimage = [0x17u8; 32];
+        let intent = intent(preimage);
+        let evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        let strict = SecretReleaseRequirement {
+            min_providers: 4,
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        let strict_evidence = [evm.clone()];
+        assert!(
+            matches!(
+                SecretReleaseFirewall::authorize(&intent, preimage, &[strict], &strict_evidence),
+                Err(SwapError::ProofVerificationFailed { .. })
+            ),
+            "three providers must not clear a four-provider policy"
+        );
+
+        // The same evidence clears the policy it does meet, so the refusal above
+        // is the bar and not something else about it.
+        let met = SecretReleaseRequirement {
+            min_providers: 3,
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(SecretReleaseFirewall::authorize(&intent, preimage, &[met], &[evm]).is_ok());
+    }
+
+    #[test]
+    fn one_provider_listed_twice_is_one_provider() {
+        let preimage = [0x18u8; 32];
+        let intent = intent(preimage);
+        let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        evm.rpc_quorum.providers = vec!["provider-a".into(), "provider-a".into()];
+        assert!(
+            SecretReleaseFirewall::authorize(
+                &intent,
+                preimage,
+                &[req("eth-mainnet", VmType::Evm, 12)],
+                &[evm]
+            )
+            .is_err(),
+            "a repeated id is not a second provider"
+        );
+    }
+
+    #[test]
+    fn an_unnamed_provider_does_not_count() {
+        let preimage = [0x19u8; 32];
+        let intent = intent(preimage);
+        let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        evm.rpc_quorum.providers = vec!["provider-a".into(), "   ".into()];
+        assert!(
+            SecretReleaseFirewall::authorize(
+                &intent,
+                preimage,
+                &[req("eth-mainnet", VmType::Evm, 12)],
+                &[evm]
+            )
+            .is_err(),
+            "a blank id is not a provider that reported"
+        );
+    }
+
+    #[test]
+    fn a_zero_provider_policy_is_refused() {
+        let preimage = [0x1au8; 32];
+        let intent = intent(preimage);
+        let evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        let nonsense = SecretReleaseRequirement {
+            min_providers: 0,
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(
+            SecretReleaseFirewall::authorize(&intent, preimage, &[nonsense], &[evm]).is_err(),
+            "\"no provider has to agree\" is not a quorum"
+        );
     }
 
     #[test]

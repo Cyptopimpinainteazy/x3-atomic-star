@@ -248,14 +248,17 @@ name = "RPC quorum oracle"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
-implemented = 78
-tested = 55
+implemented = 85
+tested = 60
 mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs Byzantine provider and partition tests"]
+blockers = [
+  "Needs Byzantine provider and partition tests",
+  "**CLOSED 2026-09-27 \u2014 the in-memory oracle no longer manufactures a quorum.** `SimpleRpcQuorum::collect_votes` returned `TxStatus::Confirmed` with `agreement_count: 1` for every provider it was handed, with the comment \u201cSimulate a successful Confirmed response at block 1\u201d. It has no transport, so it had observed nothing, and a caller that wired it up would have got a 2-of-3 consensus out of an empty network. It now reports `Unknown` with a count of zero \u2014 what \u201cI do not know\u201d looks like to `verify_consensus`, which then fails closed and names every unobserved provider as a disagreement. Two tests that *required* the fabrication were rewritten rather than deleted: `rpc_quorum::tests::test_collect_votes_returns_proof_per_provider` and the `test_new_modules_integration` block in `crates/x3-atomic-swap/tests/atomic_swap_integration.rs` both used to assert that all three votes came back `Confirmed` and that the oracle therefore reached consensus. They now assert the honest contract (one vote per provider, none claiming an observation, no consensus) and say in the test why the old assertion was the problem.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
 
 [[feature]]
@@ -300,13 +303,16 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
 implemented = 82
-tested = 62
+tested = 70
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs live heterogeneous provider evidence"]
+blockers = [
+  "Needs live heterogeneous provider evidence",
+  "**CLOSED 2026-09-27 \u2014 the only consumer of quorum evidence no longer lets the evidence set its own bar, and a disagreement cannot be padded into agreement.** The secret-release firewall compared `item.rpc_quorum.provider_count` against `item.rpc_quorum.required_quorum` \u2014 two fields of the same caller-supplied struct \u2014 so `provider_count: 3, required_quorum: 2` written by hand satisfied a security gate, and listing one provider three times satisfied it too. The bar now lives on `SecretReleaseRequirement::min_providers` (policy, and refused when it is zero), the attestation carries provider *ids* rather than a count, and the firewall counts distinct non-empty ids itself.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
 
 [[feature]]
@@ -316,14 +322,18 @@ name = "Secret-release firewall"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
-implemented = 85
-tested = 78
-mainnet_ready = 68
+implemented = 92
+tested = 88
+mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No live external-chain proof of the release path (TICKET-095): these tests exercise the chain-side firewall against constructed evidence, not a real EVM/SVM/BTC release"]
+blockers = [
+  "**NARROWED 2026-09-27 \u2014 the constructed part that mattered is gone; the live runs are real and the identities are not.** The evidence for this row *was* constructed in the place that decided the outcome: the quorum attestation carried its own `provider_count` and `required_quorum`, so the firewall's RPC-quorum gate was satisfied by numbers the evidence chose for itself, and the live EVM/SVM tests typed `provider_count: 3, required_quorum: 2` against a single anvil or solana-test-validator endpoint. The bar is now `SecretReleaseRequirement::min_providers` (policy; zero refused) and the attestation is a list of distinct provider ids the firewall counts itself \u2014 so the failure modes are duplicates, blank ids, and a policy bar the evidence cannot lower, all four of which have tests (`the_evidence_cannot_set_its_own_quorum_bar`, `one_provider_listed_twice_is_one_provider`, `an_unnamed_provider_does_not_count`, `a_zero_provider_policy_is_refused`). The live lifecycles still run against real chains and real contracts (`real_x3vm_evm_lock_claim_atomic_lifecycle`, `real_local_node_lock_finalized_claim_lifecycle`, and the SVM pair), and their requirements now say `min_providers: 1` with a comment, because one endpoint is what exists in those harnesses \u2014 the honest number instead of a typed two-of-three.",
+  "Still open on TICKET-095: the provider ids are **unauthenticated**. A caller can name three providers that never answered and clear `min_providers: 3`; what stops that is a signature over each observation from a key the verifier knows, which is the relayer's `x3-validator-attestation` model and is not wired here. The finality side has the same shape in miniature: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
+  "No live BTC release: the EVM and SVM paths have live lifecycles, Bitcoin does not.",
+]
 required_tests = [
   "authorizes_only_when_all_required_domains_are_finalized",
   "rejects_reused_proof_across_required_domains",
