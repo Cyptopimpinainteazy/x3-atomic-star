@@ -1,13 +1,13 @@
 // crates/gpu-swarm/src/advanced/jury.rs
 // Jury System - Encrypted audit logging and agent rotation
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::Utc;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::Mutex;
-use sha2::{Sha256, Digest};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tracing::{debug, span, Level};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,7 +71,7 @@ impl Jury {
 
         let timestamp = Utc::now().to_rfc3339();
         let event_data = format!("{}-{}-{}-{}", timestamp, agent_id, action, result);
-        
+
         let mut hasher = Sha256::new();
         hasher.update(event_data.as_bytes());
         let hash = STANDARD.encode(hasher.finalize());
@@ -117,10 +117,10 @@ impl Jury {
                 } else {
                     0.5
                 };
-                
+
                 let reputation_factor = agent.reputation / 100.0;
                 let slash_penalty = (1.0 - (agent.slashed_count as f32 * 0.1).min(1.0));
-                
+
                 let score = accuracy * reputation_factor * slash_penalty;
                 (i, agent.id.clone(), score)
             })
@@ -184,12 +184,18 @@ impl Jury {
         if let Some(agent) = self.agents.iter_mut().find(|a| a.id == agent_id) {
             agent.slashed_count += 1;
             agent.reputation = (agent.reputation - 25.0).max(0.0);
-            
+
             if agent.slashed_count > 3 {
                 agent.active = false;
-                debug!("🚨 Agent {} deactivated after {} slashes", agent_id, agent.slashed_count);
+                debug!(
+                    "🚨 Agent {} deactivated after {} slashes",
+                    agent_id, agent.slashed_count
+                );
             } else {
-                debug!("⚠️ Agent {} slashed ({} times)", agent_id, agent.slashed_count);
+                debug!(
+                    "⚠️ Agent {} slashed ({} times)",
+                    agent_id, agent.slashed_count
+                );
             }
 
             Ok(())
@@ -199,7 +205,10 @@ impl Jury {
     }
 
     /// Get audit log (decrypted/filtered)
-    pub fn get_audit_log(&self, agent_id: Option<&str>) -> Result<Vec<AuditEntry>, Box<dyn std::error::Error>> {
+    pub fn get_audit_log(
+        &self,
+        agent_id: Option<&str>,
+    ) -> Result<Vec<AuditEntry>, Box<dyn std::error::Error>> {
         let log = self.audit_log.lock();
 
         let entries = if let Some(agent) = agent_id {
@@ -271,18 +280,16 @@ mod tests {
 
     #[test]
     fn test_jury_creation() {
-        let agents = vec![
-            JuryAgent {
-                id: "agent1".to_string(),
-                reputation: 85.0,
-                evaluations_count: 100,
-                accurate_evaluations: 95,
-                failed_evaluations: 5,
-                slashed_count: 0,
-                active: true,
-                joined_at: Utc::now().to_rfc3339(),
-            },
-        ];
+        let agents = vec![JuryAgent {
+            id: "agent1".to_string(),
+            reputation: 85.0,
+            evaluations_count: 100,
+            accurate_evaluations: 95,
+            failed_evaluations: 5,
+            slashed_count: 0,
+            active: true,
+            joined_at: Utc::now().to_rfc3339(),
+        }];
 
         let jury = Jury::new(agents, 3600);
         assert_eq!(jury.agents.len(), 1);

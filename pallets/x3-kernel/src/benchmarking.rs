@@ -73,11 +73,16 @@ mod benchmarks {
         let evm_payload = create_evm_payload(1024);
         let svm_payload = create_svm_payload(1024);
 
-        // Compute prepare_root (bypass with zero hash)
-        let prepare_root = H256::zero();
         let comit_id = H256::from_low_u64_be(1);
         let nonce = Nonces::<T>::get(&caller);
         let fee: T::Balance = 1_000u32.into();
+        // `verify_dual_vm_with_receipts` refuses a zero `prepare_root` (that is the deliberate
+        // `dev-bypass` arm), so this benchmark presents the commitment the chain computes — the
+        // same correction `submit_comit_v2` already carries. With a zero root this benchmark failed
+        // with `ComitVerificationFailed` on every chain that builds without the bypass feature,
+        // which is why `pallet_x3_kernel`'s weights could not be regenerated at all.
+        let prepare_root =
+            Pallet::<T>::compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
 
         #[extrinsic_call]
         submit_comit(
@@ -157,6 +162,11 @@ mod benchmarks {
         let asset_id: T::AssetId = Default::default();
         let symbol = b"X3".to_vec();
         let decimals = 18u8;
+
+        // The development genesis already registers the default asset, so the precondition of
+        // `register_asset` (this id is free) has to be established or the benchmark stops at
+        // `AssetAlreadyRegistered` before it measures anything.
+        AssetRegistry::<T>::remove(asset_id);
 
         #[extrinsic_call]
         register_asset(RawOrigin::Root, asset_id, symbol.clone(), decimals);
@@ -350,6 +360,57 @@ mod benchmarks {
         // Verify: Authorities were updated and pending cleared
         assert!(PendingAuthorities::<T>::get().is_none());
         assert_eq!(Authorities::<T>::get().len(), count);
+        Ok(())
+    }
+
+    /// Benchmark emergency_pause
+    ///
+    /// Measures cost of:
+    /// - Governance origin check
+    /// - `ProtocolPaused` read (the already-paused guard) and write
+    /// - Event emission
+    ///
+    /// The three emergency calls (`emergency_pause`, `emergency_unpause`,
+    /// `emergency_halt`) charged literals of 10_000/15_000 picoseconds — a freeze
+    /// of the chain at essentially zero cost. They are measured here instead.
+    #[benchmark]
+    fn emergency_pause() -> Result<(), BenchmarkError> {
+        #[extrinsic_call]
+        emergency_pause(RawOrigin::Root);
+
+        assert!(ProtocolPaused::<T>::get());
+        Ok(())
+    }
+
+    /// Benchmark emergency_unpause
+    ///
+    /// Measures cost of:
+    /// - Governance origin check
+    /// - `ProtocolPaused` read and write
+    /// - Event emission
+    #[benchmark]
+    fn emergency_unpause() -> Result<(), BenchmarkError> {
+        // Setup: the chain has to be paused for the unpause arm to do its work.
+        ProtocolPaused::<T>::put(true);
+
+        #[extrinsic_call]
+        emergency_unpause(RawOrigin::Root);
+
+        assert!(!ProtocolPaused::<T>::get());
+        Ok(())
+    }
+
+    /// Benchmark emergency_halt
+    ///
+    /// Measures cost of:
+    /// - Governance origin check
+    /// - The `EmergencyHaltController::trigger` call
+    /// - Event emission
+    #[benchmark]
+    fn emergency_halt() -> Result<(), BenchmarkError> {
+        #[extrinsic_call]
+        emergency_halt(RawOrigin::Root);
+
         Ok(())
     }
 

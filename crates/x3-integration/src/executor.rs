@@ -33,6 +33,14 @@ pub struct X3ExecutorConfig {
     pub gas_config: X3GasConfig,
     /// Allow debug opcodes (NEVER for on-chain)
     pub allow_debug_ops: bool,
+    /// Whether this execution context can offer a private submission channel.
+    ///
+    /// An artifact may *demand* private submission in its own header (the compiled policy,
+    /// AGENTS.md §11). This is the context's half of the contract: when it is `false`, a module
+    /// carrying the demand is refused by the engine rather than executed in the clear. It defaults
+    /// to `false` everywhere, including `simulation()`, because "nobody told me whether a private
+    /// channel exists" must resolve to the refusal and not to the permissive answer.
+    pub allow_private_submission: bool,
 }
 
 impl Default for X3ExecutorConfig {
@@ -44,6 +52,7 @@ impl Default for X3ExecutorConfig {
             trace: false,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: false,
+            allow_private_submission: false,
         }
     }
 }
@@ -58,6 +67,7 @@ impl X3ExecutorConfig {
             trace: false,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: false,
+            allow_private_submission: false,
         }
     }
 
@@ -70,12 +80,23 @@ impl X3ExecutorConfig {
             trace: true,
             gas_config: X3GasConfig::default(),
             allow_debug_ops: true,
+            allow_private_submission: false,
         }
     }
 
     /// Set gas limit
     pub fn with_gas_limit(mut self, limit: u64) -> Self {
         self.gas_limit = limit;
+        self
+    }
+
+    /// Declare that this context really does offer a private submission channel.
+    ///
+    /// The runtime's equivalent is `pallet_private_execution::Enabled`; a caller that sets this
+    /// without such a channel is asserting something the chain does not have, which is why nothing
+    /// sets it by default.
+    pub fn with_private_submission_available(mut self) -> Self {
+        self.allow_private_submission = true;
         self
     }
 }
@@ -136,6 +157,22 @@ impl X3Executor {
         // (`crates/x3-integration/tests/gas_accounting.rs`).
         let module = BytecodeModule::from_bytes(bytecode)
             .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
+        // The compiled policy, before anything runs: the artifact says what it requires and this
+        // configuration says what the context can offer. Between the two, the demand is honoured —
+        // a program that asked to be submitted privately must not be executed in the clear, and the
+        // std engine has to agree with `mini_x3` about that or the same bytes would be refused on a
+        // block and accepted off it.
+        if module
+            .features
+            .has(x3_backend::bc_format::FeatureFlags::PRIVATE_SUBMISSION_REQUIRED)
+            && !config.allow_private_submission
+        {
+            return Err(X3IntegrationError::ExecutionFailed(
+                "private submission required by the compiled policy, but this context offers no \
+                 private channel"
+                    .into(),
+            ));
+        }
         let mut vm = VM::with_config_and_seeds(
             module,
             VMConfig {
@@ -261,7 +298,12 @@ impl X3Executor {
         seeds: &[([u8; 32], [u8; 32])],
     ) -> X3Result<X3ExecutionReceipt> {
         use crate::mini_x3;
-        match mini_x3::execute_x3bc_with_slots(bytecode, config.gas_limit, seeds) {
+        match mini_x3::execute_x3bc_with_slots_and_policy(
+            bytecode,
+            config.gas_limit,
+            seeds,
+            config.allow_private_submission,
+        ) {
             Ok(res) => Ok(X3ExecutionReceipt {
                 success: true,
                 gas_used: res.gas_used,

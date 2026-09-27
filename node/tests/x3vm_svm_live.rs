@@ -589,12 +589,17 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         vm_type: VmType::X3Vm,
         // The intent's X3 policy is BFT finality, which needs no confirmations.
         min_confirmations: 0,
+        // One endpoint serves this harness. The bar is part of the requirement on
+        // purpose: the attestation used to carry its own `required_quorum`, so the
+        // evidence chose the bar it had to clear.
+        min_providers: 1,
     };
     let svm_requirement = SecretReleaseRequirement {
         chain_id: String::from("solana-mainnet"),
         vm_type: VmType::Svm,
         // The intent's Solana policy is BFT finality as well.
         min_confirmations: 0,
+        min_providers: 1,
     };
     let svm_lock_proof = LockProof {
         tx_id: lock_signature.to_string(),
@@ -631,8 +636,7 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: x3_lock.tx_id.clone(),
                 block_hash: x3_lock.block_hash.clone(),
-                provider_count: 3,
-                required_quorum: 2,
+                providers: vec![String::from("x3-local")],
                 finalized: true,
             },
             refund: RefundObservation {
@@ -647,8 +651,7 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: svm_lock_proof.tx_id.clone(),
                 block_hash: svm_lock_proof.block_hash.clone(),
-                provider_count: 3,
-                required_quorum: 2,
+                providers: vec![String::from("solana-test-validator")],
                 finalized: true,
             },
             refund: RefundObservation {

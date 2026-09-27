@@ -874,7 +874,7 @@ pub mod pallet {
 
         /// Register or upsert an on-chain liquidity pool for pathfinding and oracle sync.
         #[pallet::call_index(9)]
-        #[pallet::weight(Weight::from_parts(60_000_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::register_liquidity_pool())]
         pub fn register_liquidity_pool(
             origin: OriginFor<T>,
             protocol: types::AmmProtocol,
@@ -932,7 +932,7 @@ pub mod pallet {
 
         /// Update reserves for an already registered pool.
         #[pallet::call_index(10)]
-        #[pallet::weight(Weight::from_parts(40_000_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::update_liquidity_pool())]
         pub fn update_liquidity_pool(
             origin: OriginFor<T>,
             pool_id: H256,
@@ -964,7 +964,7 @@ pub mod pallet {
 
         /// Sync a pool's spot price into the TWAP oracle immediately.
         #[pallet::call_index(11)]
-        #[pallet::weight(Weight::from_parts(50_000_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::sync_pool_price())]
         pub fn sync_pool_price(origin: OriginFor<T>, pool_id: H256) -> DispatchResult {
             T::AmmRegistrarOrigin::ensure_origin(origin)?;
 
@@ -1023,7 +1023,7 @@ pub mod pallet {
         /// * `price` - Price observation (token_b per token_a, scaled by 1e18)
         /// * `source` - AMM source of the price
         #[pallet::call_index(6)]
-        #[pallet::weight(Weight::from_parts(50_000_000, 0))]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_price_observation())]
         pub fn submit_price_observation(
             origin: OriginFor<T>,
             token_a: H256,

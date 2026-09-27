@@ -1,0 +1,25 @@
+
+# pallet tests over the relayer payload — 2026-09-27T13:22:47Z
+$ cargo test -p pallet-x3-settlement-engine --lib the_relayer_payload
+
+warning: /home/lojak/Desktop/xxxstar-main/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/xxxstar-main/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/xxxstar-main/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/xxxstar-main/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.97s
+     Running unittests src/lib.rs (target/debug/deps/pallet_x3_settlement_engine-afd79c34d6cb2be7)
+
+running 2 tests
+test tests::the_relayer_payload_is_refused_when_its_first_header_is_dropped ... ok
+test tests::the_relayer_payload_decodes_and_admits_on_an_anchored_chain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.01s
+
+TEST_EXIT=0

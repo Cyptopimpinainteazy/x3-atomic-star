@@ -17,6 +17,10 @@ serde_json = { workspace = true }
 # Runtime
 x3-chain-runtime = { path = "../../runtime", features = ["std", "native-real-vm-adapters"] }
 pallet-x3-kernel = { path = "../../pallets/x3-kernel", features = ["std"] }
+# `walletDex_estimateSwap` answers with the chain's own simulation
+# (`AtomicTradeEngineApi::simulate_trade`) instead of a fraction of the input, so the
+# runtime API trait has to be nameable here.
+pallet-atomic-trade-engine = { path = "../../pallets/atomic-trade-engine", features = ["std"] }
 
 # Substrate RPC infrastructure
 sp-api = { workspace = true }

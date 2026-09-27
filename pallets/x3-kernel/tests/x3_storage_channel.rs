@@ -172,6 +172,9 @@ impl pallet_x3_kernel::Config for StorageTest {
     type MaxPreparedOpsPerBlock = ConstU32<8>;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type RequireCrossVmProof = ConstBool<false>;
+    // This test chain speaks no private channel; the intake check must still see the posture as a
+    // runtime decision rather than a constant baked into the pallet.
+    type PrivateSubmissionChannel = ConstBool<false>;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = TestBridgeEvmEscrow;
     type BridgeSvmEscrow = TestBridgeSvmEscrow;

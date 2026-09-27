@@ -58,13 +58,18 @@ impl NetworkTuner {
         let bdp = (bandwidth_mbps / 8) * latency_ms; // in KB
         let recommended_window = (bdp * 2).max(65536).min(2097152);
 
-        self.tcp_window_size.store(recommended_window, Ordering::Relaxed);
+        self.tcp_window_size
+            .store(recommended_window, Ordering::Relaxed);
         debug!("📊 TCP window optimized to {} bytes", recommended_window);
     }
 
     /// Optimize UDP batching
     pub fn optimize_udp_batch(&self, throughput_mbps: u32) {
-        let span = span!(Level::DEBUG, "optimize_udp_batch", throughput = throughput_mbps);
+        let span = span!(
+            Level::DEBUG,
+            "optimize_udp_batch",
+            throughput = throughput_mbps
+        );
         let _enter = span.enter();
 
         // Scale batch size based on throughput
@@ -96,9 +101,13 @@ impl NetworkTuner {
         };
 
         self.gossip_fanout.store(fanout, Ordering::Relaxed);
-        self.gossip_interval_ms.store(interval_ms, Ordering::Relaxed);
+        self.gossip_interval_ms
+            .store(interval_ms, Ordering::Relaxed);
 
-        debug!("🔄 Gossip optimized: fanout={}, interval={}ms", fanout, interval_ms);
+        debug!(
+            "🔄 Gossip optimized: fanout={}, interval={}ms",
+            fanout, interval_ms
+        );
     }
 
     /// Record packet sent
@@ -110,7 +119,8 @@ impl NetworkTuner {
     /// Record packet received
     pub fn record_packet_received(&self, bytes: u32) {
         self.packets_received.fetch_add(1, Ordering::Relaxed);
-        self.bytes_received.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.bytes_received
+            .fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     /// Record packet loss

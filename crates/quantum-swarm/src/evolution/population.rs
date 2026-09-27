@@ -224,7 +224,11 @@ impl Population {
     /// Get top N genomes
     pub fn top_n(&self, n: usize) -> Vec<&Genome> {
         let mut sorted: Vec<_> = self.genomes.values().collect();
-        sorted.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
+        sorted.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.into_iter().take(n).collect()
     }
 
@@ -311,7 +315,11 @@ impl Population {
     /// Rank-based selection
     pub fn rank_select(&self, count: usize) -> Vec<Genome> {
         let mut sorted: Vec<_> = self.genomes.values().collect();
-        sorted.sort_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap());
+        sorted.sort_by(|a, b| {
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let n = sorted.len();
         let total_rank: usize = (1..=n).sum();

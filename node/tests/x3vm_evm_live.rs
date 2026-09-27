@@ -495,6 +495,10 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         chain_id: String::from("x3-local"),
         vm_type: VmType::X3Vm,
         min_confirmations: 0,
+        // One endpoint serves this harness. The bar is part of the requirement on
+        // purpose: the attestation used to carry its own `required_quorum`, so the
+        // evidence chose the bar it had to clear.
+        min_providers: 1,
     };
     // The EVM executor labels its chain `anvil`; the intent's Ethereum policy
     // requires one confirmation. The firewall matches domains by chain family,
@@ -505,6 +509,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         chain_id: String::from("ethereum-anvil"),
         vm_type: VmType::Evm,
         min_confirmations: 1,
+        min_providers: 1,
     };
     let evm_lock_finality = FinalityProof {
         chain_id: String::from("ethereum-anvil"),
@@ -526,8 +531,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: x3_lock.tx_id.clone(),
                 block_hash: x3_lock.block_hash.clone(),
-                provider_count: 3,
-                required_quorum: 2,
+                providers: vec![String::from("x3-local")],
                 finalized: true,
             },
             refund: RefundObservation {
@@ -542,8 +546,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: evm_lock.tx_id.clone(),
                 block_hash: evm_lock.block_hash.clone(),
-                provider_count: 3,
-                required_quorum: 2,
+                providers: vec![String::from("ethereum-anvil")],
                 finalized: true,
             },
             refund: RefundObservation {

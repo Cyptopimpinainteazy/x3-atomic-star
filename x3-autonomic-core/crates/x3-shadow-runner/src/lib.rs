@@ -1,9 +1,11 @@
 //! X3 Shadow Runner
-//! 
+//!
 //! Shadow execution engine that replays blocks in an isolated environment
 //! to verify correctness without affecting the main chain state.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// Off-chain tooling: no `std` feature is declared here, so the `no_std` attribute this crate
+// carried made it permanently no_std while the code uses `Vec`, `String` and `format!`. It
+// never compiled. Off-chain tooling is std.
 
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
@@ -66,43 +68,45 @@ impl ShadowRunner {
     }
 
     /// Execute a block in shadow mode and return the result
+    ///
+    /// # Refused, not fabricated
+    ///
+    /// This returned `Ok` with `state_root_matches: true`, `execution_time_ms: 0` and no events
+    /// for any block, without executing anything (`extrinsics` was unused). A shadow runner that
+    /// always reports a match is worse than one that reports nothing: the whole point of the
+    /// comparison is to catch a divergence. There is no isolated runtime wired here to replay a
+    /// block in, so it refuses and says so.
     pub fn execute_shadow_block(
         &self,
         block_hash: &[u8],
         extrinsics: &[Vec<u8>],
     ) -> Result<ShadowExecutionResult, ShadowRunnerError> {
-        // Shadow execution implementation
-        // In production, this would replay the block in an isolated runtime
-        Ok(ShadowExecutionResult {
-            block_hash: block_hash.to_vec(),
-            execution_time_ms: 0,
-            state_root_matches: true,
-            events: vec![],
-            errors: vec![],
-        })
+        let _ = (block_hash, extrinsics);
+        Err(ShadowRunnerError::IsolatedRuntimeUnavailable)
     }
 
     /// Verify that shadow execution results match expected state
+    ///
+    /// This returned `true` for every input ("Simplified verification"): a verifier that cannot
+    /// fail verifies nothing. It now compares the state root the shadow execution produced
+    /// against the production root, and refuses when there is no root to compare.
     pub fn verify_shadow_result(
         &self,
         result: &ShadowExecutionResult,
         expected_root: &[u8],
-    ) -> bool {
+    ) -> Result<bool, ShadowRunnerError> {
         if !self.config.verify_state_roots {
-            return true;
+            return Ok(true); // Verification is switched off in this configuration.
         }
-        // Simplified verification
-        true
+        if result.state_root.is_empty() {
+            return Err(ShadowRunnerError::StateRootMissing);
+        }
+        Ok(result.state_root == expected_root)
     }
 
     /// Check if autonomy level allows automatic action
     pub fn can_auto_act(&self) -> bool {
-        matches!(
-            self.current_autonomy_level,
-            AutonomyLevel::Automatic(_)
-                | AutonomyLevel::SelfImproving
-                | AutonomyLevel::SelfGoverning
-        )
+        self.current_autonomy_level.allows_autonomous_change()
     }
 }
 
@@ -119,6 +123,10 @@ pub enum ShadowRunnerError {
     InvalidExtrinsics,
     /// Runtime error during shadow execution
     RuntimeError(String),
+    /// No isolated runtime is wired in to replay the block.
+    IsolatedRuntimeUnavailable,
+    /// The result carries no state root, so there is nothing to compare.
+    StateRootMissing,
 }
 
 impl core::fmt::Display for ShadowRunnerError {
@@ -129,6 +137,14 @@ impl core::fmt::Display for ShadowRunnerError {
             Self::StateRootMismatch => write!(f, "State root mismatch"),
             Self::InvalidExtrinsics => write!(f, "Invalid extrinsics provided"),
             Self::RuntimeError(msg) => write!(f, "Runtime error: {}", msg),
+            Self::IsolatedRuntimeUnavailable => write!(
+                f,
+                "shadow execution is not wired into this node: no isolated runtime to replay a block"
+            ),
+            Self::StateRootMissing => write!(
+                f,
+                "the shadow result carries no state root, so there is nothing to verify"
+            ),
         }
     }
 }
@@ -136,19 +152,90 @@ impl core::fmt::Display for ShadowRunnerError {
 impl From<ShadowRunnerError> for AuditEvent {
     fn from(err: ShadowRunnerError) -> Self {
         AuditEvent::Error {
-            severity: Severity::High,
+            severity: Severity::Critical,
             component: "x3-shadow-runner".into(),
-            message: err.to_string(),
+            message: err.to_string().into_bytes(),
             context: None,
         }
     }
 }
 
-#[cfg(feature = "std")]
 impl std::error::Error for ShadowRunnerError {}
 
 /// Health check for the shadow runner
 pub fn health_check() -> HealthStatus {
     // Shadow runner is healthy if it can be instantiated
     HealthStatus::Healthy
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result_with_root(root: &[u8]) -> ShadowExecutionResult {
+        ShadowExecutionResult {
+            block_hash: b"block".to_vec(),
+            state_root: root.to_vec(),
+            execution_time_ms: 1,
+            state_root_matches: false,
+            events: vec![],
+            errors: vec![],
+        }
+    }
+
+    /// `execute_shadow_block` returned `Ok` with `state_root_matches: true` and no events for any
+    /// block, without executing anything. A shadow runner that always reports a match cannot do
+    /// the one thing it exists for. It refuses now.
+    #[test]
+    fn shadow_execution_refuses_without_an_isolated_runtime() {
+        let runner = ShadowRunner::new(ShadowRunnerConfig::default());
+        let error = runner
+            .execute_shadow_block(b"block", &[vec![1, 2, 3]])
+            .expect_err("there is no isolated runtime to replay a block in");
+        assert!(
+            error.to_string().contains("not wired into this node"),
+            "{error}"
+        );
+    }
+
+    /// `verify_shadow_result` returned `true` for every input. It compares the roots now, and
+    /// refuses when there is nothing to compare.
+    #[test]
+    fn verification_compares_roots_and_refuses_when_there_are_none() {
+        let runner = ShadowRunner::new(ShadowRunnerConfig::default());
+
+        assert_eq!(
+            runner.verify_shadow_result(&result_with_root(b"root-a"), b"root-a"),
+            Ok(true)
+        );
+        assert_eq!(
+            runner.verify_shadow_result(&result_with_root(b"root-a"), b"root-b"),
+            Ok(false)
+        );
+        assert_eq!(
+            runner.verify_shadow_result(&result_with_root(b""), b"root-a"),
+            Err(ShadowRunnerError::StateRootMissing)
+        );
+
+        // With verification switched off, the runner says so instead of pretending to compare.
+        let unverified = ShadowRunner::new(ShadowRunnerConfig {
+            verify_state_roots: false,
+            ..ShadowRunnerConfig::default()
+        });
+        assert_eq!(
+            unverified.verify_shadow_result(&result_with_root(b""), b"root-a"),
+            Ok(true)
+        );
+    }
+
+    /// The autonomy gate is the ladder's answer, not a list of variants that do not exist.
+    #[test]
+    fn autonomous_action_follows_the_autonomy_ladder() {
+        let mut runner = ShadowRunner::new(ShadowRunnerConfig::default());
+        assert!(!runner.can_auto_act());
+        runner.set_autonomy_level(AutonomyLevel::Canary);
+        assert!(runner.can_auto_act());
+        runner.set_autonomy_level(AutonomyLevel::Manual);
+        assert!(!runner.can_auto_act());
+    }
 }

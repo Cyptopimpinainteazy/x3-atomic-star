@@ -677,16 +677,17 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
-        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
 // ── mainnet-rc1: narrowed pallet set ─────────────────────────────────────────
-// Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
-// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
-// DePIN marketplace, private execution).
+// Excludes the legacy experimental Swarm plus DEX, flashloan, launchpad,
+// auction, meme, evolution, compute market, automation, oracle, VRF, DA,
+// sequencer, DePIN marketplace, and private execution. NorthernSwarm is part
+// of the guarded launch surface and is release-gated separately.
 #[cfg(all(
     not(feature = "dev"),
     not(feature = "frontier"),
@@ -745,6 +746,7 @@ construct_runtime!(
         X3JuryAnchor: pallet_x3_jury_anchor,
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -823,6 +825,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -901,6 +904,7 @@ construct_runtime!(
         X3LpLocker: pallet_x3_lp_locker,
         X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -1389,6 +1393,38 @@ impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowStorage {
         pallet_x3_kernel::BridgeSvmEscrow::<Runtime>::get()
     }
 }
+
+/// The chain's private-submission posture, as `pallet_x3_kernel`'s intake check reads it.
+///
+/// Deliberately *derived* from the pallet that owns the private channel rather than a constant:
+/// `pallet_private_execution::Enabled` is the switch governance flips to turn private execution on,
+/// so binding the X3VM intake to it means there is exactly one answer to "can this chain offer a
+/// private submission channel?" instead of two that can drift apart. With private execution off —
+/// the shipped posture — a program whose compiled policy demands private submission is refused at
+/// intake instead of executed in the clear.
+///
+/// `mainnet-rc1` is the exception, and it has to be spelled out because the reference above cannot
+/// compile there: the scope lock does **not** include `pallet-private-execution`, so
+/// `Runtime: pallet_private_execution::Config` is not implemented and the storage item's `get()`
+/// does not resolve. Answering a constant `false` on that variant is not a workaround — it is the
+/// fact the derived version would have reported, and it keeps the fail-closed posture: a program
+/// whose compiled policy demands private submission is refused at intake because this chain has no
+/// private channel to submit it through. Measured 2026-09-27: without this, `runtime variant
+/// dry-runs` failed to build the `mainnet-rc1` variant outright (E0599 at this line), which is the
+/// variant mainnet is meant to run.
+pub struct RuntimePrivateSubmissionChannel;
+impl frame_support::traits::Get<bool> for RuntimePrivateSubmissionChannel {
+    #[cfg(not(feature = "mainnet-rc1"))]
+    fn get() -> bool {
+        pallet_private_execution::Enabled::<Runtime>::get()
+    }
+
+    #[cfg(feature = "mainnet-rc1")]
+    fn get() -> bool {
+        false
+    }
+}
+
 parameter_types! {
     pub const MaxReplayPruneItemsPerBlock: u32 = 64u32;
 }
@@ -1725,6 +1761,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type MaxPreparedCrossVmOps = MaxPreparedCrossVmOps;
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type RequireCrossVmProof = RequireCrossVmProof;
+    type PrivateSubmissionChannel = RuntimePrivateSubmissionChannel;
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:
@@ -2558,6 +2595,7 @@ impl pallet_x3_asset_registry::Config for Runtime {
 impl pallet_x3_supply_ledger::Config for Runtime {
     type SupplyGovernance = EnsureRootOrHalfCouncil;
     type Registry = X3AssetRegistry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Runtime>;
 }
 
 // ── Protocol fee parameters ──────────────────────────────────────────────────
@@ -2598,6 +2636,7 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
     type Sentinel = X3Sentinel;
+    type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -2777,21 +2816,26 @@ impl pallet_swarm::Config for Runtime {
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
 }
 
-// ===== Northern Swarm Pallet Configuration (dev-only; guarded until RC2) =====
-#[cfg(feature = "dev")]
+// ===== Northern Swarm Pallet Configuration =====
+// Guarded by the Swarm/Reactor mainnet release gate; available in dev and
+// production runtime variants so the launch binary can actually host the market.
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
-    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
+    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~48 minutes at 200ms blocks
     pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
+    pub const NorthernSwarmQuorumThreshold: u32 = 2;
+    pub const NorthernSwarmMaxExecutorsPerTask: u32 = 3;
 }
 
-#[cfg(feature = "dev")]
 impl pallet_northern_swarm::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MinExecutorStake = NorthernSwarmMinExecutorStake;
     type DeregistrationCooldown = NorthernSwarmDeregistrationCooldown;
     type MaxClaimedTasksPerExecutor = NorthernSwarmMaxClaimedTasksPerExecutor;
+    type QuorumThreshold = NorthernSwarmQuorumThreshold;
+    type MaxExecutorsPerTask = NorthernSwarmMaxExecutorsPerTask;
+    type WeightInfo = pallet_northern_swarm::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== DePIN Marketplace Pallet Configuration =====
@@ -3113,6 +3157,7 @@ impl pallet_x3_treasury_policy::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type OperatorOrigin = EnsureRootOrHalfCouncil;
     type MaxInsuranceReserve = MaxInsuranceReserve;
+    type WeightInfo = pallet_x3_treasury_policy::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Custody Configuration =====
@@ -3473,6 +3518,8 @@ mod benches {
     #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     #[allow(unused_imports)]
+    use pallet_northern_swarm::Pallet as NorthernSwarm;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
     #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
@@ -3484,13 +3531,40 @@ mod benches {
     // answered "No benchmarks found which match your input".
     #[allow(unused_imports)]
     use pallet_x3_kernel::Pallet as AtlasKernel;
+    // Added 2026-09-27: `pallet-atomic-trade-engine` ships a generated `weights.rs` and a
+    // `benchmarking.rs`, but four of its calls (register/update liquidity pool, sync pool price,
+    // submit price observation) charged literal weights written by hand — and nothing could
+    // re-measure them, because the pallet was not registered here: the CLI answered
+    // "No benchmarks found which match your input".
+    #[allow(unused_imports)]
+    use pallet_atomic_trade_engine::Pallet as AtomicTradeEngine;
+    // Added 2026-09-27: `pallet-x3-supply-ledger` charged literals for a governance mint, a burn
+    // and three switches while its own `Ledgers` map was the real cost, and nothing could re-measure
+    // them because the pallet was not registered here.
+    #[allow(unused_imports)]
+    use pallet_x3_supply_ledger::Pallet as X3SupplyLedger;
+    // Added 2026-09-27: `pallet-x3-treasury-policy` charged literals for all eight calls — a vault
+    // funding at 80,000,000 picoseconds — behind a `runtime-benchmarks` feature that had nothing in
+    // it and that this list did not enable either, so the pallet could not be measured at all.
+    #[allow(unused_imports)]
+    use pallet_x3_treasury_policy::Pallet as X3TreasuryPolicy;
+    // Added 2026-09-27: `pallet-x3-token-factory` charged literals for a token launch, a mint, a
+    // burn and an authority handover, behind a `runtime-benchmarks` feature that had nothing in it
+    // and a runtime feature list that did not enable it either.
+    #[allow(unused_imports)]
+    use pallet_x3_token_factory::Pallet as X3TokenFactory;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_token_factory, X3TokenFactory]
+        [pallet_x3_treasury_policy, X3TreasuryPolicy]
+        [pallet_x3_supply_ledger, X3SupplyLedger]
+        [pallet_atomic_trade_engine, AtomicTradeEngine]
         [pallet_x3_atomic_kernel, X3AtomicKernel]
         [pallet_x3_kernel, AtlasKernel]
         [pallet_x3_settlement_engine, X3SettlementEngine]
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]
+        [pallet_northern_swarm, NorthernSwarm]
     );
 }
 

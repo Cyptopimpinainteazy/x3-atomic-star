@@ -93,6 +93,7 @@ impl AssetRegistryInspect for AlwaysActiveRegistry {
 impl pallet_x3_supply_ledger::Config for Test {
     type SupplyGovernance = RootOnly;
     type Registry = AlwaysActiveRegistry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {

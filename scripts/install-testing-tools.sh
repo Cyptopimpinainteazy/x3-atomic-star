@@ -72,7 +72,7 @@ echo "╔═══════════════════════�
 echo "║  ✅ All testing tools installed successfully!          ║"
 echo "╠════════════════════════════════════════════════════════╣"
 echo "║  Next steps:                                            ║"
-echo "║  1. cd /home/lojak/Desktop/X3_ATOMIC_STAR              ║"
+echo "║  1. cd <this checkout>                                 ║"
 echo "║  2. ./scripts/run-all-tests.sh                         ║"
 echo "║                                                         ║"
 echo "║  For detailed config:                                   ║"

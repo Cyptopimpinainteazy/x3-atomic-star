@@ -15,6 +15,16 @@
 #                (boots a real chain, snapshots it, restores it, and proves the
 #                 restored chain is the same chain — see
 #                 scripts/snapshot-live-restore-proof.sh)
+#   export-rpc: bash scripts/snapshot-restore.sh export-rpc <rpc-url> <out.json> \
+#                [--report <anchor.json>] [--from-spec <template.json>] \
+#                [--justified-ancestor] [--min-finalized N] [--force]
+#                (exports a *running* node's state at a finalized, justified
+#                 block, without stopping it — see
+#                 scripts/snapshot-rpc-export.py; unlike `backup` this never
+#                 needs the validator stopped)
+#   zero-downtime-proof: bash scripts/snapshot-restore.sh zero-downtime-proof
+#                (runs scripts/snapshot-zero-downtime-proof.sh: the live gate
+#                 for the export above, including the anchors it must refuse)
 #
 # Exit codes:
 #   0 — success
@@ -311,6 +321,36 @@ case "$ACTION" in
         # hash, the state root and the state key set to match — with an empty-DB
         # control that must fail the same check.
         exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/snapshot-live-restore-proof.sh"
+        ;;
+    zero-downtime-proof)
+        # The other snapshot bullet: take the snapshot without stopping the
+        # node. Exports the running chain's state over RPC at a finalized,
+        # justified block, recomputes the chain's own state root from the
+        # exported entries, builds and verifies the content-addressed snapshot
+        # with the chain's GRANDPA justification, restores it and boots the
+        # result - with a one-key-short export, a genesis-only spec, a wrong
+        # anchor and a pruned anchor all required to be refused.
+        exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/snapshot-zero-downtime-proof.sh"
+        ;;
+    export-rpc)
+        # Export a *running* node's state as a raw chain spec, without stopping
+        # it. `backup` cannot do this - it refuses a live database on purpose.
+        #
+        #   bash scripts/snapshot-restore.sh export-rpc <rpc-url> <out.json> \
+        #       [--report <anchor.json>] [--from-spec <template.json>] \
+        #       [--justified-ancestor] [--min-finalized N] [--force]
+        #
+        # The anchor is a finalized, GRANDPA-justified block; the resulting
+        # spec's state recomputes to that block's own state root, which
+        # `x3-state-snapshot root --from-raw-spec <out.json>` will confirm.
+        RPC_URL="${2:-}"
+        OUT_SPEC="${3:-}"
+        if [[ -z "$RPC_URL" || -z "$OUT_SPEC" ]]; then
+            echo -e "${RED}❌ export-rpc needs <rpc-url> <out.json>${NC}"
+            exit 1
+        fi
+        exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/snapshot-rpc-export.py" \
+            --rpc "$RPC_URL" --out "$OUT_SPEC" "${@:4}"
         ;;
     verify-snapshot)
         # Verify a content-addressed snapshot (manifest + chunk directory)

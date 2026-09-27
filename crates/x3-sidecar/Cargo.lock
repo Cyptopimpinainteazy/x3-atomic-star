@@ -7079,6 +7079,7 @@ dependencies = [
 name = "pallet-northern-swarm"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7666,6 +7667,7 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "x3-asset-kernel-types",
+ "x3-common",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
  "x3-packet-schema",

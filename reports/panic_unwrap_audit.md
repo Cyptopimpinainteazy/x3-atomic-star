@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-27T05:12:08Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-27T15:54:03Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 
@@ -17,9 +17,9 @@ exist in the runtime or in a release node build.
 | --- | --- | --- |
 | runtime-hook | 0 | 0 |
 | pallet-call | 0 | 0 |
-| production | 520 | 520 |
+| production | 440 | 440 |
 
-files scanned: 1408
+files scanned: 1418
 
 ## Block-hook panics
 
@@ -30,28 +30,28 @@ None. No panic is reachable from a block hook.
 -   35  pallets/pallet-x3-agent-registry/src/benchmarking.rs
 -   26  pallets/x3-atomic-kernel/src/benchmarking.rs
 -   23  pallets/agent-accounts/src/benchmarking.rs
--   19  crates/cross-vm-coordinator/src/persistence.rs
 -   17  pallets/governance/src/benchmarking.rs
 -   17  crates/x3-bridge-adapters/src/lib.rs
 -   16  crates/x3-compiler/src/parser.rs
 -   14  pallets/treasury/src/benchmarking.rs
 -   14  crates/quantum-swarm/src/quantum/circuit.rs
 -   11  pallets/x3-inventory/src/benchmarking.rs
--   10  crates/gpu-swarm/src/admin.rs
 -   10  crates/x3-bot/src/telemetry.rs
--   10  crates/x3-rpc/src/wallet_service_rpc.rs
 -    9  crates/x3-dns-server/src/config.rs
--    8  node/src/chain_spec.rs
 -    8  crates/x3-mobile-sdk/src/biometric_auth_mobile.rs
 -    8  crates/x3-backend/src/lower.rs
 -    7  pallets/pallet-x3-proof-carrying-agent/src/benchmarking.rs
 -    7  pallets/atomic-trade-engine/src/benchmarking.rs
--    7  crates/gpu-swarm/src/crown/scrapyard.rs
 -    6  crates/external-chains/src/chains/base.rs
 -    6  crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs
--    6  crates/cross-vm-coordinator/src/state_machine.rs
 -    5  runtime/build.rs
 -    5  crates/external-chains/src/chains/universal.rs
+-    5  crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs
+-    5  crates/swarm-media/src/reputation.rs
+-    5  crates/x3-hir/src/lower.rs
+-    5  crates/x3-bot/src/api.rs
+-    5  crates/cross-vm-coordinator/src/persistence.rs
+-    4  pallets/x3-kernel/src/benchmarking.rs
 
 ## Verdict
 

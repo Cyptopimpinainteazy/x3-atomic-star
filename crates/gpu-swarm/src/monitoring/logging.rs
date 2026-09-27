@@ -50,7 +50,7 @@ pub fn setup_logging() -> Result<(), Box<dyn Error>> {
         .with(console_layer)
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "debug,tokio=info,hyper=info".parse().unwrap()),
+                .map_or_else(|_| tracing_subscriber::EnvFilter::default(), |f| f),
         )
         .init();
 

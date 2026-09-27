@@ -210,3 +210,7 @@ apps/x3-desktop/dist/
 .roo/mcp.json
 .todo
 .ai-todo/
+# The release gate's and the runtime attestation's shared build lock. It is
+# process-scoped state, not evidence: it exists so a second run of either one
+# refuses instead of racing the first through `runtime/target/srtool`.
+.x3-release-build.lock

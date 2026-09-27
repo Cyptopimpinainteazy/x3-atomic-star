@@ -95,14 +95,29 @@ subsystem = "runtime_core"
 source = "master"
 paths = ["runtime/src/lib.rs"]
 implemented = 75
-tested = 55
-mainnet_ready = 50
+tested = 78
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Historical status documents show verification churn; exact-head proof still required"]
-evidence = ["runtime/src/lib.rs", "note: Feature wired through node/runtime and production gate"]
+blockers = [
+  "**2026-09-27 — the `mainnet-rc1` variant did not compile, and the default gate set was red from `ed798764d` until this fix.** `crates/x3-compiler` and the runtime gained a private-submission demand in `ed798764d`: `RuntimePrivateSubmissionChannel` (runtime/src/lib.rs) answered `pallet_private_execution::Enabled::<Runtime>::get()`, and `pallet-private-execution` is *not* in the `mainnet-rc1` `construct_runtime!` block — the scope lock excludes it. `Runtime: pallet_private_execution::Config` was therefore unimplemented and the storage item's `get()` did not resolve (E0599 at that line), so `bash scripts/check-runtime-variants.sh mainnet-rc1` failed in 36 s on the variant mainnet is meant to run. `clippy runtime rc1` is in `GATES_FAST` and builds exactly that feature set, so a plain `bash scripts/local-ci.sh` was failing too; `cargo check --workspace` cannot see it, because it compiles the runtime once with default features and never touches the other five `construct_runtime!` blocks. The rc6 sequence's stage 5 also claims a migration dry-run for every variant; it had not been re-run since that commit.",
+  "**CLOSED 2026-09-27 — the reference is cfg-aware and the whole six-variant set is green.** That variant answers a constant `false`, which is the fact the derived version would have reported there — a chain with no private channel refuses a program whose compiled policy demands one — so the fail-closed posture is unchanged. Measured: `bash scripts/check-runtime-variants.sh` — full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s. Break-it-first: the undivided reference is what failed, so the gate's own red log (`runtime-variant-20260927T075116Z-mainnet-rc1.log`, FAIL 36s, E0599) is the before and the PASS run is the after.",
+  "Still open, and why `mainnet_ready` stops at 58: a *build* of the rc1 variant is not a *chain* of it. No rc1-featured runtime has ever been booted, no genesis for it exists in `chain-specs/`, and its migration dry-run is in-process rather than against a live state. The gate proves the variant compiles and its `OnRuntimeUpgrade` work fits in a block; it does not prove an rc1 network runs.",
+]
+evidence = [
+  "runtime/src/lib.rs",
+  "note: Feature wired through node/runtime and production gate",
+  "note: 2026-09-27 — the six-variant dry-run gate now passes on every variant, including `mainnet-rc1`, which had not been built since the private-submission wiring landed",
+]
+required_tests = [
+  "runtime_upgrade_rehearsal",
+  "runtime_upgrade_rehearsal_storage_versions",
+]
+test_evidence = [
+  "note: `bash scripts/check-runtime-variants.sh` — all six variants PASS (2026-09-27); the gate is auto-selected by `scripts/local-ci.sh` when a `runtime/*` path changes, which is how this variant's breakage is supposed to be caught",
+]
 registry_feature = "triforge_runtime"
 
 [[feature]]
@@ -168,15 +183,28 @@ id = "X3-RT-005"
 name = "Atomic bundle submission"
 subsystem = "runtime_core"
 source = "master"
-paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+paths = [
+  "pallets/x3-atomic-kernel/src/lib.rs",
+  "scripts/drills/halt_recovery_live.sh",
+]
 implemented = 80
-tested = 55
-mainnet_ready = 55
+tested = 75
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs multi-validator adversarial lifecycle proof"]
+blockers = [
+  "**CLOSED 2026-09-27 — the bundle lifecycle now has a multi-validator adversarial proof, and it found the case nobody had measured.** The blocker was one sentence; the drill `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS 27s) boots three real validators, submits a real bundle as `//x3-atomic-gateway` (`submit_atomic_bundle` is gated on `EnsureX3LangGateway`), records its bond as reserved, and then requires — **while the chain is halted** — that (a) a new bundle is refused *by the pool* (`submit_atomic_bundle` is deliberately not on `RuntimeHaltExemptCalls`), (b) the in-flight bundle's `rollback_atomic_bundle` is **included** (it is exempt) and its stored status becomes `RolledBack`, (c) the submitter's reserved balance returns to exactly its pre-bundle value, and (d) after the remedy a fresh bundle is accepted again. Measured: `bundle 0x8faa7708… RolledBack at block 52, reserved back to 0`, `a new bundle while halted: refused by the pool — 1010: Custom error: 1`, `a fresh bundle is accepted after the remedy — 0xd045536a… at block 78`, and no supply minted with both validators agreeing at one finalized block. Before this, every halt/rollback proof was against an **idle** chain or a bundle id that does not exist, so \"the valve leaves the way out open\" had never been measured for a bundle that was actually holding funds",
+  "Still open on this row: no independent audit of the bond-accounting change, and no run on an rc1-featured or public network — `mainnet_ready` moves to 65 on the strength of the live three-validator evidence, not on deployment",
+]
+required_tests = [
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "a_finalized_bundle_cannot_be_rolled_back",
+  "a_rolled_back_bundle_cannot_be_finalized_and_cannot_be_rolled_back_twice",
+]
 evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real submit_atomic_bundle path with EconomicHalt guard"]
 
 [[feature]]
@@ -333,3 +361,60 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs broader governance/adversarial coverage"]
 evidence = ["pallets/x3-agent-law", "note: Status document records privacy tightening and passing tests"]
+
+[[feature]]
+id = "X3-RT-013"
+name = "Autonomic control plane"
+subsystem = "runtime_core"
+source = "master"
+paths = [
+  "x3-autonomic-core/crates/x3-autonomic-types",
+  "x3-autonomic-core/crates/x3-live-auditor",
+  "x3-autonomic-core/crates/x3-shadow-runner",
+  "x3-autonomic-core/crates/x3-regression-engine",
+  "x3-autonomic-core/crates/x3-judge-agent",
+  "x3-autonomic-core/crates/x3-benchmark-oracle",
+  "x3-autonomic-core/crates/x3-autonomic-cli",
+]
+implemented = 55
+tested = 55
+mainnet_ready = 10
+priority = "P2"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = true
+# No row covered `x3-autonomic-core` until 2026-09-27, and the reason is now clear: the workspace
+# had never compiled, so nothing could cover it. Everything below was found by making it build.
+blockers = [
+  "**CLOSED 2026-09-27 — the workspace could not resolve, let alone compile.** `x3-autonomic-types` asked for a `chrono` feature (`derive`) that no 0.4 version has, so `cargo metadata` on the workspace failed; its SCALE import named `parity_scale_codec` while the manifest declares `scale = { package = \"parity-scale-codec\" }`; five members declared `#![cfg_attr(not(feature = \"std\"), no_std)]` with no `std` feature, so they were permanently no_std while using `Vec`, `String`, `format!` and `std::io`. Resolution, import and the attribute are fixed; `cargo check --workspace` finishes clean.",
+  "**CLOSED 2026-09-27 — three types could not be SCALE-decoded, and two are pallet storage.** `InvariantDefinition.name`/`description` were `&'static str` (no `Decode` impl) and `HealthMetricDefinition`'s thresholds were `f64` (SCALE has no float), so `register_invariant` and `register_metric` took arguments no transaction could carry. Strings are owned `Vec<u8>` now and thresholds are basis points; a round-trip test pins both.",
+  "**CLOSED 2026-09-27 — four fabricated or unbuildable behaviours.** `LiveAuditor::check_invariants` returned `(id, true, severity)` for everything under a \"Placeholder\" comment (a live auditor reporting every invariant passing); `ShadowRunner::execute_shadow_block` returned `state_root_matches: true` without executing anything; `verify_shadow_result` returned `true` for every input; `JudgeAgent::evaluate` ignored its proposal argument entirely. Each refuses or answers from its input now, and the CLI (which printed \"Setting autonomy level to: X\" and performed nothing) refuses with a non-zero status like the wallet CLI does.",
+  "**CLOSED 2026-09-27 — three references to variants that do not exist.** `AutonomyLevel::{Automatic, SelfImproving, SelfGoverning}` (in two crates), `AuditEvent::Error` and `Severity::High` were all named by code that could not compile. The ladder answers via `AutonomyLevel::allows_autonomous_change()`, `AuditEvent` gained the `Error` variant its `From` impl needed, and the severity is the ladder's `Critical`.",
+  "**OPEN — nothing here is wired into anything.** No runtime registers either autonomic pallet, no node runs the auditor or shadow runner, and the CLI has no client. The two pallets in this workspace (`pallet-x3-invariants`, `pallet-x3-health`) are parked out of the member list: they pin FRAME to a 2023 substrate revision, still use `#[pallet::generate_store]` and declare no call weights, and they are orphans — the chain's invariant pallet is `pallets/x3-invariants`, a different crate. Porting or deleting them is a scheduled decision.",
+  "**OPEN — the audit and shadow paths have no chain data source.** `check_invariants` and `execute_shadow_block` refuse precisely because there is nothing to read or replay; a real autonomic loop needs a node client plus the invariants it should read.",
+]
+required_tests = [
+  "the_storage_types_round_trip_through_scale",
+  "the_autonomy_ladder_says_when_it_may_change_itself",
+  "an_audit_event_can_carry_a_component_failure",
+  "checking_invariants_refuses_without_a_state_source",
+  "the_configured_cadence_gates_a_pass",
+  "shadow_execution_refuses_without_an_isolated_runtime",
+  "verification_compares_roots_and_refuses_when_there_are_none",
+  "autonomous_action_follows_the_autonomy_ladder",
+  "a_critical_proposal_goes_to_a_human_even_at_full_autonomy",
+  "a_manual_autonomy_level_always_needs_a_human",
+  "confidence_is_basis_points_and_clamped_at_certainty",
+  "automatic_generation_follows_the_autonomy_ladder",
+  "the_autonomy_argument_parses_names_and_numbers",
+]
+test_evidence = [
+  "note: `cargo test --workspace --manifest-path x3-autonomic-core/Cargo.toml` -> 15 passed, 0 failed; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --all --check` clean (2026-09-27). Before this pass none of those commands could run at all.",
+  "note: break-it-first: restoring `Ok(true)` in `verify_shadow_result` reddens verification_compares_roots_and_refuses_when_there_are_none.",
+]
+evidence = [
+  "x3-autonomic-core/Cargo.toml",
+  "x3-autonomic-core/crates/x3-autonomic-types/src/lib.rs",
+  "x3-autonomic-core/crates/x3-live-auditor/src/lib.rs",
+  "note: 2026-09-27 - the workspace resolved to nothing; `cargo metadata` failed on a chrono feature that does not exist",
+]

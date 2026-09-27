@@ -5,18 +5,19 @@ id = "X3-OPS-001"
 name = "Genesis ceremony tooling"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh"]
-implemented = 85
-tested = 65
-mainnet_ready = 45
+paths = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "tests/test_ceremony_attestations.py"]
+implemented = 92
+tested = 85
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists",
-  "The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, and the recorded node binary is a debug build",
+  "**CLOSED 2026-09-27 — the record is signed, and the signature is one the chain would recognise.** The claim above (\u201cnothing publishes a signed manifest\u201d) was true: `record` produced a file and `verify` checked it, and nothing said *who* agreed to the artifacts. The manifest now carries an `attestations` block \u2014 each authority signs the manifest's canonical bytes (JSON, sorted keys, `attestations` removed) with the ed25519 key its GRANDPA authority **is**, generated through OpenSSL from the seed the spec's authority was derived from. The tool refuses a key that is not in the authority set, an authority that signs twice, and appending to a manifest that has been edited since it was signed (stale signatures); `verify` requires a supermajority of *distinct* authority signatures and recomputes the threshold `floor(2n/3)+1` from the authority set rather than believing the manifest's own copy of it. The authority set is decoded twice \u2014 SS58 addresses from the spec, with the checksum verified, and the SCALE `Vec<(AuthorityId, u64)>` the chain reports \u2014 and a manifest whose two accounts disagree is refused. `sign` is the rehearsal form (one machine holds every key); `attest --key <seed>` adds one operator's signature, which is the shape a real ceremony has. Measured on a four-validator network: 4/4 signed, threshold 3, `verify` PASS, and eight refusals (see `test_evidence`). The recorded binary is the `target/release` build (the drill's discovery already prefers it), so the old \u201crecorded node binary is a debug build\u201d half is no longer the state \u2014 but it is still *this box's* release build rather than a tagged srtool artifact, which is the first blocker, not this one.",
   "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries",
+  "Still open, and why this is not mainnet-ready: the ceremony has never been run against a tagged release with operators on separate machines. `attest` makes that shape possible but no operator has used it, so the multi-party path is proven against keys on one host, not against four people in four places. `genesis_ceremony.sh` still requires a tag that does not exist, the launch is loopback, and nothing publishes the signed manifest anywhere a stranger could fetch it \u2014 the signature is checkable, but there is no distribution step.",
 ]
 # The rehearsal of the whole ceremony now runs, and it produces the artifact a launch
 # can be verified against: `testnet-ceremony.py record` writes the spec sha256 (and
@@ -26,25 +27,46 @@ blockers = [
 # one line per check. `--testnet` runs the drill: build spec → boot four validators →
 # record → verify → tamper with a copy → require the verifier to reject it.
 evidence = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "scripts/testnet/build-x3-testnet-spec.py", "note: 2026-09-22 first-hand — the drill records `X3 Chain Testnet` (Live, id x3_chain_testnet) with genesis 0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad, spec sha256 a3cc9e39719fe017…, 4 aura / 4 grandpa authorities and every validator's peer id + finalized height (273 at record time, 3 peers each); `verify` passes every check against the live network and fails a manifest whose genesis hash was tampered with. `genesis_ceremony.sh` (15.6 kB) remains the mainnet, tagged-commit half"]
+test_evidence = [
+  "note: 2026-09-27 - `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` records a four-validator launch, signs it with all four GRANDPA keys, verifies it against the running network, and then proves eight refusals: a tampered genesis hash (which now fails the hash check *and* the signature), an unsigned manifest, a manifest below its own threshold, a valid signature from a key outside the authority set, a flipped signature byte, a manifest that lowers its own threshold, the same authority signing twice, and `attest` adding to a manifest edited since it was signed",
+  "note: 2026-09-27 - `python3 tests/test_ceremony_attestations.py` (20 tests) is the fast half: base58 with leading zeroes and a rejected alphabet character, an SS58 checksum refusal, SCALE authority-set decoding including a truncated input, the threshold rule for n=1..7 (4 -> 3, 7 -> 5), the ed25519 derivation pinned against `x3-chain-node keys generate --key-type grandpa --seed 0x000102…1f --output hex`, a signature that verifies and four that must not, and the canonical-bytes rule (the `attestations` member is not covered, key order is irrelevant, a signed field is)",
+]
 
 [[feature]]
 id = "X3-OPS-002"
 name = "Snapshot / restore tooling"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/snapshot-restore.sh", "scripts/snapshot-live-restore-proof.sh"]
-implemented = 70
-tested = 60
-mainnet_ready = 50
+paths = ["scripts/snapshot-restore.sh", "scripts/snapshot-live-restore-proof.sh", "scripts/snapshot-zero-downtime-proof.sh", "crates/x3-state-snapshot/src/lib.rs", "crates/x3-state-snapshot/src/tests.rs"]
+implemented = 85
+tested = 80
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-26 — there is a live restore proof, and it is load-bearing.** This row asked for \"live restore drills and integrity verification\"; the only restore test round-tripped a text file through a tarball, which passes just as well for an empty database. `scripts/snapshot-live-restore-proof.sh` (gate: `snapshot restore across a live chain`, serial, ~25s) boots a real chain, reads the anchor *from the running node* — finalized height, canonical hash at that height, state root, and every storage entry at that height over RPC — stops it, snapshots with `snapshot-restore.sh backup`, restores into a fresh base path, boots a node on the restored database and requires height, hash, state root and the whole state map to come back identical (169 keys). It then boots a **control** node on an empty base path, lets it reach the same height, and requires its hash to differ, so the same check cannot pass for an empty chain. Measured: height 9, hash 0x0193e88c…, control 0x5f51ff2c… Also green: launch-gates/snapshot-murder-test.sh (20 passed) and `cargo test -p x3-state-snapshot` (48 passed).",
-  "Still open: the backup refuses a *live* database (`check_validator_stopped`), correctly — a plain tar of a running RocksDB is not a consistent snapshot and the node exposes no `create_checkpoint`. The anchor is read from the running chain, but the archive is cut with the node stopped, so on a multi-GB validator DB that stop is the backup window. A zero-downtime snapshot needs a RocksDB checkpoint or an RPC state-export driver feeding `x3-state-snapshot build`, and the multi-GB size class has never been exercised on this box.",
+  "**CLOSED 2026-09-27 — the snapshot is taken with the node still running, and the drift it found is fixed.** The open item above named two acceptable designs; this is the RPC one. `scripts/snapshot-rpc-export.py` pins one finalized, GRANDPA-justified block, pages every key at that block hash and reads every value at the same hash, and `scripts/snapshot-zero-downtime-proof.sh` (gate: `snapshot zero downtime export`, serial, ~4 min) composes it with the existing builder. The measured run: an archive node at finalized height 523 while the export read the chain and kept finalizing (523 -> 572 -> 587 during and after), 1881 keys exported at height 513, and the trie root recomputed *from those entries* by `x3-state-snapshot root --from-raw-spec` came out exactly the `stateRoot` the chain published in that block's header (0x4de17ec4…). That is the export being measured against the chain rather than against itself: one missing key, one value read at the wrong block, or one invented key all move that root. The snapshot's `finality_proof` is the chain's own GRANDPA justification read back from `chain_getBlock` — not a placeholder — and the gate refuses an anchor that has none (`justification_generation_period` is 512 on this node, so the walk-back to the newest justified block is the normal path, not an exception).",
+  "**The first boot of a restored spec found a real defect, and it is fixed.** `x3-state-snapshot restore` wrote the state verbatim into `genesis.raw.top`, including `frame_system`'s per-block bookkeeping — so `System::Number` was the *producing* chain's height, and `frame_system::initialize` asserts `number == Self::block_number() + 1`. The restored chain panicked on its first block (`Block number must be strictly increasing. left: 513 right: 1`) and finalized nothing; the drill's red run is saved under `.ai/runlogs/`. `restore --regenesis` now drops the six named `frame_system` entries (`CHAIN_BOOKKEEPING_ENTRIES`, keys derived with `sp_core::twox_128`, not pasted hex), reports both roots instead of presenting one as the other, and records the drop in the spec's `properties`. With it, the restored chain boots as an authority and finalizes (measured: finalized height 7), its genesis state root equals the reported regenerated root, and all 1877 non-bookkeeping entries are byte-identical to the exported state.",
+  "Still open, and why this is not mainnet-ready: the export reads values **one RPC call per key** (1881 keys in ~2.4 s on loopback; a real chain has orders of magnitude more, and no batching — `state_getReadProof`-style range reads — has been written), so the multi-GB size class and the *time* a real validator would spend exporting are both unexercised. The export needs a node whose pruning window still covers the anchor: the gate demonstrates that a bounded node **refuses** an anchor it has pruned (naming pruning, writing no spec) rather than exporting a partial state, but the operator story that follows from it — run a dedicated archive node, or export inside the window — is documented guidance, not an automated provisioning step. `--regenesis` drops a fixed list of six `frame_system` entries; nothing enumerates *every* chain-local key a runtime might keep (a third-party pallet's 'current block' would still leak into the restored genesis). And a restore still produces a *new* chain, not a continuation of the same one: state-sync for an existing chain continues to need the base-path path or warp sync.",
 ]
-evidence = ["scripts/snapshot-restore.sh", "note: Independent audit previously scored snapshot/restore partial"]
+evidence = ["scripts/snapshot-restore.sh", "note: Independent audit previously scored snapshot/restore partial", "note: 2026-09-27 - `snapshot-restore.sh export-rpc` is the operator entry point for the zero-downtime path, and `zero-downtime-proof` runs the gate"]
+test_evidence = [
+  "note: 2026-09-27 (primary agent, re-run) — the end-to-end proof passes: `bash scripts/snapshot-zero-downtime-proof.sh` exit 0, 1881 state entries exported from a **running** node (head 522 -> 552 -> 559 across the export), the recomputed trie root equal to the `stateRoot` the chain published in that block, the chain's own GRANDPA justification carried into the manifest, and the restored chain then *authoring* blocks (finalizing at height 8) with all 1877 non-bookkeeping entries recovered byte-identically. It also found a defect in the gate itself: the restore call was missing `--regenesis`, so the restored spec carried the producing chain's `frame_system` bookkeeping and the proof died reading `properties.x3SnapshotBookkeepingRemoved` — the flag is now passed, and the three negative controls still refuse (one-key-short export, genesis-only spec, pruned anchor)",
+  "note: 2026-09-27 - `bash scripts/local-ci.sh --only snapshot-zero-downtime-export` is the end-to-end proof (running chain -> RPC export -> chain's own state root -> chain's own GRANDPA justification -> build -> verify -> restore -> a booted authority that finalizes); the raw output of the red run and the green run is under `.ai/runlogs/`",
+  "note: 2026-09-27 - the exporter's refusals are unit-tested in `tests/test_snapshot_rpc_export.py` against a real loopback JSON-RPC server, one case per refusal: a key the enumeration returned whose value read is null, a page walk that never advances, an anchor that is not the canonical block at its height, an anchor with no justification, an anchor whose state the node has pruned, a child-trie template, an existing output, and a missing RPC method",
+  "note: 2026-09-27 - `cargo test -p x3-state-snapshot` (53 passed) owns the re-genesis semantics: the well-known `System::Number` key is pinned against the constant every client uses, the reset drops only the entries the state actually carried, a state with no `frame_system` bookkeeping at all is refused, and a regenerated spec reports a genesis root that is deliberately *not* the snapshot root",
+  "note: 2026-09-27 - the four controls the gate requires to fail: a one-key-short export changes the recomputed root and `build` refuses it against the declared root; `verify` refuses the good snapshot against a different anchor; an unaltered genesis spec does not reproduce the anchor's root (130 keys, different root); and a bounded node refuses a pruned anchor without writing a spec",
+]
+required_tests = [
+  "a_restored_spec_reproduces_exactly_the_state_that_was_verified",
+  "a_regenerated_spec_is_a_new_chain_and_reports_both_roots",
+  "regenesis_drops_the_producing_chains_bookkeeping_and_nothing_else",
+  "the_bookkeeping_keys_are_the_ones_the_runtime_actually_uses",
+  "a_state_with_no_bookkeeping_at_all_is_refused_by_the_reset",
+  "a_restore_that_is_not_asked_to_regenerate_keeps_the_chain_bookkeeping",
+]
 
 [[feature]]
 id = "X3-OPS-003"
@@ -284,3 +306,129 @@ test_evidence = [
   "note: `test x3-wallet` (added 2026-09-25 — the crate's 174 tests ran in no gate before that) passes; the refusal tests are crates/x3-wallet/src/hardware_wallet.rs and the real Ed25519/Sr25519 checks, which refuse tampered, retargeted and truncated input, are crates/x3-wallet/src/transaction_signer.rs",
 ]
 evidence = ["crates/x3-wallet/src/hardware_wallet.rs", "crates/x3-wallet/src/transaction_signer.rs", "note: 2026-09-25 - the hardware verifier was fail-open on shaped bytes and the crate's tests ran in no gate"]
+
+[[feature]]
+id = "X3-OPS-014"
+name = "Wallet DEX RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-rpc/src/wallet_dex_rpc.rs"]
+implemented = 55
+tested = 60
+mainnet_ready = 20
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = true
+# This row did not exist until 2026-09-27: the node's wallet-facing swap RPC was tracked by no
+# row, which is how three fabricated answers sat in it while every release gate was green.
+blockers = [
+  "**CLOSED 2026-09-27 — `walletDex_estimateSwap` returned a quote nobody computed.** It was `amount_out = amount_in * 95 / 100` with `estimated_gas: 100_000`, under a comment reading 'In production: call DEX runtime api for actual prices' — a 5% fee no pool charges, and a gas figure no simulation produced. It now calls the chain's own `AtomicTradeEngineApi::simulate_trade` at the best block and turns the result into a quote: a simulation the chain rejects is a refusal carrying the chain's own error, an output below the caller's `min_amount_out` is a refusal that names both numbers, and a successful one returns the chain's output and gas. `swap_id` stays zero on purpose — an estimate is not an execution, and a plausible-looking id would be a fabricated transaction reference.",
+  "**CLOSED 2026-09-27 — `walletDex_executeSwap` reported a successful swap that never happened.** It returned `Ok` with `swap_id: [1u8; 32]` and `amount_out = amount_in * 95 / 100`. A wallet reading that believes value moved. It now checks the real preconditions (signature count and length, approval required when the amount crosses the threshold) and then refuses with `Atomic swap execution is not wired into this node` — the same answer `crates/x3-swap-router`'s executor gives for the same missing piece (`NoExecutorConfigured`).",
+  "**CLOSED 2026-09-27 — `walletDex_getApprovalStatus` answered a constant.** It returned `(\"pending\", 2)` — a status and a signature threshold for an approval nobody looked up. It refuses now, as `approve_transaction` and `get_balance` in the same module already did.",
+  "**CLOSED 2026-09-27 — the approval request id was the constant `[1u8; 32]`, and the hardware-signing request id was a splice.** Every approval in the node shared one id; the signing id took the first half of the wallet id and the second half of the transaction hash, so two different requests could collide and the message the device screen shows was not committed. Both are now `blake2_256` commitments over their subject (wallet, tokens, amounts; wallet, transaction, display message).",
+  "**OPEN — the execution path itself: an atomic swap executor is not wired into the node.** Until one is, `walletDex_executeSwap` refusing is the only honest state, and the wallet surface has no live swap execution. Also open: no test drives the RPC methods through a real `FullClient` (the tests call the decisions the methods delegate to), and no gate names this crate directly.",
+]
+required_tests = [
+  "the_quote_carries_the_chains_numbers_and_its_gas",
+  "a_quote_below_the_callers_bound_is_refused_and_names_both_numbers",
+  "a_route_the_chain_refuses_is_refused_with_the_chains_own_error",
+  "approval_requests_get_distinct_ids_and_commit_to_the_subject",
+  "the_unwired_backends_refuse_instead_of_answering",
+  "test_hardware_signature_request",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 31 passed, 0 failed (2026-09-27). The two tests this row replaced recomputed the fabricated arithmetic themselves — `let amount_out = (request.amount_in * 95) / 100; assert_eq!(amount_out, 950)` — and never called the method, which is what let the fabrication look tested.",
+]
+evidence = [
+  "crates/x3-rpc/src/wallet_dex_rpc.rs",
+  "pallets/atomic-trade-engine/src/runtime_api.rs",
+  "note: 2026-09-27 - three wallet-facing RPCs returned invented values and no row tracked the file",
+]
+
+[[feature]]
+id = "X3-OPS-015"
+name = "Wallet service RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-rpc/src/wallet_service_rpc.rs"]
+implemented = 45
+tested = 55
+mainnet_ready = 10
+priority = "P1"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = true
+# Untracked until 2026-09-27, like X3-OPS-014. Registered only for development chain specs
+# (`enable_demo_wallet_rpc = chain_type == ChainType::Development`), which is the only thing that
+# keeps it out of the launch story: the values it returned were fabricated, and the worst of them
+# was a wallet seed.
+blockers = [
+  "**CLOSED 2026-09-27 — `wallet_createWallet` handed out a wallet whose seed phrase is public.** It defaulted the mnemonic to `\"test test test … test\"` (twelve words, the standard public test phrase) and derived the address as `format!(\"0x{}\", &mnemonic[0..40])` — a slice of the mnemonic string, not a derivation of any key. Every \"wallet\" it created was the same, world-readable and unspendable. It refuses now, keeping the real name/password validations.",
+  "**CLOSED 2026-09-27 — `wallet_importWallet` returned an address sliced out of the mnemonic.** Same slice; the address did not correspond to the seed the user imported. It refuses now, after the word-count and password validations.",
+  "**CLOSED 2026-09-27 — `wallet_signTransaction` returned the message as the signature.** `signature = format!(\"0x{}\", &transaction_data[0..130])` and `transaction_hash = format!(\"hash_signed_{data}\")`: an unsigned transaction with a signature field full of its own bytes. A node holds no wallet keys and must not sign for a user. It refuses now.",
+  "**CLOSED 2026-09-27 — `wallet_submitTransaction` reported a submission that never happened.** It answered `status: \"pending\"` with a hash sliced out of its own input and never touched the transaction pool. It refuses now; the real submission surface is `author_submitExtrinsic`.",
+  "**CLOSED 2026-09-27 — the read surfaces returned constants.** `wallet_getBalance` answered 1250 X3 and 2.45 ETH with USD values for any wallet id; `wallet_getTransactions` two invented transactions at invented block heights; `wallet_listWallets` two invented wallets with balances; `wallet_getWalletStatus` `is_connected: true, network: \"mainnet\", last_sync_block: 1234567, sync_status: \"synced\"` for any id; `wallet_getNetworks` three invented endpoints (`rpc.x3chain.io`, chain ids 123456789/88/87). All five refuse now with the missing backend named. `wallet_setNetwork` validated the name and then returned `success: true` for a selection nothing stored; it validates and then refuses. `wallet_backupWallet` returned `backup_<wallet_id>` with `hash_backup_<id>` as its \"backup hash\" — no key material, no encryption; it refuses.",
+  "**OPEN — there is no wallet service.** The node has no keystore, no wallet index, no history index, no network registry and no transaction pool binding in this module, and it must never hold a user's keys. A real implementation is a client-side keystore (`crates/x3-wallet`) plus an indexer, not a node RPC. Until then every method refusing is the honest state, and the wallet UI has no node-side wallet service on a dev chain either.",
+  "**OPEN — the tests call the decisions, not the methods.** The two tests drive the pure validators and the refusal helper; driving `create_wallet`/`sign_transaction` themselves needs a `HeaderBackend` test double that this crate does not have.",
+]
+required_tests = [
+  "validation_rejects_a_malformed_request_before_anything_else",
+  "every_unwired_backend_names_itself_and_never_invents_data",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed (2026-09-27). Break-it-first: disabling the mnemonic word-count check reddens validation_rejects_a_malformed_request_before_anything_else, and the file was restored byte-identically.",
+  "note: removing ten `SystemTime::now().unwrap()` calls from this module dropped the panic/unwrap ratchet 450 -> 440; the baseline was lowered with `--update-baseline` so they cannot come back unnoticed.",
+]
+evidence = [
+  "crates/x3-rpc/src/wallet_service_rpc.rs",
+  "node/src/rpc.rs",
+  "note: 2026-09-27 - eleven wallet-service RPCs answered with fabricated values, including a public test mnemonic as a wallet seed",
+]
+
+[[feature]]
+id = "X3-OPS-016"
+name = "EVM call and gas-estimation RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = [
+  "node/src/rpc_frontier.rs",
+  "node/src/rpc.rs",
+  "crates/x3-rpc/src/gas_estimation.rs",
+]
+implemented = 75
+tested = 70
+mainnet_ready = 30
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = true
+# The `eth_*` half of this row was already real (`AtlasKernelRuntimeApi::call_evm` behind
+# `eth_call`, runtime dry-run behind `eth_estimateGas`, a hard block-range cap on `eth_getLogs`).
+# The X3-native names were not, and they were registered unconditionally rather than behind a dev
+# flag.
+blockers = [
+  "**CLOSED 2026-09-27 — `x3_call` answered a read with the reader's own question.** The node registered `x3_call` against `x3_rpc::GasEstimationRPC::call`, whose body was `Ok(tx.data.clone())` — it echoed the caller's calldata back as the call's output and labelled it `ExecutionStatus::Success`. A wallet reading a contract value through it read its own calldata. `x3_call` now goes through the same runtime-backed implementation as `eth_call`: the call body was factored into `rpc_frontier::evm_call_output`, which invokes `AtlasKernelRuntimeApi::call_evm` at the best block and returns its bytes or its revert reason.",
+  "**CLOSED 2026-09-27 — the crate-level `call` refuses.** `GasEstimationRPC::call` had no execution backend to reach; it refuses now with a message naming the real implementation, and the test that asserted `assert!(result.is_ok())` (which cannot tell an execution from an echo) was replaced by one that requires the refusal and the name.",
+  "**CLOSED 2026-09-27 — `x3_estimateGas` was a heuristic wearing an execution status.** It was served by `GasEstimationRPC`, which counted opcodes linearly (`simulate_opcodes` sums base costs, ignoring control flow, memory, storage and calls) and reported `ExecutionStatus::Success` for a transaction it had never executed. `x3_estimateGas` and `x3_estimateGasMany` now go through `rpc_frontier::evm_estimate_gas` — the same runtime dry-run `eth_estimateGas` uses (`AtlasKernelRuntimeApi::estimate_evm_gas`) — and return the richer shape from real numbers: `gas_used` from the dry-run, `gas_limit` from one shared margin rule (`x3_rpc::gas_limit_with_margin`, now public so there is not a second one), `execution_time_ms` measured, `status: success` meaning the dry-run succeeded, and `revert_reason` null. The batch endpoint keeps its cap (`x3_rpc::MAX_BATCH_SIZE`) and now refuses a batch past it instead of silently truncating.",
+  "**The request contract is one parser now.** `eth_call`/`x3_call`/`eth_estimateGas`/`x3_estimateGas` all decode through `rpc_frontier::parse_evm_request`, which the test `the_evm_request_parser_enforces_the_contract` pins: a call without `to` is refused, an estimate without `to` is contract creation at the zero address with no caller, and a short address, bad hex or bad gas value are refusals rather than defaults. Break-it-first: disabling the address-length rule reddens that test *and* the older `decode_address_rejects_wrong_length`.",
+  "**Part of the namespace is still unregistered.** The node serves `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_call`, `eth_estimateGas`, `eth_sendRawTransaction`, `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getTransactionLogs` and the SVM `svm_*` methods; `eth_getCode`, `eth_getStorageAt`, `eth_getBlockByNumber`, `eth_syncing` and the subscription family are not. A dapp that needs one of those gets `method not found` — an honest refusal, but a gap for a public testnet.",
+]
+required_tests = [
+  "a_read_only_call_is_refused_without_an_execution_backend",
+  "the_evm_request_parser_enforces_the_contract",
+  "decode_address_accepts_20_byte_hex",
+  "decode_address_rejects_wrong_length",
+  "test_rpc_estimate_gas",
+  "test_rpc_missing_from",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 33 passed, 0 failed; `cargo test -p x3-chain-node --lib rpc_frontier` -> 12 passed, 0 failed (2026-09-27); clippy -D warnings clean on both crates, so the registration sites type-check against `evm_call_output` and `evm_estimate_gas`.",
+  "note: break-it-first on the crate rule: restoring the `Ok(tx.data.clone())` echo reddens a_read_only_call_is_refused_without_an_execution_backend, and the file was restored byte-identically.",
+]
+evidence = [
+  "node/src/rpc_frontier.rs",
+  "node/src/rpc.rs",
+  "crates/x3-rpc/src/gas_estimation.rs",
+  "note: 2026-09-27 - `x3_call` returned the caller's calldata as the call result",
+]

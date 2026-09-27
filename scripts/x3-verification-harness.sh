@@ -6,7 +6,9 @@ set -euo pipefail
 CARGO="$HOME/.cargo/bin/cargo"
 NIGHTLY="$CARGO +nightly-2026-05-01"
 STABLE="$CARGO +1.90.0"
-WORKSPACE="/home/x3star/Desktop/xxxstar-main"
+# Derive the workspace from this script's own location; the hardcoded
+# /home/x3star/Desktop/xxxstar-main never existed on this box.
+WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="$WORKSPACE/proof/verification-reports"
 mkdir -p "$REPORT_DIR"
 

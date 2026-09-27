@@ -15,8 +15,20 @@ members = [
     "crates/x3-benchmark-oracle",
     "crates/x3-judge-agent",
     "crates/x3-autonomic-cli",
-    "crates/pallet-x3-invariants",
-    "crates/pallet-x3-health",
+    # `crates/pallet-x3-invariants` and `crates/pallet-x3-health` are NOT members.
+    #
+    # Both pin their FRAME dependencies to `git = ".../substrate", branch = "polkadot-v1.0.0"`
+    # (a 2023 revision) while everything else here builds against polkadot-sdk `stable2512`, and
+    # both still use `#[pallet::generate_store]`, which modern FRAME removed, and declare no
+    # weights on their calls. They cannot compile against this repository's toolchain at all —
+    # which is why `x3-autonomic-core` has never built — and nothing depends on them: the chain's
+    # invariant pallet is `pallets/x3-invariants` (a different, maintained crate), and no runtime
+    # registers a health pallet.
+    #
+    # They are parked, not deleted, because porting them is a scheduled decision (do the chain
+    # need an autonomic health/invariant pallet at all?) rather than a mechanical fix. The types
+    # they consume (`InvariantDefinition`, `HealthMetricDefinition`) are SCALE-correct now, so a
+    # port is a FRAME-API change, not a data-shape change.
 ]
 
 [profile.release]

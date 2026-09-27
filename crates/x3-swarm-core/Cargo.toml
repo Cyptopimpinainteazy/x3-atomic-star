@@ -7,17 +7,23 @@ authors = ["X3 Team"]
 description = "Core swarm orchestration primitives for X3 Atomic Star"
 repository = "https://github.com/Cyptopimpinainteazy/X3_ATOMIC_STAR"
 
-# Standalone workspace root for the X3 swarm crates (core + api + worker).
-# This marks this subtree as its own cargo workspace so the swarm crates build
-# and test independently WITHOUT being pulled into the parent substrate
-# workspace at the repo root (whose full resolve currently fails on an
-# unrelated node/ sc-consensus-grandpa 0.40.0-vs-0.40.1 git drift). See
+# Standalone workspace root for the X3 swarm core crate.
+#
+# This marks this subtree as its own cargo workspace so the crate builds and
+# tests independently WITHOUT being pulled into the parent substrate workspace
+# at the repo root (whose full resolve currently fails on an unrelated node/
+# sc-consensus-grandpa 0.40.0-vs-0.40.1 git drift). See
 # reports/swarm_build_report.md. Kept out of ../workspace members deliberately.
+#
+# It has no members: the two services that used to live under `services/` here
+# were a stale, never-compiled duplicate of the ones the repo actually runs
+# (`services/x3-swarm-api`, `services/x3-swarm-worker`, both gated in
+# scripts/local-ci.sh). `cargo test --manifest-path crates/x3-swarm-core/Cargo.toml`
+# selects the root package only, so nothing had built them in years; they
+# disagreed with the real services (a second `TaskStatus` with `Approved`/
+# `Rejected`) and were deleted rather than left as a second lifecycle.
 [workspace]
-members = [
-    "services/x3-swarm-api",
-    "services/x3-swarm-worker",
-]
+members = []
 resolver = "2"
 
 [dependencies]
@@ -29,3 +35,7 @@ async-trait = "0.1"
 tracing = "0.1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"
+# Approval commitments. `sha2` is already in the lock via ed25519-dalek, so this
+# adds no new package; it is declared directly because this crate hashes with it
+# (ed25519-dalek's digest re-export is feature-gated and not enabled here).
+sha2 = "0.10"

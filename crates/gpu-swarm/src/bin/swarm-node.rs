@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn local admin GUI server on 127.0.0.1:9101
     let admin_state = std::sync::Arc::new(tokio::sync::Mutex::new(AdminState::default()));
     let admin_state_clone = admin_state.clone();
-    let admin_addr: std::net::SocketAddr = "127.0.0.1:9101".parse().unwrap();
+    let admin_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 9101));
     tokio::spawn(async move {
         tracing::info!("Starting admin UI on http://127.0.0.1:9101");
         run_admin(admin_state_clone, admin_addr).await;

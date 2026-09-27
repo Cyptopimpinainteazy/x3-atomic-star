@@ -55,6 +55,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 use x3_atomic_swap::RpcClient;
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
+// The pending-supply phase signs a `pallet_balances` transfer and the router's two lifecycle calls,
+// so it names the runtime's own `RuntimeCall`/`Runtime`/`Address` rather than restating them.
+use x3_chain_runtime::{Address, Runtime, RuntimeCall};
 use x3_common::bytecode::MAGIC as X3BC_MAGIC;
 
 /// The chain id the signer stamps into `SignedPayload`. It is a label: the genesis hash the
@@ -106,6 +109,25 @@ const COMITS_PER_ACCOUNT: u64 = 5;
 /// Base for the per-account comit ids. Each stream's ids are `SEED ^ (account << 32) ^ index`, so a
 /// replayed id would be a `DuplicateComitId` error rather than a second, silent execution.
 const COMIT_ID_SEED: u64 = 0x0078_3373_7570_7001;
+
+/// How many cross-VM transfers the pending-supply phase leaves unresolved at once. Several
+/// outstanding legs is the point: with one transfer the counter going to `amount` and back is
+/// indistinguishable from a single write and a single delete.
+const PENDING_TRANSFERS: usize = 6;
+/// Each transfer's amount. Large enough that the counter's value is unmistakable in the log, small
+/// enough that six of them are nothing against the token's `1_000_000_000_000` canonical supply.
+const PENDING_AMOUNT: u128 = 1_000_000;
+/// What the pending phase sends the X3Lang gateway before it calls the router. The router charges
+/// `amount * RoutingFeeBps / 10_000` from the *signing* account, and `local3` authorizes
+/// `//x3-atomic-gateway` for `GatewayRole::X3Lang` without endowing it, so an unfunded gateway gets
+/// `RoutingFeeNotAffordable` on every transfer. Six fees of 500 come to 3_000; this leaves room.
+const GATEWAY_FUNDING: u128 = 10_000_000;
+/// Long enough for a debug-build node to finalize a block that carries one extrinsic.
+const PENDING_TIMEOUT: Duration = Duration::from_secs(180);
+/// The funding transfer is the first signed extrinsic the pending phase sends and it has to clear
+/// finalization before the gateway can pay a routing fee; its own wait is separate from the
+/// counter's so a slow first block and a stuck counter report differently.
+const FUNDING_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// `Balances::TotalIssuance`. Two `twox_128` prefixes concatenated: a `StorageValue` has no
 /// key suffix. Computed rather than pasted, so a layout change is a compile-time/run-time failure
@@ -387,6 +409,291 @@ fn ledger_assets(port: u16, block: &str) -> Vec<x3_asset_kernel_types::AssetId> 
         out.push(H256::from_slice(tail));
     }
     out
+}
+
+/// Every message id the router holds, enumerated at `block`.
+///
+/// Same approach as [`ledger_assets`], and for the same reason: the prefix is the pallet's own
+/// (`X3CrossVmRouter` + `Transfers`), built with `storage_prefix`, so this cannot drift from the
+/// storage layout. The tail of each key is the message id, because `Transfers` is a
+/// `StorageMap<Blake2_128Concat, H256, _>`: prefix (32) + the 16-byte `Blake2_128Concat` hash + the
+/// 32-byte key.
+fn transfers_message_ids(port: u16, block: &str) -> Vec<H256> {
+    let prefix = frame_support::storage::storage_prefix(b"X3CrossVmRouter", b"Transfers").to_vec();
+    let keys = rpc_expect(
+        port,
+        "state_getKeys",
+        vec![
+            Value::String(format!("0x{}", hex::encode(&prefix))),
+            Value::String(block.to_string()),
+        ],
+    );
+    let Some(keys) = keys.as_array() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for key in keys {
+        let Some(key) = key.as_str() else { continue };
+        let Ok(bytes) = hex::decode(key.trim_start_matches("0x")) else {
+            continue;
+        };
+        if bytes.len() != prefix.len() + 16 + 32 {
+            continue;
+        }
+        out.push(H256::from_slice(&bytes[prefix.len() + 16..]));
+    }
+    out
+}
+
+/// The asset ledger's `pending_supply` at one block on one validator. Panics rather than
+/// answering a default: a ledger record that cannot be read is not a zero.
+fn pending_supply_at(port: u16, block: &str, asset: x3_asset_kernel_types::AssetId) -> u128 {
+    read_asset_ledger(port, block, asset)
+        .unwrap_or_else(|e| panic!("pending read on :{port} at {block} failed: {e}"))
+        .unwrap_or_else(|| panic!("{asset:?} has no ledger record on :{port} at {block}"))
+        .pending_supply
+}
+
+/// The asset ledger's `pending_supply` at this validator's *current finalized* head.
+fn pending_supply_now(port: u16, asset: x3_asset_kernel_types::AssetId) -> u128 {
+    pending_supply_at(port, &finalized_head(port), asset)
+}
+
+/// Submit one signed extrinsic and require a transaction hash back. Inclusion is proven by the
+/// caller waiting for the state effect, not by this returning.
+///
+/// There is deliberately **no retry** here. `1014: Priority is too low: (x vs y)` is not pool
+/// backpressure — the SDK's own description is "too low priority to replace another transaction
+/// already in the pool" — so re-sending the same bytes cannot succeed; it means the caller signed
+/// two extrinsics for one nonce. A client that sees it must re-read the nonce and re-sign, and a
+/// driver that sees it has already broken the rule the transfer loop below spells out: each
+/// submission has to wait for the previous one's *effect*, because the signer reads its nonce from
+/// the node. Measured 2026-09-27: the completion loop signed every completion up front and the pool
+/// refused all but the first with 419 vs 419.
+fn submit_extrinsic(port: u16, signed: &str, label: &str) {
+    let hash = rpc_try(
+        port,
+        "author_submitExtrinsic",
+        vec![Value::String(signed.to_string())],
+    )
+    .unwrap_or_else(|e| panic!("{label}: :{port} refused the submission: {e}"));
+    assert!(
+        !hash.as_str().map(str::is_empty).unwrap_or(true),
+        "{label}: :{port} did not return a transaction hash ({hash})"
+    );
+}
+
+/// Poll `f` until it answers true, or panic naming `describe` after `timeout`.
+fn wait_until(timeout: Duration, describe: &str, mut f: impl FnMut() -> bool) {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        if f() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(300));
+    }
+    panic!("waited {timeout:?} for {describe} and it never happened");
+}
+
+/// The events the chain recorded at `block`, newest first, as `Debug` text.
+///
+/// A dispatch that fails is still *included*: `author_submitExtrinsic` returns a transaction hash
+/// for it, the block carries it, and the ledger is simply left untouched once the storage layer is
+/// rolled back. So "the counter did not move" and "the call succeeded but did nothing" look
+/// identical from the outside, and the answer is in `System::Events` — `system.ExtrinsicFailed`
+/// with the module and error code. This is what turns that into a diagnosis.
+fn events_at(port: u16, block: &str) -> Vec<String> {
+    let key = frame_support::storage::storage_prefix(b"System", b"Events").to_vec();
+    let raw = rpc_try(
+        port,
+        "state_getStorage",
+        vec![
+            Value::String(format!("0x{}", hex::encode(&key))),
+            Value::String(block.to_string()),
+        ],
+    );
+    let Ok(raw) = raw else {
+        return vec![format!("could not read System::Events: {raw:?}")];
+    };
+    let Some(raw) = raw.as_str() else {
+        return vec!["System::Events is empty at that block".to_string()];
+    };
+    let Ok(bytes) = hex::decode(raw.trim_start_matches("0x")) else {
+        return vec!["System::Events was not hex".to_string()];
+    };
+    let records = <Vec<frame_system::EventRecord<x3_chain_runtime::RuntimeEvent, H256>>>::decode(
+        &mut &bytes[..],
+    );
+    let Ok(records) = records else {
+        return vec![
+            "System::Events did not decode as Vec<EventRecord<RuntimeEvent, H256>>".to_string(),
+        ];
+    };
+    records
+        .iter()
+        .rev()
+        .take(16)
+        .map(|record| format!("{:?}", record.event))
+        .collect()
+}
+
+/// The best (not necessarily finalized) block hash this validator holds.
+fn best_head(port: u16) -> String {
+    rpc_string(port, "chain_getBlockHash", Vec::new())
+}
+
+/// Whether a validator's transaction pool still holds this exact extrinsic.
+fn extrinsic_is_still_pending(port: u16, signed: &str) -> bool {
+    match rpc_try(port, "author_pendingExtrinsics", Vec::new()) {
+        Ok(Value::Array(items)) => items.iter().any(|item| item.as_str() == Some(signed)),
+        _ => false,
+    }
+}
+
+/// The interesting events between two heights, inclusive: a refusal, or anything the router and the
+/// supply ledger emitted.
+///
+/// An extrinsic that is included and *refused* consumes its nonce and leaves the ledger untouched,
+/// exactly like one that succeeded and did nothing — and by the time a 180-second wait gives up,
+/// the block that carried it is far behind the head. Scanning the window that starts where the
+/// submission started is what turns "the counter did not move" into the error code.
+fn notable_events_between(port: u16, from: u64, to: u64) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut height = to;
+    while height >= from && height > 0 {
+        if let Ok(hash) = rpc_try(
+            port,
+            "chain_getBlockHash",
+            vec![Value::String(format!("0x{height:x}"))],
+        ) {
+            if let Some(hash) = hash.as_str() {
+                let notable: Vec<String> = events_at(port, hash)
+                    .into_iter()
+                    .filter(|event| {
+                        event.contains("ExtrinsicFailed")
+                            || event.contains("X3CrossVmRouter")
+                            || event.contains("LegDebited")
+                            || event.contains("LegCredited")
+                            || event.contains("TransferInitiated")
+                    })
+                    .collect();
+                if !notable.is_empty() {
+                    // A `ModuleError` names a pallet index and an error code, not the call that
+                    // produced it, and the encoding's first byte is not the call index (a signed
+                    // extrinsic carries the address, signature and signed extensions first). So
+                    // decode the block's extrinsics and print them next to the refusal.
+                    let mut entry =
+                        format!("block {height} {hash}:\n    {}", notable.join("\n    "));
+                    if notable.iter().any(|e| e.contains("ExtrinsicFailed")) {
+                        for (index, call) in extrinsics_in_block(port, hash).iter().enumerate() {
+                            entry.push_str(&format!("\n    extrinsic #{index}: {call}"));
+                        }
+                    }
+                    out.push(entry);
+                }
+            }
+        }
+        height -= 1;
+    }
+    out
+}
+
+/// A one-line description of every extrinsic a block carried, so a refusal can be tied to the call
+/// that caused it.
+fn extrinsics_in_block(port: u16, hash: &str) -> Vec<String> {
+    let Ok(block) = rpc_try(
+        port,
+        "chain_getBlock",
+        vec![Value::String(hash.to_string())],
+    ) else {
+        return Vec::new();
+    };
+    let Some(extrinsics) = block
+        .get("block")
+        .and_then(|inner| inner.get("extrinsics"))
+        .and_then(|list| list.as_array())
+    else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for extrinsic in extrinsics {
+        let Some(raw) = extrinsic.as_str() else {
+            continue;
+        };
+        let Ok(bytes) = hex::decode(raw.trim_start_matches("0x")) else {
+            continue;
+        };
+        match x3_chain_runtime::UncheckedExtrinsic::decode(&mut &bytes[..]) {
+            Ok(decoded) => {
+                let text = format!("{:?}", decoded.function);
+                out.push(text.chars().take(140).collect::<String>());
+            }
+            Err(error) => out.push(format!("<undecodable: {error}>")),
+        }
+    }
+    out
+}
+
+/// Wait for the asset ledger's `pending_supply` to reach `expected`, and if it never does, report
+/// what the chain did with the extrinsic instead of only the counter's value.
+fn wait_for_pending(
+    ports: &[u16; 3],
+    asset: x3_asset_kernel_types::AssetId,
+    expected: u128,
+    label: &str,
+    last: Option<(&str, &X3RuntimeSigner)>,
+    from_height: u64,
+) {
+    let started = Instant::now();
+    let mut observed = pending_supply_now(ports[0], asset);
+    while started.elapsed() < PENDING_TIMEOUT {
+        if observed == expected {
+            return;
+        }
+        thread::sleep(Duration::from_millis(300));
+        observed = pending_supply_now(ports[0], asset);
+    }
+    let finalized = finalized_head(ports[0]);
+    let best = best_head(ports[0]);
+    let pooled = last
+        .map(|(signed, _)| extrinsic_is_still_pending(ports[0], signed))
+        .unwrap_or(false);
+    // The nonce the *next* submission would use. If this is ahead of the chain's account nonce,
+    // the pool is holding a gap and the extrinsic here is in its future queue, not its ready one.
+    let next_index = last
+        .and_then(|(_, signer)| signer.account_nonce().ok())
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    // A router call that fails on its fee is mapped to one error for every currency error, so the
+    // payer's balance is the number that separates "insufficient" from "something else".
+    let payer_balance = last
+        .map(|(_, signer)| {
+            format!(
+                "{} free",
+                free_balance_at(ports[0], &finalized, &signer.account())
+            )
+        })
+        .unwrap_or_else(|| "n/a".to_string());
+    let best_height = header_number(ports[0], &best);
+    let trail = notable_events_between(ports[0], from_height, best_height);
+    panic!(
+        "{label}: pending on :{} is {observed}, expected {expected}, after {PENDING_TIMEOUT:?}. \
+         The last extrinsic submitted for this step is still in :{}'s transaction pool: {pooled}. \
+         The signing account's next index is {next_index} (so an earlier submission of this step \
+         did consume a nonce) and it holds {payer_balance}. Finalized head {finalized}, best head \
+         {best}.\nRefusals and router \
+         events between blocks {from_height} and {best_height}:\n  {}\nEvents at the best head, \
+         newest first:\n  {}\nEvents at the finalized head, newest first:\n  {}",
+        ports[0],
+        ports[0],
+        if trail.is_empty() {
+            "none — nothing the router or the ledger emitted, and nothing refused".to_string()
+        } else {
+            trail.join("\n  ")
+        },
+        events_at(ports[0], &best).join("\n  "),
+        events_at(ports[0], &finalized).join("\n  ")
+    );
 }
 
 /// One account's free balance at one block, read by its own key rather than by enumeration, so a
@@ -928,6 +1235,222 @@ fn write_corrupted_spec(node_bin: &Path, out: &Path) -> (String, u128, u128) {
 
 /// The negative control: boot one node from a scratch spec whose `TotalIssuance` is one unit larger
 /// than the accounts it starts with, and require the same check to notice.
+/// Drive the per-asset ledger's `pending_supply` through the signed router path and require every
+/// validator to agree that it is non-zero while the transfers are outstanding and zero once they
+/// resolve.
+///
+/// Why this phase exists. The per-asset assertions above read `pending_supply` at zero on a chain
+/// whose only writer was `create_token` — and `create_token` writes a ledger record without ever
+/// writing a pending leg. A "pending is zero" assertion there is about a field nothing has touched,
+/// so it would hold whether or not the resolution path worked at all.
+///
+/// `X3CrossVmRouter::xvm_transfer` debits the source leg into `pending_supply`
+/// (`SupplyLedgerWrite::debit_source_to_pending`) and `complete_xvm_transfer` credits the
+/// destination leg back out of it (`credit_destination_from_pending`). Those are the two signed
+/// calls that move the counter, so this phase makes the check about a transition it watched
+/// happen: it leaves `PENDING_TRANSFERS` transfers unresolved, requires the counter to read exactly
+/// `N * amount` on every validator at one finalized block, resolves them, and requires zero on
+/// every validator at a later one. Skipping the resolution leaves the counter non-zero and reddens
+/// the second assertion — measured, not asserted.
+fn require_pending_supply_returns_to_zero(
+    ports: &[u16; 3],
+    asset: x3_asset_kernel_types::AssetId,
+    before: &x3_asset_kernel_types::SupplyLedger,
+) {
+    // The router charges `amount * RoutingFeeBps / 10_000` from the signing account, and
+    // `local_three_validator_config` authorizes `//x3-atomic-gateway` for `GatewayRole::X3Lang`
+    // (it is in `dev_gateway_genesis()`) *without* endowing it (it is not in
+    // `atomic_gateway_endowed_accounts()`, unlike development/local-two-validator/local-testnet).
+    // An unfunded gateway therefore fails every transfer with `RoutingFeeNotAffordable` — the
+    // fail-closed answer rather than a silent success, and the one thing an operator has to do for
+    // a gateway its genesis names. This funds it with a signed transfer, the way an operator would,
+    // so the phase covers the fee path as well as the debit path.
+    let alice = X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//Alice")
+        .expect("build Alice's signer");
+    let gateway =
+        X3RuntimeSigner::from_uri(CHAIN_ID.into(), rpc_url(ports[0]), "//x3-atomic-gateway")
+            .expect("build the X3Lang gateway's signer");
+    println!(
+        "[x3-supply] pending phase: funding the X3Lang gateway {} from Alice with {GATEWAY_FUNDING}",
+        gateway.account()
+    );
+
+    let signed = alice
+        .sign_call(RuntimeCall::Balances(
+            pallet_balances::Call::<Runtime>::transfer_keep_alive {
+                dest: Address::Id(gateway.account()),
+                value: GATEWAY_FUNDING,
+            },
+        ))
+        .expect("sign the gateway funding transfer");
+    submit_extrinsic(ports[0], &signed, "the gateway funding transfer");
+    wait_until(
+        FUNDING_TIMEOUT,
+        "the gateway funding transfer to be included",
+        || {
+            free_balance_at(ports[0], &finalized_head(ports[0]), &gateway.account())
+                >= GATEWAY_FUNDING
+        },
+    );
+
+    // The arithmetic below is only meaningful against a zero baseline, so require it rather than
+    // assume it: if something else had already left a leg pending, this phase's expected values
+    // would be wrong in a way that could still look like a pass.
+    assert_eq!(
+        before.pending_supply, 0,
+        "{asset:?}: the ledger already carries {} pending before this phase submitted anything",
+        before.pending_supply
+    );
+
+    let expires_at = u32::try_from(finalized_number(ports[0]) + 900).expect("expiry fits in u32");
+    for index in 0..PENDING_TRANSFERS {
+        let amount_so_far = PENDING_AMOUNT * (index as u128 + 1);
+        let signed = gateway
+            .sign_xvm_transfer(
+                asset,
+                x3_asset_kernel_types::DomainId::X3Evm,
+                x3_asset_kernel_types::AccountBytes::Evm([index as u8; 20]),
+                PENDING_AMOUNT,
+                expires_at,
+            )
+            .expect("sign xvm_transfer");
+        let label = format!("xvm_transfer {index}");
+        let submitted_from = header_number(ports[0], &best_head(ports[0]));
+        submit_extrinsic(ports[index % ports.len()], &signed, &label);
+        // Wait for the *effect*, not for the pool. `debit_source_to_pending` is where the counter
+        // moves, and the signer reads its nonce from the node, so each submission has to follow the
+        // previous one's inclusion or the nonces collide.
+        wait_for_pending(
+            ports,
+            asset,
+            amount_so_far,
+            &label,
+            Some((&signed, &gateway)),
+            submitted_from,
+        );
+    }
+
+    // Every validator, one block: the counter is carrying the unresolved legs, and they agree.
+    let expected_pending = PENDING_AMOUNT * PENDING_TRANSFERS as u128;
+    let (height_live, hash_live) = common_finalized(ports);
+    let outstanding = transfers_message_ids(ports[0], &hash_live);
+    assert_eq!(
+        outstanding.len(),
+        PENDING_TRANSFERS,
+        "the router holds {} transfers at {height_live}:{hash_live}, not the {PENDING_TRANSFERS} \
+         this phase submitted — the completion loop below would then resolve the wrong set",
+        outstanding.len()
+    );
+    for port in ports {
+        let ledger = read_asset_ledger(*port, &hash_live, asset)
+            .unwrap_or_else(|e| panic!("{asset:?} at {hash_live} on :{port}: {e}"))
+            .unwrap_or_else(|| panic!("{asset:?} vanished from the ledger on :{port}"));
+        assert_eq!(
+            ledger.pending_supply, expected_pending,
+            "{asset:?} on :{port}: pending is {} at {height_live}:{hash_live}, expected \
+             {expected_pending} — the counter is not carrying the unresolved legs",
+            ledger.pending_supply
+        );
+        assert_eq!(
+            ledger.native_supply,
+            before.native_supply - expected_pending,
+            "{asset:?} on :{port}: the source leg did not fall by the pending amount"
+        );
+        assert_eq!(
+            ledger.evm_supply, before.evm_supply,
+            "{asset:?} on :{port}: the destination leg moved before the transfer was completed"
+        );
+        assert_eq!(
+            ledger.canonical_supply, before.canonical_supply,
+            "{asset:?} on :{port}: opening a transfer changed the canonical ceiling"
+        );
+        println!(
+            "[x3-supply] pending phase at {height_live}:{hash_live} on :{port}: native {} (was \
+             {}), evm {} (was {}), pending {expected_pending} — live, and all validators agree",
+            ledger.native_supply, before.native_supply, ledger.evm_supply, before.evm_supply
+        );
+    }
+
+    // Resolve them. This is the call the assertion below is about: without it the destination leg
+    // never moves and the pending counter keeps its value.
+    let mut last_completion: Option<String> = None;
+    let completion_from = header_number(ports[0], &best_head(ports[0]));
+    for (index, message_id) in outstanding.iter().enumerate() {
+        let signed = gateway
+            .sign_complete_xvm_transfer(*message_id)
+            .expect("sign complete_xvm_transfer");
+        let label = format!("complete_xvm_transfer {index}");
+        submit_extrinsic(ports[index % ports.len()], &signed, &label);
+        // Wait for this completion's *effect* before signing the next one, for the reason the
+        // transfer loop above gives: `sign_complete_xvm_transfer` reads the gateway's nonce from the
+        // node, so signing them all up front gives every one the same nonce and the pool refuses all
+        // but the first with `1014: Priority is too low (... vs ...)` — "too low priority to replace
+        // another transaction already in the pool". Measured 2026-09-27 at this exact loop.
+        let remaining = expected_pending - (PENDING_AMOUNT * (index as u128 + 1));
+        wait_for_pending(
+            ports,
+            asset,
+            remaining,
+            &label,
+            Some((&signed, &gateway)),
+            completion_from,
+        );
+        last_completion = Some(signed);
+    }
+    wait_for_pending(
+        ports,
+        asset,
+        0,
+        "completing every outstanding transfer",
+        last_completion.as_deref().map(|signed| (signed, &gateway)),
+        completion_from,
+    );
+
+    let (height_zero, hash_zero) = common_finalized(ports);
+    for port in ports {
+        let ledger = read_asset_ledger(*port, &hash_zero, asset)
+            .unwrap_or_else(|e| panic!("{asset:?} at {hash_zero} on :{port}: {e}"))
+            .unwrap_or_else(|| panic!("{asset:?} vanished from the ledger on :{port}"));
+        assert_eq!(
+            ledger.pending_supply, 0,
+            "{asset:?} on :{port}: pending is {} at {height_zero}:{hash_zero} after every leg was \
+             resolved — supply is stranded in the pending leg",
+            ledger.pending_supply
+        );
+        assert_eq!(
+            ledger.evm_supply,
+            before.evm_supply + expected_pending,
+            "{asset:?} on :{port}: the destination leg did not receive the completed amount"
+        );
+        assert_eq!(
+            ledger.native_supply,
+            before.native_supply - expected_pending,
+            "{asset:?} on :{port}: the source leg did not stay debited"
+        );
+        assert_eq!(
+            ledger.canonical_supply, before.canonical_supply,
+            "{asset:?} on :{port}: completing a transfer changed the canonical ceiling"
+        );
+        let represented = ledger
+            .native_supply
+            .checked_add(ledger.evm_supply)
+            .and_then(|v| v.checked_add(ledger.svm_supply))
+            .and_then(|v| v.checked_add(ledger.external_locked_supply))
+            .and_then(|v| v.checked_add(ledger.pending_supply))
+            .expect("represented supply overflowed");
+        assert!(
+            represented <= ledger.canonical_supply,
+            "{asset:?} on :{port}: represented {represented} exceeds canonical {}",
+            ledger.canonical_supply
+        );
+        println!(
+            "[x3-supply] pending phase at {height_zero}:{hash_zero} on :{port}: native {}, evm {}, \
+             pending 0 — every leg resolved",
+            ledger.native_supply, ledger.evm_supply
+        );
+    }
+}
+
 fn assert_corrupted_ledger_is_caught(node_bin: &Path, base_path: &Path) {
     let spec_path = base_path.join("corrupted-local3.json");
     let (key, real, corrupted) = write_corrupted_spec(node_bin, &spec_path);
@@ -1279,6 +1802,12 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
     // Now assert the identity on every validator, at one finalized block hash they all share.
     let ledger_block = finalized_head(ports[0]);
     let mut ledger_records = 0usize;
+    // The first record the loop sees, kept for the pending-supply phase below: that phase has to
+    // move an asset that actually has a ledger record and a route to transfer over.
+    let mut probe: Option<(
+        x3_asset_kernel_types::AssetId,
+        x3_asset_kernel_types::SupplyLedger,
+    )> = None;
     for asset in ledger_assets(ports[0], &ledger_block) {
         let mut views = Vec::new();
         for port in ports {
@@ -1306,6 +1835,9 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
             "{asset:?}: validators disagree about the ledger at {ledger_block}"
         );
         ledger_records += 1;
+        if probe.is_none() {
+            probe = Some((asset, views[0]));
+        }
         println!(
             "[x3-supply] asset {asset:?}: native {}, evm {}, svm {}, external_locked {}, pending {}, canonical {} — identity holds and all validators agree",
             views[0].native_supply,
@@ -1324,6 +1856,11 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
         "[x3-supply] per-asset ledger: {ledger_records} record(s) at {ledger_block}, read through \
          AtlasKernelRuntimeApi_get_asset_supply_ledger on every validator"
     );
+
+    // -------- the ledger's own pending counter, moved by the signed router path ----------
+    let (probe_asset, probe_before) =
+        probe.expect("the per-asset loop ran at least one record, so the probe is set");
+    require_pending_supply_returns_to_zero(&ports, probe_asset, &probe_before);
 
     // -------- negative control, on a scratch copy of the ledger ----------
     drop(network);

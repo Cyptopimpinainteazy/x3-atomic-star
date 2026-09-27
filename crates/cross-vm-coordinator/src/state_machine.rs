@@ -393,10 +393,11 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
                 continue;
             }
 
-            let session = self
-                .sessions
-                .get(session_id)
-                .expect("session id collected from map keys must exist");
+            // The id came from this map's own keys, but a second lookup is a second chance to be
+            // wrong; skip the entry rather than panic if it is gone.
+            let Some(session) = self.sessions.get(session_id) else {
+                continue;
+            };
             if !Self::is_stale_terminal_session(session, now_unix, max_age_secs) {
                 continue;
             }
@@ -439,7 +440,11 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         Self::validate_phase_transition(current_phase, SwapPhase::LockingHtlcs)?;
 
         {
-            let session = self.sessions.get_mut(session_id).unwrap();
+            let session = self.sessions.get_mut(session_id).ok_or_else(|| {
+                CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                }
+            })?;
 
             info!(
                 session = %session_id,
@@ -594,7 +599,11 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
         let mut abort_error = None;
         {
-            let session = self.sessions.get_mut(session_id).unwrap();
+            let session = self.sessions.get_mut(session_id).ok_or_else(|| {
+                CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                }
+            })?;
 
             // Safety check: ensure we're not too close to timelock
             if self.config.is_near_expiry(session.timelock_fast, now_unix) {
@@ -760,7 +769,11 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
         let mut abort_error = None;
         {
-            let session = self.sessions.get_mut(session_id).unwrap();
+            let session = self.sessions.get_mut(session_id).ok_or_else(|| {
+                CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                }
+            })?;
 
             // CRITICAL-006 FIX: Re-check timelock safety margin before settlement
             // Prevents revealing secret after timelock has expired
@@ -787,7 +800,13 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             return Err(err);
         }
 
-        let hash_lock = self.sessions.get(session_id).unwrap().hash_lock;
+        let hash_lock = self
+            .sessions
+            .get(session_id)
+            .map(|session| session.hash_lock)
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: session_id.to_string(),
+            })?;
         self.persist_by_id(session_id);
         Ok(hash_lock)
     }

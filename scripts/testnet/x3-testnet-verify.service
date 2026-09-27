@@ -1,3 +1,6 @@
+# This is a system unit (User=lojak), so `%h` would expand to the manager's home, not lojak's, and
+# systemd does not expand $VAR in WorkingDirectory=/Environment=. The checkout is therefore named
+# with absolute paths throughout; change them if you move it.
 [Unit]
 Description=X3 Testnet Continuous Verification
 After=network-online.target
@@ -7,8 +10,8 @@ Wants=network-online.target
 Type=simple
 User=lojak
 Group=lojak
-WorkingDirectory=/home/lojak/Desktop/x3-chain-master
-ExecStart=/bin/bash /home/lojak/Desktop/x3-chain-master/scripts/testnet/continuous-verify.sh --interval-sec 60
+WorkingDirectory=/home/lojak/Desktop/xxxstar-main
+ExecStart=/bin/bash /home/lojak/Desktop/xxxstar-main/scripts/testnet/continuous-verify.sh --interval-sec 60
 Restart=always
 RestartSec=5
 Environment=PATH=/home/lojak/.local/bin:/home/lojak/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -19,9 +22,9 @@ Environment=LOAD_DURATION_SEC=300
 Environment=MIN_FINALIZED_TPS=0
 Environment=MAX_ERROR_RATE=0.01
 Environment=CHECK_TELEMETRY=0
-Environment=TESTNET_CONFIG=/home/lojak/Desktop/x3-chain-master/docs/testnet-config/testnet-config.json
-Environment=LOG_FILE=/home/lojak/Desktop/x3-chain-master/logs/testnet-verify.log
-Environment=STATUS_FILE=/home/lojak/Desktop/x3-chain-master/logs/testnet-verify-status.json
+Environment=TESTNET_CONFIG=/home/lojak/Desktop/xxxstar-main/docs/testnet-config/testnet-config.json
+Environment=LOG_FILE=/home/lojak/Desktop/xxxstar-main/logs/testnet-verify.log
+Environment=STATUS_FILE=/home/lojak/Desktop/xxxstar-main/logs/testnet-verify-status.json
 Environment=LOG_MAX_BYTES=10485760
 Environment=LOG_BACKUPS=5
 Environment=START_LOCAL_VALIDATORS=1

@@ -332,6 +332,20 @@ pub struct Scrapyard {
     total_recycled: u64,
 }
 
+/// Seconds since the Unix epoch, or 0 when the clock is set before it.
+///
+/// `SystemTime::now().duration_since(UNIX_EPOCH)` is fallible in principle, and this file called
+/// `.unwrap()` on it at seven sites — every timestamp the scrapyard records. A clock before 1970 is
+/// what it would take, and the answer here is 0: an obviously-wrong timestamp a reader can act on,
+/// rather than a panic in a module-lifecycle path. The repository's own rule is that a production
+/// path does not panic on a condition it can express.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0)
+}
+
 impl Default for Scrapyard {
     fn default() -> Self {
         Self::new()
@@ -370,10 +384,7 @@ impl Scrapyard {
             }
         }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = now_secs();
 
         let module = ScrapyardModule {
             module_id: module_id.clone(),
@@ -401,10 +412,7 @@ impl Scrapyard {
         significance: f64,
     ) {
         if let Some(module) = self.modules.get_mut(module_id) {
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let timestamp = now_secs();
 
             module.observations.push(Observation {
                 timestamp,
@@ -448,10 +456,7 @@ impl Scrapyard {
 
     /// Analyze a module during disassembly
     async fn analyze_module(&self, module: &ScrapyardModule) -> DisassemblyReport {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = now_secs();
 
         // Analyze observations for patterns
         let mut innovations = Vec::new();
@@ -627,10 +632,7 @@ impl Scrapyard {
 
     /// Recycle useful parts from a module
     fn recycle_parts(&mut self, module_id: &str, parts: Vec<RecyclablePart>) {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = now_secs();
 
         for part in parts {
             let knowledge = RecycledKnowledge {
@@ -649,10 +651,7 @@ impl Scrapyard {
 
     /// Execute (destroy) a module
     fn execute_module(&mut self, module_id: &str, reason: &str, blacklist: bool) {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = now_secs();
 
         let record = ExecutionRecord {
             module_id: module_id.to_string(),
@@ -673,10 +672,7 @@ impl Scrapyard {
 
     /// Immediate destroy (for blacklisted)
     fn immediate_destroy(&mut self, module_id: &str, reason: &str) {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = now_secs();
 
         self.executions.push(ExecutionRecord {
             module_id: module_id.to_string(),
@@ -714,11 +710,7 @@ impl Scrapyard {
             .iter()
             .filter(|(_, m)| m.stage == ScrapyardStage::Quarantine)
             .filter(|(_, m)| {
-                let elapsed = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    - m.quarantined_at;
+                let elapsed = now_secs() - m.quarantined_at;
                 elapsed > MIN_OBSERVATION_TIME.as_secs()
             })
             .map(|(id, _)| id.clone())

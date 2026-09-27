@@ -1,0 +1,16 @@
+# Minimal pkg-config metadata for the installed FreeDesktop shared MIME database.
+#
+# Debian/Ubuntu's `shared-mime-info` package installs the database and binaries
+# but ships *no* .pc file, while `gdk-pixbuf-2.0.pc` lists `shared-mime-info`
+# in `Requires.private`. pkg-config validates that dependency even for a plain
+# non-static probe, so every GTK/WebKit crate build script fails with
+#   Package 'shared-mime-info', required by 'gdk-pixbuf-2.0', not found
+# and then reports the *transitive* victims (`gdk-3.0`, `gtk+-3.0`, ...) as the
+# missing library. This file only declares what the package is; it intentionally
+# exposes no Libs or Cflags because the database itself has none.
+#
+# `apps/tauri-os/src-tauri/run-tests.sh` and the local-ci gate prepend the
+# directory holding this file to PKG_CONFIG_PATH.
+Name: shared-mime-info
+Description: FreeDesktop shared MIME database
+Version: 2.1

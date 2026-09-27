@@ -6,9 +6,9 @@
 #![cfg(all(feature = "std", feature = "compile"))]
 
 use x3_backend::BytecodeModule;
-use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::compiler_bridge::{compile_source, compile_source_with_policy};
 use x3_x3_integration::mini_x3::{self, MiniValue};
-use x3_x3_integration::{X3Executor, X3ExecutorConfig};
+use x3_x3_integration::{CompilationPolicy, X3Executor, X3ExecutorConfig};
 
 #[test]
 fn compile_source_emits_runtime_loadable_bytecode() {
@@ -310,5 +310,122 @@ fn float_arithmetic_runs_in_simulation_and_is_refused_on_chain() {
     assert!(
         message.contains("ForbiddenOnChain"),
         "and say that it is the float opcode policy, not a parse or type failure: {message}"
+    );
+}
+
+/// X3-MEV-002's chain-intake half: a deployment policy can require private submission, and the
+/// requirement is carried by the artifact's own bytes.
+///
+/// The MEV/privacy rows recorded a structural gap for weeks — "the chain-intake pipeline carries no
+/// submission policy ... a program that reaches the chain cannot demand private submission at all"
+/// — because the compiler this chain runs had no notion of a submission policy. A demand the
+/// compiler does not record cannot be enforced by anything downstream, so these two tests pin both
+/// the positive and the negative case at the *compiler boundary*: the flag is set when the policy
+/// asks for it, and it is absent when the policy does not, with the rest of the artifact unchanged.
+///
+/// The enforcing half is `pallet-x3-kernel`'s intake check (see
+/// `pallets/x3-kernel/src/private_submission_intake.rs`), which reads this bit out of the header and
+/// refuses the program when the runtime's own `PrivateSubmissionChannel` says the chain cannot meet
+/// it. Testing only one of the two halves would prove nothing: a recorded demand nobody reads, or a
+/// check nothing ever trips.
+#[test]
+fn the_private_submission_policy_is_recorded_in_the_artifact_header() {
+    let source = "fn main() -> i64 {\n    return 7;\n}\n";
+
+    let demanded =
+        compile_source_with_policy(source, CompilationPolicy::private_submission_required())
+            .expect("valid .x3 source must compile under the private-submission policy");
+    let plain = compile_source(source).expect("valid .x3 source must compile");
+
+    assert!(
+        x3_common::bytecode::requires_private_submission(&demanded),
+        "the artifact compiled under the policy must carry the demand in its own header"
+    );
+    assert!(
+        !x3_common::bytecode::requires_private_submission(&plain),
+        "the default policy must not invent a demand"
+    );
+
+    // The demand must not change anything else about the artifact: it is a capability, not a
+    // different program. Byte-for-byte equality apart from the feature word is the strongest form
+    // of that claim available here.
+    let offset = x3_common::bytecode::FEATURE_FLAGS_OFFSET;
+    assert_eq!(
+        demanded.len(),
+        plain.len(),
+        "recording a capability must not change the artifact's length"
+    );
+    assert_eq!(
+        &demanded[..offset],
+        &plain[..offset],
+        "the header before the feature word must be identical"
+    );
+    assert_eq!(
+        &demanded[offset + 4..],
+        &plain[offset + 4..],
+        "the body and the rest of the header must be identical"
+    );
+
+    // And a module carrying the demand is still a valid module: both readers the runtime has accept
+    // it, so the refusal a chain performs is the *policy* and not a decode failure.
+    BytecodeModule::from_bytes(&demanded).expect("the std reader must accept a demanding artifact");
+    mini_x3::validate_x3bc(&demanded).expect("the no-std reader must accept a demanding artifact");
+}
+
+/// The engine's half of the compiled capability, in both interpreters.
+///
+/// X3-MEV-002's demand is recorded by the compiler and enforced at intake by `pallet-x3-kernel`; the
+/// engines a program runs on also have to honour it, or an artifact that reached an interpreter by a
+/// route which skipped the intake check would run in the clear. `mini_x3` used to read the header's
+/// feature word and *discard* it (`let _features = ...`), which is the shape a policy takes when
+/// nothing can enforce it — so this test drives the artifact through both engines and requires the
+/// same answer from each.
+#[test]
+fn both_engines_refuse_a_demanding_artifact_without_a_private_channel() {
+    let demanding = compile_source_with_policy(
+        "fn main() -> i64 {\n    return 5;\n}\n",
+        CompilationPolicy::private_submission_required(),
+    )
+    .expect("the fixture must compile");
+    let plain =
+        compile_source("fn main() -> i64 {\n    return 5;\n}\n").expect("the fixture must compile");
+
+    // mini_x3 — the interpreter a block runs, through the wrapper that supplies no posture and the
+    // one that supplies it.
+    assert_eq!(
+        mini_x3::execute_x3bc(&demanding, 100_000).err(),
+        Some(mini_x3::X3Error::PrivateSubmissionRequired),
+        "the no-std engine must refuse a demanding artifact when nothing said a private channel exists"
+    );
+    mini_x3::execute_x3bc_with_slots_and_policy(&demanding, 100_000, &[], true)
+        .expect("the same bytes must run once the context offers a private channel");
+    mini_x3::execute_x3bc(&plain, 100_000)
+        .expect("a program that does not demand privacy must be unaffected");
+
+    // The std engine, through the executor the node's adapters call.
+    let refused = X3Executor::execute(&demanding, &[], X3ExecutorConfig::on_chain());
+    assert!(
+        refused.is_err(),
+        "the std engine must refuse the same artifact: {refused:?}"
+    );
+    assert!(
+        X3Executor::execute(
+            &demanding,
+            &[],
+            X3ExecutorConfig::on_chain().with_private_submission_available()
+        )
+        .is_ok(),
+        "and must run it once the context declares a private channel"
+    );
+    assert!(
+        X3Executor::execute(&plain, &[], X3ExecutorConfig::on_chain()).is_ok(),
+        "the default policy must not be gated"
+    );
+
+    // Both engines must agree about *which* artifacts are gated, which is the property that makes
+    // this a policy rather than two independent opinions.
+    assert_eq!(
+        mini_x3::execute_x3bc(&demanding, 100_000).is_err(),
+        X3Executor::execute(&demanding, &[], X3ExecutorConfig::on_chain()).is_err(),
     );
 }

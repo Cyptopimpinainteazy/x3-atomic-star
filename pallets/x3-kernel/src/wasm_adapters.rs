@@ -214,13 +214,29 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         gas_limit: u64,
         slots: &[(sp_core::H256, [u8; 32])],
     ) -> Result<ExecutionReceipt, DispatchError> {
+        // No posture supplied: the fail-closed default. A program whose compiled policy demands
+        // private submission is refused by the engine rather than executed in the clear.
+        Self::execute_with_slots_and_policy(payload, gas_limit, slots, false)
+    }
+
+    fn execute_with_slots_and_policy(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(sp_core::H256, [u8; 32])],
+        private_channel_available: bool,
+    ) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        let config = x3_x3_integration::X3ExecutorConfig {
+        let mut config = x3_x3_integration::X3ExecutorConfig {
             gas_limit,
             ..Default::default()
         };
+        // The engine refuses a demanding artifact unless the caller says a private channel exists,
+        // and the pallet is the component that knows: it holds `Config::PrivateSubmissionChannel`.
+        if private_channel_available {
+            config = config.with_private_submission_available();
+        }
         // The chain's slots in the executor's own shape. Loading them is what makes a program able
         // to read a slot an earlier comit persisted; without them every `evm_sload` on a block
         // answered EVM's zero.

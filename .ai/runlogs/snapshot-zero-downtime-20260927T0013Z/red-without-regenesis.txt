@@ -1,0 +1,38 @@
+[zero-downtime] node:       /home/lojak/Desktop/xxxstar-main/target/release/x3-chain-node
+[zero-downtime] snapshot:   /home/lojak/Desktop/xxxstar-main/target/debug/x3-state-snapshot
+[zero-downtime] exporter:   /home/lojak/Desktop/xxxstar-main/scripts/snapshot-rpc-export.py
+[zero-downtime] ports:      base 43085
+[zero-downtime] booting the source chain (archive) at rpc 43085
+[zero-downtime] source node warns (its own words): 00:23:21 🗄️  This authority node keeps unbounded state or blocks. Validators are meant to be bounded — that is what keeps their disks from growing with t
+[zero-downtime] waiting for the chain to finalize height 520 (~104s at 5 blocks/s)
+[zero-downtime] source: finalized height 522, pid 1380907
+[zero-downtime] exporting over RPC (the node is not stopped, and will not be)
+[zero-downtime] [snapshot-export] exported 1882 keys at height 513 (0x7f5dbeb7fe50e9fb…) state_root=0x86e2dfe204a46d0c… justification=yes
+[zero-downtime] [snapshot-export] the node was never stopped: its finalized head went 524 -> 538 (+14) during the 3.057s export
+[zero-downtime] source kept finalizing through the export: 522 -> 538 -> 542
+[zero-downtime] anchor: height=513 hash=0x7f5dbeb7fe50e9fb... keys=1882 spec_version=20
+[zero-downtime]         state_root=0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142
+[zero-downtime]         head advanced 14 block(s) while the export ran
+[zero-downtime] the exported state recomputes to the chain's own state root (0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142)
+[zero-downtime] control 1: an export that is one key short must not reproduce the root
+dropped 0x47534ea9e0393d8822bfbe04dfca01c52217cda4bf4c8885399c4d2b134b09e0b3fc16a327712c1b1cfe4ea6c22a21d136000000
+[zero-downtime]             build refused it: error: the state read from /tmp/tmp.0m1PNGUa9I/short.json recomputes to 0x2e4e9ea6278d97ce4970f366cd9c955834c75fdd713295949fdf745432534f2c, but --state-root says 0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142. Those are different states; refusing to write a manifest whose own bytes do not produce the root it declares.
+[zero-downtime] control 2: the unaltered genesis spec must not reproduce the anchor's root
+[zero-downtime]             genesis root 0x1e1c45403b8e8ea9ee6717892d17d15421f4727e98b5b825214ee5ba89f10ee8 (130 keys) differs from the anchor
+[zero-downtime] building the snapshot with the chain's GRANDPA justification as its finality proof
+[zero-downtime] manifest 0x636ad4de43a5af938b3abe40741ff41c97aeb6d84a7741d294aa767e81fb4be0
+[zero-downtime] verify: verified: 1 chunk(s), block 513, state root 0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142 recomputed from the snapshot's own bytes (trie layout V1)
+[zero-downtime] control 3: verify must refuse the same snapshot against a different state root
+[zero-downtime]             refused: refused: snapshot carries state root 0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142, expected 0x1e1c45403b8e8ea9ee6717892d17d15421f4727e98b5b825214ee5ba89f10ee8
+[zero-downtime] restoring the snapshot into a chain spec (re-genesis: the producing chain's bookkeeping is dropped)
+[zero-downtime] restored 1882 entries from 1 chunk(s) into /tmp/tmp.0m1PNGUa9I/restored.json
+[zero-downtime]   chain x3_chain_dev at block 513 (runtime spec_version 20, trie layout V1)
+[zero-downtime]   block hash  0x7f5dbeb7fe50e9fb6609cc8b10a72d5523c6f53e99b2c6379706f1566acbde57
+[zero-downtime]   state root  0x86e2dfe204a46d0c1aadc68777eb0c10af7f3543185e91bb1df98d5a01b3f142 (recomputed from the snapshot's own bytes)
+[zero-downtime]   manifest    0x636ad4de43a5af938b3abe40741ff41c97aeb6d84a7741d294aa767e81fb4be0
+[zero-downtime]   boot a node with `--chain /tmp/tmp.0m1PNGUa9I/restored.json` to build a database from this state
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys;print(json.load(open(sys.argv[1]))["properties"]["x3SnapshotBookkeepingRemoved"])
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'x3SnapshotBookkeepingRemoved'

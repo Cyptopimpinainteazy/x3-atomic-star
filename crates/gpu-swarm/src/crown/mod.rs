@@ -792,8 +792,8 @@ impl Crown {
         let evaluation = CrownEvaluation {
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+                .map(|elapsed| elapsed.as_secs())
+                .unwrap_or(0),
             verdict: verdict.clone(),
             warden_state: state.clone(),
             audit_report: audit.clone(),

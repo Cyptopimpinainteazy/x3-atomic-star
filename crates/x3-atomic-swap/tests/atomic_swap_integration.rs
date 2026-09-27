@@ -3568,19 +3568,27 @@ fn test_new_modules_integration() {
     ];
 
     let votes = rpc_oracle.collect_votes(&providers, "0xabc123", 0);
-    assert_eq!(votes.len(), 3, "must collect votes from all 3 providers");
+    assert_eq!(votes.len(), 3, "must collect a vote entry per provider");
 
-    // All votes return agreement_count=1, required_quorum=1 -> all agreed
+    // This block used to assert that all three votes came back `Confirmed` with
+    // `agreement_count = 1` and that the oracle therefore reached a 2-of-3
+    // consensus against endpoints it never contacted — the test *required* an
+    // empty network to look like a quorum. What is asserted now is the honest
+    // contract: one vote per provider, none of them claiming an observation, so
+    // no consensus — and every unobserved provider named as a disagreement
+    // rather than quietly counted as agreeing.
     let consensus = rpc_oracle.verify_consensus(&votes, 2).unwrap();
     match consensus {
-        x3_atomic_swap::ConsensusResult::ConsensusAchieved {
+        x3_atomic_swap::ConsensusResult::ConsensusNotAchieved {
             agreement,
             required,
+            disagreements,
         } => {
-            assert_eq!(agreement, 3, "all 3 providers must agree");
+            assert_eq!(agreement, 0, "an oracle with no transport observed nothing");
             assert_eq!(required, 2);
+            assert_eq!(disagreements.len(), 3, "every unobserved provider is named");
         }
-        other => panic!("expected ConsensusAchieved, got {:?}", other),
+        other => panic!("expected ConsensusNotAchieved, got {:?}", other),
     }
 
     // Empty provider list -> consensus not achieved

@@ -69,16 +69,66 @@ id = "X3-GPU-003"
 name = "FRAME benchmarking"
 subsystem = "gpu_performance"
 source = "master"
-paths = [".github/workflows/frame-benchmarking.yml"]
-implemented = 70
-tested = 60
+# Re-measured 2026-09-27 and derived on this matrix's own formula
+# `implemented*0.35 + tested*0.25 + mainnet_ready*0.40`:
+#
+#   implemented 78 — the blocker was Generate production weights incomplete in older audits. Two
+#     pallets' production weights are now measured by this repository's own CLI instead of typed:
+#     `pallets/atomic-trade-engine` (register/update liquidity pool, sync pool price, submit price
+#     observation) and `pallets/x3-kernel` (emergency_pause, emergency_unpause, emergency_halt — the
+#     three calls that froze the chain for 10,000/15,000 picoseconds). Both files carry the CLI's own
+#     record line (v53.0.0, steps 50, repeat 20, wasm-execution compiled) and real proof sizes.
+#     2026-09-27, later: `pallets/x3-supply-ledger` is the third — a governance **mint** charged
+#     20,000 picoseconds and a burn 15,000 while each read and wrote `Ledgers`.
+#     2026-09-27, later still: `pallets/x3-treasury-policy` is the fourth — all eight calls were
+#     literals (a settlement vault funding at 80,000,000 picoseconds) behind a `runtime-benchmarks`
+#     feature that had nothing in it.
+#     2026-09-27, fifth pass: `pallets/x3-token-factory` is the fifth — a token launch at 60,000
+#     picoseconds, a mint/burn at 20,000 — behind the same empty feature.
+#   tested 70 — every new benchmark runs in the pallet's benchmark test suite (10 for
+#     atomic-trade-engine, 13 for x3-kernel) and the full CLI run is what wrote the files. Not
+#     higher: no workflow re-runs the per-pallet regeneration on a PR, so a stale file is still only
+#     caught by hand.
+#   mainnet_ready 55 — unchanged. The numbers were measured on this host (x3star1, Xeon E5-2620 v4)
+#     and no weight has been validated against a measured block on the launch target.
+#   The supply ledger's five benchmarks run in its own suite too (46 tests with the feature on),
+#     and the pallet had no `WeightInfo`, no `benchmarking.rs` and no `runtime-benchmarks` feature
+#     at all — the runtime feature list did not even enable its benchmarks, which is why
+#     `Pallet<Runtime>: Benchmarking` was unsatisfied and the CLI could not see it.
+#     The treasury policy's eight run in its suite (31 tests with the feature on) and its vault
+#     funding path is measured on the immediate-apply branch, with a real vault created by the
+#     inventory pallet's own root-only call.
+#     The token factory's four run in its suite (22 tests with the feature on) and its launch
+#     benchmark drives the whole path a chain takes: register, activate, configure routes, mint.
+# 84*0.35 + 76*0.25 + 55*0.40 = 29.4 + 19 + 22 = 70.4 -> 70.
+paths = [
+  ".github/workflows/frame-benchmarking.yml",
+  "pallets/atomic-trade-engine/src/weights.rs",
+  "pallets/x3-kernel/src/weights.rs",
+]
+implemented = 84
+tested = 76
 mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Generated production weights incomplete in older audits"]
-evidence = [".github/workflows/frame-benchmarking.yml", "note: Frame benchmarking workflow exists and runs on active PR heads"]
+blockers = [
+  "**OPEN — 20 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; `pallet-atomic-trade-engine`, `pallet-x3-kernel`, `pallet-x3-supply-ledger`, `pallet-x3-treasury-policy` and `pallet-x3-token-factory` are now benchmarked, and the count is 20. The rest have no `weights.rs` at all, so each needs the `WeightInfo` trait, a `benchmarking.rs`, a runtime `type WeightInfo` and a re-attestation before its numbers are measured rather than typed",
+  "**OPEN — no workflow re-runs the regeneration.** `make bench-pallets` and `scripts/run-frame-benchmarks.sh` exist and work, but nothing re-runs them automatically, so a weight file can go stale without a gate saying so",
+]
+evidence = [
+  ".github/workflows/frame-benchmarking.yml",
+  "note: Frame benchmarking workflow exists and runs on active PR heads",
+  "note: 2026-09-27 - `pallet-atomic-trade-engine` could not be benchmarked at all before this: it ships a `benchmarking.rs` but was absent from `mod benches` in `runtime/src/lib.rs`, so the CLI answered 'No benchmarks found which match your input'. It is registered now, and its four literal weights are measured output (`pallet_atomic_trade_engine`, STEPS 50, REPEAT 20, WASM-EXECUTION Compiled)",
+  "note: 2026-09-27 - two of `pallet_x3_kernel`'s own benchmarks failed when re-run, so its weights could not be regenerated either: `register_asset` hit `AssetAlreadyRegistered` (the dev genesis holds the default asset) and `submit_comit` presented `prepare_root = H256::zero()`, which `verify_dual_vm_with_receipts` refuses without the `dev-bypass` feature. Both establish their own preconditions now and the full 13-benchmark run rewrote the file. Evidence: `cargo test -p pallet-x3-kernel --features runtime-benchmarks` 253 passed",
+  "note: 2026-09-27 - `pallets/x3-kernel/src/weights.rs` and `pallets/atomic-trade-engine/src/weights.rs` were regenerated by `./target/release/x3-chain-node benchmark pallet --chain=dev --steps=50 --repeat=20 --wasm-execution=compiled --template .maintain/frame-weight-template.hbs`; the runtime hash record moved with them (`docs/reports/runtime-wasm-hashes.json`, revision ddec9b166)",
+  "note: 2026-09-27 - `pallets/x3-supply-ledger/src/weights.rs` is new: the pallet had no `WeightInfo`, no `benchmarking.rs`, no `runtime-benchmarks` feature, and the runtime's feature list did not enable one, so `Pallet<Runtime>: Benchmarking` was unsatisfied and the CLI could not measure it at all. Its mint/burn benchmarks register an asset through the asset registry — the development genesis holds none, and the ledger refuses an unknown asset — so they measure the state a chain can actually reach. `cargo test -p pallet-x3-supply-ledger --features runtime-benchmarks` 46 passed",
+  "note: 2026-09-27 - the scan count is one finding per pallet, not per call site: 25 -> 22 across the three pallets, covering 12 hand-written literals in total",
+  "note: 2026-09-27 - `pallets/x3-treasury-policy/src/weights.rs` is new: eight calls, all literals, behind a `runtime-benchmarks` feature with nothing behind it and absent from the runtime's feature list. The vault-funding benchmark creates the vault with the inventory pallet's own root-only `create_vault` and sets a cap and a threshold, so it measures the immediate-apply branch rather than the governance-queue branch the default zero threshold would produce. `cargo test -p pallet-x3-treasury-policy --features runtime-benchmarks` 31 passed; scan 22 -> 21; `check-runtime-weights-wired.py` names 40 wired configs (was 39)",
+  "note: 2026-09-27 - `pallets/x3-token-factory/src/weights.rs` is new: four calls (create_token 60,000; mint/burn 20,000; transfer_mint_authority 10,000). Its launch benchmark drives the whole path a chain takes — register the asset, activate it, configure the internal routes, mint the initial supply — and the mint/burn benchmarks use the class that permits each (`CappedMintable` for a post-launch mint, `Burnable` for a burn), because no single class allows both. `cargo test -p pallet-x3-token-factory --features runtime-benchmarks` 22 passed; scan 21 -> 20; `check-runtime-weights-wired.py` names 41 wired configs (was 40)",
+  "note: 2026-09-27 - adding `type WeightInfo` to a pallet's `Config` breaks **every other crate that implements that Config**, and nothing caught it: the supply ledger's new associated type silently broke `cargo test -p pallet-x3-token-factory` and `cargo test -p pallet-x3-cross-vm-router` (their test runtimes wire the ledger) while `make mainnet-check` stayed green, because the release gate runs a subset of packages. Both are fixed; `cargo check --workspace --all-targets` is the check that sees this class and is now the net used after every weights pass",
+]
 
 [[feature]]
 id = "X3-GPU-004"

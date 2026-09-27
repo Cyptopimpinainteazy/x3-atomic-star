@@ -155,6 +155,156 @@ fn parse_gas_limit(tx_obj: &serde_json::Value) -> Result<u64, jsonrpsee::types::
     ))
 }
 
+/// Execute a read-only EVM call through the runtime and return its raw output.
+///
+/// This is the *only* implementation of a node-side EVM call. `eth_call` is one
+/// name for it; `x3_call` is another. Before this existed, `x3_call` was served by
+/// `x3_rpc::GasEstimationRPC::call`, which returned the caller's own calldata as
+/// the "output" of the call — a read that answered with its question.
+/// The parts of an EVM request the runtime APIs take, parsed from an `eth_*-shaped` object.
+#[derive(Debug, PartialEq, Eq)]
+pub struct EvmRequest {
+    /// Destination address, twenty bytes; zeroed for contract creation.
+    pub target: Vec<u8>,
+    /// Caller address, if the request named one.
+    pub caller: Option<Vec<u8>>,
+    /// Calldata.
+    pub input: Vec<u8>,
+    /// Gas limit the caller allowed the dry-run.
+    pub gas_limit: u64,
+    /// Whether the request creates a contract rather than calling one.
+    pub creates_contract: bool,
+}
+
+/// Parse the shared shape of `eth_call` / `eth_estimateGas` / `x3_call` /
+/// `x3_estimateGas`. Every rule here is a refusal, so a malformed request cannot reach the
+/// runtime. `require_target` is false for estimation, where a missing `to` means contract
+/// creation.
+pub fn parse_evm_request(
+    tx_obj: &serde_json::Value,
+    require_target: bool,
+) -> Result<EvmRequest, jsonrpsee::types::ErrorObjectOwned> {
+    let target = tx_obj.get("to").and_then(|v| v.as_str());
+    if require_target && target.is_none() {
+        return Err(jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            "Missing to address".to_string(),
+            None::<()>,
+        ));
+    }
+    let target_bytes = match target {
+        Some(target) => decode_address(target)?,
+        None => vec![0u8; 20], // Contract creation
+    };
+    let caller = tx_obj
+        .get("from")
+        .and_then(|v| v.as_str())
+        .map(decode_address)
+        .transpose()?;
+
+    let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
+    let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
+    let input_data = hex::decode(data_stripped).map_err(|e| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            format!("Invalid data: {}", e),
+            None::<()>,
+        )
+    })?;
+
+    Ok(EvmRequest {
+        target: target_bytes,
+        caller,
+        input: input_data,
+        gas_limit: parse_gas_limit(tx_obj)?,
+        creates_contract: target.is_none(),
+    })
+}
+
+/// Execute a read-only EVM call through the runtime and return its raw output.
+///
+/// This is the only implementation of a node-side EVM call: `eth_call` and `x3_call` are two
+/// names for it.
+pub fn evm_call_output<C>(
+    client: &C,
+    tx_obj: &serde_json::Value,
+) -> Result<Vec<u8>, jsonrpsee::types::ErrorObjectOwned>
+where
+    C: ProvideRuntimeApi<Block> + HeaderBackend<Block>,
+    C::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+{
+    let request = parse_evm_request(tx_obj, true)?;
+
+    let api = client.runtime_api();
+    let at = client.info().best_hash;
+    let result: Result<Vec<u8>, Vec<u8>> = api
+        .call_evm(
+            at,
+            request.caller,
+            request.target,
+            request.input,
+            request.gas_limit,
+        )
+        .map_err(|e| {
+            jsonrpsee::types::ErrorObjectOwned::owned(
+                -32603,
+                format!("EVM API error: {}", e),
+                None::<()>,
+            )
+        })?;
+
+    result.map_err(|err| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            format!("EVM call failed: {}", String::from_utf8_lossy(&err)),
+            None::<()>,
+        )
+    })
+}
+
+/// Estimate gas for a transaction through the runtime's EVM dry-run.
+///
+/// One implementation, two names: `eth_estimateGas` returns the number as hex, and
+/// `x3_estimateGas` returns the richer `GasEstimation` shape. Before this, `x3_estimateGas` was
+/// served by `x3_rpc::GasEstimationRPC`, which counted opcodes linearly and reported
+/// `ExecutionStatus::Success` for a transaction it had never executed.
+pub fn evm_estimate_gas<C>(
+    client: &C,
+    tx_obj: &serde_json::Value,
+) -> Result<u64, jsonrpsee::types::ErrorObjectOwned>
+where
+    C: ProvideRuntimeApi<Block> + HeaderBackend<Block>,
+    C::Api: pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+{
+    let request = parse_evm_request(tx_obj, false)?;
+
+    let api = client.runtime_api();
+    let at = client.info().best_hash;
+    let result: Result<u64, Vec<u8>> = api
+        .estimate_evm_gas(
+            at,
+            request.caller,
+            request.target,
+            request.input,
+            request.gas_limit,
+        )
+        .map_err(|e| {
+            jsonrpsee::types::ErrorObjectOwned::owned(
+                -32603,
+                format!("EVM API error: {}", e),
+                None::<()>,
+            )
+        })?;
+
+    result.map_err(|err| {
+        jsonrpsee::types::ErrorObjectOwned::owned(
+            -32603,
+            format!("Gas estimation failed: {}", String::from_utf8_lossy(&err)),
+            None::<()>,
+        )
+    })
+}
+
 fn decode_u64_block_param(s: &str) -> Result<u64, jsonrpsee::types::ErrorObjectOwned> {
     if s == "latest" {
         return Err(jsonrpsee::types::ErrorObjectOwned::owned(
@@ -385,54 +535,11 @@ where
                     (tx, serde_json::Value::Null)
                 });
 
-            let target = tx_obj.get("to").and_then(|v| v.as_str()).ok_or_else(|| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    "Missing to address".to_string(),
-                    None::<()>,
-                )
-            })?;
-            let target_bytes = decode_address(target)?;
-            let caller = tx_obj
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map(decode_address)
-                .transpose()?;
-
-            let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
-            let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
-            let input_data = hex::decode(data_stripped).map_err(|e| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Invalid data: {}", e),
-                    None::<()>,
-                )
-            })?;
-            let gas_limit = parse_gas_limit(&tx_obj)?;
-
-            let api = c.runtime_api();
-            let at = c.info().best_hash;
-            let result: Result<Vec<u8>, Vec<u8>> = api
-                .call_evm(at, caller, target_bytes, input_data, gas_limit)
-                .map_err(|e| {
-                    jsonrpsee::types::ErrorObjectOwned::owned(
-                        -32603,
-                        format!("EVM API error: {}", e),
-                        None::<()>,
-                    )
-                })?;
-
-            match result {
-                Ok(output) => Ok(serde_json::Value::String(format!(
-                    "0x{}",
-                    hex::encode(output)
-                ))),
-                Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("EVM call failed: {}", String::from_utf8_lossy(&err)),
-                    None::<()>,
-                )),
-            }
+            let output = evm_call_output(c.as_ref(), &tx_obj)?;
+            Ok(serde_json::Value::String(format!(
+                "0x{}",
+                hex::encode(output)
+            )))
         },
     )?;
 
@@ -449,48 +556,8 @@ where
                 )
             })?;
 
-            let target_bytes = if let Some(target) = tx_obj.get("to").and_then(|v| v.as_str()) {
-                decode_address(target)?
-            } else {
-                vec![0u8; 20] // Contract creation
-            };
-            let caller = tx_obj
-                .get("from")
-                .and_then(|v| v.as_str())
-                .map(decode_address)
-                .transpose()?;
-
-            let data_hex = tx_obj.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
-            let data_stripped = data_hex.strip_prefix("0x").unwrap_or(data_hex);
-            let input_data = hex::decode(data_stripped).map_err(|e| {
-                jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Invalid data: {}", e),
-                    None::<()>,
-                )
-            })?;
-            let gas_limit = parse_gas_limit(&tx_obj)?;
-
-            let api = c.runtime_api();
-            let at = c.info().best_hash;
-            let result: Result<u64, Vec<u8>> = api
-                .estimate_evm_gas(at, caller, target_bytes, input_data, gas_limit)
-                .map_err(|e| {
-                    jsonrpsee::types::ErrorObjectOwned::owned(
-                        -32603,
-                        format!("EVM API error: {}", e),
-                        None::<()>,
-                    )
-                })?;
-
-            match result {
-                Ok(gas) => Ok(serde_json::Value::String(format!("0x{:x}", gas))),
-                Err(err) => Err(jsonrpsee::types::ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Gas estimation failed: {}", String::from_utf8_lossy(&err)),
-                    None::<()>,
-                )),
-            }
+            let gas = evm_estimate_gas(c.as_ref(), &tx_obj)?;
+            Ok(serde_json::Value::String(format!("0x{:x}", gas)))
         },
     )?;
 
@@ -1863,7 +1930,61 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_address, parse_gas_limit, validate_log_block_range, MAX_LOG_BLOCK_RANGE};
+    use super::{
+        decode_address, parse_evm_request, parse_gas_limit, validate_log_block_range,
+        MAX_LOG_BLOCK_RANGE,
+    };
+
+    /// One parser, two callers (`evm_call_output` and `evm_estimate_gas`), and every rule in it
+    /// is a refusal. Before this existed the same block was written twice, so a rule could be
+    /// fixed in one of them and not the other.
+    #[test]
+    fn the_evm_request_parser_enforces_the_contract() {
+        let address = format!("0x{}", "22".repeat(20));
+        let request = parse_evm_request(
+            &serde_json::json!({
+                "to": address,
+                "from": address,
+                "data": "0xdeadbeef",
+                "gas": "0x186a0",
+            }),
+            true,
+        )
+        .expect("a well formed request parses");
+        assert_eq!(request.target, vec![0x22u8; 20]);
+        assert_eq!(request.caller, Some(vec![0x22u8; 20]));
+        assert_eq!(request.input, vec![0xde, 0xad, 0xbe, 0xef]);
+        assert_eq!(request.gas_limit, 100_000);
+        assert!(!request.creates_contract);
+
+        // A call must name a destination...
+        let err = parse_evm_request(&serde_json::json!({ "data": "0x" }), true)
+            .expect_err("a call without `to` is refused");
+        assert!(
+            err.message().contains("Missing to address"),
+            "{}",
+            err.message()
+        );
+
+        // ...while an estimate may leave it out, and then it is contract creation at the zero
+        // address with a caller that was not named.
+        let creation =
+            parse_evm_request(&serde_json::json!({ "data": "0x00" }), false).expect("creation");
+        assert!(creation.creates_contract);
+        assert_eq!(creation.target, vec![0u8; 20]);
+        assert_eq!(creation.caller, None);
+
+        // A short address, bad hex and a bad gas value are all refusals, not defaults.
+        assert!(parse_evm_request(&serde_json::json!({ "to": "0x11" }), true).is_err());
+        assert!(
+            parse_evm_request(&serde_json::json!({ "to": address, "data": "0xzz" }), true).is_err()
+        );
+        assert!(parse_evm_request(
+            &serde_json::json!({ "to": address, "gas": "not-a-number" }),
+            true
+        )
+        .is_err());
+    }
 
     #[test]
     fn decode_address_accepts_20_byte_hex() {

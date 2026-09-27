@@ -8,7 +8,8 @@ Replaces the prior documentation-only check with:
   3. Critical runtime and pallet test suites
   4. Reproducible-build prerequisite check (srtool)
   5. Required documentation check (preserved from original)
-  6. Forbidden-secret scanning (preserved from original)
+  6. Northern Swarm + Reactor on-chain compute hard gate
+  7. Forbidden-secret scanning (preserved from original)
 
 Exit 0 → gate PASSES.
 Exit 1 → gate FAILS — do NOT cut a release.
@@ -22,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import fcntl
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
@@ -77,6 +79,42 @@ REQUIRED_DOCS = [
     "TESTING.md",
     "AUDIT_SPEC.md",
 ]
+
+
+BUILD_LOCK = ROOT / ".x3-release-build.lock"
+
+
+def acquire_build_lock():
+    """Take the exclusive lock every runtime-build-bearing run shares.
+
+    Returns the open handle (kept alive for the process lifetime) or `None` when another run holds
+    it, in which case the caller must not proceed: the two would write the same
+    `runtime/target/srtool` and the hashes one of them reports would describe the other's build.
+    The lock is advisory and process-scoped, so it disappears with the holder.
+    """
+    # `a+`, not `w`: opening for write truncates the file, which would erase the
+    # holding run's pid before we can name it in the refusal.
+    handle = open(BUILD_LOCK, "a+")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        holder = ""
+        try:
+            holder = BUILD_LOCK.read_text().strip()
+        except OSError:
+            holder = ""
+        print("::error:: another release-gate or runtime-attestation run holds "
+              f"{BUILD_LOCK.name}" + (f" (pid {holder})" if holder else ""))
+        print("  Both build runtime/target/srtool and boot nodes on fixed ports, so running two at")
+        print("  once produces evidence that describes neither. Wait for it to finish, or run")
+        print("  `scripts/local-ci.sh --only <gate>` for a gate that does not rebuild the runtime.")
+        handle.close()
+        return None
+    handle.seek(0)
+    handle.truncate()
+    handle.write(f"{os.getpid()}\n")
+    handle.flush()
+    return handle
 
 
 def check_required_docs() -> None:
@@ -446,6 +484,10 @@ TEST_PACKAGES = [
     # gate noticing (the workspace clippy gate caught it, which is not part of the
     # release bar). Every pallet that holds a terminal state belongs here.
     ("-p", "pallet-x3-settlement-engine", []),
+    # Swarm/compute release surface: both halves must compile and test under
+    # the same mainnet bar as settlement and runtime code.
+    ("-p", "pallet-northern-swarm", []),
+    ("-p", "northern-swarm", []),
 ]
 
 
@@ -502,6 +544,35 @@ def check_panic_ratchet() -> None:
         (line.strip() for line in output.splitlines() if "runtime-hook=" in line), ""
     )
     ok(counts_line or "panic ratchet holds")
+
+
+def check_swarm_reactor_gate() -> None:
+    """Northern Swarm/Reactor must be real on-chain compute before mainnet.
+
+    This delegates detailed structural and executable checks to a focused gate
+    so swarm-specific policy can evolve without bloating this release driver.
+    The focused gate intentionally fails while the current single-executor,
+    unsigned-submission, no-GPU path remains incomplete.
+    """
+    print("\n── 4c. Northern Swarm + Reactor on-chain compute ──")
+    script = ROOT / "scripts" / "mainnet" / "swarm_reactor_gate.py"
+    if not script.exists():
+        fail("scripts/mainnet/swarm_reactor_gate.py is missing")
+        return
+
+    result = run([sys.executable, str(script)])
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        fail("Northern Swarm + Reactor on-chain compute gate failed")
+        for line in output.splitlines()[-30:]:
+            print(f"    {line}")
+        return
+
+    summary = next(
+        (line.strip() for line in output.splitlines() if "swarm_reactor_gate: PASS" in line),
+        "swarm/reactor compute gate passed",
+    )
+    ok(summary)
 
 
 def check_runtime_upgrade_rehearsal() -> None:
@@ -737,6 +808,15 @@ def main() -> int:
     print("  Mainnet Release Gate")
     print("═" * 60)
 
+    # This gate builds the runtime in `runtime/target/srtool` and boots nodes on fixed ports. Two
+    # concurrent runs therefore share both, and the second one corrupts the first one's evidence
+    # rather than failing loudly: measured 2026-09-27, four `make mainnet-check` runs overlapped and
+    # the srtool stage spent ~50 minutes in a three-way build race. `scripts/update-runtime-hashes.sh`
+    # takes the same lock, because it builds the same target directory.
+    lock_handle = acquire_build_lock()
+    if lock_handle is None:
+        return 2
+
     check_required_docs()
     check_build()
     check_chain_runs()
@@ -749,6 +829,7 @@ def main() -> int:
     check_testnet_genesis()
     check_test_suites()
     check_panic_ratchet()
+    check_swarm_reactor_gate()
     check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()
     check_reproducible_build()

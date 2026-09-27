@@ -4,7 +4,9 @@
 
 set -e
 
-WORKSPACE="${WORKSPACE:-/home/lojak/Desktop/X3_ATOMIC_STAR}"
+# The workspace defaults to this checkout, derived from the script's own location, so the script
+# works from any path. Set WORKSPACE=... to point it at a different checkout.
+WORKSPACE="${WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SCRIPTS_DIR="$WORKSPACE/scripts"
 LOG_DIR="/tmp/x3-testnet-logs"
 

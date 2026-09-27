@@ -1,20 +1,54 @@
 # MEV / Privacy feature matrix fragment.
 
 [[feature]]
+# Re-measured 2026-09-27 on `c62f93200`. This row was a STUB whose single blocker
+# ("needs threat model covering relayers, finality delays, and ordering") was
+# accurate: `CoordinatorConfig::confirmations` (`evm: 12`, `svm: 50`, `x3: 1`)
+# had no reader on the release path at all, and `ConfirmationConfig::default()`
+# did not exist — the numbers were written inline in `CoordinatorConfig::default()`.
+# The release envelope therefore accepted any depth the *submitter's own* proof
+# asserted. `docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md` now names the assets, the
+# attacker capabilities and the six surfaces; the finality/reorg, secret-reveal
+# and unsized-domain surfaces are closed by a policy that derives from that same
+# config and is a **required** argument of `for_claim`/`for_refund`; ordering
+# (S4), withholding (S5) and adapter honesty (S6) remain open and are what keeps
+# `mainnet_ready` at 25.
 id = "X3-MEV-001"
 name = "Cross-domain MEV protection"
 subsystem = "mev_privacy"
 source = "master"
 paths = ["crates/cross-vm-coordinator"]
-implemented = 35
-tested = 18
-mainnet_ready = 20
+implemented = 55
+tested = 50
+mainnet_ready = 25
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Needs threat model covering relayers, finality delays, and ordering"]
-evidence = ["crates/cross-vm-coordinator", "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"]
+blockers = [
+  "**Ordering is still relayer-chosen (surface S4).** `settlement_outbox` records the attempts it makes and `crates/x3-order-window` implements a commit-reveal ordering lane, but that lane is *inside the X3 domain*; nothing binds a cross-domain release order to an ordering beacon, so a relayer can hold settlement A and deliver B first. Closing it means deriving a release order key from the X3 block hash and refusing an out-of-order release, the way `x3-order-window` does locally. Not attempted here.",
+  "**Withholding is undetectable at this layer (S5).** A relayer who never delivers a settlement cannot be caught by a release gate; the intent runs to its timeout/refund path, so the attacker's gain is the delay itself. `recovery`/`settlement_reconcile` bound the damage; nothing removes the attack.",
+  "**The gate enforces the policy against the evidence it is handed, not the adapter's honesty (S6).** `confirmations` and `safe_to_reveal_secret` are fields of the bundle. What is proven is that the coordinator cannot be talked into releasing *too early by evidence that says it is too early* — a fabricated deep-enough proof is the adapter's and the runtime's problem (`verify_runtime_binding`, `verify_claim_set`, matrix rows X3-XVM-*).",
+  "**No live evidence.** Every test is crate-level with the repo's own typed proof structures. Nothing has run on a multi-node network, and `crates/cross-vm-coordinator` is not in the runtime dependency graph, so this changes what the coordinator *asks* the runtime to release, not what the runtime enforces.",
+  "**`cargo clippy --features canonical-proofs --all-targets -- -D warnings` is red on this crate for two pre-existing lints** (`src/attempt_ledger.rs:156` too-many-arguments, `src/settlement_outbox.rs:273` map_or simplification), so the new code is verified warning-free rather than the crate being clippy-clean.",
+]
+required_tests = [
+  "a_claim_at_the_configured_depth_is_accepted",
+  "a_claim_one_confirmation_shallow_is_refused",
+  "a_claim_that_is_not_safe_to_reveal_the_secret_is_refused",
+  "a_refund_below_the_configured_depth_is_refused",
+  "a_domain_the_policy_never_sized_is_refused_instead_of_defaulted",
+  "the_policy_uses_the_depths_the_operator_configured",
+  "the_secret_reveal_guard_can_only_be_relaxed_explicitly",
+]
+test_evidence = [
+  "note: cargo test --features canonical-proofs (in crates/cross-vm-coordinator) -> 132 passed, 0 failed, 0 ignored; the seven new tests are `test settlement_finality::tests::*` (measured 2026-09-27 on c62f93200)",
+  "note: cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml (default features) -> 115 + 41 passed, 0 failed; `bash scripts/local-ci.sh --only test-cross-vm-coordinator` -> PASS 112s, and the gate now also runs the `--features canonical-proofs` set because the default-feature run never compiled this code at all",
+  "note: break-it-first control - with the depth comparison weakened to `observed < required && required > u64::MAX`, exactly `a_claim_one_confirmation_shallow_is_refused` and `a_refund_below_the_configured_depth_is_refused` fail and the other five stay green; restored byte-identically, 7/7",
+  "note: docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md names the assets, the attacker capabilities and the six surfaces, with the closed/open split and the file:line of each refusal",
+  "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV; this row now closes three named surfaces rather than claiming the category",
+]
+evidence = ["crates/cross-vm-coordinator/src/settlement_finality.rs", "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md", "crates/cross-vm-coordinator"]
 
 [[feature]]
 # Re-measured 2026-09-26 (round 4, workstream C) on commit c85dba7f1 of
@@ -27,18 +61,19 @@ id = "X3-MEV-002"
 name = "Private transaction submission controls"
 subsystem = "mev_privacy"
 source = "master"
-paths = ["x3-lang/compiler", "x3-lang/vm"]
-implemented = 55
-tested = 40
-mainnet_ready = 25
+paths = ["x3-lang/compiler", "x3-lang/vm", "crates/x3-common", "crates/x3-compiler", "crates/x3-integration", "pallets/x3-kernel"]
+implemented = 90
+tested = 85
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "**Superseded 2026-09-26 — the two entries below describe the tree before `6a3358041`/`23350ca0c`, and both of their central claims are now false; they are kept so the history is readable.** Both interpreters implement `evm_sstore`/`evm_sload` — `mini_x3`, the one a block runs, uses the same key derivation and the same tagged payload as `crates/x3-vm`, and `interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key byte for key byte — and the writes do land in chain state: the kernel applies them to its own `X3ContractStorage` keyspace through the typed `storage_writes` channel instead of the balance decoder, so `DecodeFailureCount` stays 0 for a storage-writing comit. What is still open is the *read*, not the write: nothing seeds a program's slots from chain state before it runs, so a second comit's `evm_sload` sees the interpreter's empty store rather than the slot the chain persisted; the per-slot weight is under-declared; and no node or validator network has run any of it.",
-  "The chain-intake pipeline carries no submission policy: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` finds zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reaches the chain cannot demand private submission at all",
-  "No runtime in this repository sets `allow_private_submission = true` and no private channel is wired to the VM, so the demand is now enforced but never satisfiable on chain",
+  "**CLOSED 2026-09-27 — the chain-intake pipeline carries the policy now, and the chain enforces it.** The gap was structural and this entry said so exactly: on-chain `.x3` goes through `crates/x3-compiler` (`compiler_bridge`) into `pallet-x3-kernel`, and `rg` over `crates/{x3-compiler,x3-vm,x3-backend,x3-common}` found zero occurrences of `submission`/`private`/`ModeCheck`, so a program that reached the chain could not demand private submission *at all* — the demand and the enforcement sat on opposite sides of a boundary nothing crossed. Three pieces now cross it. (1) The compiler records the demand: `CompilationOptions::require_private_submission` sets a bit in the artifact's own feature word (`x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED`, aliased in `x3_backend::bc_format::FeatureFlags`), and `compiler_bridge::compile_source_with_policy` is the intake entry point that takes the policy. The bit deliberately does not raise `min_version_required`: the demand is *interpreted*, and a format bump would make the module unreadable by the very loader meant to read it. (2) The chain enforces it at intake: `pallet-x3-kernel` reads the header on both routes into the VM (`submit_comit_v2` before any state is touched, and `KernelCrossVmDispatcher::execute_x3vm_tx`) and refuses with `Error::PrivateSubmissionUnavailable` when the runtime's `Config::PrivateSubmissionChannel` says this chain cannot meet the demand. (3) The posture is wired rather than assumed: the runtime binds `PrivateSubmissionChannel = RuntimePrivateSubmissionChannel`, which reads `pallet_private_execution::Enabled` — the switch governance already flips — so the entry that said 'no runtime sets it' is answered by construction instead of by a constant. Measured: `pallets/x3-kernel` 240/240 lib tests, `x3-common` 39/39, `x3-x3-integration` compiler-bridge 7/7, `cargo check -p x3-chain-runtime` clean; break-it-first — with the intake guard disabled, exactly `a_program_that_demands_private_submission_is_refused_where_the_chain_offers_none` and `the_demand_is_read_from_the_artifact_not_from_the_compiler` fail and the four controls stay green; restored, 6/6.",
+  "**CLOSED 2026-09-27 (same day, second half) — the engines enforce the demand too, and the path that opens when the chain can serve it is now wired end to end.** Intake alone left two holes, and both are closed. (1) Defence in depth: `mini_x3` read the header's feature word as `let _features` and *discarded* it, so an artifact that reached an interpreter by any route skipping the pallet's two call sites would have run in the clear — the shape a policy takes when nothing can enforce it. The reader now keeps the demand, a module carrying it is refused with `X3Error::PrivateSubmissionRequired` unless the execution context says a private channel exists, and the `std` engine refuses the same bytes with the same rule (`X3ExecutorConfig::allow_private_submission`, default `false` in `default()`, `on_chain()` *and* `simulation()`, so 'nobody told me' resolves to the refusal). `both_engines_refuse_a_demanding_artifact_without_a_private_channel` drives one artifact through both engines and requires the same answer. (2) The acceptance direction was wired to the chain's own posture rather than to a constant: `X3ExecutorAdapter::execute_with_slots_and_policy` defaults to ignoring the posture (fail closed — an adapter that does not implement it still hands its engine a channel-less context), and both shipped X3 adapters override it to pass `Config::PrivateSubmissionChannel` into the executor, which the pallet supplies at both call sites. So with the runtime's private channel enabled, a program that demands private submission now reaches a *real* adapter with the posture the chain declared, instead of being refused by an engine default nothing could override.",
+  "Still open, and why this is not mainnet-ready: none of it has run on a validator network or against a node. The two-sided proof is a pallet test with the mock adapter plus engine tests, so what is proven is the chain's *decision* and the engines' *agreement*, not an X3VM execution on a live chain under a private channel. The private channel itself is still the part this row never had: `pallet_private_execution::Enabled` can be turned on by governance and no node in this repository ever has been, `submit_private_transaction` is a separate submission route, and no end-to-end private submission has been observed anywhere. The wire format gives the demand no version bite — a loader that predates the bit would ignore it, and in this repository both readers take the constant from `x3-common`, which is what makes them agree rather than a rule the format enforces. Finally, the gas/weight accounting for a demanding program is the same as for any other: the check is a branch, not a priced operation.",
 ]
 required_tests = [
   "a_trading_program_that_requires_private_submission_carries_the_mode_check",
@@ -51,13 +86,28 @@ required_tests = [
   "the_same_trading_program_runs_where_the_channel_exists",
   "a_trading_program_that_does_not_demand_privacy_is_not_gated",
   "compiled_private_submission_requirement_is_enforced",
+  "a_program_that_demands_private_submission_is_refused_where_the_chain_offers_none",
+  "the_same_program_runs_once_the_chain_offers_a_private_channel",
+  "a_program_that_does_not_demand_privacy_is_not_gated",
+  "a_chain_with_a_channel_still_runs_programs_that_do_not_demand_it",
+  "the_demand_is_read_from_the_artifact_not_from_the_compiler",
+  "a_payload_that_is_not_a_module_is_answered_by_the_adapter_not_by_this_check",
+  "the_private_submission_policy_is_recorded_in_the_artifact_header",
+  "both_engines_refuse_a_demanding_artifact_without_a_private_channel",
 ]
 test_evidence = [
   "note: cargo test --manifest-path x3-lang/Cargo.toml --workspace -> exit 0, 1327 passed, 0 failed, 0 ignored across 102 test binaries (measured 2026-09-26 on c85dba7f1)",
   "note: cargo clippy --manifest-path x3-lang/Cargo.toml --workspace --all-targets -- -D warnings -> exit 0; cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check -> exit 0",
   "note: break-it-first control - with the lowering change disabled, x3-lang/examples/trading_core_v1.x3 (whose policy requires private submission) ran to Ok(()) under a VM config whose private-submission flag is false, and the three IR-verifier tests failed; restored, all pass",
+  "note: cargo test -p pallet-x3-kernel --lib -> 240 passed, 0 failed (measured 2026-09-27); the six private-submission intake tests are `test private_submission_intake::*`",
+  "note: cargo test -p x3-x3-integration --features std,compile --test compiler_bridge -> 7 passed, 0 failed; the new case is `the_private_submission_policy_is_recorded_in_the_artifact_header`",
+  "note: break-it-first control - with `Self::ensure_private_submission_available(&x3_payload)?` replaced by a no-op call at the `submit_comit_v2` intake, exactly the two refusal tests fail and the four controls stay green; restored, 6/6 green",
+  "note: cargo check -p x3-chain-runtime (std) -> exit 0, so the runtime binding `PrivateSubmissionChannel = RuntimePrivateSubmissionChannel` compiles against the real `construct_runtime!`",
+  "note: cargo test -p x3-x3-integration --features std,compile --test compiler_bridge -> 8 passed, 0 failed; `both_engines_refuse_a_demanding_artifact_without_a_private_channel` asserts the refusal and the acceptance direction in `mini_x3` and in `X3Executor`, and that both engines classify the same artifact the same way",
+  "note: cargo test -p pallet-x3-kernel -> 240 lib + 2 + 9 integration tests pass; the pallet's intake tests were re-run against the policy-aware adapter call, and and the three other pallets whose mock runtimes configure the kernel still build (48 + 31 + 158 + 23 tests)",
+  "note: cargo clippy -p pallet-x3-kernel -p x3-x3-integration --all-targets -> exit 0; and with --features std,compile -> exit 0",
 ]
-evidence = ["x3-lang/compiler", "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM; it is still absent from the chain-intake compiler"]
+evidence = ["x3-lang/compiler", "crates/x3-common/src/lib.rs", "crates/x3-compiler/src/options.rs", "crates/x3-integration/src/compiler_bridge.rs", "crates/x3-integration/src/mini_x3.rs", "crates/x3-integration/src/executor.rs", "pallets/x3-kernel/src/lib.rs", "pallets/x3-kernel/src/private_submission_intake.rs", "pallets/x3-kernel/src/adapters.rs", "note: Measured 2026-09-26 (round 4) - the demand is compiled into the artifact, gated ahead of the trade and interpreted by the VM. Measured 2026-09-27 - the chain-intake compiler records the same demand, the pallet refuses the program at intake when the runtime's private channel is off, both engines refuse it independently, and the pallet passes the chain's posture through to the adapter when it is on"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: cited PR #135 was closed unmerged, so it is not a source: this row's scores were recorded against that draft. Provenance corrected against master on 2026-09-22 by reading the tree; a full re-measurement is TICKET-101; the capability is on master: x3-lang/compiler/src/trading_semantic.rs (max_price_impact policy), x3-lang/vm/tests/trading_execution.rs

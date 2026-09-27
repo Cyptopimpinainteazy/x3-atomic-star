@@ -962,8 +962,8 @@ impl ConnectionManager {
 
         let conn_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+            .map(|elapsed| elapsed.as_nanos() as u64)
+            .unwrap_or(0);
 
         self.connections.write().insert(
             peer_id,

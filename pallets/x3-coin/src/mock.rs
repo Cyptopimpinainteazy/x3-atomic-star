@@ -150,6 +150,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
     type RequireCrossVmProof = ConstBool<false>;
+    type PrivateSubmissionChannel = ConstBool<false>;
     type WeightInfo = ();
     type EvmAdapter = MockEvmAdapter;
     type SvmAdapter = MockSvmAdapter;

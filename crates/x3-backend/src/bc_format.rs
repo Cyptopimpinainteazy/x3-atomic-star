@@ -179,6 +179,13 @@ impl FeatureFlags {
     pub const COMPRESSED_CONSTS: u32 = 1 << 6;
     /// Uses simd operations (v1.3+).
     pub const SIMD_OPS: u32 = 1 << 7;
+    /// The program's compiled policy requires private submission.
+    ///
+    /// The bit is defined in `x3-common::bytecode` and aliased here so the std writer and the
+    /// no-std reader name the same bit; see that definition for why it is a capability rather
+    /// than a format version.
+    pub const PRIVATE_SUBMISSION_REQUIRED: u32 =
+        x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED;
 
     pub fn new() -> Self {
         Self(0)
@@ -1484,6 +1491,43 @@ mod tests {
 
         f.set(FeatureFlags::SIMD_OPS);
         assert_eq!(f.min_version_required(), VersionInfo::new(1, 3, 0));
+    }
+
+    #[test]
+    fn the_private_submission_bit_is_the_shared_one_and_is_not_a_version_change() {
+        // One bit, two crates: `x3-common::bytecode` is where the no-std reader gets it, and this
+        // alias is what the writer sets. If they drift, a module the compiler marks as demanding
+        // privacy is read by the chain as an ordinary one — the demand would be carried and
+        // ignored, which is the failure this flag exists to prevent.
+        assert_eq!(
+            FeatureFlags::PRIVATE_SUBMISSION_REQUIRED,
+            x3_common::bytecode::FEATURE_PRIVATE_SUBMISSION_REQUIRED
+        );
+
+        let mut f = FeatureFlags::new();
+        f.set(FeatureFlags::PRIVATE_SUBMISSION_REQUIRED);
+        // Deliberately 1.0.0: the demand is interpreted by the loader, not a format change, so a
+        // reader that ignores the bit is not saved by a version bound it cannot meet.
+        assert_eq!(f.min_version_required(), VersionInfo::new(1, 0, 0));
+        assert!(f.has(FeatureFlags::PRIVATE_SUBMISSION_REQUIRED));
+        // The bit sits in the same word as the version-significant flags without colliding with
+        // any of them.
+        for other in [
+            FeatureFlags::EXTENDED_OPCODES,
+            FeatureFlags::TYPED_CONSTANTS,
+            FeatureFlags::INLINE_CACHE,
+            FeatureFlags::CROSS_VM_CALLS,
+            FeatureFlags::GAS_METERING,
+            FeatureFlags::CUSTOM_SECTIONS,
+            FeatureFlags::COMPRESSED_CONSTS,
+            FeatureFlags::SIMD_OPS,
+        ] {
+            assert_eq!(
+                other & FeatureFlags::PRIVATE_SUBMISSION_REQUIRED,
+                0,
+                "the private-submission bit must not overlap {other:#x}"
+            );
+        }
     }
 
     #[test]

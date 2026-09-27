@@ -443,6 +443,10 @@ struct RestoreArgs {
     manifest_hash: Option<String>,
     state_version: Option<u8>,
     force: bool,
+    /// Drop the producing chain's `frame_system` bookkeeping so the result is
+    /// the genesis of a new chain instead of a chain that panics on its first
+    /// block. See `CHAIN_BOOKKEEPING_ENTRIES`.
+    regenesis: bool,
 }
 
 fn parse_restore_args(args: &[String]) -> Result<RestoreArgs, String> {
@@ -489,6 +493,7 @@ fn parse_restore_args(args: &[String]) -> Result<RestoreArgs, String> {
                 );
             }
             "--force" => parsed.force = true,
+            "--regenesis" => parsed.regenesis = true,
             other => return Err(format!("unexpected argument {other:?}")),
         }
         index += 1;
@@ -621,6 +626,7 @@ fn restore(args: &[String]) -> ExitCode {
             .clone()
             .unwrap_or_else(|| manifest.chain_id.clone()),
         template: template.as_ref(),
+        regenesis: parsed.regenesis,
     };
 
     let (spec, provenance) = match restore_snapshot(&request) {
@@ -654,6 +660,19 @@ fn restore(args: &[String]) -> ExitCode {
         "  state root  {} (recomputed from the snapshot's own bytes)",
         provenance.state_root
     );
+    if provenance.regenesis {
+        println!(
+            "  regenesis   {} frame_system bookkeeping key(s) dropped, so this is the genesis of \
+             a new chain, not a continuation:",
+            provenance.bookkeeping_keys_removed.len()
+        );
+        for key in &provenance.bookkeeping_keys_removed {
+            println!("                {key}");
+        }
+        if let Some(root) = &provenance.genesis_state_root {
+            println!("  genesis root {root} (the snapshot root above, minus those keys)");
+        }
+    }
     println!("  manifest    {}", provenance.manifest_hash);
     println!(
         "  boot a node with `--chain {}` to build a database from this state",

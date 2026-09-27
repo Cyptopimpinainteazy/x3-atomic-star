@@ -6,17 +6,18 @@ name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs"]
-implemented = 80
-tested = 85
-mainnet_ready = 45
+implemented = 85
+tested = 90
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "Regtest is now real, testnet and mainnet are not: a live Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`, `.ai/reports/btc-regtest-capture-20260922.json`), but no coin has ever moved on a network anyone else can see, and no header from testnet or mainnet has been anchored",
-  "A chain can now be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12, including a live node serving the anchor and refusing a spec that lies) — but no *public* network has one pinned, and the header still arrives by an operator copying a hash rather than from a header source",
-  "The sender runs unattended now (`push-headers.mjs --loop --cursor …`: batch pushes, an atomic cursor, catch-up after restarts, and it **stops** rather than skipping a refused range — the drill requires all of it, 6/6), but nothing runs against a public network yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
+  "Regtest is real and the header source now runs against public testnet; mainnet and a live deposit are not: a Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`), `scripts/btc/push-headers.py` reads real testnet3 headers and `scripts/testnet/btc-header-source-drill.sh` proves it live and proves it refuses a tampered answer — but no X3 chain has admitted a public-network header and no coin has ever moved on a network anyone else can see",
+  "A chain can be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) — and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
+  "The sender runs unattended (`push-headers.mjs --loop --cursor …`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
+  "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks — which alternate `nBits` mid-epoch after a twenty-minute gap — are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
   "No BTC signer quorum for withdrawals",
   "BTC mainnet disabled by feature flag; no external audit",
 ]
@@ -27,8 +28,8 @@ blockers = [
 # header chain and proof-of-work check beside it, `crates/x3-bitcoin-vault`
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
 # and SPV modules.
-evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22 with the named tests below"]
-test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, and four tests over data a real Bitcoin Core v28.1.0 regtest node produced — its block 121 header hashes to the hash the node reported, its merkle path reconstructs its root and a tampered sibling does not, blocks 121/122 anchor and extend through the pallet's rules, and a real transaction's proof is refused until its block is anchored and accepted after) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; `cargo test -p pallet-x3-settlement-engine` = 148 + 23 passed, `cargo test -p x3-bitcoin-vault --lib` = 23 passed on 2026-09-22"]
+evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-bridge/src/btc_spv.rs", "scripts/btc/push-headers.py", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "pallets/x3-settlement-engine/src/tests/data/btc_relayer_testnet_headers.txt", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "scripts/testnet/btc-header-source-drill.sh", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, four tests over data a real Bitcoin Core v28.1.0 regtest node produced, the `submit_btc_headers` batch tests, and two tests that decode the relayer's own payload from a real testnet3 run and admit it on an anchored chain while refusing it with its first header dropped) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; the drill follows public testnet live and refuses a tampered answer with a non-zero exit naming the height"]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -248,14 +249,17 @@ name = "RPC quorum oracle"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
-implemented = 78
-tested = 55
+implemented = 85
+tested = 60
 mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs Byzantine provider and partition tests"]
+blockers = [
+  "Needs Byzantine provider and partition tests",
+  "**CLOSED 2026-09-27 \u2014 the in-memory oracle no longer manufactures a quorum.** `SimpleRpcQuorum::collect_votes` returned `TxStatus::Confirmed` with `agreement_count: 1` for every provider it was handed, with the comment \u201cSimulate a successful Confirmed response at block 1\u201d. It has no transport, so it had observed nothing, and a caller that wired it up would have got a 2-of-3 consensus out of an empty network. It now reports `Unknown` with a count of zero \u2014 what \u201cI do not know\u201d looks like to `verify_consensus`, which then fails closed and names every unobserved provider as a disagreement. Two tests that *required* the fabrication were rewritten rather than deleted: `rpc_quorum::tests::test_collect_votes_returns_proof_per_provider` and the `test_new_modules_integration` block in `crates/x3-atomic-swap/tests/atomic_swap_integration.rs` both used to assert that all three votes came back `Confirmed` and that the oracle therefore reached consensus. They now assert the honest contract (one vote per provider, none claiming an observation, no consensus) and say in the test why the old assertion was the problem.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
 
 [[feature]]
@@ -300,13 +304,16 @@ subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
 implemented = 82
-tested = 62
+tested = 70
 mainnet_ready = 68
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs live heterogeneous provider evidence"]
+blockers = [
+  "Needs live heterogeneous provider evidence",
+  "**CLOSED 2026-09-27 \u2014 the only consumer of quorum evidence no longer lets the evidence set its own bar, and a disagreement cannot be padded into agreement.** The secret-release firewall compared `item.rpc_quorum.provider_count` against `item.rpc_quorum.required_quorum` \u2014 two fields of the same caller-supplied struct \u2014 so `provider_count: 3, required_quorum: 2` written by hand satisfied a security gate, and listing one provider three times satisfied it too. The bar now lives on `SecretReleaseRequirement::min_providers` (policy, and refused when it is zero), the attestation carries provider *ids* rather than a count, and the firewall counts distinct non-empty ids itself.",
+]
 evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
 
 [[feature]]
@@ -316,14 +323,18 @@ name = "Secret-release firewall"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
-implemented = 85
-tested = 78
-mainnet_ready = 68
+implemented = 92
+tested = 88
+mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["No live external-chain proof of the release path (TICKET-095): these tests exercise the chain-side firewall against constructed evidence, not a real EVM/SVM/BTC release"]
+blockers = [
+  "**NARROWED 2026-09-27 \u2014 the constructed part that mattered is gone; the live runs are real and the identities are not.** The evidence for this row *was* constructed in the place that decided the outcome: the quorum attestation carried its own `provider_count` and `required_quorum`, so the firewall's RPC-quorum gate was satisfied by numbers the evidence chose for itself, and the live EVM/SVM tests typed `provider_count: 3, required_quorum: 2` against a single anvil or solana-test-validator endpoint. The bar is now `SecretReleaseRequirement::min_providers` (policy; zero refused) and the attestation is a list of distinct provider ids the firewall counts itself \u2014 so the failure modes are duplicates, blank ids, and a policy bar the evidence cannot lower, all four of which have tests (`the_evidence_cannot_set_its_own_quorum_bar`, `one_provider_listed_twice_is_one_provider`, `an_unnamed_provider_does_not_count`, `a_zero_provider_policy_is_refused`). The live lifecycles still run against real chains and real contracts (`real_x3vm_evm_lock_claim_atomic_lifecycle`, `real_local_node_lock_finalized_claim_lifecycle`, and the SVM pair), and their requirements now say `min_providers: 1` with a comment, because one endpoint is what exists in those harnesses \u2014 the honest number instead of a typed two-of-three.",
+  "Still open on TICKET-095: the provider ids are **unauthenticated**. A caller can name three providers that never answered and clear `min_providers: 3`; what stops that is a signature over each observation from a key the verifier knows, which is the relayer's `x3-validator-attestation` model and is not wired here. The finality side has the same shape in miniature: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
+  "No live BTC release: the EVM and SVM paths have live lifecycles, Bitcoin does not.",
+]
 required_tests = [
   "authorizes_only_when_all_required_domains_are_finalized",
   "rejects_reused_proof_across_required_domains",

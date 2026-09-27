@@ -54,6 +54,28 @@ pub trait X3ExecutorAdapter {
         slots: &[(H256, [u8; 32])],
     ) -> Result<ExecutionReceipt, DispatchError>;
 
+    /// Execute X3 bytecode with the chain's private-submission posture as well as its slots.
+    ///
+    /// The artifact's compiled policy can *demand* private submission, and the chain's
+    /// `Config::PrivateSubmissionChannel` says whether it can meet the demand. The pallet has
+    /// already refused a demanding program when the chain cannot meet it, so this argument exists for
+    /// the other direction: an adapter that really executes the bytes must tell its engine that a
+    /// private channel exists, or the engine's own fail-closed default would refuse the very program
+    /// the chain just accepted.
+    ///
+    /// The default implementation ignores the argument and delegates, which is fail closed: an
+    /// adapter that does not implement this still hands its engine a context with no private channel,
+    /// so a demanding artifact is refused rather than run in the clear.
+    fn execute_with_slots_and_policy(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+        private_channel_available: bool,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        let _ = private_channel_available;
+        Self::execute_with_slots(payload, gas_limit, slots)
+    }
+
     /// Validate X3 bytecode without execution
     fn validate(payload: &[u8]) -> Result<(), DispatchError>;
 
@@ -545,9 +567,23 @@ pub mod real_adapters {
             gas_limit: u64,
             slots: &[(H256, [u8; 32])],
         ) -> Result<ExecutionReceipt, DispatchError> {
+            // No posture supplied: the fail-closed default, so a program whose compiled policy
+            // demands private submission is refused by the engine rather than run in the clear.
+            Self::execute_with_slots_and_policy(payload, gas_limit, slots, false)
+        }
+
+        fn execute_with_slots_and_policy(
+            payload: &[u8],
+            gas_limit: u64,
+            slots: &[(H256, [u8; 32])],
+            private_channel_available: bool,
+        ) -> Result<ExecutionReceipt, DispatchError> {
             use x3_x3_integration::{X3Executor, X3ExecutorConfig};
 
-            let config = X3ExecutorConfig::on_chain().with_gas_limit(gas_limit);
+            let mut config = X3ExecutorConfig::on_chain().with_gas_limit(gas_limit);
+            if private_channel_available {
+                config = config.with_private_submission_available();
+            }
 
             // The chain's slots, in the executor's own key/value shape. The executor loads them as
             // inherited state, so a program reads what a previous comit persisted.

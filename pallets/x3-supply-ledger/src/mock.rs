@@ -23,6 +23,9 @@ frame_support::construct_runtime!(
     pub enum Test {
         System: frame_system,
         SupplyLedgerPallet: pallet_x3_supply_ledger,
+        // Present so the benchmark test suite can register an asset the way a chain does; the
+        // pallet's own tests keep seeding `Ledgers` directly.
+        AssetRegistry: pallet_x3_asset_registry,
     }
 );
 
@@ -65,7 +68,10 @@ pub struct TestRegistry;
 
 impl AssetRegistryInspect for TestRegistry {
     fn exists(asset_id: &AssetId) -> bool {
+        // The pallet's tests seed a ledger directly. The benchmark registers through the asset
+        // registry instead — the way a chain does — so an asset the registry lists counts too.
         pallet_x3_supply_ledger::Ledgers::<Test>::contains_key(asset_id)
+            || pallet_x3_asset_registry::Assets::<Test>::contains_key(asset_id)
     }
 
     fn status(asset_id: &AssetId) -> Option<AssetStatus> {
@@ -95,6 +101,13 @@ impl pallet_x3_supply_ledger::Config for Test {
     // wires a governance origin here.
     type SupplyGovernance = frame_system::EnsureSigned<u64>;
     type Registry = TestRegistry;
+    type WeightInfo = pallet_x3_supply_ledger::weights::SubstrateWeight<Test>;
+}
+
+impl pallet_x3_asset_registry::Config for Test {
+    type RegistryOrigin = frame_system::EnsureRoot<u64>;
+    type EmergencyPauseOrigin = frame_system::EnsureRoot<u64>;
+    type MaxAssets = frame_support::traits::ConstU32<1_000>;
 }
 
 /// A deterministic asset id.

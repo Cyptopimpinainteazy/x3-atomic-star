@@ -69,7 +69,7 @@ export function SwarmCommand() {
 
   async function approveTask(taskId: string) {
     try {
-      await invoke<string>('swarm_approve_task', { taskId });
+      await invoke<TaskRecord>('swarm_approve_task', { taskId });
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -78,7 +78,7 @@ export function SwarmCommand() {
 
   async function rejectTask(taskId: string) {
     try {
-      await invoke<string>('swarm_reject_task', { taskId });
+      await invoke<TaskRecord>('swarm_reject_task', { taskId });
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -136,7 +136,7 @@ export function SwarmCommand() {
             <p>Backend: not connected</p>
             <p>Blocker: x3-swarm-api unavailable</p>
             <p>Next action: run scripts/swarm/swarm_up.sh</p>
-            <p>Data path: Tauri invoke → src-tauri/src/main.rs → http://127.0.0.1:8787</p>
+            <p>Data path: Tauri invoke → src-tauri/src/swarm.rs → http://127.0.0.1:8787</p>
             {error ? <p style={{ color: "#c00" }}>Error: {error}</p> : null}
           </div>
         )}

@@ -6,7 +6,10 @@ echo "🧪 X3_ATOMIC_STAR: COMPREHENSIVE ADVANCED TEST SUITE"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
+# Run from this checkout, wherever it lives. The previous version hardcoded
+# /home/lojak/Desktop/X3_ATOMIC_STAR, a path that does not exist on this box, so every `cd
+# pallets/...` below ran from the wrong directory (or failed before the first test).
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Colors
 RED='\033[0;31m'

@@ -1,8 +1,10 @@
 //! X3 Autonomic CLI
-//! 
+//!
 //! Command-line interface for the X3 Autonomic Core system management.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// Off-chain tooling: no `std` feature is declared here, so the `no_std` attribute this crate
+// carried made it permanently no_std while the code uses `Vec`, `String` and `std::io`. It
+// never compiled. Off-chain tooling is std.
 
 use x3_autonomic_types::AutonomyLevel;
 

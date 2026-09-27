@@ -547,3 +547,83 @@ fn clear_halted_leaves_the_violation_policy_alone() {
         );
     });
 }
+
+/// Run `enforce_all` on a block that violates an invariant while `HaltOnViolation` is armed.
+///
+/// The halt branch ends with `frame_support::defensive!`, which expands to `debug_assert!(false)` —
+/// so it panics in any build with debug assertions on, tests included, while a release runtime only
+/// logs. That panic is a test-build artifact of the S0-6 "log + halt instead of panic" change, not
+/// the behaviour under test; the behaviour is the `Halted` flag and the `ChainHaltRequested` event
+/// the branch leaves behind. Catch the panic, require it to be the defensive one (so an unrelated
+/// panic cannot be mistaken for the expected path), and let the caller read the state. Same idiom as
+/// `pallets/x3-supply-ledger/src/tests_conservation.rs`.
+fn enforce_all_arming_the_halt(block: u64) {
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        Invariants::enforce_all(block)
+    }));
+    let payload = outcome.expect_err(
+        "a violation under the armed policy must trip the defensive assertion in a debug build",
+    );
+    let text = payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default();
+    assert!(
+        text.contains("Defensive failure"),
+        "expected the invariant's defensive assertion, got a different panic: {text}"
+    );
+}
+
+/// TICKET-153 item 4: clearing the halt does not fix the violation, so with the policy still armed
+/// the next block's `enforce_all` re-raises the flag. Only after remediation — the observed value
+/// back inside the bound — does a clear stick. Nothing else asserted this *sequence*: the other halt
+/// tests each check one transition, and the other `enforce_all` tests use the default unarmed policy,
+/// so a `clear_halted` that quietly disarmed `HaltOnViolation` would have passed them all.
+#[test]
+fn the_halt_re_raises_while_the_violation_persists_and_sticks_after_remediation() {
+    new_test_ext().execute_with(|| {
+        // Arm the policy: any violation from here on raises `Halted`.
+        assert_ok!(Invariants::set_halt_on_violation(
+            RuntimeOrigin::root(),
+            true
+        ));
+
+        // Block 1 — issuance above the genesis bound (1B tokens, 18 decimals).
+        init_block(1);
+        LastObservedIssuance::<Test>::put(2_000_000_000_000_000_000u128);
+        enforce_all_arming_the_halt(1);
+        assert!(
+            crate::Halted::<Test>::get(),
+            "a violation under the armed policy must raise the halt"
+        );
+
+        // Governance clears the flag while the violation is still present. That is allowed — but it
+        // is not a fix, and the chain must not pretend otherwise.
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+        assert!(!crate::Halted::<Test>::get());
+
+        // Block 2 — the check runs again against the unchanged, still-violating state and re-raises.
+        init_block(2);
+        enforce_all_arming_the_halt(2);
+        assert!(
+            crate::Halted::<Test>::get(),
+            "the armed policy must re-raise the halt for as long as the violation persists"
+        );
+
+        // Remediation: bring the observed value back inside the bound, then clear against a state
+        // that actually holds the invariant.
+        LastObservedIssuance::<Test>::put(999_999_999_000_000_000u128);
+        assert_ok!(Invariants::clear_halted(RuntimeOrigin::root()));
+
+        // Block 3 — the check passes and the cleared flag sticks.
+        init_block(3);
+        Invariants::enforce_all(3u64);
+        assert!(
+            !crate::Halted::<Test>::get(),
+            "once the bound holds, the cleared halt must stay cleared"
+        );
+        // Exactly the two violating blocks contributed; the remediated block did not.
+        assert_eq!(ViolationCount::<Test>::get(), 2);
+    });
+}

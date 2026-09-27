@@ -1365,12 +1365,25 @@ else is still refused while `Halted` is set.
 
 What that does **not** prove, and what this ticket is for:
 
-1. **The list can go stale.** It was written by hand from the calls that were known to hold funds.
-   A pallet added later that reserves a bond, escrow or deposit with no rollback extrinsic would be
-   trapped by a halt, and no gate would notice. There is no enumeration of "calls that release funds"
-   to check the list against, and `emergency_unpause` is on the list on the reasoning that a paused
-   kernel is the routine case — not because a test drives a halt with a paused kernel and requires
-   recovery.
+1. ~~**The list can go stale.**~~ **CLOSED 2026-09-27.** The completeness gap is now a gate.
+   `scripts/ci/check-halt-fund-holding.py` parses every pallet the runtime wires (`construct_runtime!`)
+   for dispatchables that can reach `reserve` / `reserve_named` / `hold` / `hold_named` / `set_lock`
+   (through same-file helpers) and compares them with the reviewed inventory in
+   `security/halt-fund-holding.toml`; it is wired into `scripts/local-ci.sh` (gate
+   `halt fund holding`). It fails on a fund-holding call with no entry, an entry that outlives its
+   call, a `transient` claim whose call reaches no release primitive, a `permanent_charge` whose
+   amount is not a `*Fee` constant, and a `recoverable_by`/`while_halted` claim the code does not
+   support. Measured inventory: **26 fund-holding dispatchables**; **1 releasable while halted**
+   (`X3AtomicKernel::rollback_atomic_bundle`), **2 transient** (`AtlasKernel::submit_cross_vm_operation`
+   / `prepare_cross_vm_operation`, which free what they hold in-call), **23 exceptions** whose funds
+   the halt keeps locked until `Council::close` clears it. Four break-it-first controls
+   (delete the atomic-bundle entry; relabel `governance::submit_proposal` transient; point
+   `x3-slash`'s `recoverable_by` at a non-release call) each go red, then restore green
+   byte-identically (`.ai/runlogs/halt-fund-holding-check-20260927T055706Z/`). The two genuine
+   traps it found — a reserve that is never released at all — are TICKET-154.
+   `emergency_unpause` is still on the list on the reasoning that a paused kernel is the routine
+   case, not because a test drives a halt with a paused kernel and requires recovery; that stays open
+   under item 3.
 2. ~~**Nothing measures the halt/unhalt cycle on a node.**~~ **CLOSED 2026-09-26.**
    `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS in ~25 s) starts
    three validators, trips the halt through a council motion, requires two different validators'
@@ -1380,9 +1393,18 @@ What that does **not** prove, and what this ticket is for:
    With the exemption check removed the same drill fails at the remedy, which is the one-way door.
 3. **`clear_halted` has no benchmark.** Its weight is hand-copied from `set_halt_on_violation`'s
    shape (one storage write) with a comment saying so.
-4. **There is no automatic unhalt.** After remediation the flag stays set until governance clears it;
-   if an operator clears it while the violating invariant is still out of range, `enforce_all`
-   re-raises it the next block — which is intended, but untested as a sequence.
+4. ~~**There is no automatic unhalt.**~~ **CLOSED 2026-09-27.** The re-raise sequence is now tested
+   (`d62fecf6b`): `pallets/x3-invariants/src/tests.rs::the_halt_re_raises_while_the_violation_persists_and_sticks_after_remediation`
+   arms the policy, violates `MaxSupply`, requires `Halted`; clears it while the violation persists,
+   requires the next `enforce_all` to re-raise it, then remediates the bound and requires the clear
+   to stick (and `ViolationCount` to have counted exactly the two violating blocks). The control —
+   making `clear_halted` also set `HaltOnViolation(false)` — fails the test at the re-raise
+   assertion, then restores green byte-identically
+   (`.ai/runlogs/halt-sequence-test-20260927T060113Z/`). The halt branch ends in `defensive!`, which
+   panics under `debug_assertions` while a release runtime only logs, so the test catches that one
+   panic and requires it to be the defensive failure (the `x3-supply-ledger` idiom). "Automatic
+   unhalt" remains *deliberately absent* — remediation still needs governance — which is the
+   intended design and is what the sequence proves.
 
 Acceptance criteria:
 
@@ -1399,6 +1421,39 @@ Acceptance criteria:
 Validation: the checker fails on a deliberately-removed exemption; the drill's post-clear transfer is
 `InBlock`; the re-benchmarked weight is within the copied value's order of magnitude or the copied
 value is replaced.
+
+**Items 1 and 4 status: CLOSED 2026-09-27** (`a91cf63a0`, `d62fecf6b`). Item 2's live drill is
+closed under item 2 above (the pending-bundle-bond half) and item 3 (`clear_halted` re-benchmark,
+hand-copied weight) remains open.
+
+## TICKET-154 — two pallets reserve an anti-spam fee and never release it — 2026-09-27
+
+Found by the TICKET-153 completeness gate on its first run. `pallets/x3-da` and `pallets/x3-sequencer`
+both charge their per-byte anti-spam fee by calling `T::Currency::reserve(&submitter, fee)` — and
+neither pallet contains a single `unreserve`, `slash_reserved` or `repatriate_reserved`, so the
+reserved balance is never touched again.
+
+* `pallets/x3-da/src/lib.rs::submit_blob_commitment` reserves `PerByteFee * size_bytes`
+  (`x3-da` has no other dispatchable that releases funds; `submit_shard_proof` only writes storage).
+* `pallets/x3-sequencer/src/lib.rs::submit_transaction` reserves `BaseFee + PerByteFee * payload_size`
+  (`x3-sequencer` has one dispatchable, this one).
+
+A `reserve` is a bond: the funds stay in the account and are unspendable until one of the release
+primitives frees them. With none, the submitter's balance is locked forever — indistinguishable from
+a fund trap, and exactly the class TICKET-153 was written to surface. The comment in both pallets
+says the amount is a *fee*, where a charge should leave the account (a transfer to the treasury, or
+`withdraw(.., WithdrawReasons::FEE, ..)`), not sit in `reserved`.
+
+The gate records this honestly as `disposition = "permanent_charge"` (the amount is a named `*Fee`
+constant) rather than pretending a release path exists; that disposition is a *finding*, not a
+pass. What is not decided here — and is the owner's call because it moves funds and changes an
+economic path — is which charge primitive replaces the reserve: burn the fee (`withdraw` and drop
+the imbalance), forward it to the treasury, or turn it into a refundable bond with a real release
+call. Until that is chosen, both calls are listed as exceptions in the halt gate.
+
+Validation for the fix: a `cargo test -p pallet-x3-da` / `-p pallet-x3-sequencer` test that a
+submission's `reserved_balance` returns to zero (or that the fee lands where the chosen policy says),
+and the halt gate's entry for each call changes from `permanent_charge` to `recoverable`/`exempt`.
 
 ## GAP-TOOLCHAIN-WIPE — `~/.cargo/bin` loses everything that was installed after the base image — 2026-09-26
 
@@ -1628,6 +1683,88 @@ container behind.
 header documents the mount; measured 2026-09-25: 30+ minutes in that fetch versus seconds with the
 cache). Capture the output to a file this time.
 
+## RC2/RC6 SEQUENCE — seven defects between a red sequence and a truthful one — 2026-09-27
+
+`reports/rc6/*` said **FAIL** and the sequence behind it had never run on this box. Fixing it turned
+up seven distinct defects, each measured rather than guessed. They are listed here because six of
+them are shapes that will recur (a stale absolute path, a launcher that does not produce blocks, a
+cargo target that needs a feature, a spec that pins an old runtime, an authorized-but-unfunded
+account, and a client library that cannot decode the chain).
+
+| # | defect | evidence | fix |
+| --- | --- | --- | --- |
+| 1 | `run_release_gates_rc6.sh` hardcoded `ROOT=/home/lojak/Desktop/X3_ATOMIC_STAR` | that path does not exist; every step `cd`'d into nothing and "failed" instantly — the FAIL in `reports/rc6/*` was the script's own path | derive `ROOT` from `BASH_SOURCE` |
+| 2 | `rc2_mock_and_live_gate.sh` hardcoded the same path | worse: its `mkdir -p "$ROOT/reports/rc2"` **created** the empty directory, then it failed with `manifest path tests/e2e/Cargo.toml does not exist`, which reads like a missing crate | derive `ROOT`; the stray tree (0 files) was removed |
+| 3 | the live suite needs `--features real-chain` | `error: target live_internal_mainnet_e2e in package e2e_tests requires the features: real-chain` | pass the feature |
+| 4 | gates that need finality booted `scripts/start-x3-chain.sh` (`--chain dev`, no session keys) | node log: `Failed to trigger bootstrap: No known peers`; the smoke died with `block height/finality did not advance` | new `scripts/mainnet/local3_lib.sh` boots the three-validator `local3` network and waits for a **finalized** height; both rc2 gates use it and stop only what they started |
+| 5 | the committed `chain-specs/x3-local3-raw.json` is from Sep 25 | it handed the smoke `spec_version 11` while the tree's runtime is 20 — a gate reporting on code it is not running | `local3_lib.sh` builds a raw spec from the **current binary** into its temp dir unless a caller names one |
+| 6 | `local3` genesis *authorized* the gateway accounts but never *endowed* them | `EnsureX3LangGateway` lets `//x3-atomic-gateway` submit `xvmTransfer`, and the call failed with `1010: Invalid Transaction: Inability to pay some fees` | `local3` now extends `atomic_gateway_endowed_accounts()`, as `development_config`, `staging_config` and `testnet_config` already did |
+| 7 | the rc2 smoke's JavaScript driver used `HttpProvider` | `HttpProvider` cannot subscribe, so `signAndSend` callbacks arrive with no `status` → `TypeError: Cannot read properties of undefined (reading 'isInBlock')`; the driver computed a `wsRpc` and never used it | the driver talks WS |
+
+**Retired, not silenced:** the same driver still cannot decode this chain — `createType(ExtrinsicUnknown)::
+Unsupported unsigned extrinsic version 5` for every block, because the runtime's extrinsics are
+version 5 and the pinned `@polkadot/api` in `packages/blockchain-connector` knows version 4. The rc6
+sequence's step 2 is therefore recorded as retired, with that reason, instead of failing every run.
+
+**The ticket this creates.** The JS smoke swept all six internal routes (X3Native/X3Evm/X3Svm pairs)
+plus nine negative cases — external route, wrong recipient per domain, wrong sender type, duplicate
+message, duplicate nonce, refund-after-finalize, refund-before-expiry, completion-after-refund — with
+a supply-invariant check at the end. The Rust live suite that replaces it as evidence
+(`tests/e2e --features real-chain --test live_internal_mainnet_e2e`) has four tests: node progress and
+required RPC methods, bridge-proof crypto and full accounting paths, timeout expiry, and reordered
+delivery / duplicate ack rejection. **Port the route sweep and the negative matrix into the Rust
+suite** (or raise the JS client to a polkadot-js that understands extrinsic v5), then delete the JS
+driver. Until that lands, the sequence's green is not the same breadth of green it used to claim.
+
+Measured after the fixes: `rc2_internal_settlement_smoke.sh` reaches the chain and submits
+transactions; `rc2_mock_and_live_gate.sh` passes both halves (`PASS: mock suite and live suite both
+passed`, 16 + 4 tests).
+
+## X3-ECO-002 — the distributed proof passes, and the driver is what was broken — 2026-09-27
+
+The row's open blocker was *"the invariant is proven for one ledger view in one process — not under
+concurrent cross-domain traffic on a multi-validator network"*. The test for that already existed
+(`node/tests/supply_invariant_distributed.rs`) and was failing — for a reason in the driver, not the
+chain:
+
+> `complete_xvm_transfer 5: :19966 refused the submission: 1014: Priority is too low: (419 vs 419)`
+
+The SDK's own description of `POOL_TOO_LOW_PRIORITY` is *"the transaction has too low priority to
+replace another transaction already in the pool"* — a **nonce collision, not pool backpressure**. The
+completion loop signed every `complete_xvm_transfer` up front and then submitted them; because
+`sign_complete_xvm_transfer` reads the gateway account's nonce from the node, every signature carried
+the *same* nonce, so each validator's pool accepted the first and refused the rest. The transfer loop
+twenty lines above documents exactly this ("each submission has to follow the previous one's
+inclusion or the nonces collide") and follows it; the completion loop did not. Fixed by waiting for
+each completion's effect — the pending counter falling by one transfer's amount — before signing the
+next.
+
+**After the fix the proof runs green (exit 0, 271s, one frozen node binary for every node):**
+
+```text
+:19964/:19965/:19966 at 119 — 10 accounts, accounted 9999999998338644985,
+                              TotalIssuance 9999999998338644985 — conserved
+pending phase at 159 — native 999,994,000,000 (was 1,000,000,000,000), pending 6,000,000
+                       on all three validators, agreeing
+pending phase at 191 — native 999,994,000,000, evm 6,000,000, pending 0 —
+                       every leg resolved, on all three validators
+```
+
+with the corrupted-chain control still refusing (a scratch chain carrying one extra unit in
+`Balances::TotalIssuance` is reported as a violation with the delta named). X3-ECO-002's second
+blocker is closed on that evidence; what remains open there is a public-network run and the
+per-bridge observation path (X3-XVM-002).
+
+Two process notes worth keeping. A first attempt failed with a *different* error — `chain_getFinalizedHead
+on :19964 failed: Connection refused` — while the other two validators were conserved at the same
+block: another lane's live gate was running concurrently and its cleanup killed my nodes. The test
+itself refuses to start unless its ports are free (`assert_ports_free`), so the only fix is to
+serialize; a clean run needs the box quiet, and a failure of that shape is environmental, not a
+conservation violation. Second, a stray commit-then-push window meant one agent's commit
+(`feat(snapshot)`) rode along with a push of mine before I had verified it; it was verified
+afterwards (53 crate tests, three snapshot gates) and one defect in it was found and fixed
+(`snapshot-zero-downtime-proof.sh` was missing the `--regenesis` its own comment requires).
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be
@@ -1638,3 +1775,281 @@ every time.
 --no-modify-path --default-toolchain 1.90.0-x86_64-unknown-linux-gnu`, then copy the three tools
 back into `~/.cargo/bin` from `~/.local/bin`. Do it as one actor: concurrent installers into the
 same directory are what makes this look worse than it is.
+
+---
+
+## GAP-SNAPSHOT-REGENESIS — a restored state snapshot was a chain that panicked on its first block — 2026-09-27
+
+**How it was found.** The snapshot row's last open item was that the archive is cut with the node
+stopped, so `scripts/snapshot-zero-downtime-proof.sh` was written to take it the other way: export a
+*running* node's state over RPC at a finalized, GRANDPA-justified block and build the snapshot from
+that. The export half worked on the first try — `x3-state-snapshot root --from-raw-spec` recomputed
+the trie root from the exported entries and it equalled the `stateRoot` the chain published in that
+block's header — and the drill then booted the restored spec, which is the step nothing had ever
+done. The node answered RPC and then failed every block it tried to author:
+
+```
+assertion `left == right` failed: Block number must be strictly increasing.
+  left: 513
+ right: 1
+```
+
+**The cause.** `x3-state-snapshot restore` wrote the state verbatim into `genesis.raw.top`. A raw
+spec is the state itself, so it carried the *producing* chain's `frame_system` bookkeeping — notably
+`System::Number` = 513 — and `frame_system::initialize` opens every block with
+`assert_eq!(Self::block_number() + 1, *number)`. A genesis is defined by those keys being absent:
+`x3-chain-node build-spec --dev --raw` carries no `System::Number` at all, so the runtime's storage
+default of zero applies. Reproduced on its own in seconds by patching that one key to `0x05000000`
+in an otherwise untouched raw genesis and booting it (124 panics,
+`.ai/runlogs/snapshot-zero-downtime-20260927T0013Z/reproduction-number-not-zero.txt`). This was a
+real defect in the restore path, not a drill artifact: the CLI's own help said "boot a node with
+`--chain <spec>` to build a database from this state", and no node could.
+
+**The fix.** `restore --regenesis` drops the six `frame_system` entries that record where the chain
+*was* (`CHAIN_BOOKKEEPING_ENTRIES`; keys derived with `sp_core::twox_128`, and the `System::Number`
+key is pinned in a test against the well-known `:number` constant every client uses). It is opt-in,
+because the honest default for an existing restore is "verbatim", and it reports *both* roots rather
+than presenting one as the other: the snapshot's declared root and the regenerated genesis root (they
+differ by exactly those keys), plus the list of dropped keys, in the spec's `properties` so the
+provenance travels with the file. With it the restored chain boots as an authority, finalizes, and
+its non-bookkeeping entries are byte-identical to the export.
+
+**What is still open on this row, and why it is not mainnet-ready.** The export reads one RPC call
+per key (1881 keys in ~2.4 s on loopback); no batched or range reader has been written, so the
+multi-GB size class and the wall-clock an operator would spend exporting are both unexercised. The
+anchor must be inside the node's pruning window — the gate demonstrates the *refusal* (a bounded node
+refuses an anchor it pruned, names pruning, and writes no spec) but the operator path that follows
+from it is documented guidance, not automated. `--regenesis` drops a fixed list of six entries;
+nothing enumerates every chain-local key a third-party pallet might keep. And a restore produces a
+*new* chain, not a continuation: state-sync for an existing chain still needs the base-path path or
+warp sync.
+
+**Gate:** `snapshot zero downtime export` (serial, ~4 min; `bash scripts/local-ci.sh --only
+snapshot-zero-downtime-export`). Red evidence for the fix: removing `--regenesis` from the drill's
+restore makes the gate fail
+(`.ai/runlogs/snapshot-zero-downtime-20260927T0013Z/red-without-regenesis.log`).
+
+## GAP-ROUTER-FEE-DEPOSIT — the signed cross-VM transfer was unusable below `ED * 10_000 / bps`
+
+**Found 2026-09-27** while driving X3-ECO-002's pending-supply invariant through the router on three
+validators. `X3CrossVmRouter::xvm_transfer` charges `amount * RoutingFeeBps / 10_000` to the signing
+account and sends it to the protocol treasury. The currency refuses any deposit that would leave the
+*destination* below the existential deposit (`pallet-balances` `can_deposit` → `BelowMinimum`; SDK
+checkout `substrate/frame/balances/src/impl_fungible.rs`), and the treasury account has never existed
+on a dev/local chain — the runtime's transaction fees do not go to it. So every transfer whose fee is
+below `ExistentialDeposit = 100 * MICRO_ATLAS` was refused with `RoutingFeeNotAffordable`.
+
+Measured by post-mortem on the kept chain (block
+`0x6523cca5195dcbac4d421943ae8286b81f8ed78ed5d8992a4102057f3f99e3c5`; the test keeps its data dir
+on failure): the refused extrinsic decoded as pallet `0x1a` = `X3CrossVmRouter`, call `0x00` =
+`xvm_transfer`, signed by the X3Lang gateway `4c81d416…`; the router's error code was variant **36**
+`RoutingFeeNotAffordable`; and the payer's `System::Account` at that block read
+`free = 999_999_999_900_043_000`, `frozen = 0`, `flags = NEW_LOGIC`, i.e. nothing locked and nothing
+spent except the extrinsic fee. The treasury's `System::Account` key **did not exist**. The amount
+was 1_000_000 and the fee 2_000.
+
+Two reasons the existing evidence could not see it. The router's own mock wires `RoutingFeeBps = 0`,
+so the branch never ran in `pallets/x3-cross-vm-router/src/tests.rs`. And the rc2 smoke drives every
+route at `amount = 10`, whose fee is 0, so it skipped the branch too — its six-route results
+(`reports/rc2/six_route_results.json`, committed in `681e2e260`) show the routes failing *later*, at
+completion, while never exercising the fee.
+
+**Fixed** in `ded7e558d`: `do_initiate_transfer` now asks the payer's balance which side refused.
+Funds present ⇒ the refusal is the destination's, the fee is waived and a distinct
+`XvmRoutingFeeWaived` event records it (a waived fee is uncollected revenue and must not be silent).
+Funds absent ⇒ `RoutingFeeNotAffordable` stands unchanged. Three pallet tests cover all three
+branches, measured break-it-first. Residual: waived fees are not accrued, and nothing yet requires an
+operator to keep the treasury funded — a policy decision, recorded on row X3-XVM-014.
+
+**Re-attestation ordering:** `crates/x3-cross-vm-router` is in the runtime graph, so this change
+invalidates any runtime attestation taken before it. An srtool run was in progress on this box while
+this landed, and several lanes were still editing runtime files at 02:15 local. The release
+attestation has to be taken after the last runtime-graph change.
+
+## GAP-RC2-DRIVER-FORMAT — the six-route live gate cannot read the chain, and reported a driver bug as a chain bug
+
+`scripts/mainnet/rc2_internal_settlement_smoke.sh` is the only thing that drives all six internal
+routes plus the router's negative cases on a live chain. Step 2 of the rc6 sequence is **retired**,
+with the reason recorded in `681e2e260`: this driver cannot decode the chain at all. Its pinned
+`@polkadot/api` understands transaction format v4 and the chain emits v5 (`Unsupported unsigned
+extrinsic version 5` on every block). So the sequence no longer runs it, and nothing else exercises
+the six routes end to end.
+
+Before it was retired it also reported a **driver** bug as a chain bug. Every route's completion was
+signed by `alice`:
+
+```js
+await submit(api, alice, api.tx.x3CrossVmRouter.completeXvmTransfer(messageId), …)
+```
+
+But `complete_xvm_transfer` is gated on the same `EnsureX3LangGateway` origin as `xvm_transfer`, and
+on a dev/local chain the only account authorized for `GatewayRole::X3Lang` is `//x3-atomic-gateway`.
+Alice is not it, so the call could only ever be refused with `BadOrigin`. The committed
+`reports/rc2/six_route_results.json` shows exactly that shape: every route with `source_delta -10`,
+`pending_after_transfer 10`, `destination_delta 0` and `pending_zero false` — the debit moved and the
+completion never did. A reader would file that as a broken router. The same commit fixed the same
+mistake in the refund cleanup call and missed this one.
+
+**Fixed 2026-09-27:** the completion is submitted by the gateway, and the file now asserts *first*
+that a non-gateway completion of a `SourceDebited` transfer is refused, so the origin requirement is
+pinned while it is real rather than after the fact. **Unproven:** the fix cannot be run until the
+driver can decode the chain, so it is verified only by `node --check` and by the runtime's own origin
+wiring. The real repair for the coverage is a Rust live suite for the six routes plus the nine
+negative cases (the port `681e2e260` names); the pending-supply phase in
+`node/tests/supply_invariant_distributed.rs` is one route's worth of that port and the rest is open.
+
+## GAP-RC1-VARIANT-NOT-BUILT — the runtime variant mainnet is meant to run did not compile
+
+**Found 2026-09-27** by running the variants gate on the `mainnet-rc1` feature set — the one mainnet
+is meant to run, and the one that has the scope lock excluding unaudited pallets.
+
+```
+=== runtime variant: mainnet-rc1 (features: std,mainnet-rc1) ===
+error[E0599]: the function or associated item `get` exists for struct
+              StorageValue<_GeneratedPrefixForStorageEnabled<Runtime>, bool, ...>, but its trait
+              bounds were not satisfied
+    --> runtime/src/lib.rs:1404:55
+     |     pallet_private_execution::Enabled::<Runtime>::get()
+     |     doesn't satisfy `Runtime: pallet_private_execution::Config`
+FAIL (36s)
+```
+
+`ed798764d` (tonight's private-submission wiring) added `RuntimePrivateSubmissionChannel`, whose
+`get()` reads `pallet_private_execution::Enabled::<Runtime>`. `pallet-private-execution` is **not** in
+the `mainnet-rc1` `construct_runtime!` block — the scope lock leaves it out, as it leaves out the
+other unaudited surfaces — so `Runtime: pallet_private_execution::Config` is unimplemented there and
+the storage item does not resolve. The variant simply did not build.
+
+**The default gate set was red and nobody ran it.** `clippy runtime rc1` is in `GATES_FAST` — it is
+`cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D
+warnings`, the same feature set this error comes from — so a plain `bash scripts/local-ci.sh` failed
+from `ed798764d` until this fix, and the lane that landed that commit did not see it. The
+`--variants` group's `runtime variant dry-runs` (`scripts/check-runtime-variants.sh`, auto-selected by
+`scripts/local-ci.sh` when a `runtime/*` path changes) and the rc6 sequence's stage 5 both claim a
+migration dry-run for *every* variant, and neither had been re-run either. The breakage is invisible
+to `cargo check --workspace`, which compiles the runtime once, with default features, and never sees
+the other five `construct_runtime!` blocks.
+
+**Fixed 2026-09-27:** the reference is now cfg-aware. On `mainnet-rc1` the answer is a constant
+`false`, which is not a workaround — it is the fact the derived version would have reported on a
+chain with no private channel, and it keeps the posture fail-closed: a program whose compiled policy
+demands private submission is refused at intake. Measured after: `bash
+scripts/check-runtime-variants.sh` — full PASS 35s, dev PASS 47s, dev+frontier PASS 95s, frontier
+PASS 63s, mainnet-rc1 PASS 7s, testnet PASS 45s.
+
+**Still open:** a build of the variant is not a chain of it. No rc1-featured runtime has been booted
+and no rc1 genesis exists in `chain-specs/`, so this closes "the variant compiles and its
+`OnRuntimeUpgrade` work fits in a block", not "an rc1 network runs". That is recorded on row
+X3-RT-003, whose scores were resting on a variant that did not build.
+
+## GAP-WORKSPACE-RED — the whole workspace stopped building, and two gates said so
+
+**Found 2026-09-27** by running the *entire* default gate set for the first time tonight instead of
+the gates around whatever was being edited. 128 gates: 124 passed, 4 failed. Three of the four were
+real, and all three came from the same night's private-submission work (`ed798764d`), which is what a
+`CompilationOptions` field added for one caller does to every other caller.
+
+| gate | failure | cause |
+| --- | --- | --- |
+| `workspace check` | `crates/x3-cli` failed with `E0063: missing field \`require_private_submission\` in initializer of \`CompilationOptions\`` | five struct literals in `crates/x3-cli/src/commands/{compile,build,repl}.rs` |
+| `clippy workspace` | same E0063 | same |
+| `test x3-sidecar` | `the lock file crates/x3-sidecar/Cargo.lock needs to be updated but --locked was passed` | the sidecar has its own lockfile, and `pallet-x3-kernel` gained an `x3-common` dependency that never reached it |
+
+**`cargo check --workspace` failing is the loudest thing a repository can say, and it was not run.**
+`crates/x3-sidecar` is outside the workspace (its own manifest and lockfile), so the workspace check
+cannot cover it either — which is why it needs its own gate, and why its lockfile has to be
+regenerated whenever a path dependency's own dependency list grows. The earlier `a434ea852` fixed the
+same class for a different nested lockfile.
+
+**Fixed 2026-09-27.** The CLI's five initializers now name the field, and the artifact-producing
+commands declare the capability properly rather than defaulting it: `x3 compile
+--require-private-submission` and `x3 build --require-private-submission` compile the demand into the
+artifact, which is where it belongs — a chain with no private channel refuses the program at intake,
+so the demand is a property of what you ship, not of the invocation that runs it. The REPL, which
+compiles a snippet in-process for immediate execution, passes `false` with that reason written at the
+site. Verified: `x3 compile --help` and `x3 build --help` both list the flag; `workspace check` PASS
+50s; `clippy workspace` PASS 120s; `test x3-sidecar` PASS 120s after `cargo metadata` added the one
+missing lockfile line (`x3-common` under `pallet-x3-kernel`).
+
+**Still open:** the fourth failure is `runtime hash freshness`, which is the stale release attestation
+and is being re-taken separately. The lesson that produced all three is worth keeping: a gate set is
+only as good as how often the whole of it runs, and three lanes editing one tree means "green around
+my change" is not "green".
+
+## GAP-SILENT-FEE-WAIVER — two more fees can be waived with nothing recording it
+
+**Found 2026-09-27** by hunting the class of `GAP-ROUTER-FEE-DEPOSIT` across every
+`Currency::transfer` whose destination is a configured account. Two more pay into
+`T::ProtocolTreasury::get()` and both already tolerate a refusal — they are *best-effort*, so unlike
+the router they do not fail the operation:
+
+* `pallets/atomic-trade-engine/src/lib.rs` — protocol trade fee on a completed batch
+  (`if <T as Config>::Currency::transfer(…).is_ok() { deposit ProtocolFeeCollected }`)
+* `pallets/x3-settlement-engine/src/lib.rs` — protocol settlement fee on finalization
+  (`if …transfer(…).is_ok() { deposit SettlementFeeCollected }`)
+
+That is the right behaviour and it is not a blocker. What is wrong is that the refusal is **silent**:
+when the treasury is dead and the fee is below the existential deposit — which is every fee below
+`ED`, not an edge case — the protocol collects nothing and no event, counter or log says so. A
+treasury that can never accept dust fees looks exactly like a treasury with no fees to collect, and
+the difference is revenue.
+
+**Ticket (not fixed tonight, deliberately):** give both sites the same treatment the router got —
+waive, and emit a named event (`ProtocolFeeWaived` / `SettlementFeeWaived`) — so waived revenue is
+auditable in one place across all three fee paths. Held back because both pallets are in the runtime
+graph, a release attestation was being taken while this was found, and editing a runtime-graph file
+underneath a running `make mainnet-check` invalidates it. The alternative fix — keep the treasury
+funded so the fee can always be credited — is a policy decision for the operator, and it is the same
+one recorded on row X3-XVM-014.
+
+## NIGHT SHIFT — the state at 05:00 local on 2026-09-27, for whoever starts next
+
+Written for the operator's return. Nothing below is a plan; it is what is true on disk and on
+`origin/master`.
+
+**Green and verified at `8e23c9cbe`:** `make mainnet-check` passes end to end, including stage 6b
+rebuilding the runtime in srtool and matching `docs/reports/runtime-wasm-hashes.json`
+(`0x1ea62909…` / `0x50c5a499…`, `recorded_revision` `248435935`); the full default gate set is
+**102/102**; the rc6 sequence is 5/5 (step 2 retired with a ticket); `runtime hash freshness` PASSes.
+
+**Scoreboard:** composite **67.94%**, P0 mean **69.38%**, **66 of 82 P0 rows below 80**, 0 broken
+rows, 2 stubs (`X3-GPU-001` hardware-blocked at 7, `X3-MEV-001` at 25 — a lane is on it).
+
+**What moved overnight, worst-first:**
+
+| area | change |
+| --- | --- |
+| X3-MEV-002 private submission | 39 → **75**: the compiled artifact records the demand, `pallet-x3-kernel` refuses it at intake, both engines enforce it, the runtime binds the posture to `pallet_private_execution::Enabled` |
+| runtime variant / CLI / sidecar | the **mainnet-rc1 variant did not compile** and `x3-cli` did not build; both fixed, with the gates that missed them named |
+| router fee | every small `xvm_transfer` was refused because the treasury could not accept the 20 bps fee; fixed with an explicit waiver + event |
+| X3-ECO-002 distributed supply | proven on three validators (pending 6,000,000 → 0, every leg resolved, per-validator conservation at one finalized block); the failure was a nonce collision in the driver |
+| X3-OPS-002 zero-downtime snapshot | the proof script was missing the `--regenesis` its own comment requires; with it, a running chain is exported, rebuilt and restored, and the restored chain finalizes |
+| rc2/rc6 gates | seven defects between a red sequence and a green one (hardcoded repo path ×2, a non-starting dev chain, a missing cargo feature, a stale raw spec, an authorized-but-unfunded gateway, an HttpProvider that cannot subscribe) |
+| panic ratchet | **520 → 450** sites, with the baseline re-baselined downward at each step |
+
+**The morning's real blockers**, in the order I would take them:
+
+1. **The 7 physical servers.** The 72-hour soak, public testnet hosting, the live 7-node runtime
+   upgrade and the per-validator monitoring all need them; nothing local substitutes.
+2. **No rc1-featured network exists yet** — the `mainnet-rc1` variant compiles now, but there is no
+   rc1 genesis, so the feature mode has never run on a chain.
+3. **The six-route live sweep is still one route in Rust.** The legacy JS driver cannot decode
+   extrinsic v5, so the route/negative matrix it used to cover is recorded as GAP-RC2-DRIVER-FORMAT,
+   half-ported (`node/tests/supply_invariant_distributed.rs` covers X3Native → X3Evm).
+4. **Two decisions are the operator's, not an agent's:** whether a validator must keep its treasury
+   funded (rather than the router fee being waived), and what charge primitive replaces
+   `pallet-x3-da`/`pallet-x3-sequencer`'s `reserve`-as-anti-spam-fee, which holds funds nothing can
+   release (TICKET-154).
+5. **Remaining panic sites are now concentrated** in `pallets/*/benchmarking.rs` (101 of the 450,
+   compiled only under `runtime-benchmarks`), `crates/x3-dex` (19), `crates/x3-gpu-validator-swarm`
+   (18) and `crates/x3-bridge-adapters` (18) — all runtime-graph, so each batch costs a re-attest
+   (~10 min) and a `mainnet-check` (~30 min). The free (non-runtime-graph) ones left are
+   `crates/x3-bot` (15), `crates/x3-mobile-sdk` (14), `crates/quantum-swarm`'s `CircuitBuilder`
+   (11) and `crates/x3-cli` (10).
+
+**Process notes worth keeping.** Five actors share this box; load average sat at 19–27 and the
+default `target/` is a queue everyone waits in — `CARGO_TARGET_DIR=/tmp/<name>` cuts a build from
+minutes to under a minute, but it breaks the nested WASM build for a node check, so pair it with
+`SKIP_WASM_BUILD=1`. Two `make mainnet-check` runs at once fight over ports 9944/9945; two
+`supply_invariant_distributed` runs cannot coexist at all (the test asserts its ports free).
+`~/.cargo/bin` is still the one directory CI deletes, and the fix for that is `ab18567f5`.

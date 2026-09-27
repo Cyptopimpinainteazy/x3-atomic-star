@@ -27,7 +27,10 @@ pub use benchmark::{
     BenchmarkJobStatus, BenchmarkMetrics, BenchmarkReport, BenchmarkReportArtifact,
     BenchmarkReportSummary, BenchmarkRpcApi, BenchmarkService, X3BenchmarkRpc,
 };
-pub use gas_estimation::{ExecutionStatus, GasEstimation, GasEstimationRPC, RPCTransaction};
+pub use gas_estimation::{
+    gas_limit_with_margin, ExecutionStatus, GasEstimation, GasEstimationRPC, RPCTransaction,
+    MAX_BATCH_SIZE,
+};
 pub use gateway_rpc::{
     create_gateway_rpc, GatewayRpc, GatewayRpcApi, RouteConfigResponse, StorageKeysFn,
     StorageReadFn, TransferSummaryResponse, WithdrawalSummaryResponse,

@@ -11,6 +11,7 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
@@ -23,14 +24,21 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 log = { workspace = true, default-features = false }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
+# Only the benchmark module needs this crate: the mint/burn benchmarks have to
+# register an asset the way a chain does, and the development genesis holds none.
+pallet-x3-asset-registry = { path = "../x3-asset-registry", optional = true, default-features = false }
 
 [dev-dependencies]
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
+# The mock runtime carries the registry pallet so the benchmark test suite can
+# register an asset through it.
+pallet-x3-asset-registry = { path = "../x3-asset-registry" }
 
 [features]
 default = ["std"]
 std = [
+    "frame-benchmarking?/std",
     "frame-support/std",
     "frame-system/std",
     "codec/std",
@@ -42,6 +50,11 @@ std = [
     "serde",
     "serde/std",
     "x3-asset-kernel-types/std",
+    "pallet-x3-asset-registry?/std",
+]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "pallet-x3-asset-registry",
 ]
 try-runtime = [
     "frame-support/try-runtime",

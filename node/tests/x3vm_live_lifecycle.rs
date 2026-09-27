@@ -643,19 +643,22 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         // firewall maps to zero required confirmations. Declaring anything else
         // makes the requirement disagree with the declared policy.
         min_confirmations: 0,
+        // One endpoint serves this harness, and the bar lives here rather than on
+        // the attestation: an attestation that carries its own quorum is one the
+        // evidence gets to set for itself.
+        min_providers: 1,
     };
     let evidence = SecretReleaseEvidence {
         lock: lock.clone(),
         finality: lock_finality,
         // The firewall binds this attestation to the observed lock: it requires
-        // `tx_id`/`block_hash` to match the lock proof, a non-zero quorum that
-        // the provider count actually satisfies, and `finalized`. The observed
-        // lock is not refunded, so the release path stays open.
+        // `tx_id`/`block_hash` to match the lock proof, at least the requirement's
+        // number of *distinct* providers to have reported, and `finalized`. The
+        // observed lock is not refunded, so the release path stays open.
         rpc_quorum: RpcQuorumAttestation {
             tx_id: lock.tx_id.clone(),
             block_hash: lock.block_hash.clone(),
-            provider_count: 3,
-            required_quorum: 2,
+            providers: vec![String::from("x3-local")],
             finalized: true,
         },
         refund: RefundObservation {
