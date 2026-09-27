@@ -263,15 +263,27 @@ bytes**:
   Those values are the generated stubs (hand-sized `ref_time` with real read/write counts), not
   benchmarks — `X3-GPU-003` is the row that measures them.
 
-* `d62fecf6b` — the halt-recovery sequence gets a test, and the record moves for it. The only file
-  in the runtime's graph that changed is `pallets/x3-invariants/src/tests.rs` (`#[cfg(test)] mod
-  tests;`, which the WASM build does not compile), so the hashes are **identical to `9125c487a`'s**:
-  compact 8,748,372 bytes (`0xce698445fab88f37b600a71a8708346e5b2aa95869f3b740672279c6e656501a`),
-  compressed 1,512,695 (`0x4971c1fcfc5cce8638054658b7b97957d1ec6c240013ed9f7071ca4badc70462`). Only
-  `recorded_revision` moves — the fourth revision in this list where that happens, and the same
-  property `cc19883faf` records: the freshness gate watches the runtime's dependency graph, so a
-  test file the wasm never compiles is in the graph but not in the artifact. Two from-scratch builds
-  of `d62fecf6b` agree.
+* `06b79a939` — **the bytes move this time, and the reason is real.** This record was written by
+  `./scripts/update-runtime-hashes.sh` after two from-scratch `srtool` builds of `06b79a939`
+  agreed, and it replaces the `d62fecf6b` entry that had been carried since the halt-recovery
+  commit. Seventeen files in the runtime's dependency graph changed between the two revisions, and
+  unlike the test-only moves above, these are compiled into the artifact: the private-submission
+  demand now reaches the chain-intake compiler (`crates/x3-compiler`, `crates/x3-backend`,
+  `crates/x3-common`, `crates/x3-integration`) and the kernel enforces it at the door
+  (`pallets/x3-kernel`), the router no longer fails a transfer on a fee the treasury cannot accept
+  (`pallets/x3-cross-vm-router`), the secret-release firewall's quorum bar became policy
+  (`crates/x3-atomic-swap`), and the `mainnet-rc1` runtime variant was fixed so it compiles
+  (`runtime/src/lib.rs`). So:
+  compact 8,742,756 bytes (`0x1ea6290946e35b06fb2b24446ab2e58721f8236a890cd87e5b72ec11ae448b10`),
+  compressed 1,510,586 (`0x50c5a4999cbe17fe804aae5535a3ac0de8e8f0ff897a4ea502559df573193021`) —
+  both different from `d62fecf6b`'s `0xce698445…` / `0x4971c1fc…`, which is what a revision with
+  real runtime changes is supposed to look like.
+
+  One thing this entry is *not*: a statement that the two builds used the same sources as each
+  other. An earlier attempt at this re-attestation was refused by the script for exactly that
+  reason — `c85c7b207` landed between its two builds, so they disagreed by one build's worth of
+  source, and the script wrote nothing. That is the guard working, and it is worth knowing that the
+  window is real: this repository takes commits while a 20-minute double build runs.
 
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
