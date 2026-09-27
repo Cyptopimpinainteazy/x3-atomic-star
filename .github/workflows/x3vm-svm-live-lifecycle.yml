@@ -153,6 +153,10 @@ jobs:
         # purpose: the SBF and client builds above keep their own target paths.
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+          # The target dir is outside the checkout, so substrate-wasm-builder cannot find
+          # Cargo.lock by walking up from it and re-resolves the runtime's dependencies
+          # without the lockfile or its patches. Point it at the workspace.
+          WASM_BUILD_WORKSPACE_HINT: ${{ github.workspace }}
           CARGO_BUILD_JOBS: "12"
         run: |
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
@@ -163,6 +167,10 @@ jobs:
       - name: Run real X3VM-SVM timeout/refund atomic lifecycle
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+          # The target dir is outside the checkout, so substrate-wasm-builder cannot find
+          # Cargo.lock by walking up from it and re-resolves the runtime's dependencies
+          # without the lockfile or its patches. Point it at the workspace.
+          WASM_BUILD_WORKSPACE_HINT: ${{ github.workspace }}
           CARGO_BUILD_JOBS: "12"
         run: |
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
