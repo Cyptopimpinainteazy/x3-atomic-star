@@ -24,7 +24,7 @@ reqwest     = { workspace = true }
 
 # Chain metadata/signing and shared runtime task types.
 subxt = "0.50.3"
-subxt-signer = "0.50.3"
+subxt-signer = { version = "0.50.3", default-features = false, features = ["std", "sr25519", "subxt"] }
 sp-core = { workspace = true, features = ["std"] }
 pallet-northern-swarm = { path = "../../pallets/northern-swarm" }
 
