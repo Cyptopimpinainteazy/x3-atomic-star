@@ -299,7 +299,7 @@ dangerous_paths = ["keys", "secrets", "mainnet"]
 
 [northern_swarm_reactor]
 mode = "GUARDED_TESTNET"
-crate_or_service = "pallets/northern-swarm + crates/northern-swarm"
+crate_or_service = "crates/northern-swarm"
 tauri_app = "SwarmCommand"
 required_tests = [
   "same_input_produces_same_hash",
