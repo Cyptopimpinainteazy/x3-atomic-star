@@ -1,0 +1,41 @@
+name: swarm-reactor-pr519-verify
+
+on:
+  push:
+    branches:
+      - "release-gate/swarm-reactor-onchain-v1"
+  workflow_dispatch:
+
+concurrency:
+  group: swarm-reactor-pr519-verify
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Same-repository branch only. There is deliberately no pull_request trigger,
+    # so untrusted fork code is never executed on the self-hosted X3 runner.
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+      CARGO_BUILD_JOBS: 8
+
+    steps:
+      - name: Checkout exact branch revision
+        uses: actions/checkout@v4
+
+      - name: Record revision
+        run: |
+          git rev-parse HEAD
+          rustc --version
+          cargo --version
+
+      - name: Northern Swarm pallet
+        run: cargo test -p pallet-northern-swarm --all-targets --no-fail-fast
+
+      - name: Northern Swarm executor
+        run: cargo test -p northern-swarm --all-targets --no-fail-fast
+
+      - name: Focused Swarm Reactor release gate
+        run: python3 scripts/mainnet/swarm_reactor_gate.py
