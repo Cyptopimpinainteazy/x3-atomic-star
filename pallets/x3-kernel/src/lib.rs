@@ -574,6 +574,20 @@ pub mod pallet {
         #[pallet::constant]
         type RequireCrossVmProof: Get<bool>;
 
+        /// Whether this chain can actually offer a private submission channel.
+        ///
+        /// The other half of the compiled-capability contract: an artifact may *demand* private
+        /// submission (the bit in its header), and this says whether the chain can *meet* it. A
+        /// program whose compiled policy demands privacy is refused at intake when this is false,
+        /// because the alternative is running a program that asked not to be public in the clear.
+        ///
+        /// The runtime binds this to the pallet that owns the private channel
+        /// (`pallet_private_execution::Enabled`) rather than to a constant, so the switch that
+        /// enables private execution on chain is the same switch this intake check reads — one
+        /// posture, two readers, no way for them to disagree.
+        #[pallet::constant]
+        type PrivateSubmissionChannel: Get<bool>;
+
         /// Weight information provider for extrinsics.
         type WeightInfo: WeightInfo;
 
@@ -1108,6 +1122,13 @@ pub mod pallet {
         SettlementMismatch,
         /// State inconsistency detected across VM branches.
         StateInconsistency,
+        /// A compiled program requires private submission and this chain cannot offer it.
+        ///
+        /// The demand comes from the artifact's own header (AGENTS.md §11), not from a parameter
+        /// the caller could omit, so the refusal is the program's compiled policy being honoured
+        /// rather than a submission-time option. It is raised at intake, before the adapter runs,
+        /// so a program that requires privacy never executes in the clear.
+        PrivateSubmissionUnavailable,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -1791,6 +1812,10 @@ pub mod pallet {
                 // every non-empty X3 payload failed with `X3ExecutionFailed` on a chain whose
                 // adapter is real. Validation now asks the component that will do the work.
                 T::X3Adapter::validate(&x3_payload).map_err(|_| Error::<T>::InvalidX3VmPacket)?;
+                // The program's compiled policy comes next, before any state is touched: an
+                // artifact that demands private submission is refused on a chain that cannot
+                // offer it rather than executed in the clear.
+                Self::ensure_private_submission_available(&x3_payload)?;
             }
 
             Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
@@ -2426,6 +2451,33 @@ pub mod pallet {
             }
             if !svm_payload.is_empty() {
                 T::SvmAdapter::validate(svm_payload).map_err(|_| Error::<T>::InvalidSvmPacket)?;
+            }
+            Ok(())
+        }
+
+        /// Refuse an X3 program whose compiled policy demands private submission that this chain
+        /// cannot offer.
+        ///
+        /// The demand is read from the artifact's own feature word — the compiler records it
+        /// (AGENTS.md §11: policy comes from the compiled artifact, never from a caller-supplied
+        /// parameter) — and the answer to "can this chain meet it?" is the runtime's
+        /// `PrivateSubmissionChannel`. Both directions are load-bearing: with the demand present
+        /// and the channel absent the program is refused, and with the channel present the same
+        /// bytes run. A check that only ever refused would be indistinguishable from an adapter
+        /// that cannot execute X3BC at all, which is why the pallet's tests drive both.
+        ///
+        /// A payload that is not a readable X3BC header is *not* judged here: that answer belongs
+        /// to `T::X3Adapter`, whose `validate` names a non-module refusal, and every caller below
+        /// runs it. Answering `false` for "I could not read a header" is therefore not a fail-open
+        /// path — the bytes still have to get past the adapter, which refuses them by name.
+        fn ensure_private_submission_available(x3_payload: &[u8]) -> DispatchResult {
+            if x3_payload.is_empty() {
+                return Ok(());
+            }
+            if x3_common::bytecode::requires_private_submission(x3_payload)
+                && !T::PrivateSubmissionChannel::get()
+            {
+                return Err(Error::<T>::PrivateSubmissionUnavailable.into());
             }
             Ok(())
         }
@@ -3882,6 +3934,12 @@ pub mod pallet {
             // Its slot *writes* are deliberately not applied here: this path returns a receipt to a
             // caller that may still roll the whole cross-VM operation back, so applying storage at
             // this point would commit state an aborted caller was entitled to abandon (TICKET-152).
+            //
+            // The compiled policy is checked on this path too, because a cross-VM call reaches the
+            // adapter without passing `submit_comit_v2`'s intake: an artifact that demands private
+            // submission must be refused here as well, or the demand would hold on one route into
+            // the VM and not on another.
+            Pallet::<T>::ensure_private_submission_available(call.payload.as_slice())?;
             let slots = Pallet::<T>::x3_storage_view()?;
             let receipt =
                 T::X3Adapter::execute_with_slots(call.payload.as_slice(), call.gas_budget, &slots)?;
@@ -4658,6 +4716,12 @@ mod chaos_tests;
 // "returning an error rolls back storage" claim needed a test rather than a comment.
 #[cfg(test)]
 mod failure_path_conservation;
+
+// The compiled private-submission policy, read at intake (X3-MEV-002). The demand travels in the
+// artifact's feature word and the chain's answer is its own `PrivateSubmissionChannel`; both
+// directions are driven through `submit_comit_v2`.
+#[cfg(test)]
+mod private_submission_intake;
 
 #[cfg(test)]
 mod packet_integration_tests;

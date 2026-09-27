@@ -42,6 +42,10 @@ x3-packet-schema = { path = "../../crates/x3-packet-schema", default-features = 
 # The per-asset supply ledger's own type, so the runtime API below returns the shape the
 # ledger stores instead of a tuple whose field order callers have to remember.
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
+# The X3BC header's shared definition (`MAGIC`, the feature word, the private-submission bit). The
+# intake check below reads the artifact's own feature word, and it has to be the *same* definition
+# the two decoders use, not a second opinion about the header's layout.
+x3-common = { path = "../../crates/x3-common", default-features = false }
 
 [features]
 default = ["std"]
@@ -68,6 +72,7 @@ std = [
     "x3-x3-integration/std",
     "x3-cross-vm-bridge/std",
     "x3-packet-schema/std",
+    "x3-common/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking",

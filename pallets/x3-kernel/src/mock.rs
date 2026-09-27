@@ -27,6 +27,36 @@ pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 pub static EMERGENCY_HALT_TRIGGERED: AtomicBool = AtomicBool::new(false);
 pub static EMERGENCY_HALT_TRIGGER_COUNT: AtomicU64 = AtomicU64::new(0);
 
+thread_local! {
+    /// The test chain's private-submission posture, flipped by the tests that need both answers.
+    ///
+    /// A constant would make the refusal untestable in the direction that matters: a check that can
+    /// only ever be `false` is indistinguishable from an adapter that cannot run X3BC at all, so the
+    /// tests have to be able to say "the chain *can* offer a private channel" and watch the same bytes
+    /// run.
+    ///
+    /// Per-thread rather than a process-global `static`, because `cargo test` runs these tests on
+    /// several threads at once: a global posture let one test flip the chain for another, and the
+    /// refusal tests failed with `Ok(())` — the check had read a *different* test's chain. Each
+    /// thread gets the honest default (`false`), and a test that flips it restores it.
+    static PRIVATE_SUBMISSION_CHANNEL: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+}
+
+/// `Config::PrivateSubmissionChannel` for the mock chain.
+pub struct TestPrivateSubmissionChannel;
+impl Get<bool> for TestPrivateSubmissionChannel {
+    fn get() -> bool {
+        PRIVATE_SUBMISSION_CHANNEL.with(|enabled| enabled.get())
+    }
+}
+
+impl TestPrivateSubmissionChannel {
+    /// Set this thread's chain posture. Only the thread that set it sees the value.
+    pub fn set(enabled: bool) {
+        PRIVATE_SUBMISSION_CHANNEL.with(|flag| flag.set(enabled));
+    }
+}
+
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
     pub const ExistentialDeposit: Balance = 1;
@@ -432,6 +462,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxPreparedOpsPerBlock = ConstU32<8>;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type RequireCrossVmProof = ConstBool<false>;
+    type PrivateSubmissionChannel = TestPrivateSubmissionChannel;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;

@@ -1389,6 +1389,22 @@ impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowStorage {
         pallet_x3_kernel::BridgeSvmEscrow::<Runtime>::get()
     }
 }
+
+/// The chain's private-submission posture, as `pallet_x3_kernel`'s intake check reads it.
+///
+/// Deliberately *derived* from the pallet that owns the private channel rather than a constant:
+/// `pallet_private_execution::Enabled` is the switch governance flips to turn private execution on,
+/// so binding the X3VM intake to it means there is exactly one answer to "can this chain offer a
+/// private submission channel?" instead of two that can drift apart. With private execution off —
+/// the shipped posture — a program whose compiled policy demands private submission is refused at
+/// intake instead of executed in the clear.
+pub struct RuntimePrivateSubmissionChannel;
+impl frame_support::traits::Get<bool> for RuntimePrivateSubmissionChannel {
+    fn get() -> bool {
+        pallet_private_execution::Enabled::<Runtime>::get()
+    }
+}
+
 parameter_types! {
     pub const MaxReplayPruneItemsPerBlock: u32 = 64u32;
 }
@@ -1725,6 +1741,7 @@ impl pallet_x3_kernel::Config for Runtime {
     type MaxPreparedCrossVmOps = MaxPreparedCrossVmOps;
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type RequireCrossVmProof = RequireCrossVmProof;
+    type PrivateSubmissionChannel = RuntimePrivateSubmissionChannel;
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:

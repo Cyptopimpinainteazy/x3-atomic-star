@@ -12485,6 +12485,7 @@ dependencies = [
  "sp-std 14.0.0",
  "x3-asset-kernel-types",
  "x3-backend",
+ "x3-common",
  "x3-cross-vm-bridge",
  "x3-evm-integration",
  "x3-packet-schema",
@@ -27185,6 +27186,7 @@ dependencies = [
  "pallet-cross-chain-validator",
  "pallet-transaction-payment",
  "pallet-x3-agent-law",
+ "pallet-x3-cross-vm-router",
  "pallet-x3-invariants",
  "pallet-x3-kernel",
  "pallet-x3-settlement-engine",
@@ -27193,6 +27195,7 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-runtime",
+ "x3-asset-kernel-types",
  "x3-atomic-swap",
  "x3-chain-runtime",
 ]

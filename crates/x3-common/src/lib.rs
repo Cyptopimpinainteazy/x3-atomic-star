@@ -214,6 +214,24 @@ pub mod bytecode {
     /// Byte offset of the checksum inside the header.
     pub const CHECKSUM_OFFSET: usize = 12;
 
+    /// Byte offset of the feature-flags word inside the header.
+    pub const FEATURE_FLAGS_OFFSET: usize = 20;
+
+    /// Feature flag: the program's compiled policy requires private submission.
+    ///
+    /// This is a *capability the artifact carries*, not a format change. AGENTS.md §11 says the
+    /// security policy has to come from the compiled artifact, and §12 that a check the runtime
+    /// does not interpret is worse than no check at all — so a bit set here means the loader must
+    /// refuse the module unless the execution context it is loading into actually offers a private
+    /// channel. A reader that reads the header and ignores this bit turns "this program demands
+    /// privacy" into "this program runs in the clear", which is the one direction a private
+    /// submission policy must never take.
+    ///
+    /// It lives here, beside [`MAGIC`] and [`VERSION`], because `x3-integration::mini_x3` — the
+    /// interpreter a block runs — cannot depend on `x3-backend` (TICKET-108) and both readers have
+    /// to name the same bit.
+    pub const FEATURE_PRIVATE_SUBMISSION_REQUIRED: u32 = 1 << 8;
+
     /// Format version this loader writes: major 1, minor 0, patch 0, which is what
     /// `(major << 16) | (minor << 8) | patch` packs to.
     pub const VERSION: u32 = 1 << 16;
@@ -263,9 +281,79 @@ pub mod bytecode {
         min_version <= VERSION
     }
 
+    /// The feature-flags word of an X3BC header, or `None` when these bytes are not a header.
+    ///
+    /// `None` means "not an X3BC module", not "no demands": the magic and the header length are the
+    /// two facts a caller needs before it can read the field at all. Callers that gate on a flag
+    /// keep the refusal for a non-module payload with the component whose job that is, so this
+    /// function answers only the question it can answer.
+    pub fn feature_flags(bytes: &[u8]) -> Option<u32> {
+        if bytes.len() < HEADER_LEN || &bytes[0..4] != MAGIC {
+            return None;
+        }
+        let mut word = [0u8; 4];
+        word.copy_from_slice(&bytes[FEATURE_FLAGS_OFFSET..FEATURE_FLAGS_OFFSET + 4]);
+        Some(u32::from_le_bytes(word))
+    }
+
+    /// Does this payload declare that its compiled policy requires private submission?
+    ///
+    /// `false` covers both "the module does not demand it" and "this is not a module"; a caller that
+    /// needs to tell those apart uses [`feature_flags`] directly.
+    pub fn requires_private_submission(bytes: &[u8]) -> bool {
+        matches!(
+            feature_flags(bytes),
+            Some(flags) if flags & FEATURE_PRIVATE_SUBMISSION_REQUIRED != 0
+        )
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
+        use alloc::vec::Vec;
+
+        /// A header whose feature word the caller chooses, with a body whose checksum is genuine so
+        /// the reader under test is exercised rather than a malformed blob.
+        fn header_with_features(features: u32) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(MAGIC);
+            bytes.extend_from_slice(&VERSION.to_le_bytes());
+            bytes.extend_from_slice(&0u32.to_le_bytes()); // flags
+            bytes.extend_from_slice(&checksum(&[]).to_le_bytes());
+            bytes.extend_from_slice(&VERSION.to_le_bytes()); // min_version
+            bytes.extend_from_slice(&features.to_le_bytes());
+            assert_eq!(bytes.len(), HEADER_LEN);
+            bytes
+        }
+
+        #[test]
+        fn the_private_submission_bit_is_read_from_the_feature_word() {
+            // Both directions, because a reader that always answers `false` is exactly the bug this
+            // flag exists to fix: the demand would be carried and ignored.
+            assert!(requires_private_submission(&header_with_features(
+                FEATURE_PRIVATE_SUBMISSION_REQUIRED
+            )));
+            assert!(!requires_private_submission(&header_with_features(0)));
+            // A different flag in the same word must not be mistaken for this one.
+            assert!(!requires_private_submission(&header_with_features(1 << 7)));
+            // A neighbouring bit inside the same word must not mask the demand either.
+            assert!(requires_private_submission(&header_with_features(
+                FEATURE_PRIVATE_SUBMISSION_REQUIRED | (1 << 7)
+            )));
+        }
+
+        #[test]
+        fn a_payload_that_is_not_a_module_is_not_a_demand() {
+            // `None`, not `Some(0)`: the callers keep "this is not a program" owned by the adapter
+            // that refuses it, and this function must not answer a question it cannot read.
+            assert_eq!(feature_flags(&[]), None);
+            assert_eq!(feature_flags(b"X3BC"), None);
+            assert_eq!(feature_flags(&[0u8; HEADER_LEN]), None, "wrong magic");
+            let mut short = header_with_features(FEATURE_PRIVATE_SUBMISSION_REQUIRED);
+            short.truncate(HEADER_LEN - 1);
+            assert_eq!(feature_flags(&short), None);
+            assert!(!requires_private_submission(b"not a program at all"));
+        }
 
         #[test]
         fn the_checksum_is_order_sensitive_and_deterministic() {
