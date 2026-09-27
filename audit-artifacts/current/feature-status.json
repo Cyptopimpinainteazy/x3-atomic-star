@@ -3146,19 +3146,24 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 25,
+      "composite": 42,
       "confidence": "high",
       "evidence": [
-        "crates/cross-vm-coordinator",
-        "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"
+        "crates/cross-vm-coordinator/src/settlement_finality.rs",
+        "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md",
+        "crates/cross-vm-coordinator"
       ],
       "id": "X3-MEV-001",
-      "implemented": 35,
+      "implemented": 55,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 20,
+      "mainnet_ready": 25,
       "missing_work": [
-        "Needs threat model covering relayers, finality delays, and ordering"
+        "**Ordering is still relayer-chosen (surface S4).** `settlement_outbox` records the attempts it makes and `crates/x3-order-window` implements a commit-reveal ordering lane, but that lane is *inside the X3 domain*; nothing binds a cross-domain release order to an ordering beacon, so a relayer can hold settlement A and deliver B first. Closing it means deriving a release order key from the X3 block hash and refusing an out-of-order release, the way `x3-order-window` does locally. Not attempted here.",
+        "**Withholding is undetectable at this layer (S5).** A relayer who never delivers a settlement cannot be caught by a release gate; the intent runs to its timeout/refund path, so the attacker's gain is the delay itself. `recovery`/`settlement_reconcile` bound the damage; nothing removes the attack.",
+        "**The gate enforces the policy against the evidence it is handed, not the adapter's honesty (S6).** `confirmations` and `safe_to_reveal_secret` are fields of the bundle. What is proven is that the coordinator cannot be talked into releasing *too early by evidence that says it is too early* \u2014 a fabricated deep-enough proof is the adapter's and the runtime's problem (`verify_runtime_binding`, `verify_claim_set`, matrix rows X3-XVM-*).",
+        "**No live evidence.** Every test is crate-level with the repo's own typed proof structures. Nothing has run on a multi-node network, and `crates/cross-vm-coordinator` is not in the runtime dependency graph, so this changes what the coordinator *asks* the runtime to release, not what the runtime enforces.",
+        "**`cargo clippy --features canonical-proofs --all-targets -- -D warnings` is red on this crate for two pre-existing lints** (`src/attempt_ledger.rs:156` too-many-arguments, `src/settlement_outbox.rs:273` map_or simplification), so the new code is verified warning-free rather than the crate being clippy-clean."
       ],
       "name": "Cross-domain MEV protection",
       "paths": [
@@ -3166,11 +3171,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "PARTIAL",
+      "state_rule": "implemented >= 50",
       "subsystem": "mev_privacy",
-      "tested": 18,
-      "tests": "tested score 18% (no named test list on this row)"
+      "tested": 50,
+      "tests": "tested score 50% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4747,7 +4752,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "501287ab0010e5003084ee9e50858050704e2c061e164331c5b153749e15d5f6",
+    "source_digest": "487421178e8db83af0a40789ac44c5023169791685b6dcc717876444f0e0bc68",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "394cfa23c254cf2d66b7e2fe24eda9760fe201a2bed37bff6da260bcc3620bb1",
@@ -4759,7 +4764,7 @@
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
-      "feature-matrix/mev-privacy.toml": "a3d8d284e59a486a4b52a8d2cadb88b87a6e2acbd1d58f0af37d141ec3138dc4",
+      "feature-matrix/mev-privacy.toml": "2ac7bd1283bf95338dec5be68b2cae268e6c9e9bc63c74373a56bd40883c024e",
       "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
       "feature-matrix/runtime-core.toml": "833ae18c048a4a7b5bf8b40db02b5e249e40899add628656e3b03c872b3a9a89",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
@@ -5228,8 +5233,8 @@
       "FUNCTIONAL BUT UNHARDENED": 61,
       "NOT INTEGRATED": 5,
       "NOT STARTED": 0,
-      "PARTIAL": 71,
-      "STUB": 2
+      "PARTIAL": 72,
+      "STUB": 1
     },
     "matrix_features": 149,
     "registry_features": 22,
