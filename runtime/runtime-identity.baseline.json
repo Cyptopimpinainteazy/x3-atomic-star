@@ -1,5 +1,11 @@
 {
-  "accepted_reasons": {},
+  "accepted_reasons": {
+    "construct_runtime_variants": "Regenerated after the Northern Swarm / Reactor merge (PR #519) added `NorthernSwarm: pallet_northern_swarm` to every variant. That is an index-renumbering change for every pallet declared after it, which is exactly what this baseline is for; it is accepted here because the merge is the change that introduced it and no chain runs this runtime yet (`transaction_version` stays 1: no existing call's encoding moved).",
+    "runtime_version.spec_version": "The baseline was seeded at spec_version 10 and never regenerated, because the gate could not run: `sp_version::RuntimeVersion` dropped `state_version` in the pinned polkadot-sdk revision and the script required it, so every invocation exited before comparing anything. Regenerated 2026-09-27 at 20, which is the value `docs/reports/runtime-wasm-reproducibility.md` records across v10-v20 (v20 removed the unsigned `submit_finalization_result`).",
+    "runtime_version.state_version": "Absent from the source in the pinned revision; the field no longer exists in `sp_version::RuntimeVersion`. `system_version` replaces it here.",
+    "runtime_version.system_version": "Present from the v20 source (1).",
+    "signed_extra": "Unchanged in content and order; recorded here because the seeded baseline predates the two X3 checks (`InvariantCheck`, `AgentLawCheck`) that the source now carries."
+  },
   "construct_runtime_variants": [
     {
       "cfg": "#[cfg(all(feature = \"dev\", not(feature = \"frontier\")))]",
@@ -117,6 +123,10 @@
           "pallet_x3_cross_vm_router"
         ],
         [
+          "X3CrosschainGateway",
+          "pallet_x3_crosschain_gateway"
+        ],
+        [
           "X3TokenFactory",
           "pallet_x3_token_factory"
         ],
@@ -183,6 +193,14 @@
         [
           "X3Slash",
           "pallet_x3_slash"
+        ],
+        [
+          "X3AgentRegistry",
+          "pallet_x3_agent_registry"
+        ],
+        [
+          "X3ProofCarryingAgent",
+          "pallet_x3_proof_carrying_agent"
         ],
         [
           "X3WalletPallet",
@@ -253,8 +271,20 @@
           "pallet_x3_compute_market"
         ],
         [
+          "X3LpLocker",
+          "pallet_x3_lp_locker"
+        ],
+        [
+          "X3Sentinel",
+          "pallet_x3_sentinel"
+        ],
+        [
           "X3FlashLoan",
           "pallet_x3_flashloan"
+        ],
+        [
+          "NorthernSwarm",
+          "pallet_northern_swarm"
         ]
       ]
     },
@@ -374,6 +404,10 @@
           "pallet_x3_cross_vm_router"
         ],
         [
+          "X3CrosschainGateway",
+          "pallet_x3_crosschain_gateway"
+        ],
+        [
           "X3TokenFactory",
           "pallet_x3_token_factory"
         ],
@@ -440,6 +474,14 @@
         [
           "X3Slash",
           "pallet_x3_slash"
+        ],
+        [
+          "X3AgentRegistry",
+          "pallet_x3_agent_registry"
+        ],
+        [
+          "X3ProofCarryingAgent",
+          "pallet_x3_proof_carrying_agent"
         ],
         [
           "X3WalletPallet",
@@ -510,6 +552,14 @@
           "pallet_x3_compute_market"
         ],
         [
+          "X3LpLocker",
+          "pallet_x3_lp_locker"
+        ],
+        [
+          "X3Sentinel",
+          "pallet_x3_sentinel"
+        ],
+        [
           "X3FlashLoan",
           "pallet_x3_flashloan"
         ],
@@ -520,11 +570,228 @@
         [
           "Ethereum",
           "pallet_ethereum"
+        ],
+        [
+          "NorthernSwarm",
+          "pallet_northern_swarm"
         ]
       ]
     },
     {
-      "cfg": "#[cfg(all(\n    not(feature = \"dev\"),\n    not(feature = \"frontier\"),\n    not(feature = \"mainnet-rc1\")\n))]",
+      "cfg": "#[cfg(all(\n    not(feature = \"dev\"),\n    not(feature = \"frontier\"),\n    feature = \"mainnet-rc1\",\n))]",
+      "pallets": [
+        [
+          "System",
+          "frame_system"
+        ],
+        [
+          "Timestamp",
+          "pallet_timestamp"
+        ],
+        [
+          "Aura",
+          "pallet_aura"
+        ],
+        [
+          "Grandpa",
+          "pallet_grandpa"
+        ],
+        [
+          "Session",
+          "pallet_session"
+        ],
+        [
+          "Historical",
+          "pallet_session::historical"
+        ],
+        [
+          "Offences",
+          "pallet_offences"
+        ],
+        [
+          "Balances",
+          "pallet_balances"
+        ],
+        [
+          "TransactionPayment",
+          "pallet_transaction_payment"
+        ],
+        [
+          "Scheduler",
+          "pallet_scheduler"
+        ],
+        [
+          "Preimage",
+          "pallet_preimage"
+        ],
+        [
+          "AtlasKernel",
+          "pallet_x3_kernel"
+        ],
+        [
+          "X3Invariants",
+          "pallet_x3_invariants"
+        ],
+        [
+          "X3AgentLaw",
+          "pallet_x3_agent_law"
+        ],
+        [
+          "X3Coin",
+          "pallet_x3_coin"
+        ],
+        [
+          "AtomicTradeEngine",
+          "pallet_atomic_trade_engine"
+        ],
+        [
+          "Council",
+          "pallet_collective::<Instance1>"
+        ],
+        [
+          "Governance",
+          "pallet_governance"
+        ],
+        [
+          "Treasury",
+          "pallet_treasury"
+        ],
+        [
+          "AgentAccounts",
+          "pallet_agent_accounts"
+        ],
+        [
+          "AgentMemory",
+          "pallet_agent_memory"
+        ],
+        [
+          "X3Verifier",
+          "pallet_x3_verifier"
+        ],
+        [
+          "X3DomainRegistry",
+          "pallet_x3_domain_registry"
+        ],
+        [
+          "X3AssetRegistry",
+          "pallet_x3_asset_registry"
+        ],
+        [
+          "X3SupplyLedger",
+          "pallet_x3_supply_ledger"
+        ],
+        [
+          "X3CrossVmRouter",
+          "pallet_x3_cross_vm_router"
+        ],
+        [
+          "X3CrosschainGateway",
+          "pallet_x3_crosschain_gateway"
+        ],
+        [
+          "X3TokenFactory",
+          "pallet_x3_token_factory"
+        ],
+        [
+          "X3AccountRegistry",
+          "pallet_x3_account_registry"
+        ],
+        [
+          "CrossChainValidator",
+          "pallet_cross_chain_validator"
+        ],
+        [
+          "X3SettlementEngine",
+          "pallet_x3_settlement_engine"
+        ],
+        [
+          "FraudProofs",
+          "crate::fraud_proofs::pallet::pallet"
+        ],
+        [
+          "X3Consensus",
+          "pallet_x3_consensus"
+        ],
+        [
+          "X3AtomicKernel",
+          "pallet_x3_atomic_kernel"
+        ],
+        [
+          "X3Slash",
+          "pallet_x3_slash"
+        ],
+        [
+          "X3AgentRegistry",
+          "pallet_x3_agent_registry"
+        ],
+        [
+          "X3ProofCarryingAgent",
+          "pallet_x3_proof_carrying_agent"
+        ],
+        [
+          "X3WalletPallet",
+          "pallet_x3_wallet_pallet"
+        ],
+        [
+          "X3Inventory",
+          "pallet_x3_inventory"
+        ],
+        [
+          "X3Reservation",
+          "pallet_x3_reservation"
+        ],
+        [
+          "X3Solvency",
+          "pallet_x3_solvency"
+        ],
+        [
+          "X3Rebalance",
+          "pallet_x3_rebalance"
+        ],
+        [
+          "X3Partner",
+          "pallet_x3_partner"
+        ],
+        [
+          "X3TreasuryPolicy",
+          "pallet_x3_treasury_policy"
+        ],
+        [
+          "X3Custody",
+          "pallet_x3_custody"
+        ],
+        [
+          "X3Reconciliation",
+          "pallet_x3_reconciliation"
+        ],
+        [
+          "X3Wrapped",
+          "pallet_x3_wrapped"
+        ],
+        [
+          "SvmRuntime",
+          "pallet_svm_runtime"
+        ],
+        [
+          "X3JuryAnchor",
+          "pallet_x3_jury_anchor"
+        ],
+        [
+          "X3LpLocker",
+          "pallet_x3_lp_locker"
+        ],
+        [
+          "X3Sentinel",
+          "pallet_x3_sentinel"
+        ],
+        [
+          "NorthernSwarm",
+          "pallet_northern_swarm"
+        ]
+      ]
+    },
+    {
+      "cfg": "#[cfg(all(\n    not(feature = \"dev\"),\n    not(feature = \"frontier\"),\n    not(feature = \"mainnet-rc1\"),\n))]",
       "pallets": [
         [
           "System",
@@ -635,6 +902,10 @@
           "pallet_x3_cross_vm_router"
         ],
         [
+          "X3CrosschainGateway",
+          "pallet_x3_crosschain_gateway"
+        ],
+        [
           "X3TokenFactory",
           "pallet_x3_token_factory"
         ],
@@ -701,6 +972,14 @@
         [
           "X3Slash",
           "pallet_x3_slash"
+        ],
+        [
+          "X3AgentRegistry",
+          "pallet_x3_agent_registry"
+        ],
+        [
+          "X3ProofCarryingAgent",
+          "pallet_x3_proof_carrying_agent"
         ],
         [
           "X3WalletPallet",
@@ -771,258 +1050,20 @@
           "pallet_x3_compute_market"
         ],
         [
+          "X3LpLocker",
+          "pallet_x3_lp_locker"
+        ],
+        [
+          "X3Sentinel",
+          "pallet_x3_sentinel"
+        ],
+        [
           "X3FlashLoan",
           "pallet_x3_flashloan"
-        ]
-      ]
-    },
-    {
-      "cfg": "#[cfg(all(feature = \"mainnet-rc1\", not(feature = \"frontier\")))]",
-      "pallets": [
-        [
-          "System",
-          "frame_system"
         ],
         [
-          "Timestamp",
-          "pallet_timestamp"
-        ],
-        [
-          "Aura",
-          "pallet_aura"
-        ],
-        [
-          "Grandpa",
-          "pallet_grandpa"
-        ],
-        [
-          "Session",
-          "pallet_session"
-        ],
-        [
-          "Historical",
-          "pallet_session::historical"
-        ],
-        [
-          "Offences",
-          "pallet_offences"
-        ],
-        [
-          "Balances",
-          "pallet_balances"
-        ],
-        [
-          "TransactionPayment",
-          "pallet_transaction_payment"
-        ],
-        [
-          "Scheduler",
-          "pallet_scheduler"
-        ],
-        [
-          "Preimage",
-          "pallet_preimage"
-        ],
-        [
-          "AtlasKernel",
-          "pallet_x3_kernel"
-        ],
-        [
-          "X3Invariants",
-          "pallet_x3_invariants"
-        ],
-        [
-          "X3AgentLaw",
-          "pallet_x3_agent_law"
-        ],
-        [
-          "Council",
-          "pallet_collective::<Instance1>"
-        ],
-        [
-          "Governance",
-          "pallet_governance"
-        ],
-        [
-          "Treasury",
-          "pallet_treasury"
-        ],
-        [
-          "X3AssetRegistry",
-          "pallet_x3_asset_registry"
-        ],
-        [
-          "X3SupplyLedger",
-          "pallet_x3_supply_ledger"
-        ],
-        [
-          "X3CrossVmRouter",
-          "pallet_x3_cross_vm_router"
-        ],
-        [
-          "X3AtomicKernel",
-          "pallet_x3_atomic_kernel"
-        ],
-        [
-          "X3SettlementEngine",
-          "pallet_x3_settlement_engine"
-        ],
-        [
-          "SvmRuntime",
-          "pallet_svm_runtime"
-        ],
-        [
-          "X3Verifier",
-          "pallet_x3_verifier"
-        ],
-        [
-          "X3DomainRegistry",
-          "pallet_x3_domain_registry"
-        ],
-        [
-          "X3AccountRegistry",
-          "pallet_x3_account_registry"
-        ],
-        [
-          "CrossChainValidator",
-          "pallet_cross_chain_validator"
-        ],
-        [
-          "FraudProofs",
-          "crate::fraud_proofs::pallet::pallet"
-        ],
-        [
-          "X3Slash",
-          "pallet_x3_slash"
-        ]
-      ]
-    },
-    {
-      "cfg": "#[cfg(all(feature = \"mainnet-rc1\", feature = \"frontier\"))]",
-      "pallets": [
-        [
-          "System",
-          "frame_system"
-        ],
-        [
-          "Timestamp",
-          "pallet_timestamp"
-        ],
-        [
-          "Aura",
-          "pallet_aura"
-        ],
-        [
-          "Grandpa",
-          "pallet_grandpa"
-        ],
-        [
-          "Session",
-          "pallet_session"
-        ],
-        [
-          "Historical",
-          "pallet_session::historical"
-        ],
-        [
-          "Offences",
-          "pallet_offences"
-        ],
-        [
-          "Balances",
-          "pallet_balances"
-        ],
-        [
-          "TransactionPayment",
-          "pallet_transaction_payment"
-        ],
-        [
-          "Scheduler",
-          "pallet_scheduler"
-        ],
-        [
-          "Preimage",
-          "pallet_preimage"
-        ],
-        [
-          "AtlasKernel",
-          "pallet_x3_kernel"
-        ],
-        [
-          "X3Invariants",
-          "pallet_x3_invariants"
-        ],
-        [
-          "X3AgentLaw",
-          "pallet_x3_agent_law"
-        ],
-        [
-          "Council",
-          "pallet_collective::<Instance1>"
-        ],
-        [
-          "Governance",
-          "pallet_governance"
-        ],
-        [
-          "Treasury",
-          "pallet_treasury"
-        ],
-        [
-          "X3AssetRegistry",
-          "pallet_x3_asset_registry"
-        ],
-        [
-          "X3SupplyLedger",
-          "pallet_x3_supply_ledger"
-        ],
-        [
-          "X3CrossVmRouter",
-          "pallet_x3_cross_vm_router"
-        ],
-        [
-          "X3AtomicKernel",
-          "pallet_x3_atomic_kernel"
-        ],
-        [
-          "X3SettlementEngine",
-          "pallet_x3_settlement_engine"
-        ],
-        [
-          "SvmRuntime",
-          "pallet_svm_runtime"
-        ],
-        [
-          "X3Verifier",
-          "pallet_x3_verifier"
-        ],
-        [
-          "X3DomainRegistry",
-          "pallet_x3_domain_registry"
-        ],
-        [
-          "X3AccountRegistry",
-          "pallet_x3_account_registry"
-        ],
-        [
-          "CrossChainValidator",
-          "pallet_cross_chain_validator"
-        ],
-        [
-          "FraudProofs",
-          "crate::fraud_proofs::pallet::pallet"
-        ],
-        [
-          "X3Slash",
-          "pallet_x3_slash"
-        ],
-        [
-          "Evm",
-          "pallet_evm"
-        ],
-        [
-          "Ethereum",
-          "pallet_ethereum"
+          "NorthernSwarm",
+          "pallet_northern_swarm"
         ]
       ]
     },
@@ -1138,6 +1179,10 @@
           "pallet_x3_cross_vm_router"
         ],
         [
+          "X3CrosschainGateway",
+          "pallet_x3_crosschain_gateway"
+        ],
+        [
           "X3TokenFactory",
           "pallet_x3_token_factory"
         ],
@@ -1204,6 +1249,14 @@
         [
           "X3Slash",
           "pallet_x3_slash"
+        ],
+        [
+          "X3AgentRegistry",
+          "pallet_x3_agent_registry"
+        ],
+        [
+          "X3ProofCarryingAgent",
+          "pallet_x3_proof_carrying_agent"
         ],
         [
           "X3WalletPallet",
@@ -1274,8 +1327,20 @@
           "pallet_x3_compute_market"
         ],
         [
+          "X3LpLocker",
+          "pallet_x3_lp_locker"
+        ],
+        [
+          "X3Sentinel",
+          "pallet_x3_sentinel"
+        ],
+        [
           "X3FlashLoan",
           "pallet_x3_flashloan"
+        ],
+        [
+          "NorthernSwarm",
+          "pallet_northern_swarm"
         ],
         [
           "Evm",
@@ -1293,7 +1358,7 @@
     "impl_name": "x3-chain",
     "impl_version": 1,
     "spec_name": "x3-chain",
-    "spec_version": 10,
+    "spec_version": 20,
     "system_version": 1,
     "transaction_version": 1
   },

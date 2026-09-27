@@ -433,6 +433,17 @@ GATES_FAST=(
   # is exactly the shape of claim this repository keeps finding months later.
   "test northern-swarm:cargo test -p northern-swarm"
   "test pallet-northern-swarm:cargo test -p pallet-northern-swarm --all-targets"
+  # `scripts/ci/verify_runtime_identity_baseline.sh` pins the three consensus surfaces that
+  # live in one Rust file: `RuntimeVersion` (spec_name/impl_name/authoring_version/spec_version/
+  # impl_version/transaction_version), the `construct_runtime!` pallet order that decides every
+  # pallet index, and the `SignedExtra` tuple order that is part of every signed payload. It
+  # existed, held a baseline (`runtime/runtime-identity.baseline.json`) and was called by
+  # nothing — so nothing noticed either that it could no longer run, or that its baseline had
+  # been sitting at `spec_version: 10` for ten versions. Measured 2026-09-27 before the fix:
+  # every invocation exited 1 with `::error::RuntimeVersion.state_version missing`, a field the
+  # pinned polkadot-sdk revision removed. It runs here now, and the baseline was regenerated at
+  # the current runtime with `accepted_reasons` naming why each value is what it is.
+  "runtime identity baseline:bash scripts/ci/verify_runtime_identity_baseline.sh runtime/src/lib.rs runtime/runtime-identity.baseline.json"
   # `X3-CLAIM-002` scored 20/10/10 against a claim that had already been renamed out of
   # `CURRENT_MAINNET_STATUS.md` — because it had moved somewhere nothing checked: the desktop
   # CRM's outbound templates, which asserted "300ms cross-chain finality (vs 12s on Solana)",

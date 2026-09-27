@@ -300,6 +300,39 @@ bytes**:
   source, and the script wrote nothing. That is the guard working, and it is worth knowing that the
   window is real: this repository takes commits while a 20-minute double build runs.
 
+* `c62f93200` — **the Northern Swarm / Reactor merge reaches the runtime, and `spec_version` stays
+  at 20 on purpose.** `construct_runtime!` gains `NorthernSwarm` in every variant, which is new
+  storage and new calls, so the bytes move for real: compact 8,882,167 bytes
+  (`0x3a6d6d13a30237307e40b4559e3a752f448fff227034648c0ee5b49b642a18b2`) — was 8,742,756 — and
+  compressed 1,524,730
+  (`0x7c3b8721360bc3a603ca59f0a9701724bf6aff0068b26bb98da0a3cfc2e10e78`) — was 1,510,586. The
+  pallet's own weights are *measured*: the shared template had been reading `{{cmd.low_range}}` and
+  `{{benchmark.base_proof_size}}`, fields the pinned CLI no longer emits, so it rendered
+  `Weight::from_parts(N, )` and eight E0611-class compile errors; the template is now the pinned
+  polkadot-sdk one and every generated weight carries a proof size.
+
+  Why no `spec_version` bump here, despite the rule two entries up ("new storage and a new call, so
+  `spec_version` moves"): this repository does not bump in-tree for a release. `spec_version` in
+  `runtime/src/lib.rs` is the **before** side, and
+  `scripts/mainnet/build_runtime_upgrade_artifact.sh` builds the **after** side by incrementing it by
+  exactly one on top of the revision being released — it refuses a worktree that already carries a
+  bump, or one whose `runtime/src/lib.rs` differs from the revision by more than that one line. So
+  the upgrade rehearsal's `spec_version_before`/`spec_version_after` pair is 20 → 21, and the
+  identity baseline gate (`scripts/ci/verify_runtime_identity_baseline.sh`) is what stops the
+  in-tree value moving silently — it pins `RuntimeVersion`, the `construct_runtime!` pallet
+  order that decides every pallet index, and the `SignedExtra` order that is part of every
+  signed payload. It had been dead: it required `RuntimeVersion.state_version`, a field the
+  pinned polkadot-sdk revision removed, so every run exited with
+  `::error::RuntimeVersion.state_version missing`, and nothing ran it to notice. It now runs in
+  the default gate set (`runtime identity baseline`), and `runtime/runtime-identity.baseline.json`
+  was regenerated at the value above with `accepted_reasons` naming why each field reads what it
+  reads.
+
+  The record was written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
+  agreed. It names `c62f93200`; the two revisions after it (`4420f99c1`, `f31686518`) touch a matrix
+  row and `crates/x3-bench`, and `runtime hash freshness` confirms none of the runtime's 131
+  dependency-graph packages changed, so the record still describes `HEAD`.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.
