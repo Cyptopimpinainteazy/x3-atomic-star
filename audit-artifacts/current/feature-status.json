@@ -3815,6 +3815,40 @@
     },
     {
       "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 42,
+      "confidence": "high",
+      "evidence": [
+        "crates/x3-rpc/src/wallet_dex_rpc.rs",
+        "pallets/atomic-trade-engine/src/runtime_api.rs",
+        "note: 2026-09-27 - three wallet-facing RPCs returned invented values and no row tracked the file"
+      ],
+      "id": "X3-OPS-014",
+      "implemented": 55,
+      "launch_scope": "guarded",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 20,
+      "missing_work": [
+        "**CLOSED 2026-09-27 \u2014 `walletDex_estimateSwap` returned a quote nobody computed.** It was `amount_out = amount_in * 95 / 100` with `estimated_gas: 100_000`, under a comment reading 'In production: call DEX runtime api for actual prices' \u2014 a 5% fee no pool charges, and a gas figure no simulation produced. It now calls the chain's own `AtomicTradeEngineApi::simulate_trade` at the best block and turns the result into a quote: a simulation the chain rejects is a refusal carrying the chain's own error, an output below the caller's `min_amount_out` is a refusal that names both numbers, and a successful one returns the chain's output and gas. `swap_id` stays zero on purpose \u2014 an estimate is not an execution, and a plausible-looking id would be a fabricated transaction reference.",
+        "**CLOSED 2026-09-27 \u2014 `walletDex_executeSwap` reported a successful swap that never happened.** It returned `Ok` with `swap_id: [1u8; 32]` and `amount_out = amount_in * 95 / 100`. A wallet reading that believes value moved. It now checks the real preconditions (signature count and length, approval required when the amount crosses the threshold) and then refuses with `Atomic swap execution is not wired into this node` \u2014 the same answer `crates/x3-swap-router`'s executor gives for the same missing piece (`NoExecutorConfigured`).",
+        "**CLOSED 2026-09-27 \u2014 `walletDex_getApprovalStatus` answered a constant.** It returned `(\"pending\", 2)` \u2014 a status and a signature threshold for an approval nobody looked up. It refuses now, as `approve_transaction` and `get_balance` in the same module already did.",
+        "**CLOSED 2026-09-27 \u2014 the approval request id was the constant `[1u8; 32]`, and the hardware-signing request id was a splice.** Every approval in the node shared one id; the signing id took the first half of the wallet id and the second half of the transaction hash, so two different requests could collide and the message the device screen shows was not committed. Both are now `blake2_256` commitments over their subject (wallet, tokens, amounts; wallet, transaction, display message).",
+        "**OPEN \u2014 the execution path itself: an atomic swap executor is not wired into the node.** Until one is, `walletDex_executeSwap` refusing is the only honest state, and the wallet surface has no live swap execution. Also open: no test drives the RPC methods through a real `FullClient` (the tests call the decisions the methods delegate to), and no gate names this crate directly."
+      ],
+      "name": "Wallet DEX RPC",
+      "paths": [
+        "crates/x3-rpc/src/wallet_dex_rpc.rs"
+      ],
+      "priority": "P1",
+      "source": "master",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "operations_user_tools",
+      "tested": 60,
+      "tests": "tested score 60% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
       "claim_risk": false,
       "composite": 78,
       "confidence": "high",
@@ -4768,7 +4802,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "fc9c8168bd2f4f5d30897d9052ada50de8682abd0e0a4c8b5d109bc248d9b97f",
+    "source_digest": "d3b1e7773f1f91d390221384f5d7f781d3bfbd3eea803c466993aa95c88bd99e",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "b8f8547e4ce2d80f52822512aadc23e411190ee386574075bce98b5fafdb953c",
@@ -4781,7 +4815,7 @@
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
-      "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
+      "feature-matrix/operations-user-tools.toml": "395e5b42f1dfda3dba8146bd5874704e3885924b584477ddf56bfc7ca3a281a1",
       "feature-matrix/runtime-core.toml": "d6883d27846f614206d7daeb2645cb5d44d2b8219c926ffb829c28f66ba3a82d",
       "feature-matrix/security-proofgate.toml": "e068bac58eb1ef680f457bcea1d8ad794ba65d89a410c7871b89d5edac2c9f37"
     }
@@ -5307,12 +5341,12 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 62,
-      "NOT INTEGRATED": 5,
+      "NOT INTEGRATED": 6,
       "NOT STARTED": 0,
       "PARTIAL": 71,
       "STUB": 1
     },
-    "matrix_features": 149,
+    "matrix_features": 150,
     "registry_features": 22,
     "registry_max_readiness": 88,
     "registry_mean_readiness": 63.18,

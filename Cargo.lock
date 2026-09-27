@@ -27164,6 +27164,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpsee",
+ "pallet-atomic-trade-engine",
  "pallet-x3-crosschain-gateway",
  "pallet-x3-kernel",
  "parity-scale-codec",

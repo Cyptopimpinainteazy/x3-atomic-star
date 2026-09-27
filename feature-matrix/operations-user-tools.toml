@@ -306,3 +306,42 @@ test_evidence = [
   "note: `test x3-wallet` (added 2026-09-25 — the crate's 174 tests ran in no gate before that) passes; the refusal tests are crates/x3-wallet/src/hardware_wallet.rs and the real Ed25519/Sr25519 checks, which refuse tampered, retargeted and truncated input, are crates/x3-wallet/src/transaction_signer.rs",
 ]
 evidence = ["crates/x3-wallet/src/hardware_wallet.rs", "crates/x3-wallet/src/transaction_signer.rs", "note: 2026-09-25 - the hardware verifier was fail-open on shaped bytes and the crate's tests ran in no gate"]
+
+[[feature]]
+id = "X3-OPS-014"
+name = "Wallet DEX RPC"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-rpc/src/wallet_dex_rpc.rs"]
+implemented = 55
+tested = 60
+mainnet_ready = 20
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = true
+# This row did not exist until 2026-09-27: the node's wallet-facing swap RPC was tracked by no
+# row, which is how three fabricated answers sat in it while every release gate was green.
+blockers = [
+  "**CLOSED 2026-09-27 — `walletDex_estimateSwap` returned a quote nobody computed.** It was `amount_out = amount_in * 95 / 100` with `estimated_gas: 100_000`, under a comment reading 'In production: call DEX runtime api for actual prices' — a 5% fee no pool charges, and a gas figure no simulation produced. It now calls the chain's own `AtomicTradeEngineApi::simulate_trade` at the best block and turns the result into a quote: a simulation the chain rejects is a refusal carrying the chain's own error, an output below the caller's `min_amount_out` is a refusal that names both numbers, and a successful one returns the chain's output and gas. `swap_id` stays zero on purpose — an estimate is not an execution, and a plausible-looking id would be a fabricated transaction reference.",
+  "**CLOSED 2026-09-27 — `walletDex_executeSwap` reported a successful swap that never happened.** It returned `Ok` with `swap_id: [1u8; 32]` and `amount_out = amount_in * 95 / 100`. A wallet reading that believes value moved. It now checks the real preconditions (signature count and length, approval required when the amount crosses the threshold) and then refuses with `Atomic swap execution is not wired into this node` — the same answer `crates/x3-swap-router`'s executor gives for the same missing piece (`NoExecutorConfigured`).",
+  "**CLOSED 2026-09-27 — `walletDex_getApprovalStatus` answered a constant.** It returned `(\"pending\", 2)` — a status and a signature threshold for an approval nobody looked up. It refuses now, as `approve_transaction` and `get_balance` in the same module already did.",
+  "**CLOSED 2026-09-27 — the approval request id was the constant `[1u8; 32]`, and the hardware-signing request id was a splice.** Every approval in the node shared one id; the signing id took the first half of the wallet id and the second half of the transaction hash, so two different requests could collide and the message the device screen shows was not committed. Both are now `blake2_256` commitments over their subject (wallet, tokens, amounts; wallet, transaction, display message).",
+  "**OPEN — the execution path itself: an atomic swap executor is not wired into the node.** Until one is, `walletDex_executeSwap` refusing is the only honest state, and the wallet surface has no live swap execution. Also open: no test drives the RPC methods through a real `FullClient` (the tests call the decisions the methods delegate to), and no gate names this crate directly.",
+]
+required_tests = [
+  "the_quote_carries_the_chains_numbers_and_its_gas",
+  "a_quote_below_the_callers_bound_is_refused_and_names_both_numbers",
+  "a_route_the_chain_refuses_is_refused_with_the_chains_own_error",
+  "approval_requests_get_distinct_ids_and_commit_to_the_subject",
+  "the_unwired_backends_refuse_instead_of_answering",
+  "test_hardware_signature_request",
+]
+test_evidence = [
+  "note: `cargo test -p x3-rpc --lib` -> 31 passed, 0 failed (2026-09-27). The two tests this row replaced recomputed the fabricated arithmetic themselves — `let amount_out = (request.amount_in * 95) / 100; assert_eq!(amount_out, 950)` — and never called the method, which is what let the fabrication look tested.",
+]
+evidence = [
+  "crates/x3-rpc/src/wallet_dex_rpc.rs",
+  "pallets/atomic-trade-engine/src/runtime_api.rs",
+  "note: 2026-09-27 - three wallet-facing RPCs returned invented values and no row tracked the file",
+]
