@@ -642,6 +642,11 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # The promotion record: what ties a passing RC run to the genesis it promotes.
+  # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
+  # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
+  # `verify` re-hashes every artifact after the fact. Cheap: 10 checks, no build.
+  "launch record:python3 tests/test_launch_record.py"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob

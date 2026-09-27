@@ -4917,10 +4917,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "30b3f73a4d4c3ea08d3b562165978117e750dd8757691f1e019216e1fcec2ffc",
+    "source_digest": "37fca3189995b32dadaecf421702d7f142225bc3975695e6e0220a643c10ca6c",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "a2909bd9c5006efb0dd6492ad7d39fe5ce0ba32dd422825f0e0726ab29b20250",
+      "FEATURE_REGISTRY.toml": "7485c78e7e58d8557b2882b8589c6d76294bce6d0574e78872b9a56ee9d89499",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5088,15 +5088,14 @@
     },
     {
       "blockers": [
-        "mainnet_rc_gate is manual approval, not automated",
-        "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`",
-        "The launch decision itself is still a human approval; no automated promotion record ties a green RC run to the deployed genesis hash"
+        "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`",
+        "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`"
       ],
       "crate_or_service": "scripts/mainnet/mainnet_rc_gate.sh",
       "feature": "launch_gate",
       "mode": "LIVE_TESTNET",
       "proof_report": "",
-      "readiness_score": 42,
+      "readiness_score": 47,
       "required_tests": [
         "scripts/testnet/testnet_rc_gate.sh::testnet_rc_gate",
         "scripts/mainnet/mainnet_rc_gate.sh::mainnet_rc_gate"
@@ -5465,7 +5464,7 @@
     "matrix_features": 153,
     "registry_features": 22,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 62.59,
+    "registry_mean_readiness": 62.82,
     "registry_min_readiness": 42
   }
 }

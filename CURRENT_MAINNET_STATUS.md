@@ -16,7 +16,7 @@ Atomic Lock (pallets/x3-atomic-kernel)             ██████░░░�
 Atomic Gateway (crates/x3-gateway)                 ██████░░░░  65%  GUARDED_TESTNET — 4 verifier families + CI gate + code review
 Triforge Runtime (pallets/evolution-core)          ██████░░░░  65%  GUARDED_TESTNET — CI build step wired, mainnet-rc1 feature wired
 X3 Wallet Pallet (pallets/x3-wallet-pallet)        █████░░░░░  55%  LIVE_TESTNET — CI gate verified, biometric security review pending
-Launch Gate (scripts/mainnet)                      ████░░░░░░  42%  LIVE_TESTNET — Both RC gates exist, fail closed, and are driven by tests/test_rc_gates.py (18 checks, gated); neither has run against 7 live validators
+Launch Gate (scripts/mainnet)                      █████░░░░░  47%  LIVE_TESTNET — Both RC gates exist and fail closed (18 checks), and a promotion record binds a passing run to the genesis it promotes (10 checks); neither gate has run against 7 live validators
 State Snapshot (crates/x3-state-snapshot)          ███████░░░  70%  GUARDED_TESTNET — Content-addressed manifest, verifier, exporter and restore, 48 tests; a snapshot rebuilt into a chain spec makes a booting node recompute the chain's own state root
 X3 Sentinel (pallets/x3-sentinel)                  █████░░░░░  47%  GUARDED_TESTNET — freeze power unreachable without sudo
 X3 Reactor (crates/x3-bench)                       ████░░░░░░  40%  LIVE_TESTNET — Benchmark not in CI critical path
