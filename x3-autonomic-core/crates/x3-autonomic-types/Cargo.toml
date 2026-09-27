@@ -6,7 +6,9 @@ description = "Shared types for X3 Autonomic Core"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
-chrono = { version = "0.4", features = ["derive"], optional = true }
+# `chrono` has no `derive` feature at any 0.4 version. Serde support is what the
+# timestamp fields need, and it is what `chrono/serde` below enables.
+chrono = { version = "0.4", features = ["serde"], optional = true }
 uuid = { version = "1.6", features = ["v4"], optional = true }
 sha2 = { version = "0.10", optional = true }
 scale = { package = "parity-scale-codec", version = "3.0", features = ["derive"] }
