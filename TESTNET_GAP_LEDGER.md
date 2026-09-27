@@ -1975,3 +1975,29 @@ missing lockfile line (`x3-common` under `pallet-x3-kernel`).
 and is being re-taken separately. The lesson that produced all three is worth keeping: a gate set is
 only as good as how often the whole of it runs, and three lanes editing one tree means "green around
 my change" is not "green".
+
+## GAP-SILENT-FEE-WAIVER — two more fees can be waived with nothing recording it
+
+**Found 2026-09-27** by hunting the class of `GAP-ROUTER-FEE-DEPOSIT` across every
+`Currency::transfer` whose destination is a configured account. Two more pay into
+`T::ProtocolTreasury::get()` and both already tolerate a refusal — they are *best-effort*, so unlike
+the router they do not fail the operation:
+
+* `pallets/atomic-trade-engine/src/lib.rs` — protocol trade fee on a completed batch
+  (`if <T as Config>::Currency::transfer(…).is_ok() { deposit ProtocolFeeCollected }`)
+* `pallets/x3-settlement-engine/src/lib.rs` — protocol settlement fee on finalization
+  (`if …transfer(…).is_ok() { deposit SettlementFeeCollected }`)
+
+That is the right behaviour and it is not a blocker. What is wrong is that the refusal is **silent**:
+when the treasury is dead and the fee is below the existential deposit — which is every fee below
+`ED`, not an edge case — the protocol collects nothing and no event, counter or log says so. A
+treasury that can never accept dust fees looks exactly like a treasury with no fees to collect, and
+the difference is revenue.
+
+**Ticket (not fixed tonight, deliberately):** give both sites the same treatment the router got —
+waive, and emit a named event (`ProtocolFeeWaived` / `SettlementFeeWaived`) — so waived revenue is
+auditable in one place across all three fee paths. Held back because both pallets are in the runtime
+graph, a release attestation was being taken while this was found, and editing a runtime-graph file
+underneath a running `make mainnet-check` invalidates it. The alternative fix — keep the treasury
+funded so the fee can always be credited — is a policy decision for the operator, and it is the same
+one recorded on row X3-XVM-014.
