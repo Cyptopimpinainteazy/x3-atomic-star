@@ -89,3 +89,29 @@ Own `crates/x3-relayer/**`, `crates/x3-validator-attestation/**` for this workst
 
 GPU measurement (no device on this box), the seven physical servers, the 72-hour soak, public
 testnet hosting, the live runtime upgrade: external blockers, unchanged.
+
+## Workstream Z — a compiled `.x3` program cannot persist state (unclaimed, highest value left)
+
+Not dispatched this round: the agent thread limit was full when the brief was written, so it is
+recorded here with the facts already verified so the next agent does not re-derive them.
+
+The chain's `.x3` path is `crates/x3-integration/src/compiler_bridge.rs::compile_source` ->
+`x3-compiler::Compiler::compile` -> `x3_parser` -> `x3_hir` -> `x3_mir` -> `x3_opt` -> `x3_backend`
+-> X3BC, and X3BC is executed on a block by `crates/x3-integration/src/mini_x3.rs`. Both interpreters
+implement `evm_sstore` (0xB4) and `evm_sload` (0xB3), both now take the chain's slots as an inherited
+view (`19445a914`), and `crates/x3-backend/src/emit.rs` already has `emit_evm_sload` /
+`emit_evm_sstore`. What is missing is every stage between the source and the emitter:
+
+* `crates/x3-parser` / `crates/x3-ast` have no node for a VM intrinsic (grep for
+  `VmIntrinsic|sstore|sload` there returns nothing);
+* `crates/x3-hir/src/hir.rs` has `HirExprKind::VmIntrinsic` with `VmIntrinsic::EvmSload`/`EvmSstore`,
+  and nothing produces it;
+* `crates/x3-mir/src/lower.rs:451` swallows it (`emit_assignment(Literal(Unit))`);
+* `crates/x3-backend/src/lower.rs:604` returns `BackendErrorKind::NotImplemented`.
+
+Deliverable: a syntax a user can write in `.x3` for the two opcodes, lowered through HIR and MIR to
+the emitter's instructions with operand checks (two args for a store, one for a load, an integer
+slot, a value a 32-byte tagged payload can carry), plus an end-to-end test that compiles **source**
+and runs the emitted X3BC on both engines: store writes slot 7, and a load handed that slot as a
+seed reads 7 while the same program with no seed reads 0. That is what makes the public-testnet
+X3Lang claim carry state instead of a constant.

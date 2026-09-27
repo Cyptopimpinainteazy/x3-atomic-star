@@ -108,8 +108,7 @@ fn a_full_ordering_window_is_settlable_in_one_block() {
     // three-validator run hit — the window opened, was committed into and revealed, and every
     // settle was refused by the pool with `Invalid Transaction: Transaction would exhaust the
     // block limits`. If that configuration is ever restored, this test says so before a drill does.
-    let previously_configured =
-        <() as WeightInfo>::settle_ordering_window(1024, 1_048_576);
+    let previously_configured = <() as WeightInfo>::settle_ordering_window(1024, 1_048_576);
     assert!(
         !previously_configured.all_lte(limit),
         "1024 commitments and 1 MiB of revealed plaintext weigh {previously_configured:?}, which \
