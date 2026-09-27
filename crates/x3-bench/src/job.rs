@@ -28,6 +28,8 @@ pub const JOB_DOMAIN: &[u8] = b"x3-bench-job-v1";
 /// Domain separator for report digests. Distinct from the job domain so a job id
 /// can never be mistaken for a report digest.
 pub const REPORT_DOMAIN: &[u8] = b"x3-bench-report-v1";
+/// Domain separator for run attestations.
+pub const ATTESTATION_DOMAIN: &[u8] = b"x3-bench-attestation-v1";
 
 /// Absorb a length-prefixed field, so `("ab", "c")` and `("a", "bc")` cannot
 /// commit to the same bytes.
@@ -125,6 +127,118 @@ pub struct PublishedReport {
     pub job_id: [u8; 32],
     pub report: Report,
     pub digest: [u8; 32],
+    /// The run attestation the report was published under, if the registry
+    /// required one. `None` means this publication carries no proof about the
+    /// run — which is what a registry with no trusted attester produces.
+    pub attestation: Option<RunAttestation>,
+}
+
+/// What a run attestation claims: which job the measurement belongs to, at which
+/// revision, on which host, with which configuration, over which samples — signed
+/// by an attester the registry trusts.
+///
+/// Without this, publication is bound to the *job's* identity and nothing else:
+/// a submitter can name any revision it likes, because nothing evidences that the
+/// measurement was taken there. Every claim here is committed to by the
+/// signature, and [`RunAttestation::verify`] refuses a claim that does not match
+/// the job, the report, the revision, or the trusted key set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunAttestation {
+    /// The job this measurement belongs to.
+    pub job_id: [u8; 32],
+    /// The revision the run was performed at.
+    pub git_revision: String,
+    /// Identity of the host that took the measurement.
+    pub host_id: String,
+    /// Digest of the build/run configuration the measurement was taken with.
+    pub config_digest: [u8; 32],
+    /// Digest of the samples the run produced.
+    pub samples_digest: [u8; 32],
+    /// Public key of the attester.
+    pub signer: [u8; 32],
+    /// Ed25519 signature over [`RunAttestation::signing_digest`].
+    pub signature: Vec<u8>,
+}
+
+impl RunAttestation {
+    /// The digest an attester signs: every claim, including who is making it, so
+    /// a signature cannot be re-attributed to another key.
+    pub fn signing_digest(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        absorb(&mut hasher, ATTESTATION_DOMAIN);
+        absorb(&mut hasher, &self.job_id);
+        absorb(&mut hasher, self.git_revision.as_bytes());
+        absorb(&mut hasher, self.host_id.as_bytes());
+        absorb(&mut hasher, &self.config_digest);
+        absorb(&mut hasher, &self.samples_digest);
+        absorb(&mut hasher, &self.signer);
+        hasher.finalize().into()
+    }
+
+    /// Build and sign a claim about one run.
+    pub fn signed(
+        key: &ed25519_dalek::SigningKey,
+        job_id: [u8; 32],
+        git_revision: impl Into<String>,
+        host_id: impl Into<String>,
+        config_digest: [u8; 32],
+        samples_digest: [u8; 32],
+    ) -> Self {
+        use ed25519_dalek::Signer;
+
+        let mut attestation = Self {
+            job_id,
+            git_revision: git_revision.into(),
+            host_id: host_id.into(),
+            config_digest,
+            samples_digest,
+            signer: key.verifying_key().to_bytes(),
+            signature: Vec::new(),
+        };
+        attestation.signature = key.sign(&attestation.signing_digest()).to_bytes().to_vec();
+        attestation
+    }
+
+    /// Check this claim against the job it names, the report's content digest, and
+    /// the attesters the registry trusts. Every failure names which claim broke.
+    pub fn verify(
+        &self,
+        trusted: &[[u8; 32]],
+        job: &BenchmarkJob,
+        report_digest: [u8; 32],
+    ) -> Result<(), PublishRefusal> {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+        if self.job_id != job.id {
+            return Err(PublishRefusal::AttestedJobMismatch {
+                expected: job.id,
+                found: self.job_id,
+            });
+        }
+        if self.git_revision != job.request.git_revision {
+            return Err(PublishRefusal::RevisionMismatch {
+                expected: job.request.git_revision.clone(),
+                found: self.git_revision.clone(),
+            });
+        }
+        if self.samples_digest != report_digest {
+            return Err(PublishRefusal::SamplesDigestMismatch {
+                expected: report_digest,
+                found: self.samples_digest,
+            });
+        }
+        if !trusted.contains(&self.signer) {
+            return Err(PublishRefusal::UntrustedSigner {
+                signer: self.signer,
+            });
+        }
+        let key =
+            VerifyingKey::from_bytes(&self.signer).map_err(|_| PublishRefusal::BadSignature)?;
+        let signature =
+            Signature::from_slice(&self.signature).map_err(|_| PublishRefusal::BadSignature)?;
+        key.verify(&self.signing_digest(), &signature)
+            .map_err(|_| PublishRefusal::BadSignature)
+    }
 }
 
 /// Why a submission, a publication or a verification was refused.
@@ -156,6 +270,31 @@ pub enum PublishRefusal {
         published: [u8; 32],
         recomputed: [u8; 32],
     },
+    /// This registry requires a run attestation and none was supplied.
+    Unattested {
+        job_id: [u8; 32],
+    },
+    /// The attestation names a different job than the one being published.
+    AttestedJobMismatch {
+        expected: [u8; 32],
+        found: [u8; 32],
+    },
+    /// The attestation claims a revision the job did not ask for.
+    RevisionMismatch {
+        expected: String,
+        found: String,
+    },
+    /// The attestation's sample digest is not the report's content digest.
+    SamplesDigestMismatch {
+        expected: [u8; 32],
+        found: [u8; 32],
+    },
+    /// The signature is from a key this registry does not trust.
+    UntrustedSigner {
+        signer: [u8; 32],
+    },
+    /// The signature does not cover this attestation.
+    BadSignature,
 }
 
 impl core::fmt::Display for PublishRefusal {
@@ -181,6 +320,29 @@ impl core::fmt::Display for PublishRefusal {
                     f,
                     "the report's content does not match the published digest"
                 )
+            }
+            PublishRefusal::Unattested { .. } => write!(
+                f,
+                "this registry requires a run attestation and none was supplied"
+            ),
+            PublishRefusal::AttestedJobMismatch { .. } => {
+                write!(f, "the attestation names a different job")
+            }
+            PublishRefusal::RevisionMismatch { expected, found } => write!(
+                f,
+                "the attestation claims revision {found} but the job asked for {expected}"
+            ),
+            PublishRefusal::SamplesDigestMismatch { .. } => write!(
+                f,
+                "the attestation's sample digest is not the report's content digest"
+            ),
+            PublishRefusal::UntrustedSigner { signer } => write!(
+                f,
+                "the attestation is signed by {} which this registry does not trust",
+                hex::encode(signer)
+            ),
+            PublishRefusal::BadSignature => {
+                write!(f, "the attestation signature does not verify")
             }
         }
     }
@@ -216,11 +378,34 @@ pub fn report_digest(report: &Report) -> [u8; 32] {
 #[derive(Debug, Default)]
 pub struct ReportRegistry {
     published: BTreeMap<[u8; 32], PublishedReport>,
+    /// Attester keys this registry accepts. Empty means "no attestation is
+    /// required", which is what the local/dev path uses; a non-empty set makes an
+    /// attestation mandatory, because a registry that knows who may attest has no
+    /// reason to accept a report from nobody.
+    trusted_attesters: Vec<[u8; 32]>,
 }
 
 impl ReportRegistry {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A registry that accepts a report only from one of `attesters`.
+    pub fn trusting(attesters: Vec<[u8; 32]>) -> Self {
+        Self {
+            published: BTreeMap::new(),
+            trusted_attesters: attesters,
+        }
+    }
+
+    /// Whether this registry refuses an unattested publication.
+    pub fn requires_attestation(&self) -> bool {
+        !self.trusted_attesters.is_empty()
+    }
+
+    /// The attester keys this registry accepts.
+    pub fn trusted_attesters(&self) -> &[[u8; 32]] {
+        &self.trusted_attesters
     }
 
     pub fn len(&self) -> usize {
@@ -243,10 +428,41 @@ impl ReportRegistry {
     ///
     /// Returns the digest a reader can re-check. A job publishes once; a report
     /// that does not cover the job's samples is not stored.
+    ///
+    /// A registry with trusted attesters **refuses this call**: evidence that
+    /// says "somebody ran it" is not evidence of who ran it, and the only way to
+    /// publish there is [`ReportRegistry::publish_attested`].
     pub fn publish(
         &mut self,
         job: &BenchmarkJob,
         report: Report,
+    ) -> Result<[u8; 32], PublishRefusal> {
+        if self.requires_attestation() {
+            return Err(PublishRefusal::Unattested { job_id: job.id });
+        }
+        self.insert(job, report, None)
+    }
+
+    /// Publish `report` under a run attestation that has to verify against the
+    /// job, the report and this registry's trusted attesters.
+    pub fn publish_attested(
+        &mut self,
+        job: &BenchmarkJob,
+        report: Report,
+        attestation: &RunAttestation,
+    ) -> Result<[u8; 32], PublishRefusal> {
+        let digest = report_digest(&report);
+        attestation.verify(&self.trusted_attesters, job, digest)?;
+        self.insert(job, report, Some(attestation.clone()))
+    }
+
+    /// The same as [`ReportRegistry::publish`] with no attestation supplied.
+    /// Kept separate so the strict path cannot be reached by accident.
+    fn insert(
+        &mut self,
+        job: &BenchmarkJob,
+        report: Report,
+        attestation: Option<RunAttestation>,
     ) -> Result<[u8; 32], PublishRefusal> {
         if self.published.contains_key(&job.id) {
             return Err(PublishRefusal::AlreadyPublished { job_id: job.id });
@@ -274,9 +490,27 @@ impl ReportRegistry {
                 job_id: job.id,
                 report,
                 digest,
+                attestation,
             },
         );
         Ok(digest)
+    }
+
+    /// Re-check the attestation a report was published under.
+    pub fn verify_attestation(
+        &self,
+        job: &BenchmarkJob,
+        report: &Report,
+    ) -> Result<(), PublishRefusal> {
+        let published = self
+            .published
+            .get(&job.id)
+            .ok_or(PublishRefusal::NotPublished { job_id: job.id })?;
+        let attestation = published
+            .attestation
+            .as_ref()
+            .ok_or(PublishRefusal::Unattested { job_id: job.id })?;
+        attestation.verify(&self.trusted_attesters, job, report_digest(report))
     }
 
     /// Re-check a report against what was published for `job`.
@@ -321,6 +555,184 @@ mod tests {
 
     fn report(samples: Vec<SampleMetrics>) -> Report {
         Report::new(samples)
+    }
+
+    /// A fresh copy of the same one-sample report, for tests that need the same
+    /// content twice (the API takes the report by value, so a second use needs a
+    /// second value).
+    fn measured_clone() -> Report {
+        report(vec![sample("one", 10, 100)])
+    }
+
+    fn attester() -> ed25519_dalek::SigningKey {
+        ed25519_dalek::SigningKey::from_bytes(&[7u8; 32])
+    }
+
+    fn strict_registry() -> ReportRegistry {
+        ReportRegistry::trusting(vec![attester().verifying_key().to_bytes()])
+    }
+
+    fn attestation_for(job: &BenchmarkJob, rep: &Report) -> RunAttestation {
+        RunAttestation::signed(
+            &attester(),
+            job.id(),
+            job.request().git_revision.clone(),
+            "x3star1",
+            [0x11; 32],
+            report_digest(rep),
+        )
+    }
+
+    /// The gap this closes: publication used to be bound to the job's identity and
+    /// nothing else, so a submitter could name any revision it liked. A registry
+    /// that knows who may attest refuses a report with no attestation at all.
+    #[test]
+    fn a_strict_registry_refuses_an_unattested_report() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let mut registry = strict_registry();
+        assert!(registry.requires_attestation());
+        assert_eq!(registry.trusted_attesters().len(), 1);
+
+        let refusal = registry
+            .publish(&job, report(vec![sample("one", 10, 100)]))
+            .expect_err("a strict registry must not accept an unattested report");
+        assert!(
+            matches!(refusal, PublishRefusal::Unattested { .. }),
+            "expected Unattested, got {refusal:?}"
+        );
+        assert_eq!(registry.len(), 0, "the refused report was not stored");
+    }
+
+    #[test]
+    fn a_signed_attestation_publishes_and_reverifies() {
+        let job = BenchmarkJob::submit(request("abc123", &["one", "two"])).unwrap();
+        let rep = report(vec![sample("one", 10, 100), sample("two", 20, 200)]);
+        let attestation = attestation_for(&job, &rep);
+        let expected = report_digest(&rep);
+
+        let mut registry = strict_registry();
+        let digest = registry
+            .publish_attested(&job, rep, &attestation)
+            .expect("a verified attestation publishes");
+        assert_eq!(digest, expected);
+        let stored = registry.get(&job.id()).unwrap();
+        assert!(stored.attestation.is_some());
+        assert_eq!(stored.attestation.as_ref().unwrap().host_id, "x3star1");
+        let stored_report = &registry.get(&job.id()).unwrap().report;
+        registry
+            .verify_attestation(&job, stored_report)
+            .expect("the stored attestation re-verifies");
+    }
+
+    #[test]
+    fn a_report_that_is_not_what_the_attester_measured_is_refused() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let measured = report(vec![sample("one", 10, 100)]);
+        let attestation = attestation_for(&job, &measured);
+        // Same sample set, different numbers: the digest is the only thing that
+        // ties the attestation to *this* measurement.
+        let swapped = report(vec![sample("one", 9_999, 100)]);
+
+        let mut registry = strict_registry();
+        let refusal = registry
+            .publish_attested(&job, swapped, &attestation)
+            .expect_err("a report the attester did not measure must not publish");
+        assert!(
+            matches!(refusal, PublishRefusal::SamplesDigestMismatch { .. }),
+            "expected SamplesDigestMismatch, got {refusal:?}"
+        );
+    }
+
+    #[test]
+    fn an_attestation_for_another_revision_or_job_is_refused() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let rep = report(vec![sample("one", 10, 100)]);
+
+        let mut wrong_revision = attestation_for(&job, &rep);
+        wrong_revision.git_revision = "def456".to_string();
+        let mut registry = strict_registry();
+        let refusal = registry
+            .publish_attested(&job, measured_clone(), &wrong_revision)
+            .expect_err("a claim about another revision must be refused");
+        assert!(
+            matches!(refusal, PublishRefusal::RevisionMismatch { .. }),
+            "expected RevisionMismatch, got {refusal:?}"
+        );
+
+        // A different job (different sample set, so a different identity) must not
+        // accept an attestation that was signed for the first one.
+        let other = BenchmarkJob::submit(request("abc123", &["two"])).unwrap();
+        let reused = attestation_for(&job, &measured_clone());
+        let refusal = registry
+            .publish_attested(&other, measured_clone(), &reused)
+            .expect_err("a re-used attestation from another job must be refused");
+        assert!(
+            matches!(refusal, PublishRefusal::AttestedJobMismatch { .. }),
+            "expected AttestedJobMismatch, got {refusal:?}"
+        );
+    }
+
+    #[test]
+    fn a_signature_from_an_untrusted_key_is_refused() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let rep = report(vec![sample("one", 10, 100)]);
+        let stranger = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        let attestation = RunAttestation::signed(
+            &stranger,
+            job.id(),
+            "abc123",
+            "not-a-trusted-host",
+            [0x11; 32],
+            report_digest(&rep),
+        );
+
+        let mut registry = strict_registry();
+        let refusal = registry
+            .publish_attested(&job, rep, &attestation)
+            .expect_err("an unknown attester must be refused");
+        assert!(
+            matches!(refusal, PublishRefusal::UntrustedSigner { .. }),
+            "expected UntrustedSigner, got {refusal:?}"
+        );
+        assert!(refusal.to_string().contains("does not trust"));
+    }
+
+    #[test]
+    fn a_tampered_attestation_does_not_verify() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let rep = report(vec![sample("one", 10, 100)]);
+        let mut attestation = attestation_for(&job, &rep);
+        // Re-attribute the run to another host without re-signing.
+        attestation.host_id = "somebody-elses-box".to_string();
+
+        let mut registry = strict_registry();
+        let refusal = registry
+            .publish_attested(&job, rep, &attestation)
+            .expect_err("a tampered claim must not verify");
+        assert!(
+            matches!(refusal, PublishRefusal::BadSignature),
+            "{refusal:?}"
+        );
+    }
+
+    /// The local path stays usable and *says* it carries no proof about the run,
+    /// so a reader is never left to assume one.
+    #[test]
+    fn the_local_registry_publishes_and_reports_that_it_is_unattested() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let rep = report(vec![sample("one", 10, 100)]);
+        let mut registry = ReportRegistry::new();
+        assert!(!registry.requires_attestation());
+        registry.publish(&job, rep).expect("local publish works");
+        assert!(
+            registry.get(&job.id()).unwrap().attestation.is_none(),
+            "an unattested publication must not look attested"
+        );
+        let stored_report = &registry.get(&job.id()).unwrap().report;
+        assert!(matches!(
+            registry.verify_attestation(&job, stored_report),
+            Err(PublishRefusal::Unattested { .. })
+        ));
     }
 
     #[test]

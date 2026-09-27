@@ -24,5 +24,5 @@ pub use comparator::{
 };
 pub use job::{
     report_digest, BenchmarkJob, JobRequest, PublishRefusal, PublishedReport, ReportRegistry,
-    JOB_DOMAIN, REPORT_DOMAIN,
+    RunAttestation, ATTESTATION_DOMAIN, JOB_DOMAIN, REPORT_DOMAIN,
 };

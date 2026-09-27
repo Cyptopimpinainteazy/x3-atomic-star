@@ -269,11 +269,22 @@ dangerous_paths = ["freeze authority", "upgradeability"]
 mode = "LIVE_TESTNET"
 crate_or_service = "crates/x3-bench"
 tauri_app = "Reactor"
-required_tests = ["create_and_compare_reports", "test_compile_optimized"]
+required_tests = [
+  "create_and_compare_reports",
+  "test_compile_optimized",
+  "the_optimizer_moves_the_measured_instruction_count_down",
+  "a_strict_registry_refuses_an_unattested_report",
+  "a_signed_attestation_publishes_and_reverifies",
+  "a_report_that_is_not_what_the_attester_measured_is_refused",
+  "an_attestation_for_another_revision_or_job_is_refused",
+  "a_signature_from_an_untrusted_key_is_refused",
+  "a_tampered_attestation_does_not_verify",
+  "the_local_registry_publishes_and_reports_that_it_is_unattested",
+]
 # `reports/reactor_benchmark_report.md` does not exist; citation cleared. The row
 # already records that its benchmark is not in the CI critical path.
 proof_report = ""
-readiness_score = 40
+readiness_score = 49
 # 2026-09-27: the Northern Swarm/Reactor hard gate
 # (`scripts/mainnet/swarm_reactor_gate.py`) is named "reactor" but does **not**
 # reach this crate — it checks `pallets/northern-swarm` and
@@ -283,9 +294,12 @@ readiness_score = 40
 blockers = [
   "Benchmark infrastructure not in CI critical path",
   "GPU benchmark path depends on optional sidecar",
-  "**CLOSED 2026-09-27 — a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` (449 lines, commit `f31686518`) is a real job path with a publish step and a once-only guarantee, and `cargo test -p x3-bench` is 14 + 4 passed, 0 failed, run by the `test x3-bench` gate. The score stays 40 because the two blockers above it are unchanged and the formula is applied rather than re-guessed: implemented 55, tested 55, mainnet_ready 15 → 19.25 + 13.75 + 6 = 39, and the previously cited `benchmark_job_submits` / `benchmark_result_publishes` names are still not used — the new tests are the ones that exist."
+  "**CLOSED 2026-09-27 — a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` is a real job path with a publish step and a once-only guarantee, run by the `test x3-bench` gate.",
+  "**CLOSED 2026-09-27 — publication carries a proof about the run, not just about the job.** `RunAttestation` commits to the job id, the revision, the host, a configuration digest and the report's content digest, signed with ed25519; `ReportRegistry::trusting(attesters)` makes an attestation *mandatory* (an unattested `publish` is refused with `Unattested`), and `publish_attested` refuses a claim about another job (`AttestedJobMismatch`), another revision (`RevisionMismatch`), another measurement (`SamplesDigestMismatch`), an untrusted key (`UntrustedSigner`) or a tampered field (`BadSignature`). The local registry still publishes and now says `attestation: None` rather than looking attested. Seven tests drive it; break-it-first: deleting the samples-digest check reddens `a_report_that_is_not_what_the_attester_measured_is_refused`, and the file was restored byte-identically.",
+  "**CLOSED 2026-09-27 — the measurement is asserted, not just the compilation.** `the_optimizer_moves_the_measured_instruction_count_down` runs the pipeline on a redundant fixture both ways and requires the optimized instruction count to be strictly lower, every reported figure to be non-zero, and each result's byte count to equal the bytes it actually emitted — the old tests only asserted that compilation succeeded,",
+  "The two halves of the Reactor are still unjoined: the placement scheduler lives in `crates/northern-swarm/src/reactor.rs` (where the backends are) and this crate owns benchmark submission and publication, so a published report cannot yet say which backend ran the job."
 ]
-dangerous_paths = ["gpu benchmark", "concurrency"]
+dangerous_paths = ["gpu benchmark", "concurrency", "benchmark attestation keys"]
 
 [tauri_os]
 mode = "GUARDED_TESTNET"

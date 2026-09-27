@@ -22,6 +22,10 @@ env_logger = "0.10"
 # Benchmark job identities and report digests. Already in the workspace lock
 # graph; declared because `job.rs` hashes with it.
 sha2 = "0.10"
+# Run attestations: a published report has to say *who* measured it, and a
+# signature is the only claim a reader can re-check. Already in the workspace
+# lock graph via `x3-swarm-core`.
+ed25519-dalek = { workspace = true }
 
 # X3 workspace crates
 x3-parser = { path = "../x3-parser" }
