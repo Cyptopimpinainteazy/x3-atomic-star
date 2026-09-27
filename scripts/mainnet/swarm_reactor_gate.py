@@ -163,6 +163,30 @@ def check_pallet_contract() -> None:
     else:
         ok("Northern Swarm weights carry benchmark CLI provenance")
 
+    # This is the defect that made the merged branch fail to compile: a generated
+    # weight whose proof-size argument is empty (`Weight::from_parts(x, )`). The
+    # pinned CLI only emits that when the template reads a field it no longer
+    # provides, so check the generated file *and* the template that produces it.
+    empty_proof = re.findall(r"Weight::from_parts\(\s*[0-9_]+\s*,\s*\)", weights)
+    if empty_proof:
+        fail(
+            f"Northern Swarm weights.rs has {len(empty_proof)} weight(s) with no proof "
+            "size (`Weight::from_parts(x, )`), which does not compile; regenerate with "
+            "the repository's FRAME template"
+        )
+    else:
+        ok("every generated Northern Swarm weight carries a proof size")
+
+    template = read(".maintain/frame-weight-template.hbs")
+    if "base_calculated_proof_size" not in template:
+        fail(
+            ".maintain/frame-weight-template.hbs does not read "
+            "`base_calculated_proof_size`, the field the pinned benchmark CLI emits; "
+            "regenerating any pallet would produce weights with no proof size again"
+        )
+    else:
+        ok("the FRAME weight template reads the pinned CLI's proof-size field")
+
     if "type QuorumThreshold" not in pallet:
         fail("no on-chain quorum threshold exists for result finalization")
     else:
