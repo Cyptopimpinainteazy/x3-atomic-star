@@ -630,7 +630,7 @@ pub mod pallet {
             // bounded winner count and split the total task bounty exactly once.
             let divisor: BalanceOf<T> = winner_count.into();
             let share = task.reward / divisor;
-            let mut paid = Zero::zero();
+            let mut paid: BalanceOf<T> = Zero::zero();
 
             for executor in winners.iter() {
                 let remaining = T::Currency::repatriate_reserved(
