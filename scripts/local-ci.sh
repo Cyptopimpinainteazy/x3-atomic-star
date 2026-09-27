@@ -686,6 +686,14 @@ GATES_LIVE=(
   # settled. It is charged for the window's actual contents now, and the runtime caps were reduced
   # so even a full window fits.
   "ordering window on a live chain:bash scripts/drills/ordering_window_live.sh"
+  # The wallet pallet's biometric registration and social recovery, on a live three-validator chain.
+  # `X3-ECO-001`/`X3-ECO-004` were P0/core rows proven only against the pallet's mock — and before
+  # `d85f79c85` that mock's recovery test had to seed a guardian record straight into storage,
+  # because no extrinsic created one. This drives the real extrinsics: a profile that names its
+  # signer, an unsupported type refused by name, guardians registered, a guardian-initiated request
+  # with a delay, two approvals, a finalize refused before the delay and refused again for a
+  # non-owner cancel, and a finalize that changes the *stored* recovery owner.
+  "wallet recovery on a live chain:bash scripts/drills/wallet_recovery_live.sh"
   "EVM contract lifecycle:X3-contracts/evm/test-live-lifecycle.sh"
   # `cargo build-sbf` runs `cargo +1.89.0-sbpf-solana-v1.54 …` internally, and
   # `+toolchain` only works through the rustup shim — which this script puts
@@ -1161,6 +1169,7 @@ SERIAL_GATES=(
   "snapshot restore across a live chain"
   "runtime upgrade through governance"
   "ordering window on a live chain"
+  "wallet recovery on a live chain"
   "load soak across validators"
   "EVM contract lifecycle"
   "SVM contract lifecycle"
