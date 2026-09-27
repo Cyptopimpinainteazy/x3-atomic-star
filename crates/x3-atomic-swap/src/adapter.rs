@@ -475,6 +475,62 @@ pub trait X3VmAdapter: Send + Sync {
     fn readiness_score(&self) -> AdapterReadinessScore;
 }
 
+/// Every adapter this crate implements, one per [`VmType`].
+///
+/// One list, not two: the scoreboard's default view and the cross-adapter proof tests used to
+/// build their own inventories, which is how the scoreboard came to advertise numbers (Substrate
+/// 80, X3VM 100, Bitcoin 80) that those same adapters' `readiness_score()` no longer declared.
+/// Anything that needs "all of them" calls this.
+///
+/// `ZkVmAdapter` is included even though it reports `SourceLockFailed` — zkVMs have no lock — so a
+/// caller that needs a lock proof has to skip it explicitly (see
+/// `cross_adapter_tests::test_all_adapters_produce_consistent_lock_proof_structure`).
+pub fn all_adapters() -> Vec<Box<dyn X3VmAdapter>> {
+    vec![
+        Box::new(crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20])),
+        Box::new(crate::svm_htlc::SvmAdapter::at_program_id([0x02u8; 32])),
+        Box::new(crate::substrate_htlc::SubstrateHtlcAdapter::new(
+            "sub".into(),
+        )),
+        Box::new(crate::bitcoin_htlc::BtcHtlcAdapter::new(
+            crate::bitcoin_htlc::BitcoinNetwork::Mainnet,
+        )),
+        Box::new(crate::x3vm_htlc::X3VmAdapterImpl::simulation("x3".into())),
+        Box::new(crate::move_vm_htlc::MoveVmAdapter::new("sui".into())),
+        Box::new(crate::cosmwasm_htlc::CosmWasmAdapter::new("osmo".into())),
+        Box::new(crate::cairo_vm_htlc::CairoVmAdapter::new("stark".into())),
+        Box::new(crate::plutus_htlc::PlutusHtlcAdapter::new(
+            "cardano".into(),
+            crate::plutus_htlc::PlutusNetwork::Mainnet,
+        )),
+        Box::new(crate::fuel_htlc::FuelHtlcAdapter::new(
+            "fuel".into(),
+            crate::fuel_htlc::FuelNetwork::Mainnet,
+        )),
+        Box::new(crate::ton_htlc::TonHtlcAdapter::new(
+            "ton".into(),
+            crate::ton_htlc::TonNetwork::Mainnet,
+        )),
+        Box::new(crate::near_htlc::NearHtlcAdapter::new(
+            "near".into(),
+            crate::near_htlc::NearNetwork::Mainnet,
+        )),
+        Box::new(crate::soroban_htlc::SorobanHtlcAdapter::new(
+            "soroban".into(),
+            crate::soroban_htlc::SorobanNetwork::Mainnet,
+        )),
+        Box::new(crate::polkadot_ink_htlc::InkHtlcAdapter::new(
+            "ink".into(),
+            crate::polkadot_ink_htlc::InkNetwork::PolkadotMainnet,
+        )),
+        Box::new(crate::wasm_l1_htlc::WasmL1Adapter::new(
+            "icp".into(),
+            crate::wasm_l1_htlc::WasmL1Runtime::InternetComputer,
+        )),
+        Box::new(crate::zkvm_htlc::ZkVmAdapter::new("zk".into())),
+    ]
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cross-Adapter Atomicity Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -724,55 +780,17 @@ mod cross_adapter_tests {
 
     #[test]
     fn test_all_adapters_produce_consistent_lock_proof_structure() {
-        let adapters: Vec<Box<dyn X3VmAdapter>> = vec![
-            Box::new(crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20])),
-            Box::new(crate::svm_htlc::SvmAdapter::at_program_id([0x02u8; 32])),
-            Box::new(crate::substrate_htlc::SubstrateHtlcAdapter::new(
-                "sub".into(),
-            )),
-            Box::new(crate::bitcoin_htlc::BtcHtlcAdapter::new(
-                crate::bitcoin_htlc::BitcoinNetwork::Mainnet,
-            )),
-            Box::new(crate::x3vm_htlc::X3VmAdapterImpl::simulation("x3".into())),
-            Box::new(crate::move_vm_htlc::MoveVmAdapter::new("sui".into())),
-            Box::new(crate::cosmwasm_htlc::CosmWasmAdapter::new("osmo".into())),
-            Box::new(crate::cairo_vm_htlc::CairoVmAdapter::new("stark".into())),
-            Box::new(crate::plutus_htlc::PlutusHtlcAdapter::new(
-                "cardano".into(),
-                crate::plutus_htlc::PlutusNetwork::Mainnet,
-            )),
-            Box::new(crate::fuel_htlc::FuelHtlcAdapter::new(
-                "fuel".into(),
-                crate::fuel_htlc::FuelNetwork::Mainnet,
-            )),
-            Box::new(crate::ton_htlc::TonHtlcAdapter::new(
-                "ton".into(),
-                crate::ton_htlc::TonNetwork::Mainnet,
-            )),
-            Box::new(crate::near_htlc::NearHtlcAdapter::new(
-                "near".into(),
-                crate::near_htlc::NearNetwork::Mainnet,
-            )),
-            Box::new(crate::soroban_htlc::SorobanHtlcAdapter::new(
-                "soroban".into(),
-                crate::soroban_htlc::SorobanNetwork::Mainnet,
-            )),
-            Box::new(crate::polkadot_ink_htlc::InkHtlcAdapter::new(
-                "ink".into(),
-                crate::polkadot_ink_htlc::InkNetwork::PolkadotMainnet,
-            )),
-            Box::new(crate::wasm_l1_htlc::WasmL1Adapter::new(
-                "icp".into(),
-                crate::wasm_l1_htlc::WasmL1Runtime::InternetComputer,
-            )),
-        ];
+        let adapters = all_adapters();
 
         // ZkVmAdapter intentionally returns SourceLockFailed (zkVMs don't support lock),
-        // so we exclude it from this structural proof-consistency test.
-        let skip_zk = |name: &str| name == "zk";
+        // so we exclude it from this structural proof-consistency test. Match on the VM type, not
+        // the adapter's display name: the name is the constructor's chain id, so a name-based skip
+        // silently stops skipping the moment anyone renames the chain (it did, when this list moved
+        // into `all_adapters()`).
+        let skip_zk = |vm_type: VmType| vm_type == VmType::ZkVm;
         let intent = sample_intent(99, "all", "all");
         for adapter in &adapters {
-            if skip_zk(adapter.adapter_name()) {
+            if skip_zk(adapter.vm_type()) {
                 continue;
             }
             let lock = adapter.lock(&intent).unwrap();

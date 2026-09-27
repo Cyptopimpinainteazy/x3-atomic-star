@@ -173,7 +173,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": true,
-      "composite": 35,
+      "composite": 54,
       "confidence": "high",
       "evidence": [
         "reports/atomic_crossvm_completion_audit.md",
@@ -181,25 +181,30 @@
         "note: 2026-09-26 - the audit's finding was reproduced in code: the adapters' self-declared readiness was the score, and it claimed evidence they fabricate"
       ],
       "id": "X3-CLAIM-003",
-      "implemented": 45,
+      "implemented": 60,
       "launch_scope": "research",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 38,
       "missing_work": [
-        "Distinguish internal cross-VM from external-chain settlement",
+        "**CLOSED 2026-09-27 \u2014 the two scopes are separate values now, not a sentence in an audit.** `SettlementScope::{InternalDomain, ExternalChain}` classifies every adapter by `VmType` (EVM/SVM/X3VM are the domains X3 runs; the other thirteen settle on chains X3 does not run), `AdapterScoreboard` carries `internal_score`/`internal_max_score` and `external_score`/`external_max_score` beside the pooled figure, `internal_is_ready()`/`external_is_ready()` are the two bars a completeness claim must clear, and the CLI prints all three lines. `Default for SettlementScope` is `ExternalChain` \u2014 fail closed \u2014 and it is the `#[serde(default)]`, so a scoreboard serialised before the field existed loads without any entry being silently promoted to an internal domain. Break-it-first, measured: classifying `BitcoinScript` as internal reddens exactly `only_the_three_domains_x3_runs_are_internal`, `an_external_adapter_never_moves_the_internal_score`, `the_pooled_score_is_a_blend_that_hides_whichever_side_is_unready` and `the_default_scoreboard_agrees_with_every_adapters_own_declaration`, and leaves the other scoreboard tests green; restoring the match returns 17/17",
+        "**The default view was a second place the scoreboard fed the claim.** `AdapterScoreboard::default_scoreboard()` hand-wrote sixteen entries and had drifted: `x3-adapter-substrate` 80, `x3-adapter-x3vm` 100, `x3-adapter-bitcoin` 80, while those adapters' own `readiness_score()` declared 60-70 with the missing capabilities named. Nothing tied the table to the code, so nothing could make it disagree. It is now `from_adapters(crate::adapter::all_adapters())` \u2014 one inventory, shared with the cross-adapter proof test (`test_all_adapters_produce_consistent_lock_proof_structure`, whose skip for the zk adapter now matches on `VmType::ZkVm` rather than on a display name that was the constructor's chain id) \u2014 and `the_default_scoreboard_agrees_with_every_adapters_own_declaration` fails if a score, a vm_type, a scope or a missing-capability count ever drifts from the adapter's own declaration",
+        "**Measured on the derived board, and the opposite of what this row assumed: internal 56, external 60, pooled 60.** X3's own three domains are not the strong side, and neither side is ready, so \"cross-chain complete\" is false on both counts. `mainnet_ready` stays below the claim-risk cap (40) for that reason: the claim is now *scoped* rather than proven",
+        "Still open for a completeness claim, and named in the audit's 2026-09-27 addendum: no external chain is live, no external adapter is proven against a real chain, BTC has no trusted header source, and the legacy adapter family (`evm_htlc.rs`, `bitcoin_htlc.rs`) is still in the crate as a drift hazard even though it is off the live path",
         "**2026-09-26, corrected \u2014 the scoreboard fed the claim.** `AdapterScoreboard` reports each adapter's self-declared `readiness_score()` verbatim, and fourteen adapters declared `event_proof_extraction`, `finality_proof`, `rpc_indexer_support` and `proof_ledger_integration` true while building their lock, claim and refund proofs from `mock_tx_id(..)`, a \"Simulated block number\" and literal \"mock proof\" payloads, with `finality_status` returning a block hash derived from the number 42. All fourteen are corrected now: every adapter whose `finality_status` returns a constant proof declares `finality_proof: false`, the five that declared `proof_ledger_integration` without a ledger write declare it false, and the tests that pinned the inflated totals moved with them (move_vm and bitcoin 80 -> 60, cosmwasm 80/100/80 -> 60/80/60, wasm_l1 90 -> 70, and the rest 70 -> 60). `security/adapter-readiness-claims-baseline.txt` is empty, so `scripts/ci/check-adapter-readiness-claims.py` is a plain gate now rather than a ratchet; `crates/x3-atomic-swap/tests/adapter_readiness_truth.rs` pins the EVM and SVM cases and the integration suite asserts the honest overall rather than `>= 70`. Measured load-bearing: re-declaring `finality_proof: true` on the EVM adapter fails both the checker and the test."
       ],
       "name": "Cross-chain complete claim",
       "paths": [
-        "reports/atomic_crossvm_completion_audit.md"
+        "reports/atomic_crossvm_completion_audit.md",
+        "crates/x3-atomic-swap/src/scoreboard.rs",
+        "crates/x3-atomic-swap/src/adapter.rs"
       ],
       "priority": "P0",
       "source": "claim_risk",
       "state": "NOT INTEGRATED",
       "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
       "subsystem": "claims_hygiene",
-      "tested": 30,
-      "tests": "tested score 30% (no named test list on this row)"
+      "tested": 70,
+      "tests": "tested score 70% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4598,12 +4603,12 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "67ee1eacc26b59e2eda19d6f97bf5ebf39a73fdc378c8c192787e560c09ee0db",
+    "source_digest": "3a154e58741e1afd3ad5b5da14073a5a2e92292935e5fa9a3f640e5f62d6553d",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
       "feature-matrix/agents-experimental.toml": "ee8873db3141b8db2bf09a04e3268b62f47fb286191c82189143b721cd2fd5a4",
-      "feature-matrix/claims-hygiene.toml": "03b541230c64713f1ec9a2e8f3a8a8ec488488831896c7073b5feabcf390a252",
+      "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "4d9eaf186008d82f7b8e1a6b06b10b185d2c49e332134ec8298d7600701b1496",
       "feature-matrix/cross-vm-atomic.toml": "648d79cf40b9464d215d63a840f1a6a6fd1d097aea45aea0ae9e2c7f6b75fbc7",

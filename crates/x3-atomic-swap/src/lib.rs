@@ -182,7 +182,9 @@ pub use rpc_client::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcClient, R
 pub use rpc_quorum::{
     ConsensusResult, ConsolidatedQuorum, RpcProvider, RpcQuorumOracle, RpcVote, SimpleRpcQuorum,
 };
-pub use scoreboard::{AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SwapScoreboard};
+pub use scoreboard::{
+    AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SettlementScope, SwapScoreboard,
+};
 pub use secret_release::{
     SecretReleaseEvidence, SecretReleaseFirewall, SecretReleasePermit, SecretReleaseRequirement,
 };

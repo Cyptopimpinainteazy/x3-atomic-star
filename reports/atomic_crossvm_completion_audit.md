@@ -204,3 +204,44 @@ The sentence to keep in mind is this file's own: *"fully coherent internally, no
 integrated externally."* The internal legs are now proven end to end against real local
 chains; what is missing is public deployment, the BTC trust root, and the submitting
 authority — not the proof machinery.
+
+## Addendum, 2026-09-27 — the distinction this audit was missing, now in the code
+
+The audit's own verdict sentence (*"fully coherent internally, not fully integrated
+externally"*) is the distinction, but nothing in the code made it: `AdapterScoreboard`
+averaged every adapter — the three domains X3 executes itself and the thirteen that settle on
+chains X3 does not run — into a single `overall_score`, so a board with unready external chains
+read exactly like one that was cross-chain complete. `X3-CLAIM-003`'s first blocker was that
+conflation, and it is closed in `crates/x3-atomic-swap/src/scoreboard.rs`:
+
+| concept | code | meaning |
+| --- | --- | --- |
+| internal execution domain | `SettlementScope::InternalDomain` | EVM, SVM, X3VM — X3's validators run these, so their readiness is X3's own |
+| external chain | `SettlementScope::ExternalChain` | the other thirteen adapters — readiness has to be proven against a chain X3 does not run |
+| unclassified | `SettlementScope::default()` | **external**, i.e. fail closed; an entry that predates the field is never counted as an internal domain |
+
+`AdapterScoreboard` now carries `internal_score`/`internal_max_score` and
+`external_score`/`external_max_score` beside the pooled figure, `internal_is_ready()` and
+`external_is_ready()` are the two bars a completeness claim has to clear, and the CLI prints
+all three lines. The default view is no longer a hand-written table: it is
+`AdapterScoreboard::from_adapters(crate::adapter::all_adapters())`, the same inventory the
+cross-adapter proof test uses, and
+`the_default_scoreboard_agrees_with_every_adapters_own_declaration` fails if the two ever
+disagree. That mattered: the table had drifted to advertising `x3-adapter-substrate` at 80,
+`x3-adapter-x3vm` at 100 and `x3-adapter-bitcoin` at 80 while those adapters' own
+`readiness_score()` declared 60-70 with the gaps named.
+
+**Measured on the derived board (2026-09-27): internal 56, external 60, pooled 60.** Two
+honest readings, both of which the pooled figure hid:
+
+1. **X3's own three domains are not the strong side.** The assumption behind "we're ready
+   internally, external chains are the gap" is false on these declarations — EVM/SVM/X3VM
+   report 56% average against the external adapters' 60%.
+2. **Neither side is ready**, so *"cross-chain complete"* is false on both counts; the pooled
+   60 is a blend that looks like progress and answers neither question.
+
+What this does **not** claim: no external chain is live, no external adapter has been proven
+against a real chain, and BTC still has no trusted header source. The change is about not
+conflating the two scopes in any score or claim — the audit's existing list of what is
+simulated and what is real is unchanged, and §8's P0 "external-chain legs are
+simulation/mock, not real" still stands for the legacy adapter family.
