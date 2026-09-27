@@ -126,7 +126,7 @@ impl ChainWatcher {
                 ))
             })?;
 
-            if !matches!(record.status, TaskStatus::Pending | TaskStatus::Claimed) {
+            if !is_claimable_status(&record.status) {
                 continue;
             }
 
@@ -256,6 +256,16 @@ impl ChainWatcher {
     }
 }
 
+fn is_claimable_status(status: &TaskStatus) -> bool {
+    // A first result commit must not make the task invisible to the remaining
+    // executors needed to form quorum. The pallet's claim_task accepts this
+    // exact set, so discovery and dispatch cannot drift apart.
+    matches!(
+        status,
+        TaskStatus::Pending | TaskStatus::Claimed | TaskStatus::ResultCommitted
+    )
+}
+
 fn storage_prefix(pallet: &str, item: &str) -> Vec<u8> {
     let mut prefix = Vec::with_capacity(32);
     prefix.extend_from_slice(&sp_core::twox_128(pallet.as_bytes()));
@@ -307,6 +317,15 @@ mod tests {
         key.extend_from_slice(&[0xAA; 16]);
         key.extend_from_slice(&id);
         assert_eq!(task_id_from_storage_key(&key).unwrap(), id);
+    }
+
+    #[test]
+    fn result_committed_task_remains_discoverable_for_quorum() {
+        assert!(is_claimable_status(&TaskStatus::Pending));
+        assert!(is_claimable_status(&TaskStatus::Claimed));
+        assert!(is_claimable_status(&TaskStatus::ResultCommitted));
+        assert!(!is_claimable_status(&TaskStatus::Finalised));
+        assert!(!is_claimable_status(&TaskStatus::Disputed));
     }
 
     #[test]
