@@ -1,77 +1,131 @@
-//! Result hash submitter (RC1.5).
+//! Signed Northern Swarm transaction submitter.
 //!
-//! Submits `ExecutionResult.result_hash` back to the chain via JSON-RPC
-//! `author_submitExtrinsic` using a SCALE-encoded unsigned extrinsic that
-//! calls `NorthernSwarm::submit_result`. This transforms the RC1 stub into
-//! a real on-chain interaction without adding a `subxt` dependency.
-//!
-//! Proof bundles are still persisted to `./proofs/` for RC3 quorum comparison.
+//! All calls are encoded from live runtime metadata through Subxt. There are no
+//! hard-coded pallet/call indices and no unsigned shortcut: the same registered
+//! executor key that claims a task signs the result commit.
 
 use crate::types::*;
-use codec::Encode;
-use serde_json::Value;
+use std::str::FromStr;
+use subxt::{
+    dynamic::{tx, Value},
+    transactions::DynamicPayload,
+    OnlineClient, SubstrateConfig,
+};
+use subxt_signer::{sr25519::Keypair, SecretUri};
 use tracing::{info, warn};
 
-/// Submits result hashes and proof bundles to the chain.
+/// Dynamic transaction payload shape used by Northern Swarm calls.
+type SwarmCall = DynamicPayload<Vec<Value>>;
+
+/// Submits claims/results and persists proof bundles.
 pub struct ResultSubmitter {
     config: Config,
-    http_client: reqwest::Client,
 }
 
 impl ResultSubmitter {
     pub fn new(config: Config) -> Self {
-        ResultSubmitter {
-            config,
-            http_client: reqwest::Client::new(),
-        }
+        Self { config }
     }
 
-    /// Submit a task execution result via `author_submitExtrinsic`.
+    /// Claim one on-chain task as this configured executor.
+    pub async fn claim_task(&self, task_id: &str) -> Result<(), NorthernSwarmError> {
+        let task_id = parse_h256(task_id, "task_id")?;
+        let call = tx(
+            "NorthernSwarm",
+            "claim_task",
+            vec![Value::from_bytes(task_id)],
+        );
+
+        self.submit_signed("claim_task", &call).await?;
+        info!(task_id = %hex::encode(task_id), "task claim finalised on-chain");
+        Ok(())
+    }
+
+    /// Submit a successful execution result as the registered executor.
     pub async fn submit(&self, result: ExecutionResult) -> Result<(), NorthernSwarmError> {
         if result.status != ExecutionStatus::Success {
             warn!(
                 task_id = %result.task_id,
-                status  = ?result.status,
+                status = ?result.status,
                 "skipping submission for non-success result",
             );
             return Ok(());
         }
 
-        let task_id_bytes = result.task_id.as_bytes().to_vec();
-        let result_hash_bytes =
-            hex::decode(result.result_hash.trim_start_matches("0x")).map_err(|e| {
-                NorthernSwarmError::SubmitFailed {
-                    task_id: result.task_id.clone(),
-                    reason: format!("result_hash hex decode: {e}"),
-                }
-            })?;
+        let task_id = parse_h256(&result.task_id, "task_id")?;
+        let result_hash = parse_h256(&result.result_hash, "result_hash")?;
+        let call = tx(
+            "NorthernSwarm",
+            "submit_result",
+            vec![Value::from_bytes(task_id), Value::from_bytes(result_hash)],
+        );
 
-        let call = SubmitResultCall {
-            pallet_index: 82u8,
-            call_index: 6u8,
-            task_id: task_id_bytes,
-            result_hash: result_hash_bytes,
-        };
-
-        let encoded_call = call.encode();
-        let extrinsic_hex = format!("0x{}", hex::encode(&encoded_call));
-
-        let resp = self
-            .json_rpc_call("author_submitExtrinsic", &[Value::String(extrinsic_hex)])
-            .await?;
+        self.submit_signed("submit_result", &call).await?;
 
         info!(
-            task_id     = %result.task_id,
+            task_id = %result.task_id,
             result_hash = %result.result_hash,
-            response    = %resp,
-            "result hash submitted to chain",
+            "result hash finalised on-chain",
         );
 
         self.store_proof_locally(&result.proof).await?;
         Ok(())
     }
 
-    /// Persist a proof bundle to `./proofs/<task_id>.json`.
+    fn signer(&self) -> Result<Keypair, NorthernSwarmError> {
+        let uri = SecretUri::from_str(&self.config.executor_key).map_err(|error| {
+            NorthernSwarmError::Crypto(format!(
+                "invalid NS_EXECUTOR_KEY secret URI: {error}"
+            ))
+        })?;
+
+        Keypair::from_uri(&uri).map_err(|error| {
+            NorthernSwarmError::Crypto(format!("executor key derivation failed: {error}"))
+        })
+    }
+
+    async fn client(&self) -> Result<OnlineClient<SubstrateConfig>, NorthernSwarmError> {
+        OnlineClient::<SubstrateConfig>::from_url(&self.config.chain_rpc_url)
+            .await
+            .map_err(|error| NorthernSwarmError::ChainConnection {
+                url: self.config.chain_rpc_url.clone(),
+                reason: error.to_string(),
+            })
+    }
+
+    async fn submit_signed(
+        &self,
+        operation: &str,
+        call: &SwarmCall,
+    ) -> Result<(), NorthernSwarmError> {
+        let api = self.client().await?;
+        let at = api
+            .at_current_block()
+            .await
+            .map_err(|error| NorthernSwarmError::ChainRpc(error.to_string()))?;
+        let signer = self.signer()?;
+        let mut tx = at.tx();
+
+        let progress = tx
+            .sign_and_submit_then_watch_default(call, &signer)
+            .await
+            .map_err(|error| NorthernSwarmError::SubmitFailed {
+                task_id: operation.to_string(),
+                reason: error.to_string(),
+            })?;
+
+        progress
+            .wait_for_finalized_success()
+            .await
+            .map_err(|error| NorthernSwarmError::SubmitFailed {
+                task_id: operation.to_string(),
+                reason: format!("transaction did not finalise successfully: {error}"),
+            })?;
+
+        Ok(())
+    }
+
+    /// Persist a proof bundle beneath the local proofs directory.
     async fn store_proof_locally(&self, proof: &ProofBundle) -> Result<(), NorthernSwarmError> {
         let dir = std::path::PathBuf::from("proofs");
         tokio::fs::create_dir_all(&dir).await?;
@@ -81,66 +135,41 @@ impl ResultSubmitter {
         info!(task_id = %proof.task_id, path = %path.display(), "proof bundle stored");
         Ok(())
     }
+}
 
-    /// Make a JSON-RPC 2.0 call to the chain node.
-    async fn json_rpc_call(
-        &self,
-        method: &str,
-        params: &[Value],
-    ) -> Result<Value, NorthernSwarmError> {
-        let body = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": method,
-            "params": params,
-        });
-
-        let resp = self
-            .http_client
-            .post(&self.config.chain_rpc_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| NorthernSwarmError::ChainConnection {
-                url: self.config.chain_rpc_url.clone(),
-                reason: e.to_string(),
-            })?;
-
-        let mut json: Value =
-            resp.json()
-                .await
-                .map_err(|e| NorthernSwarmError::ChainConnection {
-                    url: self.config.chain_rpc_url.clone(),
-                    reason: format!("decode response: {e}"),
-                })?;
-
-        if let Some(err) = json.get("error") {
-            return Err(NorthernSwarmError::ChainConnection {
-                url: self.config.chain_rpc_url.clone(),
-                reason: format!("RPC error: {err}"),
-            });
+fn parse_h256(value: &str, field: &str) -> Result<[u8; 32], NorthernSwarmError> {
+    let bytes = hex::decode(value.trim_start_matches("0x")).map_err(|error| {
+        NorthernSwarmError::SubmitFailed {
+            task_id: value.to_string(),
+            reason: format!("{field} is not valid hex: {error}"),
         }
+    })?;
 
-        Ok(json["result"].take())
+    bytes
+        .try_into()
+        .map_err(|bytes: Vec<u8>| NorthernSwarmError::SubmitFailed {
+            task_id: value.to_string(),
+            reason: format!("{field} must be exactly 32 bytes, got {}", bytes.len()),
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn h256_parser_rejects_short_ids_instead_of_padding_them() {
+        let err = parse_h256("deadbeef", "task_id").unwrap_err();
+        assert!(err.to_string().contains("exactly 32 bytes"));
     }
-}
 
-/// SCALE-encoding structure for `pallet_northern_swarm::Call::submit_result`.
-struct SubmitResultCall {
-    pallet_index: u8,
-    call_index: u8,
-    task_id: Vec<u8>,
-    result_hash: Vec<u8>,
-}
-
-impl Encode for SubmitResultCall {
-    fn encode_to<W: codec::Output + ?Sized>(&self, dest: &mut W) {
-        self.pallet_index.encode_to(dest);
-        self.call_index.encode_to(dest);
-        self.task_id.encode_to(dest);
-        let mut h256 = [0u8; 32];
-        let len = self.result_hash.len().min(32);
-        h256[..len].copy_from_slice(&self.result_hash[..len]);
-        h256.encode_to(dest);
+    #[test]
+    fn h256_parser_accepts_prefixed_and_unprefixed_ids() {
+        let raw = "11".repeat(32);
+        assert_eq!(parse_h256(&raw, "task_id").unwrap(), [0x11; 32]);
+        assert_eq!(
+            parse_h256(&format!("0x{raw}"), "task_id").unwrap(),
+            [0x11; 32]
+        );
     }
 }
