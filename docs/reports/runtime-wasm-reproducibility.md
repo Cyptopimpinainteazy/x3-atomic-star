@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `69a58d4fe`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `891a47f96`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -501,3 +501,15 @@ alters the runtime, so the record and the code land together.
   to a pallet's `Config` touches every crate that wires it. `cargo check --workspace --all-targets` is
   the check that sees it, and it is now run after every weights pass. Scanner
   `pallet-call-without-weights` 21 → 20.
+
+* `891a47f96` — **the sequencer and the DA pallet measure their calls.** `pallets/x3-sequencer`
+  charged 10,000 picoseconds for `submit_transaction` while reserving a per-byte fee, bumping the
+  global sequence and pushing into the pending batch; `pallets/x3-da` charged 15,000 for a blob
+  commitment and 10,000 for a shard proof. Both declared `runtime-benchmarks` features with nothing
+  behind them. They carry generated weight files now: compact 8888569 bytes (`0x1570b59530b954d0e6e99ed64158728461acd3eb282a76320a08d040dc742d6a`)
+  — was 8,894,628 — and compressed 1524965 (`0xb8088b091b6116540d0a2e693e4e3bff9c0a1eca92c3848c34e9eb7ca23b8124`) — was 1,524,541.
+
+  The DA pallet's shard-proof benchmark commits the blob it attests to first, through the pallet's own
+  extrinsic, because `BlobNotFound` is the guard and the commitment has to exist. Both benchmarks
+  measure the fee reserve as part of the call, since `ReservableCurrency::reserve` is inside it.
+  Scanner `pallet-call-without-weights` 20 → 18.

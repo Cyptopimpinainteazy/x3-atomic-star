@@ -2930,6 +2930,7 @@ impl pallet_x3_sequencer::Config for Runtime {
     type MaxPayloadSize = SeqMaxPayloadSize;
     type PerByteFee = SeqPerByteFee;
     type BaseFee = SeqBaseFee;
+    type WeightInfo = pallet_x3_sequencer::weights::SubstrateWeight<Runtime>;
 }
 
 // ── Fraud-proof trait implementations ─────────────────────────────────────────
@@ -2961,6 +2962,7 @@ impl pallet_x3_da::Config for Runtime {
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = DaMaxShardProofs;
     type RetentionBlocks = DaRetentionBlocks;
+    type WeightInfo = pallet_x3_da::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Offchain transaction creation impls (required by pallet-x3-atomic-kernel) =====
@@ -3553,8 +3555,16 @@ mod benches {
     // and a runtime feature list that did not enable it either.
     #[allow(unused_imports)]
     use pallet_x3_token_factory::Pallet as X3TokenFactory;
+    // Added 2026-09-27: `pallet-x3-sequencer` and `pallet-x3-da` charged literals on every call
+    // behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_da::Pallet as X3Da;
+    #[allow(unused_imports)]
+    use pallet_x3_sequencer::Pallet as X3Sequencer;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_sequencer, X3Sequencer]
+        [pallet_x3_da, X3Da]
         [pallet_x3_token_factory, X3TokenFactory]
         [pallet_x3_treasury_policy, X3TreasuryPolicy]
         [pallet_x3_supply_ledger, X3SupplyLedger]

@@ -2369,7 +2369,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 70,
+      "composite": 72,
       "confidence": "high",
       "evidence": [
         ".github/workflows/frame-benchmarking.yml",
@@ -2381,15 +2381,16 @@
         "note: 2026-09-27 - the scan count is one finding per pallet, not per call site: 25 -> 22 across the three pallets, covering 12 hand-written literals in total",
         "note: 2026-09-27 - `pallets/x3-treasury-policy/src/weights.rs` is new: eight calls, all literals, behind a `runtime-benchmarks` feature with nothing behind it and absent from the runtime's feature list. The vault-funding benchmark creates the vault with the inventory pallet's own root-only `create_vault` and sets a cap and a threshold, so it measures the immediate-apply branch rather than the governance-queue branch the default zero threshold would produce. `cargo test -p pallet-x3-treasury-policy --features runtime-benchmarks` 31 passed; scan 22 -> 21; `check-runtime-weights-wired.py` names 40 wired configs (was 39)",
         "note: 2026-09-27 - `pallets/x3-token-factory/src/weights.rs` is new: four calls (create_token 60,000; mint/burn 20,000; transfer_mint_authority 10,000). Its launch benchmark drives the whole path a chain takes \u2014 register the asset, activate it, configure the internal routes, mint the initial supply \u2014 and the mint/burn benchmarks use the class that permits each (`CappedMintable` for a post-launch mint, `Burnable` for a burn), because no single class allows both. `cargo test -p pallet-x3-token-factory --features runtime-benchmarks` 22 passed; scan 21 -> 20; `check-runtime-weights-wired.py` names 41 wired configs (was 40)",
-        "note: 2026-09-27 - adding `type WeightInfo` to a pallet's `Config` breaks **every other crate that implements that Config**, and nothing caught it: the supply ledger's new associated type silently broke `cargo test -p pallet-x3-token-factory` and `cargo test -p pallet-x3-cross-vm-router` (their test runtimes wire the ledger) while `make mainnet-check` stayed green, because the release gate runs a subset of packages. Both are fixed; `cargo check --workspace --all-targets` is the check that sees this class and is now the net used after every weights pass"
+        "note: 2026-09-27 - adding `type WeightInfo` to a pallet's `Config` breaks **every other crate that implements that Config**, and nothing caught it: the supply ledger's new associated type silently broke `cargo test -p pallet-x3-token-factory` and `cargo test -p pallet-x3-cross-vm-router` (their test runtimes wire the ledger) while `make mainnet-check` stayed green, because the release gate runs a subset of packages. Both are fixed; `cargo check --workspace --all-targets` is the check that sees this class and is now the net used after every weights pass",
+        "note: 2026-09-27 - `pallets/x3-sequencer/src/weights.rs` and `pallets/x3-da/src/weights.rs` are new: one sequenced-transaction call and two DA calls, all literals, behind `runtime-benchmarks` features with nothing behind them. The DA pallet's shard-proof benchmark commits the blob it attests to first, through the pallet's own extrinsic, because the commitment has to exist. `cargo test -p pallet-x3-sequencer --features runtime-benchmarks` 16 passed; `-p pallet-x3-da` 17 passed; scan 20 -> 18; `check-runtime-weights-wired.py` names 43 wired configs (was 41)"
       ],
       "id": "X3-GPU-003",
-      "implemented": 84,
+      "implemented": 86,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 55,
       "missing_work": [
-        "**OPEN \u2014 20 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; `pallet-atomic-trade-engine`, `pallet-x3-kernel`, `pallet-x3-supply-ledger`, `pallet-x3-treasury-policy` and `pallet-x3-token-factory` are now benchmarked, and the count is 20. The rest have no `weights.rs` at all, so each needs the `WeightInfo` trait, a `benchmarking.rs`, a runtime `type WeightInfo` and a re-attestation before its numbers are measured rather than typed",
+        "**OPEN \u2014 18 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; seven pallets are benchmarked now (`atomic-trade-engine`, `x3-kernel`, `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`, `x3-sequencer`, `x3-da`) and the count is 18. The rest have no `weights.rs` at all, so each needs the `WeightInfo` trait, a `benchmarking.rs`, a runtime `type WeightInfo` and a re-attestation before its numbers are measured rather than typed",
         "**OPEN \u2014 no workflow re-runs the regeneration.** `make bench-pallets` and `scripts/run-frame-benchmarks.sh` exist and work, but nothing re-runs them automatically, so a weight file can go stale without a gate saying so"
       ],
       "name": "FRAME benchmarking",
@@ -2403,8 +2404,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 76,
-      "tests": "tested score 76% (no named test list on this row)"
+      "tested": 78,
+      "tests": "tested score 78% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4928,7 +4929,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "c83bf5d0ee5ba18ab04440e691176a0d4b9fcf62f86cf31fd8061bb45e61aca3",
+    "source_digest": "aef7ed2ceeff1958dfd4d69ecfc6b6cc67fb4bc1c73ed4e4a0ccbfa60d68dbd8",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "7485c78e7e58d8557b2882b8589c6d76294bce6d0574e78872b9a56ee9d89499",
@@ -4938,7 +4939,7 @@
       "feature-matrix/cross-chain.toml": "16f06c9e47283289afa2f5d20537c77e0075f10b83ac8162f06effe1b7b80561",
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "103c4b34af862fcbbcb0dab858f26377d98cf1286e1f305a9d7efc683359ff70",
+      "feature-matrix/gpu-performance.toml": "89b81072ab823a1dfa057a05311b320bc173c407c15778b93459b1ae395c8829",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "0c5fc98a13dde3a2500796e6e409b28fb593428116de33bf6338f5a1ddd93c8f",

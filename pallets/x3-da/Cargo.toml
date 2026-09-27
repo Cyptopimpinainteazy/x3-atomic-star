@@ -6,6 +6,7 @@ description = "Data Availability pallet — blob commitments, shard proofs, and 
 license = "Apache-2.0"
 
 [dependencies]
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
 scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
 frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
@@ -23,6 +24,7 @@ pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch 
 [features]
 default = ["std"]
 std = [
+    "frame-benchmarking?/std",
     "codec/std",
     "scale-info/std",
     "frame-support/std",
@@ -32,5 +34,9 @@ std = [
     "sp-std/std",
     "log/std",
 ]
-runtime-benchmarks = ["frame-support/runtime-benchmarks", "frame-system/runtime-benchmarks"]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+]
 try-runtime = ["frame-support/try-runtime", "frame-system/try-runtime"]
