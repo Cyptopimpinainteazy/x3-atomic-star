@@ -8562,3 +8562,67 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   GITHUB_PATH (x3star2 was started outside its service and lacks it on PATH) and set WASM_BUILD_WORKSPACE_HINT. Runner
   restart of x3star2 was NOT done (blocked); owner can run `cd ~/actions-runner-2 && sudo ./svc.sh install && sudo ./svc.sh start`.
   After merge: re-attest the runtime wasm hash record (this PR changes the runtime).
+- **UPDATE (xxxstar-main-2d, 2026-09-27 04:45):** PR #518 gate run 36291534546: every code step green (4 live jobs, all
+  pallet tests, release build, srtool build + evidence verify). Failed only at "Upload reproducible runtime evidence":
+  GitHub artifact storage quota exhausted (recalculated every 6-12h). Owner chose to wait; a watcher reruns the failed
+  gate job every ~3h (4 tries) and merges #518 only on full success. The un-run steps are the release audit, node build
+  verification and mainnet check. CI fixes also in #518: srtool report now written from artifacts (was console output),
+  compressed-blob magic check, always() cleanup of uid-1001 srtool output (it blocked checkout on x3star2).
+
+## 2026-09-27 06:20 — CLAIM (session xxxstar-main-2d): X3 HTLC (P4) burn-down
+- **Picking up:** `X3-contracts/svm/programs/x3_htlc` registry blockers — (1) an on-chain integration test against a
+  deployed program on a local validator, (2) wiring into the atomic/cross-VM route. Worktree `/tmp/x3-htlc`, branch
+  `feat/x3-htlc-onchain` off origin/master; lands via PR.
+- **Not touching:** PR #519 / `release-gate/swarm-reactor-onchain-v1` (another agent is pushing CI fixes to it every
+  20-60 min — Northern Swarm, Swarm Core and Reactor are theirs), and `pallets/x3-atomic-kernel` (finality-anchor work
+  landed 5h ago; TICKET-107 looks in flight). PR #518 is parked on the GitHub artifact quota with an auto-merge watcher.
+- **Heads-up (xxxstar-main-2d, 2026-09-27 07:17 UTC):** `node/tests/x3vm_live_lifecycle.rs` binds FIXED ports (RPC 19944,
+  p2p 30379; the EVM suite uses 19945). Two sessions running it at once on this box collide: the second node cannot bind
+  and the tests talk to whichever node owns the port. I am waiting for the main-checkout run (pid 1643958, started 07:07 UTC)
+  to exit before re-running mine. Check `pgrep -af x3-chain-node` before launching a live suite.
+
+## 2026-09-27 05:05 — RECORD (session openclaw-agent): PR #519 landed, and the three records that still described the tree before it
+- **PR #519 is on master, not pending.** `origin/master` = `975408a9b`, four commits above the
+  prelaunch branch tip `a5f6ddca9`: `975e58eea` merged Northern Swarm / Reactor On-Chain V1 with its
+  weights regenerated, `65863a923` locked `subxt-signer` for the executor's signed submission,
+  `249b8ce31` replaced `.maintain/frame-weight-template.hbs` with the pinned polkadot-sdk revision,
+  and `975408a9b` added the gate check that refuses a generated weight with no proof size. Verified
+  on this host: `cargo test -p pallet-northern-swarm --all-targets` 7 passed / 0 failed / 0 ignored,
+  `cargo test -p northern-swarm --all-targets` 13 passed / 0 failed / 0 ignored,
+  `python3 scripts/mainnet/swarm_reactor_gate.py` PASS.
+- **Why the weights file was broken, recorded so it is not re-diagnosed.** The template at `a5f6ddca9`
+  was written for the pre-v53 CLI: it read `{{cmd.execution}}` and `{{benchmark.base_proof_size}}`,
+  neither of which CLI 53.0.0 emits (`CmdData` has `lowest_range_values` / `highest_range_values` /
+  `worst_case_map_values`; `BenchmarkData` has `base_recorded_proof_size` / `base_calculated_proof_size`).
+  It rendered `Weight::from_parts(N, )` — eight E0061s, captured in
+  `.ai/runlogs/swarm-bench-build.log`. The fix is not the template *content* invented here: it is the
+  pinned file, `substrate/.maintain/frame-weight-template.hbs` from the pinned polkadot-sdk checkout,
+  copied verbatim. Regeneration on x3star1 (`BENCHMARK_STEPS=50 BENCHMARK_REPEAT=20 bash
+  scripts/run-frame-benchmarks.sh run pallet-northern-swarm`) produced the same shape and the same
+  proof sizes as the committed file, with ref_time differing only in benchmark noise — a second
+  independent measurement, kept at
+  `.ai/runlogs/swarm-reactor-reconcile-20260927/weights-regenerated-by-primary.rs`.
+- **Three records still described the pre-merge tree, and this is the fix.** (1) `FEATURE_REGISTRY.toml`
+  `[northern_swarm_reactor]` was 30 with six blockers naming a fabricated `PendingTasks` key, an
+  unsigned `author_submitExtrinsic` at pallet index 82, no mock/tests, hand-written weights,
+  `on_finalize` auto-finalization and a missing `ComputeBackend` — all six false now; it is 45,
+  derived on the matrix formula with implemented=75 / tested=60 / mainnet_ready=15, and its new
+  blockers say what is actually open. (2) `NORTHERN_SWARM_ARCHITECTURE.md` listed the same six as
+  release-blocking. (3) `RELEASE_GATES.md` repeated the 30 and the 54.8% mean (now 55.5%).
+- **Trap for whoever adds a registry row next.** `check-readiness-consistency.sh` resolves every
+  `required_tests` name *under the row's own `crate_or_service`* — citing `pallet-northern-swarm`
+  test names from a row whose crate is `crates/northern-swarm` is four fictional citations and a red
+  gate. Pallet tests belong in the matrix rows (where `paths` covers both crates), not in the coarse
+  row. And a new registry row whose crate no fast gate tests trips
+  `check-registry-tests-are-gated.py`; `test northern-swarm` and `test pallet-northern-swarm` are now
+  in `scripts/local-ci.sh` for exactly that reason.
+- **Still open on this surface (do not read the PASS as more than it is):** no live-node test of the
+  executor↔chain path; result acceptance is hash equality over self-reported hashes with no
+  re-execution, so an agreeing-but-wrong quorum is paid; a `TaskStatus::Disputed` task has no
+  resolution path and its bond stays reserved; `SlashReason::QuorumMismatch` exists and no code path
+  constructs it; there is no `AutoBackend` (only a fail-closed `GpuBackend` and a `CpuBackend`
+  reference) and no parity/quarantine test; advertised hardware is self-declared. Matrix rows
+  `X3-SWARM-001`, `X3-SWARM-002`, `X3-REACTOR-001` carry the detail.
+- **Next seed:** the `Disputed` refund path is the only one of these that strands funds — a task whose
+  claim slots fill with non-matching hashes leaves the submitter's reward reserved forever, and
+  nothing tests that it does not. That is the smallest honest next step on this surface.
