@@ -29,3 +29,7 @@ async-trait = "0.1"
 tracing = "0.1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"
+# Approval commitments. `sha2` is already in the lock via ed25519-dalek, so this
+# adds no new package; it is declared directly because this crate hashes with it
+# (ed25519-dalek's digest re-export is feature-gated and not enabled here).
+sha2 = "0.10"
