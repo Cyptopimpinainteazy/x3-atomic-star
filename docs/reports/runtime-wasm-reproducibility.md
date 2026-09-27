@@ -243,6 +243,26 @@ bytes**:
   were replaced with real ones. The bytes move: compact 8,508,732 bytes (was 8,508,725), compressed
   1,465,245 (was 1,465,616). Two from-scratch builds agree.
 
+* `9125c487a` — the record catches up with a day of runtime-graph work, and eighteen pallets stop
+  charging zero. `docs/reports/runtime-wasm-hashes.json` had stood at `335a27d8c` while the gate
+  counted **64 runtime-graph files** moved under it (the halt's exemption list and its recovery
+  path — the
+  finality anchor derived from the chain's own `block_hash`, the finality-certificate producer, the
+  ordering window's settle-weight fix, the wallet's signature verification, and finally the
+  `WeightInfo` wiring). `runtime hash freshness` named every one of them and refused to pass; it
+  passes now.
+  The bytes move: compact 8,748,372 bytes (was 8,512,083), compressed 1,512,695 (was 1,464,553).
+  Two from-scratch builds agree, and `recorded_revision` names this commit — the field can only name
+  a revision that already exists, so this is the first record in this list written from a tree that
+  was already committed.
+
+  The weight change is worth naming because it is the one that altered *behaviour* without altering
+  the ABI: `runtime/src/lib.rs` now points eighteen pallet configs at the `SubstrateWeight` their
+  pallets already shipped instead of `type WeightInfo = ();`, whose `impl WeightInfo for ()` returns
+  `Weight::zero()`. Dispatchables that were invisible to the block weight limit are now charged.
+  Those values are the generated stubs (hand-sized `ref_time` with real read/write counts), not
+  benchmarks — `X3-GPU-003` is the row that measures them.
+
 Bytes changing is the intended behaviour: a revision that a mainnet governance
 motion attests to has to be named, and the hash has to describe the artifact that
 revision builds.
