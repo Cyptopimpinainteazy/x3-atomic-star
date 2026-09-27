@@ -5,7 +5,7 @@
 
 use crate::mock::*;
 use crate::{ControlAction, ControlAuthority, ControlDomain, ControlRecords, ControlState, Error};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, BoundedVec};
 
 #[test]
 fn a_stranger_cannot_claim_governance_authority() {
@@ -73,8 +73,15 @@ fn root_may_freeze_and_thaw() {
 }
 
 #[test]
-fn an_operator_may_pause_but_not_freeze() {
+fn an_authorised_operator_may_pause_but_not_freeze() {
     new_test_ext().execute_with(|| {
+        // Being an operator is a governance decision, not a fact about holding a key: the
+        // `Operator` authority is satisfied by the operator list, which starts empty.
+        assert_ok!(crate::Pallet::<Test>::set_control_operators(
+            RuntimeOrigin::root(),
+            BoundedVec::try_from(vec![Stranger::get()]).unwrap(),
+        ));
+
         assert_ok!(crate::Pallet::<Test>::execute_control_action(
             RuntimeOrigin::signed(Stranger::get()),
             ControlDomain::ProofRelay,
@@ -96,6 +103,54 @@ fn an_operator_may_pause_but_not_freeze() {
                 RuntimeOrigin::signed(Stranger::get()),
                 ControlDomain::Chain,
                 ControlAction::Freeze,
+                ControlAuthority::Operator,
+            ),
+            Error::<Test>::InsufficientAuthority
+        );
+    });
+}
+
+/// A signed account is not an operator.
+///
+/// This used to be the other way round: `ensure_signed` and nothing else, so any account at all
+/// could pause or resume any domain on a ten-block cooldown — a liveness lever anyone could pull on
+/// a chain that wired this pallet up. The list is empty at genesis, so the refusal is the default.
+#[test]
+fn a_stranger_is_not_an_operator() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            crate::Pallet::<Test>::execute_control_action(
+                RuntimeOrigin::signed(Stranger::get()),
+                ControlDomain::ProofRelay,
+                ControlAction::Pause,
+                ControlAuthority::Operator,
+            ),
+            Error::<Test>::InsufficientAuthority
+        );
+        assert!(
+            ControlRecords::<Test>::get(ControlDomain::ProofRelay).is_none(),
+            "a refused action must not leave a record behind"
+        );
+    });
+}
+
+/// Anyone can name themselves in a call, and the pallet still refuses: the authority is checked
+/// against the origin, and the list is set by governance only.
+#[test]
+fn only_governance_may_authorise_an_operator() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            crate::Pallet::<Test>::set_control_operators(
+                RuntimeOrigin::signed(Stranger::get()),
+                BoundedVec::try_from(vec![Stranger::get()]).unwrap(),
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+        assert_noop!(
+            crate::Pallet::<Test>::execute_control_action(
+                RuntimeOrigin::signed(Stranger::get()),
+                ControlDomain::Chain,
+                ControlAction::Pause,
                 ControlAuthority::Operator,
             ),
             Error::<Test>::InsufficientAuthority
