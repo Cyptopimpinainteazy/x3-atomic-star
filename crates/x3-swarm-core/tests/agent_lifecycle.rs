@@ -19,10 +19,12 @@
 
 use x3_swarm_core::{
     guard::{evaluate_path, ForbiddenPathGuard, GuardAction},
-    memory::{append_memory_entry, load_memory_entries, AgentMemory, ResultState, SwarmMemoryEntry},
+    memory::{
+        append_memory_entry, load_memory_entries, AgentMemory, ResultState, SwarmMemoryEntry,
+    },
     AgentKind, AgentPermissionTier, AgentTask, ApprovalRequirement, AuditCategory, AuthorityError,
-    DispatchRefusal, GenesisRecord, Sanction, SpawnError, SpawnGuard, SwarmAuthority, SwarmScheduler,
-    TaskStatus, ViolationClass,
+    DispatchRefusal, GenesisRecord, Sanction, SpawnError, SpawnGuard, SwarmAuthority,
+    SwarmScheduler, TaskStatus, ViolationClass,
 };
 
 fn agent_id(byte: u8) -> [u8; 32] {
@@ -63,7 +65,7 @@ fn swarm_agent_can_receive_task() {
     // Nothing is handed out before anything is queued.
     assert_eq!(scheduler.count_tasks(), 0);
     assert_eq!(
-        scheduler.next_task_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10),
+        scheduler.claim_next_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10),
         Err(DispatchRefusal::NoTask)
     );
 
@@ -76,29 +78,30 @@ fn swarm_agent_can_receive_task() {
     ));
     assert_eq!(scheduler.count_tasks(), 2);
 
-    // The agent receives its own task, still pending, with its own fields.
+    // The agent receives its own task with its own fields, and receiving it is
+    // the claim: the task is out of the queue and stamped with the holder.
     let received = scheduler
-        .next_task_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10)
+        .claim_next_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10)
         .expect("a scanner must receive the task queued for scanners");
     assert_eq!(received.id, scanner_task.id);
     assert_eq!(received.title, scanner_task.title);
     assert_eq!(received.feature, scanner_task.feature);
     assert_eq!(received.agent, AgentKind::RepoScanner);
-    assert_eq!(received.status, TaskStatus::Pending);
+    assert_eq!(received.status, TaskStatus::Running);
+    assert_eq!(scheduler.claim_of(&received.id), Some(&agent_id(1)));
 
     // A class with nothing queued is not handed somebody else's work.
     assert_eq!(
-        scheduler.next_task_for(AgentKind::BuildFixer, &agent_id(1), &authority, 10),
+        scheduler.claim_next_for(AgentKind::BuildFixer, &agent_id(1), &authority, 10),
         Err(DispatchRefusal::NoTask)
     );
 
-    // Claiming the task takes it out of the handout queue: work is not
-    // delivered twice to two agents.
-    assert!(scheduler.update_status("T-001", TaskStatus::Running));
+    // The claim took the task out of the handout queue, so a second attempt is
+    // told there is nothing, not handed the same work twice.
     assert_eq!(
-        scheduler.next_task_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10),
+        scheduler.claim_next_for(AgentKind::RepoScanner, &agent_id(1), &authority, 10),
         Err(DispatchRefusal::NoTask),
-        "a running task must not be handed out again"
+        "a claimed task must not be handed out again"
     );
 
     // The outcome is recorded, and unknown task ids are refused.
@@ -110,7 +113,7 @@ fn swarm_agent_can_receive_task() {
 /// The kill switch reaches the queue, not just the ledger.
 ///
 /// Until 2026-09-26 the sanction ladder was complete and tested, but the only
-/// way to take a task off the scheduler was `next_task(AgentKind)`, which
+/// way to take a task off the scheduler was a class-only handout, which
 /// compared the agent's *class* and never asked whether the agent had been
 /// quarantined, suspended or killed. A killed agent was therefore still handed
 /// the next pending task. This test is the one that fails if that regresses.
@@ -129,7 +132,7 @@ fn a_killed_agent_is_not_handed_work() {
     // Before the kill the task is available to it.
     assert_eq!(
         scheduler
-            .next_task_for(class.clone(), &agent_id(2), &authority, 10)
+            .claim_next_for(class.clone(), &agent_id(2), &authority, 10)
             .unwrap()
             .id,
         "T-KILL"
@@ -146,7 +149,7 @@ fn a_killed_agent_is_not_handed_work() {
 
     // The task is still pending, and the killed agent cannot take it.
     let refusal = scheduler
-        .next_task_for(class.clone(), &agent_id(2), &authority, 10)
+        .claim_next_for(class.clone(), &agent_id(2), &authority, 10)
         .expect_err("a killed agent must not be handed work");
     assert!(
         matches!(refusal, DispatchRefusal::Terminated(_)),
@@ -154,11 +157,17 @@ fn a_killed_agent_is_not_handed_work() {
     );
 
     // A living agent of the same class still gets the work, so the refusal
-    // protected the queue rather than emptying it.
+    // protected the queue rather than emptying it. The task it held has to be
+    // released first: a claim does not outlive the agent that made it.
+    assert_eq!(
+        scheduler.release_claims_of(&agent_id(2)),
+        1,
+        "the killed agent held exactly one task"
+    );
     let survivor = authority_for(3, class.clone());
     assert_eq!(
         scheduler
-            .next_task_for(class, &agent_id(3), &survivor, 10)
+            .claim_next_for(class, &agent_id(3), &survivor, 10)
             .unwrap()
             .id,
         "T-KILL"
@@ -181,7 +190,7 @@ fn an_unregistered_agent_is_not_handed_work() {
     ));
 
     assert_eq!(
-        scheduler.next_task_for(class, &agent_id(42), &authority, 10),
+        scheduler.claim_next_for(class, &agent_id(42), &authority, 10),
         Err(DispatchRefusal::UnknownAgent(agent_id(42)))
     );
 }
@@ -296,7 +305,10 @@ fn swarm_memory_records_lesson() {
     // Queries filter on both dimensions independently.
     assert_eq!(memory.query(None, Some("guard")).len(), 1);
     assert_eq!(memory.query(None, Some("guard"))[0].id, "L-002");
-    assert_eq!(memory.query(Some(AgentKind::Breaker), Some("guard")).len(), 0);
+    assert_eq!(
+        memory.query(Some(AgentKind::Breaker), Some("guard")).len(),
+        0
+    );
     assert_eq!(memory.query(None, None).len(), 2);
 
     // The store is append-only: a second lesson never rewrites the first.
@@ -349,11 +361,7 @@ fn swarm_kill_switch_stops_agents() {
 
     // While clean, the agent may spawn a child of a class whose depth allows it.
     assert_eq!(
-        SpawnGuard::new(authority.genesis(), 10).check(
-            &id,
-            &AgentKind::Integrator,
-            &spawn_lineage
-        ),
+        SpawnGuard::new(authority.genesis(), 10).check(&id, &AgentKind::Integrator, &spawn_lineage),
         Ok(())
     );
 
@@ -362,20 +370,23 @@ fn swarm_kill_switch_stops_agents() {
     let mut sanction = Sanction::Clean;
     for block in 1..=3u64 {
         sanction = authority
-            .enforce_violation(
-                id,
-                ViolationClass::D,
-                "attempted mainnet key access",
-                block,
-            )
-            .unwrap_or_else(|e| panic!("violation at block {block} is below the kill threshold: {e:?}"));
+            .enforce_violation(id, ViolationClass::D, "attempted mainnet key access", block)
+            .unwrap_or_else(|e| {
+                panic!("violation at block {block} is below the kill threshold: {e:?}")
+            });
     }
     assert_eq!(sanction, Sanction::Kill);
 
     // The kill switch has consequences, not just a flag.
     assert!(authority.misconduct().is_halted(&id));
-    let record = authority.genesis().get(&id).expect("the record still exists");
-    assert!(record.terminated, "a killed agent's genesis record is terminated");
+    let record = authority
+        .genesis()
+        .get(&id)
+        .expect("the record still exists");
+    assert!(
+        record.terminated,
+        "a killed agent's genesis record is terminated"
+    );
     assert!(!record.is_active(20), "a killed agent is not active");
     assert!(
         authority
@@ -388,11 +399,7 @@ fn swarm_kill_switch_stops_agents() {
 
     // Consequence 1: it can no longer spawn a child.
     assert_eq!(
-        SpawnGuard::new(authority.genesis(), 20).check(
-            &id,
-            &AgentKind::Integrator,
-            &spawn_lineage
-        ),
+        SpawnGuard::new(authority.genesis(), 20).check(&id, &AgentKind::Integrator, &spawn_lineage),
         Err(SpawnError::ParentInactive(id))
     );
 

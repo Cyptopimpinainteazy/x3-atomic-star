@@ -77,6 +77,14 @@ pub enum DispatchRefusal {
     },
     /// The authority cleared the agent, but it has no pending task.
     NoTask,
+    /// The only pending task for this agent is waiting on an approval it has not
+    /// been given, so handing it out would be an agent acting without the
+    /// authorisation the task carries.
+    AwaitingApproval {
+        agent_id: AgentId,
+        task_id: String,
+        requirement: crate::policy::ApprovalRequirement,
+    },
 }
 
 impl core::fmt::Display for DispatchRefusal {
@@ -92,6 +100,14 @@ impl core::fmt::Display for DispatchRefusal {
                 write!(f, "agent {agent_id:?} is halted: {sanction:?}")
             }
             DispatchRefusal::NoTask => write!(f, "no pending task for this agent"),
+            DispatchRefusal::AwaitingApproval {
+                agent_id,
+                task_id,
+                requirement,
+            } => write!(
+                f,
+                "task {task_id} for agent {agent_id:?} is waiting on {requirement:?}"
+            ),
         }
     }
 }
@@ -124,7 +140,7 @@ impl SwarmAuthority {
     /// May this agent be given new work at block `now`?
     ///
     /// This is the dispatcher's only route to a task
-    /// ([`crate::scheduler::SwarmScheduler::next_task_for`]) and it is
+    /// ([`crate::scheduler::SwarmScheduler::claim_next_for`]) and it is
     /// deliberately fail-closed: every condition it cannot prove is a refusal.
     ///
     /// * no genesis record -> [`DispatchRefusal::UnknownAgent`]
