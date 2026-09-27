@@ -3,9 +3,9 @@
   "id": "x3_chain_testnet",
   "chainType": "Live",
   "bootNodes": [
-    "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWBckzUMmAq2XM6u4hzeRiCwBfuCqX96EhVLBm4NdCt2DK",
-    "/ip4/127.0.0.1/tcp/30334/p2p/12D3KooWEFEiN36P9UqXgataFbY9DTbuXwLMF4nzXrKtD5jEorZH",
-    "/ip4/127.0.0.1/tcp/30335/p2p/12D3KooWHi5eZg7ExJrDFiB9f1xj2Y9q9qx6ETe2qWFXK4NN1c1L"
+    "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWH1U35N4kqKkqYx2mEZ2DKeZ5peYWiGZy5AgCQKbDGVJP",
+    "/ip4/127.0.0.1/tcp/30334/p2p/12D3KooWHYwRwbL38yaNYSj8hoYRkG3wyFd8NUrhL9GzwVV9nJrR",
+    "/ip4/127.0.0.1/tcp/30335/p2p/12D3KooWF9AyChSE78eduCnukR7UGkWVudJveR1Z24oE3Ni2QsBx"
   ],
   "telemetryEndpoints": null,
   "protocolId": "x3",
@@ -63,14 +63,14 @@
             ]
           ],
           "authorities": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL",
-            "5DoEuShC445cHifN3PixzWWD9jZ3UpXoxnuGp8Qk3cms588J"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe",
+            "5G6VDsckdSXaNGTuGF31sVRpamQkRa4c2RNfgPhMbN6s95s3"
           ],
           "authorizedAccounts": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL",
-            "5DoEuShC445cHifN3PixzWWD9jZ3UpXoxnuGp8Qk3cms588J"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe",
+            "5G6VDsckdSXaNGTuGF31sVRpamQkRa4c2RNfgPhMbN6s95s3"
           ],
           "evmEscrow": "0x1111111111111111111111111111111111111111",
           "svmEscrow": [
@@ -110,27 +110,27 @@
         },
         "aura": {
           "authorities": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL",
-            "5DoEuShC445cHifN3PixzWWD9jZ3UpXoxnuGp8Qk3cms588J"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe",
+            "5G6VDsckdSXaNGTuGF31sVRpamQkRa4c2RNfgPhMbN6s95s3"
           ]
         },
         "balances": {
           "balances": [
             [
-              "5DJiJ8FbpQfoNXYHRe6x5JT9Wm9MCjoyrGP361zh79TF4Xtq",
+              "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
               1000000000000000000
             ],
             [
-              "5DoEuShC445cHifN3PixzWWD9jZ3UpXoxnuGp8Qk3cms588J",
+              "5CD5kVjRDH6ZcLoBr9bkqoJMTUtqRcVfLjgnrqsSEYEL3NBB",
               1000000000000000000
             ],
             [
-              "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL",
+              "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe",
               1000000000000000000
             ],
             [
-              "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
+              "5G6VDsckdSXaNGTuGF31sVRpamQkRa4c2RNfgPhMbN6s95s3",
               1000000000000000000
             ]
           ],
@@ -138,8 +138,8 @@
         },
         "council": {
           "members": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe"
           ]
         },
         "depinMarketplace": {
@@ -165,15 +165,15 @@
         "grandpa": {
           "authorities": [
             [
-              "5DTNLq4uBEazM8u4TsAUocVjmYqCcRBiHeHz8LCn5jmkGgPj",
+              "5HQVjHMEmZJ8CdYa3AAoxgVAjL5DJQ9zYZBC9wWeaFyy3uqB",
               1
             ],
             [
-              "5D6GbjTSPZnCH4nvETzCQLnZPGtYZ7BLUwqLqEtwBYr2ghJj",
+              "5DRNHUthd8ieqKw3Trs6Lb4qMLTwDEbW8zPKrNLLoWCds1PN",
               1
             ],
             [
-              "5EjbTRwteJ59g4u7yuteuF7hzSzPXAjVNDbfDYhzFYthjui5",
+              "5CNn8NCYQTYxDhRpBkxu9oVjQQZjRaVwYLoHt99VQKVT1B9L",
               1
             ]
           ]
@@ -191,8 +191,8 @@
         },
         "treasury": {
           "initialSigners": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe",
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg",
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe"
           ]
         },
         "x3Coin": {
@@ -1193,10 +1193,10 @@
           "initialTierThresholds": [],
           "phantom": null,
           "settlementGateways": [
-            "5Dt1GXcWj3x31zyiBWowFvwm2ct7BFzVMFFEjwuEASsqHksL"
+            "5Fnznz6e1anN7YDx7jFJStiahq7UPNfc8LSXMdkMDNcsgqVe"
           ],
           "x3LangGateways": [
-            "5G1zU5N2TR6oQnL9pDmvEqCpmYuobjEtkbf1UcnBhobPQUxe"
+            "5C5s1z6nczFNZxDLcdd8TNLxRtSbHSqtJdtzFGaiscuWDjMg"
           ]
         },
         "x3DappHub": {

@@ -9,6 +9,18 @@ AMOUNT="10"
 SEED="//Alice"
 RC2_NODE="${RC2_NODE:-node}"
 
+# This gate used to require a node someone else had started and failed with a JavaScript
+# `API/INIT: fetch failed` stack when there was none. It now boots what it needs through
+# `local3_lib.sh`, and stops only what it started.
+#
+# Why `local3` and not `scripts/start-x3-chain.sh`: that launcher runs one `--chain dev` node with no
+# session keys. It answers RPC and never advances — the node log fills with
+# `Failed to trigger bootstrap: No known peers` — so a smoke whose first assertion is that height and
+# finality advance fails against it, which is exactly what happened on 2026-09-27.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=scripts/mainnet/local3_lib.sh
+source "$ROOT_DIR/scripts/mainnet/local3_lib.sh"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --rpc)
@@ -59,6 +71,12 @@ USAGE
 done
 
 mkdir -p "$OUT_DIR" "$(dirname "$REPORT")"
+
+# A node that answers RPC but has finalized nothing is not usable here: the driver's first wait is
+# for height *and* finality to advance. `start_local3` enforces that, and reuses a running network
+# only when it has finalized something.
+trap stop_local3 EXIT
+start_local3 150
 
 NODE_SCRIPT="${TMPDIR:-/tmp}/x3-rc2-smoke-$$.cjs"
 cat > "$NODE_SCRIPT" <<'NODE'
@@ -479,11 +497,22 @@ async function main() {
   ensureDir(reportPath);
   await cryptoWaitReady();
 
-  const provider = rpc.startsWith('ws') ? new WsProvider(rpc) : new HttpProvider(rpc);
+  // `HttpProvider` cannot subscribe, so `signAndSend`'s callback arrives without `status` and the
+  // driver dies with `TypeError: Cannot read properties of undefined (reading 'isInBlock')` — the
+  // API even says so at init: "Api will be available in a limited mode since the provider does not
+  // support subscriptions". `wsRpc` was computed above and never used. Submitting needs a
+  // subscription, so the whole driver talks WS (queries work over WS too).
+  const provider = new WsProvider(wsRpc);
   const api = await ApiPromise.create({ provider, throwOnConnect: true });
   const keyring = new Keyring({ type: 'sr25519', ss58Format: 42 });
   const alice = keyring.addFromUri(seed);
   const bob = keyring.addFromUri('//Bob');
+  // `xvmTransfer`/`xvmTransferFromVm` require `T::X3LangOrigin`, which this runtime wires to
+  // `EnsureX3LangGateway`: the call must come from the gateway account the genesis names, not from
+  // any signed account. Measured 2026-09-27 — signing with `//Alice` produced no transfer row and no
+  // `TransferInitiated` event, which the driver reported as "expected one new transfer, found 0".
+  // `dev_gateway_genesis()` blesses `//x3-atomic-gateway` on dev/local chains.
+  const gateway = keyring.addFromUri(process.env.RC2_GATEWAY_SEED || '//x3-atomic-gateway');
 
   const metadataNames = api.runtimeMetadata.asLatest.pallets.map((pallet) => pallet.name.toString());
   const missing = REQUIRED_PALLETS.filter((name) => !metadataNames.includes(name));
@@ -576,9 +605,10 @@ async function main() {
         expiresAt,
       );
     }
-    const transferReceipt = source === 'X3Native'
-      ? await submit(api, alice, transferTx, `transfer ${source} -> ${destination}`)
-      : await dispatchViaCouncil(api, alice, bob, transferTx, `transfer ${source} -> ${destination}`);
+    // Both origins are the gateway: `xvmTransfer` takes a signed origin and derives the sender from
+    // it, `xvmTransferFromVm` additionally requires `VmAdapterOrigin`, and this runtime wires both to
+    // `EnsureX3LangGateway`.
+    const transferReceipt = await submit(api, gateway, transferTx, `transfer ${source} -> ${destination}`);
     const messageId = extractMessageId(transferReceipt, false) || await findNewTransferId(api, transferIdsBefore, `transfer ${source} -> ${destination}`);
     lastMessageId = messageId;
     const pending = normalizeLedger(await api.query.x3SupplyLedger.ledgers(assetId));
@@ -646,7 +676,7 @@ async function main() {
   await expectNoStateChange('external Ethereum route rejected', api.tx.x3CrossVmRouter.xvmTransfer(assetId, domainValue('Ethereum'), domainAccount('Ethereum'), amount.toString(), expiry));
   await expectNoStateChange('wrong EVM recipient rejected', api.tx.x3CrossVmRouter.xvmTransfer(assetId, domainValue('X3Evm'), wrongRecipientFor('X3Evm'), amount.toString(), expiry));
   await expectNoStateChange('wrong SVM recipient rejected', api.tx.x3CrossVmRouter.xvmTransfer(assetId, domainValue('X3Svm'), wrongRecipientFor('X3Svm'), amount.toString(), expiry));
-  await expectNoStateChange('wrong sender type rejected', api.tx.x3CrossVmRouter.xvmTransferFromVm(assetId, domainValue('X3Evm'), wrongSenderFor('X3Evm'), domainValue('X3Native'), domainAccount('X3Native'), amount.toString(), expiry), { viaCouncil: true });
+  await expectNoStateChange('wrong sender type rejected', api.tx.x3CrossVmRouter.xvmTransferFromVm(assetId, domainValue('X3Evm'), wrongSenderFor('X3Evm'), domainValue('X3Native'), domainAccount('X3Native'), amount.toString(), expiry), );
   if (lastMessageId) {
     await expectNoStateChange('duplicate message rejected', api.tx.x3CrossVmRouter.completeXvmTransfer(lastMessageId));
     await expectNoStateChange('duplicate nonce rejected', api.tx.x3CrossVmRouter.completeXvmTransfer(lastMessageId));
@@ -655,10 +685,10 @@ async function main() {
 
   const refundExpiry = (await api.rpc.chain.getHeader()).number.toNumber() + 120;
   const refundTransferIdsBefore = await transferIds(api);
-  const refundReceipt = await submit(api, alice, api.tx.x3CrossVmRouter.xvmTransfer(assetId, domainValue('X3Evm'), domainAccount('X3Evm'), amount.toString(), refundExpiry), 'refund negative setup');
+  const refundReceipt = await submit(api, gateway, api.tx.x3CrossVmRouter.xvmTransfer(assetId, domainValue('X3Evm'), domainAccount('X3Evm'), amount.toString(), refundExpiry), 'refund negative setup');
   const refundMessageId = extractMessageId(refundReceipt, false) || await findNewTransferId(api, refundTransferIdsBefore, 'refund negative setup');
   await expectNoStateChange('refund before expiry rejected', api.tx.x3CrossVmRouter.cancelExpiredXvmTransfer(refundMessageId));
-  await submit(api, alice, api.tx.x3CrossVmRouter.completeXvmTransfer(refundMessageId), 'cleanup refund negative setup');
+  await submit(api, gateway, api.tx.x3CrossVmRouter.completeXvmTransfer(refundMessageId), 'cleanup refund negative setup');
   await expectNoStateChange('completion after refund rejected', api.tx.x3CrossVmRouter.completeXvmTransfer(refundMessageId));
 
   const supplyAfter = normalizeLedger(await api.query.x3SupplyLedger.ledgers(assetId));

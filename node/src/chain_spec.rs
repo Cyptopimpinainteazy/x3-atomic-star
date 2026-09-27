@@ -708,6 +708,13 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
     ];
     endowed_accounts.extend(dev_evm_endowed_accounts());
+    // This spec *authorizes* the gateway accounts a few lines below (`dev_gateway_genesis()`), so it
+    // has to be able to pay their fees too: `EnsureX3LangGateway` lets the x3-lang gateway submit
+    // `xvmTransfer`, and an authorized-but-unfunded account fails every such call with
+    // `1010: Invalid Transaction: Inability to pay some fees` — measured 2026-09-27 against this
+    // spec. `development_config`, `staging_config` and `testnet_config` already endow them; this one
+    // did not.
+    endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
     let council_members = vec![
         get_account_id_from_seed::<sr25519::Public>("Alice")?,

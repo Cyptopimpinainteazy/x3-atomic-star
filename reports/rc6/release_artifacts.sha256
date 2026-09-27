@@ -1,11 +1,11 @@
-commit 8b4431a055532ae5272d29d274fd9f57fa4fc922
-0378293c842c3542561c1ae685bf1ce88a3ec7c80bd3f4cf50c4adc9cdf0af09  /home/lojak/Desktop/xxxstar-main/target/release/x3-chain-node
-df65c62dc8a01eec15a21ab60488273c81d759815b4f5cc518f399c6c7128bc0  /home/lojak/Desktop/xxxstar-main/chain-specs/x3-public-testnet-plain.json
+commit d62fecf6baa176a32f91ffc3ed4f938391ff0f7d
+f923cb61079e69155155bc9a363f0d0a425d53fa40869f8d51c4aaee64265dab  /home/lojak/Desktop/xxxstar-main/target/release/x3-chain-node
+1884c51281d1bb942a2a6cd51bac4dc4e72c1601aa3fc786ba95727de7e4f54a  /home/lojak/Desktop/xxxstar-main/chain-specs/x3-public-testnet-plain.json
 5a8ad90df377327df2730640a4ca555d8a13e9b2e431e5fe2ad1789d3d4e546d  /home/lojak/Desktop/xxxstar-main/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
 e05a4024d68abb0a867ed1df53e2fddbd073e5e4dce1397855dd2805c3c3c2bf  /home/lojak/Desktop/xxxstar-main/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm
 5a8ad90df377327df2730640a4ca555d8a13e9b2e431e5fe2ad1789d3d4e546d  /home/lojak/Desktop/xxxstar-main/target/release/wbuild/x3-chain-runtime/target/wasm32v1-none/release/deps/x3_chain_runtime.wasm
 5a8ad90df377327df2730640a4ca555d8a13e9b2e431e5fe2ad1789d3d4e546d  /home/lojak/Desktop/xxxstar-main/target/release/wbuild/x3-chain-runtime/target/wasm32v1-none/release/x3_chain_runtime.wasm
 3ba5c665bbfc022c57bd1cf7beda0b0f41e31572237c57a4cc0cc704a22ad2ed  /home/lojak/Desktop/xxxstar-main/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.wasm
-37e20d181adf648f074519c2f8c04b8644139fd7b7b30882996d9a0b113e3d25  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
-0ee1c4bf14c5320e5f3203b5ec712a3f8f3ea52e9c3dc86dc9b3771f74adf638  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/target/wasm32v1-none/release/deps/x3_chain_runtime.wasm
-0ee1c4bf14c5320e5f3203b5ec712a3f8f3ea52e9c3dc86dc9b3771f74adf638  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/target/wasm32v1-none/release/x3_chain_runtime.wasm
+2320e995940cdb083586e1f2534c5e71da60a1c86bc8261d76f939d272cdeff6  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+ce6400c9b354a66c468115981e62109ec23af31de1eb1571c6aea9982e96d30b  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/target/wasm32v1-none/release/deps/x3_chain_runtime.wasm
+ce6400c9b354a66c468115981e62109ec23af31de1eb1571c6aea9982e96d30b  /home/lojak/Desktop/xxxstar-main/target/debug/wbuild/x3-chain-runtime/target/wasm32v1-none/release/x3_chain_runtime.wasm
