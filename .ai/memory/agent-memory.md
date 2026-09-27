@@ -8780,3 +8780,46 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   the parser, a deterministic order, a CI gate, and patch generation written under `.ai/` only. The
   two other named lanes (B, F) and the two stuck dispatches (`swarm_executor_backend`,
   `repo_scanner_v2`) no longer need to be re-checked.
+
+## 2026-09-27 — `x3_htlc` (SVM SPL escrow): the gate that did not exist, and the trap that hid it
+
+- **`X3-contracts/svm/programs/x3_htlc` now has a real lifecycle: 61 assertions against a deployed
+  program.** `test-live-lifecycle.sh` (local-ci `SVM HTLC x3_htlc lifecycle`) builds with
+  `cargo build-sbf`, deploys at the id `declare_id!` fixes, creates a real SPL mint and three real
+  token accounts, and asserts every escrow/vault/token amount from raw account bytes; it then
+  restarts the validator on the same ledger and requires the funded escrow, its vault balance, its
+  hashlock and the timelock rule to survive. `run-expiry-test.sh` (local-ci `SVM HTLC x3_htlc expiry`)
+  runs the same `.so` in `solana-program-test` with an overridden clock sysvar, which is the *only*
+  way to reach the post-expiry refund: the program's minimum timelock is one hour and `--warp-slot`
+  moves the slot counter, not the clock (verified: `Clock.unix_timestamp` tracks wall time after a
+  200 000-slot warp). `test x3-htlc client` (local-ci) runs the broadcaster's 10 layout tests.
+- **The trap: a Solana `RpcClient` preflights against the *finalized* bank.** `solana-rpc-client`
+  sets `preflight_commitment = Some(self.commitment())` and `RpcClient::new` is finalized, so any
+  account created by a transaction that is only *confirmed* is invisible to the next transaction's
+  simulation on this validator — it surfaces as a bogus `AnchorError … AccountNotInitialized` for an
+  account that demonstrably exists. Measured: an SPL mint created by the `spl-token` CLI (config
+  commitment `confirmed`) took ~13s to become visible at `finalized`. The fix is to wait for
+  finalization (`account_len()`/`token_amount()` poll at `finalized`) before submitting work that
+  depends on externally created accounts. Do not "fix" it by loosening the client's preflight
+  commitment.
+- **Anchor 0.30 errors are observable as exact codes**, which makes rejection assertions sharp:
+  `HtlcError` variant *n* is `6000 + n`, so `InvalidPreimage`=6003, `HtlcNotClaimable`=6004,
+  `HtlcNotRefundable`=6005, `TimelockNotExpired`=6006, `NotRecipient`=6007, `NotInitiator`=6008 —
+  observed on a live validator and echoed by `BanksClientError::TransactionError(InstructionError(0,
+  Custom(code)))` under `solana-program-test`.
+- **A claim after the timelock is accepted while the escrow is still funded.** `claim_htlc` gates on
+  `status == Funded` and the hashlock, not on the clock, so the recipient keeps the race until the
+  refund lands; the escrow still cannot be paid twice. It is asserted in the expiry suite and
+  recorded as a registry blocker to review — do not "fix" it without a product decision.
+- **Dead end — do not repeat:** trying to reach the refund-after-expiry branch on a live validator.
+  `solana-test-validator --warp-slot 200000` left `Clock.unix_timestamp` equal to wall time, and
+  `--account <SysvarC1ock…>` preloads are overwritten when each bank is created.
+- **Shared-tree hazard, observed twice this session:** another lane ran an `add -A`-style commit and
+  swept (a) this lane's `FEATURE_REGISTRY.toml` + regenerated `docs/audit/*` and
+  `audit-artifacts/current/feature-status.json`, then (b) the whole `x3_htlc` client + gates while
+  they were staged. Check `git log -- <file>` before assuming uncommitted work is still uncommitted.
+- **Next seed:** `x3_htlc` is still not on any cross-VM route (the live SVM route is
+  `programs/svm/x3_atomic_swap`). Wiring it means a caller in `crates/cross-vm-coordinator` or the
+  atomic router plus an X3VM↔SVM lifecycle that uses this program's SPL escrow, and a devnet
+  deployment; until then its registry row is capped below 60%.
+  `repo_scanner_v2`) no longer need to be re-checked.
