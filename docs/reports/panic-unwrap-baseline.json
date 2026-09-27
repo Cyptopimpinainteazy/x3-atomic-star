@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-09-27T10:14:20Z",
-  "commit": "3e6a17691",
+  "generated_at": "2026-09-27T10:16:07Z",
+  "commit": "08bccc09b",
   "scanner_sha256": "c3928504b130a35644f00829d2e10b5fdf26196bec101d6ada32c8051723f0f9",
   "counts": {
     "runtime-hook": 0,
     "pallet-call": 0,
-    "production": 461
+    "production": 450
   },
   "files_scanned": 1409,
   "runtime_hooks_allowed": [],

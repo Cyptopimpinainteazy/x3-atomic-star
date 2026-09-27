@@ -109,7 +109,11 @@ impl ArenaScheduler {
 
         // Sort by current Elo (in real Swiss, by score)
         let mut sorted: Vec<_> = combatants.iter().collect();
-        sorted.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+        sorted.sort_by(|a, b| {
+            b.elo
+                .partial_cmp(&a.elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let ids: Vec<_> = sorted.iter().map(|c| c.id).collect();
 
@@ -135,7 +139,11 @@ impl ArenaScheduler {
 
         // Sort by Elo (highest first)
         let mut sorted: Vec<_> = combatants.iter().collect();
-        sorted.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+        sorted.sort_by(|a, b| {
+            b.elo
+                .partial_cmp(&a.elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let ids: Vec<_> = sorted.iter().map(|c| c.id).collect();
         let n = ids.len();

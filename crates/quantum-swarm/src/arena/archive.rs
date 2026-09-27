@@ -91,7 +91,11 @@ impl Archive {
     /// Get top N by Elo
     pub fn top_by_elo(&self, n: usize) -> Vec<&ArchivedStrategy> {
         let mut sorted: Vec<_> = self.strategies.iter().collect();
-        sorted.sort_by(|a, b| b.final_elo.partial_cmp(&a.final_elo).unwrap());
+        sorted.sort_by(|a, b| {
+            b.final_elo
+                .partial_cmp(&a.final_elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.into_iter().take(n).collect()
     }
 

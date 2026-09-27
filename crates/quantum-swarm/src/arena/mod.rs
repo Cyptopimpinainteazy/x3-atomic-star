@@ -166,7 +166,11 @@ impl Arena {
 
         // Calculate rankings
         let mut rankings: Vec<_> = self.combatants.values().filter(|c| c.is_active()).collect();
-        rankings.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+        rankings.sort_by(|a, b| {
+            b.elo
+                .partial_cmp(&a.elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let ranking_map: HashMap<_, _> = rankings
             .iter()
@@ -263,7 +267,11 @@ impl Arena {
 
         // Sort by Elo (lowest first)
         let mut active: Vec<_> = self.combatants.values().filter(|c| c.is_active()).collect();
-        active.sort_by(|a, b| a.elo.partial_cmp(&b.elo).unwrap());
+        active.sort_by(|a, b| {
+            a.elo
+                .partial_cmp(&b.elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Mark bottom for elimination
         let to_kill: Vec<_> = active.iter().take(kill_count).map(|c| c.id).collect();
@@ -303,7 +311,7 @@ impl Arena {
             .filter(|c| c.is_active())
             .map(|c| (c.elo, c.genome.clone()))
             .collect();
-        winners.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        winners.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         let parent_pool_size = (winners.len() / 2).max(2);
         let parents: Vec<Genome> = winners
@@ -354,7 +362,11 @@ impl Arena {
     /// Get leaderboard
     pub fn leaderboard(&self, top_n: usize) -> Vec<&Combatant> {
         let mut active: Vec<_> = self.combatants.values().filter(|c| c.is_active()).collect();
-        active.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+        active.sort_by(|a, b| {
+            b.elo
+                .partial_cmp(&a.elo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         active.into_iter().take(top_n).collect()
     }
 
