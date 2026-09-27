@@ -263,6 +263,21 @@ bytes**:
   Those values are the generated stubs (hand-sized `ref_time` with real read/write counts), not
   benchmarks — `X3-GPU-003` is the row that measures them.
 
+* `248435935` — the private-submission policy reaches the chain, and the bytes move for real. Since
+  the previous record the runtime graph gained the whole MEV-002 path
+  (`crates/x3-common`'s feature-word reader, `crates/x3-backend`'s alias for the same bit,
+  `crates/x3-compiler`'s policy-carrying entry, `pallets/x3-kernel`'s intake guard and its
+  `PrivateSubmissionChannel` binding in `runtime/src/lib.rs`), the cross-VM router's fee fix, the
+  RPC-quorum fix, and the `mainnet-rc1` variant compile fix. The bytes move:
+  compact 8,742,756 bytes, `0x1ea62909…`; compressed 1,510,586 bytes, `0x50c5a499…` (was
+  `0xce698445…` / `0x4971c1fc…`). Two from-scratch builds agree, and `runtime hash freshness`
+  passes against the new record.
+
+  One operational note this run produced: the checkout's root had lost its `o+rx` bit
+  (mode `700`), which the srtool image cannot enter as uid 1001 — the build failed in **3 seconds**
+  with a message naming the exact `chmod`. Worth keeping in mind: the failure is not a build
+  failure, but it looks like one in a log that only says `build 1/2`.
+
 * `06b79a939` — **the bytes move this time, and the reason is real.** This record was written by
   `./scripts/update-runtime-hashes.sh` after two from-scratch `srtool` builds of `06b79a939`
   agreed, and it replaces the `d62fecf6b` entry that had been carried since the halt-recovery
