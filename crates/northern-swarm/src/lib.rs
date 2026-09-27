@@ -14,11 +14,13 @@
 //! `pallets/swarm` is retained as a **historical reference only**.
 //! Do not add new production dependencies to `pallets/swarm`.
 
+pub mod backend;
 pub mod chain_watcher;
 pub mod executor;
 pub mod result_submitter;
 pub mod types;
 
+pub use backend::{ComputeBackend, CpuBackend, GpuBackend};
 pub use chain_watcher::ChainWatcher;
 pub use executor::TaskExecutor;
 pub use result_submitter::ResultSubmitter;
