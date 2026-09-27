@@ -18,9 +18,9 @@ Findings: 32
 
 | gate | status | detail |
 |---|---|---|
-| stub / marker ratchet | pass | critical-marker=445, explicit-stub=74, marker=1186 |
+| stub / marker ratchet | pass | critical-marker=443, explicit-stub=74, marker=1186 |
 | fake-code scan | pass | constant-assert=17, noop-test=2, skip=139 |
-| panic / unwrap ratchet | pass | pallet-call=0, production=450, runtime-hook=0 |
+| panic / unwrap ratchet | pass | pallet-call=0, production=440, runtime-hook=0 |
 
 ## Findings
 

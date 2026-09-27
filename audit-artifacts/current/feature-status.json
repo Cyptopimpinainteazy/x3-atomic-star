@@ -4311,6 +4311,48 @@
     },
     {
       "benchmark": "\u2014",
+      "claim_risk": true,
+      "composite": 37,
+      "confidence": "high",
+      "evidence": [
+        "x3-autonomic-core/Cargo.toml",
+        "x3-autonomic-core/crates/x3-autonomic-types/src/lib.rs",
+        "x3-autonomic-core/crates/x3-live-auditor/src/lib.rs",
+        "note: 2026-09-27 - the workspace resolved to nothing; `cargo metadata` failed on a chrono feature that does not exist"
+      ],
+      "id": "X3-RT-013",
+      "implemented": 55,
+      "launch_scope": "dev_tooling",
+      "live_tested": "not a registered launch feature",
+      "mainnet_ready": 10,
+      "missing_work": [
+        "**CLOSED 2026-09-27 \u2014 the workspace could not resolve, let alone compile.** `x3-autonomic-types` asked for a `chrono` feature (`derive`) that no 0.4 version has, so `cargo metadata` on the workspace failed; its SCALE import named `parity_scale_codec` while the manifest declares `scale = { package = \"parity-scale-codec\" }`; five members declared `#![cfg_attr(not(feature = \"std\"), no_std)]` with no `std` feature, so they were permanently no_std while using `Vec`, `String`, `format!` and `std::io`. Resolution, import and the attribute are fixed; `cargo check --workspace` finishes clean.",
+        "**CLOSED 2026-09-27 \u2014 three types could not be SCALE-decoded, and two are pallet storage.** `InvariantDefinition.name`/`description` were `&'static str` (no `Decode` impl) and `HealthMetricDefinition`'s thresholds were `f64` (SCALE has no float), so `register_invariant` and `register_metric` took arguments no transaction could carry. Strings are owned `Vec<u8>` now and thresholds are basis points; a round-trip test pins both.",
+        "**CLOSED 2026-09-27 \u2014 four fabricated or unbuildable behaviours.** `LiveAuditor::check_invariants` returned `(id, true, severity)` for everything under a \"Placeholder\" comment (a live auditor reporting every invariant passing); `ShadowRunner::execute_shadow_block` returned `state_root_matches: true` without executing anything; `verify_shadow_result` returned `true` for every input; `JudgeAgent::evaluate` ignored its proposal argument entirely. Each refuses or answers from its input now, and the CLI (which printed \"Setting autonomy level to: X\" and performed nothing) refuses with a non-zero status like the wallet CLI does.",
+        "**CLOSED 2026-09-27 \u2014 three references to variants that do not exist.** `AutonomyLevel::{Automatic, SelfImproving, SelfGoverning}` (in two crates), `AuditEvent::Error` and `Severity::High` were all named by code that could not compile. The ladder answers via `AutonomyLevel::allows_autonomous_change()`, `AuditEvent` gained the `Error` variant its `From` impl needed, and the severity is the ladder's `Critical`.",
+        "**OPEN \u2014 nothing here is wired into anything.** No runtime registers either autonomic pallet, no node runs the auditor or shadow runner, and the CLI has no client. The two pallets in this workspace (`pallet-x3-invariants`, `pallet-x3-health`) are parked out of the member list: they pin FRAME to a 2023 substrate revision, still use `#[pallet::generate_store]` and declare no call weights, and they are orphans \u2014 the chain's invariant pallet is `pallets/x3-invariants`, a different crate. Porting or deleting them is a scheduled decision.",
+        "**OPEN \u2014 the audit and shadow paths have no chain data source.** `check_invariants` and `execute_shadow_block` refuse precisely because there is nothing to read or replay; a real autonomic loop needs a node client plus the invariants it should read."
+      ],
+      "name": "Autonomic control plane",
+      "paths": [
+        "x3-autonomic-core/crates/x3-autonomic-types",
+        "x3-autonomic-core/crates/x3-live-auditor",
+        "x3-autonomic-core/crates/x3-shadow-runner",
+        "x3-autonomic-core/crates/x3-regression-engine",
+        "x3-autonomic-core/crates/x3-judge-agent",
+        "x3-autonomic-core/crates/x3-benchmark-oracle",
+        "x3-autonomic-core/crates/x3-autonomic-cli"
+      ],
+      "priority": "P2",
+      "source": "master",
+      "state": "NOT INTEGRATED",
+      "state_rule": "source is not master (open PR or research), so it is not in the tree under test",
+      "subsystem": "runtime_core",
+      "tested": 55,
+      "tests": "tested score 55% (no named test list on this row)"
+    },
+    {
+      "benchmark": "\u2014",
       "claim_risk": false,
       "composite": 73,
       "confidence": "high",
@@ -4875,7 +4917,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "7cb4ffcf61129eb58b9cf660b9d56db50da02fa7c9effe7eb56c12f192ea01be",
+    "source_digest": "5675a4ce20155e8e8ef9044a3d6771d81d08347223a47f1f9c656d07aac54239",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
       "FEATURE_REGISTRY.toml": "b8f8547e4ce2d80f52822512aadc23e411190ee386574075bce98b5fafdb953c",
@@ -4889,7 +4931,7 @@
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "0c5fc98a13dde3a2500796e6e409b28fb593428116de33bf6338f5a1ddd93c8f",
-      "feature-matrix/runtime-core.toml": "d6883d27846f614206d7daeb2645cb5d44d2b8219c926ffb829c28f66ba3a82d",
+      "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
       "feature-matrix/security-proofgate.toml": "e068bac58eb1ef680f457bcea1d8ad794ba65d89a410c7871b89d5edac2c9f37"
     }
   },
@@ -5414,12 +5456,12 @@
       "BROKEN": 0,
       "COMPLETE": 10,
       "FUNCTIONAL BUT UNHARDENED": 62,
-      "NOT INTEGRATED": 8,
+      "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
       "PARTIAL": 71,
       "STUB": 1
     },
-    "matrix_features": 152,
+    "matrix_features": 153,
     "registry_features": 22,
     "registry_max_readiness": 88,
     "registry_mean_readiness": 63.18,

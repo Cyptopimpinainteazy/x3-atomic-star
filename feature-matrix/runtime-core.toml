@@ -361,3 +361,60 @@ launch_scope = "core"
 claim_risk = false
 blockers = ["Needs broader governance/adversarial coverage"]
 evidence = ["pallets/x3-agent-law", "note: Status document records privacy tightening and passing tests"]
+
+[[feature]]
+id = "X3-RT-013"
+name = "Autonomic control plane"
+subsystem = "runtime_core"
+source = "master"
+paths = [
+  "x3-autonomic-core/crates/x3-autonomic-types",
+  "x3-autonomic-core/crates/x3-live-auditor",
+  "x3-autonomic-core/crates/x3-shadow-runner",
+  "x3-autonomic-core/crates/x3-regression-engine",
+  "x3-autonomic-core/crates/x3-judge-agent",
+  "x3-autonomic-core/crates/x3-benchmark-oracle",
+  "x3-autonomic-core/crates/x3-autonomic-cli",
+]
+implemented = 55
+tested = 55
+mainnet_ready = 10
+priority = "P2"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = true
+# No row covered `x3-autonomic-core` until 2026-09-27, and the reason is now clear: the workspace
+# had never compiled, so nothing could cover it. Everything below was found by making it build.
+blockers = [
+  "**CLOSED 2026-09-27 — the workspace could not resolve, let alone compile.** `x3-autonomic-types` asked for a `chrono` feature (`derive`) that no 0.4 version has, so `cargo metadata` on the workspace failed; its SCALE import named `parity_scale_codec` while the manifest declares `scale = { package = \"parity-scale-codec\" }`; five members declared `#![cfg_attr(not(feature = \"std\"), no_std)]` with no `std` feature, so they were permanently no_std while using `Vec`, `String`, `format!` and `std::io`. Resolution, import and the attribute are fixed; `cargo check --workspace` finishes clean.",
+  "**CLOSED 2026-09-27 — three types could not be SCALE-decoded, and two are pallet storage.** `InvariantDefinition.name`/`description` were `&'static str` (no `Decode` impl) and `HealthMetricDefinition`'s thresholds were `f64` (SCALE has no float), so `register_invariant` and `register_metric` took arguments no transaction could carry. Strings are owned `Vec<u8>` now and thresholds are basis points; a round-trip test pins both.",
+  "**CLOSED 2026-09-27 — four fabricated or unbuildable behaviours.** `LiveAuditor::check_invariants` returned `(id, true, severity)` for everything under a \"Placeholder\" comment (a live auditor reporting every invariant passing); `ShadowRunner::execute_shadow_block` returned `state_root_matches: true` without executing anything; `verify_shadow_result` returned `true` for every input; `JudgeAgent::evaluate` ignored its proposal argument entirely. Each refuses or answers from its input now, and the CLI (which printed \"Setting autonomy level to: X\" and performed nothing) refuses with a non-zero status like the wallet CLI does.",
+  "**CLOSED 2026-09-27 — three references to variants that do not exist.** `AutonomyLevel::{Automatic, SelfImproving, SelfGoverning}` (in two crates), `AuditEvent::Error` and `Severity::High` were all named by code that could not compile. The ladder answers via `AutonomyLevel::allows_autonomous_change()`, `AuditEvent` gained the `Error` variant its `From` impl needed, and the severity is the ladder's `Critical`.",
+  "**OPEN — nothing here is wired into anything.** No runtime registers either autonomic pallet, no node runs the auditor or shadow runner, and the CLI has no client. The two pallets in this workspace (`pallet-x3-invariants`, `pallet-x3-health`) are parked out of the member list: they pin FRAME to a 2023 substrate revision, still use `#[pallet::generate_store]` and declare no call weights, and they are orphans — the chain's invariant pallet is `pallets/x3-invariants`, a different crate. Porting or deleting them is a scheduled decision.",
+  "**OPEN — the audit and shadow paths have no chain data source.** `check_invariants` and `execute_shadow_block` refuse precisely because there is nothing to read or replay; a real autonomic loop needs a node client plus the invariants it should read.",
+]
+required_tests = [
+  "the_storage_types_round_trip_through_scale",
+  "the_autonomy_ladder_says_when_it_may_change_itself",
+  "an_audit_event_can_carry_a_component_failure",
+  "checking_invariants_refuses_without_a_state_source",
+  "the_configured_cadence_gates_a_pass",
+  "shadow_execution_refuses_without_an_isolated_runtime",
+  "verification_compares_roots_and_refuses_when_there_are_none",
+  "autonomous_action_follows_the_autonomy_ladder",
+  "a_critical_proposal_goes_to_a_human_even_at_full_autonomy",
+  "a_manual_autonomy_level_always_needs_a_human",
+  "confidence_is_basis_points_and_clamped_at_certainty",
+  "automatic_generation_follows_the_autonomy_ladder",
+  "the_autonomy_argument_parses_names_and_numbers",
+]
+test_evidence = [
+  "note: `cargo test --workspace --manifest-path x3-autonomic-core/Cargo.toml` -> 15 passed, 0 failed; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --all --check` clean (2026-09-27). Before this pass none of those commands could run at all.",
+  "note: break-it-first: restoring `Ok(true)` in `verify_shadow_result` reddens verification_compares_roots_and_refuses_when_there_are_none.",
+]
+evidence = [
+  "x3-autonomic-core/Cargo.toml",
+  "x3-autonomic-core/crates/x3-autonomic-types/src/lib.rs",
+  "x3-autonomic-core/crates/x3-live-auditor/src/lib.rs",
+  "note: 2026-09-27 - the workspace resolved to nothing; `cargo metadata` failed on a chrono feature that does not exist",
+]

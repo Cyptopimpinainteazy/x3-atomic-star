@@ -546,6 +546,11 @@ GATES_FAST=(
   # Measured 2026-09-27: 69s, S0 VERIFIED 100.0%, all six catastrophic and three critical blockers
   # pass, S1 verifies five modules.
   "security gates S0 S1:bash scripts/run-security-gates.sh"
+  # `x3-autonomic-core` had no gate because it had never compiled: `cargo metadata` on the
+  # workspace failed on a `chrono` feature that does not exist at any 0.4 version. With that,
+  # the SCALE import, five bogus `no_std` attributes and the pallet types repaired, the
+  # workspace's 15 tests run here — so the next break is visible instead of silent.
+  "test autonomic core:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-autonomic cargo test --workspace --manifest-path x3-autonomic-core/Cargo.toml"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:

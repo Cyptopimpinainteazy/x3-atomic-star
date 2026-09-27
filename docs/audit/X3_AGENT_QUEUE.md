@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `7cb4ffcf61129eb5…` — the artifacts move when
+Source digest: `5675a4ce20155e8e…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -191,6 +191,7 @@ fails when they do not match.
 | MTX-X3-RT-010 | runtime_core | Runtime API surface: **CLOSED 2026-09-25 — the kernel's API surface is declared once, and one of its accessors is now proven over the wire.** `pallets/x3-kernel/src/runtime_api.rs` declared a second trait (`AtlasKernelApi`) that no `mod` declaration ever compil… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-011 | runtime_core | Token class / fixed supply model: Supply invariants still incomplete | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · 3 named tests in FEATURE_REGISTRY | open |
 | MTX-X3-RT-012 | runtime_core | Agent-law runtime guard: Needs broader governance/adversarial coverage | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 55% (no named test list on this row) | open |
+| MTX-X3-RT-013 | runtime_core | Autonomic control plane: **CLOSED 2026-09-27 — the workspace could not resolve, let alone compile.** `x3-autonomic-types` asked for a `chrono` feature (`derive`) that no 0.4 version has, so `cargo metadata` on the workspace failed; its SCALE import named `parity_sc… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P2/high | `bash scripts/local-ci.sh` | NOT INTEGRATED · tested score 55% (no named test list on this row) | open |
 | MTX-X3-SEC-001 | security_proofgate | Reproducible srtool runtime build: Measured locally, 2026-09-22: `./scripts/update-runtime-hashes.sh` builds the runtime twice from scratch in the pinned srtool image and refuses to write unless the two builds agree byte for byte. Run three times in one session (`93fe86c9bd`… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
 | MTX-X3-SEC-002 | security_proofgate | Runtime artifact hash evidence: `docs/reports/runtime-wasm-hashes.json` records the revision, image digest, compact/compressed sizes, set_code, authorize_upgrade, IPFS CID and BLAKE2-256, plus the runtime version and metadata the artifact reports; `scripts/check-runtime-h… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
 | MTX-X3-SEC-003 | security_proofgate | Mainnet release audit script: Must remain aligned with actual production build artifacts | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
@@ -210,6 +211,6 @@ fails when they do not match.
 | MTX-X3-SWARM-001 | swarm_compute | Northern Swarm on-chain pallet (stake/task/quorum/reward): Closed 2026-09-27 — a `Disputed` task no longer strands funds. `resolve_disputed_task` (call_index 8) refunds the submitter's exact reserved reward and moves the task to the new terminal `TaskStatus::Refunded`; it is permissionless because… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · tested score 78% (no named test list on this row) | open |
 | MTX-X3-SWARM-002 | swarm_compute | Northern Swarm executor: signed metadata-driven chain contract and compute backends: No live-node integration test. The watcher/encoder/signer contract is proven at its own boundary - the storage prefix is derived and stable, the map key decodes to the task id, the HTTP polling URL conversion is pinned, the signature parser… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 13 named tests in FEATURE_REGISTRY | open |
 
-**198 open rows** (11 blocker lines on registry rows are marked CLOSED and are not
+**199 open rows** (11 blocker lines on registry rows are marked CLOSED and are not
 listed). A row disappears only when the underlying record changes - a fixed blocker removed
 from `FEATURE_REGISTRY.toml`, or a matrix row that reached `COMPLETE`.
