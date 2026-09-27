@@ -1365,12 +1365,25 @@ else is still refused while `Halted` is set.
 
 What that does **not** prove, and what this ticket is for:
 
-1. **The list can go stale.** It was written by hand from the calls that were known to hold funds.
-   A pallet added later that reserves a bond, escrow or deposit with no rollback extrinsic would be
-   trapped by a halt, and no gate would notice. There is no enumeration of "calls that release funds"
-   to check the list against, and `emergency_unpause` is on the list on the reasoning that a paused
-   kernel is the routine case — not because a test drives a halt with a paused kernel and requires
-   recovery.
+1. ~~**The list can go stale.**~~ **CLOSED 2026-09-27.** The completeness gap is now a gate.
+   `scripts/ci/check-halt-fund-holding.py` parses every pallet the runtime wires (`construct_runtime!`)
+   for dispatchables that can reach `reserve` / `reserve_named` / `hold` / `hold_named` / `set_lock`
+   (through same-file helpers) and compares them with the reviewed inventory in
+   `security/halt-fund-holding.toml`; it is wired into `scripts/local-ci.sh` (gate
+   `halt fund holding`). It fails on a fund-holding call with no entry, an entry that outlives its
+   call, a `transient` claim whose call reaches no release primitive, a `permanent_charge` whose
+   amount is not a `*Fee` constant, and a `recoverable_by`/`while_halted` claim the code does not
+   support. Measured inventory: **26 fund-holding dispatchables**; **1 releasable while halted**
+   (`X3AtomicKernel::rollback_atomic_bundle`), **2 transient** (`AtlasKernel::submit_cross_vm_operation`
+   / `prepare_cross_vm_operation`, which free what they hold in-call), **23 exceptions** whose funds
+   the halt keeps locked until `Council::close` clears it. Four break-it-first controls
+   (delete the atomic-bundle entry; relabel `governance::submit_proposal` transient; point
+   `x3-slash`'s `recoverable_by` at a non-release call) each go red, then restore green
+   byte-identically (`.ai/runlogs/halt-fund-holding-check-20260927T055706Z/`). The two genuine
+   traps it found — a reserve that is never released at all — are TICKET-154.
+   `emergency_unpause` is still on the list on the reasoning that a paused kernel is the routine
+   case, not because a test drives a halt with a paused kernel and requires recovery; that stays open
+   under item 3.
 2. ~~**Nothing measures the halt/unhalt cycle on a node.**~~ **CLOSED 2026-09-26.**
    `scripts/drills/halt_recovery_live.sh` (gate `halt recovery on a live chain`, PASS in ~25 s) starts
    three validators, trips the halt through a council motion, requires two different validators'
@@ -1399,6 +1412,39 @@ Acceptance criteria:
 Validation: the checker fails on a deliberately-removed exemption; the drill's post-clear transfer is
 `InBlock`; the re-benchmarked weight is within the copied value's order of magnitude or the copied
 value is replaced.
+
+**Item 1 status: CLOSED 2026-09-27** (`scripts/ci/check-halt-fund-holding.py`,
+`security/halt-fund-holding.toml`, `scripts/local-ci.sh`). Items 2 (live drill), 3 (`clear_halted`
+re-benchmark) and 4 (halt/remediate/clear sequence test) remain open.
+
+## TICKET-154 — two pallets reserve an anti-spam fee and never release it — 2026-09-27
+
+Found by the TICKET-153 completeness gate on its first run. `pallets/x3-da` and `pallets/x3-sequencer`
+both charge their per-byte anti-spam fee by calling `T::Currency::reserve(&submitter, fee)` — and
+neither pallet contains a single `unreserve`, `slash_reserved` or `repatriate_reserved`, so the
+reserved balance is never touched again.
+
+* `pallets/x3-da/src/lib.rs::submit_blob_commitment` reserves `PerByteFee * size_bytes`
+  (`x3-da` has no other dispatchable that releases funds; `submit_shard_proof` only writes storage).
+* `pallets/x3-sequencer/src/lib.rs::submit_transaction` reserves `BaseFee + PerByteFee * payload_size`
+  (`x3-sequencer` has one dispatchable, this one).
+
+A `reserve` is a bond: the funds stay in the account and are unspendable until one of the release
+primitives frees them. With none, the submitter's balance is locked forever — indistinguishable from
+a fund trap, and exactly the class TICKET-153 was written to surface. The comment in both pallets
+says the amount is a *fee*, where a charge should leave the account (a transfer to the treasury, or
+`withdraw(.., WithdrawReasons::FEE, ..)`), not sit in `reserved`.
+
+The gate records this honestly as `disposition = "permanent_charge"` (the amount is a named `*Fee`
+constant) rather than pretending a release path exists; that disposition is a *finding*, not a
+pass. What is not decided here — and is the owner's call because it moves funds and changes an
+economic path — is which charge primitive replaces the reserve: burn the fee (`withdraw` and drop
+the imbalance), forward it to the treasury, or turn it into a refundable bond with a real release
+call. Until that is chosen, both calls are listed as exceptions in the halt gate.
+
+Validation for the fix: a `cargo test -p pallet-x3-da` / `-p pallet-x3-sequencer` test that a
+submission's `reserved_balance` returns to zero (or that the fee lands where the chosen policy says),
+and the halt gate's entry for each call changes from `permanent_charge` to `recoverable`/`exempt`.
 
 ## GAP-TOOLCHAIN-WIPE — `~/.cargo/bin` loses everything that was installed after the base image — 2026-09-26
 

@@ -363,6 +363,13 @@ GATES_FAST=(
   # through a halt without review. This compares the runtime's list with
   # `security/halt-exemptions.toml` and requires every entry to resolve to a real dispatchable.
   "halt exemptions:python3 scripts/ci/check-halt-exemptions.py"
+  # The exemption list above can only be as complete as the inventory of calls that hold funds, and
+  # nothing built that inventory: a pallet that reserves a bond, escrow or deposit with no halt-
+  # reachable release is invisible to it (TICKET-153). This parses every runtime-wired pallet for
+  # dispatchables that reach `reserve`/`hold`/`set_lock`, compares them with
+  # `security/halt-fund-holding.toml`, and fails on an unclassified call, a stale entry, or a
+  # disposition the code does not support.
+  "halt fund holding:python3 scripts/ci/check-halt-fund-holding.py"
   # `x3-packet-schema` is the comit path's wire format: `pallet-x3-kernel`'s packet adapters call
   # `Packet::from_wire_format` on bytes a transaction carries. It was in no fast gate — a root
   # workspace member, so `test workspace` covered it, but only under `--deep`. Its own 58 tests plus
