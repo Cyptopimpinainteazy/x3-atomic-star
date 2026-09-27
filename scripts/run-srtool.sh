@@ -25,6 +25,34 @@ RUNTIME_DIR="${SRTOOL_RUNTIME_DIR:-runtime}"
 REPORT_DIR="$REPO_ROOT/.srtool-reports"
 REPORT_FILE="$REPORT_DIR/srtool-$(date +%Y%m%d-%H%M%S).json"
 LATEST_REPORT="$REPORT_DIR/latest.json"
+BUILD_LOG="${REPORT_FILE%.json}.log"
+
+# Write a JSON report for the runtime srtool just built: path, size, SHA-256 and BLAKE2-256 of the
+# compact and the compressed blob, in the `runtimes.{compact,compressed}` shape srtool uses.
+write_report() {
+  python3 - "$1" "$REPO_ROOT" "$RUNTIME_DIR" "$PACKAGE" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+out, root, runtime_dir, package = sys.argv[1], Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+stem = package.replace("-", "_")
+dirs = [root / runtime_dir / "target/srtool/release/wbuild" / package,
+        root / "target/srtool/release/wbuild" / package]
+def entry(suffix):
+    for d in dirs:
+        f = d / f"{stem}.{suffix}"
+        if f.is_file() and f.stat().st_size > 0:
+            data = f.read_bytes()
+            return {"wasm": str(f.relative_to(root)), "size": len(data),
+                    "sha256": "0x" + hashlib.sha256(data).hexdigest(),
+                    "blake2_256": "0x" + hashlib.blake2b(data, digest_size=32).hexdigest()}
+    return None
+compact, compressed = entry("compact.wasm"), entry("compact.compressed.wasm")
+if compact is None or compressed is None:
+    sys.exit(1)
+Path(out).write_text(json.dumps({"gen": "scripts/run-srtool.sh", "package": package,
+    "runtimes": {"compact": compact, "compressed": compressed}}, indent=2) + "\n")
+PY
+}
 
 # srtool Docker image — pin to the Rust toolchain you target.
 #
@@ -208,7 +236,7 @@ cmd_build() {
       --image "$SRTOOL_IMAGE" \
       -p "$PACKAGE" \
       --runtime-dir "$RUNTIME_DIR" \
-      2>&1 | tee "$REPORT_FILE"
+      2>&1 | tee "$BUILD_LOG"
 
   else
     # ── Raw Docker path ──────────────────────────────────────────────────
@@ -225,13 +253,19 @@ cmd_build() {
       "${CACHE_MOUNT[@]}" \
       "$SRTOOL_IMAGE" \
       build \
-      2>&1 | tee "$REPORT_FILE"
+      2>&1 | tee "$BUILD_LOG"
   fi
 
   local exit_code=${PIPESTATUS[0]}
   if [[ $exit_code -ne 0 ]]; then
     die "srtool build FAILED. Check output above."
   fi
+
+  # The report. srtool's own output went to "$BUILD_LOG": with `--app` the CLI prints its
+  # human-readable summary even when `--json` is passed, and this file used to be that output
+  # (build logs and all) under a `.json` name, so every JSON reader of it failed
+  # (production-gate run 36287647494). The report is computed from the artifacts srtool built.
+  write_report "$REPORT_FILE" || die "srtool build produced no runtime artifacts to report on"
 
   # Symlink latest
   ln -sf "$REPORT_FILE" "$LATEST_REPORT"
@@ -413,7 +447,8 @@ assert d.get('runtimes',{}).get('compact',{}).get('blake2_256')
       echo -e "${GREEN}✓ PASS${NC} ($b2)"
       PASS=$((PASS + 1))
     else
-      echo -e "${YELLOW}⚠ WARN${NC} (report exists but blake2_256 field not found)"
+      echo -e "${RED}✗ FAIL${NC} (report is not JSON with runtimes.compact.blake2_256)"
+      FAIL=$((FAIL + 1))
     fi
   else
     echo -e "  ${YELLOW}⚠ SKIP${NC}: No srtool report found (run './scripts/run-srtool.sh build' first)"
