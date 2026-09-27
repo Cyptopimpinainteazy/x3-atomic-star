@@ -47,12 +47,13 @@ fn submit_compute_task<T: Config>(
     let payload: BoundedVec<u8, ConstU32<512>> =
         BoundedVec::truncate_from(b"hex:0102030405060708".to_vec());
     let block = frame_system::Pallet::<T>::block_number();
-    let task_id = T::Hashing::hash_of(&(submitter, &payload, block));
+    let kind = TaskKind::Compute;
+    let task_id = T::Hashing::hash_of(&(submitter, &payload, &kind, block));
     assert_ok!(NorthernSwarm::<T>::submit_task(
         RawOrigin::Signed(submitter.clone()).into(),
         payload,
         reward,
-        TaskKind::Compute,
+        kind,
     ));
     task_id
 }
