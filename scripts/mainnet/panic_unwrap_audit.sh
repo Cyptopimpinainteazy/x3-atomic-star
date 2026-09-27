@@ -47,14 +47,21 @@ CURRENT="$(mktemp)"
 trap 'rm -f "$CURRENT"' EXIT
 python3 "$SCAN" >"$CURRENT"
 
-python3 - "$CURRENT" "$BASELINE" "$REPORT" "$UPDATE" "$ROOT_DIR" <<'PY'
+# The baseline is only comparable to a measurement taken with the *same* scanner. This was learned
+# the hard way on 2026-09-27: a raw-string bug made the scan both miss real production sites and
+# invent test ones, so a baseline recorded with the old scanner and a count taken with the new one
+# were two different quantities — the ratchet read "516 -> 519" when the truth was "477 -> 520".
+# The hash below is pinned into the baseline, and a mismatch is a deliberate re-baseline, not a pass.
+python3 - "$CURRENT" "$BASELINE" "$REPORT" "$UPDATE" "$ROOT_DIR" "$SCAN" <<'PY'
 import json
+import hashlib
 import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 
-current_path, baseline_path, report_path, update_flag, root = sys.argv[1:6]
+current_path, baseline_path, report_path, update_flag, root, scan_path = sys.argv[1:7]
+scanner_sha256 = hashlib.sha256(open(scan_path, "rb").read()).hexdigest()
 # argv is a string: "0" is truthy in Python, so compare instead of testing.
 update = update_flag == "1"
 current = json.load(open(current_path))
@@ -77,6 +84,7 @@ if update:
         {
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "commit": commit,
+            "scanner_sha256": scanner_sha256,
             "counts": counts,
             "files_scanned": current["files_scanned"],
             "runtime_hooks_allowed": hooks,
@@ -84,6 +92,9 @@ if update:
                 "Panic/unwrap ratchet. `counts` may only go down; runtime_hooks_allowed "
                 "is an explicit allowlist of KNOWN block-hook panics that are scheduled to "
                 "be removed — it is not a target state, and it should trend to empty. "
+                "`scanner_sha256` is the scanner this baseline was measured with: the audit "
+                "refuses to compare a count taken by a different scanner, because a scanner "
+                "change can move the number in either direction without any code changing. "
                 "Refresh with "
                 "scripts/mainnet/panic_unwrap_audit.sh --update-baseline, and say why "
                 "in the commit message if a count increases."
@@ -113,6 +124,20 @@ if baseline is None:
 else:
     base_counts = baseline["counts"]
     allowed_hooks = baseline.get("runtime_hooks_allowed", [])
+    base_scanner = baseline.get("scanner_sha256")
+    if base_scanner is None:
+        failures.append(
+            "the baseline has no scanner_sha256: it was recorded before the audit pinned the "
+            "scanner, so its count is not comparable to this one. Re-baseline deliberately with "
+            "scripts/mainnet/panic_unwrap_audit.sh --update-baseline and say why."
+        )
+    elif base_scanner != scanner_sha256:
+        failures.append(
+            "the scanner changed since the baseline was recorded "
+            f"({base_scanner[:12]} -> {scanner_sha256[:12]}): a count taken with a different "
+            "instrument is not a ratchet movement. Re-baseline deliberately with "
+            "scripts/mainnet/panic_unwrap_audit.sh --update-baseline and say why."
+        )
 
 new_hooks = sorted(set(hooks) - set(allowed_hooks))
 if new_hooks:

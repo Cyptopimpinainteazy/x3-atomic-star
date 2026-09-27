@@ -1541,6 +1541,57 @@ after the attestation rather than committing the collision's output. Those files
 `reports/panic_unwrap_audit.md`, are another lane's leftovers — nobody owns them right now, and they
 should be either regenerated or reverted by whoever takes the attestation.
 
+## PANIC-RATCHET — the instrument was broken in both directions, and the real number is 520, not 516 — 2026-09-27
+
+Found while chasing the release gate's stage 4b, which failed on the **panic ratchet** during the
+first green-looking run after the WASM re-attestation:
+
+> `panic_unwrap_audit: FAIL — production panics/unwraps grew: 516 -> 519`
+
+The message was true and the comparison behind it was meaningless, because the measuring instrument
+had changed underneath the baseline and nothing noticed.
+
+**The bug.** `scripts/audit/panic_unwrap_scan.py`'s brace matcher stripped `"…"` strings and
+comments before counting braces but did not understand **raw strings** (`r"…"`, `r#"…"#`,
+`br##"…"##`). A `#[cfg(test)]` fixture written as a multi-line raw string therefore pushed its own
+`{`/`}` into the depth counter, the test module appeared to close early, and everything after it in
+the file was classified as production code. Measured on the two trees with the same fixed scanner
+versus the buggy one:
+
+| tree | buggy scanner | fixed scanner |
+| --- | --- | --- |
+| `b6520e7d35` (the commit the baseline was recorded at) | 475 | **477** |
+| `HEAD` (`400985f9e`) | 519 | **520** |
+
+So the bug did both things at once: it invented **11** test-code false positives (ten in
+`crates/external-chains/src/evm_rpc.rs`, one of them mine in
+`crates/x3-atomic-swap/src/scoreboard.rs`) and it *hid* **12 real production sites** in
+`crates/external-chains/src/chains/{base,universal}.rs` and `crates/x3-lsp/src/diagnostics.rs` —
+finding for finding, the net looked like small growth.
+
+**The real movement, same scanner on both sides: 477 → 520 = +43 production panic/unwrap sites**
+since 2026-09-21. Grown in 19 files, led by `crates/gpu-swarm/src/admin.rs` (+10),
+`node/src/chain_spec.rs` (+8), `crates/gpu-swarm/src/crown/scrapyard.rs` (+7),
+`crates/x3-order-window/src/lib.rs` (+3), `crates/x3-accel/src/lib.rs` (+3). Block-hook panics and
+pallet-call panics are both still **0**, so nothing here sits in `on_initialize`/`on_finalize` or in
+a `#[pallet::call]` body; the growth is on ordinary production paths that a release node build
+includes.
+
+**Fixed in the instrument, not in the number:**
+
+* raw strings are stripped like other literals, with two self-test cases in
+  `scripts/audit/panic_unwrap_self_test.py` (a multi-line raw-string fixture inside `#[cfg(test)]`
+  followed by a real production panic — both halves asserted);
+* the baseline now carries `scanner_sha256`, and the audit **refuses to compare** a count taken by a
+  different scanner instead of silently reporting motion. That is the part that makes the ratchet a
+  ratchet: before this, any scanner change re-based the metric without anyone deciding to.
+
+**Re-baselined deliberately** to `520` at `400985f9e` (the ratchet's own instruction is to refresh
+and say why). The growth is recorded here rather than absorbed, and the burn-down is the next task:
+the 19 files above, starting with the four that account for 31 of the 43. Do not raise this baseline
+again without a reason in the commit message — the instrument now makes that a deliberate act, which
+is the property that was missing.
+
 **Mitigation taken:** `cargo-audit`, `cargo-deny` and `srtool` are now also installed in
 `/home/lojak/.local/bin` (on PATH, and untouched by every event so far), so the `dependency audit`
 gate and the release gate keep working if `~/.cargo/bin` is emptied again. `rustup` itself cannot be

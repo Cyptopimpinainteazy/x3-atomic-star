@@ -94,9 +94,58 @@ def tree_cases() -> None:
     )
 
 
+def raw_string_cases() -> None:
+    """A raw string's braces must not end a test module's range.
+
+    Measured 2026-09-27: a `#[cfg(test)]` fixture written as a multi-line `r#"{ … }"#` JSON blob put
+    two braces into the depth counter, so the enclosing test module appeared to close early and the
+    test's own `panic!` was reported as a production finding — a false positive in a ratchet whose
+    whole purpose is to be trustworthy. Raw strings were simply not handled.
+    """
+    print("raw strings")
+    lines = [
+        "pub fn production() {",  # 1
+        "    let v = maybe().unwrap();",  # 2 — production, must count
+        "}",  # 3
+        "#[cfg(test)]",  # 4
+        "mod tests {",  # 5
+        "    #[test]",  # 6
+        "    fn parses() {",  # 7
+        '        let json = r#"{',  # 8 — brace inside a raw string
+        '            "entries": [{ "a": 1 }]',  # 9 — more braces inside it
+        '        }"#;',  # 10 — closes the raw string
+        '        let parsed = serde_json::from_str(json).expect("loads");',  # 11 — test
+        '        assert!(parsed.is_object(), "{}", "no");',  # 12 — test
+        "    }",  # 13
+        "}",  # 14
+        "",  # 15
+        "pub fn after_the_tests() -> u8 {",  # 16
+        "    Option::<u8>::None.unwrap()",  # 17 — production, must count again
+        "}",  # 18
+    ]
+    ranges = scan.test_line_ranges(lines)
+    covered = {n for start, end in ranges for n in range(start, end + 1)}
+    for line in range(4, 15):
+        check(f"line {line} (raw-string fixture) is inside the test range", line in covered)
+    for line in (1, 2, 3, 16, 17, 18):
+        check(f"line {line} is production", line not in covered)
+
+    # And the scanner's own classification of those braces, end to end.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "sample.rs")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        findings = scan.scan_file(path, set())
+    found_lines = {line for line, _ in findings}
+    check("the raw-string fixture is not a finding", found_lines == {2, 17})
+
+
 def main() -> int:
     attribute_cases()
     range_cases()
+    raw_string_cases()
     tree_cases()
     if FAILURES:
         print(f"\npanic_unwrap_self_test: FAIL — {len(FAILURES)} case(s) moved")
