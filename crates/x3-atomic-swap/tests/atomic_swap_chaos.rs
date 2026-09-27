@@ -16,9 +16,9 @@ use x3_atomic_swap::{
     ledger::ProofLedger,
     scan_for_alerts, AtomicIntent, AtomicIntentBuilder, AtomicSwapStatus, ChainHealthOracle,
     ChainHealthStatus, ChainKind, ChaosTestResult, ChaosTestScoreboard, EvmHtlcContract,
-    FinalityLevel, FinalityRequirement, HealthCheck, PausableChainHealth, RefundPath, Relayer,
-    RouteMode, SlashReason, SlashableActor, SlashingEngine, SolPubkey, SolverModel, SolverRegistry,
-    SvmHtlcProgram, TimeoutEngine, WatcherAlert,
+    FinalityCertificate, FinalityLevel, FinalityRequirement, HealthCheck, PausableChainHealth,
+    RefundPath, Relayer, RouteMode, SlashReason, SlashableActor, SlashingEngine, SolPubkey,
+    SolverModel, SolverRegistry, SvmHtlcProgram, TimeoutEngine, WatcherAlert,
 };
 
 // ---------------------------------------------------------------------------
@@ -602,10 +602,15 @@ fn test_chaos_rpc_disagreement() {
 /// 14. Finality delay → timeout safety triggered
 #[test]
 fn test_chaos_finality_delay() {
-    let relayer = Relayer::new("relayer-finality".into(), 12);
+    let mut relayer = Relayer::new("relayer-finality".into(), 12);
 
-    // Simulate insufficient confirmations (3 < 12)
-    let result = relayer.verify_finality(12, 3, "eth");
+    // A certificate three blocks deep (3 < 12). The depth is derived from the anchor, so a caller
+    // cannot report one the block does not have.
+    let shallow =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1012, [0x05u8; 32], [0x06u8; 32], 1014)
+            .expect("anchor at or below the tip");
+    assert_eq!(shallow.confirmations(), 3);
+    let result = relayer.verify_finality(ChainKind::Ethereum, &shallow);
     let passed = result.is_err();
     report(
         "test_chaos_finality_delay",
@@ -1149,13 +1154,20 @@ fn test_chaos_source_chain_reorg() {
     )
     .expect("EVM lock should succeed");
 
-    // Before reorg: 15 confirmations >= 12 required
-    let relayer = Relayer::new("relayer-reorg".into(), 12);
-    let pre_reorg = relayer.verify_finality(12, 15, "eth");
+    // Before reorg: the lock is anchored sixteen blocks below the observed tip.
+    let mut relayer = Relayer::new("relayer-reorg".into(), 12);
+    let before_reorg =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1000, [0x01u8; 32], [0x02u8; 32], 1015)
+            .expect("anchor at or below the tip");
+    let pre_reorg = relayer.verify_finality(ChainKind::Ethereum, &before_reorg);
     assert!(pre_reorg.is_ok(), "pre-reorg finality must pass");
 
-    // After reorg: confirmations drop to 3
-    let post_reorg = relayer.verify_finality(12, 3, "eth");
+    // After reorg: the same transaction is anchored three blocks below the tip instead of sixteen.
+    let after_reorg =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1013, [0x01u8; 32], [0x02u8; 32], 1015)
+            .expect("anchor at or below the tip");
+    assert_eq!(after_reorg.confirmations(), 3);
+    let post_reorg = relayer.verify_finality(ChainKind::Ethereum, &after_reorg);
     let passed = post_reorg.is_err();
     report(
         "test_chaos_source_chain_reorg",

@@ -15,7 +15,7 @@ use x3_atomic_swap::{
     AdapterLedgerBridge, AdapterScoreboard, AtomicCommandCenter, AtomicIntent, AtomicIntentBuilder,
     AtomicSwapStatus, BitcoinNetwork, BtcHtlcAdapter, CairoVmAdapter, ChainHealthOracle,
     ChainHealthStatus, ChainKind, CosmWasmAdapter, EventLog, EventWatcher, EvmHtlcContract,
-    FinalityCheckData, FinalityLevel, FinalityOracle, FinalityRequirement, FuelHtlcAdapter,
+    FinalityCertificate, FinalityLevel, FinalityOracle, FinalityRequirement, FuelHtlcAdapter,
     FuelNetwork, HealthCheck, HealthThresholds, HtlcEvent, InMemoryFinalityOracle, InkHtlcAdapter,
     InkNetwork, MoveVmAdapter, NearHtlcAdapter, NearNetwork, PausableChainHealth,
     PlutusHtlcAdapter, PlutusNetwork, ProofKind, ProofLedger, RefundPath, Relayer, RelayerModel,
@@ -164,9 +164,16 @@ fn test_happy_path_claim() {
         "hashlocks must match"
     );
 
-    // Verify finality (simulated: we have 15 confirmations on eth)
+    // Verify finality: a certificate whose anchor is sixteen blocks below the observed tip. The
+    // depth is derived from the anchor, so a caller cannot report one the block does not have.
+    let eth_certificate =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1000, [0x01u8; 32], [0x02u8; 32], 1015)
+            .expect("anchor at or below the tip");
+    assert_eq!(eth_certificate.confirmations(), 16);
     assert!(
-        relayer.verify_finality(12, 15, "eth").is_ok(),
+        relayer
+            .verify_finality(ChainKind::Ethereum, &eth_certificate)
+            .is_ok(),
         "finality must be verified on ETH"
     );
 
@@ -392,10 +399,14 @@ fn test_hashlock_mismatch_rejection() {
 // ===========================================================================
 #[test]
 fn test_relayer_cannot_claim_without_finality() {
-    let relayer = Relayer::new("relayer-test".into(), 12);
+    let mut relayer = Relayer::new("relayer-test".into(), 12);
 
-    // Simulate insufficient confirmations
-    let result = relayer.verify_finality(12, 3, "eth");
+    // A certificate three blocks deep — below the relayer's twelve.
+    let shallow =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1012, [0x03u8; 32], [0x04u8; 32], 1014)
+            .expect("anchor at or below the tip");
+    assert_eq!(shallow.confirmations(), 3);
+    let result = relayer.verify_finality(ChainKind::Ethereum, &shallow);
     assert!(
         result.is_err(),
         "relayer must refuse to proceed without sufficient finality"
@@ -973,15 +984,26 @@ fn test_source_chain_reorg() {
     )
     .expect("EVM lock should succeed");
 
-    // Initially 15 confirmations >= 12 required - finality met
-    let relayer = Relayer::new("relayer-reorg".into(), 12);
+    // Initially the lock is anchored sixteen blocks below the observed tip - finality met
+    let mut relayer = Relayer::new("relayer-reorg".into(), 12);
+    let before_reorg =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1000, [0x01u8; 32], [0x02u8; 32], 1015)
+            .expect("anchor at or below the tip");
     assert!(
-        relayer.verify_finality(12, 15, "eth").is_ok(),
-        "initial finality must pass with 15 confirmations"
+        relayer
+            .verify_finality(ChainKind::Ethereum, &before_reorg)
+            .is_ok(),
+        "initial finality must pass with 16 confirmations"
     );
 
-    // After a reorg, confirmations drop to 3 (< 12) - finality check fails
-    let reorg_result = relayer.verify_finality(12, 3, "eth");
+    // After a reorg the *same* transaction is anchored three blocks below the tip instead of
+    // sixteen. The tip has not moved; the anchor has, and the depth the certificate carries is now
+    // 3 (< 12), so the finality check fails.
+    let after_reorg =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1013, [0x01u8; 32], [0x02u8; 32], 1015)
+            .expect("anchor at or below the tip");
+    assert_eq!(after_reorg.confirmations(), 3);
+    let reorg_result = relayer.verify_finality(ChainKind::Ethereum, &after_reorg);
     assert!(
         reorg_result.is_err(),
         "reorg must cause finality to fail: expected Err, got {:?}",
@@ -3469,59 +3491,66 @@ fn test_new_modules_integration() {
     // ------------------------------------------------------------------
     // 1. FinalityOracle: verify finality on both chains
     // ------------------------------------------------------------------
-    let finality_oracle = InMemoryFinalityOracle::new();
+    let mut finality_oracle = InMemoryFinalityOracle::new();
 
-    // Ethereum: 12 confirmations required, 15 current -> OK
-    let eth_finality = finality_oracle.verify_finality(ChainKind::Ethereum, 15, "");
-    assert!(
-        eth_finality.is_ok(),
-        "Ethereum finality should pass with 15 confirms"
+    // Ethereum: 12 confirmations required. An anchor fifteen blocks below the observed tip passes.
+    let eth_deep =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1000, [0x11u8; 32], [0x22u8; 32], 1014)
+            .expect("anchor at or below the tip");
+    assert_eq!(eth_deep.confirmations(), 15);
+    assert_eq!(
+        finality_oracle.verify_finality(ChainKind::Ethereum, &eth_deep),
+        Ok(true),
+        "Ethereum finality should pass at 15 confirmations"
     );
 
-    // Ethereum: 12 confirmations required, 5 current -> FAIL
-    let eth_finality_fail = finality_oracle.verify_finality(ChainKind::Ethereum, 5, "");
+    // Ethereum: the same tip, an anchor only five blocks deep -> FAIL. The depth comes from the
+    // certificate, so the caller cannot report one the anchored block does not carry.
+    let eth_shallow =
+        FinalityCertificate::observe(ChainKind::Ethereum, 1010, [0x11u8; 32], [0x22u8; 32], 1014)
+            .expect("anchor at or below the tip");
+    assert_eq!(eth_shallow.confirmations(), 5);
     assert!(
-        eth_finality_fail.is_err(),
-        "Ethereum finality should fail with 5 confirms"
+        finality_oracle
+            .verify_finality(ChainKind::Ethereum, &eth_shallow)
+            .is_err(),
+        "Ethereum finality should fail at 5 confirmations"
     );
 
-    // Solana: "finalized" commitment -> OK
-    let sol_finality = finality_oracle.verify_finality(ChainKind::Solana, 0, "finalized");
+    // Solana: a "finalized" commitment -> OK
+    let sol_finalized =
+        FinalityCertificate::observe(ChainKind::Solana, 500, [0x33u8; 32], [0x44u8; 32], 500)
+            .expect("anchor at or below the tip")
+            .with_commitment_level("finalized");
     assert!(
-        sol_finality.is_ok(),
+        finality_oracle
+            .verify_finality(ChainKind::Solana, &sol_finalized)
+            .is_ok(),
         "Solana finality should pass with finalized commitment"
     );
 
-    // Solana: "confirmed" commitment -> FAIL (oracle requires finalized)
-    let sol_finality_fail = finality_oracle.verify_finality(ChainKind::Solana, 0, "confirmed");
+    // Solana: a "confirmed" commitment -> FAIL (oracle requires finalized)
+    let sol_confirmed =
+        FinalityCertificate::observe(ChainKind::Solana, 500, [0x33u8; 32], [0x44u8; 32], 500)
+            .expect("anchor at or below the tip")
+            .with_commitment_level("confirmed");
     assert!(
-        sol_finality_fail.is_err(),
+        finality_oracle
+            .verify_finality(ChainKind::Solana, &sol_confirmed)
+            .is_err(),
         "Solana finality should fail with confirmed commitment"
     );
 
-    // Also via is_finalized with FinalityCheckData
-    let eth_data = FinalityCheckData {
-        chain: ChainKind::Ethereum,
-        block_height: 1000,
-        confirmations: 15,
-        commitment_level: String::new(),
-    };
+    // Also via is_finalized with a certificate
     assert!(
         finality_oracle
-            .is_finalized(ChainKind::Ethereum, &eth_data)
+            .is_finalized(ChainKind::Ethereum, &eth_deep)
             .unwrap(),
         "is_finalized must return true for 15 confirms on Ethereum"
     );
-
-    let sol_data = FinalityCheckData {
-        chain: ChainKind::Solana,
-        block_height: 500,
-        confirmations: 0,
-        commitment_level: "finalized".into(),
-    };
     assert!(
         finality_oracle
-            .is_finalized(ChainKind::Solana, &sol_data)
+            .is_finalized(ChainKind::Solana, &sol_finalized)
             .unwrap(),
         "is_finalized must return true for Solana finalized"
     );

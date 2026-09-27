@@ -148,7 +148,10 @@ pub use event_watcher::{
 pub use evm_htlc::{
     EvmAdapter, EvmClaimedEvent, EvmHtlcAdapter, EvmHtlcContract, EvmLockedEvent, EvmRefundedEvent,
 };
-pub use finality::{FinalityCheckData, FinalityConfig, FinalityOracle, InMemoryFinalityOracle};
+pub use finality::{
+    is_confirmation_based, FinalityCertificate, FinalityConfig, FinalityOracle,
+    InMemoryFinalityOracle, DEFAULT_CERTIFICATE_STALENESS_BLOCKS,
+};
 pub use fuel_htlc::{FuelHtlcAdapter, FuelNetwork, FuelPredicate, StatefulFuelAdapter};
 pub use intent::{
     AtomicIntent, AtomicIntentBuilder, AtomicSwapStatus, ChainKind, FinalityLevel,
