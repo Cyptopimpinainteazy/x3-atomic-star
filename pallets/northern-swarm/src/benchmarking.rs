@@ -14,6 +14,7 @@ use frame_support::{
 };
 use frame_system::RawOrigin;
 use sp_runtime::traits::{Hash, Saturating};
+use sp_std::vec;
 
 fn hardware() -> HardwareProfile {
     HardwareProfile {
