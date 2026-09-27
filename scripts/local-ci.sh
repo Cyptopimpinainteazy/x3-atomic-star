@@ -524,6 +524,11 @@ GATES_FAST=(
   # for the same reason `nested workspaces` names one: a second workspace sharing the root target
   # walks cargo through rebuilds it does not need.
   "test x3-htlc:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
+  # The nested `x3_htlc` tree did have *one* thing the root never ran even after the line above: the
+  # live broadcaster client in `programs/x3_htlc/client`. It is its own workspace (like the
+  # `x3_atomic_swap` client) and it holds the instruction layout that both the validator gate and the
+  # program-test expiry suite drive, so its tests are gated explicitly rather than implied.
+  "test x3-htlc client:env CARGO_TARGET_DIR=/tmp/x3-htlc-client cargo test --locked --manifest-path X3-contracts/svm/programs/x3_htlc/client/Cargo.toml"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:
@@ -816,6 +821,18 @@ GATES_LIVE=(
   # behind the pinned toolchain directory on purpose. Put the shim back in front
   # for this gate, or the build dies with "no such command: `+…`".
   "SVM contract lifecycle:env PATH=\"$HOME/.cargo/bin:$PATH\" programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
+  # The *other* SVM HTLC tree, `X3-contracts/svm/programs/x3_htlc`, finally gets the same treatment:
+  # `cargo build-sbf`, deployed at the address its `declare_id!` fixes, a real SPL mint and real token
+  # accounts on the real token program, and 52 assertions decoded from raw account bytes. It covers
+  # the lock/claim path, wrong-preimage, wrong-recipient, double-claim, early refund, wrong-authority
+  # refund, the three rejected lock shapes, re-lock, and supply conservation. The escrow's 1-hour
+  # minimum timelock means a live validator cannot reach the post-expiry refund (its clock advances
+  # with wall time; `--warp-slot` moves the slot, not the clock), so that branch is the gate below.
+  "SVM HTLC x3_htlc lifecycle:env PATH=\"$HOME/.cargo/bin:$PATH\" bash X3-contracts/svm/programs/x3_htlc/test-live-lifecycle.sh"
+  # The expiry branch, against the same compiled artifact, in `solana-program-test` with an overridden
+  # clock sysvar: refund-before-expiry refused, refund-after-expiry moving real tokens back to the
+  # initiator, double refund refused, claim-after-refund refused, and the late-claim rule asserted.
+  "SVM HTLC x3_htlc expiry:env PATH=\"$HOME/.cargo/bin:$PATH\" bash X3-contracts/svm/programs/x3_htlc/run-expiry-test.sh"
 )
 
 GATES_VARIANTS=(
