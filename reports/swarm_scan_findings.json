@@ -4,7 +4,7 @@
   "counts": {
     "pallet-call-without-weights": 25,
     "stale-registry-test": 2,
-    "ungated-crate": 4,
+    "ungated-crate": 2,
     "unregistered-pallet": 1
   },
   "structural_counts": {
@@ -13,13 +13,13 @@
     "stale-proof-report": 0,
     "unregistered-pallet": 1,
     "pallet-call-without-weights": 25,
-    "ungated-crate": 4
+    "ungated-crate": 2
   },
   "gate_summary": [
     {
       "gate": "stub / marker ratchet",
       "status": "pass",
-      "detail": "critical-marker=443, explicit-stub=74, marker=1186"
+      "detail": "critical-marker=443, explicit-stub=74, marker=1187"
     },
     {
       "gate": "fake-code scan",
@@ -355,32 +355,6 @@
       "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
       "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
       "test_required": "cargo test -p pallet-x3-settlement-engine-fuzz",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
-      "id": "cab3617159c31da4",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "x3-autonomic-core/crates/x3-live-auditor/Cargo.toml",
-      "line": 0,
-      "symbol": "x3-live-auditor",
-      "why": "2 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p x3-live-auditor",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
-      "id": "1535c31380202a8b",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "x3-autonomic-core/crates/x3-regression-engine/Cargo.toml",
-      "line": 0,
-      "symbol": "x3-regression-engine",
-      "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p x3-regression-engine",
       "gate_affected": "crate tests are gated",
       "patch_eligible": true
     },

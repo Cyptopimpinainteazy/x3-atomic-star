@@ -4,7 +4,7 @@
     "pallet-call-without-weights": 25,
     "stale-proof-report": 0,
     "stale-registry-test": 2,
-    "ungated-crate": 4,
+    "ungated-crate": 2,
     "unregistered-pallet": 1
   },
   "note": "Counts of the finding kinds this scanner owns. Growth fails the `repo scanner` gate; shrinking is always allowed."
