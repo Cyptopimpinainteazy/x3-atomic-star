@@ -3515,13 +3515,13 @@ mod benches {
     #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     #[allow(unused_imports)]
+    use pallet_northern_swarm::Pallet as NorthernSwarm;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
     #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
     #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
-    #[allow(unused_imports)]
-    use pallet_northern_swarm::Pallet as NorthernSwarm;
     // Added 2026-09-25: `pallet-x3-kernel`'s benchmark module compiles and its `submit_comit_v2`
     // entry was a hand-written placeholder ("same base weight as submit_comit until benchmarks are
     // re-run") that nothing could re-run, because the pallet was not registered here — the CLI
