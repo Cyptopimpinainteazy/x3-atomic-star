@@ -161,7 +161,7 @@ def check_pallet_contract() -> None:
         if path.exists():
             test_sources += path.read_text(encoding="utf-8", errors="ignore")
     for test_name in required_pallet_tests:
-        if not re.search(rf"fn\\s+{re.escape(test_name)}\\s*\\(", test_sources):
+        if not re.search(rf"fn\s+{re.escape(test_name)}\s*\(", test_sources):
             fail(f"missing required pallet behavior test: {test_name}")
         else:
             ok(f"pallet behavior test exists: {test_name}")
