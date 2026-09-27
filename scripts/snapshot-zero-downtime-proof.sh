@@ -367,7 +367,7 @@ say "restoring the snapshot into a chain spec (re-genesis: the producing chain's
 "$SNAPSHOT_BIN" restore --manifest "$WORK/snapshot/manifest.json" --chunks "$WORK/snapshot" \
   --out "$WORK/restored.json" --chain-id "$CHAIN_ID" --block-hash "$ANCHOR_HASH" \
   --state-root "$ANCHOR_ROOT" --runtime-version "$ANCHOR_SPEC" \
-  --from-spec "$WORK/template.json" --state-version 1 --force >"$WORK/restore.log" 2>&1 \
+  --from-spec "$WORK/template.json" --state-version 1 --regenesis --force >"$WORK/restore.log" 2>&1 \
   || { cat "$WORK/restore.log" >&2; die "restore refused the snapshot"; }
 sed 's/^/[zero-downtime] /' "$WORK/restore.log"
 

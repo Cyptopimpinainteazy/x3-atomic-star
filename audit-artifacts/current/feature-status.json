@@ -3445,33 +3445,39 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 60,
+      "composite": 73,
       "confidence": "high",
       "evidence": [
         "scripts/snapshot-restore.sh",
-        "note: Independent audit previously scored snapshot/restore partial"
+        "note: Independent audit previously scored snapshot/restore partial",
+        "note: 2026-09-27 - `snapshot-restore.sh export-rpc` is the operator entry point for the zero-downtime path, and `zero-downtime-proof` runs the gate"
       ],
       "id": "X3-OPS-002",
-      "implemented": 70,
+      "implemented": 85,
       "launch_scope": "guarded",
-      "live_tested": "not a registered launch feature",
-      "mainnet_ready": 50,
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 58,
       "missing_work": [
         "**CLOSED 2026-09-26 \u2014 there is a live restore proof, and it is load-bearing.** This row asked for \"live restore drills and integrity verification\"; the only restore test round-tripped a text file through a tarball, which passes just as well for an empty database. `scripts/snapshot-live-restore-proof.sh` (gate: `snapshot restore across a live chain`, serial, ~25s) boots a real chain, reads the anchor *from the running node* \u2014 finalized height, canonical hash at that height, state root, and every storage entry at that height over RPC \u2014 stops it, snapshots with `snapshot-restore.sh backup`, restores into a fresh base path, boots a node on the restored database and requires height, hash, state root and the whole state map to come back identical (169 keys). It then boots a **control** node on an empty base path, lets it reach the same height, and requires its hash to differ, so the same check cannot pass for an empty chain. Measured: height 9, hash 0x0193e88c\u2026, control 0x5f51ff2c\u2026 Also green: launch-gates/snapshot-murder-test.sh (20 passed) and `cargo test -p x3-state-snapshot` (48 passed).",
-        "Still open: the backup refuses a *live* database (`check_validator_stopped`), correctly \u2014 a plain tar of a running RocksDB is not a consistent snapshot and the node exposes no `create_checkpoint`. The anchor is read from the running chain, but the archive is cut with the node stopped, so on a multi-GB validator DB that stop is the backup window. A zero-downtime snapshot needs a RocksDB checkpoint or an RPC state-export driver feeding `x3-state-snapshot build`, and the multi-GB size class has never been exercised on this box."
+        "**CLOSED 2026-09-27 \u2014 the snapshot is taken with the node still running, and the drift it found is fixed.** The open item above named two acceptable designs; this is the RPC one. `scripts/snapshot-rpc-export.py` pins one finalized, GRANDPA-justified block, pages every key at that block hash and reads every value at the same hash, and `scripts/snapshot-zero-downtime-proof.sh` (gate: `snapshot zero downtime export`, serial, ~4 min) composes it with the existing builder. The measured run: an archive node at finalized height 523 while the export read the chain and kept finalizing (523 -> 572 -> 587 during and after), 1881 keys exported at height 513, and the trie root recomputed *from those entries* by `x3-state-snapshot root --from-raw-spec` came out exactly the `stateRoot` the chain published in that block's header (0x4de17ec4\u2026). That is the export being measured against the chain rather than against itself: one missing key, one value read at the wrong block, or one invented key all move that root. The snapshot's `finality_proof` is the chain's own GRANDPA justification read back from `chain_getBlock` \u2014 not a placeholder \u2014 and the gate refuses an anchor that has none (`justification_generation_period` is 512 on this node, so the walk-back to the newest justified block is the normal path, not an exception).",
+        "**The first boot of a restored spec found a real defect, and it is fixed.** `x3-state-snapshot restore` wrote the state verbatim into `genesis.raw.top`, including `frame_system`'s per-block bookkeeping \u2014 so `System::Number` was the *producing* chain's height, and `frame_system::initialize` asserts `number == Self::block_number() + 1`. The restored chain panicked on its first block (`Block number must be strictly increasing. left: 513 right: 1`) and finalized nothing; the drill's red run is saved under `.ai/runlogs/`. `restore --regenesis` now drops the six named `frame_system` entries (`CHAIN_BOOKKEEPING_ENTRIES`, keys derived with `sp_core::twox_128`, not pasted hex), reports both roots instead of presenting one as the other, and records the drop in the spec's `properties`. With it, the restored chain boots as an authority and finalizes (measured: finalized height 7), its genesis state root equals the reported regenerated root, and all 1877 non-bookkeeping entries are byte-identical to the exported state.",
+        "Still open, and why this is not mainnet-ready: the export reads values **one RPC call per key** (1881 keys in ~2.4 s on loopback; a real chain has orders of magnitude more, and no batching \u2014 `state_getReadProof`-style range reads \u2014 has been written), so the multi-GB size class and the *time* a real validator would spend exporting are both unexercised. The export needs a node whose pruning window still covers the anchor: the gate demonstrates that a bounded node **refuses** an anchor it has pruned (naming pruning, writing no spec) rather than exporting a partial state, but the operator story that follows from it \u2014 run a dedicated archive node, or export inside the window \u2014 is documented guidance, not an automated provisioning step. `--regenesis` drops a fixed list of six `frame_system` entries; nothing enumerates *every* chain-local key a runtime might keep (a third-party pallet's 'current block' would still leak into the restored genesis). And a restore still produces a *new* chain, not a continuation of the same one: state-sync for an existing chain continues to need the base-path path or warp sync."
       ],
       "name": "Snapshot / restore tooling",
       "paths": [
         "scripts/snapshot-restore.sh",
-        "scripts/snapshot-live-restore-proof.sh"
+        "scripts/snapshot-live-restore-proof.sh",
+        "scripts/snapshot-zero-downtime-proof.sh",
+        "crates/x3-state-snapshot/src/lib.rs",
+        "crates/x3-state-snapshot/src/tests.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 80,
+      "tests": "12 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -4612,7 +4618,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "029a62335039534b7541d8211042eb7668a3e4a0003b6504b3d1937ac66c26e2",
+    "source_digest": "cee3291d7b70bc6a69cbd6e5961cdbc78fcd92301c2457f1f867526a66308019",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4625,7 +4631,7 @@
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
-      "feature-matrix/operations-user-tools.toml": "9d2ec869ddcc7f4cf614d9400a2906d0b0ba775b736c5b4be18b049d2d52503b",
+      "feature-matrix/operations-user-tools.toml": "dab9c5f373bab7e45d10420d6339a73836d3f2d1b9b08a0e7a7b741587b4bba8",
       "feature-matrix/runtime-core.toml": "5d8859153c18969b55f1140a6119c8908fc17a3254c96e76ba016178ff50f2df",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }

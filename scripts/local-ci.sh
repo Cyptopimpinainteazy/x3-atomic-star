@@ -235,6 +235,12 @@ GATES_FAST=(
   # modules counted as production and the release gate read 570 against a 516
   # baseline. This pins the classification and the empty result for runtime/src.
   "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
+  # The runtime-hash check exempts files that cannot reach the wasm target
+  # (`#[cfg(test)] mod tests;`, `<package>/tests/*.rs`) so a test-only edit does
+  # not demand a ten-minute double srtool rebuild. An exemption that is too wide
+  # would let a real runtime change through, so its classification is pinned in
+  # both directions.
+  "runtime hash exemption self-test:python3 scripts/check-runtime-hash-freshness.py --self-test"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   # `check-readiness-consistency.sh` validates `required_tests` in FEATURE_REGISTRY.toml. The matrix
   # fragments carry the same field and nothing checked them: X3-XVM-006 could cite
@@ -547,6 +553,11 @@ GATES_FAST=(
   # murder-test matrix (wrong chain, stale, wrong state root, corrupt /
   # reordered / missing chunk) is cheap, so it belongs in the gate set of record.
   "test state snapshot:cargo test -p x3-state-snapshot"
+  # The zero-downtime snapshot's exporter. Its refusals (a key the enumeration
+  # returned whose value read is null, a page walk that never advances, an anchor
+  # that is not canonical, a pruned anchor, a child trie) are the whole point of
+  # it, and each one is a case against a real loopback JSON-RPC server.
+  "snapshot export unit tests:python3 tests/test_snapshot_rpc_export.py"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob
@@ -701,6 +712,16 @@ GATES_LIVE=(
   # storage entry to come back — with a control node on an empty database required
   # to disagree, so the same check cannot pass for an empty chain.
   "snapshot restore across a live chain:bash scripts/snapshot-live-restore-proof.sh"
+  # The snapshot bullet's other half: take the snapshot *without stopping the
+  # node*. The archive path above refuses a live database (correctly), so this
+  # exports the running chain's state over RPC at a finalized, justified block,
+  # requires the recomputed trie root to equal the state root the chain published
+  # in that block's header, builds and verifies the snapshot with the chain's own
+  # GRANDPA justification, then restores it into a spec, boots it as an authority
+  # and requires it to finalize blocks. Four controls have to refuse: a
+  # one-key-short export, a wrong anchor, an unaltered genesis spec, and an anchor
+  # whose state a bounded node has already pruned.
+  "snapshot zero downtime export:bash scripts/snapshot-zero-downtime-proof.sh"
   # The upgrade path this chain actually has: three live validators on `local3`,
   # council governance carrying `system.set_code` to Root, the new spec_version read
   # back over RPC from every validator, and a transfer after the swap. Self-contained;
@@ -1208,6 +1229,7 @@ SERIAL_GATES=(
   "observability across seven validators"
   "public testnet gate across seven validators"
   "snapshot restore across a live chain"
+  "snapshot zero downtime export"
   "runtime upgrade through governance"
   "ordering window on a live chain"
   "wallet recovery on a live chain"
