@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # run-frame-benchmarks.sh — FRAME pallet weight benchmarking for X3
 #
-# Runs `benchmark pallet` for all 4 pallets that have benchmarks! blocks,
+# Runs `benchmark pallet` for all registered release-critical pallets that have benchmark blocks,
 # writes generated WeightInfo impls to each pallet's src/weights.rs, and
 # cross-checks each output against the reference hardware baseline.
 #
@@ -10,7 +10,8 @@
 #   • pallet-x3-atomic-kernel     (submit_atomic_bundle, assign_bundle_executor)
 #   • pallet-x3-settlement-engine (settle_bundle, record_settlement)
 #   • pallet-cross-chain-validator (validate_cross_chain_proof)
-#   • pallet-x3-slash              (slash_validator, report_double_sign)
+#   • pallet-x3-slash              (bond/slash lifecycle)
+#   • pallet-northern-swarm        (executor/task/quorum/reward lifecycle)
 #
 # Modes:
 #   ./scripts/run-frame-benchmarks.sh build           — compile with runtime-benchmarks
@@ -52,6 +53,7 @@ declare -A PALLET_PATHS=(
   ["pallet-x3-settlement-engine"]="pallets/x3-settlement-engine/src/weights.rs"
   ["pallet-cross-chain-validator"]="pallets/cross-chain-validator/src/weights.rs"
   ["pallet-x3-slash"]="pallets/x3-slash/src/weights.rs"
+  ["pallet-northern-swarm"]="pallets/northern-swarm/src/weights.rs"
 )
 
 print_help() {
