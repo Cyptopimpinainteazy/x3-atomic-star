@@ -9121,3 +9121,34 @@ registration, with the outcome per file:
   re-attestation (~20 min, two srtool builds) per batch, and remember the runtime feature-list trap
   above: 15 pallets that declare a `runtime-benchmarks` feature are still excluded from the runtime's
   list with their first compile error written next to them.
+
+## 2026-09-27 (fourth weights pass) — the treasury policy, and what a benchmark's setup must not hide
+
+- **`pallets/x3-treasury-policy` had all eight calls hand-typed** (settlement vault funding
+  80,000,000 ps, cap 50,000,000, threshold 30,000,000, the rest 40-60,000,000) behind a
+  `runtime-benchmarks` feature with nothing behind it, on a pallet the runtime's feature list did not
+  enable either — so `define_benchmarks!` could not see it and none of the eight had been measured.
+  Now measured, wired, and the fourth pallet cleared: scanner `pallet-call-without-weights`
+  **22 → 21** (it counts one finding per pallet, so 25 → 21 is four pallets, 20 literals).
+- **Two deltas to the recipe from the previous pass** (`pallets/x3-supply-ledger`):
+  1. A pallet whose `Config` has a supertrait on another pallet (`pallets/x3-treasury-policy::
+     Config: pallet_x3_inventory::pallet::Config`) needs **no** extra `#[benchmarks(where …)]` bound
+     to use that pallet's calls — the bound is already implied.
+  2. `StorageMap::put(key, value)` no longer exists in this FRAME revision. Use `insert(key, value)`
+     for maps; `put(value)` is still right for `StorageValue`.
+- **A benchmark's setup decides which branch it measures.** `fund_settlement_vault` sends every
+  non-zero action into the governance queue when the operator threshold is 0 (its default), so the
+  benchmark sets a cap and a threshold first and measures the immediate-apply branch. The vault it
+  needs comes from the inventory pallet's own root-only `create_vault` (`RawOrigin::Root`), with
+  zero bands — the inventory `Balance` is generic and its bounds have no `From<u32>`, so
+  `Default::default()` is the portable way to build the band arguments.
+- **Evidence**: `cargo test -p pallet-x3-treasury-policy` 23 passed; `--features runtime-benchmarks`
+  31 passed (8 benchmark entries); runtime `--features runtime-benchmarks` clean; `make mainnet-check`
+  PASS after two agreeing srtool builds recorded revision `af80888a6` (compact 8,881,232
+  `0x88164e76…`, compressed 1,526,056 `0xa764ea62…`); `check-runtime-weights-wired.py` 40 wired configs
+  (39 before); `X3-GPU-003` 68 → 69.
+- **Next seeds:** 21 pallets remain. Money path first — `x3-token-factory`, `x3-wrapped`,
+  `x3-wallet-pallet`, `x3-cross-vm-router`, `x3-asset-registry`, `x3-reservation`. The runtime's
+  feature-list exclusion comment still names ~12 pallets with their first compile error, and every
+  one of those is the same shape of work: add `frame-benchmarking`, write `benchmarking.rs`, register
+  in `mod benches`, enable the feature, generate, then wire.
