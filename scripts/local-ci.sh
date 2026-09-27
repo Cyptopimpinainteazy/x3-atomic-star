@@ -830,6 +830,14 @@ GATES_LIVE=(
   # with a delay, two approvals, a finalize refused before the delay and refused again for a
   # non-owner cancel, and a finalize that changes the *stored* recovery owner.
   "wallet recovery on a live chain:bash scripts/drills/wallet_recovery_live.sh"
+  # `[x3_sentinel]`'s one blocker was "no live governance simulation". This drill runs the
+  # simulation on three validators and the answer is worse than missing evidence: the governance
+  # gate is real (a signed account is refused with `BadOrigin` twice over, and the freeze map stays
+  # empty), but the privileged path the pallet documents is *unreachable* — the runtime wires
+  # `x3Sentinel::FreezeOrigin = EnsureRoot` in the single shared `Config` impl, and the three
+  # non-dev runtime variants have no sudo, so no extrinsic can arrive as root. The gate pins both
+  # halves, so a wiring change or a regression in the refusal is visible.
+  "sentinel privileged origin:bash scripts/drills/sentinel_privileged_origin_live.sh"
   # `X3-RT-001`/`X3-RT-006`/`X3-RT-007` and `TICKET-153`: the economic halt had never been tripped
   # on a network, so every claim about it was a single-process claim. This trips it through a
   # council motion on three validators, requires the pool of two different validators to refuse a

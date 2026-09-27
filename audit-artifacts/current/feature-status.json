@@ -4761,10 +4761,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "a579fbe40b5ebbc70617c67f96e8df0478932d5632031df6747e0003d5828c46",
+    "source_digest": "8f8ed602b7dc57c3bad0d20af34be7025582adc28d115952e15223876a6cf22a",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "9b681813d46c7bae1fe879daa3e515130ae71404132c1bdb7be7905a086fccb8",
+      "FEATURE_REGISTRY.toml": "c09b12d95d4e2efd6a722f4d2e70cf7ea5dbb5dac82b864ef278b7cd90a28d3d",
       "feature-matrix/agents-experimental.toml": "fb40d266a070b61f4bed312eb30e3e3e16443179fbbde5cb12678cf67768628f",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5169,13 +5169,14 @@
     },
     {
       "blockers": [
-        "No live governance simulation"
+        "The freeze/review/approval power cannot be engaged on any shipped chain: `x3Sentinel::FreezeOrigin = EnsureRoot` (the one shared Config impl, so all six runtime variants) and the three non-dev variants have no sudo, so nothing can arrive as root. Operator decision required: wire `EnsureRootOrHalfCouncil` (the origin five other pallets in this runtime use, and what the pallet's own doc contemplates) and re-attest the runtime, or document the pallet as a root-callable primitive that is outside the launch chain's live control surface. Evidence: `.ai/reports/sentinel-origin-reachability-20260927.md`, gate `sentinel privileged origin`",
+        "The guard is inert while nothing can be frozen, so its refusal path (`AuthorityFrozenBySentinel`) has never run on a chain; the drill takes that branch only when a privileged path exists"
       ],
       "crate_or_service": "pallets/x3-sentinel",
       "feature": "x3_sentinel",
       "mode": "GUARDED_TESTNET",
-      "proof_report": "reports/testnet_readiness_report.md",
-      "readiness_score": 50,
+      "proof_report": ".ai/reports/sentinel-origin-reachability-20260927.md",
+      "readiness_score": 47,
       "required_tests": [
         "sentinel_checks_mint_authority",
         "sentinel_checks_freeze_authority"
@@ -5296,7 +5297,7 @@
     "matrix_features": 149,
     "registry_features": 22,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 62.82,
+    "registry_mean_readiness": 62.68,
     "registry_min_readiness": 40
   }
 }

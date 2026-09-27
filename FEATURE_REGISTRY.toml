@@ -236,10 +236,32 @@ mode = "GUARDED_TESTNET"
 crate_or_service = "pallets/x3-sentinel"
 tauri_app = "Sentinel"
 required_tests = ["sentinel_checks_mint_authority", "sentinel_checks_freeze_authority"]
-proof_report = "reports/testnet_readiness_report.md"
-readiness_score = 50
+# The live simulation now exists and answered the blocker with a defect rather than a gap:
+# `bash scripts/drills/sentinel_privileged_origin_live.sh` (the `sentinel privileged origin` gate)
+# boots three validators on `local3`, creates a `CappedMintable` token through the real
+# `x3TokenFactory`, mints as the mint authority, then tries to freeze that authority as Alice and as
+# Bob. Both are refused with `BadOrigin` and the `frozenAccounts` map stays empty — the governance
+# gate is real. But the privileged path is **unreachable on this chain**: `FreezeOrigin` is
+# `EnsureRoot` in the single shared `Config` impl, and the three non-dev runtime variants have no
+# sudo, so no extrinsic can arrive as root. Measured 2026-09-27: finalized #17 with 2 peers, asset
+# `0x9bada2470ed719195842d4832b95b8c4893c92fbbb002710cf72c931f48866e8`, verdict
+# `privileged_path=unreachable`. Full write-up: `.ai/reports/sentinel-origin-reachability-20260927.md`.
+proof_report = ".ai/reports/sentinel-origin-reachability-20260927.md"
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   60 — the pallet and its guard are real and the token factory consults them before
+#                      every supply-changing authority op; the privileged calls cannot be reached
+#                      on a chain without sudo
+#   tested        70 — the pallet's unit tests plus a live three-validator simulation of the gate and
+#                      the gap, run by a gate that fails if either half changes
+#   mainnet_ready 20 — a security control that cannot be engaged on the launch chain is a mainnet
+#                      blocker, not a hardening item
+# 0.35*60 + 0.25*70 + 0.40*20 = 21 + 17.5 + 8 = 46.5 -> 47
+# Re-measured *down* from 50 on purpose: the live run turned "missing evidence" into "the control is
+# unreachable", which is a worse state than the row assumed.
+readiness_score = 47
 blockers = [
-  "No live governance simulation"
+  "The freeze/review/approval power cannot be engaged on any shipped chain: `x3Sentinel::FreezeOrigin = EnsureRoot` (the one shared Config impl, so all six runtime variants) and the three non-dev variants have no sudo, so nothing can arrive as root. Operator decision required: wire `EnsureRootOrHalfCouncil` (the origin five other pallets in this runtime use, and what the pallet's own doc contemplates) and re-attest the runtime, or document the pallet as a root-callable primitive that is outside the launch chain's live control surface. Evidence: `.ai/reports/sentinel-origin-reachability-20260927.md`, gate `sentinel privileged origin`",
+  "The guard is inert while nothing can be frozen, so its refusal path (`AuthorityFrozenBySentinel`) has never run on a chain; the drill takes that branch only when a privileged path exists",
 ]
 dangerous_paths = ["freeze authority", "upgradeability"]
 
