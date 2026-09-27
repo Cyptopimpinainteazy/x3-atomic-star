@@ -9040,3 +9040,47 @@ registration, with the outcome per file:
   bytes and compares booleans — it never calls the router, so it fuzzes nothing; (3)
   `x3_sentinel`'s freeze power is still unreachable (`FreezeOrigin = EnsureRoot`, no
   sudo on non-dev variants) and is an operator decision; (4) the 7 physical servers.
+
+## 2026-09-27 (later) — two pallets stop charging typed weights, and the recipe is now written down
+
+- **The weights burndown has a working, repeatable recipe.** Per pallet: (1) add the pallet to
+  `mod benches` in `runtime/src/lib.rs` if the CLI says `No benchmarks found which match your
+  input` — that module is `#[cfg(feature = "runtime-benchmarks")]`, so the production WASM does not
+  move because of the wiring; (2) add the missing benchmarks to `src/benchmarking.rs`; (3) build
+  `cargo build --release -p x3-chain-node --features runtime-benchmarks` (≈3 min warm, and it
+  *deletes and rebuilds* `target/release/wbuild/...` when the feature set changed — that is normal);
+  (4) `./target/release/x3-chain-node benchmark pallet --chain=dev --pallet=<p> --extrinsic '*' --steps=50
+  --repeat=20 --wasm-execution=compiled --heap-pages=4096 --template .maintain/frame-weight-template.hbs
+  --output pallets/<dir>/src/weights.rs`; (5) *then* wire the call sites — the trait only gains the
+  new functions after step 4, so wiring first does not compile. `--extrinsic` filtering writes a file
+  with only the selected functions, so it cannot be used to work around a failing benchmark.
+- **`pallet-atomic-trade-engine` had never been benchmarkable.** It ships `benchmarking.rs` and
+  `weights.rs`, but it was absent from `mod benches`, so four calls
+  (`register_liquidity_pool`, `update_liquidity_pool`, `sync_pool_price`,
+  `submit_price_observation`) charged literals nobody could re-measure. Registered + benchmarked;
+  `scripts/run-frame-benchmarks.sh` gained it in `PALLET_PATHS`.
+- **`pallet_x3_kernel`'s weights could not be regenerated either, for two real reasons.** Both are
+  fixed in `pallets/x3-kernel/src/benchmarking.rs`: `register_asset` registered the asset the dev
+  genesis already holds (`AssetAlreadyRegistered`) — it clears the id in setup now; and
+  `submit_comit` presented `prepare_root = H256::zero()`, which `verify_dual_vm_with_receipts`
+  refuses without the `dev-bypass` feature (`ComitVerificationFailed`) — it computes the commitment
+  the chain computes now, the fix `submit_comit_v2` already carried. The three emergency calls
+  (`emergency_pause`, `emergency_unpause`, `emergency_halt`) charged 10,000/15,000 picoseconds: a
+  chain-wide freeze for nothing. All measured now.
+- **Evidence**: atomic-trade-engine 48 lib + 58 benchmark-gated tests; x3-kernel 240 lib + 253
+  benchmark-gated tests; scanner `pallet-call-without-weights` **25 → 23** (the scanner counts one
+  finding per *pallet*, not per call site); `docs/reports/runtime-wasm-hashes.json` re-recorded at
+  revision `f8ecd7970`'s parent (`ddec9b166`) after two srtool builds agreed; `make mainnet-check`
+  PASS with the new record; matrix row `X3-GPU-003` 62 → 67 (78/70/55).
+- **Do not rewrite `runtime-wasm-reproducibility.md` history.** `update-runtime-hashes.sh` prints a
+  blanket list of old→new values and asks you to replace them, but most of the file is a per-revision
+  log; replacing there would claim a past revision's bytes were the new ones. Add an entry for the
+  new revision, update the sentence that names the *current* revision, leave the history alone.
+- **Box note**: `pkill -f <pattern>` inside a tool session matches the session's own command line and
+  kills the shell (exit 143). It also leaves an orphaned `docker run` srtool build behind; kill the
+  container by name (`docker kill x3-srtool-<pid>`) instead.
+- **Next seeds:** 23 pallets still charge typed weights, all of the heavy class (no `weights.rs`, no
+  `WeightInfo`, no `benchmarking.rs`, no `type WeightInfo` in the runtime, and each needs an
+  attestation) — money path first: `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`,
+  `x3-wrapped`, `x3-wallet-pallet`, `x3-cross-vm-router`. Also open: no workflow re-runs the
+  regeneration, so a weight file can go stale silently.
