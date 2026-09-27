@@ -8976,3 +8976,67 @@ registration, with the outcome per file:
   compute providers, benchmarks, logs, alerts, settlement); `launch_node`/`stop_node`
   need a real spawn with a tracked child handle; and the swarm path is proven against
   a local server, not against a booted `x3-swarm-api` in a gate.
+
+## 2026-09-27 (latest) — the RC gates were always-green, and the launch decision had no record
+
+- **The `launch_gate` row's two phantom citations were the tip of a cluster.** Its
+  `required_tests` resolved to nothing because `scripts/testnet/testnet_rc_gate.sh`
+  ran *every* check as `... || true` and finished by printing `COMPLETED` rather
+  than `PASSED` — `scripts/x3/yolo_autoprove.sh` runs that gate, so the autoprove
+  path reported an RC gate that could not fail. It also swallowed the panic-ratchet
+  exit code. And both gates called `scripts/testnet/generate_testnet_chain_spec.sh`,
+  which was never created here: under `set -e`, `mainnet_rc_gate.sh` exited 127 on
+  its third line and could never pass. Also: `testnet_genesis_lint.sh` only required
+  a `chain-specs/` directory to exist (then printed a hand-off line), and
+  `testnet/runtime_upgrade_rehearsal.sh` printed a hand-off line and exited 0 when
+  its delegate was missing.
+- **Root cause of the unresolvable citation, inside the scanner itself:**
+  `defined_symbols()` in `scripts/swarm/x3_repo_scan.py` anchored the shell-function
+  pattern on `^` **without `re.MULTILINE`**, so `^` meant the start of the *file*.
+  The only shell function it could ever see was one defined on line 0 — meaning the
+  `scripts/<gate>.sh::<case>` citation form the scanner's own documentation asks for
+  could never resolve. Fixed with `re.MULTILINE`; the regression test
+  (`test_a_shell_case_resolves_wherever_it_is_defined`) fails the moment it comes
+  back.
+- **Both gates are now functions** (`mainnet_rc_gate`, `testnet_rc_gate`) that resolve
+  every prerequisite *before* running the first one, so a missing check fails with its
+  path named. `scripts/testnet/generate_testnet_chain_spec.sh` now exists and resolves
+  the real generator `build-x3-testnet-spec.py`. `tests/test_rc_gates.py` (18 checks,
+  gate `rc gate scripts`) copies each gate byte-for-byte into a fixture root with
+  stand-in prerequisites and proves a failing prerequisite reddens it, a missing one
+  fails rather than skips, `cargo` failing reddens it, no check may discard its status,
+  and the two cited names resolve to functions in the cited files.
+- **A launch now has a record.** `scripts/mainnet/launch_record.py build` refuses
+  without a named operator, a clean tree, a `Live` spec whose Aura set is exactly
+  `--expect-authorities`, a raw twin that is also `Live`, a joinable bootnode, and an
+  RC log carrying the gate's own `PASSED` marker; it writes the commit, the operator,
+  and the hash/id/chain-type/authority counts of both genesis artifacts. `verify`
+  re-hashes everything and fails on the first mismatch. 10 checks, gate
+  `launch record`. Row re-measured 42 -> 47 (68*0.35 + 70*0.25 + 15*0.40).
+- **`pallet-x3-control` is a recorded omission, not an oversight.** Nothing on a chain
+  reads `ControlState`, so wiring it means deciding who acts on `Frozen`/`Paused`; the
+  scanner now carries `KNOWN_UNWIRED_PALLETS` (package -> owner document + reason),
+  renders the decision in the report's own section, and still reports the entry the
+  moment the runtime names the pallet or the owning document disappears.
+- **The two `ungated-crate` findings were `cargo new` templates**: both
+  `pallets/*/fuzz/src/lib.rs` files were `add(a,b)` plus `assert_eq!(add(2,2), 4)`.
+  No fuzz target used them. Deleted; both fuzz workspaces still parse and the
+  `fuzz targets` gate passes. Structural scanner counts are now
+  `stale-registry-test 0, ungated-crate 0, unregistered-pallet 0`, with 25
+  `pallet-call-without-weights` left for the weights lane.
+- **Box facts:** `python3 -m pytest` does not exist for the Homebrew python 3.14 here —
+  the working runner is `/home/lojak/.local/bin/pytest`, and the repo's own plain-python
+  tests use `python3 tests/test_x.py`. A `nohup ... &` job started inside a tool session
+  is killed when that session ends; run long gates in a session and poll it.
+- **Do not rely on sub-agent task delivery in this environment.** Three lanes
+  (`pallet_weights`, `swarm_reactor_compute`, `htlc_atomic_kernel`) and a fresh
+  `spawn_agent` all reported "no task payload arrived" and then worked on whatever they
+  chose; the commits they did land are real, but the briefs never reached them. Do the
+  work directly unless a spawned agent's first line confirms it received the task.
+- **Next seeds:** (1) the weights lane is untouched — 25 `pallet-call-without-weights`
+  sites, money path first `x3-supply-ledger` -> `x3-treasury-policy` -> `x3-token-factory`
+  -> `x3-wrapped` -> `x3-wallet-pallet` -> `x3-cross-vm-router`; (2)
+  `pallets/x3-cross-vm-router/fuzz/fuzz_targets/router_transfer_validation.rs` decodes
+  bytes and compares booleans — it never calls the router, so it fuzzes nothing; (3)
+  `x3_sentinel`'s freeze power is still unreachable (`FreezeOrigin = EnsureRoot`, no
+  sudo on non-dev variants) and is an operator decision; (4) the 7 physical servers.
