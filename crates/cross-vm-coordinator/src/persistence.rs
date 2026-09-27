@@ -60,6 +60,23 @@ pub struct InMemoryPersistence {
     used_secret_claims: std::sync::RwLock<Vec<([u8; 32], String)>>,
 }
 
+/// Take a read guard without turning a poisoned lock into a panic.
+///
+/// `RwLock::read()`/`write()` return `Err` when a previous holder panicked while the guard was
+/// live. This struct holds a `HashMap` and two `Vec`s, and every write is a whole-value replacement
+/// (`*guard = …`) or a single insert/remove, so there is no multi-step invariant a panic could leave
+/// half-applied — the poison flag carries no information a caller here can act on. Panicking again
+/// in `load` would convert "another thread died" into "the coordinator dies too", which is the
+/// failure mode this persistence layer exists to survive.
+fn read_guard<T>(lock: &std::sync::RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The write half of [`read_guard`], with the same reasoning.
+fn write_guard<T>(lock: &std::sync::RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 impl Default for InMemoryPersistence {
     fn default() -> Self {
         Self::new()
@@ -78,47 +95,47 @@ impl InMemoryPersistence {
 
 impl SessionPersistence for InMemoryPersistence {
     fn save(&self, session: &SwapSession) {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = write_guard(&self.inner);
         guard.insert(session.session_id.clone(), session.clone());
     }
 
     fn load(&self, session_id: &str) -> Option<SwapSession> {
-        let guard = self.inner.read().unwrap();
+        let guard = read_guard(&self.inner);
         guard.get(session_id).cloned()
     }
 
     fn remove(&self, session_id: &str) {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = write_guard(&self.inner);
         guard.remove(session_id);
     }
 
     fn load_all(&self) -> HashMap<String, SwapSession> {
-        let guard = self.inner.read().unwrap();
+        let guard = read_guard(&self.inner);
         guard.clone()
     }
 
     fn count(&self) -> usize {
-        let guard = self.inner.read().unwrap();
+        let guard = read_guard(&self.inner);
         guard.len()
     }
 
     fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
-        let mut guard = self.used_secrets.write().unwrap();
+        let mut guard = write_guard(&self.used_secrets);
         *guard = secrets.to_vec();
     }
 
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
-        let guard = self.used_secrets.read().unwrap();
+        let guard = read_guard(&self.used_secrets);
         guard.clone()
     }
 
     fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
-        let mut guard = self.used_secret_claims.write().unwrap();
+        let mut guard = write_guard(&self.used_secret_claims);
         *guard = claims.to_vec();
     }
 
     fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
-        self.used_secret_claims.read().unwrap().clone()
+        read_guard(&self.used_secret_claims).clone()
     }
 }
 
@@ -293,7 +310,7 @@ impl<Backend: sp_core::offchain::OffchainStorage + Send + Sync + 'static> Offcha
     for SubstrateOffchainAdapter<Backend>
 {
     fn set(&self, key: &[u8], value: &[u8]) {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = write_guard(&self.inner);
         // Use PERSISTENT storage so it survives reboots
         guard.set(sp_core::offchain::STORAGE_PREFIX, key, value);
         // Maintain an index of all stored keys under this prefix so that
@@ -302,18 +319,18 @@ impl<Backend: sp_core::offchain::OffchainStorage + Send + Sync + 'static> Offcha
     }
 
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let guard = self.inner.read().unwrap();
+        let guard = read_guard(&self.inner);
         guard.get(sp_core::offchain::STORAGE_PREFIX, key)
     }
 
     fn remove(&self, key: &[u8]) {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = write_guard(&self.inner);
         guard.remove(sp_core::offchain::STORAGE_PREFIX, key);
         Self::remove_from_index(&mut *guard, key);
     }
 
     fn keys_with_prefix(&self, prefix: &[u8]) -> Vec<Vec<u8>> {
-        let guard = self.inner.read().unwrap();
+        let guard = read_guard(&self.inner);
         let index_key = Self::index_key(prefix);
         match guard.get(sp_core::offchain::STORAGE_PREFIX, &index_key) {
             Some(bytes) => serde_json::from_slice::<Vec<Vec<u8>>>(&bytes).unwrap_or_default(),
@@ -327,7 +344,7 @@ impl<Backend: sp_core::offchain::OffchainStorage + Send + Sync + 'static> Offcha
         old_value: Option<&[u8]>,
         new_value: &[u8],
     ) -> bool {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = write_guard(&self.inner);
         guard.compare_and_set(
             sp_core::offchain::STORAGE_PREFIX,
             key,
