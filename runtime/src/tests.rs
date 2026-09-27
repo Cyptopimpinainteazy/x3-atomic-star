@@ -662,3 +662,220 @@ fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
         );
     });
 }
+
+// ── The emergency halt must not brick the chain ───────────────────────────────
+//
+// `pallet_x3_invariants::InvariantCheck` is wired into `SignedExtra`, and while
+// `Halted` is true it refuses *every* signed extrinsic. `RuntimeEmergencyHaltController`
+// (the kernel's `emergency_halt`) sets that flag, and the supply ledger's
+// `TransferHalted` with it. The recovery calls the halt is supposed to permit —
+// `rollback_atomic_bundle` to release a pending bundle's bond, and the governance
+// path that clears the flag — are ordinary signed calls in the same tuple, so if
+// the gate does not exempt them the chain has no route back: no extrinsic can
+// enter a block, and every validator's pool refuses the halt's own remedy.
+//
+// These tests enter through the transaction-validity API the pool calls, because
+// that — not the dispatch layer — is what stops the chain.
+
+/// A signed extrinsic built exactly the way the runtime's clients build one.
+///
+/// The tuple order is consensus-critical, so this mirrors
+/// `node/src/rpc.rs`, `node/src/atomic_gateway.rs` and `crates/x3-runtime-signer`
+/// rather than approximating them.
+fn signed_xt(call: RuntimeCall, pair: &sp_core::sr25519::Pair, nonce: u32) -> UncheckedExtrinsic {
+    use sp_core::Pair as _;
+
+    let genesis_hash = System::block_hash(0);
+    let extra: SignedExtra = (
+        frame_system::CheckNonZeroSender::<Runtime>::new(),
+        frame_system::CheckSpecVersion::<Runtime>::new(),
+        frame_system::CheckTxVersion::<Runtime>::new(),
+        frame_system::CheckGenesis::<Runtime>::new(),
+        frame_system::CheckEra::<Runtime>::from(sp_runtime::generic::Era::Immortal),
+        frame_system::CheckNonce::<Runtime>::from(nonce),
+        frame_system::CheckWeight::<Runtime>::new(),
+        pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
+        pallet_x3_invariants::InvariantCheck::<Runtime>::new(),
+        Decode::decode(&mut &[][..]).expect("the agent-law extension decodes from empty bytes"),
+    );
+    let payload = SignedPayload::from_raw(
+        call.clone(),
+        extra.clone(),
+        (
+            (),
+            VERSION.spec_version,
+            VERSION.transaction_version,
+            genesis_hash,
+            genesis_hash,
+            (),
+            (),
+            (),
+            (),
+            (),
+        ),
+    );
+    let signature = Signature::from(pair.sign(payload.encode().as_slice()));
+    UncheckedExtrinsic::new_signed(call, Address::Id(account_from(pair)), signature, extra)
+}
+
+fn account_from(pair: &sp_core::sr25519::Pair) -> AccountId {
+    use sp_core::Pair as _;
+    use sp_runtime::traits::IdentifyAccount;
+    pair.public().into_account().into()
+}
+
+/// Ask the pool's own validity API what it thinks of `call`.
+fn pool_validity(
+    pair: &sp_core::sr25519::Pair,
+    call: RuntimeCall,
+) -> sp_runtime::transaction_validity::TransactionValidity {
+    let xt = signed_xt(call, pair, System::account_nonce(account_from(pair)));
+    // `Executive::validate_transaction` is what the runtime's
+    // `TaggedTransactionQueue` implementation calls, so this is the pool's own gate.
+    Executive::validate_transaction(
+        sp_runtime::transaction_validity::TransactionSource::External,
+        xt,
+        System::block_hash(0),
+    )
+}
+
+fn halt_test_ext() -> sp_io::TestExternalities {
+    use sp_core::Pair as _;
+    use sp_runtime::BuildStorage;
+
+    let who = account_from(&sp_core::sr25519::Pair::from_string("//Alice", None).unwrap());
+    let storage = RuntimeGenesisConfig {
+        balances: BalancesConfig {
+            balances: vec![(who, 10_000 * X3)],
+            dev_accounts: None,
+        },
+        ..Default::default()
+    }
+    .build_storage()
+    .expect("the halt test genesis must build");
+
+    let mut ext: sp_io::TestExternalities = storage.into();
+    ext.execute_with(|| {
+        System::set_block_number(1);
+    });
+    ext
+}
+
+/// A halted chain must keep the recovery path open.
+///
+/// Before this was fixed, the gate refused everything, so the halt's own remedy was
+/// unreachable: the bond of a pending bundle could not be released, and no extrinsic
+/// could clear the flag. That made `emergency_halt` a one-way door — a governance
+/// call that bricks the chain until a runtime upgrade.
+#[test]
+fn a_halted_chain_still_accepts_the_recovery_calls_that_release_funds() {
+    use sp_core::Pair as _;
+
+    let pair = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
+
+    halt_test_ext().execute_with(|| {
+        let remark = RuntimeCall::System(frame_system::Call::remark { remark: Vec::new() });
+
+        // Control: before the halt the same call shape is valid, so a later refusal
+        // is the halt and not a broken fixture.
+        assert!(
+            pool_validity(&pair, remark.clone()).is_ok(),
+            "the control call must be valid before the halt"
+        );
+
+        // Governance trips the halt through the kernel, exactly as it would on chain.
+        assert_ok!(pallet_x3_kernel::Pallet::<Runtime>::emergency_halt(
+            RuntimeOrigin::root()
+        ));
+        assert!(pallet_x3_invariants::Halted::<Runtime>::get());
+        assert!(pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+
+        let halted_code = Err(
+            sp_runtime::transaction_validity::TransactionValidityError::Invalid(
+                sp_runtime::transaction_validity::InvalidTransaction::Custom(
+                    pallet_x3_invariants::INVARIANT_HALT_CODE,
+                ),
+            ),
+        );
+
+        assert_eq!(
+            pool_validity(&pair, remark),
+            halted_code,
+            "a user call must be refused while halted"
+        );
+
+        // The calls the halt exists to leave open.
+        let rollback =
+            RuntimeCall::X3AtomicKernel(pallet_x3_atomic_kernel::Call::rollback_atomic_bundle {
+                bundle_id: H256::zero(),
+                reason: pallet_x3_atomic_kernel::BundleRollbackReason::SubmitterCancelled,
+            });
+        assert!(
+            pool_validity(&pair, rollback).is_ok(),
+            "the bond-releasing rollback must not be refused by the halt"
+        );
+
+        let clear = RuntimeCall::X3Invariants(pallet_x3_invariants::Call::clear_halted {});
+        assert!(
+            pool_validity(&pair, clear).is_ok(),
+            "the halt must have a reachable remedy"
+        );
+
+        // The remedy is governance-gated (`UpdateOrigin`/`SupplyGovernance` are
+        // `EnsureRootOrHalfCouncil`) and a mainnet-rc1 chain has no sudo, so the
+        // transaction that reaches it is a council motion. Those calls must be
+        // submittable too, or the remedy exists on paper only.
+        let motion = RuntimeCall::Council(pallet_collective::Call::propose {
+            threshold: 2,
+            proposal: Box::new(RuntimeCall::X3Invariants(
+                pallet_x3_invariants::Call::clear_halted {},
+            )),
+            length_bound: 1_000,
+        });
+        assert!(
+            pool_validity(&pair, motion).is_ok(),
+            "the council motion that carries the remedy must be submittable while halted"
+        );
+
+        let resume =
+            RuntimeCall::X3SupplyLedger(pallet_x3_supply_ledger::Call::resume_transfers {});
+        assert!(
+            pool_validity(&pair, resume).is_ok(),
+            "the economy freeze the same controller raised must be liftable"
+        );
+
+        // And the remedy does what it says when it runs. `Members(2, 2)` is the origin
+        // `Council::close` produces once two of two members have approved a motion.
+        let council_origin: RuntimeOrigin =
+            pallet_collective::RawOrigin::<AccountId, CouncilCollective>::Members(2, 2).into();
+        assert_ok!(pallet_x3_invariants::Pallet::<Runtime>::clear_halted(
+            council_origin.clone()
+        ));
+        assert_ok!(pallet_x3_supply_ledger::Pallet::<Runtime>::resume_transfers(council_origin));
+
+        assert!(!pallet_x3_invariants::Halted::<Runtime>::get());
+        assert!(!pallet_x3_supply_ledger::TransferHalted::<Runtime>::get());
+        assert!(
+            pool_validity(
+                &pair,
+                RuntimeCall::System(frame_system::Call::remark { remark: Vec::new() })
+            )
+            .is_ok(),
+            "once the halt is cleared, normal traffic must be valid again"
+        );
+
+        // Negative control: below the council threshold the remedy is not reachable,
+        // so this is a governed recovery and not an open door.
+        pallet_x3_invariants::Halted::<Runtime>::put(true);
+        let minority: RuntimeOrigin =
+            pallet_collective::RawOrigin::<AccountId, CouncilCollective>::Members(0, 2).into();
+        assert!(
+            pallet_x3_invariants::Pallet::<Runtime>::clear_halted(minority).is_err(),
+            "a minority of the council must not be able to clear the halt"
+        );
+        assert!(
+            pallet_x3_invariants::Halted::<Runtime>::get(),
+            "the refusal must leave the halt in place"
+        );
+    });
+}

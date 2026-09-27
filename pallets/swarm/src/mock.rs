@@ -85,6 +85,8 @@ impl pallet_x3_invariants::Config for Test {
     type DefaultMaxProposalDepth = DefaultMaxProposalDepth;
     type WeightInfo = ();
     type SecurityHook = x3_security_events::NoOpHook;
+    // The swarm's mock never halts, so nothing needs to be exempt from a halt.
+    type HaltExemptCalls = frame_support::traits::Nothing;
 }
 
 parameter_types! {

@@ -134,6 +134,19 @@ pub mod pallet {
         /// (invariant breach, chain halt, kill switch activation). Implementations
         /// forward these to off-chain monitoring; use `NoOpHook` in test mocks.
         type SecurityHook: SecurityEventHook<BlockNumberFor<Self>>;
+
+        /// The calls that stay dispatchable while `Halted` is set.
+        ///
+        /// `InvariantCheck` refuses every signed extrinsic while the chain is
+        /// halted, which is the point of the halt — but a gate that refuses
+        /// *everything* also refuses the halt's own remedy, and then the flag can
+        /// never be cleared and a pending bundle's bond can never be released.
+        /// This is the escape hatch: the recovery/refund calls, plus the
+        /// governance route that reaches them. Every other call stays blocked.
+        ///
+        /// Configure this as narrowly as the runtime allows. Exempting a call here
+        /// exempts it from the halt, not from its own origin checks.
+        type HaltExemptCalls: frame_support::traits::Contains<Self::RuntimeCall>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────────
@@ -158,6 +171,8 @@ pub mod pallet {
         },
         /// `HaltOnViolation` flag changed.
         HaltModeChanged { halt: bool },
+        /// The constitutional halt flag was cleared, so normal traffic resumes.
+        HaltCleared { block: BlockNumberFor<T> },
         /// Constitution hash registered on-chain.
         ConstitutionHashSet { hash: [u8; 32] },
         /// S0-6: Chain halt requested due to invariant violation.
@@ -328,6 +343,27 @@ pub mod pallet {
             T::UpdateOrigin::ensure_origin(origin)?;
             HaltOnViolation::<T>::put(halt);
             Self::deposit_event(Event::HaltModeChanged { halt });
+            Ok(())
+        }
+
+        /// Clear the constitutional halt flag.
+        ///
+        /// `Halted` is set by `enforce_all` on an invariant violation and by
+        /// `RuntimeEmergencyHaltController` when governance trips the kernel's
+        /// `emergency_halt`. Setting `HaltOnViolation(false)` only stops *future*
+        /// violations from re-raising it — the flag itself stays set, so this is
+        /// the call that actually ends the halt. It is exempt from the halt gate
+        /// (see `Config::HaltExemptCalls`), otherwise it could never be reached.
+        ///
+        /// Origin: `UpdateOrigin`.
+        #[pallet::call_index(10)]
+        #[pallet::weight(T::WeightInfo::clear_halted())]
+        pub fn clear_halted(origin: OriginFor<T>) -> DispatchResult {
+            T::UpdateOrigin::ensure_origin(origin)?;
+            Halted::<T>::put(false);
+            Self::deposit_event(Event::HaltCleared {
+                block: frame_system::Pallet::<T>::block_number(),
+            });
             Ok(())
         }
 
@@ -969,8 +1005,9 @@ use sp_runtime::{
 /// invariant violation.  Code `1` avoids clashing with FRAME built-ins (0).
 pub const INVARIANT_HALT_CODE: u8 = 1;
 
-/// Transaction-pipeline guard: rejects all extrinsics while the constitutional
-/// halt flag (`Halted`) is active.
+/// Transaction-pipeline guard: rejects extrinsics while the constitutional
+/// halt flag (`Halted`) is active, except the recovery calls the halt must leave
+/// open (`Config::HaltExemptCalls`).
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 pub struct InvariantCheck<T: pallet::Config>(core::marker::PhantomData<T>);
@@ -1010,14 +1047,22 @@ where
     fn validate(
         &self,
         origin: <T::RuntimeCall as Dispatchable>::RuntimeOrigin,
-        _call: &T::RuntimeCall,
+        call: &T::RuntimeCall,
         _info: &DispatchInfoOf<T::RuntimeCall>,
         _len: usize,
         _self_implicit: Self::Implicit,
         _inherited_implication: &impl Encode,
         _source: TransactionSource,
     ) -> ValidateResult<Self::Val, T::RuntimeCall> {
-        if pallet::Halted::<T>::get() {
+        // A halt that refuses its own remedy is a one-way door: a pending bundle's bond
+        // stays locked and the flag can never be cleared, because clearing it needs a
+        // signed extrinsic too. Recovery calls stay dispatchable; everything else is
+        // refused, and an exempt call is still subject to its own origin check.
+        if pallet::Halted::<T>::get()
+            && !<T::HaltExemptCalls as frame_support::traits::Contains<T::RuntimeCall>>::contains(
+                call,
+            )
+        {
             return Err(InvalidTransaction::Custom(INVARIANT_HALT_CODE).into());
         }
         Ok((ValidTransaction::default(), (), origin))

@@ -960,6 +960,58 @@ pub type SignedExtra = (
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 
+/// The calls that stay dispatchable while `pallet_x3_invariants::Halted` is set.
+///
+/// `InvariantCheck` refuses every signed extrinsic while the chain is halted. That is
+/// what a halt is for, but a gate that refuses everything also refuses the halt's own
+/// remedy — and then `emergency_halt` (which sets `Halted` *and* the supply ledger's
+/// `TransferHalted`) is a one-way door: a pending atomic bundle's bond stays locked
+/// and no extrinsic can clear either flag.
+///
+/// The list is deliberately short and every entry is load-bearing:
+///
+/// * `clear_halted` — ends the halt. `set_halt_on_violation(false)` only stops future
+///   violations from re-raising it; it does not clear the flag.
+/// * `resume_transfers` — ends the economy freeze the same controller raised.
+/// * `rollback_atomic_bundle` — the only path that releases a pending bundle's bond,
+///   so without it a halt strands funds.
+/// * `emergency_unpause` — lifting the routine operational pause.
+/// * Council `propose` / `vote` / `close` / `execute` — the only *transaction-reachable*
+///   origin for the calls above (`UpdateOrigin`/`SupplyGovernance` are
+///   `EnsureRootOrHalfCouncil`, and a mainnet-rc1 chain has no sudo), so the remedy
+///   needs the motion that carries it. A motion still has to clear the council's
+///   threshold to dispatch anything.
+///
+/// Everything else — every transfer, mint, swap, bridge and ordinary user call — stays
+/// refused. Exempt means "not blocked by the halt"; each call still enforces its own
+/// origin check.
+pub struct RuntimeHaltExemptCalls;
+
+impl frame_support::traits::Contains<RuntimeCall> for RuntimeHaltExemptCalls {
+    fn contains(call: &RuntimeCall) -> bool {
+        use pallet_collective::Call as CouncilCall;
+
+        matches!(
+            call,
+            RuntimeCall::X3Invariants(pallet_x3_invariants::Call::clear_halted { .. })
+                | RuntimeCall::X3Invariants(
+                    pallet_x3_invariants::Call::set_halt_on_violation { .. }
+                )
+                | RuntimeCall::X3SupplyLedger(
+                    pallet_x3_supply_ledger::Call::resume_transfers { .. }
+                )
+                | RuntimeCall::X3AtomicKernel(
+                    pallet_x3_atomic_kernel::Call::rollback_atomic_bundle { .. }
+                )
+                | RuntimeCall::AtlasKernel(pallet_x3_kernel::Call::emergency_unpause { .. })
+                | RuntimeCall::Council(CouncilCall::propose { .. })
+                | RuntimeCall::Council(CouncilCall::vote { .. })
+                | RuntimeCall::Council(CouncilCall::close { .. })
+                | RuntimeCall::Council(CouncilCall::execute { .. })
+        )
+    }
+}
+
 // ===== Config Impls (after construct_runtime!) =====
 
 parameter_types! {
@@ -1630,6 +1682,7 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
     type SecurityHook = FailClosedSecurityHook;
+    type HaltExemptCalls = RuntimeHaltExemptCalls;
 }
 
 impl pallet_x3_agent_law::Config for Runtime {
