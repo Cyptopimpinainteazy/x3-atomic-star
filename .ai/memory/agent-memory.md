@@ -8556,3 +8556,9 @@ FAIL - EVIDENCE_RECORDS with `benchmarks/` removed reddens the TPS archive     (
   the same epoch still cannot open the ciphertext, which `the_epoch_label_is_not_the_security_boundary` asserts
   under the same mutation that reddens the label test. The family-wide next blocker is now single and structural:
   three rows of real MEV/privacy code and **no path from any of them to a chain**.
+- **UPDATE (xxxstar-main-2d, 2026-09-27 01:50):** PR #518 production gate run 36282807923: all four live jobs green
+  (native-x3vm, evm HTLC, evm X3VM→Anvil, svm HTLC); the aggregate `gate` job (guard, all pallets, release node, srtool)
+  was still running, with an auto-merge-on-success poll. CI fixes in the PR: live workflows export ~/.foundry/bin to
+  GITHUB_PATH (x3star2 was started outside its service and lacks it on PATH) and set WASM_BUILD_WORKSPACE_HINT. Runner
+  restart of x3star2 was NOT done (blocked); owner can run `cd ~/actions-runner-2 && sudo ./svc.sh install && sudo ./svc.sh start`.
+  After merge: re-attest the runtime wasm hash record (this PR changes the runtime).
