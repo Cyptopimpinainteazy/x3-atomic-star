@@ -126,6 +126,15 @@ pub enum ExecutionStatus {
 pub struct ProofBundle {
     pub task_id: TaskId,
     pub executor_id: ExecutorId,
+    /// Which backend the reactor placed this execution on.
+    ///
+    /// Recorded because "the accelerator was used" is a claim about a run, and a
+    /// claim needs evidence: [`crate::reactor`] explains the choice (preference,
+    /// reputation, cost, availability) and this is where the decision travels with
+    /// the result.
+    pub backend_id: String,
+    /// The accelerator class that backend belongs to.
+    pub accelerator: crate::reactor::Accelerator,
     /// SHA-256 of the full input payload body.
     pub input_hash: String,
     /// SHA-256 of the execution output.

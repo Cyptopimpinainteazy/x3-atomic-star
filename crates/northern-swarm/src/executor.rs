@@ -1,5 +1,9 @@
 use crate::{
     backend::{AutoBackend, ComputeBackend},
+    reactor::{
+        schedule, Accelerator, BackendDescriptor, Preference, ScheduleDecision, ScheduleRefusal,
+        TaskRequirements,
+    },
     types::*,
 };
 use sha2::{Digest, Sha256};
@@ -20,14 +24,68 @@ pub struct TaskExecutor {
     /// Hardware-detecting backend that compares any accelerator output against
     /// the canonical CPU reference before it is ever used.
     backend: AutoBackend,
+    /// The backends this executor is willing to place work on, as the reactor
+    /// sees them. Defaults to the canonical CPU; an executor that has an
+    /// accelerator sidecar advertises it here.
+    backends: Vec<BackendDescriptor>,
+    /// Placement policy. `FidelityFirst` + `must_accelerate = false` is the
+    /// default: the canonical CPU takes the work unless the operator says the
+    /// work needs an accelerator or asks for throughput.
+    preference: Preference,
+    must_accelerate: bool,
+    min_reputation: u8,
 }
 
 impl TaskExecutor {
     pub fn new(executor_id: ExecutorId) -> Self {
         TaskExecutor {
+            backends: vec![BackendDescriptor::cpu(format!("{executor_id}/cpu-0"), 100)],
             executor_id,
             backend: AutoBackend::new(),
+            preference: Preference::FidelityFirst,
+            must_accelerate: false,
+            min_reputation: 0,
         }
+    }
+
+    /// An executor that advertises the given backends and places work with the
+    /// given policy. `must_accelerate` makes the reactor refuse work it cannot
+    /// place on an accelerator instead of quietly using the CPU reference.
+    pub fn with_backends(
+        executor_id: ExecutorId,
+        backends: Vec<BackendDescriptor>,
+        preference: Preference,
+        must_accelerate: bool,
+        min_reputation: u8,
+    ) -> Self {
+        TaskExecutor {
+            executor_id,
+            backend: AutoBackend::new(),
+            backends,
+            preference,
+            must_accelerate,
+            min_reputation,
+        }
+    }
+
+    /// The reactor's decision for `payload`, or why it cannot be placed.
+    ///
+    /// This is the placement half of execution: [`TaskExecutor::execute`] asks
+    /// this first and refuses to run work it cannot place, so a missing
+    /// accelerator is a typed refusal rather than a silent fallback.
+    pub fn schedule_for(&self, payload: &TaskPayload) -> Result<ScheduleDecision, ScheduleRefusal> {
+        let mut requirements = TaskRequirements::new(payload.kind.clone());
+        requirements.preference = self.preference;
+        requirements.must_accelerate = self.must_accelerate;
+        requirements.min_reputation = self.min_reputation;
+        schedule(&self.backends, &requirements)
+    }
+
+    /// The accelerator this executor reports for a placement decision.
+    pub fn accelerator_of(&self, payload: &TaskPayload) -> Option<Accelerator> {
+        self.schedule_for(payload)
+            .ok()
+            .map(|d| d.chosen_accelerator)
     }
 
     /// Execute a task payload and return the result.
@@ -39,17 +97,32 @@ impl TaskExecutor {
         info!(task_id = %payload.task_id, kind = ?payload.kind, "starting execution");
 
         let input_hash = sha256_hex(&payload.body);
-        let output = if matches!(payload.kind, TaskKind::AiInference) {
+        let (output, placement) = if matches!(payload.kind, TaskKind::AiInference) {
             return Err(NorthernSwarmError::ExecutionFailed {
                 task_id: payload.task_id.clone(),
                 reason: "AiInference requires a real model backend; hash-only execution is refused"
                     .into(),
             });
         } else {
+            // Placement first: the reactor decides which backend takes this task,
+            // and work it cannot place is refused rather than run elsewhere.
+            let decision = self.schedule_for(&payload).map_err(|refusal| {
+                NorthernSwarmError::ExecutionFailed {
+                    task_id: payload.task_id.clone(),
+                    reason: format!("reactor refused to place this task: {refusal}"),
+                }
+            })?;
+            debug!(
+                task_id = %payload.task_id,
+                backend = %decision.chosen_backend_id,
+                accelerator = ?decision.chosen_accelerator,
+                "reactor placed the task",
+            );
             // `AutoBackend` never returns an accelerator result without having
             // compared it against the CPU reference; a divergence quarantines
             // the device and returns the reference instead.
-            self.backend.execute(&payload)?
+            let output = self.backend.execute(&payload)?;
+            (output, Some(decision))
         };
         let duration_ms = start.elapsed().as_millis() as u64;
         let result_hash = sha256_hex(&output);
@@ -65,6 +138,14 @@ impl TaskExecutor {
         let proof = ProofBundle {
             task_id: payload.task_id.clone(),
             executor_id: self.executor_id.clone(),
+            backend_id: placement
+                .as_ref()
+                .map(|decision| decision.chosen_backend_id.clone())
+                .unwrap_or_else(|| self.backend.name().to_string()),
+            accelerator: placement
+                .as_ref()
+                .map(|decision| decision.chosen_accelerator)
+                .unwrap_or(Accelerator::Cpu),
             input_hash,
             output_hash,
             executed_at: unix_now(),
@@ -113,6 +194,37 @@ mod tests {
             params: Default::default(),
             input_uri: None,
         }
+    }
+
+    /// The placement decision travels with the result: an operator can see which
+    /// backend the reactor chose for this exact execution.
+    #[tokio::test]
+    async fn the_execution_receipt_names_the_backend_the_reactor_chose() {
+        let exec = TaskExecutor::new("exec-placement".to_string());
+        let result = exec.execute(dummy_payload(b"placed")).await.unwrap();
+        assert_eq!(result.proof.backend_id, "exec-placement/cpu-0");
+        assert_eq!(result.proof.accelerator, Accelerator::Cpu);
+    }
+
+    /// Work that needs an accelerator is refused when the executor advertises
+    /// none, and the refusal says why — it is never run quietly on the CPU.
+    #[tokio::test]
+    async fn work_that_needs_an_accelerator_is_refused_by_an_accelerator_less_executor() {
+        let exec = TaskExecutor::with_backends(
+            "exec-cpu-only".to_string(),
+            vec![BackendDescriptor::cpu("exec-cpu-only/cpu-0", 100)],
+            Preference::ThroughputFirst,
+            true,
+            // must accelerate
+            0,
+        );
+        let err = exec.execute(dummy_payload(b"gpu-only")).await.unwrap_err();
+        let message = err.to_string();
+        assert!(
+            message.contains("reactor refused to place this task")
+                && message.contains("requires an accelerator"),
+            "unexpected refusal: {message}"
+        );
     }
 
     #[tokio::test]

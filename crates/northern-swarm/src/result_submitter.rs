@@ -175,6 +175,8 @@ mod tests {
             proof: ProofBundle {
                 task_id: task_id.into(),
                 executor_id: "exec-1".into(),
+                backend_id: "exec-1/cpu-0".into(),
+                accelerator: crate::reactor::Accelerator::Cpu,
                 input_hash: "00".repeat(32),
                 output_hash: result_hash.into(),
                 executed_at: 0,
