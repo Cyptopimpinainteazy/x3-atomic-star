@@ -157,16 +157,16 @@ name = "Northern Swarm executor: signed metadata-driven chain contract and compu
 subsystem = "swarm_compute"
 source = "master"
 paths = ["crates/northern-swarm"]
-implemented = 72
-tested = 62
-mainnet_ready = 10
+implemented = 78
+tested = 72
+mainnet_ready = 12
 priority = "P1"
 confidence = "medium"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "No live-node integration test. The watcher/encoder/signer contract is proven at its own boundary - the storage prefix is derived and stable, the map key decodes to the task id, the HTTP polling URL conversion is pinned, the signature parser rejects short ids - but nothing here has ever talked to a running chain. `state_getKeys`, the Subxt signing path and the inclusion watch are all exercised for the first time in production.",
-  "Accelerator selection is unfinished. `GpuBackend` calls `x3_accel::sha256_with_parity`, which recomputes on CPU and refuses a divergent accelerator result, so a bad device cannot change a work hash - but it is fail-closed (it returns `ExecutionFailed`) rather than selecting a backend: there is no `AutoBackend` that detects hardware, picks, verifies when required, records telemetry and falls back to CPU, and there is no parity test and no divergent-fake-accelerator quarantine test.",
+  "Closed 2026-09-27 — accelerator selection no longer trusts the device. `backend.rs` gained `AutoBackend`: it always computes the CPU reference, compares any accelerator output byte-for-byte, returns the accelerator result only on agreement, and on divergence quarantines the device (storing both hashes in `Divergence`), records it in `BackendTelemetry`, and returns the CPU result. Refusal/error is a separate, counted fallback. `TaskExecutor` now executes through `AutoBackend`, and `AutoBackend::execute` fails closed on a kind it does not support. Evidence: `auto_backend_agrees_with_the_cpu_reference_on_supported_work`, `auto_backend_falls_back_to_cpu_when_the_accelerator_refuses`, `auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result` (a fake returning `0xDEADBEEF` cannot change the result and is never consulted again) and `auto_backend_refuses_a_kind_it_cannot_serve`. Break-it-first: dropping the `candidate == reference` comparison reddens exactly the quarantine test.",
   "`AiInference` is routed but not executed. `CpuBackend` and `GpuBackend` both declare `!supports(AiInference)`, and `ai_inference_without_real_model_backend_is_refused` pins that refusal - so the kind survives into routing and is then honestly refused, rather than hashed and called a result.",
 ]
 required_tests = [
@@ -176,13 +176,18 @@ required_tests = [
   "sha256_hex_is_stable",
   "ai_inference_is_not_faked_by_hash_backend",
   "cpu_backend_is_explicit_fallback_for_deterministic_work",
+  "auto_backend_agrees_with_the_cpu_reference_on_supported_work",
+  "auto_backend_falls_back_to_cpu_when_the_accelerator_refuses",
+  "auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result",
+  "auto_backend_refuses_a_kind_it_cannot_serve",
   "storage_prefix_is_32_bytes_and_stable",
   "task_id_is_extracted_from_blake2_concat_map_key",
 ]
 test_evidence = [
   "crates/northern-swarm/src/chain_watcher.rs",
   "crates/northern-swarm/src/backend.rs",
-  "note: measured 2026-09-27 on the committed bytes - `cargo test -p northern-swarm --all-targets` 13 passed / 0 failed / 0 ignored",
+  "note: measured 2026-09-27 on the committed bytes - `cargo test -p northern-swarm --all-targets` 17 passed / 0 failed / 0 ignored; `cargo clippy -p northern-swarm --all-targets -- -D warnings` clean",
+  "note: the four AutoBackend tests are the backend contract: parity returns the accelerator result only when it equals the CPU reference, a divergent fake is quarantined and its `0xDEADBEEF` never returned (and the device is not consulted again), a refusing accelerator is a counted fallback rather than a divergence, and an unsupported kind fails closed",
   "note: `storage_prefix_is_32_bytes_and_stable` is the check that the watcher reads the real `NorthernSwarm::Tasks` map rather than a fabricated full key, and `task_id_is_extracted_from_blake2_concat_map_key` pins the 32+16+32 layout the pallet's `StorageMap` produces",
   "note: `ai_inference_is_not_faked_by_hash_backend` asserts the refusal in both backends, which is the check that `TaskKind` is not silently dropped before routing",
 ]

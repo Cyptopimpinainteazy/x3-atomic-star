@@ -20,7 +20,9 @@ pub mod executor;
 pub mod result_submitter;
 pub mod types;
 
-pub use backend::{ComputeBackend, CpuBackend, GpuBackend};
+pub use backend::{
+    AutoBackend, BackendTelemetry, ComputeBackend, CpuBackend, Divergence, GpuBackend,
+};
 pub use chain_watcher::ChainWatcher;
 pub use executor::TaskExecutor;
 pub use result_submitter::ResultSubmitter;

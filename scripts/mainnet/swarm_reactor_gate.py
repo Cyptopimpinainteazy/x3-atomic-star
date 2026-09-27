@@ -308,6 +308,27 @@ def check_gpu_backend_contract() -> None:
     else:
         ok("CPU fallback backend exists")
 
+    # Selection must not become a way to trust the accelerator: consensus
+    # output has to be compared against the CPU reference, a divergence has to
+    # quarantine the device, and that behaviour has to be tested.
+    if "struct AutoBackend" not in combined:
+        fail(
+            "no AutoBackend selects/verifies the accelerator against the CPU "
+            "reference; a divergent device could otherwise change the work hash"
+        )
+    elif "pub fn quarantine(" not in combined:
+        fail("AutoBackend records no divergence/quarantine, so a bad device is untraceable")
+    elif not re.search(
+        r"fn\s+auto_backend_quarantines_a_divergent_accelerator_and_returns_the_cpu_result\s*\(",
+        combined,
+    ):
+        fail(
+            "no test proves a divergent accelerator is quarantined and its "
+            "result rejected in favour of the CPU reference"
+        )
+    else:
+        ok("AutoBackend quarantines a divergent accelerator, with a test")
+
 
 def check_tests() -> None:
     print("\n── Swarm 5. Executable tests ──")

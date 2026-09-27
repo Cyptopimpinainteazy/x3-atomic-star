@@ -1,9 +1,9 @@
 use crate::{
-    backend::{ComputeBackend, CpuBackend, GpuBackend},
+    backend::{AutoBackend, ComputeBackend},
     types::*,
 };
 use sha2::{Digest, Sha256};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Off-chain task executor (RC1).
 ///
@@ -17,16 +17,16 @@ use tracing::{debug, info, warn};
 /// slashing in the RC3 quorum round.
 pub struct TaskExecutor {
     executor_id: ExecutorId,
-    cpu: CpuBackend,
-    gpu: GpuBackend,
+    /// Hardware-detecting backend that compares any accelerator output against
+    /// the canonical CPU reference before it is ever used.
+    backend: AutoBackend,
 }
 
 impl TaskExecutor {
     pub fn new(executor_id: ExecutorId) -> Self {
         TaskExecutor {
             executor_id,
-            cpu: CpuBackend,
-            gpu: GpuBackend::new(),
+            backend: AutoBackend::new(),
         }
     }
 
@@ -45,21 +45,11 @@ impl TaskExecutor {
                 reason: "AiInference requires a real model backend; hash-only execution is refused"
                     .into(),
             });
-        } else if self.gpu.supports(&payload.kind) {
-            match self.gpu.execute(&payload) {
-                Ok(output) => output,
-                Err(error) => {
-                    warn!(
-                        task_id = %payload.task_id,
-                        backend = self.gpu.name(),
-                        err = %error,
-                        "GPU execution unavailable/refused; falling back to canonical CPU backend",
-                    );
-                    self.cpu.execute(&payload)?
-                }
-            }
         } else {
-            self.cpu.execute(&payload)?
+            // `AutoBackend` never returns an accelerator result without having
+            // compared it against the CPU reference; a divergence quarantines
+            // the device and returns the reference instead.
+            self.backend.execute(&payload)?
         };
         let duration_ms = start.elapsed().as_millis() as u64;
         let result_hash = sha256_hex(&output);
