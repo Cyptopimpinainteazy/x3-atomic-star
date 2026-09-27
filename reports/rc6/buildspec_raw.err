@@ -1,2 +1,1 @@
-2026-05-16 19:55:03 Building X3 Chain chain specification (raw: true)
-2026-05-16 19:55:03 Building chain spec
+no bootnode in the plain spec: the node refuses a Live spec in raw form without one, and bootnode deployment is allowed to be pending at RC6

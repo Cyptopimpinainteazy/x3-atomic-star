@@ -26,7 +26,7 @@ PASS
 | Release node builds | PASS |
 | Runtime WASM builds | PASS |
 | Public testnet plain chain spec generates | PASS |
-| Public testnet raw chain spec generates | PASS |
+| Public testnet raw chain spec generates (no bootnode yet) | SKIP |
 | No Alice/Bob/Charlie dev authority keys in public config | PASS |
 | Bootnode config present (or documented pending) | PASS |
 | External bridges are disabled | PASS |

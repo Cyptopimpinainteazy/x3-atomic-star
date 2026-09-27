@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -u
 
-ROOT="/home/lojak/Desktop/X3_ATOMIC_STAR"
+# Derived, not hardcoded. This script named `/home/lojak/Desktop/X3_ATOMIC_STAR`, a directory that
+# does not exist on this box, so every step ran `cd` into nothing and the whole sequence failed
+# instantly — which is exactly the FAIL that `reports/rc6/*` carried: the report was describing the
+# script's own broken path, not the chain. Every other gate in this repository derives its root from
+# `BASH_SOURCE`; so does this one now.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Ensure Rust toolchain and local Node 20 are available for gate scripts.
 if [ -f "$HOME/.cargo/env" ]; then
