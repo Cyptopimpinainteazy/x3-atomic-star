@@ -264,7 +264,22 @@ def test_patch_context_matches_the_file_it_patches(tmp_path: Path) -> None:
 
 
 def test_scanner_is_the_registry_citation() -> None:
-    """The registry must cite a test this module really defines."""
-    registry = (REPO / "FEATURE_REGISTRY.toml").read_text()
-    assert 'required_tests = ["swarm_scan_generates_report"]' in registry
-    assert callable(swarm_scan_generates_report)
+    """Every test `[repo_scanner_agent]` cites must be a function this module defines.
+
+    The readiness gate cannot check this row (its `crate_or_service` is a script,
+    not a directory of `.rs` files), so the row checks itself — which is the whole
+    reason the scanner exists.
+    """
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+        import tomli as tomllib
+
+    registry = tomllib.loads((REPO / "FEATURE_REGISTRY.toml").read_text())
+    row = registry["repo_scanner_agent"]
+    assert "swarm_scan_generates_report" in row["required_tests"]
+    for name in row["required_tests"]:
+        assert callable(globals().get(name)), (
+            f"[repo_scanner_agent] cites `{name}`, which this module does not define"
+        )
+    assert (REPO / row["proof_report"]).is_file(), "the row must cite a report that exists"

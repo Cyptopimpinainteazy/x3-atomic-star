@@ -734,6 +734,12 @@ GATES_FAST=(
   # leftover `next start -p 3010` satisfied the criterion on another port — which is why the
   # URL is a pin now. It needs no chain: the other fourteen criteria are expected to fail.
   "explorer gate drill:bash scripts/testnet/explorer-gate-drill.sh"
+  # Two suites the repo scanner found running nowhere (kind `ungated-crate`, 2026-09-27). Both pass;
+  # the point of adding them is that nothing ran them before, so a regression in either would have
+  # shipped silently. The scanner proposes this exact gate line as a patch; applying it dropped its
+  # `ungated-crate` count and the ratchet was re-baselined in the same commit.
+  "test x3-svm-client:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-client cargo test --locked --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml -p x3-svm-client"
+  "test svm counter:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-counter cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).

@@ -448,12 +448,14 @@ tauri_app = "SwarmCommand"
 # `scripts/x3_fake_code_scan.py`, reachable panics to `scripts/audit/panic_unwrap_scan.py`. It runs
 # both and folds their verdicts into the report's gate summary instead of duplicating their debt.
 #
-# First live run, 2026-09-27 (36 findings): 13 registered pallets charge invented literal weights
+# First live run, 2026-09-27 (36 findings; 32 after two of the ungated crates were gated the same
+# session — the scanner proposed the gate lines as patches and applying them dropped its own count):
+# 13 registered pallets charge invented literal weights
 # (`Weight::from_parts(10_000, 0)`) while shipping generated weights — the class the PR #519 weights
-# incident belongs to; `launch_gate` cites two tests nobody wrote; 7 crates (2 fuzz, 3 under the
-# nested `x3-autonomic-core` workspace, the SVM broadcaster client, an integration-test crate) have
-# suites no gate runs; `pallets/pallet-x3-control` is not registered. Those are recorded in the
-# baseline as debt, not repaired here.
+# incident belongs to; `launch_gate` cites two tests nobody wrote; 4 crates still have suites no gate
+# runs (2 fuzz, 3 under the nested `x3-autonomic-core` workspace whose dependency graph does not
+# resolve at all, and the SVM broadcaster); `pallets/pallet-x3-control` is not registered. Those are
+# recorded in the baseline as debt, not repaired here.
 proof_report = "reports/swarm_scan_report.md"
 readiness_score = 58
 required_tests = [
@@ -473,7 +475,7 @@ required_tests = [
 # 0.35*80 + 0.25*70 + 0.40*30 = 28 + 17.5 + 12 = 57.5 -> 58
 blockers = [
   "Dev-ops tooling — not part of blockchain runtime",
-  "It finds and records; it does not repair: the 36 findings of its first run sit in docs/reports/repo-scan-baseline.json as ratcheted debt",
+  "It finds and records; it does not repair: the 32 open findings sit in docs/reports/repo-scan-baseline.json as ratcheted debt (two crates it flagged were gated the same day)",
   "The `ungated-crate` standard follows this repository's own (a workspace-wide `cargo test` counts as coverage for root-workspace members), so a root suite that only the opt-in `--deep` run reaches is not reported",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]

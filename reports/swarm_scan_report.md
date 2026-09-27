@@ -3,7 +3,7 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 34
+Findings: 32
 
 ## Counts
 
@@ -11,7 +11,7 @@ Findings: 34
 |---|---|---|
 | `pallet-call-without-weights` | 25 | yes |
 | `stale-registry-test` | 2 | yes |
-| `ungated-crate` | 6 | yes |
+| `ungated-crate` | 4 | yes |
 | `unregistered-pallet` | 1 | yes |
 
 ## Related ratchets (not re-reported here)
@@ -231,16 +231,6 @@ Findings: 34
 - **test required:** testnet_rc_gate
 - **release gate affected:** readiness consistency
 
-### MEDIUM — `ungated-crate` — integration-tests/svm-counter-test/Cargo.toml
-
-- **id:** `37ac6f137e00f15a`
-- **symbol:** `svm-counter-test`
-- **why it matters:** 1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers
-- **suggested fix:** append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated
-- **test required:** cargo test -p svm-counter-test
-- **release gate affected:** crate tests are gated
-- **patch:** `.ai/patches/37ac6f137e00f15a.patch` (`--patches`)
-
 ### MEDIUM — `ungated-crate` — pallets/x3-cross-vm-router/fuzz/Cargo.toml
 
 - **id:** `275693779fa5e4da`
@@ -260,16 +250,6 @@ Findings: 34
 - **test required:** cargo test -p pallet-x3-settlement-engine-fuzz
 - **release gate affected:** crate tests are gated
 - **patch:** `.ai/patches/343b07a276c84a27.patch` (`--patches`)
-
-### MEDIUM — `ungated-crate` — programs/svm/x3_atomic_swap/client/Cargo.toml
-
-- **id:** `2aba50ac5e4e2d23`
-- **symbol:** `x3-svm-client`
-- **why it matters:** 10 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers
-- **suggested fix:** append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated
-- **test required:** cargo test -p x3-svm-client
-- **release gate affected:** crate tests are gated
-- **patch:** `.ai/patches/2aba50ac5e4e2d23.patch` (`--patches`)
 
 ### MEDIUM — `ungated-crate` — x3-autonomic-core/crates/x3-live-auditor/Cargo.toml
 

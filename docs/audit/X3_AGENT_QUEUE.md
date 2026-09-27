@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `7174ffde9cfe8099…` — the artifacts move when
+Source digest: `b6893395b08c6667…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -32,7 +32,7 @@ fails when they do not match.
 | REG-x3_wallet_pallet-1 | x3_wallet_pallet (LIVE_TESTNET) | Biometric template and recovery logic have no security review | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-x3_wallet_pallet-2 | x3_wallet_pallet (LIVE_TESTNET) | Measured 2026-09-26: the pallet's biometric registration validated nothing and its recovery extrinsic changed nothing. Both now delegate to the `x3-wallet` library's managers (`BiometricManager::create_profile`, `SocialRecoveryManager`), wh… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-repo_scanner_agent-1 | repo_scanner_agent (LIVE_TESTNET) | Dev-ops tooling — not part of blockchain runtime | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/swarm_scan_report.md` | open |
-| REG-repo_scanner_agent-2 | repo_scanner_agent (LIVE_TESTNET) | It finds and records; it does not repair: the 36 findings of its first run sit in docs/reports/repo-scan-baseline.json as ratcheted debt | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/swarm_scan_report.md` | open |
+| REG-repo_scanner_agent-2 | repo_scanner_agent (LIVE_TESTNET) | It finds and records; it does not repair: the 32 open findings sit in docs/reports/repo-scan-baseline.json as ratcheted debt (two crates it flagged were gated the same day) | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/swarm_scan_report.md` | open |
 | REG-repo_scanner_agent-3 | repo_scanner_agent (LIVE_TESTNET) | The `ungated-crate` standard follows this repository's own (a workspace-wide `cargo test` counts as coverage for root-workspace members), so a root suite that only the opt-in `--deep` run reaches is not reported | unassigned | — | — | below 60pct - triage candidate | `bash scripts/local-ci.sh` | `reports/swarm_scan_report.md` | open |
 | REG-atomic_gateway-1 | atomic_gateway (GUARDED_TESTNET) | Gateway is guarded — ExternalBridgesEnabled = false at genesis (governance gate) | unassigned | — | — | at or above 60pct | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |
 | REG-x3_wrapped-1 | x3_wrapped (GUARDED_TESTNET) | External bridge deposits are disabled at genesis (ExternalBridgesEnabled=false per LAUNCH_SCOPE.md) — wrapped assets can only be minted via governance-gated RPC for testing, not from a real external-chain deposit | unassigned | — | — | at or above 60pct | `bash scripts/local-ci.sh` | required_tests resolved by check-readiness-consistency.sh | open |

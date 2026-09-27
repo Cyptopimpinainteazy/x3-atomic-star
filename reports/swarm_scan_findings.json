@@ -4,7 +4,7 @@
   "counts": {
     "pallet-call-without-weights": 25,
     "stale-registry-test": 2,
-    "ungated-crate": 6,
+    "ungated-crate": 4,
     "unregistered-pallet": 1
   },
   "structural_counts": {
@@ -13,7 +13,7 @@
     "stale-proof-report": 0,
     "unregistered-pallet": 1,
     "pallet-call-without-weights": 25,
-    "ungated-crate": 6
+    "ungated-crate": 4
   },
   "gate_summary": [
     {
@@ -333,19 +333,6 @@
       "patch_eligible": false
     },
     {
-      "id": "37ac6f137e00f15a",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "integration-tests/svm-counter-test/Cargo.toml",
-      "line": 0,
-      "symbol": "svm-counter-test",
-      "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p svm-counter-test",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
       "id": "275693779fa5e4da",
       "kind": "ungated-crate",
       "severity": "medium",
@@ -368,19 +355,6 @@
       "why": "1 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
       "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
       "test_required": "cargo test -p pallet-x3-settlement-engine-fuzz",
-      "gate_affected": "crate tests are gated",
-      "patch_eligible": true
-    },
-    {
-      "id": "2aba50ac5e4e2d23",
-      "kind": "ungated-crate",
-      "severity": "medium",
-      "path": "programs/svm/x3_atomic_swap/client/Cargo.toml",
-      "line": 0,
-      "symbol": "x3-svm-client",
-      "why": "10 test attribute(s), no gate command names this package, and no workspace-wide `cargo test` gate reaches its workspace, so its suite runs only when a human remembers",
-      "suggested_fix": "append the gate line below to the fast-gate list in scripts/local-ci.sh, or record why it is intentionally ungated",
-      "test_required": "cargo test -p x3-svm-client",
       "gate_affected": "crate tests are gated",
       "patch_eligible": true
     },

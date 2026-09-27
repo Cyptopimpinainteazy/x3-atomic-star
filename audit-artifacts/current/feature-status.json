@@ -4761,10 +4761,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "7174ffde9cfe80991c39c4ee635fb1c139a81b8b6c89f9325684c759da7eecf2",
+    "source_digest": "b6893395b08c6667b2ecd7df8d5a61e7eb64c6f2c89234de21ec3c0281514f51",
     "sources": {
       "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
-      "FEATURE_REGISTRY.toml": "7ba34bb8b546948e2c0c09223ea19d8ce4abf95ff6c930f188dcfb7bd023baa9",
+      "FEATURE_REGISTRY.toml": "60b97b40324c9be8c4d7615a5fe4c6e6c41bf1cdf692ea90b6acf14069ba82d4",
       "feature-matrix/agents-experimental.toml": "a3f6c7070bc6ad2607790bb123bb7827ed71e74ffe5f8bb0f0e56ce439472320",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -4970,7 +4970,7 @@
     {
       "blockers": [
         "Dev-ops tooling \u2014 not part of blockchain runtime",
-        "It finds and records; it does not repair: the 36 findings of its first run sit in docs/reports/repo-scan-baseline.json as ratcheted debt",
+        "It finds and records; it does not repair: the 32 open findings sit in docs/reports/repo-scan-baseline.json as ratcheted debt (two crates it flagged were gated the same day)",
         "The `ungated-crate` standard follows this repository's own (a workspace-wide `cargo test` counts as coverage for root-workspace members), so a root suite that only the opt-in `--deep` run reaches is not reported"
       ],
       "crate_or_service": "scripts/swarm/swarm_scan.sh",
