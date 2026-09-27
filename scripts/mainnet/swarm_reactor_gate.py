@@ -112,6 +112,16 @@ def check_runtime_wiring() -> None:
         "NorthernSwarm is present in construct_runtime!",
     )
 
+    runtime = read("runtime/src/lib.rs")
+    mainnet_start = runtime.find("// ── mainnet-rc1:")
+    default_start = runtime.find("// ── default (no dev", mainnet_start)
+    if mainnet_start < 0 or default_start < 0:
+        fail("could not locate the mainnet-rc1 runtime section")
+    elif "NorthernSwarm: pallet_northern_swarm" not in runtime[mainnet_start:default_start]:
+        fail("NorthernSwarm is not included in the mainnet-rc1 construct_runtime! set")
+    else:
+        ok("NorthernSwarm is included in the mainnet-rc1 release runtime")
+
 
 def check_pallet_contract() -> None:
     print("\n── Swarm 2. On-chain pallet safety contract ──")
