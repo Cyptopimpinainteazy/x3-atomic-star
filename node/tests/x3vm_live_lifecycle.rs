@@ -533,7 +533,11 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
 
     let primary = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("primary signer");
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+    // The taker locks its own side. Both legs are native X3, which the settlement engine now
+    // holds as real funds from their depositor, so the maker may no longer lock the taker's leg:
+    // a maker funding both sides would have both paid to the taker at finalization.
+    let bob_uri = dev_uri("Bob");
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &bob_uri)
         .expect("second-leg signer");
 
     let prepared = primary
@@ -590,7 +594,10 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         )
         .expect("sign second escrow leg");
     assert!(!submit(&leg1).is_empty());
-    wait_finalized(&leg1, Duration::from_secs(180));
+    let (_, leg1_block) = wait_finalized(&leg1, Duration::from_secs(180));
+    // Inclusion is not success: the claim below needs the intent fully funded, and a refused
+    // lock would otherwise surface only there, as the claim's `InvalidIntentState`.
+    assert_dispatch_succeeded(&second_leg, &leg1_block, &leg1);
 
     // Wrong secrets are now rejected before signing/broadcast: the live claim
     // boundary accepts only a permit issued by the secret-release firewall.
@@ -736,7 +743,11 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     let alice_uri = dev_uri("Alice");
     let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("timeout signer");
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+    // The taker locks its own side. Both legs are native X3, which the settlement engine now
+    // holds as real funds from their depositor, so the maker may no longer lock the taker's leg:
+    // a maker funding both sides would have both paid to the taker at finalization.
+    let bob_uri = dev_uri("Bob");
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &bob_uri)
         .expect("timeout second-leg signer");
 
     let prepared = signer
