@@ -538,6 +538,14 @@ GATES_FAST=(
   # `launch_gate` citations that name tests nobody wrote.
   "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
   "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
+  # The S0/S1 security gate — the formal TLA+ check plus the catastrophic and critical blocker
+  # checks — ran only in CI. Nothing on this box ran it, which is why a *missing java* went
+  # unnoticed for as long as it did: every TLA+ spec errored out, the wrapper looked at exit codes
+  # that were already 0, and the gate reported green over its own red report. The wrapper now reads
+  # the report and fails on a remaining blocker, and this gate makes the same failure local.
+  # Measured 2026-09-27: 69s, S0 VERIFIED 100.0%, all six catastrophic and three critical blockers
+  # pass, S1 verifies five modules.
+  "security gates S0 S1:bash scripts/run-security-gates.sh"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:

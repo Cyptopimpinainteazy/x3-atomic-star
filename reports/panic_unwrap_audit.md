@@ -1,6 +1,6 @@
 # Panic Unwrap Audit
 
-Generated: 2026-09-27T14:18:22Z by scripts/mainnet/panic_unwrap_audit.sh
+Generated: 2026-09-27T14:28:37Z by scripts/mainnet/panic_unwrap_audit.sh
 
 ## Classification
 

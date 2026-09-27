@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `07bd21853b65a87b…` — the artifacts move when
+Source digest: `fc9c8168bd2f4f5d…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -192,7 +192,7 @@ fails when they do not match.
 | MTX-X3-SEC-002 | security_proofgate | Runtime artifact hash evidence: `docs/reports/runtime-wasm-hashes.json` records the revision, image digest, compact/compressed sizes, set_code, authorize_upgrade, IPFS CID and BLAKE2-256, plus the runtime version and metadata the artifact reports; `scripts/check-runtime-h… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
 | MTX-X3-SEC-003 | security_proofgate | Mainnet release audit script: Must remain aligned with actual production build artifacts | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
 | MTX-X3-SEC-004 | security_proofgate | Production gate: The blocker this row carried — "srtool hardening is on #166 branch, not master yet" — is stale: #166 merged 2026-09-17 and the reproducible-build path is on master (`scripts/run-srtool.sh`, `scripts/update-runtime-hashes.sh`); What is actua… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 75% (no named test list on this row) | open |
-| MTX-X3-SEC-005 | security_proofgate | Formal verification workflow: Selected proof coverage only; K/toolchain reliability historically required repair | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 50% (no named test list on this row) | open |
+| MTX-X3-SEC-005 | security_proofgate | Formal verification workflow: **CLOSED 2026-09-27 - the toolchain repair this row asked for, and a gate that was green over its own red report.** Measured and verified 2026-09-27: `bash scripts/run-security-gates.sh` exits 0 in 69s, `.proof-results/s0-security-gate.txt`… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 70% (no named test list on this row) | open |
 | MTX-X3-SEC-006 | security_proofgate | CodeQL analysis: Not all languages/modes may be covered | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 65% (no named test list on this row) | open |
 | MTX-X3-SEC-007 | security_proofgate | ProofForge gates: Coverage does not equal whole-protocol formal proof | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 65% (no named test list on this row) | open |
 | MTX-X3-SEC-008 | security_proofgate | Test-cheat / placeholder detection: Needs broad language coverage and CI enforcement | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 60% (no named test list on this row) | open |
