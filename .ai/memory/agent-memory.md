@@ -9187,3 +9187,46 @@ registration, with the outcome per file:
   already has benchmarks (`benchmarks/` gate) so it is the *cheap* class; `x3-wrapped` is heavy.
   After each pass: fmt, scanner re-baseline, panic ratchet, `--workspace --all-targets`, attestation,
   release gate.
+- **UPDATE (xxxstar-main-2d, 2026-09-27 22:30 UTC):**
+  - **PR #520** (`feat/x3-htlc-onchain`): native X3 HTLC legs (`ExternalChainId::X3Native` in pallet-x3-settlement-engine)
+    now hold real funds — before, lock/finalize/refund moved nothing while events reported amounts. Live on real nodes:
+    native lifecycle 4/4 incl. a new restart-recovery test, EVM gate 7/7 (anvil), SVM gate 2/2 (solana-test-validator).
+    The live suites no longer have the maker lock the taker's native leg (refused now). Runtime-affecting.
+  - **PR #518** merged with master (280 commits): master's mini_x3 fail-closed/atomic/slots/privacy work kept, this
+    branch's safety fixes (checked registers, argc, div overflow, wasm32 reader, full on-chain validator) layered on;
+    840 tests + runtime 60 green. A runtime fault in the on-chain engine is now an unsuccessful receipt (master's
+    storage-channel convention), a validation refusal stays an error.
+  - Both PRs' production gates dispatched with merge-on-success watchers. Last #518 gate attempt died at the 90-min job
+    timeout in srtool (box heavily loaded), before that the artifact storage quota.
+
+## 2026-09-27 (sixth weights pass) — two small pallets in one attestation
+
+- **Batch small pallets, attest once.** `pallets/x3-sequencer` (one call) and `pallets/x3-da` (two)
+  both charged literals behind empty `runtime-benchmarks` features. Doing them in one pass costs one
+  srtool double-build instead of two, and the per-pallet work is small when the pallet has no sibling
+  trait in its `Config` — `Currency: ReservableCurrency` plus a mock is the whole dependency story.
+  Scanner `pallet-call-without-weights` **20 → 18** (seven pallets measured, 28 literals).
+- **Recipe additions from this pass:**
+  * `frame-benchmarking` must be added to `[dependencies]` as well as to the feature list — adding
+    `"frame-benchmarking/runtime-benchmarks"` to `runtime-benchmarks` without the dependency fails
+    manifest load with `feature ... includes ... but frame-benchmarking is not a dependency`.
+  * Fund a caller with `T::Currency::make_free_balance_be(&caller, 10_000_000u32.into())` (the idiom
+    `pallets/x3-settlement-engine` already uses) — `u32.into()` works for `BalanceOf<T>`, and the
+    runtime's sequencing/DA fees are 10 and 5 per byte, so it covers a 1 KiB payload with room.
+  * A benchmark whose call has a precondition creates it through the pallet's own extrinsic where one
+    exists: the DA shard-proof benchmark commits the blob first (`BlobNotFound` is the guard) and the
+    commitment then exists exactly as a chain would have it.
+- **Evidence**: `cargo test -p pallet-x3-sequencer` 15 passed / `--features runtime-benchmarks` 16;
+  `-p pallet-x3-da` 15 / 17; `cargo check --workspace --all-targets` clean;
+  `panic_unwrap_audit.sh` PASS 440/440; `make mainnet-check` PASS after two agreeing srtool builds
+  recorded revision `891a47f96` (compact 8,888,569 `0x1570b595…`, compressed 1,524,965 `0xb8088b09…`);
+  `check-runtime-weights-wired.py` 43 wired configs; `X3-GPU-003` 70 → 72.
+- **Next seeds:** 18 findings left, of which 4 are the documented `T::DbWeight::get().reads_writes`
+  form (depin-marketplace, private-execution, x3-jury-anchor, x3-rebalance) that the lane brief says to
+  leave — so **14 real pallets remain**. Cheapest first by call count: `x3-account-registry` (3),
+  `x3-flashloan` (3), `x3-domain-registry` (3), `x3-reservation` (3), `x3-wallet-pallet` (3), then
+  `x3-reconciliation` (6), `x3-sentinel` (7), `x3-wrapped` (7), `x3-asset-registry` (7), `x3-dapp-hub`
+  (8), `x3-cross-vm-router` (8), `x3-custody` (10), `x3-crosschain-gateway` (11). `x3-cross-vm-router`
+  is special: it already has a benchmark module but for internal helpers, and its
+  `register_external_root` is refused by the runtime's `RefuseExternalRoots`, so that one call cannot
+  be measured on the dev chain and needs the documented-exception path.
