@@ -481,7 +481,10 @@ pub mod pallet {
             Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
                 let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
                 ensure!(
-                    matches!(task.status, TaskStatus::Pending | TaskStatus::Claimed),
+                    matches!(
+                        task.status,
+                        TaskStatus::Pending | TaskStatus::Claimed | TaskStatus::ResultCommitted
+                    ),
                     Error::<T>::TaskNotClaimable,
                 );
                 task.status = TaskStatus::Claimed;
