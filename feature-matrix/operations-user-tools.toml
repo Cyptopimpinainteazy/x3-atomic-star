@@ -5,18 +5,19 @@ id = "X3-OPS-001"
 name = "Genesis ceremony tooling"
 subsystem = "operations_user_tools"
 source = "master"
-paths = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh"]
-implemented = 85
-tested = 65
-mainnet_ready = 45
+paths = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "tests/test_ceremony_attestations.py"]
+implemented = 92
+tested = 85
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists",
-  "The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, and the recorded node binary is a debug build",
+  "**CLOSED 2026-09-27 — the record is signed, and the signature is one the chain would recognise.** The claim above (\u201cnothing publishes a signed manifest\u201d) was true: `record` produced a file and `verify` checked it, and nothing said *who* agreed to the artifacts. The manifest now carries an `attestations` block \u2014 each authority signs the manifest's canonical bytes (JSON, sorted keys, `attestations` removed) with the ed25519 key its GRANDPA authority **is**, generated through OpenSSL from the seed the spec's authority was derived from. The tool refuses a key that is not in the authority set, an authority that signs twice, and appending to a manifest that has been edited since it was signed (stale signatures); `verify` requires a supermajority of *distinct* authority signatures and recomputes the threshold `floor(2n/3)+1` from the authority set rather than believing the manifest's own copy of it. The authority set is decoded twice \u2014 SS58 addresses from the spec, with the checksum verified, and the SCALE `Vec<(AuthorityId, u64)>` the chain reports \u2014 and a manifest whose two accounts disagree is refused. `sign` is the rehearsal form (one machine holds every key); `attest --key <seed>` adds one operator's signature, which is the shape a real ceremony has. Measured on a four-validator network: 4/4 signed, threshold 3, `verify` PASS, and eight refusals (see `test_evidence`). The recorded binary is the `target/release` build (the drill's discovery already prefers it), so the old \u201crecorded node binary is a debug build\u201d half is no longer the state \u2014 but it is still *this box's* release build rather than a tagged srtool artifact, which is the first blocker, not this one.",
   "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries",
+  "Still open, and why this is not mainnet-ready: the ceremony has never been run against a tagged release with operators on separate machines. `attest` makes that shape possible but no operator has used it, so the multi-party path is proven against keys on one host, not against four people in four places. `genesis_ceremony.sh` still requires a tag that does not exist, the launch is loopback, and nothing publishes the signed manifest anywhere a stranger could fetch it \u2014 the signature is checkable, but there is no distribution step.",
 ]
 # The rehearsal of the whole ceremony now runs, and it produces the artifact a launch
 # can be verified against: `testnet-ceremony.py record` writes the spec sha256 (and
@@ -26,6 +27,10 @@ blockers = [
 # one line per check. `--testnet` runs the drill: build spec → boot four validators →
 # record → verify → tamper with a copy → require the verifier to reject it.
 evidence = ["scripts/mainnet/genesis_ceremony.sh", "scripts/testnet/testnet-ceremony.py", "scripts/testnet/testnet-ceremony-drill.sh", "scripts/testnet/build-x3-testnet-spec.py", "note: 2026-09-22 first-hand — the drill records `X3 Chain Testnet` (Live, id x3_chain_testnet) with genesis 0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad, spec sha256 a3cc9e39719fe017…, 4 aura / 4 grandpa authorities and every validator's peer id + finalized height (273 at record time, 3 peers each); `verify` passes every check against the live network and fails a manifest whose genesis hash was tampered with. `genesis_ceremony.sh` (15.6 kB) remains the mainnet, tagged-commit half"]
+test_evidence = [
+  "note: 2026-09-27 - `bash scripts/local-ci.sh --testnet --only testnet-ceremony-drill` records a four-validator launch, signs it with all four GRANDPA keys, verifies it against the running network, and then proves eight refusals: a tampered genesis hash (which now fails the hash check *and* the signature), an unsigned manifest, a manifest below its own threshold, a valid signature from a key outside the authority set, a flipped signature byte, a manifest that lowers its own threshold, the same authority signing twice, and `attest` adding to a manifest edited since it was signed",
+  "note: 2026-09-27 - `python3 tests/test_ceremony_attestations.py` (20 tests) is the fast half: base58 with leading zeroes and a rejected alphabet character, an SS58 checksum refusal, SCALE authority-set decoding including a truncated input, the threshold rule for n=1..7 (4 -> 3, 7 -> 5), the ed25519 derivation pinned against `x3-chain-node keys generate --key-type grandpa --seed 0x000102…1f --output hex`, a signature that verifies and four that must not, and the canonical-bytes rule (the `attestations` member is not covered, key order is irrelevant, a signed field is)",
+]
 
 [[feature]]
 id = "X3-OPS-002"

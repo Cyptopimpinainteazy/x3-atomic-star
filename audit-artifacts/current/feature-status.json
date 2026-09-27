@@ -3409,7 +3409,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 64,
+      "composite": 77,
       "confidence": "high",
       "evidence": [
         "scripts/mainnet/genesis_ceremony.sh",
@@ -3419,28 +3419,30 @@
         "note: 2026-09-22 first-hand \u2014 the drill records `X3 Chain Testnet` (Live, id x3_chain_testnet) with genesis 0xa1005528d8d6ec35693e37f8d72a85408067aabeca8fa7f8a6379184628000ad, spec sha256 a3cc9e39719fe017\u2026, 4 aura / 4 grandpa authorities and every validator's peer id + finalized height (273 at record time, 3 peers each); `verify` passes every check against the live network and fails a manifest whose genesis hash was tampered with. `genesis_ceremony.sh` (15.6 kB) remains the mainnet, tagged-commit half"
       ],
       "id": "X3-OPS-001",
-      "implemented": 85,
+      "implemented": 92,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 45,
+      "mainnet_ready": 58,
       "missing_work": [
         "The mainnet ceremony itself has not been run: `genesis_ceremony.sh` requires a tagged release commit and srtool, and no tag exists",
-        "The ceremony record exists but is only produced and checked locally: nothing publishes a signed manifest, and the recorded node binary is a debug build",
-        "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries"
+        "**CLOSED 2026-09-27 \u2014 the record is signed, and the signature is one the chain would recognise.** The claim above (\u201cnothing publishes a signed manifest\u201d) was true: `record` produced a file and `verify` checked it, and nothing said *who* agreed to the artifacts. The manifest now carries an `attestations` block \u2014 each authority signs the manifest's canonical bytes (JSON, sorted keys, `attestations` removed) with the ed25519 key its GRANDPA authority **is**, generated through OpenSSL from the seed the spec's authority was derived from. The tool refuses a key that is not in the authority set, an authority that signs twice, and appending to a manifest that has been edited since it was signed (stale signatures); `verify` requires a supermajority of *distinct* authority signatures and recomputes the threshold `floor(2n/3)+1` from the authority set rather than believing the manifest's own copy of it. The authority set is decoded twice \u2014 SS58 addresses from the spec, with the checksum verified, and the SCALE `Vec<(AuthorityId, u64)>` the chain reports \u2014 and a manifest whose two accounts disagree is refused. `sign` is the rehearsal form (one machine holds every key); `attest --key <seed>` adds one operator's signature, which is the shape a real ceremony has. Measured on a four-validator network: 4/4 signed, threshold 3, `verify` PASS, and eight refusals (see `test_evidence`). The recorded binary is the `target/release` build (the drill's discovery already prefers it), so the old \u201crecorded node binary is a debug build\u201d half is no longer the state \u2014 but it is still *this box's* release build rather than a tagged srtool artifact, which is the first blocker, not this one.",
+        "The recorded launch is loopback (four validators on one host) and its bootnodes are /ip4/127.0.0.1/... entries",
+        "Still open, and why this is not mainnet-ready: the ceremony has never been run against a tagged release with operators on separate machines. `attest` makes that shape possible but no operator has used it, so the multi-party path is proven against keys on one host, not against four people in four places. `genesis_ceremony.sh` still requires a tag that does not exist, the launch is loopback, and nothing publishes the signed manifest anywhere a stranger could fetch it \u2014 the signature is checkable, but there is no distribution step."
       ],
       "name": "Genesis ceremony tooling",
       "paths": [
         "scripts/mainnet/genesis_ceremony.sh",
         "scripts/testnet/testnet-ceremony.py",
-        "scripts/testnet/testnet-ceremony-drill.sh"
+        "scripts/testnet/testnet-ceremony-drill.sh",
+        "tests/test_ceremony_attestations.py"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "operations_user_tools",
-      "tested": 65,
-      "tests": "tested score 65% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4618,7 +4620,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cee3291d7b70bc6a69cbd6e5961cdbc78fcd92301c2457f1f867526a66308019",
+    "source_digest": "d6743654c346894bccec03411ee1c79a92e5ab81987d763599d314ff2ce2d608",
     "sources": {
       "FEATURE_MATRIX.toml": "0dc9211d212c48721fd443bb3dc8c7f119fc0bf967578bc939ee3b047956ca2f",
       "FEATURE_REGISTRY.toml": "87fe96919ab7eaad391cf01a6f1f50e6530b4713bbefca5c2756601a91da295b",
@@ -4631,7 +4633,7 @@
       "feature-matrix/gpu-performance.toml": "7fd37d857912a9282b2952e6052e63d3093e2d1a70e4cb82f405c176f15d172a",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "44f084d56201fc4027ba49812e3d5b2efedb80547b3a5789c147eb8d57cdc97a",
-      "feature-matrix/operations-user-tools.toml": "dab9c5f373bab7e45d10420d6339a73836d3f2d1b9b08a0e7a7b741587b4bba8",
+      "feature-matrix/operations-user-tools.toml": "aa4c7eaddb3f25a72668fe82b293577bb78738cf6892acec48687629523f4388",
       "feature-matrix/runtime-core.toml": "5d8859153c18969b55f1140a6119c8908fc17a3254c96e76ba016178ff50f2df",
       "feature-matrix/security-proofgate.toml": "661af2c5aadc782ff60f27bb157e152d47e0be6ea42814dbc0110072af685f55"
     }

@@ -558,6 +558,11 @@ GATES_FAST=(
   # that is not canonical, a pruned anchor, a child trie) are the whole point of
   # it, and each one is a case against a real loopback JSON-RPC server.
   "snapshot export unit tests:python3 tests/test_snapshot_rpc_export.py"
+  # The ceremony manifest's operator attestations: SS58 and SCALE decoding, the
+  # ed25519 derivation the node's own CLI produces, the threshold rule, and every
+  # way a signature can be wrong. The live four-validator half is the
+  # `testnet-ceremony-drill` gate in the --testnet set.
+  "ceremony attestation unit tests:python3 tests/test_ceremony_attestations.py"
   # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
   # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
   # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob
