@@ -533,7 +533,7 @@ def check_swarm_reactor_gate() -> None:
 
     summary = next(
         (line.strip() for line in output.splitlines() if "swarm_reactor_gate: PASS" in line),
-        "swarm/reaction compute gate passed",
+        "swarm/reactor compute gate passed",
     )
     ok(summary)
 
