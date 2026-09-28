@@ -3529,9 +3529,14 @@ fn local_claims_do_not_finalize_without_cross_domain_proof_set() {
 /// the historical lifecycle tests must present one instead of relying on local
 /// claims alone.
 fn submit_canonical_claim_proof_set(intent_id: H256) {
-    use x3_atomic_swap::{
-        CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
-    };
+    submit_canonical_proof_set(intent_id, x3_atomic_swap::CrossDomainOperation::Claim);
+}
+
+/// Build and submit a canonical cross-domain proof set covering every escrowed leg of
+/// `intent_id` with bundles for `operation` (a terminal `Finalized` needs Claim bundles, a
+/// terminal `Refunded` needs Refund bundles).
+fn submit_canonical_proof_set(intent_id: H256, operation: x3_atomic_swap::CrossDomainOperation) {
+    use x3_atomic_swap::{CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType};
 
     let runtime_intent_id = intent_id.to_fixed_bytes();
     let intent = SettlementIntents::<Test>::get(intent_id).expect("intent exists");
@@ -3563,7 +3568,7 @@ fn submit_canonical_claim_proof_set(intent_id: H256) {
             intent_hash: [0x11u8; 32],
             chain_id: chain_id.clone(),
             vm_type,
-            operation: CrossDomainOperation::Claim,
+            operation,
             tx_id: tx_id.clone(),
             block_number,
             block_hash: block_hash.clone(),
@@ -5127,5 +5132,318 @@ fn audit_finding_3_deadline_index_spills_instead_of_dropping_bursts() {
             buckets.iter().all(|(_, n)| *n <= 20),
             "no bucket may exceed its 20-entry storage bound"
         );
+    });
+}
+
+// ─── Native X3 legs hold real funds ─────────────────────────────────────────────────────────
+//
+// A leg on `ExternalChainId::X3Native` is locked on *this* chain, so this pallet is its custodian:
+// the lock must hold the depositor's balance, finalization must pay it to the counterparty and a
+// refund must return it. External legs settle on their own chains and are only tracked here.
+
+const NATIVE_AMOUNT: u128 = 10_000;
+const EXTERNAL_AMOUNT: u128 = 500;
+
+/// Maker offers `NATIVE_AMOUNT` of X3 for `EXTERNAL_AMOUNT` on Ethereum; both legs locked.
+fn native_for_ethereum_intent(secret: H256) -> H256 {
+    let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
+    assert_ok!(Pallet::<Test>::create_intent(
+        RuntimeOrigin::signed(ALICE),
+        BOB,
+        AssetSpec {
+            chain: ExternalChainId::X3Native,
+            token: TokenId::Native,
+            amount: NATIVE_AMOUNT,
+        },
+        AssetSpec {
+            chain: ExternalChainId::Ethereum,
+            token: TokenId::Native,
+            amount: EXTERNAL_AMOUNT,
+        },
+        secret_hash,
+        Some(3_600),
+    ));
+    let intent_id = SettlementIntents::<Test>::iter()
+        .find(|(_, intent)| intent.maker == ALICE && intent.secret_hash == secret_hash)
+        .map(|(id, _)| id)
+        .expect("intent exists");
+    assert_ok!(Pallet::<Test>::lock_escrow(
+        RuntimeOrigin::signed(ALICE),
+        intent_id,
+        0,
+        ExternalChainId::X3Native,
+        NATIVE_AMOUNT,
+        vec![],
+    ));
+    assert_ok!(Pallet::<Test>::lock_escrow(
+        RuntimeOrigin::signed(BOB),
+        intent_id,
+        1,
+        ExternalChainId::Ethereum,
+        EXTERNAL_AMOUNT,
+        vec![],
+    ));
+    intent_id
+}
+
+fn free(who: u64) -> u128 {
+    pallet_balances::Pallet::<Test>::free_balance(who)
+}
+
+fn reserved(who: u64) -> u128 {
+    pallet_balances::Pallet::<Test>::reserved_balance(who)
+}
+
+fn issuance() -> u128 {
+    pallet_balances::Pallet::<Test>::total_issuance()
+}
+
+/// Past the intent's 3,600 s timeout (the mock starts the clock at 1 s).
+fn past_timeout() {
+    pallet_timestamp::Pallet::<Test>::set_timestamp((1 + 3_600 + 1) * 1_000);
+}
+
+#[test]
+fn a_native_lock_holds_the_depositors_funds() {
+    new_test_ext().execute_with(|| {
+        let (free_before, reserved_before) = (free(ALICE), reserved(ALICE));
+        let _ = native_for_ethereum_intent(H256::from([7u8; 32]));
+        assert_eq!(
+            free(ALICE),
+            free_before - NATIVE_AMOUNT,
+            "the lock takes the funds"
+        );
+        assert_eq!(
+            reserved(ALICE),
+            reserved_before + NATIVE_AMOUNT,
+            "and holds them"
+        );
+    });
+}
+
+#[test]
+fn a_native_lock_beyond_the_depositors_balance_is_refused() {
+    new_test_ext().execute_with(|| {
+        let secret_hash = H256::from(sp_io::hashing::sha2_256(&[1u8; 32]));
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(ALICE),
+            BOB,
+            AssetSpec {
+                chain: ExternalChainId::X3Native,
+                token: TokenId::Native,
+                amount: 2_000_000
+            },
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: 1
+            },
+            secret_hash,
+            Some(3_600),
+        ));
+        let intent_id = SettlementIntents::<Test>::iter()
+            .next()
+            .map(|(id, _)| id)
+            .unwrap();
+        let before = (free(ALICE), reserved(ALICE));
+        assert!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            0,
+            ExternalChainId::X3Native,
+            2_000_000,
+            vec![],
+        )
+        .is_err());
+        assert_eq!(
+            (free(ALICE), reserved(ALICE)),
+            before,
+            "a refused lock moves nothing"
+        );
+        assert!(
+            crate::EscrowStates::<Test>::get(intent_id, 0).is_none(),
+            "and records nothing"
+        );
+    });
+}
+
+#[test]
+fn a_native_lock_must_lock_the_amount_the_intent_declares() {
+    new_test_ext().execute_with(|| {
+        let secret_hash = H256::from(sp_io::hashing::sha2_256(&[2u8; 32]));
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(ALICE),
+            BOB,
+            AssetSpec {
+                chain: ExternalChainId::X3Native,
+                token: TokenId::Native,
+                amount: NATIVE_AMOUNT
+            },
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: EXTERNAL_AMOUNT
+            },
+            secret_hash,
+            Some(3_600),
+        ));
+        let intent_id = SettlementIntents::<Test>::iter()
+            .next()
+            .map(|(id, _)| id)
+            .unwrap();
+        // One unit locked against a 10,000 declaration would settle 10,000 of volume on 1 of funds.
+        assert!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            0,
+            ExternalChainId::X3Native,
+            1,
+            vec![],
+        )
+        .is_err());
+        // Nor may the taker, whose side is on Ethereum, lock a native leg for this intent.
+        assert!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(BOB),
+            intent_id,
+            0,
+            ExternalChainId::X3Native,
+            NATIVE_AMOUNT,
+            vec![],
+        )
+        .is_err());
+    });
+}
+
+#[test]
+fn finalization_pays_the_native_leg_to_the_counterparty_and_conserves_issuance() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([9u8; 32]);
+        let issuance_before = issuance();
+        let (alice_before, bob_before) = (free(ALICE) + reserved(ALICE), free(BOB) + reserved(BOB));
+        let intent_id = native_for_ethereum_intent(secret);
+        submit_canonical_claim_proof_set(intent_id);
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(BOB),
+            intent_id,
+            secret
+        ));
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            secret
+        ));
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::Finalized
+        ));
+
+        assert_eq!(reserved(ALICE), 0, "nothing stays held after settlement");
+        assert_eq!(
+            free(BOB),
+            bob_before + NATIVE_AMOUNT,
+            "the counterparty receives the native leg"
+        );
+        // The maker loses the leg (and any protocol fee the configuration charges, which moves to
+        // the treasury rather than disappearing).
+        assert!(free(ALICE) <= alice_before - NATIVE_AMOUNT);
+        assert_eq!(
+            issuance(),
+            issuance_before,
+            "settlement creates and destroys nothing"
+        );
+    });
+}
+
+#[test]
+fn a_refund_returns_the_native_leg_to_its_depositor() {
+    new_test_ext().execute_with(|| {
+        let alice_before = free(ALICE);
+        let intent_id = native_for_ethereum_intent(H256::from([3u8; 32]));
+        past_timeout();
+        submit_canonical_proof_set(intent_id, x3_atomic_swap::CrossDomainOperation::Refund);
+        assert_ok!(Pallet::<Test>::refund_settlement(
+            RuntimeOrigin::signed(ALICE),
+            intent_id
+        ));
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::Refunded
+        ));
+        assert_eq!(reserved(ALICE), 0);
+        assert_eq!(
+            free(ALICE),
+            alice_before,
+            "the depositor gets exactly its funds back"
+        );
+    });
+}
+
+#[test]
+fn a_claim_after_a_refund_is_refused_and_moves_nothing() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([4u8; 32]);
+        let intent_id = native_for_ethereum_intent(secret);
+        past_timeout();
+        submit_canonical_proof_set(intent_id, x3_atomic_swap::CrossDomainOperation::Refund);
+        assert_ok!(Pallet::<Test>::refund_settlement(
+            RuntimeOrigin::signed(ALICE),
+            intent_id
+        ));
+        let balances = (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB));
+        assert!(
+            Pallet::<Test>::claim_settlement(RuntimeOrigin::signed(BOB), intent_id, secret)
+                .is_err()
+        );
+        assert_eq!(
+            (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB)),
+            balances
+        );
+    });
+}
+
+#[test]
+fn a_refund_after_finalization_is_refused_and_moves_nothing() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([5u8; 32]);
+        let intent_id = native_for_ethereum_intent(secret);
+        submit_canonical_claim_proof_set(intent_id);
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(BOB),
+            intent_id,
+            secret
+        ));
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(ALICE),
+            intent_id,
+            secret
+        ));
+        past_timeout();
+        let balances = (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB));
+        assert!(
+            Pallet::<Test>::refund_settlement(RuntimeOrigin::signed(ALICE), intent_id).is_err()
+        );
+        assert_eq!(
+            (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB)),
+            balances
+        );
+    });
+}
+
+#[test]
+fn a_refund_by_a_third_party_or_before_the_timeout_is_refused() {
+    new_test_ext().execute_with(|| {
+        let intent_id = native_for_ethereum_intent(H256::from([6u8; 32]));
+        let held = reserved(ALICE);
+        assert!(
+            Pallet::<Test>::refund_settlement(RuntimeOrigin::signed(ALICE), intent_id).is_err(),
+            "before the timeout"
+        );
+        past_timeout();
+        submit_canonical_proof_set(intent_id, x3_atomic_swap::CrossDomainOperation::Refund);
+        assert!(
+            Pallet::<Test>::refund_settlement(RuntimeOrigin::signed(99), intent_id).is_err(),
+            "by an account that is neither maker nor taker"
+        );
+        assert_eq!(reserved(ALICE), held, "the held funds stay held");
     });
 }

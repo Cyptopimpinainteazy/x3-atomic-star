@@ -162,6 +162,8 @@ pub mod pallet {
 
     type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
     type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
+    /// Native X3 legs still held by this pallet, as (depositor, amount).
+    type HeldNativeLegs<T> = Vec<(AccountIdOf<T>, BalanceOf<T>)>;
 
     // ============================================================================
     // Pallet Definition
@@ -933,6 +935,9 @@ pub mod pallet {
         /// Every bucket in the bounded expiry-index window is full, so the intent
         /// or lock could not be given a reachable automatic-expiry slot.
         ExpiryIndexFull,
+        /// A native X3 leg's held funds are not all still held, so it cannot be paid out or
+        /// returned in full. Nothing is moved.
+        NativeEscrowCustodyMismatch,
     }
 
     // ============================================================================
@@ -1369,6 +1374,34 @@ pub mod pallet {
                 !EscrowStates::<T>::contains_key(intent_id, leg_index),
                 Error::<T>::EscrowAlreadyExists
             );
+
+            // A leg on X3 itself is held here, not on another chain, so this pallet is its
+            // custodian. It used to record the leg and hold nothing: a native lock took no funds,
+            // finalization paid the counterparty nothing and a refund returned nothing, while the
+            // events reported the amounts as received. The depositor may lock only its own
+            // declared native side, exactly, once — and the funds are reserved here.
+            if chain == ExternalChainId::X3Native {
+                let declared = if who == intent.maker {
+                    &intent.asset_a
+                } else {
+                    &intent.asset_b
+                };
+                ensure!(
+                    declared.chain == ExternalChainId::X3Native
+                        && amount == declared.amount
+                        && amount > 0,
+                    Error::<T>::InvalidAssetSpec
+                );
+                ensure!(
+                    !(0..intent.legs_total).any(|leg| {
+                        EscrowStates::<T>::get(intent_id, leg).is_some_and(|e| {
+                            e.depositor == who && e.chain == ExternalChainId::X3Native
+                        })
+                    }),
+                    Error::<T>::EscrowAlreadyExists
+                );
+                <T as Config>::Currency::reserve(&who, amount.saturated_into())?;
+            }
 
             // Convert escrow data to bounded vec
             let bounded_escrow_address: BoundedVec<u8, ConstU32<64>> = escrow_data
@@ -3221,6 +3254,21 @@ pub mod pallet {
             intent: &SettlementIntent<AccountIdOf<T>>,
             _claimer: &AccountIdOf<T>,
         ) -> Result<(), DispatchError> {
+            // Pay each held native leg to the other party before any state moves.
+            for (depositor, amount) in Self::held_native_legs(intent_id, intent)? {
+                let counterparty = if depositor == intent.maker {
+                    intent.taker.clone()
+                } else {
+                    intent.maker.clone()
+                };
+                let unpaid = <T as Config>::Currency::repatriate_reserved(
+                    &depositor,
+                    &counterparty,
+                    amount,
+                    frame_support::traits::BalanceStatus::Free,
+                )?;
+                ensure!(unpaid.is_zero(), Error::<T>::NativeEscrowCustodyMismatch);
+            }
             // Update all escrow legs to Released
             for leg_idx in 0..intent.legs_total {
                 EscrowStates::<T>::mutate(intent_id, leg_idx, |maybe_escrow| {
@@ -3293,6 +3341,16 @@ pub mod pallet {
             intent: &SettlementIntent<AccountIdOf<T>>,
             reason: RefundReason,
         ) -> Result<(), DispatchError> {
+            // Return each held native leg to its depositor before any state moves. This runs from
+            // the timeout hooks too, which are not transactional: `held_native_legs` checks that
+            // every leg is still fully held before anything is released.
+            for (depositor, amount) in Self::held_native_legs(intent_id, intent)? {
+                let unreturned = <T as Config>::Currency::unreserve(&depositor, amount);
+                ensure!(
+                    unreturned.is_zero(),
+                    Error::<T>::NativeEscrowCustodyMismatch
+                );
+            }
             // Refund all escrow legs
             for leg_idx in 0..intent.legs_total {
                 EscrowStates::<T>::mutate(intent_id, leg_idx, |maybe_escrow| {
@@ -3337,6 +3395,41 @@ pub mod pallet {
         ///
         /// A claim must correspond to a concrete locked escrow leg. This blocks
         /// replayed claims that previously only incremented an aggregate counter.
+        /// The native X3 legs of `intent_id` this pallet still holds, as (depositor, amount).
+        ///
+        /// Fails, moving nothing, unless each depositor's reserved balance covers everything held
+        /// for it here: a leg is paid or returned in full or not at all.
+        fn held_native_legs(
+            intent_id: H256,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<HeldNativeLegs<T>, DispatchError> {
+            let mut held: HeldNativeLegs<T> = Vec::new();
+            for leg_idx in 0..intent.legs_total {
+                let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
+                    continue;
+                };
+                if escrow.chain != ExternalChainId::X3Native
+                    || escrow.state != EscrowLegState::Locked
+                {
+                    continue;
+                }
+                held.push((escrow.depositor, escrow.amount.saturated_into()));
+            }
+            for (depositor, _) in &held {
+                let owed = held
+                    .iter()
+                    .filter(|(d, _)| d == depositor)
+                    .fold(BalanceOf::<T>::zero(), |sum, (_, amount)| {
+                        sum.saturating_add(*amount)
+                    });
+                ensure!(
+                    <T as Config>::Currency::reserved_balance(depositor) >= owed,
+                    Error::<T>::NativeEscrowCustodyMismatch
+                );
+            }
+            Ok(held)
+        }
+
         fn mark_claimed_leg(
             intent_id: H256,
             intent: &SettlementIntent<AccountIdOf<T>>,

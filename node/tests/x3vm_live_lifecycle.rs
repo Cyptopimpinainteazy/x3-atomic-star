@@ -48,6 +48,9 @@ fn spawn_dev_node() -> NodeGuard {
             "--port",
             "30379",
             "--no-telemetry",
+            // No metrics endpoint: nothing here reads it, and every node binding the default 9615 made
+            // concurrent runs on one host fail with "Address already in use".
+            "--no-prometheus",
         ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -206,6 +209,38 @@ fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_en
     let raw = value.as_str().expect("intent state storage hex");
     let bytes = hex::decode(raw.trim_start_matches("0x")).expect("decode intent state hex");
     pallet_x3_settlement_engine::IntentState::decode(&mut &bytes[..]).expect("decode IntentState")
+}
+
+/// An account's (free, reserved) balance in finalized state at `block_hash`.
+///
+/// `System::Account` is a `Blake2_128Concat` map of `AccountInfo`, whose `data` is the balances
+/// pallet's `AccountData`: reading it back is how a live test sees that a native escrow leg is
+/// held as real funds, and returned, rather than only recorded.
+fn balances_at(account: &AccountId, block_hash: &str) -> (u128, u128) {
+    let mut key = frame_support::storage::storage_prefix(b"System", b"Account").to_vec();
+    let encoded = account.encode();
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&encoded);
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let value = rpc
+        .call(
+            "state_getStorage",
+            vec![
+                Value::String(format!("0x{}", hex::encode(key))),
+                Value::String(block_hash.to_string()),
+            ],
+        )
+        .expect("state_getStorage")
+        .result
+        .expect("account storage result");
+    let raw = value.as_str().expect("account storage hex");
+    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("decode account hex");
+    let info = frame_system::AccountInfo::<
+        x3_chain_runtime::Nonce,
+        pallet_balances::AccountData<x3_chain_runtime::Balance>,
+    >::decode(&mut &bytes[..])
+    .expect("decode AccountInfo");
+    (info.data.free, info.data.reserved)
 }
 
 /// The storage key of a comit's X3 execution receipt.
@@ -533,7 +568,11 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
 
     let primary = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("primary signer");
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+    // The taker locks its own side. Both legs are native X3, which the settlement engine now
+    // holds as real funds from their depositor, so the maker may no longer lock the taker's leg:
+    // a maker funding both sides would have both paid to the taker at finalization.
+    let bob_uri = dev_uri("Bob");
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &bob_uri)
         .expect("second-leg signer");
 
     let prepared = primary
@@ -590,7 +629,10 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         )
         .expect("sign second escrow leg");
     assert!(!submit(&leg1).is_empty());
-    wait_finalized(&leg1, Duration::from_secs(180));
+    let (_, leg1_block) = wait_finalized(&leg1, Duration::from_secs(180));
+    // Inclusion is not success: the claim below needs the intent fully funded, and a refused
+    // lock would otherwise surface only there, as the claim's `InvalidIntentState`.
+    assert_dispatch_succeeded(&second_leg, &leg1_block, &leg1);
 
     // Wrong secrets are now rejected before signing/broadcast: the live claim
     // boundary accepts only a permit issued by the secret-release firewall.
@@ -739,7 +781,11 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     let alice_uri = dev_uri("Alice");
     let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("timeout signer");
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+    // The taker locks its own side. Both legs are native X3, which the settlement engine now
+    // holds as real funds from their depositor, so the maker may no longer lock the taker's leg:
+    // a maker funding both sides would have both paid to the taker at finalization.
+    let bob_uri = dev_uri("Bob");
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &bob_uri)
         .expect("timeout second-leg signer");
 
     let prepared = signer
@@ -954,6 +1000,9 @@ fn spawn_dev_node_at_base_path(base_path: &std::path::Path) -> NodeGuard {
             "--port",
             "30379",
             "--no-telemetry",
+            // No metrics endpoint: nothing here reads it, and every node binding the default 9615 made
+            // concurrent runs on one host fail with "Address already in use".
+            "--no-prometheus",
         ])
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -1253,4 +1302,209 @@ fn a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt() {
         .expect("a program inside the budget still gets its receipt");
     assert!(receipt.success);
     assert_eq!(receipt.return_data, 42i64.to_le_bytes().to_vec());
+}
+
+/// A native X3 HTLC locked before a node restart is still held after it, and settles from the
+/// restarted node: both depositors' funds are reserved by the locks, stay reserved across the
+/// restart (the database, not memory, holds them), and come back in full from a refund the
+/// restarted chain finalizes.
+#[test]
+#[ignore = "requires building and launching the real x3-chain-node binary"]
+fn a_locked_native_htlc_survives_a_node_restart_and_refunds_in_full() {
+    let base_path = TempBasePath::new("htlc-restart");
+    let ledger_path = proof_ledger_path("htlc-restart");
+    let chain_id = String::from("x3-local");
+    let local_id = 7u64;
+    let preimage = [0x71u8; 32];
+    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
+    let alice_uri = dev_uri("Alice");
+    let bob_uri = dev_uri("Bob");
+    let (alice, bob) = (dev_account("Alice"), dev_account("Bob"));
+    const LEG: u128 = 1_000_000;
+
+    // ── run 1: create, lock both native legs, observe the funds held, stop ───
+    let (runtime_intent_id, intent, lock, held_alice, held_bob, baseline) = {
+        let _node = spawn_dev_node_at_base_path(&base_path.0);
+        wait_rpc(Duration::from_secs(180));
+        let maker = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+            .expect("maker signer");
+        let taker = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &bob_uri)
+            .expect("taker signer");
+
+        let prepared = maker
+            .prepare_create_intent(
+                bob.clone(),
+                X3RuntimeSigner::x3_native_asset(LEG),
+                X3RuntimeSigner::x3_native_asset(LEG),
+                hashlock,
+                Some(30),
+            )
+            .expect("prepare intent");
+        assert!(!submit(&prepared.signed_extrinsic).is_empty());
+        let (_, created_head) =
+            wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+        assert_dispatch_succeeded(&maker, &created_head, &prepared.signed_extrinsic);
+        let baseline = (
+            balances_at(&alice, &created_head).1,
+            balances_at(&bob, &created_head).1,
+        );
+        let created_hash = H256::from_slice(
+            &hex::decode(created_head.trim_start_matches("0x")).expect("decode head"),
+        );
+        let runtime_intent_id = maker
+            .resolve_intent_id(&prepared, created_hash)
+            .expect("resolve intent id");
+        maker.bind_intent(local_id, runtime_intent_id).unwrap();
+
+        let transport = NativeX3NodeTransport::new_with_proof_ledger(
+            X3NodeTransportConfig {
+                chain_id: chain_id.clone(),
+                rpc_url: RPC_URL.into(),
+                finality_poll_attempts: 480,
+                finality_poll_delay_ms: 500,
+                expected_block_time_ms: 6_000,
+            },
+            maker,
+            ledger_path.clone(),
+        )
+        .expect("persistent native transport");
+        let adapter = LiveX3VmAdapter::new(
+            chain_id.clone(),
+            b"x3-native-restart-escrow".to_vec(),
+            transport,
+        );
+        let intent = atomic_intent(local_id, preimage);
+        let lock = adapter.lock(&intent).expect("maker's native lock");
+
+        let leg1 = taker
+            .sign_lock_escrow_leg(
+                runtime_intent_id,
+                1,
+                pallet_x3_settlement_engine::ExternalChainId::X3Native,
+                LEG,
+                b"x3-native-restart-escrow-leg1".to_vec(),
+            )
+            .expect("sign taker's leg");
+        assert!(!submit(&leg1).is_empty());
+        let (_, locked_head) = wait_finalized(&leg1, Duration::from_secs(180));
+        assert_dispatch_succeeded(&taker, &locked_head, &leg1);
+
+        let held_alice = balances_at(&alice, &locked_head).1;
+        let held_bob = balances_at(&bob, &locked_head).1;
+        assert_eq!(
+            held_alice,
+            baseline.0 + LEG,
+            "the maker's native leg is held"
+        );
+        assert_eq!(held_bob, baseline.1 + LEG, "the taker's native leg is held");
+        (
+            runtime_intent_id,
+            intent,
+            lock,
+            held_alice,
+            held_bob,
+            baseline,
+        )
+        // `_node` drops here: the node process is killed.
+    };
+
+    // ── run 2: same database, new process ─────────────────────────────────────
+    let _restarted = spawn_dev_node_at_base_path(&base_path.0);
+    wait_rpc(Duration::from_secs(180));
+    let restarted_head = finalized_head();
+    assert!(
+        !matches!(
+            intent_state_at(runtime_intent_id, &restarted_head),
+            pallet_x3_settlement_engine::IntentState::Refunded
+                | pallet_x3_settlement_engine::IntentState::Finalized
+        ),
+        "the intent is still open after the restart"
+    );
+    assert_eq!(
+        balances_at(&alice, &restarted_head).1,
+        held_alice,
+        "still held after restart"
+    );
+    assert_eq!(
+        balances_at(&bob, &restarted_head).1,
+        held_bob,
+        "still held after restart"
+    );
+
+    // Refund from the restarted node, with the canonical Refund proof set the engine requires.
+    let maker = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+        .expect("maker signer after restart");
+    maker.bind_intent(local_id, runtime_intent_id).unwrap();
+    // The executor side restarts too: its record of the lock's finalized inclusion is the
+    // persistent proof ledger, not memory.
+    let transport = NativeX3NodeTransport::new_with_proof_ledger(
+        X3NodeTransportConfig {
+            chain_id: chain_id.clone(),
+            rpc_url: RPC_URL.into(),
+            finality_poll_attempts: 480,
+            finality_poll_delay_ms: 500,
+            expected_block_time_ms: 6_000,
+        },
+        maker,
+        ledger_path.clone(),
+    )
+    .expect("persistent native transport after restart");
+    let adapter = LiveX3VmAdapter::new(
+        chain_id.clone(),
+        b"x3-native-restart-escrow".to_vec(),
+        transport,
+    );
+    let mut refund_finality = adapter
+        .finality_status(&lock.tx_id)
+        .expect("the lock is still finalized on the restarted node");
+    refund_finality.chain_id = String::from("x3-native");
+    let mut proof_set = CrossDomainProofSet::new(&intent, runtime_intent_id.to_fixed_bytes());
+    let refund_bundle = CrossDomainProofBundle::new(
+        &intent,
+        runtime_intent_id.to_fixed_bytes(),
+        String::from("x3-native"),
+        VmType::X3Vm,
+        CrossDomainOperation::Refund,
+        lock.tx_id.clone(),
+        lock.block_number,
+        lock.block_hash.clone(),
+        lock.raw_proof.clone(),
+        refund_finality,
+    )
+    .expect("canonical refund bundle");
+    proof_set
+        .push_verified(&intent, refund_bundle)
+        .expect("verified refund bundle");
+    let taker = X3RuntimeSigner::from_uri(chain_id, RPC_URL.into(), &bob_uri)
+        .expect("taker signer after restart");
+    let signed_proof_set = taker
+        .prepare_cross_domain_proof_set(runtime_intent_id, proof_set)
+        .expect("sign refund proof set");
+    assert!(!submit(&signed_proof_set).is_empty());
+    let (_, proof_head) = wait_finalized(&signed_proof_set, Duration::from_secs(180));
+    assert_dispatch_succeeded(&taker, &proof_head, &signed_proof_set);
+
+    let refund_head = match wait_for_refund_state(runtime_intent_id, Duration::from_secs(180)) {
+        Some(head) => head,
+        None => {
+            adapter
+                .refund(local_id)
+                .expect("explicit refund from the restarted node");
+            wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
+        }
+    };
+    assert!(matches!(
+        intent_state_at(runtime_intent_id, &refund_head),
+        pallet_x3_settlement_engine::IntentState::Refunded
+    ));
+    assert_eq!(
+        balances_at(&alice, &refund_head).1,
+        baseline.0,
+        "the maker's native leg is returned in full"
+    );
+    assert_eq!(
+        balances_at(&bob, &refund_head).1,
+        baseline.1,
+        "the taker's native leg is returned in full"
+    );
 }

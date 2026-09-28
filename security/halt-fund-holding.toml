@@ -212,6 +212,15 @@ while_halted = false
 why = "Depositing a settlement bond reserves it; `trigger_refund` returns it to the depositor, and that call is not halt-exempt."
 
 [[holding]]
+call = "pallet_x3_settlement_engine/lock_escrow"
+pallet_variant = "X3SettlementEngine"
+disposition = "recoverable"
+recoverable_by = "pallet_x3_settlement_engine/refund_settlement"
+recoverable_variant = "X3SettlementEngine"
+while_halted = false
+why = "A native X3 escrow leg (`ExternalChainId::X3Native`) reserves the depositor's funds; `refund_settlement` unreserves them (`process_refund`) and is not halt-exempt, and finalization repatriates them to the counterparty. The pallet's own timeout hooks also run `process_refund` without an extrinsic — after the intent timeout with a Refund proof set, and unconditionally past `SettlementTimeoutBlocks` — so a halt delays the return of a held leg but does not trap it."
+
+[[holding]]
 call = "pallet_x3_slash/post_bond"
 pallet_variant = "X3Slash"
 disposition = "recoverable"
