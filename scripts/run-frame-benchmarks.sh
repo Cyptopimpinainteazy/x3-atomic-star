@@ -61,6 +61,7 @@ declare -A PALLET_PATHS=(
   ["pallet-x3-reconciliation"]="pallets/x3-reconciliation/src/weights.rs"
   ["pallet-x3-wrapped"]="pallets/x3-wrapped/src/weights.rs"
   ["pallet-x3-sentinel"]="pallets/x3-sentinel/src/weights.rs"
+  ["pallet-x3-asset-registry"]="pallets/x3-asset-registry/src/weights.rs"
   ["pallet-x3-atomic-kernel"]="pallets/x3-atomic-kernel/src/weights.rs"
   ["pallet-x3-settlement-engine"]="pallets/x3-settlement-engine/src/weights.rs"
   ["pallet-cross-chain-validator"]="pallets/cross-chain-validator/src/weights.rs"

@@ -3583,10 +3583,15 @@ mod benches {
     // behind `runtime-benchmarks` features with nothing behind them.
     #[allow(unused_imports)]
     use pallet_x3_sentinel::Pallet as X3Sentinel;
+    // Added 2026-09-28: `pallet-x3-asset-registry` charged literals on all seven calls — a registration
+    // at 25,000 picoseconds — behind a `runtime-benchmarks` feature that did not exist.
+    #[allow(unused_imports)]
+    use pallet_x3_asset_registry::Pallet as X3AssetRegistry;
     #[allow(unused_imports)]
     use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]
         [pallet_x3_domain_registry, X3DomainRegistry]

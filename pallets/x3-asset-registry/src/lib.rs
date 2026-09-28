@@ -477,6 +477,9 @@ pub mod pallet {
     pub type RouteKeyAlias = RouteKey;
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;
+
 #[cfg(test)]
 mod tests {
     use super::pallet::*;
@@ -568,7 +571,7 @@ mod tests {
         type MaxAssets = MaxAssets;
     }
 
-    fn new_test_ext() -> TestExternalities {
+    pub fn new_test_ext() -> TestExternalities {
         system::GenesisConfig::<Test>::default()
             .build_storage()
             .unwrap()
