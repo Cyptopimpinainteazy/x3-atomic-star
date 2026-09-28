@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `ade64a57d`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `e39297afb`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -600,3 +600,17 @@ alters the runtime, so the record and the code land together.
   because a comment changed a runtime-graph file — two builds agreed the bytes were identical, and the
   attestation that followed the #518 merge is the one this file now names.
 
+* `e39297afb` — **the unused `ed25519-dalek` dependency goes, and the record follows.** Every red run
+  on `master` was a Dependabot Updates job, and the `cargo in /.` one could not resolve
+  `ed25519-dalek`: `crates/x3-common` requested `ed25519-dalek/std` (a feature 3.0.0 dropped) for a
+  dependency no source file in that crate uses (`rg 'dalek' crates/x3-common` matched only the
+  manifest), while `agave-precompiles 3.0.14` pins the vulnerable 1.0.1 copy to `^1.0`. Removing the
+  unused dependency moves the bytes: compact 8899373
+  (`0x1528ad65a4b2fb656a928aa728cc225d6f23e97e69a704b414b0e85361c89fb4`) — was 8,899,733 — and
+  compressed 1530897
+  (`0xdc247b530ea5a31613fd255b31b6e5ac19bca630a89899682d2963e8e0173a67`) — was 1,530,460, from two
+  builds that agreed. A *second* attestation run of the committed tree reproduced the same pair
+  exactly, and the same change also moves `lru` from 0.12 to 0.16.3 in `crates/gpu-swarm` and
+  `crates/x3-gulfstream` (GHSA-rhfx-m35p-ff5j) and records the two unfixable alerts in
+  `.github/dependabot.yml`; those three files are outside the runtime's graph, which is why only this
+  one moved the hashes. Detail: `.ai/reports/dependabot-jobs-triage-20260928.md`.
