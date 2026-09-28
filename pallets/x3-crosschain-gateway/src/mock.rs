@@ -73,6 +73,7 @@ impl pallet_x3_crosschain_gateway::Config for Test {
     type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
     type DailyLimitWindowBlocks = DailyWindow;
     type EvmHeaderAnchor = MockEvmAnchor;
+    type WeightInfo = ();
 }
 
 // ── The attested-header anchor ────────────────────────────────────────────

@@ -2785,6 +2785,7 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     /// pallet has recorded a receipts root for, and its confirmation depth is
     /// measured from the attested head rather than from the proof.
     type EvmHeaderAnchor = pallet_cross_chain_validator::Pallet<Runtime>;
+    type WeightInfo = pallet_x3_crosschain_gateway::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Swarm Pallet Configuration =====
@@ -3613,6 +3614,8 @@ mod benches {
     // reads and writes — and neither was registered here. `custody`'s runtime feature was
     // already on; `partner`'s was not.
     #[allow(unused_imports)]
+    use pallet_x3_crosschain_gateway::Pallet as X3CrosschainGateway;
+    #[allow(unused_imports)]
     use pallet_x3_custody::Pallet as X3Custody;
     #[allow(unused_imports)]
     use pallet_x3_partner::Pallet as X3Partner;
@@ -3627,6 +3630,7 @@ mod benches {
         [pallet_x3_partner, X3Partner]
         [pallet_x3_custody, X3Custody]
         [pallet_x3_wallet_pallet, X3WalletPallet]
+        [pallet_x3_crosschain_gateway, X3CrosschainGateway]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]
