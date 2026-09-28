@@ -10,7 +10,7 @@
 //! blocks don't exceed weight limits and to calculate transaction fees accurately.
 
 use super::*;
-use frame_benchmarking::benchmarks;
+use frame_benchmarking::{benchmarks, BenchmarkError};
 use frame_support::traits::{Currency, ReservableCurrency};
 use frame_system::RawOrigin;
 use sp_core::H256;
@@ -46,12 +46,18 @@ fn setup_intent<T: Config>() -> (T::AccountId, T::AccountId, H256, AssetSpec, As
 }
 
 /// A canonical Refund proof set covering every escrowed leg of `intent_id`, one bundle per domain.
-fn refund_proof_set<T: Config>(intent_id: H256) -> x3_atomic_swap::CrossDomainProofSet {
+///
+/// Returns a `Result` rather than panicking: the production panic/unwrap ratchet counts a
+/// `#[cfg(feature = "runtime-benchmarks")]` module, and two `expect` calls here grew it 440 → 442 and
+/// reddened `make mainnet-check` on the merge that brought them in.
+fn refund_proof_set<T: Config>(
+    intent_id: H256,
+) -> Result<x3_atomic_swap::CrossDomainProofSet, BenchmarkError> {
     use x3_atomic_swap::{
         CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
     };
     let runtime_intent_id = intent_id.to_fixed_bytes();
-    let intent = SettlementIntents::<T>::get(intent_id).expect("intent exists");
+    let intent = SettlementIntents::<T>::get(intent_id).ok_or(BenchmarkError::Weightless)?;
     let mut bundles: Vec<CrossDomainProofBundle> = Vec::new();
     for leg_idx in 0..intent.legs_total {
         let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
@@ -94,15 +100,17 @@ fn refund_proof_set<T: Config>(intent_id: H256) -> x3_atomic_swap::CrossDomainPr
             },
             proof_hash: [0u8; 32],
         };
-        bundle.proof_hash = bundle.compute_hash().expect("canonical bundle hash");
+        bundle.proof_hash = bundle
+            .compute_hash()
+            .map_err(|_| BenchmarkError::Weightless)?;
         bundles.push(bundle);
     }
-    CrossDomainProofSet {
+    Ok(CrossDomainProofSet {
         intent_id: 1,
         runtime_intent_id,
         intent_hash: [0x11u8; 32],
         bundles,
-    }
+    })
 }
 
 benchmarks! {
@@ -242,7 +250,7 @@ benchmarks! {
         Pallet::<T>::submit_cross_domain_proof_set(
             RawOrigin::Signed(maker.clone()).into(),
             intent_id,
-            refund_proof_set::<T>(intent_id),
+            refund_proof_set::<T>(intent_id)?,
         )?;
 
         let origin = RawOrigin::Signed(maker.clone());
