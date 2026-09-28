@@ -6829,7 +6829,7 @@ dependencies = [
  "hyper 1.11.1",
  "hyper-util",
  "libp2p 0.53.2",
- "lru 0.12.5",
+ "lru 0.16.4",
  "once_cell",
  "parking_lot 0.12.5",
  "pbkdf2 0.11.0",
@@ -26224,7 +26224,6 @@ dependencies = [
 name = "x3-common"
 version = "0.1.0"
 dependencies = [
- "ed25519-dalek 2.2.0",
  "hex",
  "secp256k1 0.28.2",
  "serde",
@@ -26734,7 +26733,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures 0.3.34",
- "lru 0.12.5",
+ "lru 0.16.4",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",

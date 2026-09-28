@@ -16,6 +16,18 @@ updates:
     labels:
       - dependencies
       - security
+    ignore:
+      # Without this the whole "cargo in /." security job fails with
+      # `dependency_file_not_resolvable` instead of opening (or skipping) a
+      # pull request. The vulnerable copy is ed25519-dalek 1.0.1, required by
+      # agave-precompiles 3.0.14 (Solana, through crates/svm-integration), which
+      # pins `^1.0`. Dependabot targets the newest release (3.0.0), which agave
+      # cannot select and which also dropped the `std` feature that
+      # crates/x3-common used to request. That copy is not compiled into the
+      # node -- `cargo tree -i ed25519-dalek@1.0.1` resolves nothing. The whole
+      # reasoning, with the alert ids, is in
+      # .ai/reports/dependabot-jobs-triage-20260928.md.
+      - dependency-name: "ed25519-dalek"
 
   - package-ecosystem: npm
     directory: "/"
@@ -33,6 +45,32 @@ updates:
     labels:
       - dependencies
       - security
+
+  # `elliptic` is the only dependency in this package that the npm security job
+  # cannot move: its newest published release (6.6.1) is also the last affected
+  # version, so there is no fixed version for Dependabot to select and the job
+  # ends in `security_update_not_found`. It arrives through the legacy
+  # `@polkadot/util-crypto` 6.x copies that @polkadot/api's type-definition
+  # packages still carry, and through @ethersproject/signing-key. Recorded in
+  # .ai/reports/dependabot-jobs-triage-20260928.md.
+  - package-ecosystem: npm
+    directory: "/packages/polkawallet-bridge-adapter"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      npm-nonmajor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - security
+    ignore:
+      - dependency-name: "elliptic"
 
   - package-ecosystem: pip
     directory: "/"

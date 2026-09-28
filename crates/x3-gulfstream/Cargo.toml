@@ -17,7 +17,9 @@ parking_lot = "0.12"
 bytes = "1.5"
 uuid = { version = "1.6", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-lru = "0.12"
+# GHSA-rhfx-m35p-ff5j (Stacked-Borrows violation in IterMut) affects
+# `lru <0.16.3`; 0.16.3 is the first patched release.
+lru = "0.16.3"
 futures = "0.3"
 async-trait = "0.1"
 
