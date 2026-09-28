@@ -2661,6 +2661,7 @@ parameter_types! {
 impl pallet_x3_account_registry::Config for Runtime {
     type AtlasId = AtlasId;
     type MaxNameLength = MaxAccountNameLength;
+    type WeightInfo = pallet_x3_account_registry::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3SettlementEngine Configuration =====
@@ -3591,10 +3592,17 @@ mod benches {
     // at 25,000 picoseconds — behind a `runtime-benchmarks` feature that did not exist.
     #[allow(unused_imports)]
     use pallet_x3_asset_registry::Pallet as X3AssetRegistry;
+    // Added 2026-09-28: `pallet-x3-account-registry` charged the same literal (10,000) on all
+    // three calls and had no `benchmarking.rs` at all, while this runtime already enabled
+    // `pallet-x3-account-registry/runtime-benchmarks` — the feature named a capability the
+    // pallet could not provide, and nothing could measure it because it was not registered here.
+    #[allow(unused_imports)]
+    use pallet_x3_account_registry::Pallet as X3AccountRegistry;
     #[allow(unused_imports)]
     use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_account_registry, X3AccountRegistry]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]
