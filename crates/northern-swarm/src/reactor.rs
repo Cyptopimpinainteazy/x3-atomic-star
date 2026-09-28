@@ -46,6 +46,16 @@ impl Accelerator {
     pub fn is_canonical(self) -> bool {
         matches!(self, Accelerator::Cpu)
     }
+
+    /// The accelerator's name, as serialized (`cpu`, `gpu`, `npu`, `fpga`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Accelerator::Cpu => "cpu",
+            Accelerator::Gpu => "gpu",
+            Accelerator::Npu => "npu",
+            Accelerator::Fpga => "fpga",
+        }
+    }
 }
 
 /// What the caller optimises for. A policy knob, not a heuristic.
@@ -225,6 +235,16 @@ pub struct ScheduleDecision {
 }
 
 impl ScheduleDecision {
+    /// The chosen backend, as a benchmark job's placement. A job submitted with
+    /// it (`x3_bench::BenchmarkJob::submit_placed`) publishes only under a run
+    /// attestation from this backend, so the published report names where it ran.
+    pub fn placement(&self) -> x3_bench::Placement {
+        x3_bench::Placement::new(
+            self.chosen_backend_id.clone(),
+            self.chosen_accelerator.as_str(),
+        )
+    }
+
     /// The disqualifications, for a caller that wants only the failures.
     pub fn disqualifications(&self) -> impl Iterator<Item = (&str, &Disqualification)> {
         self.candidates
@@ -644,5 +664,88 @@ mod tests {
         let requirements = TaskRequirements::new(TaskKind::Other(7));
         let decision = schedule(&backends, &requirements).unwrap();
         assert_eq!(decision.chosen_backend_id, "cpu-0");
+    }
+
+    /// `as_str` is the serialized name, so a placement and a decision read back
+    /// from JSON name the accelerator the same way.
+    #[test]
+    fn an_accelerators_name_is_its_serialized_form() {
+        for accelerator in [
+            Accelerator::Cpu,
+            Accelerator::Gpu,
+            Accelerator::Npu,
+            Accelerator::Fpga,
+        ] {
+            assert_eq!(
+                serde_json::to_value(accelerator).unwrap(),
+                serde_json::Value::String(accelerator.as_str().to_string())
+            );
+        }
+    }
+
+    /// The Reactor end to end: the scheduler places a benchmark job, and the
+    /// benchmark registry publishes its report only under an attestation from the
+    /// backend the scheduler chose, so the published report says where it ran.
+    #[test]
+    fn a_scheduled_benchmark_publishes_only_from_the_backend_it_was_placed_on() {
+        use x3_bench::{
+            report_digest, BenchmarkJob, JobRequest, Placement, PublishRefusal, Report,
+            ReportRegistry, RunAttestation, SampleMetrics,
+        };
+
+        let backends = [BackendDescriptor::cpu("cpu-0", 90), gpu("gpu-0", 99, 5, 1)];
+        let mut requirements = TaskRequirements::new(TaskKind::Compute);
+        requirements.preference = Preference::ThroughputFirst;
+        let decision = schedule(&backends, &requirements).unwrap();
+        assert_eq!(decision.placement(), Placement::new("gpu-0", "gpu"));
+
+        let job = BenchmarkJob::submit_placed(
+            JobRequest {
+                suite: "optimizer-core".to_string(),
+                git_revision: "abc123".to_string(),
+                max_opt_iters: 3,
+                sample_names: vec!["one".to_string()],
+            },
+            decision.placement(),
+        )
+        .unwrap();
+        let report = || {
+            Report::new(vec![SampleMetrics {
+                name: "one".to_string(),
+                instr: 10,
+                gas: 100,
+                bytes: 5,
+            }])
+        };
+        let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let attest = |on: &str, accelerator: &str| {
+            RunAttestation::signed_with_placement(
+                &key,
+                job.id(),
+                "abc123",
+                "x3star1",
+                [0x11; 32],
+                report_digest(&report()),
+                Some(Placement::new(on, accelerator)),
+            )
+        };
+        let mut registry = ReportRegistry::trusting(vec![key.verifying_key().to_bytes()]);
+
+        // The CPU lost the placement, so its run is not the job's run.
+        assert!(matches!(
+            registry.publish_attested(&job, report(), &attest("cpu-0", "cpu")),
+            Err(PublishRefusal::PlacementMismatch { .. })
+        ));
+        registry
+            .publish_attested(&job, report(), &attest("gpu-0", "gpu"))
+            .expect("the chosen backend's run publishes");
+        let published = registry.get(&job.id()).unwrap();
+        assert_eq!(
+            published
+                .attestation
+                .as_ref()
+                .and_then(|attestation| attestation.placement.clone()),
+            Some(decision.placement())
+        );
     }
 }

@@ -30,7 +30,14 @@ pallet-northern-swarm = { path = "../../pallets/northern-swarm" }
 
 # Vendor-neutral accelerator layer. CPU remains the deterministic reference.
 x3-accel = { path = "../x3-accel" }
+# The Reactor's benchmark half: a scheduling decision becomes a benchmark job's
+# placement (`ScheduleDecision::placement`), which the run attestation must match.
+x3-bench = { path = "../x3-bench" }
 
 [features]
 default = []
 wgpu = ["x3-accel/wgpu"]
+
+[dev-dependencies]
+# The end-to-end placement test signs a run attestation the way an attester would.
+ed25519-dalek = { workspace = true }

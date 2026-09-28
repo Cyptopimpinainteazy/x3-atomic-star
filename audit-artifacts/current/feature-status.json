@@ -4868,7 +4868,7 @@
       "state_rule": "implemented >= 50",
       "subsystem": "swarm_compute",
       "tested": 78,
-      "tests": "10 named tests in FEATURE_REGISTRY"
+      "tests": "13 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -4944,10 +4944,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5002e54d4e2bed21c6a0096a27f24987afe72a0713bcf22155631131dbaa219f",
+    "source_digest": "e17d2498e677208f7729b03dbd8071b543be8c6f1b74af8e33883936e59c287b",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
-      "FEATURE_REGISTRY.toml": "7a27ab993f64a1e258007ce1614f7764e5e72f3f28e6a887866254abc3e31101",
+      "FEATURE_REGISTRY.toml": "b3181de17e97134964df7e156b1b3f9efc63e20136a6822df057aaae9ee3bf0d",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5341,7 +5341,7 @@
         "**CLOSED 2026-09-27 \u2014 a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` is a real job path with a publish step and a once-only guarantee, run by the `test x3-bench` gate.",
         "**CLOSED 2026-09-27 \u2014 publication carries a proof about the run, not just about the job.** `RunAttestation` commits to the job id, the revision, the host, a configuration digest and the report's content digest, signed with ed25519; `ReportRegistry::trusting(attesters)` makes an attestation *mandatory* (an unattested `publish` is refused with `Unattested`), and `publish_attested` refuses a claim about another job (`AttestedJobMismatch`), another revision (`RevisionMismatch`), another measurement (`SamplesDigestMismatch`), an untrusted key (`UntrustedSigner`) or a tampered field (`BadSignature`). The local registry still publishes and now says `attestation: None` rather than looking attested. Seven tests drive it; break-it-first: deleting the samples-digest check reddens `a_report_that_is_not_what_the_attester_measured_is_refused`, and the file was restored byte-identically.",
         "**CLOSED 2026-09-27 \u2014 the measurement is asserted, not just the compilation.** `the_optimizer_moves_the_measured_instruction_count_down` runs the pipeline on a redundant fixture both ways and requires the optimized instruction count to be strictly lower, every reported figure to be non-zero, and each result's byte count to equal the bytes it actually emitted \u2014 the old tests only asserted that compilation succeeded,",
-        "The two halves of the Reactor are still unjoined: the placement scheduler lives in `crates/northern-swarm/src/reactor.rs` (where the backends are) and this crate owns benchmark submission and publication, so a published report cannot yet say which backend ran the job."
+        "**CLOSED 2026-09-28 \u2014 a published report says which backend ran it.** The scheduler's decision becomes the job's placement (`ScheduleDecision::placement()` in `crates/northern-swarm/src/reactor.rs`, submitted with `BenchmarkJob::submit_placed`). `RunAttestation` now signs the backend it ran on (`placement`, domain bumped to `x3-bench-attestation-v2`), and `publish_attested` refuses `PlacementMismatch` when a placed job's attestation names another backend or none. The stored attestation therefore names the backend. Tests: `a_placed_job_publishes_only_under_an_attestation_from_its_backend`, `the_attested_backend_is_covered_by_the_signature` and `a_placement_with_no_backend_is_refused` (gate `test x3-bench`, 25 passed), plus `a_scheduled_benchmark_publishes_only_from_the_backend_it_was_placed_on`, which drives the real scheduler into a placed job (gate `test northern-swarm`). Break-it-first: disabling the placement check turns exactly the two placement tests red; leaving the backend out of the signed digest turns the signature test red; restored byte-identically. The score is not re-derived here (this row has no formula breakdown to update)."
       ],
       "crate_or_service": "crates/x3-bench",
       "feature": "x3_reactor",
@@ -5358,7 +5358,10 @@
         "an_attestation_for_another_revision_or_job_is_refused",
         "a_signature_from_an_untrusted_key_is_refused",
         "a_tampered_attestation_does_not_verify",
-        "the_local_registry_publishes_and_reports_that_it_is_unattested"
+        "the_local_registry_publishes_and_reports_that_it_is_unattested",
+        "a_placed_job_publishes_only_under_an_attestation_from_its_backend",
+        "the_attested_backend_is_covered_by_the_signature",
+        "a_placement_with_no_backend_is_refused"
       ]
     },
     {

@@ -29,7 +29,9 @@ pub const JOB_DOMAIN: &[u8] = b"x3-bench-job-v1";
 /// can never be mistaken for a report digest.
 pub const REPORT_DOMAIN: &[u8] = b"x3-bench-report-v1";
 /// Domain separator for run attestations.
-pub const ATTESTATION_DOMAIN: &[u8] = b"x3-bench-attestation-v1";
+/// v2: the attestation also commits to the backend the run executed on
+/// ([`Placement`]). A v1 signature cannot verify as v2.
+pub const ATTESTATION_DOMAIN: &[u8] = b"x3-bench-attestation-v2";
 
 /// Absorb a length-prefixed field, so `("ab", "c")` and `("a", "bc")` cannot
 /// commit to the same bytes.
@@ -96,12 +98,37 @@ impl JobRequest {
     }
 }
 
+/// Where a job runs: the backend the Reactor's placement scheduler chose
+/// (`northern_swarm::reactor::ScheduleDecision::placement`).
+///
+/// Plain strings, so this crate does not depend on the scheduler: the scheduler
+/// converts its decision into this, and a run attestation commits to it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Placement {
+    /// The backend's stable identity (`cpu-0`, `gpu-0`, or a worker account id).
+    pub backend_id: String,
+    /// The accelerator class the backend runs on (`cpu`, `gpu`, `npu`, `fpga`).
+    pub accelerator: String,
+}
+
+impl Placement {
+    pub fn new(backend_id: impl Into<String>, accelerator: impl Into<String>) -> Self {
+        Self {
+            backend_id: backend_id.into(),
+            accelerator: accelerator.into(),
+        }
+    }
+}
+
 /// A submitted job. Submission is the only way to get one; the id is derived,
 /// never accepted from the caller.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BenchmarkJob {
     id: [u8; 32],
     request: JobRequest,
+    /// The backend the scheduler placed the job on, if it was placed. A placed
+    /// job's report publishes only under an attestation from that backend.
+    placement: Option<Placement>,
 }
 
 impl BenchmarkJob {
@@ -109,7 +136,33 @@ impl BenchmarkJob {
     pub fn submit(request: JobRequest) -> Result<Self, PublishRefusal> {
         request.validate()?;
         let id = request.id();
-        Ok(Self { id, request })
+        Ok(Self {
+            id,
+            request,
+            placement: None,
+        })
+    }
+
+    /// Submit a job the scheduler has already placed on a backend.
+    ///
+    /// The placement is not part of the job id: the id names *what* is measured,
+    /// and the registry still publishes one report per job. What the placement
+    /// changes is who may attest to it: only a run on this backend.
+    pub fn submit_placed(
+        request: JobRequest,
+        placement: Placement,
+    ) -> Result<Self, PublishRefusal> {
+        if placement.backend_id.trim().is_empty() || placement.accelerator.trim().is_empty() {
+            return Err(PublishRefusal::EmptyPlacement);
+        }
+        let mut job = Self::submit(request)?;
+        job.placement = Some(placement);
+        Ok(job)
+    }
+
+    /// The backend this job was placed on, if any.
+    pub fn placement(&self) -> Option<&Placement> {
+        self.placement.as_ref()
     }
 
     pub fn id(&self) -> [u8; 32] {
@@ -154,6 +207,9 @@ pub struct RunAttestation {
     pub config_digest: [u8; 32],
     /// Digest of the samples the run produced.
     pub samples_digest: [u8; 32],
+    /// The backend the run executed on, when the attester knows it. A placed
+    /// job refuses an attestation that names another backend, or none.
+    pub placement: Option<Placement>,
     /// Public key of the attester.
     pub signer: [u8; 32],
     /// Ed25519 signature over [`RunAttestation::signing_digest`].
@@ -171,11 +227,19 @@ impl RunAttestation {
         absorb(&mut hasher, self.host_id.as_bytes());
         absorb(&mut hasher, &self.config_digest);
         absorb(&mut hasher, &self.samples_digest);
+        match &self.placement {
+            None => absorb(&mut hasher, &[0]),
+            Some(placement) => {
+                absorb(&mut hasher, &[1]);
+                absorb(&mut hasher, placement.backend_id.as_bytes());
+                absorb(&mut hasher, placement.accelerator.as_bytes());
+            }
+        }
         absorb(&mut hasher, &self.signer);
         hasher.finalize().into()
     }
 
-    /// Build and sign a claim about one run.
+    /// Build and sign a claim about one run, naming no backend.
     pub fn signed(
         key: &ed25519_dalek::SigningKey,
         job_id: [u8; 32],
@@ -183,6 +247,27 @@ impl RunAttestation {
         host_id: impl Into<String>,
         config_digest: [u8; 32],
         samples_digest: [u8; 32],
+    ) -> Self {
+        Self::signed_with_placement(
+            key,
+            job_id,
+            git_revision,
+            host_id,
+            config_digest,
+            samples_digest,
+            None,
+        )
+    }
+
+    /// Build and sign a claim about one run, including the backend it ran on.
+    pub fn signed_with_placement(
+        key: &ed25519_dalek::SigningKey,
+        job_id: [u8; 32],
+        git_revision: impl Into<String>,
+        host_id: impl Into<String>,
+        config_digest: [u8; 32],
+        samples_digest: [u8; 32],
+        placement: Option<Placement>,
     ) -> Self {
         use ed25519_dalek::Signer;
 
@@ -192,6 +277,7 @@ impl RunAttestation {
             host_id: host_id.into(),
             config_digest,
             samples_digest,
+            placement,
             signer: key.verifying_key().to_bytes(),
             signature: Vec::new(),
         };
@@ -226,6 +312,14 @@ impl RunAttestation {
                 expected: report_digest,
                 found: self.samples_digest,
             });
+        }
+        if let Some(placed) = &job.placement {
+            if self.placement.as_ref() != Some(placed) {
+                return Err(PublishRefusal::PlacementMismatch {
+                    expected: placed.clone(),
+                    found: self.placement.clone(),
+                });
+            }
         }
         if !trusted.contains(&self.signer) {
             return Err(PublishRefusal::UntrustedSigner {
@@ -295,6 +389,14 @@ pub enum PublishRefusal {
     },
     /// The signature does not cover this attestation.
     BadSignature,
+    /// A placement names no backend or no accelerator.
+    EmptyPlacement,
+    /// The job was placed on one backend and the attestation claims a run on
+    /// another (or names none).
+    PlacementMismatch {
+        expected: Placement,
+        found: Option<Placement>,
+    },
 }
 
 impl core::fmt::Display for PublishRefusal {
@@ -344,6 +446,21 @@ impl core::fmt::Display for PublishRefusal {
             PublishRefusal::BadSignature => {
                 write!(f, "the attestation signature does not verify")
             }
+            PublishRefusal::EmptyPlacement => {
+                write!(f, "the placement names no backend or no accelerator")
+            }
+            PublishRefusal::PlacementMismatch { expected, found } => match found {
+                Some(found) => write!(
+                    f,
+                    "the job was placed on {} ({}) but the attestation claims {} ({})",
+                    expected.backend_id, expected.accelerator, found.backend_id, found.accelerator
+                ),
+                None => write!(
+                    f,
+                    "the job was placed on {} ({}) but the attestation names no backend",
+                    expected.backend_id, expected.accelerator
+                ),
+            },
         }
     }
 }
@@ -861,5 +978,113 @@ mod tests {
             report_digest(&b),
             "the digest must measure the report, not the clock"
         );
+    }
+
+    fn placed_attestation(
+        job: &BenchmarkJob,
+        rep: &Report,
+        on: Option<Placement>,
+    ) -> RunAttestation {
+        RunAttestation::signed_with_placement(
+            &attester(),
+            job.id(),
+            job.request().git_revision.clone(),
+            "x3star1",
+            [0x11; 32],
+            report_digest(rep),
+            on,
+        )
+    }
+
+    /// The Reactor's two halves meet here: the scheduler placed the job on
+    /// `cpu-0`, so only a run attested on `cpu-0` publishes, and the published
+    /// report says so.
+    #[test]
+    fn a_placed_job_publishes_only_under_an_attestation_from_its_backend() {
+        let placed = Placement::new("cpu-0", "cpu");
+        let job = BenchmarkJob::submit_placed(request("abc123", &["one"]), placed.clone()).unwrap();
+        assert_eq!(job.placement(), Some(&placed));
+        assert_eq!(
+            job.id(),
+            BenchmarkJob::submit(request("abc123", &["one"]))
+                .unwrap()
+                .id(),
+            "placement does not change what the job measures"
+        );
+        let mut registry = strict_registry();
+
+        let elsewhere = placed_attestation(
+            &job,
+            &measured_clone(),
+            Some(Placement::new("gpu-0", "gpu")),
+        );
+        assert_eq!(
+            registry.publish_attested(&job, measured_clone(), &elsewhere),
+            Err(PublishRefusal::PlacementMismatch {
+                expected: placed.clone(),
+                found: Some(Placement::new("gpu-0", "gpu")),
+            }),
+            "a run on another backend is not the run the scheduler placed"
+        );
+        let nowhere = placed_attestation(&job, &measured_clone(), None);
+        assert_eq!(
+            registry.publish_attested(&job, measured_clone(), &nowhere),
+            Err(PublishRefusal::PlacementMismatch {
+                expected: placed.clone(),
+                found: None,
+            }),
+            "an attestation that names no backend cannot vouch for a placed job"
+        );
+        assert!(registry.is_empty(), "neither refusal stored anything");
+
+        let here = placed_attestation(&job, &measured_clone(), Some(placed.clone()));
+        registry
+            .publish_attested(&job, measured_clone(), &here)
+            .expect("the placed backend's own attestation publishes");
+        let stored = registry.get(&job.id()).unwrap();
+        assert_eq!(
+            stored
+                .attestation
+                .as_ref()
+                .and_then(|a| a.placement.as_ref()),
+            Some(&placed),
+            "the published report says which backend ran the job"
+        );
+        registry
+            .verify_attestation(&job, &measured_clone())
+            .expect("and it re-verifies");
+    }
+
+    /// The backend is a signed claim: rewriting it after signing breaks the
+    /// signature, so a report cannot be re-labelled as having run elsewhere.
+    #[test]
+    fn the_attested_backend_is_covered_by_the_signature() {
+        let job = BenchmarkJob::submit(request("abc123", &["one"])).unwrap();
+        let mut attestation = placed_attestation(
+            &job,
+            &measured_clone(),
+            Some(Placement::new("cpu-0", "cpu")),
+        );
+        attestation.placement = Some(Placement::new("gpu-0", "gpu"));
+        assert_eq!(
+            strict_registry().publish_attested(&job, measured_clone(), &attestation),
+            Err(PublishRefusal::BadSignature)
+        );
+        attestation.placement = None;
+        assert_eq!(
+            strict_registry().publish_attested(&job, measured_clone(), &attestation),
+            Err(PublishRefusal::BadSignature),
+            "dropping the backend claim breaks the signature too"
+        );
+    }
+
+    #[test]
+    fn a_placement_with_no_backend_is_refused() {
+        for placement in [Placement::new(" ", "cpu"), Placement::new("cpu-0", "")] {
+            assert_eq!(
+                BenchmarkJob::submit_placed(request("abc123", &["one"]), placement),
+                Err(PublishRefusal::EmptyPlacement)
+            );
+        }
     }
 }

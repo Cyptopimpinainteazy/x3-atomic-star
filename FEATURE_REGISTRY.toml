@@ -288,6 +288,9 @@ required_tests = [
   "a_signature_from_an_untrusted_key_is_refused",
   "a_tampered_attestation_does_not_verify",
   "the_local_registry_publishes_and_reports_that_it_is_unattested",
+  "a_placed_job_publishes_only_under_an_attestation_from_its_backend",
+  "the_attested_backend_is_covered_by_the_signature",
+  "a_placement_with_no_backend_is_refused",
 ]
 # `reports/reactor_benchmark_report.md` does not exist; citation cleared. The row
 # already records that its benchmark is not in the CI critical path.
@@ -305,7 +308,7 @@ blockers = [
   "**CLOSED 2026-09-27 — a benchmark job is submitted, run and published once.** `crates/x3-bench/src/job.rs` is a real job path with a publish step and a once-only guarantee, run by the `test x3-bench` gate.",
   "**CLOSED 2026-09-27 — publication carries a proof about the run, not just about the job.** `RunAttestation` commits to the job id, the revision, the host, a configuration digest and the report's content digest, signed with ed25519; `ReportRegistry::trusting(attesters)` makes an attestation *mandatory* (an unattested `publish` is refused with `Unattested`), and `publish_attested` refuses a claim about another job (`AttestedJobMismatch`), another revision (`RevisionMismatch`), another measurement (`SamplesDigestMismatch`), an untrusted key (`UntrustedSigner`) or a tampered field (`BadSignature`). The local registry still publishes and now says `attestation: None` rather than looking attested. Seven tests drive it; break-it-first: deleting the samples-digest check reddens `a_report_that_is_not_what_the_attester_measured_is_refused`, and the file was restored byte-identically.",
   "**CLOSED 2026-09-27 — the measurement is asserted, not just the compilation.** `the_optimizer_moves_the_measured_instruction_count_down` runs the pipeline on a redundant fixture both ways and requires the optimized instruction count to be strictly lower, every reported figure to be non-zero, and each result's byte count to equal the bytes it actually emitted — the old tests only asserted that compilation succeeded,",
-  "The two halves of the Reactor are still unjoined: the placement scheduler lives in `crates/northern-swarm/src/reactor.rs` (where the backends are) and this crate owns benchmark submission and publication, so a published report cannot yet say which backend ran the job."
+  "**CLOSED 2026-09-28 — a published report says which backend ran it.** The scheduler's decision becomes the job's placement (`ScheduleDecision::placement()` in `crates/northern-swarm/src/reactor.rs`, submitted with `BenchmarkJob::submit_placed`). `RunAttestation` now signs the backend it ran on (`placement`, domain bumped to `x3-bench-attestation-v2`), and `publish_attested` refuses `PlacementMismatch` when a placed job's attestation names another backend or none. The stored attestation therefore names the backend. Tests: `a_placed_job_publishes_only_under_an_attestation_from_its_backend`, `the_attested_backend_is_covered_by_the_signature` and `a_placement_with_no_backend_is_refused` (gate `test x3-bench`, 25 passed), plus `a_scheduled_benchmark_publishes_only_from_the_backend_it_was_placed_on`, which drives the real scheduler into a placed job (gate `test northern-swarm`). Break-it-first: disabling the placement check turns exactly the two placement tests red; leaving the backend out of the signed digest turns the signature test red; restored byte-identically. The score is not re-derived here (this row has no formula breakdown to update).",
 ]
 dangerous_paths = ["gpu benchmark", "concurrency", "benchmark attestation keys"]
 
