@@ -2830,7 +2830,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 61,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2838,12 +2838,12 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 72,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local, `break`/`continue`, and float arithmetic with the on-chain refusal asserted; not proven for match statements, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"
+        "Re-measured 2026-09-28. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`, with a load not merged across a store and the on-chain receipt journalling the writes), top-level constants (inlined, cycles and effectful initializers refused, `let mut` at top level refused by name) and strings (bound, passed and returned; any operator on one refused at compile time rather than failing at run time). The optimizer's order-sensitivity is gone (#518's per-function PRE) and held by `optimizer_order.rs`, which fails on the pre-#518 tree. `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: `emit` (refused: no lowering preserves it), mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2859,8 +2859,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 78,
-      "tests": "tested score 78% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4944,7 +4944,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5002e54d4e2bed21c6a0096a27f24987afe72a0713bcf22155631131dbaa219f",
+    "source_digest": "fc0e0990f49d3642b7d1390cef7b2d058008e457a77bc03a62c420d98ca02068",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "7a27ab993f64a1e258007ce1614f7764e5e72f3f28e6a887866254abc3e31101",
@@ -4955,7 +4955,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
+      "feature-matrix/language-trading.toml": "41b7814c6ae813b516e497501a817cb85038e7f078e2c1217233248ac077f651",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
