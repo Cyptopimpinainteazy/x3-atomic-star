@@ -332,6 +332,7 @@ runtime-benchmarks = [
 	"pallet-x3-token-factory/runtime-benchmarks",
 	"pallet-x3-sequencer/runtime-benchmarks",
 	"pallet-x3-da/runtime-benchmarks",
+	"pallet-x3-reservation/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 	# Measured 2026-09-25: 37 of the 52 runtime dependencies that declare a `runtime-benchmarks`
 	# feature compile with it on, and 15 do not — their benchmark modules have **never been

@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `891a47f96`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `9f5446270`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -513,3 +513,22 @@ alters the runtime, so the record and the code land together.
   extrinsic, because `BlobNotFound` is the guard and the commitment has to exist. Both benchmarks
   measure the fee reserve as part of the call, since `ReservableCurrency::reserve` is inside it.
   Scanner `pallet-call-without-weights` 20 → 18.
+
+* `9f5446270` — **the flash loan and the reservation pallet measure their calls.** `pallets/x3-flashloan`
+  charged 10,000 picoseconds to borrow or repay and 5,000 to add liquidity; `pallets/x3-reservation`
+  charged 10,000 for each of its three root transitions — a request that locks real vault inventory
+  and increments the lane's unsettled notional, and the two terminal transitions that undo it. Both
+  declared `runtime-benchmarks` features with nothing behind them. They carry generated weight files
+  now: compact 8895788 bytes (`0x343f40ba483afd6550234e05810269abc4b73c4512a1ee8d196eaeb46673cebf`) — was 8,888,569 — and compressed 1524612
+  (`0x942851a920761e1d35ec741852572e4296c5f6de63bad1870aacbc193084b094`) — was 1,524,965.
+
+  Two traps live in this revision. `define_benchmarks!`'s location name must match the
+  `construct_runtime!` pallet alias exactly — `X3FlashLoan`, not `X3Flashloan` — because the macro
+  resolves that name at the crate root, where a `use` alias declared inside `mod benches` is not in
+  scope; the failure is reported as `cannot find type X3Flashloan in this scope` on the macro line.
+  And a benchmark's amounts have to clear the chain's existential deposit: the flash loan's 1,000-unit
+  pool passed in the mock and failed on the dev chain with "Account cannot exist with the funds that
+  would be given", so its amounts are multiples of `minimum_balance()` now. The reservation benchmark
+  requires the chain's balance to be `u128` and uses real amounts for the same class of reason: the
+  inventory helpers return early for zero, and a zero-amount benchmark measures the no-op path.
+  Scanner `pallet-call-without-weights` 18 → 16.

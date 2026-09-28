@@ -12406,6 +12406,7 @@ dependencies = [
 name = "pallet-x3-flashloan"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12615,6 +12616,7 @@ dependencies = [
 name = "pallet-x3-reservation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",

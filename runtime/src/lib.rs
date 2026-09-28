@@ -3110,6 +3110,7 @@ parameter_types! {
 impl pallet_x3_reservation::Config for Runtime {
     type ReservationTtlBlocks = ReservationTtlBlocks;
     type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
+    type WeightInfo = pallet_x3_reservation::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Solvency Configuration =====
@@ -3439,6 +3440,7 @@ impl pallet_x3_flashloan::Config for Runtime {
     type Currency = Balances;
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
     type MaxLoanFraction = FlashLoanMaxLoanFraction;
+    type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== SVM Runtime Configuration =====
@@ -3561,6 +3563,12 @@ mod benches {
     use pallet_x3_da::Pallet as X3Da;
     #[allow(unused_imports)]
     use pallet_x3_sequencer::Pallet as X3Sequencer;
+    // Added 2026-09-27: `pallet-x3-flashloan` and `pallet-x3-reservation` charged literals on every
+    // call behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_flashloan::Pallet as X3FlashLoan;
+    #[allow(unused_imports)]
+    use pallet_x3_reservation::Pallet as X3Reservation;
 
     frame_benchmarking::define_benchmarks!(
         [pallet_x3_sequencer, X3Sequencer]
@@ -3575,6 +3583,8 @@ mod benches {
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]
         [pallet_northern_swarm, NorthernSwarm]
+        [pallet_x3_flashloan, X3FlashLoan]
+        [pallet_x3_reservation, X3Reservation]
     );
 }
 
