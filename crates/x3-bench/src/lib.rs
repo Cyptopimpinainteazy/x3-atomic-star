@@ -23,6 +23,6 @@ pub use comparator::{
     compare_reports, read_report, write_report, GlobalMetrics, Report, SampleMetrics,
 };
 pub use job::{
-    report_digest, BenchmarkJob, JobRequest, PublishRefusal, PublishedReport, ReportRegistry,
-    RunAttestation, ATTESTATION_DOMAIN, JOB_DOMAIN, REPORT_DOMAIN,
+    report_digest, BenchmarkJob, JobRequest, Placement, PublishRefusal, PublishedReport,
+    ReportRegistry, RunAttestation, ATTESTATION_DOMAIN, JOB_DOMAIN, REPORT_DOMAIN,
 };

@@ -1385,7 +1385,10 @@ pub mod pallet {
             // custodian. It used to record the leg and hold nothing: a native lock took no funds,
             // finalization paid the counterparty nothing and a refund returned nothing, while the
             // events reported the amounts as received. The depositor may lock only its own
-            // declared native side, exactly, once — and the funds are reserved here.
+            // declared native side, exactly, once — and the funds are reserved here. The custodian
+            // holds `T::Currency` only, so the declared token must be that currency: reserving
+            // native coins for a leg that promises an X3 asset or a contract token would pay the
+            // counterparty in a different asset than the intent names.
             if chain == ExternalChainId::X3Native {
                 let declared = if who == intent.maker {
                     &intent.asset_a
@@ -1394,6 +1397,7 @@ pub mod pallet {
                 };
                 ensure!(
                     declared.chain == ExternalChainId::X3Native
+                        && declared.token == TokenId::Native
                         && amount == declared.amount
                         && amount > 0,
                     Error::<T>::InvalidAssetSpec

@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `9be777e00`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `23197c6d3`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -682,7 +682,7 @@ alters the runtime, so the record and the code land together.
   (`0x7904649cf82fb1dc80076f6c7b16c1cf104d9705988e78d20c9a38fdc87b0acd`) — was 1,530,072, from two
   builds that agreed.
 
-* `9be777e00` — **the cross-VM router's three reachable calls are measured, and the five that are not
+* `23197c6d3` — **the cross-VM router's three reachable calls are measured, and the five that are not
   are recorded.** Its `benchmarking.rs` turned out to be dead code — `lib.rs` declared no
   `pub mod benchmarking;`, so nothing compiled it, and it measured helper functions rather than the
   pallet's dispatchables; the crate never declared `frame-benchmarking` either. It now carries real
@@ -692,8 +692,8 @@ alters the runtime, so the record and the code land together.
   `register_external_root`, which this runtime refuses at its `RefuseExternalRoots` verifier by
   policy. Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
   whole twelve-pallet burndown is closed, leaving only the documented
-  `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8906360
-  (`0x3318e5bd9b6b945c7f949cb354907cae57bd6d05f522c9b8c6c541c87cac3eff`) — was 8,905,964 — and
-  compressed 1530220
-  (`0x75e6a9f92d2c273f63621b96a49d4957ee9825a8dc9ca0ae45327f6e5c7a2cef`) — was 1,530,061, from two
+  `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8906380
+  (`0x935e456ecc1b237eb864b3eac9bc02d87a5e430e15fc99f056c38dd62fbf6e4f`) — was 8,905,964 — and
+  compressed 1530152
+  (`0x1e52f28ffa4af7582d267fd6eb57426643c8c5a0803f4e508a0187d82462748e`) — was 1,530,061, from two
   builds that agreed.
