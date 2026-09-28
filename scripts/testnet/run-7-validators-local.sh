@@ -488,6 +488,7 @@ validate_keys() {
 
 wait_for_rpc() {
   local rpc_port="$1"
+  local log_file="${2:-}"
   # 180s, not 60: a cold debug-build node reads a 17 MB spec and a fresh keystore
   # before it answers RPC, and back-to-back launches (a drill followed by another
   # drill, say) have taken longer than a minute. The wait is still bounded, and the
@@ -497,6 +498,21 @@ wait_for_rpc() {
       -d '{"jsonrpc":"2.0","id":1,"method":"system_health","params":[]}' \
       "http://127.0.0.1:${rpc_port}" | grep -q '"isSyncing"'; then
       return 0
+    fi
+    # A node that has already died will never answer, so waiting the full three
+    # minutes and then reporting only the port wastes the operator's time and hides
+    # the cause. Measured 2026-09-28: a `target/release/x3-chain-node` built with
+    # `--features runtime-benchmarks` embeds a runtime that imports the benchmarking
+    # host functions, so a node without them dies in ~3s with
+    # "runtime requires function imports which are not present on the host", and this
+    # function reported "RPC not ready on port 19800" for the next 177 seconds. That is
+    # the ordinary state of the tree right after any weights work, so the message names
+    # the cause and the fix.
+    if [[ -n "$log_file" ]] && grep -q 'runtime requires function imports which are not present on the host' "$log_file" 2>/dev/null; then
+      echo "RPC not ready on port ${rpc_port}: the node exited because its runtime needs" \
+        "benchmarking host functions — the binary at ${X3_NODE_BIN:-$NODE_BIN} was built with" \
+        "'--features runtime-benchmarks'. Rebuild it with 'cargo build --release -p x3-chain-node'." >&2
+      return 1
     fi
     sleep 1
   done
@@ -630,7 +646,7 @@ start_node() {
   echo $! > "${PID_DIR}/node-${i}.pid"
   echo "Started ${name} (p2p=${p2p_port}, rpc=${rpc_port}, prom=${prom_port})"
 
-  wait_for_rpc "$rpc_port"
+  wait_for_rpc "$rpc_port" "$log_file"
   echo "Node ${name} ready"
 }
 

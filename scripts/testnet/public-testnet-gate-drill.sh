@@ -153,6 +153,14 @@ run_gate() {
 }
 
 info "running the public testnet gate against validator 1"
+# Criterion 14 reads an explorer the operator starts, and the two ends have to agree: the page must
+# read *this* network. Measured 2026-09-28 — the explorer on :3000 pointed at the monitoring gates'
+# rpc 19800 while this drill ran on 19820, so the page rendered `rpc-unreachable`, the criterion
+# refused it ("shows no finalized head … while http://127.0.0.1:19820 reports #124"), and nothing in
+# the drill's output said which endpoint the page was supposed to read. Naming it here costs one line
+# and removes a run.
+info "criterion 14: start the explorer against http://127.0.0.1:$RPC_BASE (it reads X3_EXPLORER_RPC), e.g."
+info "             cd apps/explorer && npm run build && X3_EXPLORER_RPC=http://127.0.0.1:$RPC_BASE npx next start -p 3000"
 run_gate "$RPC_BASE" "$WORK_DIR/gate.out"
 GATE_RC=$?
 cat "$WORK_DIR/gate.out"
