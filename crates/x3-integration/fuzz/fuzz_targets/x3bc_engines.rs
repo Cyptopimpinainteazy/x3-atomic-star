@@ -32,7 +32,7 @@ fuzz_target!(|data: &[u8]| {
         assert!(ran.is_err(), "mini_x3 ran a module its validator refused");
     }
 
-    let _ = X3Executor::execute_on_chain(data, 10_000);
+    let _ = X3Executor::execute_on_chain(data, 10_000, &[], false);
     let mut config = X3ExecutorConfig::on_chain();
     config.gas_limit = 10_000;
     let _ = X3Executor::execute(data, &[], config);

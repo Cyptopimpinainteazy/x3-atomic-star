@@ -290,7 +290,7 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
         x3_x3_integration::X3Executor::verify_on_chain(payload)
-            .map_err(|_| DispatchError::Other("X3 validation failed"))
+            .map_err(|_| DispatchError::Other("Invalid X3 bytecode"))
     }
 
     fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
