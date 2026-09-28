@@ -630,30 +630,16 @@ alters the runtime, so the record and the code land together.
   (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
   builds that agreed.
 
-* `b8a73a01d` — **the cross-chain gateway charges measured weights.** All eleven dispatchables
-  charged `Weight::from_parts(20_000..60_000, 0)` with no read or write count. The benchmarks build
-  their state through the pallet's own extrinsics, and the route they use is `X3Internal` — the
-  verification level whose verifier this repository can actually satisfy, which is what makes the
-  deposit and release proof paths measurable rather than mocked. Scanner
-  `pallet-call-without-weights` reached 5 from 6; `x3-cross-vm-router` is the last pallet that still
-  charges a literal, and the other four findings are the documented `T::DbWeight::get().reads_writes`
-  form. The bytes move: compact 8905964
-  (`0x108225d763aa5f41b39d59b4ad69e284b3da1546d4af3dab84f7df1470986bec`) — was 8,899,712 — and
-  compressed 1530061
-  (`0x7904649cf82fb1dc80076f6c7b16c1cf104d9705988e78d20c9a38fdc87b0acd`) — was 1,530,072, from two
-  builds that agreed.
-
-* `1b9b04e5d` — **the wallet pallet charges measured weights.** `pallet-x3-wallet` (aliased here as
-  `pallet-x3-wallet-pallet`) charged 5,000-15,000 picoseconds on all twelve calls behind a
-  `runtime-benchmarks` feature that pulled `frame-benchmarking` in and never used it, and it was not
-  registered in `mod benches`. Its four recovery benchmarks walk the real flow
-  (`register_recovery_guardians` -> `initiate_recovery` -> `approve_recovery`) with a zero delay, so
-  `finalize_recovery` reaches its executable block without the benchmark moving the chain's block
-  number. Scanner `pallet-call-without-weights` reached 6 from 7 (four of the six are the documented
-  `T::DbWeight::get().reads_writes` form). The bytes move: compact 8899712
-  (`0xc0889ffe389ce6ee96d7a20ff521aab1257d95669c887fc2e8d46e11ef27bec6`) — was 8,898,068 — and
-  compressed 1530072
-  (`0x0e737994439fae21e99ecd597ae8cc8c9d7bac04d777d7a4a9de4291c42002f5`) — was 1,529,260, from two
+* `10b7f5c5d` — **the account registry and the dApp hub charge measured weights too.** Both pallets
+  charged literals on every dispatchable and neither had a `benchmarking.rs`, while this runtime
+  already enabled their `runtime-benchmarks` features — a feature that named a capability the pallet
+  could not provide. `pallet-x3-account-registry` now carries three benchmarks and
+  `pallet-x3-dapp-hub` eight, both are registered in `mod benches`, and both charge
+  `type WeightInfo` from the generated files. Scanner `pallet-call-without-weights` reached 9 from
+  12; runtime configs wired to generated weights 50 -> 53. The bytes move: compact 8903183
+  (`0x0871ced5f0fcea528a13125d54d61d113f73cc750b9e25f029b9e720288ab38f`) — was 8,902,436 — and
+  compressed 1529715
+  (`0x63f5ad963d515a4667f31fa2c261e699db09454996adbf36f6fd28ee2a39b3c8`) — was 1,529,033, from two
   builds that agreed.
 
 * `8981b29c9` — **the capacity manager and the custody registry charge measured weights.** They
@@ -670,14 +656,28 @@ alters the runtime, so the record and the code land together.
   (`0xafdc7d331d9bf8b5cfa5cd6b69c22f0178d03f8887499fd7bea337b073963d39`) — was 1,529,715, from two
   builds that agreed.
 
-* `10b7f5c5d` — **the account registry and the dApp hub charge measured weights too.** Both pallets
-  charged literals on every dispatchable and neither had a `benchmarking.rs`, while this runtime
-  already enabled their `runtime-benchmarks` features — a feature that named a capability the pallet
-  could not provide. `pallet-x3-account-registry` now carries three benchmarks and
-  `pallet-x3-dapp-hub` eight, both are registered in `mod benches`, and both charge
-  `type WeightInfo` from the generated files. Scanner `pallet-call-without-weights` reached 9 from
-  12; runtime configs wired to generated weights 50 -> 53. The bytes move: compact 8903183
-  (`0x0871ced5f0fcea528a13125d54d61d113f73cc750b9e25f029b9e720288ab38f`) — was 8,902,436 — and
-  compressed 1529715
-  (`0x63f5ad963d515a4667f31fa2c261e699db09454996adbf36f6fd28ee2a39b3c8`) — was 1,529,033, from two
+* `1b9b04e5d` — **the wallet pallet charges measured weights.** `pallet-x3-wallet` (aliased here as
+  `pallet-x3-wallet-pallet`) charged 5,000-15,000 picoseconds on all twelve calls behind a
+  `runtime-benchmarks` feature that pulled `frame-benchmarking` in and never used it, and it was not
+  registered in `mod benches`. Its four recovery benchmarks walk the real flow
+  (`register_recovery_guardians` -> `initiate_recovery` -> `approve_recovery`) with a zero delay, so
+  `finalize_recovery` reaches its executable block without the benchmark moving the chain's block
+  number. Scanner `pallet-call-without-weights` reached 6 from 7 (four of the six are the documented
+  `T::DbWeight::get().reads_writes` form). The bytes move: compact 8899712
+  (`0xc0889ffe389ce6ee96d7a20ff521aab1257d95669c887fc2e8d46e11ef27bec6`) — was 8,898,068 — and
+  compressed 1530072
+  (`0x0e737994439fae21e99ecd597ae8cc8c9d7bac04d777d7a4a9de4291c42002f5`) — was 1,529,260, from two
+  builds that agreed.
+
+* `b8a73a01d` — **the cross-chain gateway charges measured weights.** All eleven dispatchables
+  charged `Weight::from_parts(20_000..60_000, 0)` with no read or write count. The benchmarks build
+  their state through the pallet's own extrinsics, and the route they use is `X3Internal` — the
+  verification level whose verifier this repository can actually satisfy, which is what makes the
+  deposit and release proof paths measurable rather than mocked. Scanner
+  `pallet-call-without-weights` reached 5 from 6; `x3-cross-vm-router` is the last pallet that still
+  charges a literal, and the other four findings are the documented `T::DbWeight::get().reads_writes`
+  form. The bytes move: compact 8905964
+  (`0x108225d763aa5f41b39d59b4ad69e284b3da1546d4af3dab84f7df1470986bec`) — was 8,899,712 — and
+  compressed 1530061
+  (`0x7904649cf82fb1dc80076f6c7b16c1cf104d9705988e78d20c9a38fdc87b0acd`) — was 1,530,072, from two
   builds that agreed.
