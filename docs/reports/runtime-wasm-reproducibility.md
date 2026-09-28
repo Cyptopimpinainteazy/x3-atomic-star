@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `69a58d4fe`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `953abcdab`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -482,12 +482,12 @@ alters the runtime, so the record and the code land together.
   branch would have missed the immediate-apply path a chain takes. Scanner
   `pallet-call-without-weights` 22 → 21.
 
-* `69a58d4fe` — **the token factory measures its launch, and a cross-crate regression the gate missed.**
+* `953abcdab` — **the token factory measures its launch, and a cross-crate regression the gate missed.**
   `pallets/x3-token-factory` charged literals for a token launch (60,000 picoseconds), a mint and a
   burn (20,000 each) and an authority handover (10,000), behind a `runtime-benchmarks` feature that
   had nothing in it. It carries a generated `weights.rs`, a `benchmarking.rs` and a `type WeightInfo`
-  now: compact 8894628 bytes (`0xcaab18521a8364f1f0ea1ef3e036a357478ed50749c9fff8fa32de53433746c7`) — was 8,881,232 — and compressed 1524541
-  (`0x6399941a9a001b39f5cca3bd224a287d23c83417d12ec60842f146da58f05824`) — was 1,526,056.
+  now: compact 8887198 bytes (`0x4d48500b38458576e1a1898d030a4c91ea34cc73634b870a2e252ab9395e55b4`) — was 8,881,232 — and compressed 1530143
+  (`0x201adaf959694ab75a75090202afb61e2d6762a8cde9e8b5c1cc52065a0be1c5`) — was 1,526,056.
 
   The launch benchmark drives the whole path a chain takes — register the asset, activate it,
   configure the internal routes, mint the initial supply — and the mint and burn benchmarks use the
