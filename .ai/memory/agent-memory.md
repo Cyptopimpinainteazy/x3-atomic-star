@@ -9324,3 +9324,34 @@ registration, with the outcome per file:
   (11), `x3-custody` (10), `x3-dapp-hub` (8), `x3-cross-vm-router` (8; `register_external_root` is
   refused by the runtime by design and needs the documented-exception path), `x3-asset-registry` (7),
   `x3-account-registry` (3, **no mock and no tests at all** — its own turn).
+
+## 2026-09-27/28 (post-merge) — PR #520 landed mid-turn, and its two benchmark defects
+
+- **The remote moved while this turn ran**: `origin/master` gained 11 commits and **PR #520
+  (`feat/x3-htlc-onchain`) merged**, with its own re-attestation. My docs commit had to be rebased
+  (`git stash push reports/panic_unwrap_audit.md` first — the stash is the timestamp-only generated
+  report, which is always dirty after a gate run).
+- **The merge grew the production panic/unwrap ratchet 440 → 442**, because `pallets/x3-settlement-engine/src/benchmarking.rs`
+  gained two `expect` calls and a `#[cfg(feature = "runtime-benchmarks")]` module counts as
+  production. `make mainnet-check` was red on the merged tree until `refund_proof_set` was changed to
+  return `Result<_, BenchmarkError>` (commit `8d4c91da2`), after which the gate passed. This ratchet
+  has now caught this exact trap three times.
+- **Still red, deliberately not fixed here:** `cargo test -p pallet-x3-settlement-engine --features
+  runtime-benchmarks` fails one benchmark test-suite entry, `bench_submit_proof`, with `InvalidProof`.
+  PR #520 tightened the EVM proof path to walk a real receipts trie; that benchmark still builds a
+  two-zero-root proof. The passing path is `tests::create_evm_receipt_proof`, whose `receipt_trie`
+  helper lives in `cfg(test)` code and so cannot be reached from the benchmark's CLI run. To make
+  `pallet-x3-settlement-engine`'s weights regenerable, lift that fixture into a module compiled under
+  `runtime-benchmarks` (e.g. `src/proof_fixtures.rs` behind `cfg(any(test, feature = "runtime-benchmarks"))`)
+  and use it from both the test and the benchmark. **No gate runs that suite today**, which is why the
+  gates stay green without it.
+- **Weights pass this turn (before the merge landed)**: `x3-wrapped` (7 calls) and `x3-sentinel`
+  (7 calls) measured; scanner `pallet-call-without-weights` 14 → 12; `X3-GPU-003` 74 → 75; the
+  sentinel has no `mock.rs` (its test runtime is `tests.rs`, `new_test_ext` had to become `pub`), and
+  adding `type WeightInfo` to it broke `pallets/x3-token-factory`'s test runtime — the third crate
+  that class has caught.
+- **Next seeds:** 12 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form, so
+  **8 real pallets**: `x3-wallet-pallet` (12 calls), `x3-crosschain-gateway` (11), `x3-custody` (10),
+  `x3-dapp-hub` (8), `x3-cross-vm-router` (8, needs the documented-exception path for
+  `register_external_root`), `x3-asset-registry` (7), `x3-account-registry` (3, no mock and no tests —
+  its own turn), and the settlement-engine fixture lift above.
