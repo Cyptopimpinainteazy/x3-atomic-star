@@ -543,6 +543,13 @@ GATES_FAST=(
   # `launch_gate` citations that name tests nobody wrote.
   "repo scanner:python3 scripts/swarm/x3_repo_scan.py --check"
   "repo scanner test:pytest -q scripts/swarm/test_x3_repo_scan.py"
+  # The other half of the weights story. `runtime-weights-wired` (below) proves a wired pallet
+  # charges *something*; nothing proved the something still describes the pallet. Re-running the
+  # FRAME CLI for all 51 files needs a `--features runtime-benchmarks` node build per pallet, so
+  # this checks what the tree can answer: an entry no call charges (a renamed call, or a call back
+  # on a literal) and a weights file with no benchmark CLI record line at all, ratcheted by
+  # `docs/reports/weights-unmeasured-baseline.json`.
+  "weights freshness:python3 scripts/check-weights-freshness.py"
   # The S0/S1 security gate — the formal TLA+ check plus the catastrophic and critical blocker
   # checks — ran only in CI. Nothing on this box ran it, which is why a *missing java* went
   # unnoticed for as long as it did: every TLA+ spec errored out, the wrapper looked at exit codes

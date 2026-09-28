@@ -27,13 +27,26 @@ source = "master"
 # `type WeightInfo = ()`, and `impl WeightInfo for ()` returns `Weight::zero()`, which drops the
 # pallet out of block-weight accounting entirely. Eighteen configs are now wired to the non-zero,
 # read/write-counted `SubstrateWeight` their pallets already shipped, and a gate holds the line.
+#
+# Re-measured 2026-09-28: the other half of this row was "the generated weights are stubs", and that
+# claim was too strong in both directions, so it is now a count. Of the 51 `pallets/*/src/weights.rs`
+# files in the tree, **29 carry the benchmark CLI's own record line** — a real run at STEPS/REPEAT on
+# this host — and 22 do not. Eight of those 29 were produced by the weights burndown X3-GPU-003
+# records (`x3-asset-registry`, `x3-account-registry`, `x3-dapp-hub`, `x3-partner`, `x3-custody`,
+# `x3-wallet-pallet`, `x3-crosschain-gateway`, `x3-cross-vm-router`), and the 22 have a ratcheted
+# baseline now rather than a sentence. The remaining cap is unchanged and is what keeps
+# `mainnet_ready` at 55: nothing here has been measured on the launch target's hardware and no weight
+# has been validated against a measured block.
+# 82*0.35 + 80*0.25 + 55*0.40 = 28.7 + 20 + 22 = 70.7 -> 71.
 paths = [
   "runtime/src/lib.rs",
   "runtime/src/tests.rs",
   "scripts/check-runtime-weights-wired.py",
+  "scripts/check-weights-freshness.py",
+  "docs/reports/weights-unmeasured-baseline.json",
 ]
-implemented = 75
-tested = 75
+implemented = 82
+tested = 80
 mainnet_ready = 55
 priority = "P0"
 confidence = "high"
@@ -41,7 +54,7 @@ launch_scope = "guarded"
 claim_risk = false
 blockers = [
   "**CLOSED 2026-09-27 — eighteen zero-weight dispatchable sets now charge their pallets' own weights.** Measured before: `runtime/src/lib.rs` set `type WeightInfo = ();` for `pallet_x3_{oracle,vrf,dex,automation,atomic_kernel,auction,launchpad,compute_market}`, `pallet_{governance,treasury,agent_accounts,agent_memory,depin_marketplace,meme_overlord,private_execution}`, `pallet_svm_runtime`, `pallet_grandpa`, `pallet_timestamp`, `pallet_scheduler`, `pallet_preimage` and `pallet_x3_lp_locker`. Eighteen of those (all but grandpa, launchpad and lp_locker) are wired to `<crate>::weights::SubstrateWeight<Runtime>`; the FRAME pallets use their SDK weights. The three that remain are in the gate's shrink-only exception list, each with the reason it cannot be wired today",
-  "**The generated weights are stubs, and the row says so.** Every `weights.rs` in this repository opens with `//! Auto-generated weight stubs … Run cargo benchmark against real hardware to populate concrete values`, so wiring them replaces `Weight::zero()` with a real read/write count at hand-sized `ref_time`, not with a measured one. That is strictly better than charging nothing and is not the same as benchmarking; the measured half of this subsystem is X3-GPU-003, and the values must be regenerated on target hardware before a mainnet claim",
+  "**CORRECTED 2026-09-28 — \"every generated weight is a stub\" was wrong in both directions, and the split is a ratchet now.** 29 of the 51 `pallets/*/src/weights.rs` files carry the benchmark CLI's own record line (a real STEPS/REPEAT run on this host, v53.0.0); the other 22 carry a hand-written header and were never produced by a run. Eight of the 29 came from the weights burndown X3-GPU-003 records. The 22 are listed in `docs/reports/weights-unmeasured-baseline.json`, which `scripts/check-weights-freshness.py` holds shrink-only — a new unmeasured file fails the default gate set, and the gate prints the ones that become measured so the list can drop",
   "**Two generated weight files are dead, and one is worse than dead.** `pallets/x3-launchpad/src/weights.rs` is not a module of its pallet at all (`lib.rs` declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`), so the runtime cannot point at it — the gate's exception says so. `pallets/x3-consensus/src/weights.rs` is shadowed by an inline `pub mod weights { … }` in its `lib.rs`, so the runtime is correctly weighted but the file beside it is never compiled; the gate prints a WARNING rather than failing, because the wired numbers are live either way",
   "**Found and fixed while here — `clippy runtime rc1` was red in the default gate set.** `runtime/src/tests.rs::a_full_ordering_window_is_settlable_in_one_block` exercises `pallet_private_execution`, whose `Config` impl for `Runtime` is `#[cfg(not(feature = \"mainnet-rc1\"))]`, but the test carried no `cfg` of its own, so the `mainnet-rc1` build of the test file did not compile (`the trait bound Runtime: pallet_private_execution::Config is not satisfied`, 12 errors). It carries that cfg now and the gate is green",
   "Still open on this row: 3 runtime configs remain on `()`, and the runtime carries SDK pallets whose own weight modules were not audited here (`pallet_balances`, `pallet_session`, `pallet_evm`, `pallet_collective`, `pallet_transaction_payment`, `pallet_sudo` — the gate only checks that they do not charge zero, not that their numbers are current). Nothing has re-benchmarked on this host, and no weight here has been validated against a measured block",
@@ -52,6 +65,7 @@ evidence = [
   "scripts/check-runtime-weights-wired.py",
   "note: `impl WeightInfo for ()` returns `Weight::zero()` for every method — the reason a `()`-wired config is invisible to the block weight limit rather than merely under-charged",
   "note: 2026-09-27 — 31 pallets ship `src/weights.rs`, 29 declare `pub mod weights;`, and before this change `rg 'WeightInfo = weights::' runtime/src/lib.rs` returned 0 matches; it returns 18 now, and the gate reports `37 runtime config(s) wired to generated weights, 3 documented exception(s)`",
+  "note: 2026-09-28 — 51 pallets ship `src/weights.rs` and `check-runtime-weights-wired.py` reports **57 wired configs** with 3 documented exceptions. `python3 scripts/check-weights-freshness.py` reports 22 unmeasured against a baseline of 22, 5 documented drift exceptions and no drift elsewhere; the eight files from the X3-GPU-003 burndown are among the 29 that carry the CLI's own STEPS/REPEAT record line",
 ]
 test_evidence = [
   "note: `cargo test -p x3-chain-runtime --lib` — 58 passed, 0 failed, including `a_wired_pallet_charges_more_than_nothing` (atomic-kernel + timestamp, both feature sets) and `a_wired_rc1_excluded_pallet_charges_more_than_nothing` (x3-auction)",
@@ -121,14 +135,45 @@ source = "master"
 #     The wrapped pallet's seven and the sentinel's seven run in their suites (33 and 14 tests with
 #     the feature on); the wrapped setups register an asset through the pallet's own governance call,
 #     and the sentinel's unfreeze/unenroll/approval benchmarks establish the state each one acts on.
-# 92*0.35 + 84*0.25 + 55*0.40 = 32.2 + 21 + 22 = 75.2 -> 75.
+#     2026-09-28, final pass: the remaining eight pallets are measured and the scanner's
+#     `pallet-call-without-weights` count reaches **4, all `low`** — every one of them the
+#     documented `T::DbWeight::get().reads_writes` estimate rather than an invented cost. There is no
+#     high finding left anywhere in the tree. `x3-asset-registry` (7 calls), `x3-account-registry` (3,
+#     plus the `benchmarking.rs` and `mod benches` entry it never had), `x3-dapp-hub` (8),
+#     `x3-partner` (8, whose `runtime-benchmarks` feature the runtime did not even enable),
+#     `x3-custody` (10), `x3-wallet-pallet` (12), `x3-crosschain-gateway` (11) and
+#     `x3-cross-vm-router` (3 of 8) all charge generated weights now. This pass also had to fix the
+#     build that produced them: `pallet-x3-settlement-engine` enabled its optional `rlp` dependency
+#     with default features, so the runtime's `runtime-benchmarks` build pulled `rlp/std` —
+#     `bytes/std` and `rustc-hex/std` — into a `wasm32v1-none` blob that has no std, and no pallet's
+#     weights could be regenerated at all.
+#   tested 88 — every new benchmark runs in its pallet's benchmark test suite, the full CLI run wrote
+#     each file, and the row's second blocker is closed: `scripts/check-weights-freshness.py` now runs
+#     in the default gate set, failing on a weight entry no call charges (drift) and on a
+#     `weights.rs` that carries no benchmark CLI record line (unmeasured), ratcheted shrink-only by
+#     `docs/reports/weights-unmeasured-baseline.json`. Not higher: the gate checks drift and
+#     measured-ness,
+#     it does not re-run a benchmark on a change, so a *number* can still be stale even when the file
+#     agrees with the pallet.
+#   mainnet_ready 58 — **moved for the first time, by 3.** The row's cap is target-hardware
+#     measurement and that has not changed: these numbers come from x3star1 (Xeon E5-2620 v4) and no
+#     weight has been validated against a measured block on the launch target. What moved is the
+#     class of defect underneath it. Twenty-one pallets charged **invented literals** — up to
+#     70,000,000 picoseconds against a measured cost that turned out to be a fraction of that — which
+#     is a consensus-relevant error: a weight that understates the work is a cheap way to fill a
+#     block. Those literals are gone, the five calls that genuinely cannot be measured are recorded
+#     with reasons instead of guesses, and a gate now fails when a file stops describing its pallet.
+# 95*0.35 + 88*0.25 + 58*0.40 = 33.25 + 22 + 23.2 = 78.45 -> 78.
 paths = [
   ".github/workflows/frame-benchmarking.yml",
   "pallets/atomic-trade-engine/src/weights.rs",
   "pallets/x3-kernel/src/weights.rs",
+  "scripts/check-weights-freshness.py",
+  "docs/reports/weights-unmeasured-baseline.json",
+  "docs/reports/benchmark-exceptions.md",
 ]
-implemented = 92
-tested = 84
+implemented = 95
+tested = 88
 # The check requires a row at `tested >= 80` to name the tests behind it. These are the benchmark
 # test suites and the CLI runs that produced each weight file, run on this host.
 test_evidence = [
@@ -141,16 +186,23 @@ test_evidence = [
   "note: `cargo test -p pallet-x3-flashloan --features runtime-benchmarks` 15 passed (3 benchmark entries); `-p pallet-x3-reservation` 21 passed (3)",
   "note: `cargo test -p pallet-x3-domain-registry --features runtime-benchmarks` 10 passed (3 benchmark entries); `-p pallet-x3-reconciliation` 38 passed (6)",
   "note: `cargo test -p pallet-x3-wrapped --features runtime-benchmarks` 33 passed (7 benchmark entries); `-p pallet-x3-sentinel` 14 passed (7)",
-  "note: `cargo test -p pallet-x3-asset-registry --features runtime-benchmarks` 7 benchmark entries pass; its weights are blocked by the benchmark build defect",
+  "note: `cargo test -p pallet-x3-asset-registry --features runtime-benchmarks` 38 passed (7 benchmark entries); the benchmark build defect that blocked its weights file is fixed, and the CLI wrote it",
+  "note: `cargo test -p pallet-x3-account-registry --features runtime-benchmarks` 28 passed (3 benchmark entries); `-p pallet-x3-dapp-hub` 30 passed (8)",
+  "note: `cargo test -p pallet-x3-partner --features runtime-benchmarks` 27 passed (8 benchmark entries); `-p pallet-x3-custody` 45 passed (10)",
+  "note: `cargo test -p pallet-x3-wallet --features runtime-benchmarks` 35 passed (12 benchmark entries)",
+  "note: `cargo test -p pallet-x3-crosschain-gateway --features runtime-benchmarks` 69 passed (11 benchmark entries); `-p pallet-x3-cross-vm-router` 88 passed (3)",
+  "note: `python3 scripts/check-weights-freshness.py` — OK, 22 unmeasured against a baseline of 22, 5 documented drift exceptions, no drift elsewhere; break-it-first measured both ways (a fabricated entry added to `x3-dapp-hub`'s trait fails it naming `never_charged`; removing `x3-verifier` from the baseline fails it naming the file — both restored byte-identically and green again)",
+  "note: `python3 scripts/swarm/x3_repo_scan.py --check` — 4 findings, all `low`: the documented `DbWeight::get().reads_writes` form in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance",
 ]
-mainnet_ready = 55
+mainnet_ready = 58
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "**OPEN — 12 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; thirteen pallets are benchmarked now (`atomic-trade-engine`, `x3-kernel`, `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`, `x3-sequencer`, `x3-da`, `x3-flashloan`, `x3-reservation`, `x3-domain-registry`, `x3-reconciliation`, `x3-wrapped`, `x3-sentinel`) and the count is 12. Four of those are the documented `T::DbWeight::get().reads_writes` form, so twelve pallets remain to be measured",
-  "**OPEN — no workflow re-runs the regeneration.** `make bench-pallets` and `scripts/run-frame-benchmarks.sh` exist and work, but nothing re-runs them automatically, so a weight file can go stale without a gate saying so",
+  "**CLOSED 2026-09-28 — every pallet that charged a typed weight is measured, and the count is 4, all `low`.** The burndown started at 25 `pallet-call-without-weights` sites. Twenty-one pallets are measured by this repository's own CLI now, and the four findings that remain are the documented `T::DbWeight::get().reads_writes` estimate — a stated storage-access count, not an invented cost — in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance. There is no `high` finding left. The last pass also fixed the defect that had made the whole burndown impossible: `pallet-x3-settlement-engine` enabled its optional `rlp` with default features, so the runtime's `runtime-benchmarks` build dragged `bytes/std` and `rustc-hex/std` into the `wasm32v1-none` blob and died with E0463 before any weights could be regenerated",
+  "**CLOSED 2026-09-28 — a gate now says when a weight file has gone stale.** `scripts/check-weights-freshness.py` runs in the default gate set and answers the two questions the tree can answer without a per-pallet node build: an entry no call charges (a renamed call, or a call that went back to a literal) is drift and fails, and a `weights.rs` with no benchmark CLI record line was never produced by a run, so it is unmeasured — ratcheted shrink-only by `docs/reports/weights-unmeasured-baseline.json` (22 files on 2026-09-28, down from every file being one). What it deliberately does *not* do is re-run a benchmark on change, so a number can still be stale while the file agrees with the pallet; that needs a CI runner with a benchmark-featured node build",
+  "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root` (this runtime's `RefuseExternalRoots` verifier refuses every root by policy). Measuring either would report a cost *below* the real one for the calls that gate the atomic kernel",
 ]
 evidence = [
   ".github/workflows/frame-benchmarking.yml",

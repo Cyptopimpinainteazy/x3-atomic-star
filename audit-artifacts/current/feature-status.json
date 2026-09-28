@@ -2331,23 +2331,24 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 67,
+      "composite": 71,
       "confidence": "high",
       "evidence": [
         "runtime/src/lib.rs",
         "runtime/src/tests.rs",
         "scripts/check-runtime-weights-wired.py",
         "note: `impl WeightInfo for ()` returns `Weight::zero()` for every method \u2014 the reason a `()`-wired config is invisible to the block weight limit rather than merely under-charged",
-        "note: 2026-09-27 \u2014 31 pallets ship `src/weights.rs`, 29 declare `pub mod weights;`, and before this change `rg 'WeightInfo = weights::' runtime/src/lib.rs` returned 0 matches; it returns 18 now, and the gate reports `37 runtime config(s) wired to generated weights, 3 documented exception(s)`"
+        "note: 2026-09-27 \u2014 31 pallets ship `src/weights.rs`, 29 declare `pub mod weights;`, and before this change `rg 'WeightInfo = weights::' runtime/src/lib.rs` returned 0 matches; it returns 18 now, and the gate reports `37 runtime config(s) wired to generated weights, 3 documented exception(s)`",
+        "note: 2026-09-28 \u2014 51 pallets ship `src/weights.rs` and `check-runtime-weights-wired.py` reports **57 wired configs** with 3 documented exceptions. `python3 scripts/check-weights-freshness.py` reports 22 unmeasured against a baseline of 22, 5 documented drift exceptions and no drift elsewhere; the eight files from the X3-GPU-003 burndown are among the 29 that carry the CLI's own STEPS/REPEAT record line"
       ],
       "id": "X3-GPU-002",
-      "implemented": 75,
+      "implemented": 82,
       "launch_scope": "guarded",
       "live_tested": "GUARDED_TESTNET",
       "mainnet_ready": 55,
       "missing_work": [
         "**CLOSED 2026-09-27 \u2014 eighteen zero-weight dispatchable sets now charge their pallets' own weights.** Measured before: `runtime/src/lib.rs` set `type WeightInfo = ();` for `pallet_x3_{oracle,vrf,dex,automation,atomic_kernel,auction,launchpad,compute_market}`, `pallet_{governance,treasury,agent_accounts,agent_memory,depin_marketplace,meme_overlord,private_execution}`, `pallet_svm_runtime`, `pallet_grandpa`, `pallet_timestamp`, `pallet_scheduler`, `pallet_preimage` and `pallet_x3_lp_locker`. Eighteen of those (all but grandpa, launchpad and lp_locker) are wired to `<crate>::weights::SubstrateWeight<Runtime>`; the FRAME pallets use their SDK weights. The three that remain are in the gate's shrink-only exception list, each with the reason it cannot be wired today",
-        "**The generated weights are stubs, and the row says so.** Every `weights.rs` in this repository opens with `//! Auto-generated weight stubs \u2026 Run cargo benchmark against real hardware to populate concrete values`, so wiring them replaces `Weight::zero()` with a real read/write count at hand-sized `ref_time`, not with a measured one. That is strictly better than charging nothing and is not the same as benchmarking; the measured half of this subsystem is X3-GPU-003, and the values must be regenerated on target hardware before a mainnet claim",
+        "**CORRECTED 2026-09-28 \u2014 \"every generated weight is a stub\" was wrong in both directions, and the split is a ratchet now.** 29 of the 51 `pallets/*/src/weights.rs` files carry the benchmark CLI's own record line (a real STEPS/REPEAT run on this host, v53.0.0); the other 22 carry a hand-written header and were never produced by a run. Eight of the 29 came from the weights burndown X3-GPU-003 records. The 22 are listed in `docs/reports/weights-unmeasured-baseline.json`, which `scripts/check-weights-freshness.py` holds shrink-only \u2014 a new unmeasured file fails the default gate set, and the gate prints the ones that become measured so the list can drop",
         "**Two generated weight files are dead, and one is worse than dead.** `pallets/x3-launchpad/src/weights.rs` is not a module of its pallet at all (`lib.rs` declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`), so the runtime cannot point at it \u2014 the gate's exception says so. `pallets/x3-consensus/src/weights.rs` is shadowed by an inline `pub mod weights { \u2026 }` in its `lib.rs`, so the runtime is correctly weighted but the file beside it is never compiled; the gate prints a WARNING rather than failing, because the wired numbers are live either way",
         "**Found and fixed while here \u2014 `clippy runtime rc1` was red in the default gate set.** `runtime/src/tests.rs::a_full_ordering_window_is_settlable_in_one_block` exercises `pallet_private_execution`, whose `Config` impl for `Runtime` is `#[cfg(not(feature = \"mainnet-rc1\"))]`, but the test carried no `cfg` of its own, so the `mainnet-rc1` build of the test file did not compile (`the trait bound Runtime: pallet_private_execution::Config is not satisfied`, 12 errors). It carries that cfg now and the gate is green",
         "Still open on this row: 3 runtime configs remain on `()`, and the runtime carries SDK pallets whose own weight modules were not audited here (`pallet_balances`, `pallet_session`, `pallet_evm`, `pallet_collective`, `pallet_transaction_payment`, `pallet_sudo` \u2014 the gate only checks that they do not charge zero, not that their numbers are current). Nothing has re-benchmarked on this host, and no weight here has been validated against a measured block"
@@ -2356,20 +2357,22 @@
       "paths": [
         "runtime/src/lib.rs",
         "runtime/src/tests.rs",
-        "scripts/check-runtime-weights-wired.py"
+        "scripts/check-runtime-weights-wired.py",
+        "scripts/check-weights-freshness.py",
+        "docs/reports/weights-unmeasured-baseline.json"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 75,
+      "tested": 80,
       "tests": "3 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 75,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         ".github/workflows/frame-benchmarking.yml",
@@ -2388,27 +2391,31 @@
         "note: 2026-09-27 - `pallets/x3-wrapped/src/weights.rs` and `pallets/x3-sentinel/src/weights.rs` are new: seven calls each. The sentinel had no `mock.rs` at all \u2014 its test runtime lives in `tests.rs`, and `new_test_ext` had to become `pub` for the benchmark test suite to link against it. Its seven calls also split the way the pallet does: `freeze_authority(origin, asset, who, reason)` takes four arguments and `freeze_asset(origin, asset, reason)` three, which is not guessable from the call names. Adding `type WeightInfo` to the sentinel broke `pallets/x3-token-factory`'s test runtime, which wires the sentinel \u2014 the third crate this class has caught. `cargo test -p pallet-x3-wrapped --features runtime-benchmarks` 33 passed; `-p pallet-x3-sentinel` 14 passed; scan 14 -> 12; `check-runtime-weights-wired.py` names 49 wired configs (was 47)"
       ],
       "id": "X3-GPU-003",
-      "implemented": 92,
+      "implemented": 95,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 55,
+      "mainnet_ready": 58,
       "missing_work": [
-        "**OPEN \u2014 12 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; thirteen pallets are benchmarked now (`atomic-trade-engine`, `x3-kernel`, `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`, `x3-sequencer`, `x3-da`, `x3-flashloan`, `x3-reservation`, `x3-domain-registry`, `x3-reconciliation`, `x3-wrapped`, `x3-sentinel`) and the count is 12. Four of those are the documented `T::DbWeight::get().reads_writes` form, so twelve pallets remain to be measured",
-        "**OPEN \u2014 no workflow re-runs the regeneration.** `make bench-pallets` and `scripts/run-frame-benchmarks.sh` exist and work, but nothing re-runs them automatically, so a weight file can go stale without a gate saying so"
+        "**CLOSED 2026-09-28 \u2014 every pallet that charged a typed weight is measured, and the count is 4, all `low`.** The burndown started at 25 `pallet-call-without-weights` sites. Twenty-one pallets are measured by this repository's own CLI now, and the four findings that remain are the documented `T::DbWeight::get().reads_writes` estimate \u2014 a stated storage-access count, not an invented cost \u2014 in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance. There is no `high` finding left. The last pass also fixed the defect that had made the whole burndown impossible: `pallet-x3-settlement-engine` enabled its optional `rlp` with default features, so the runtime's `runtime-benchmarks` build dragged `bytes/std` and `rustc-hex/std` into the `wasm32v1-none` blob and died with E0463 before any weights could be regenerated",
+        "**CLOSED 2026-09-28 \u2014 a gate now says when a weight file has gone stale.** `scripts/check-weights-freshness.py` runs in the default gate set and answers the two questions the tree can answer without a per-pallet node build: an entry no call charges (a renamed call, or a call that went back to a literal) is drift and fails, and a `weights.rs` with no benchmark CLI record line was never produced by a run, so it is unmeasured \u2014 ratcheted shrink-only by `docs/reports/weights-unmeasured-baseline.json` (22 files on 2026-09-28, down from every file being one). What it deliberately does *not* do is re-run a benchmark on change, so a number can still be stale while the file agrees with the pallet; that needs a CI runner with a benchmark-featured node build",
+        "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root` (this runtime's `RefuseExternalRoots` verifier refuses every root by policy). Measuring either would report a cost *below* the real one for the calls that gate the atomic kernel"
       ],
       "name": "FRAME benchmarking",
       "paths": [
         ".github/workflows/frame-benchmarking.yml",
         "pallets/atomic-trade-engine/src/weights.rs",
-        "pallets/x3-kernel/src/weights.rs"
+        "pallets/x3-kernel/src/weights.rs",
+        "scripts/check-weights-freshness.py",
+        "docs/reports/weights-unmeasured-baseline.json",
+        "docs/reports/benchmark-exceptions.md"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 84,
-      "tests": "tested score 84% (no named test list on this row)"
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4932,9 +4939,9 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "6817ad8758f1a2d1461b62c98c8895301e17d0aa77a237cc7c81e3cccefff97c",
+    "source_digest": "814dbbe42ebd9a88c1569cd931e21a4c7cf9f6b08738bedf7db1d32b0aeaf8a1",
     "sources": {
-      "FEATURE_MATRIX.toml": "a2345ed55b18ad75a9d65046c85211925362c9c29cf3b0eb7c166c575c801e6e",
+      "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "7485c78e7e58d8557b2882b8589c6d76294bce6d0574e78872b9a56ee9d89499",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
@@ -4942,7 +4949,7 @@
       "feature-matrix/cross-chain.toml": "16f06c9e47283289afa2f5d20537c77e0075f10b83ac8162f06effe1b7b80561",
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "ee4a8103c1a29d5b653152b7b4685446222be1f007d6d086fa6afd8a3b253ea6",
+      "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
       "feature-matrix/language-trading.toml": "00425783815173a43087c07f84c98c63805fc6c17debbb3577eab2653942dc68",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "0c5fc98a13dde3a2500796e6e409b28fb593428116de33bf6338f5a1ddd93c8f",
