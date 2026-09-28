@@ -10,7 +10,7 @@
 //! blocks don't exceed weight limits and to calculate transaction fees accurately.
 
 use super::*;
-use frame_benchmarking::benchmarks;
+use frame_benchmarking::{benchmarks, BenchmarkError};
 use frame_support::traits::{Currency, ReservableCurrency};
 use frame_system::RawOrigin;
 use sp_core::H256;
@@ -46,12 +46,18 @@ fn setup_intent<T: Config>() -> (T::AccountId, T::AccountId, H256, AssetSpec, As
 }
 
 /// A canonical Refund proof set covering every escrowed leg of `intent_id`, one bundle per domain.
-fn refund_proof_set<T: Config>(intent_id: H256) -> x3_atomic_swap::CrossDomainProofSet {
+///
+/// Returns a `Result` rather than panicking: the production panic/unwrap ratchet counts a
+/// `#[cfg(feature = "runtime-benchmarks")]` module, and two `expect` calls here grew it 440 → 442 and
+/// reddened `make mainnet-check` on the merge that brought them in.
+fn refund_proof_set<T: Config>(
+    intent_id: H256,
+) -> Result<x3_atomic_swap::CrossDomainProofSet, BenchmarkError> {
     use x3_atomic_swap::{
         CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
     };
     let runtime_intent_id = intent_id.to_fixed_bytes();
-    let intent = SettlementIntents::<T>::get(intent_id).expect("intent exists");
+    let intent = SettlementIntents::<T>::get(intent_id).ok_or(BenchmarkError::Weightless)?;
     let mut bundles: Vec<CrossDomainProofBundle> = Vec::new();
     for leg_idx in 0..intent.legs_total {
         let Some(escrow) = EscrowStates::<T>::get(intent_id, leg_idx) else {
@@ -94,15 +100,17 @@ fn refund_proof_set<T: Config>(intent_id: H256) -> x3_atomic_swap::CrossDomainPr
             },
             proof_hash: [0u8; 32],
         };
-        bundle.proof_hash = bundle.compute_hash().expect("canonical bundle hash");
+        bundle.proof_hash = bundle
+            .compute_hash()
+            .map_err(|_| BenchmarkError::Weightless)?;
         bundles.push(bundle);
     }
-    CrossDomainProofSet {
+    Ok(CrossDomainProofSet {
         intent_id: 1,
         runtime_intent_id,
         intent_hash: [0x11u8; 32],
         bundles,
-    }
+    })
 }
 
 benchmarks! {
@@ -242,7 +250,7 @@ benchmarks! {
         Pallet::<T>::submit_cross_domain_proof_set(
             RawOrigin::Signed(maker.clone()).into(),
             intent_id,
-            refund_proof_set::<T>(intent_id),
+            refund_proof_set::<T>(intent_id)?,
         )?;
 
         let origin = RawOrigin::Signed(maker.clone());
@@ -354,31 +362,12 @@ benchmarks! {
             1_000_000u128,
             vec![2u8; 64],
         ).ok();
-        let receipt_data = vec![0xc3, 0x80, 0x80, 0x80];
-        let proof = SettlementProof {
-            proof_type: ProofType::MerkleTrie,
-            tx_hash: H256::from(sp_io::hashing::keccak_256(&receipt_data)),
-            block_hash: H256::from_low_u64_be(3),
-            // The height the proof is about. Stated rather than derived from
-            // `tx_hash`, which is what the benchmark's proof used to imply
-            // (TICKET-061).
-            chain_height: Some(18_000_000),
-            confirmations: 12u32,
-            // Two entries: the state root and the receipt root, which is what the
-            // EVM path verifies against (see `proof_roots`).
-            merkle_proof: vec![H256::zero(), H256::zero()]
-                .try_into()
-                .expect("two-item proof is within the configured maximum"),
-            receipt_data: receipt_data
-                .try_into()
-                .expect("four-byte receipt is within the configured maximum"),
-            // The EVM path reads neither: `receipt_index` is the BTC/SPV position
-            // and `trie_proof` is the Merkle-Patricia path, which this benchmark's
-            // proof deliberately does not carry (it exercises the shape check, and
-            // the proof is refused for exactly that reason).
-            receipt_index: None,
-            trie_proof: None,
-        };
+        // The proof the EVM path accepts: a receipt that walks to its own receipts root. The
+        // benchmark used to hand the pallet a two-zero-root proof with no trie path and no receipt
+        // index, which the verification added in PR #520 refuses (`InvalidProof`) — and the
+        // `benchmarks!` macro asserts the extrinsic succeeds, so that benchmark could never pass.
+        let proof = crate::proof_fixtures::create_evm_receipt_proof()
+            .map_err(|_| BenchmarkError::Weightless)?;
 
         let origin = RawOrigin::Signed(maker.clone());
     }: _(origin, intent_id, ExternalChainId::Ethereum, proof)

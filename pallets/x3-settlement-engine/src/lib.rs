@@ -96,6 +96,12 @@ pub mod weights;
 
 #[cfg(test)]
 mod mock;
+
+/// Proof fixtures shared by the tests and the benchmarks: the benchmark's CLI run is a
+/// `--features runtime-benchmarks` build rather than `cfg(test)`, so a fixture that lives only in
+/// `tests.rs` is unreachable from it.
+#[cfg(any(test, feature = "runtime-benchmarks"))]
+pub mod proof_fixtures;
 #[cfg(test)]
 mod tests;
 

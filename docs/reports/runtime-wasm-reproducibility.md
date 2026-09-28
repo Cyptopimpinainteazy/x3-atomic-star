@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `9e1fa6539`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `924a7c37e`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -547,15 +547,45 @@ alters the runtime, so the record and the code land together.
   pallet's own test run, which passes with `std`. The reconciliation benchmarks set the state their
   calls read through the pallet's own extrinsics. Scanner `pallet-call-without-weights` 16 → 14.
 
-* `9e1fa6539` — **the wrapped pallet and the sentinel measure their calls.** `pallets/x3-wrapped`
+* `eac5255ce` — **the wrapped pallet and the sentinel measure their calls.** `pallets/x3-wrapped`
   charged 8,000-20,000 picoseconds across seven calls; `pallets/x3-sentinel` charged 15,000 on each
   of seven — and each of those is a security power: freezing an authority's supply-changing rights on
   an asset, freezing the asset, enrolling it for guardian review, granting an approval. Both declared
   `runtime-benchmarks` features with nothing behind them. They carry generated weight files now:
-  compact 8899740 bytes (`0x170cfade0321786153805c40c5ba7aca014048aafe2fb4f1cefb0b2957ec9df1`) — was 8,890,492 — and compressed 1530710
-  (`0xefff2d771f5ac64d12efa5651a2ede8766e2f8b492e7a8540ba2ea5c89256249`) — was 1,526,313.
+  compact 8888748 bytes (`0xd15e080511871e250c3d6674bc5bf3bdf115107cde087c49801518b01be59478`) — was 8,890,492 — and compressed 1528293
+  (`0xe3d3a6f7bcd1ca623dbcbed037cfc15db729b2e621314831af2fb76371c66d8c`) — was 1,526,313.
 
   The sentinel has no `mock.rs`; its test runtime lives in `tests.rs`, and `new_test_ext` had to
   become `pub` for the benchmark test suite to link against it. Its argument shapes are not guessable
   from the call names either — `freeze_authority(origin, asset, who, reason)` takes four and
   `freeze_asset(origin, asset, reason)` three. Scanner `pallet-call-without-weights` 14 → 12.
+
+* `41f386c3d` — **the settlement proof fixture moves out of `cfg(test)`, and the record catches up with
+  the merge.** PR #520 tightened the EVM settlement path to walk a real receipts trie, which left that
+  pallet's `submit_proof` benchmark handing the verifier a proof with no trie path and no receipt
+  index; the `benchmarks!` macro asserts the extrinsic succeeds, so the benchmark could never pass, and
+  `cargo test -p pallet-x3-settlement-engine --features runtime-benchmarks` was red on master. The
+  fixture (`receipt_trie`, `create_evm_receipt_proof`, their two constants) now lives in
+  `src/proof_fixtures.rs`, compiled under `cfg(any(test, feature = "runtime-benchmarks"))`, so the
+  benchmark's CLI run — which is not `cfg(test)` — can reach the same evidence the tests use. The suite
+  is 176 passed with the feature on, where it was 175 and one failing.
+
+  The same change carries the record forward: the merge's attestation (`eac5255ce`) was taken inside
+  the PR branch before master was merged into it, so the merged tree's bytes are new — compact
+  8888737 bytes (`0x18d31490b724d8e5af91f0eb77436a3a3e95947d5576bb973022f125a16e63b1`) — was 8,880,606 — and compressed 1528341
+  (`0x73df026fa625427bb4e02aaadda76b53be0a788d7876e3b7f46823af5bfac7b6`) — was 1,528,293, from two builds that agreed.
+
+* `924a7c37e` — **the asset registry joins the registered benchmark pallets, and the record follows.**
+  `pallets/x3-asset-registry`'s seven dispatchables charged literals with no `runtime-benchmarks`
+  feature at all. The benchmarks exist and pass in the pallet's own suite now (seven entries), and the
+  runtime registers the pallet in `mod benches`, which moves the recorded bytes by one: compact
+  8888737 (`0x7e761cc4692ac1baab78f4b81e8138dde9c42122e1e34b5868f21b2a1ad8d9a3`) — was 8,888,737 — and compressed 1528342 (`0xdc8e889f70c893f0bedc00e4e9b2e271e657c3e2cc55f36474eb753afc6c6854`)
+  — was 1,528,341, from two builds that agreed.
+
+  **No weights file yet, and the reason is a defect in this repository's benchmark build, not in the
+  pallet.** `cargo build --release -p x3-chain-node --features runtime-benchmarks` fails in the nested
+  WASM build with `E0463: can't find crate for 'std'` from `rustc-hex`/`bytes`, reached through
+  `evm/std`; the same command fails with every uncommitted edit stashed, so it predates this change,
+  and clearing the nested build cache does not help. The weights CLI cannot work around it either: a
+  node built with `SKIP_WASM_BUILD=1` refuses to start without an embedded runtime. Until that build is
+  fixed, no pallet's weights can be regenerated.
