@@ -70,6 +70,12 @@ cleanup() {
     [[ -f "$f" ]] || continue
     kill -9 "$(cat "$f")" 2>/dev/null || true
   done
+  # The forced-restart step (gate 7) kills a validator and relaunches it from its own argv, so the
+  # relaunched process is not the pid the launcher recorded and the loop above misses it. Measured
+  # 2026-09-28: that survivor held rpc 19820 and p2p 30520, and the *next* drill run died with
+  # "RPC not ready on port 19821" because node-2 could not bind. Scoped to this drill's own temp
+  # base directory — never a bare `pkill -f x3-chain-node`.
+  pkill -9 -f -- "--base-path $BASE_DIR/node-" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -153,6 +159,16 @@ run_gate() {
 }
 
 info "running the public testnet gate against validator 1"
+# Gate 7 used to read `reports/drill_node_restart.md` and accept any `restart_drill: PASS` in it,
+# so a report from a different chain — or from a previous boot of this one — satisfied a launch
+# criterion. The criterion now requires the report to name this network's genesis hash, which means
+# the drill that owns this network has to run the restart drill on it first. That is the flow the
+# criterion always documented ("run scripts/drills/node_restart_drill.sh"), just enforced.
+info "running the forced node restart drill against this network (gate 7 reads its report)"
+X3_RPC_URL="http://127.0.0.1:$RPC_BASE" bash "$ROOT_DIR/scripts/drills/node_restart_drill.sh" \
+  >"$WORK_DIR/restart-drill.out" 2>&1 || { tail -20 "$WORK_DIR/restart-drill.out" >&2; fail "the forced node restart drill did not pass on this network"; }
+grep -E '^- restart_drill(_chain)?:' "$ROOT_DIR/reports/drill_node_restart.md" | sed 's/^/  /'
+
 # Criterion 14 reads an explorer the operator starts, and the two ends have to agree: the page must
 # read *this* network. Measured 2026-09-28 — the explorer on :3000 pointed at the monitoring gates'
 # rpc 19800 while this drill ran on 19820, so the page rendered `rpc-unreachable`, the criterion

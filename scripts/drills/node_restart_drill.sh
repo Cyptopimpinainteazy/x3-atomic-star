@@ -26,10 +26,23 @@ TIMEOUT=120
 RESULT="FAIL"
 RPC_PORT="${RPC_URL##*:}"; RPC_PORT="${RPC_PORT%%/*}"
 
+# Prints exactly one decimal number, always.
+#
+# The previous form was
+#   curl … | jq -r '.result.number // "0x0"' | xargs printf "%d\n" 2>/dev/null || echo "0"
+# and it printed *two* lines — "0\n0" — whenever nothing was listening on the RPC port:
+# `set -o pipefail` makes the pipeline fail because curl failed, so the `|| echo "0"`
+# fired on top of the "0" the printf had already produced. The caller's
+# `[[ "$PRE_BLOCK" -eq 0 ]]` then died with `[[: 0 0: syntax error in expression`
+# and the drill exited 7 on the one path it is supposed to take when no node is up
+# (the SKIP path), instead of saying so. Measured 2026-09-28.
 get_block() {
-    curl -sf -m 5 "$RPC_URL" -H 'Content-Type: application/json' \
-        -d '{"id":1,"jsonrpc":"2.0","method":"chain_getHeader","params":[]}' \
-    | jq -r '.result.number // "0x0"' | xargs printf "%d\n" 2>/dev/null || echo "0"
+    local raw=""
+    raw="$(curl -sf -m 5 "$RPC_URL" -H 'Content-Type: application/json' \
+        -d '{"id":1,"jsonrpc":"2.0","method":"chain_getHeader","params":[]}' 2>/dev/null \
+        | jq -r '.result.number // "0x0"' 2>/dev/null)" || true
+    [[ -n "$raw" ]] || raw="0x0"
+    printf '%d\n' "$raw" 2>/dev/null || printf '0\n'
 }
 
 hash_of() { # <block number>
@@ -162,9 +175,21 @@ fi
 # end of a drill whose whole point is that the validator came back.
 echo "  Node left running: pid $NEW_PID (log: $NEW_LOG)"
 
+# The chain this run proved something about. The public testnet gate's Gate 7 reads this
+# report, and until 2026-09-28 it accepted `restart_drill: PASS` from *any* file at this path —
+# including a run against a different network, or one from a previous boot of the same one. The
+# genesis hash is the identity the gate can check: it reads its own chain's genesis and requires
+# the report to name the same one. Recorded here rather than in the gate because only the drill
+# knows which endpoint it actually restarted.
+CHAIN_GENESIS="$(curl -sf -m 5 "$RPC_URL" -H 'Content-Type: application/json' \
+    -d '{"id":1,"jsonrpc":"2.0","method":"chain_getBlockHash","params":[0]}' 2>/dev/null \
+    | jq -r '.result // ""' 2>/dev/null)" || true
+
 {
     echo "# Node Restart Drill"
     echo ""
+    echo "- restart_drill_chain: ${CHAIN_GENESIS:-unknown}"
+    echo "- restart_drill_rpc: $RPC_URL"
     echo "- RPC checked: $RPC_URL (port $RPC_PORT)"
     echo "- Node killed: pid $NODE_PID, restarted from its own argv as pid ${NEW_PID:-none}"
     echo "- Pre-kill best block: $PRE_BLOCK"

@@ -289,7 +289,24 @@ echo "→ [Gate 7] Forced node restart drill..."
 RESTART_REPORT="$REPORT_DIR/drill_node_restart.md"
 if [[ -f "$RESTART_REPORT" ]]; then
     if grep -q "restart_drill: PASS" "$RESTART_REPORT"; then
-        pass "forced_node_restart_drill"
+        # A PASS from *some* run is not a proof about *this* network. Until 2026-09-28 this
+        # criterion accepted any file at this path containing `restart_drill: PASS`, so a report
+        # from a different chain — or from a previous boot of this one — satisfied a launch
+        # criterion. The drill now records the chain it restarted, and the gate requires that
+        # genesis hash to be its own. A report predating the field is refused rather than trusted,
+        # because there is no way to tell which network it described.
+        GATE_GENESIS="$(rpc_value chain_getBlockHash '[0]')"
+        REPORT_CHAIN="$(sed -n 's/^- restart_drill_chain: //p' "$RESTART_REPORT" | head -1)"
+        if [[ -z "$REPORT_CHAIN" || "$REPORT_CHAIN" == "unknown" ]]; then
+            fail "forced_node_restart_drill" "the report at $RESTART_REPORT does not name the chain it restarted (reports written before 2026-09-28 do not) — re-run scripts/drills/node_restart_drill.sh against this network"
+        elif [[ -z "$GATE_GENESIS" ]]; then
+            fail "forced_node_restart_drill" "could not read this chain's genesis hash from $RPC_URL, so the restart report cannot be tied to it"
+        elif [[ "$REPORT_CHAIN" != "$GATE_GENESIS" ]]; then
+            fail "forced_node_restart_drill" "the report proves a restart on chain $REPORT_CHAIN but this gate reads $GATE_GENESIS — the drill was run against a different network (or a previous boot)"
+        else
+            info "the restart report names this chain ($GATE_GENESIS)"
+            pass "forced_node_restart_drill"
+        fi
     else
         fail "forced_node_restart_drill" "drill report present but not PASS — see $RESTART_REPORT"
     fi
