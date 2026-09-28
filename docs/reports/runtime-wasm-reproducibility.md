@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `9f5446270`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `382f4c8da`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -532,3 +532,17 @@ alters the runtime, so the record and the code land together.
   requires the chain's balance to be `u128` and uses real amounts for the same class of reason: the
   inventory helpers return early for zero, and a zero-amount benchmark measures the no-op path.
   Scanner `pallet-call-without-weights` 18 → 16.
+
+* `382f4c8da` — **the domain registry and the reconciliation pallet measure their calls.**
+  `pallets/x3-domain-registry` charged 20,000 picoseconds to register a domain and 30,000 to set its
+  records; `pallets/x3-reconciliation` charged 10,000-30,000 across six calls — a chain supply report,
+  the canonical supply, the reconciliation run itself, the halt lift, and two governance-power calls.
+  Both declared `runtime-benchmarks` features with nothing behind them. They carry generated weight
+  files now: compact 8890492 bytes (`0x84ae71b3d391d407c06d7a4cb4789ae7d2e58cd480c6f13fc811e37201785db5`) — was 8,895,788 — and compressed
+  1526313 (`0xbe7d4de0bd5020c3ebc2c86ac4f21e83c1719da09e40f60328844d52fbd25a02`) — was 1,524,612.
+
+  A benchmark module also compiles into this runtime's WASM build, where `Vec` and `vec!` are not in
+  the prelude: the domain registry's `Vec<X3DnsRecord<T>>` helper needed `use sp_std::{vec, vec::Vec}`,
+  and the failure surfaced as `cannot find type Vec in this scope` from the build script, not from the
+  pallet's own test run, which passes with `std`. The reconciliation benchmarks set the state their
+  calls read through the pallet's own extrinsics. Scanner `pallet-call-without-weights` 16 → 14.

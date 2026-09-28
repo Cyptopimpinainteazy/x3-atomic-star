@@ -75,6 +75,7 @@ impl pallet_x3_domain_registry::Config for Test {
     type MaxRecordsPerDomain = MaxRecordsPerDomain;
     type MaxCnameLen = MaxCnameLen;
     type MaxTxtLen = MaxTxtLen;
+    type WeightInfo = pallet_x3_domain_registry::weights::SubstrateWeight<Test>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

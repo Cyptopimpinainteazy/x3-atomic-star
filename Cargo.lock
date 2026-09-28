@@ -12389,6 +12389,7 @@ dependencies = [
 name = "pallet-x3-domain-registry"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12601,6 +12602,7 @@ dependencies = [
 name = "pallet-x3-reconciliation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",

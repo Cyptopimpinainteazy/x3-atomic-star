@@ -11,6 +11,7 @@ repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
 scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
 
@@ -32,6 +33,7 @@ sp-core = { workspace = true, features = ["std"] }
 [features]
 default = ["std"]
 std = [
+  "frame-benchmarking?/std",
   "codec/std",
   "scale-info/std",
   "frame-support/std",
@@ -43,6 +45,7 @@ std = [
   "serde/std",
 ]
 runtime-benchmarks = [
+  "frame-benchmarking/runtime-benchmarks",
   "frame-support/runtime-benchmarks",
   "frame-system/runtime-benchmarks",
 ]

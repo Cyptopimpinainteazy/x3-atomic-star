@@ -89,6 +89,8 @@ source = "master"
 #     for 10,000 picoseconds, a blob commitment for 15,000 and a shard proof for 10,000.
 #     2026-09-27, seventh pass: `pallets/x3-flashloan` (borrow/repay 10,000, add_liquidity 5,000) and
 #     `pallets/x3-reservation` (three root transitions at 10,000 each).
+#     2026-09-27, eighth pass: `pallets/x3-domain-registry` (three calls, 20,000/30,000) and
+#     `pallets/x3-reconciliation` (six calls, 10,000-30,000).
 #   tested 70 — every new benchmark runs in the pallet's benchmark test suite (10 for
 #     atomic-trade-engine, 13 for x3-kernel) and the full CLI run is what wrote the files. Not
 #     higher: no workflow re-runs the per-pallet regeneration on a PR, so a stale file is still only
@@ -110,21 +112,25 @@ source = "master"
 #     with the feature on); the reservation benchmark requires the chain's balance to be `u128` and
 #     uses real amounts, because the inventory helpers return early for zero and a zero-amount
 #     benchmark would measure the no-op path.
-# 88*0.35 + 80*0.25 + 55*0.40 = 30.8 + 20 + 22 = 72.8 -> 73.
+#     The domain registry's three and the reconciliation pallet's six run in their suites (10 and 38
+#     tests with the feature on); the reconciliation's own benchmarks set the state its calls read
+#     through the pallet's extrinsics (a canonical supply and a chain report before a reconciliation,
+#     an active halt before a halt lift).
+# 90*0.35 + 82*0.25 + 55*0.40 = 31.5 + 20.5 + 22 = 74.
 paths = [
   ".github/workflows/frame-benchmarking.yml",
   "pallets/atomic-trade-engine/src/weights.rs",
   "pallets/x3-kernel/src/weights.rs",
 ]
-implemented = 88
-tested = 80
+implemented = 90
+tested = 82
 mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "**OPEN — 16 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; nine pallets are benchmarked now (`atomic-trade-engine`, `x3-kernel`, `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`, `x3-sequencer`, `x3-da`, `x3-flashloan`, `x3-reservation`) and the count is 16. The rest have no `weights.rs` at all, so each needs the `WeightInfo` trait, a `benchmarking.rs`, a runtime `type WeightInfo` and a re-attestation before its numbers are measured rather than typed",
+  "**OPEN — 14 pallets still charge a weight somebody typed.** `scripts/swarm/x3_repo_scan.py` reported 25 `pallet-call-without-weights` sites; eleven pallets are benchmarked now (`atomic-trade-engine`, `x3-kernel`, `x3-supply-ledger`, `x3-treasury-policy`, `x3-token-factory`, `x3-sequencer`, `x3-da`, `x3-flashloan`, `x3-reservation`, `x3-domain-registry`, `x3-reconciliation`) and the count is 14. The rest have no `weights.rs` at all, so each needs the `WeightInfo` trait, a `benchmarking.rs`, a runtime `type WeightInfo` and a re-attestation before its numbers are measured rather than typed",
   "**OPEN — no workflow re-runs the regeneration.** `make bench-pallets` and `scripts/run-frame-benchmarks.sh` exist and work, but nothing re-runs them automatically, so a weight file can go stale without a gate saying so",
 ]
 evidence = [
@@ -140,6 +146,7 @@ evidence = [
   "note: 2026-09-27 - adding `type WeightInfo` to a pallet's `Config` breaks **every other crate that implements that Config**, and nothing caught it: the supply ledger's new associated type silently broke `cargo test -p pallet-x3-token-factory` and `cargo test -p pallet-x3-cross-vm-router` (their test runtimes wire the ledger) while `make mainnet-check` stayed green, because the release gate runs a subset of packages. Both are fixed; `cargo check --workspace --all-targets` is the check that sees this class and is now the net used after every weights pass",
   "note: 2026-09-27 - `pallets/x3-sequencer/src/weights.rs` and `pallets/x3-da/src/weights.rs` are new: one sequenced-transaction call and two DA calls, all literals, behind `runtime-benchmarks` features with nothing behind them. The DA pallet's shard-proof benchmark commits the blob it attests to first, through the pallet's own extrinsic, because the commitment has to exist. `cargo test -p pallet-x3-sequencer --features runtime-benchmarks` 16 passed; `-p pallet-x3-da` 17 passed; scan 20 -> 18; `check-runtime-weights-wired.py` names 43 wired configs (was 41)",
   "note: 2026-09-27 - `pallets/x3-flashloan/src/weights.rs` and `pallets/x3-reservation/src/weights.rs` are new: three calls each, all literals. Two traps showed up here. (1) `define_benchmarks!`'s location name has to match the `construct_runtime!` pallet alias exactly — `X3FlashLoan`, not `X3Flashloan` — because the macro resolves it at the crate root, where the `use` alias inside `mod benches` is not in scope. (2) A benchmark amount has to clear the chain's existential deposit: the flash loan's 1,000-unit pool failed on the dev chain with 'Account cannot exist with the funds that would be given' while passing in the mock, so its amounts are now multiples of `minimum_balance()`. The reservation benchmark uses real amounts for the same class of reason — the inventory helpers return early for zero. `cargo test -p pallet-x3-flashloan --features runtime-benchmarks` 15 passed; `-p pallet-x3-reservation` 21 passed; scan 18 -> 16; `check-runtime-weights-wired.py` names 45 wired configs (was 43). `cargo check --workspace --all-targets` caught a third Config impl (`pallets/x3-solvency`'s mock) that the added `type WeightInfo` broke",
+  "note: 2026-09-27 - `pallets/x3-domain-registry/src/weights.rs` and `pallets/x3-reconciliation/src/weights.rs` are new: three and six calls, all literals. A benchmark module also compiles in the runtime's WASM build, where `Vec` and `vec!` are not in the prelude — the domain registry's `Vec<X3DnsRecord<T>>` helper needed `use sp_std::{vec, vec::Vec};`, and the failure appears as `cannot find type Vec in this scope` from the build script, not from the pallet's own test run (which passes with `std`). `cargo test -p pallet-x3-domain-registry --features runtime-benchmarks` 10 passed; `-p pallet-x3-reconciliation` 38 passed; scan 16 -> 14; `check-runtime-weights-wired.py` names 47 wired configs (was 45)",
 ]
 
 [[feature]]

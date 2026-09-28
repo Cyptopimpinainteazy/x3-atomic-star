@@ -2646,6 +2646,7 @@ impl pallet_x3_domain_registry::Config for Runtime {
     type MaxRecordsPerDomain = MaxX3RecordsPerDomain;
     type MaxCnameLen = MaxX3CnameLen;
     type MaxTxtLen = MaxX3TxtLen;
+    type WeightInfo = pallet_x3_domain_registry::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Account Registry Pallet Configuration =====
@@ -3206,6 +3207,7 @@ impl pallet_x3_reconciliation::Config for Runtime {
     type MintHaltThresholdBlocks = MintHaltThresholdBlocks;
     type ToleranceBps = ReconciliationToleranceBps;
     type GovernanceDivergenceAlertBps = ReconciliationGovDivergenceAlertBps;
+    type WeightInfo = pallet_x3_reconciliation::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Wrapped Token Configuration =====
@@ -3569,8 +3571,16 @@ mod benches {
     use pallet_x3_flashloan::Pallet as X3FlashLoan;
     #[allow(unused_imports)]
     use pallet_x3_reservation::Pallet as X3Reservation;
+    // Added 2026-09-27: `pallet-x3-domain-registry` and `pallet-x3-reconciliation` charged literals
+    // on every call behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_domain_registry::Pallet as X3DomainRegistry;
+    #[allow(unused_imports)]
+    use pallet_x3_reconciliation::Pallet as X3Reconciliation;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_domain_registry, X3DomainRegistry]
+        [pallet_x3_reconciliation, X3Reconciliation]
         [pallet_x3_sequencer, X3Sequencer]
         [pallet_x3_da, X3Da]
         [pallet_x3_token_factory, X3TokenFactory]
