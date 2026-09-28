@@ -66,6 +66,7 @@ impl pallet_x3_dapp_hub::Config for Test {
     type RegistrationDepositAmount = RegistrationDepositAmount;
     type FeaturedPlacementFeeAmount = FeaturedPlacementFeeAmount;
     type PremiumPlacementFeeAmount = PremiumPlacementFeeAmount;
+    type WeightInfo = ();
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

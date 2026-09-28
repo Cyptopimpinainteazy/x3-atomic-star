@@ -3414,6 +3414,7 @@ impl pallet_x3_dapp_hub::Config for Runtime {
     type RegistrationDepositAmount = DappHubRegistrationDeposit;
     type FeaturedPlacementFeeAmount = DappHubFeaturedPlacementFee;
     type PremiumPlacementFeeAmount = DappHubPremiumPlacementFee;
+    type WeightInfo = pallet_x3_dapp_hub::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Compute Market Configuration (Phase 10) =====
@@ -3598,11 +3599,17 @@ mod benches {
     // pallet could not provide, and nothing could measure it because it was not registered here.
     #[allow(unused_imports)]
     use pallet_x3_account_registry::Pallet as X3AccountRegistry;
+    // Added 2026-09-28: `pallet-x3-dapp-hub` charged literals on all eight calls and had no
+    // `benchmarking.rs`, while this runtime already enabled
+    // `pallet-x3-dapp-hub/runtime-benchmarks`.
+    #[allow(unused_imports)]
+    use pallet_x3_dapp_hub::Pallet as X3DappHub;
     #[allow(unused_imports)]
     use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
         [pallet_x3_account_registry, X3AccountRegistry]
+        [pallet_x3_dapp_hub, X3DappHub]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]
