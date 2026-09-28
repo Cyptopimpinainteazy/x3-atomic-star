@@ -9355,3 +9355,35 @@ registration, with the outcome per file:
   `x3-dapp-hub` (8), `x3-cross-vm-router` (8, needs the documented-exception path for
   `register_external_root`), `x3-asset-registry` (7), `x3-account-registry` (3, no mock and no tests —
   its own turn), and the settlement-engine fixture lift above.
+
+## 2026-09-28 — the settlement fixture leaves `cfg(test)`, and the benchmark runs again
+
+- **The blocker from the last turn is closed.** `pallets/x3-settlement-engine`'s `submit_proof`
+  benchmark handed the verifier a two-zero-root proof with no trie path and no receipt index — the
+  `benchmarks!` macro asserts the extrinsic succeeds, so after PR #520 tightened the EVM path to walk
+  a real receipts trie that benchmark could never pass (`175 passed, 1 failed` on master).
+- **The fixture now lives in `src/proof_fixtures.rs`**, compiled under
+  `cfg(any(test, feature = "runtime-benchmarks"))` — a benchmark's CLI run is *not* `cfg(test)`, which
+  is why a fixture that only exists in `tests.rs` is unreachable from it. `rlp` moved from a
+  dev-dependency to an **optional dependency enabled by the `runtime-benchmarks` feature**, because
+  the fixture needs it in a non-test build. This is the general shape for any "the benchmark needs the
+  test's fixture" problem in this repo.
+- **Moving code out of `cfg(test)` converts its `unwrap`s into production panics.** The fixture's three
+  `try_into().unwrap()` calls did exactly that; the builder is `Result<_, DispatchError>` now, the
+  tests unwrap it in a `cfg(test)` wrapper (where the ratchet does not count them), and the benchmark
+  maps the error to `BenchmarkError::Weightless`. The production ratchet **fell 440 → 438** and the
+  baseline was re-recorded.
+- **The runtime record moved for a reason worth remembering:** the merge's attestation (`eac5255ce`)
+  was taken *inside the PR branch* before master was merged into it, so the merged tree's bytes were
+  new. Revision `41f386c3d`, compact 8,888,737 `0x18d31490…`, compressed 1,528,341 `0x73df026f…`,
+  from two agreeing srtool builds.
+- **Evidence**: settlement-engine 168 passed / **176 with `--features runtime-benchmarks`** (was 175 +
+  1 failed), 23 integration tests; `cargo check --workspace --all-targets` clean;
+  `check-runtime-hash-freshness.py` rc 0; `panic_unwrap_audit.sh` PASS at 438; `make mainnet-check`
+  PASS; consistency and scanner PASS.
+- **Next seeds:** the weights burndown has 12 findings left, 4 of them the documented
+  `T::DbWeight::get().reads_writes` form, so **8 pallets**: `x3-wallet-pallet` (12 calls),
+  `x3-crosschain-gateway` (11), `x3-custody` (10), `x3-dapp-hub` (8), `x3-cross-vm-router` (8, needs
+  the documented-exception path for `register_external_root`), `x3-asset-registry` (7),
+  `x3-account-registry` (3, no mock and no tests), and `x3-settlement-engine`'s own weights can now be
+  regenerated on a dev chain if the runtime's verifier accepts the fixture — worth trying next.
