@@ -22,7 +22,18 @@ sp-core = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 # The receipts-trie fixture the `submit_proof` benchmark needs is shared with the
 # tests, so the pallet needs `rlp` in a build that is not `cfg(test)`.
-rlp = { version = "0.5", optional = true }
+#
+# `default-features = false` is load-bearing, not tidiness. `runtime-benchmarks`
+# turns this optional dependency on, and the runtime's `runtime-benchmarks` build
+# is compiled into the WASM blob at `wasm32v1-none`, which has no `std`. rlp's
+# default feature is `std`, and `rlp/std` pulls in `bytes/std` and
+# `rustc-hex/std`; both crates are `#![cfg_attr(not(feature = "std"), no_std)]`,
+# so with `std` named and absent they compile as std crates against a target
+# without a prelude and die with a wall of `cannot find type Option` /
+# `can't find crate for std`. Turning the default off leaves the fixture on
+# rlp's `no_std` path, which `x3-verification-router` already uses in this same
+# graph; `std` re-enables it for host builds through the feature below.
+rlp = { version = "0.5", optional = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-api = { workspace = true, default-features = false }
@@ -83,6 +94,9 @@ std = [
     # wasm build gets its `no_std` path; the host build has to turn `std` back on
     # explicitly.
     "x3-verification-router/std",
+    # `rlp` is only present under `runtime-benchmarks`, so this is weak
+    # (`rlp?/std`) and applies to host builds only.
+    "rlp?/std",
 ]
 runtime-benchmarks = [
     "rlp",
