@@ -57,6 +57,7 @@ impl pallet_x3_wrapped::Config for Test {
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type MaxChainsPerAsset = MaxChainsPerAsset;
     type MaxWrappedAssets = MaxWrappedAssets;
+    type WeightInfo = pallet_x3_wrapped::weights::SubstrateWeight<Test>;
 }
 
 // ── Common test fixtures ──────────────────────────────────────────────────────

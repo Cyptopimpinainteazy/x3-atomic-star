@@ -76,9 +76,10 @@ impl EnsureOrigin<RuntimeOrigin> for FreezeRoot {
 
 impl pallet_x3_sentinel::Config for Test {
     type FreezeOrigin = FreezeRoot;
+    type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Test>;
 }
 
-fn new_test_ext() -> sp_io::TestExternalities {
+pub fn new_test_ext() -> sp_io::TestExternalities {
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();

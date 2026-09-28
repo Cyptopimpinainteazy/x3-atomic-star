@@ -3,13 +3,13 @@
 Findings carry an id, a severity, the exact file and symbol, why it matters, the fix, the test that would prove the fix and the gate that catches a regression. Sorted by severity, kind, path and line, so two runs over the same tree are byte-identical.
 
 Root: `/home/lojak/Desktop/xxxstar-main`
-Findings: 14
+Findings: 12
 
 ## Counts
 
 | kind | count | ratcheted here |
 |---|---|---|
-| `pallet-call-without-weights` | 14 | yes |
+| `pallet-call-without-weights` | 12 | yes |
 
 ## Related ratchets (not re-reported here)
 
@@ -84,15 +84,6 @@ Findings: 14
 - **test required:** cargo test -p x3-partner --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
-### HIGH — `pallet-call-without-weights` — pallets/x3-sentinel/src/lib.rs:218
-
-- **id:** `f02935bb98289364`
-- **symbol:** `x3-sentinel::Weight::from_parts(15_000, 0`
-- **why it matters:** 7 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
-- **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
-- **test required:** cargo test -p x3-sentinel --features runtime-benchmarks
-- **release gate affected:** runtime identity / benchmarks
-
 ### HIGH — `pallet-call-without-weights` — pallets/x3-wallet-pallet/src/lib.rs:218
 
 - **id:** `b9033896ff6205da`
@@ -100,15 +91,6 @@ Findings: 14
 - **why it matters:** 12 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
 - **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
 - **test required:** cargo test -p x3-wallet-pallet --features runtime-benchmarks
-- **release gate affected:** runtime identity / benchmarks
-
-### HIGH — `pallet-call-without-weights` — pallets/x3-wrapped/src/lib.rs:278
-
-- **id:** `e76afd632d1f8b4f`
-- **symbol:** `x3-wrapped::Weight::from_parts(10_000, 0`
-- **why it matters:** 7 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs
-- **suggested fix:** add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>
-- **test required:** cargo test -p x3-wrapped --features runtime-benchmarks
 - **release gate affected:** runtime identity / benchmarks
 
 ### LOW — `pallet-call-without-weights` — pallets/depin-marketplace/src/lib.rs:368

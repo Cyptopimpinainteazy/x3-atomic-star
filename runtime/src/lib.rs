@@ -3222,6 +3222,7 @@ impl pallet_x3_wrapped::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrTwoThirdsCouncil;
     type MaxChainsPerAsset = MaxChainsPerAsset;
     type MaxWrappedAssets = MaxWrappedAssets;
+    type WeightInfo = pallet_x3_wrapped::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Auction Configuration =====
@@ -3261,6 +3262,7 @@ impl pallet_x3_sentinel::Config for Runtime {
     // council/governance must be delegated explicitly at runtime-author-time;
     // this deliberately defaults to the strongest, easiest-to-audit origin.
     type FreezeOrigin = frame_system::EnsureRoot<AccountId>;
+    type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Launchpad Configuration =====
@@ -3577,8 +3579,16 @@ mod benches {
     use pallet_x3_domain_registry::Pallet as X3DomainRegistry;
     #[allow(unused_imports)]
     use pallet_x3_reconciliation::Pallet as X3Reconciliation;
+    // Added 2026-09-27: `pallet-x3-wrapped` and `pallet-x3-sentinel` charged literals on every call
+    // behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_sentinel::Pallet as X3Sentinel;
+    #[allow(unused_imports)]
+    use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_wrapped, X3Wrapped]
+        [pallet_x3_sentinel, X3Sentinel]
         [pallet_x3_domain_registry, X3DomainRegistry]
         [pallet_x3_reconciliation, X3Reconciliation]
         [pallet_x3_sequencer, X3Sequencer]

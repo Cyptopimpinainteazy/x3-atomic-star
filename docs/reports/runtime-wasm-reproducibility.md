@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `382f4c8da`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `2084743d1`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -546,3 +546,16 @@ alters the runtime, so the record and the code land together.
   and the failure surfaced as `cannot find type Vec in this scope` from the build script, not from the
   pallet's own test run, which passes with `std`. The reconciliation benchmarks set the state their
   calls read through the pallet's own extrinsics. Scanner `pallet-call-without-weights` 16 → 14.
+
+* `2084743d1` — **the wrapped pallet and the sentinel measure their calls.** `pallets/x3-wrapped`
+  charged 8,000-20,000 picoseconds across seven calls; `pallets/x3-sentinel` charged 15,000 on each
+  of seven — and each of those is a security power: freezing an authority's supply-changing rights on
+  an asset, freezing the asset, enrolling it for guardian review, granting an approval. Both declared
+  `runtime-benchmarks` features with nothing behind them. They carry generated weight files now:
+  compact 8880606 bytes (`0x711de9175cf9fca94cfdee05bd9084b819e9ab575ba93caff16359942d60f54e`) — was 8,890,492 — and compressed 1524413
+  (`0x7f131976c94ca2044a5ae7f2551625bd71cd265af1cd0b665e815f20e86a5658`) — was 1,526,313.
+
+  The sentinel has no `mock.rs`; its test runtime lives in `tests.rs`, and `new_test_ext` had to
+  become `pub` for the benchmark test suite to link against it. Its argument shapes are not guessable
+  from the call names either — `freeze_authority(origin, asset, who, reason)` takes four and
+  `freeze_asset(origin, asset, reason)` three. Scanner `pallet-call-without-weights` 14 → 12.
