@@ -378,6 +378,90 @@ def test_an_unregistered_pallet_that_is_not_on_the_list_is_still_a_finding(tmp_p
     assert [f["symbol"] for f in findings] == ["forgotten-pallet"], findings
 
 
+def weight_exception_fixture(root: Path, *, measured: bool = False, other_literal: bool = False) -> None:
+    """A tree with one pallet whose named call is on the unmeasurable-weight list."""
+    write(
+        root / "pallets/x3-cross-vm-router/Cargo.toml",
+        '[package]\nname = "pallet-x3-cross-vm-router"\nversion = "0.1.0"\n',
+    )
+    # The fixture reproduces the pallet's real shape: every call on the exception list is present, so
+    # an entry only reads as stale when the tree genuinely stopped charging a literal for it.
+    recorded = [
+        "register_external_root",
+        "xvm_transfer",
+        "xvm_transfer_from_vm",
+        "complete_xvm_transfer",
+        "cancel_expired_xvm_transfer",
+    ]
+    calls = []
+    for index, name in enumerate(recorded):
+        if name == "register_external_root" and measured:
+            weight = "#[pallet::weight(T::WeightInfo::register_external_root())]"
+        else:
+            weight = "#[pallet::weight(frame_support::weights::Weight::from_parts(50_000, 0))]"
+        calls.append(
+            f"#[pallet::call_index({index})]\n{weight}\n"
+            f"pub fn {name}() -> DispatchResult {{ Ok(()) }}\n"
+        )
+    if other_literal:
+        calls.append(
+            "#[pallet::call_index(9)]\n"
+            "#[pallet::weight(frame_support::weights::Weight::from_parts(40_000, 0))]\n"
+            "pub fn unrecorded_call() -> DispatchResult { Ok(()) }\n"
+        )
+    write(
+        root / "pallets/x3-cross-vm-router/src/lib.rs",
+        "#[pallet::call]\nimpl Pallet {\n" + "".join(calls) + "}\n",
+    )
+    write(root / "runtime/src/lib.rs", "pallet_x3_cross_vm_router,\n")
+    write(root / "docs/reports/benchmark-exceptions.md", "# recorded exceptions\n")
+
+
+def test_a_recorded_unmeasurable_weight_is_a_decision_not_a_finding(tmp_path: Path) -> None:
+    """A call no benchmark can reach is rendered with its reason, not reported as a defect.
+
+    `register_external_root` fails at the runtime's `RefuseExternalRoots` verifier by policy, so no
+    benchmark can reach the stores the weight describes. The scanner has to tell that apart from a
+    literal somebody simply never measured — while still reporting every *other* literal in the same
+    pallet, and while failing the moment the recorded call becomes measurable.
+    """
+    weight_exception_fixture(tmp_path)
+    assert by_kind(scan_findings(tmp_path), "pallet-call-without-weights") == []
+
+    documented, stale = scan_mod.documented_unmeasurable_calls(scan_mod.ScanContext(tmp_path))
+    assert stale == []
+    assert documented == {
+        ("x3-cross-vm-router", "register_external_root"),
+        ("x3-cross-vm-router", "xvm_transfer"),
+        ("x3-cross-vm-router", "xvm_transfer_from_vm"),
+        ("x3-cross-vm-router", "complete_xvm_transfer"),
+        ("x3-cross-vm-router", "cancel_expired_xvm_transfer"),
+    }
+
+
+def test_a_recorded_weight_exception_goes_stale_when_the_call_is_measured(tmp_path: Path) -> None:
+    weight_exception_fixture(tmp_path, measured=True)
+    documented, stale = scan_mod.documented_unmeasurable_calls(scan_mod.ScanContext(tmp_path))
+    # Only the call that is measured now goes stale; the others are still live decisions.
+    assert ("x3-cross-vm-router", "register_external_root") not in documented
+    assert len(documented) == 4
+    assert len(stale) == 1 and "measured now" in stale[0]
+    findings = by_kind(scan_findings(tmp_path), "pallet-call-without-weights")
+    assert [f["symbol"] for f in findings] == [
+        "stale-weight-exception:pallet-x3-cross-vm-router::register_external_root"
+    ], findings
+    assert "UNMEASURABLE_CALL_WEIGHTS" in findings[0]["suggested_fix"]
+
+
+def test_a_literal_outside_the_recorded_exceptions_is_still_a_finding(tmp_path: Path) -> None:
+    """The control: the list is keyed per call, so a second literal in the same pallet is reported."""
+    weight_exception_fixture(tmp_path, other_literal=True)
+    findings = by_kind(scan_findings(tmp_path), "pallet-call-without-weights")
+    assert [f["symbol"] for f in findings] == [
+        "x3-cross-vm-router::frame_support::weights::Weight::from_parts(40_000, 0"
+    ], findings
+
+
 def test_scanner_is_the_registry_citation() -> None:
     """Every test `[repo_scanner_agent]` cites must be a function this module defines.
 

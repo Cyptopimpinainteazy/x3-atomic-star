@@ -104,6 +104,48 @@ KNOWN_UNWIRED_PALLETS: dict[str, dict[str, str]] = {
     },
 }
 
+# Extrinsic weights that cannot be measured, keyed `"<pallet entry>::<extrinsic>"`.
+#
+# A handful of calls cannot be reached by a benchmark at all: the runtime refuses them by design, or
+# their origin cannot be synthesized because no origin is *always* authorized. `try_successful_origin`
+# returning `Err` is the documented answer for those origins, and the honest consequence is that the
+# call keeps a stated cost until the runtime grows a path a benchmark can drive. This is the same
+# shape as `KNOWN_UNWIRED_PALLETS`: a recorded decision with an owner and a reason, plus a tripwire —
+# the moment the call stops charging a literal (i.e. somebody measured it) the entry goes stale and
+# the scanner says so, so an exception cannot outlive its justification.
+UNMEASURABLE_CALL_WEIGHTS: dict[str, dict[str, str]] = {
+    "pallet-x3-cross-vm-router::register_external_root": {
+        "owner": "docs/reports/benchmark-exceptions.md",
+        "reason": (
+            "the runtime wires `RefuseExternalRoots` as `ExternalRootVerifier` by policy, so every "
+            "call fails at the verifier and no benchmark can reach the success path that the weight "
+            "describes; it becomes measurable when a per-chain light client verifier is wired"
+        ),
+    },
+    "pallet-x3-cross-vm-router::xvm_transfer": {
+        "owner": "docs/reports/benchmark-exceptions.md",
+        "reason": (
+            "gated on `X3LangOrigin = EnsureAuthorizedGateway`, whose `try_successful_origin` returns "
+            "`Err` because no account is always authorized in the custody registry; the router's "
+            "`Config` has no path to that pallet, so its benchmark cannot authorize one"
+        ),
+    },
+    "pallet-x3-cross-vm-router::xvm_transfer_from_vm": {
+        "owner": "docs/reports/benchmark-exceptions.md",
+        "reason": (
+            "same custody-backed gateway origin as `xvm_transfer`, checked twice (adapter + x3-lang)"
+        ),
+    },
+    "pallet-x3-cross-vm-router::complete_xvm_transfer": {
+        "owner": "docs/reports/benchmark-exceptions.md",
+        "reason": "same custody-backed gateway origin as `xvm_transfer`",
+    },
+    "pallet-x3-cross-vm-router::cancel_expired_xvm_transfer": {
+        "owner": "docs/reports/benchmark-exceptions.md",
+        "reason": "same custody-backed gateway origin as `xvm_transfer`",
+    },
+}
+
 SKIP_DIRS = {
     ".git",
     "target",
@@ -466,6 +508,67 @@ def documented_unwired(ctx: ScanContext) -> tuple[list[dict[str, str]], list[str
     return documented, stale
 
 
+def documented_unmeasurable_calls(
+    ctx: ScanContext,
+) -> tuple[set[tuple[str, str]], list[str]]:
+    """The recorded unmeasurable-call decisions, and notes for entries that went stale.
+
+    Returns the `(pallet entry, extrinsic)` pairs whose literal weights the scanner should not report,
+    plus a note for every entry that no longer describes the tree. An entry is stale when its owning
+    document is gone, or when the call it names no longer charges a literal — which is exactly what
+    "somebody benchmarked it" looks like from here.
+    """
+    documented: set[tuple[str, str]] = set()
+    stale: list[str] = []
+    pallets_dir = ctx.root / "pallets"
+    if not pallets_dir.is_dir():
+        return documented, stale
+    for key, decision in sorted(UNMEASURABLE_CALL_WEIGHTS.items()):
+        package, _, extrinsic = key.partition("::")
+        entry = next(
+            (
+                candidate
+                for candidate in sorted(pallets_dir.iterdir())
+                if (candidate / "Cargo.toml").is_file()
+                and f'name = "{package}"' in read_text(candidate / "Cargo.toml")
+            ),
+            None,
+        )
+        # A package that is not in this tree leaves nothing to decide about.
+        if entry is None:
+            continue
+        owner = decision.get("owner", "")
+        if not owner or not (ctx.root / owner).exists():
+            stale.append(f"{key}: the owning document `{owner}` does not exist")
+            continue
+        body = "".join(ctx.text(rel) for rel, _ in ctx.files() if rel.startswith(f"pallets/{entry.name}/"))
+        if not re.search(rf"pub fn {re.escape(extrinsic)}\b", body):
+            stale.append(f"{key}: the pallet no longer defines `{extrinsic}`")
+            continue
+        if "WeightInfo" in literal_weight_block(body, extrinsic):
+            stale.append(
+                f"{key}: the call is measured now, so the recorded exception is stale — "
+                "drop the entry"
+            )
+            continue
+        documented.add((entry.name, extrinsic))
+    return documented, stale
+
+
+def literal_weight_block(body: str, extrinsic: str) -> str:
+    """The `#[pallet::weight(...)]` attribute text on the line before `pub fn <extrinsic>`."""
+    lines = body.splitlines()
+    for index, line in enumerate(lines):
+        if not re.match(rf"\s*pub fn {re.escape(extrinsic)}\b", line):
+            continue
+        # Walk back over the doc/attribute lines to the weight attribute, if any.
+        for earlier in reversed(lines[max(0, index - 12) : index]):
+            if "#[pallet::weight(" in earlier:
+                return earlier
+        return ""
+    return ""
+
+
 def detect_unregistered_pallets(ctx: ScanContext) -> list[Finding]:
     """`pallets/*` crates the runtime never mentions."""
     runtime = ctx.text("runtime/src/lib.rs")
@@ -522,6 +625,7 @@ def detect_pallet_call_without_weights(ctx: ScanContext) -> list[Finding]:
     pallets_dir = ctx.root / "pallets"
     if not pallets_dir.is_dir():
         return findings
+    documented_calls, _ = documented_unmeasurable_calls(ctx)
     by_pallet: dict[str, list[str]] = {}
     for rel, _ in ctx.files():
         if rel.startswith("pallets/"):
@@ -539,8 +643,23 @@ def detect_pallet_call_without_weights(ctx: ScanContext) -> list[Finding]:
         invented: list[tuple[str, int, str]] = []
         estimated: list[tuple[str, int, str]] = []
         for rel in sources:
-            for number, line in enumerate(ctx.text(rel).splitlines(), start=1):
+            lines = ctx.text(rel).splitlines()
+            for number, line in enumerate(lines, start=1):
                 if "#[pallet::weight(" not in line or "WeightInfo" in line:
+                    continue
+                # `#[pallet::weight(...)]` sits immediately above the extrinsic it charges, so the
+                # next `pub fn` is the call this literal belongs to.
+                extrinsic = next(
+                    (
+                        match.group(1)
+                        for match in (
+                            re.match(r"\s*pub fn ([A-Za-z0-9_]+)", later) for later in lines[number:]
+                        )
+                        if match
+                    ),
+                    "",
+                )
+                if (entry.name, extrinsic) in documented_calls:
                     continue
                 if re.search(r"Weight::from_parts\(\s*\d", line) or re.search(
                     r"#\[pallet::weight\(\s*\d[\d_]*\s*\)\]", line
@@ -971,6 +1090,23 @@ def scan(root: Path, with_gate_summary: bool = True) -> tuple[list[Finding], lis
             )
         )
     findings += detect_unregistered_pallets(ctx)
+    _, stale_weight_decisions = documented_unmeasurable_calls(ctx)
+    for note in stale_weight_decisions:
+        findings.append(
+            Finding(
+                kind="pallet-call-without-weights",
+                severity="medium",
+                path="scripts/swarm/x3_repo_scan.py",
+                line=0,
+                # The note is `"<package>::<extrinsic>: <why>"`; the key itself has no spaces, so
+                # the first ": " is the boundary. Splitting on ":" would cut into the "::".
+                symbol=f"stale-weight-exception:{note.split(': ', 1)[0]}",
+                why=f"a recorded unmeasurable-weight decision no longer describes the tree: {note}",
+                suggested_fix="delete or correct the entry in `UNMEASURABLE_CALL_WEIGHTS`",
+                test_required="repo scanner test",
+                gate_affected="repo scanner",
+            )
+        )
     findings += detect_pallet_call_without_weights(ctx)
     findings += detect_ungated_crates(ctx)
     findings.sort(key=sort_key)
@@ -983,12 +1119,16 @@ def write_reports(root: Path, findings: list[Finding], summary: list[dict]) -> d
     for finding in findings:
         counts[finding.kind] = counts.get(finding.kind, 0) + 1
     documented, _ = documented_unwired(ScanContext(root))
+    documented_calls, _ = documented_unmeasurable_calls(ScanContext(root))
     payload = {
         "schema": 1,
         "root": str(root),
         "counts": {k: counts[k] for k in sorted(counts)},
         "structural_counts": structural_counts(findings),
         "documented_unwired": documented,
+        "documented_unmeasurable_call_weights": sorted(
+            f"{entry}::{extrinsic}" for entry, extrinsic in documented_calls
+        ),
         "gate_summary": summary,
         "findings": [f.as_dict() for f in findings],
     }
