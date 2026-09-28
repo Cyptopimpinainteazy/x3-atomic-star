@@ -120,6 +120,26 @@ impl SwarmScheduler {
         Ok(claimed)
     }
 
+    /// Store `task` with exactly `holder` as its claim, keeping its queue
+    /// position if the id is already queued. The reconciler's write path: it
+    /// sets the state another replica or the arbiter settled on, where
+    /// [`SwarmScheduler::enqueue`] would drop a claim on a `Pending` task and
+    /// could not set one at all.
+    pub(crate) fn put(&mut self, task: AgentTask, holder: Option<AgentId>) {
+        if !self.tasks.contains_key(&task.id) {
+            self.task_order.push_back(task.id.clone());
+        }
+        match holder {
+            Some(agent_id) => {
+                self.claims.insert(task.id.clone(), agent_id);
+            }
+            None => {
+                self.claims.remove(&task.id);
+            }
+        }
+        self.tasks.insert(task.id.clone(), task);
+    }
+
     /// Who holds this task, if anyone.
     pub fn claim_of(&self, task_id: &str) -> Option<&AgentId> {
         self.claims.get(task_id)
@@ -129,8 +149,8 @@ impl SwarmScheduler {
     ///
     /// This is what a reconciler reads: two replicas that were partitioned can
     /// disagree about a task id, and the disagreement is only visible if the
-    /// claims are readable. Settling it is the chain's job — see
-    /// `pallet-northern-swarm`'s `claim_task`, which refuses a second executor.
+    /// claims are readable. [`crate::reconcile::reconcile`] settles it against
+    /// the chain's record of the task's first claimer.
     pub fn claims(&self) -> impl Iterator<Item = (&str, &AgentId)> {
         self.task_order.iter().filter_map(move |task_id| {
             self.claims

@@ -492,7 +492,42 @@ proof_report = ""
 #     plus the service's 4 in `test x3-swarm-api`. No live-node or fleet-scale run.
 #   mainnet_ready 25 — nothing here is deployed; it is the local control plane.
 #   0.35*65 + 0.25*72 + 0.40*25 = 22.75 + 18 + 10 = 50.75 -> 51
-readiness_score = 51
+#
+# Fifth pass, 2026-09-28 — the partition reconciler blocker is answered:
+#
+#   * `src/reconcile.rs` adds `reconcile(a, b, arbiter)`, which settles two
+#     `SwarmScheduler` replicas task by task: a task only one side has is copied
+#     across with its claim; a claim only one side made is copied so the other side
+#     cannot hand the task out again; a finished (`Passed`/`Failed`) record beats an
+#     unfinished one; two different holders are put to a `ClaimArbiter`, and its
+#     `HeldBy` / `Unclaimed` verdict is stamped on both sides, with every losing local
+#     holder listed in `ReconcileReport::evicted`. An `Unavailable` arbiter, two
+#     different finished outcomes, or records that describe different work are left
+#     byte-for-byte as they were and reported in `unresolved` — it never picks.
+#   * The arbiter semantics follow the pallet as it is, not as the crate's docs said:
+#     `pallet-northern-swarm`'s `claim_task` is **not** exclusive — it admits up to
+#     `MaxExecutorsPerTask` (3 in the runtime) executors and records the first in
+#     `claimed_by`. The crate and test docs that said "a second executor is refused
+#     there" were wrong and are corrected; the reconciler converges on the first
+#     claimer.
+#   * Evidence: `tests/replica_reconcile.rs`, 10 tests against the real scheduler and
+#     dispatch path, with a verdict table standing in for the chain. Break-it-first,
+#     four mutations, each reddening exactly its tests: an `Unavailable` arbiter
+#     picking side A (1 red), evictions not reported (4 red), a one-sided claim not
+#     copied (1 red, the replica hands the task out a second time), different work
+#     merged (1 red); the file was restored byte-identically.
+#   * Still open (blocker 2, narrowed): no `ClaimArbiter` reads `claimed_by` from a
+#     node, so the reconciler has only been driven by a table.
+#
+#   implemented 68 — the reconciler exists and converges the replicas; the chain-side
+#     arbiter client does not.
+#   tested 74 — 79 lib + 6 agent_lifecycle + 15 guard_tests + 3 race_and_partition +
+#     10 replica_reconcile + 11 sensitive_actions = **124 passed, 0 failed, 0 ignored**
+#     in `test x3-swarm-core`, plus the service's 4 in `test x3-swarm-api`. Still no
+#     live-node or fleet-scale run.
+#   mainnet_ready 25 — unchanged.
+#   0.35*68 + 0.25*74 + 0.40*25 = 23.8 + 18.5 + 10 = 52.3 -> 52
+readiness_score = 52
 # CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names previously
 # listed here existed as real test functions anywhere under crates/x3-swarm-core,
 # so they were removed rather than left as citations. Closed 2026-09-26: all four
@@ -520,10 +555,15 @@ required_tests = [
   "parallel_claims_match_the_sequential_reference",
   "a_partitioned_replica_pair_reports_its_conflict",
   "claim_stamps_never_outnumber_the_queue",
+  "partitioned_replicas_converge_on_the_chains_first_claimer",
+  "a_conflict_nobody_claimed_on_chain_goes_back_to_the_queue",
+  "an_unreachable_arbiter_changes_nothing",
+  "a_one_sided_claim_is_copied_so_the_task_is_not_handed_out_twice",
+  "a_finished_record_wins_and_evicts_the_other_holder",
 ]
 blockers = [
   "Experimental — its crate tests do run in the fast set (`test x3-swarm-core`), but crates/x3-swarm-core is excluded from the root workspace and is absent from the runtime dependency graph cargo metadata reports for x3-chain-runtime, so the swarm control plane is not on the deployed blockchain path",
-  "Partition settlement has no reconciler: two replicas of one queue can both claim the same task, and while the conflict is now visible (`claims()`) and recoverable (`release_claim`), nothing diffs the replicas automatically — the arbiter is `pallet-northern-swarm`'s exclusive `claim_task`, and a second executor is refused there, not here",
+  "Partition settlement is only proven against a verdict table: `reconcile` (src/reconcile.rs) converges two replicas and reports evicted holders, but no `ClaimArbiter` reads the task's first claimer (`claimed_by`) from `pallet-northern-swarm` on a node, so an operator cannot yet run it against the chain",
   "No live-node or fleet-scale run: the authority the scheduler consults is a local data structure; nothing drives this control plane from a real chain or a real worker fleet",
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]

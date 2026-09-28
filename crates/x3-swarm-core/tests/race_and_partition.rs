@@ -13,8 +13,8 @@
 //!    no single-process data structure can prevent that. What the crate owes an
 //!    operator is that the conflict is **visible** (`claims()`) and that the
 //!    loser can be put back to work (`release_claim`). Settling which replica
-//!    wins is the chain's job: `pallet-northern-swarm`'s `claim_task` is the
-//!    exclusive claim, and a second executor is refused there.
+//!    wins is `reconcile`'s job, against the chain's record of the task's first
+//!    claimer (`pallet-northern-swarm`'s `claimed_by`); see `replica_reconcile.rs`.
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
@@ -206,8 +206,8 @@ fn a_partitioned_replica_pair_reports_its_conflict() {
     );
 
     // The crate's half of the recovery: the losing side's claim is released, and
-    // the task is workable again. Deciding *which* side loses is the chain's job —
-    // `pallet-northern-swarm`'s `claim_task` refuses the second executor.
+    // the task is workable again. Deciding *which* side loses is `reconcile`'s
+    // job, which asks the chain who claimed first (`replica_reconcile.rs`).
     assert!(side_b.release_claim(&claimed_b));
     assert_eq!(side_b.claim_of(&claimed_b), None);
     assert_eq!(
