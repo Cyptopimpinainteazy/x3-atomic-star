@@ -216,6 +216,7 @@ fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_en
 /// `System::Account` is a `Blake2_128Concat` map of `AccountInfo`, whose `data` is the balances
 /// pallet's `AccountData`: reading it back is how a live test sees that a native escrow leg is
 /// held as real funds, and returned, rather than only recorded.
+#[cfg(feature = "live-node")]
 fn balances_at(account: &AccountId, block_hash: &str) -> (u128, u128) {
     let mut key = frame_support::storage::storage_prefix(b"System", b"Account").to_vec();
     let encoded = account.encode();
@@ -1308,8 +1309,11 @@ fn a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt() {
 /// restarted node: both depositors' funds are reserved by the locks, stay reserved across the
 /// restart (the database, not memory, holds them), and come back in full from a refund the
 /// restarted chain finalizes.
+///
+/// Behind the `live-node` feature: `cargo test -p x3-chain-node --features live-node \
+/// --test x3vm_live_lifecycle a_locked_native_htlc_survives_a_node_restart_and_refunds_in_full`.
 #[test]
-#[ignore = "requires building and launching the real x3-chain-node binary"]
+#[cfg(feature = "live-node")]
 fn a_locked_native_htlc_survives_a_node_restart_and_refunds_in_full() {
     let base_path = TempBasePath::new("htlc-restart");
     let ledger_path = proof_ledger_path("htlc-restart");

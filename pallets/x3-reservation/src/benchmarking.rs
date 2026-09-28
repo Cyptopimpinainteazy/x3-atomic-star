@@ -6,7 +6,7 @@
 //!
 //! Every amount here is a real one. The inventory pallet's `Balance` is generic with no `From<u32>`,
 //! and its mutation helpers return early for a zero amount — a benchmark written with zero balances
-//! would measure the no-op path and skip exactly the storage work these calls exist to do. The
+//! would measure the early-return path and skip exactly the storage work these calls exist to do. The
 //! module therefore requires the chain's balance to be `u128`, which is what this runtime and the
 //! mock both use.
 

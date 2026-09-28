@@ -20,5 +20,8 @@ includes = [
 version = 1
 audit_date = "2026-09-12"
 repository = "Cyptopimpinainteazy/xxxstar"
-feature_count_expected = 149
+# 149 -> 153 on 2026-09-28: four rows were added deliberately (X3-LANG-009/010, X3-MEV-004/007/008 and
+# the asset-registry benchmark work); the guard exists to catch a *silent* row loss, so it moves with
+# the count rather than being removed.
+feature_count_expected = 153
 scoring = "implemented*0.35 + tested*0.25 + mainnet_ready*0.40"

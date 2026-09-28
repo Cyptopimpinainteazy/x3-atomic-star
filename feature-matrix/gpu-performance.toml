@@ -129,6 +129,20 @@ paths = [
 ]
 implemented = 92
 tested = 84
+# The check requires a row at `tested >= 80` to name the tests behind it. These are the benchmark
+# test suites and the CLI runs that produced each weight file, run on this host.
+test_evidence = [
+  "note: `cargo test -p pallet-atomic-trade-engine --features runtime-benchmarks` 58 passed (10 benchmark entries)",
+  "note: `cargo test -p pallet-x3-kernel --features runtime-benchmarks` 253 passed (13 benchmark entries)",
+  "note: `cargo test -p pallet-x3-supply-ledger --features runtime-benchmarks` 46 passed (5 benchmark entries)",
+  "note: `cargo test -p pallet-x3-treasury-policy --features runtime-benchmarks` 31 passed (8 benchmark entries)",
+  "note: `cargo test -p pallet-x3-token-factory --features runtime-benchmarks` 22 passed (4 benchmark entries)",
+  "note: `cargo test -p pallet-x3-sequencer --features runtime-benchmarks` 16 passed (1 benchmark entry); `-p pallet-x3-da` 17 passed (2)",
+  "note: `cargo test -p pallet-x3-flashloan --features runtime-benchmarks` 15 passed (3 benchmark entries); `-p pallet-x3-reservation` 21 passed (3)",
+  "note: `cargo test -p pallet-x3-domain-registry --features runtime-benchmarks` 10 passed (3 benchmark entries); `-p pallet-x3-reconciliation` 38 passed (6)",
+  "note: `cargo test -p pallet-x3-wrapped --features runtime-benchmarks` 33 passed (7 benchmark entries); `-p pallet-x3-sentinel` 14 passed (7)",
+  "note: `cargo test -p pallet-x3-asset-registry --features runtime-benchmarks` 7 benchmark entries pass; its weights are blocked by the benchmark build defect",
+]
 mainnet_ready = 55
 priority = "P0"
 confidence = "high"

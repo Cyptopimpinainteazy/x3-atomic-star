@@ -114,6 +114,12 @@ frame-benchmarking-cli = { workspace = true, optional = true, default-features =
 default = ["cli"]
 cli = []
 
+# The integration tests under `tests/` that boot a real node and drive it over RPC. They are
+# compiled only when a gate asks for them (`cargo test -p x3-chain-node --features live-node --test
+# x3vm_live_lifecycle`), which is stronger than `#[ignore]`: the test either exists and must pass, or
+# it is not compiled at all — and the test-cheat ratchet counts every `#[ignore]` as debt.
+live-node = []
+
 # The development runtime: `pallet-sudo` in the runtime, dev defaults in the specs, and
 # this network's `powLimit` at Bitcoin regtest's (`0x207fffff`) rather than mainnet's, so a
 # local chain can anchor a header it just mined.

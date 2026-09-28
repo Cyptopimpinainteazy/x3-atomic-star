@@ -7367,6 +7367,7 @@ dependencies = [
 name = "pallet-x3-asset-registry"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7529,6 +7530,7 @@ dependencies = [
 name = "pallet-x3-da"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7573,6 +7575,7 @@ dependencies = [
 name = "pallet-x3-domain-registry"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7588,6 +7591,7 @@ dependencies = [
 name = "pallet-x3-flashloan"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7766,6 +7770,7 @@ dependencies = [
 name = "pallet-x3-reconciliation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7779,6 +7784,7 @@ dependencies = [
 name = "pallet-x3-reservation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",
@@ -7793,6 +7799,7 @@ dependencies = [
 name = "pallet-x3-sentinel"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7808,6 +7815,7 @@ dependencies = [
 name = "pallet-x3-sequencer"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7883,9 +7891,11 @@ dependencies = [
 name = "pallet-x3-supply-ledger"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
+ "pallet-x3-asset-registry",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -7900,6 +7910,7 @@ dependencies = [
 name = "pallet-x3-token-factory"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -7916,6 +7927,7 @@ dependencies = [
 name = "pallet-x3-treasury-policy"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",
@@ -7980,6 +7992,7 @@ dependencies = [
 name = "pallet-x3-wrapped"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -14203,6 +14216,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpsee",
+ "pallet-atomic-trade-engine",
  "pallet-x3-crosschain-gateway",
  "pallet-x3-kernel",
  "parity-scale-codec",

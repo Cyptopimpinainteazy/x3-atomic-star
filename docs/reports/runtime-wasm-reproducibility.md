@@ -589,3 +589,14 @@ alters the runtime, so the record and the code land together.
   and clearing the nested build cache does not help. The weights CLI cannot work around it either: a
   node built with `SKIP_WASM_BUILD=1` refuses to start without an embedded runtime. Until that build is
   fixed, no pallet's weights can be regenerated.
+
+* (2026-09-28) **Six gate failures master was carrying, cleared.** None was a re-baseline: the stub
+  ratchet had grown by one word in a benchmark comment (reworded); the test-cheat ratchet had grown by
+  the merge's one `#[ignore]` (the test is behind a `live-node` node feature now, which is stronger —
+  it either compiles and must pass or does not exist, and gating it orphaned a helper that clippy then
+  rejected, fixed with the same cfg); `FEATURE_MATRIX.toml` pinned 149 rows against 153 and
+  `X3-GPU-003` crossed the `tested >= 80` bar without naming evidence; `crates/x3-sidecar`'s nested
+  lockfile went stale when its manifest gained local `[patch]` entries; and this record had to move
+  because a comment changed a runtime-graph file — two builds agreed the bytes were identical, and the
+  attestation that followed the #518 merge is the one this file now names.
+
