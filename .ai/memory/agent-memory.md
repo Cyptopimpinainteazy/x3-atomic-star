@@ -9265,3 +9265,32 @@ registration, with the outcome per file:
   `x3-asset-registry` (7), `x3-dapp-hub` (8), `x3-cross-vm-router` (8, and its
   `register_external_root` cannot be measured on a dev chain — the runtime refuses every external
   root by design), `x3-custody` (10), `x3-crosschain-gateway` (11).
+
+## 2026-09-27 (eighth weights pass) — domain registry + reconciliation, and the WASM-prelude trap
+
+- **`pallets/x3-domain-registry`** (3 calls: 20,000/30,000/30,000) and **`pallets/x3-reconciliation`**
+  (6 calls: 10,000-30,000) both charged literals behind empty `runtime-benchmarks` features.
+  Eleven pallets measured now; scanner `pallet-call-without-weights` **16 → 14** (39 literals).
+- **Trap: a benchmark module also compiles into the runtime's WASM build.** There, `Vec` and `vec!` are
+  not in the prelude — the domain registry's `Vec<X3DnsRecord<T>>` helper needed
+  `use sp_std::{vec, vec::Vec};`. The `cargo test -p <pallet> --features runtime-benchmarks` run passes
+  first (it has `std`), so the failure only appears when the *node* is built:
+  `cannot find type Vec in this scope` from the runtime's build script. Build the node before believing
+  a new benchmark module is finished.
+- **Wiring recipe confirmation:** `pub mod weights;` + `pub use weights::WeightInfo;` at the crate
+  root, `use crate::weights::WeightInfo;` inside `pub mod pallet`, `type WeightInfo: WeightInfo;` at
+  the *end* of the `Config` trait (an anchor that matches the middle of the trait silently splits it —
+  the domain registry's `MaxRecordsPerDomain` anchor did exactly that and produced
+  `unexpected closing delimiter: }`).
+- **Evidence**: domain-registry 7 passed / 10 with the feature; reconciliation 32 / 38;
+  `cargo check --workspace --all-targets` clean; panic ratchet 440/440; `make mainnet-check` PASS after
+  two agreeing srtool builds recorded revision `382f4c8da` (compact 8,890,492 `0x84ae71b3…`,
+  compressed 1,526,313 `0xbe7d4de0…`); `check-runtime-weights-wired.py` 47 wired configs;
+  `X3-GPU-003` 73 → 74.
+- **Next seeds:** 14 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form
+  (leave those), so **10 real pallets**: `x3-wallet-pallet` (12 calls — the biggest), `x3-crosschain-gateway`
+  (11), `x3-custody` (10), `x3-dapp-hub` (8), `x3-cross-vm-router` (8; `register_external_root` cannot
+  be measured on a dev chain because the runtime refuses every external root — needs the
+  documented-exception path), `x3-wrapped` (7), `x3-asset-registry` (7), `x3-sentinel` (7),
+  `x3-account-registry` (3, and it has **no mock and no tests at all** — it needs a test runtime before
+  it can be benchmarked).
