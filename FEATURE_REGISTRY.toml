@@ -807,6 +807,88 @@ blockers = [
 dangerous_paths = ["pallets/x3-wrapped", "runtime", "bridge authority", "council governance"]
 
 [x3_htlc]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/x3-settlement-engine"
+tauri_app = ""
+# Re-pointed 2026-09-28 (owner's decision). This row used to describe the orphan SVM
+# program `X3-contracts/svm/programs/x3_htlc`, which no route calls; that evidence moved
+# unchanged to `[svm_x3_htlc_program]` below. `x3_htlc` is now the X3 HTLC that runs on
+# the chain: a leg on `ExternalChainId::X3Native` in `pallet-x3-settlement-engine`, where
+# this pallet is the custodian (PR #520).
+#
+# What the code does (pallets/x3-settlement-engine/src/lib.rs):
+#   * `lock_escrow` on an X3Native leg accepts only the depositor's own declared native
+#     side, of `TokenId::Native`, at exactly the declared amount, once, and reserves it
+#     with `T::Currency::reserve`.
+#   * `claim_settlement` requires the SHA-256 preimage and refuses after the intent's
+#     unix timeout (`TimeoutExpired`, checked in the call *and* again in
+#     `check_settlement_invariants`) and after `SettlementTimeoutBlocks`; finalization
+#     `repatriate_reserved`s the leg to the counterparty once every required domain has a
+#     canonical Claim proof.
+#   * `refund_settlement` needs the timeout plus canonical Refund proofs and `unreserve`s
+#     the leg back to the depositor. Every native reserve is checked before anything moves
+#     (`held_native_legs`), so a short reserve fails the whole call
+#     (`NativeEscrowCustodyMismatch`) instead of settling some legs.
+#   * `security/halt-fund-holding.toml` classifies `lock_escrow` as fund-holding,
+#     recoverable by `refund_settlement`.
+#
+# Found and fixed 2026-09-28 while re-pointing this row: the lock checked the declared
+# chain and amount but not the declared token, so a leg promising `X3Asset(7)` or a
+# contract token was "locked" by reserving the same amount of native X3, and the
+# counterparty would have been paid in a different asset than the intent named. The lock
+# now also requires `TokenId::Native` (`a_native_leg_declaring_a_non_native_token_cannot_be_locked`,
+# red before the fix with `Ok(())` where `InvalidAssetSpec` was expected). Custody of X3
+# assets is not implemented; such a leg fails closed.
+#
+# Measured 2026-09-28:
+#   * `test settlement-engine` (`cargo test -p pallet-x3-settlement-engine`): 170 lib +
+#     23 integration passed, 0 failed; 178 lib with `--features runtime-benchmarks`.
+#     Ten of those are the native-custody unit tests named below. Break-it-first on the new
+#     late-claim test: removing only the call's timeout check leaves it green (the
+#     invariant check refuses too); removing both makes it red with the late claim
+#     returning `Ok(())`. File restored byte-identically.
+#   * Live, on a real dev node (local CI run on the #518 merge head, 2026-09-28):
+#     `X3-native lifecycles` PASS — lock -> finalized claim, timeout -> finalized refund,
+#     refund-before-timeout fails closed, and a locked native HTLC survives a node restart
+#     and refunds in full. `cross-domain EVM` / `cross-domain SVM` PASS in both the default
+#     and the strict-proof posture (X3 native leg against a real anvil / solana-test-validator).
+#
+# implemented*0.35 + tested*0.25 + mainnet_ready*0.40
+#   implemented   75 — real custody on the runtime path with all-or-nothing preflight,
+#                      both timeouts, halt classification and measured weights; native
+#                      currency only (no X3-asset custody)
+#   tested        80 — 10 native-custody unit tests, adversarial cases included, plus live
+#                      single-node claim / refund / early-refund / restart and live
+#                      cross-domain EVM and SVM gates in two postures; no multi-validator
+#                      HTLC run
+#   mainnet_ready 35 — in the runtime and live-node proven, but no external audit and no
+#                      public-testnet or multi-validator exercise of this path
+# 0.35*75 + 0.25*80 + 0.40*35 = 26.25 + 20 + 14 = 60.25 -> 60
+readiness_score = 60
+proof_report = ""
+required_tests = [
+  "a_native_lock_holds_the_depositors_funds",
+  "a_native_lock_beyond_the_depositors_balance_is_refused",
+  "a_native_lock_must_lock_the_amount_the_intent_declares",
+  "a_native_leg_declaring_a_non_native_token_cannot_be_locked",
+  "finalization_pays_the_native_leg_to_the_counterparty_and_conserves_issuance",
+  "a_refund_returns_the_native_leg_to_its_depositor",
+  "a_claim_after_a_refund_is_refused_and_moves_nothing",
+  "a_claim_after_the_timeout_is_refused_and_the_refund_still_returns_everything",
+  "a_refund_after_finalization_is_refused_and_moves_nothing",
+  "a_refund_by_a_third_party_or_before_the_timeout_is_refused",
+]
+# The live restart test, `a_locked_native_htlc_survives_a_node_restart_and_refunds_in_full`,
+# lives in node/tests/x3vm_live_lifecycle.rs (gate `X3-native lifecycles`), outside this
+# row's crate, so it is evidence above rather than a `required_tests` citation.
+blockers = [
+  "No external audit of the settlement engine's custody path",
+  "No multi-validator or public-testnet run of a native HTLC; the live evidence is a single dev node (plus the cross-domain gates)",
+  "Native currency only: a leg on X3 that declares an X3 asset or a contract token is refused at lock, because X3-asset custody is not implemented",
+]
+dangerous_paths = ["pallets/x3-settlement-engine", "hashlock and timelock logic", "reserve / repatriate / unreserve custody", "security/halt-fund-holding.toml"]
+
+[svm_x3_htlc_program]
 mode = "SIM_TESTNET"
 crate_or_service = "X3-contracts/svm/programs/x3_htlc"
 tauri_app = ""

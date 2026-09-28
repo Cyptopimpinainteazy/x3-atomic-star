@@ -135,6 +135,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
     type VmAdapterOrigin = RootOrAny;
     type X3LangOrigin = RootOrSignedAccount;
+    type WeightInfo = ();
     type EconomicHalt = Ledger;
     type RoutingFeeBps = RoutingFeeBps;
     type ProtocolTreasury = ProtocolTreasury;
