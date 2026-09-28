@@ -9230,3 +9230,38 @@ registration, with the outcome per file:
   is special: it already has a benchmark module but for internal helpers, and its
   `register_external_root` is refused by the runtime's `RefuseExternalRoots`, so that one call cannot
   be measured on the dev chain and needs the documented-exception path.
+
+## 2026-09-27 (seventh weights pass) — flash loan + reservation, and three traps worth the price
+
+- **`pallets/x3-flashloan`** (borrow/repay 10,000 ps, add_liquidity 5,000) and **`pallets/x3-reservation`**
+  (three root transitions at 10,000) both charged literals behind empty `runtime-benchmarks` features.
+  Nine pallets measured now; scanner `pallet-call-without-weights` **18 → 16** (30 literals).
+- **Trap 1 — `define_benchmarks!`'s location name must match the `construct_runtime!` alias exactly.**
+  I wrote `X3Flashloan` for a runtime whose variant is `X3FlashLoan`, and the error was
+  `cannot find type X3Flashloan in this scope`, pointing at the macro list line — the `use … as`
+  alias inside `mod benches` is *not* what resolves there. The macro captures `$locations:ty` and
+  expands at the crate root, where only the `construct_runtime!`-generated type exists. Case matters.
+- **Trap 2 — benchmark amounts must clear the chain's existential deposit.** The flash loan's
+  1,000-unit pool passed in the mock (tiny deposit) and failed on the dev chain with
+  `Account cannot exist with the funds that would be given`. Amounts are now multiples of
+  `T::Currency::minimum_balance()`, which is correct on both.
+- **Trap 3 — an added `type WeightInfo` breaks every Config impl in the tree, again.** This time
+  `pallets/x3-solvency/src/mock.rs` (it wires the reservation pallet). `cargo check --workspace
+  --all-targets` found it in ~30s; `make mainnet-check` would not have. Always run it before committing.
+- **Also worth keeping:** the reservation benchmark needs real (non-zero) amounts, because
+  `inventory::reserve_inventory` returns early for zero and a zero-amount benchmark would measure the
+  no-op path; the inventory `Balance` is generic with no `From<u32>`, so the module carries
+  `#[benchmarks(where T: Config + pallet_x3_inventory::pallet::Config<Balance = u128>)]` and the
+  runtime/mock are both `u128`.
+- **Evidence**: flashloan 12 passed / 15 with the feature; reservation 18 / 21;
+  `cargo check --workspace --all-targets` clean; panic ratchet 440/440; `make mainnet-check` PASS after
+  two agreeing srtool builds recorded revision `9f5446270` (compact 8,895,788 `0x343f40ba…`,
+  compressed 1,524,612 `0x942851a9…`); `check-runtime-weights-wired.py` 45 wired configs;
+  `X3-GPU-003` 72 → 73.
+- **Next seeds:** 16 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form
+  (leave those), so **12 real pallets**: `x3-account-registry` (3 calls, **no mock and no tests at
+  all** — it needs a test runtime before it can be benchmarked), `x3-domain-registry` (3),
+  `x3-wallet-pallet` (3), `x3-reconciliation` (6), `x3-sentinel` (7), `x3-wrapped` (7),
+  `x3-asset-registry` (7), `x3-dapp-hub` (8), `x3-cross-vm-router` (8, and its
+  `register_external_root` cannot be measured on a dev chain — the runtime refuses every external
+  root by design), `x3-custody` (10), `x3-crosschain-gateway` (11).
