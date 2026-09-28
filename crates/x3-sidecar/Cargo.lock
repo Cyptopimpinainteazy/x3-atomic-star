@@ -13965,6 +13965,7 @@ dependencies = [
  "x3-mir",
  "x3-opt",
  "x3-parser",
+ "x3-semantics",
  "x3-typeck",
  "x3-verifier",
 ]
