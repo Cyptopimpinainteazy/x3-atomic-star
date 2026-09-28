@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `8981b29c9`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `1b9b04e5d`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -628,6 +628,19 @@ alters the runtime, so the record and the code land together.
   (`0x49f94a7524542c747ce42ed2e470f9d2b86c6d00449d65b7b20dea046579d0b1`) — was 8,899,373 — and
   compressed 1529033
   (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
+  builds that agreed.
+
+* `1b9b04e5d` — **the wallet pallet charges measured weights.** `pallet-x3-wallet` (aliased here as
+  `pallet-x3-wallet-pallet`) charged 5,000-15,000 picoseconds on all twelve calls behind a
+  `runtime-benchmarks` feature that pulled `frame-benchmarking` in and never used it, and it was not
+  registered in `mod benches`. Its four recovery benchmarks walk the real flow
+  (`register_recovery_guardians` -> `initiate_recovery` -> `approve_recovery`) with a zero delay, so
+  `finalize_recovery` reaches its executable block without the benchmark moving the chain's block
+  number. Scanner `pallet-call-without-weights` reached 6 from 7 (four of the six are the documented
+  `T::DbWeight::get().reads_writes` form). The bytes move: compact 8899712
+  (`0xc0889ffe389ce6ee96d7a20ff521aab1257d95669c887fc2e8d46e11ef27bec6`) — was 8,898,068 — and
+  compressed 1530072
+  (`0x0e737994439fae21e99ecd597ae8cc8c9d7bac04d777d7a4a9de4291c42002f5`) — was 1,529,260, from two
   builds that agreed.
 
 * `8981b29c9` — **the capacity manager and the custody registry charge measured weights.** They
