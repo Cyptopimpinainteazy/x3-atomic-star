@@ -2632,6 +2632,7 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type ProtocolTreasury = TreasuryAccountId;
     /// 6-second blocks → 14_400 blocks per 24 h.
     type BlocksPerDay = ConstU32<14_400>;
+    type WeightInfo = pallet_x3_cross_vm_router::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {
@@ -3614,6 +3615,8 @@ mod benches {
     // reads and writes — and neither was registered here. `custody`'s runtime feature was
     // already on; `partner`'s was not.
     #[allow(unused_imports)]
+    use pallet_x3_cross_vm_router::Pallet as X3CrossVmRouter;
+    #[allow(unused_imports)]
     use pallet_x3_crosschain_gateway::Pallet as X3CrosschainGateway;
     #[allow(unused_imports)]
     use pallet_x3_custody::Pallet as X3Custody;
@@ -3631,6 +3634,7 @@ mod benches {
         [pallet_x3_custody, X3Custody]
         [pallet_x3_wallet_pallet, X3WalletPallet]
         [pallet_x3_crosschain_gateway, X3CrosschainGateway]
+        [pallet_x3_cross_vm_router, X3CrossVmRouter]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]

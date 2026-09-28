@@ -176,9 +176,11 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type RoutingFeeBps = RoutingFeeBps;
     type ProtocolTreasury = ProtocolTreasury;
     type BlocksPerDay = BlocksPerDay;
+    type WeightInfo = ();
 }
 
-fn new_test_ext() -> sp_io::TestExternalities {
+/// `pub(crate)` so the benchmark test suite can drive the same runtime.
+pub(crate) fn new_test_ext() -> sp_io::TestExternalities {
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();

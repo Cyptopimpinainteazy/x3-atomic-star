@@ -12291,6 +12291,7 @@ dependencies = [
 name = "pallet-x3-cross-vm-router"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-balances",

@@ -13,6 +13,7 @@ crate-type = ["rlib"]
 [dependencies]
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 sp-core = { workspace = true, default-features = false }
@@ -62,6 +63,7 @@ gpu-acceleration   = []  # GPU validator acceleration
 std = [
     "frame-support/std",
     "frame-system/std",
+    "frame-benchmarking?/std",
     "codec/std",
     "scale-info/std",
     "sp-core/std",
@@ -82,6 +84,7 @@ try-runtime = [
     "frame-system/try-runtime",
 ]
 runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
 ]

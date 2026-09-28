@@ -1,91 +1,74 @@
-//! Performance benchmarking for x3-cross-vm-router hot paths.
+//! Benchmarking setup for `pallet-x3-cross-vm-router`.
 //!
-//! Measures throughput and latency of:
-//! - do_initiate_transfer (nonce reservation + message build + ledger debit)
-//! - do_complete_xvm_transfer (message validation + state machine advance + ledger credit)
-//! - Nonce generation under contention
+//! This file replaces an earlier one that was never declared as a module — `lib.rs` had no
+//! `pub mod benchmarking;`, so nothing ever compiled it — and that measured helper functions
+//! (`nonce_reservation_single`, `route_lookup_cached`, `ledger_debit_operation`) rather than the
+//! pallet's dispatchables. The three calls below are the ones a benchmark can actually reach: each
+//! is root-gated, and its preconditions are other governance calls in this same pallet.
+//!
+//! The other five are recorded in `docs/reports/benchmark-exceptions.md` and enforced by
+//! `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py`. Four are gated on the
+//! custody-backed gateway origin, whose `try_successful_origin` returns `Err` because no account is
+//! always authorized; the fifth (`register_external_root`) fails at this runtime's
+//! `RefuseExternalRoots` verifier by policy, so no benchmark can reach the stores its weight
+//! describes. Measuring a path the chain never executes would report a cost *below* the real one.
 
 #![cfg(feature = "runtime-benchmarks")]
 
-use frame_benchmarking::{benchmarks, whitelisted_caller, impl_benchmark_test_suite};
-use frame_support::assert_ok;
-use sp_runtime::traits::StaticLookup;
+use super::*;
+use frame_benchmarking::v2::*;
+use frame_system::RawOrigin;
+use sp_std::vec;
+use sp_std::vec::Vec;
 
-use crate::*;
-
-/// BASELINE: Single nonce reservation (current: NextNonce::mutate per call)
 #[benchmarks]
 mod benchmarks {
     use super::*;
 
-    #[benchmark]
-    fn nonce_reservation_single() {
-        let source = DomainId::X3Native;
-        let sender = AccountBytes::new_native(vec![1u8; 32]);
-        
-        #[extrinsic_call]
-        {
-            let _nonce = NextNonce::<T>::mutate(source, sender.clone(), |n| {
-                let cur = *n;
-                *n = n.saturating_add(1);
-                cur
-            });
-        }
+    /// Reserved for X3Native, so any non-zero id names an external chain.
+    const EXTERNAL_CHAIN_ID: u32 = 1;
 
-        // Verify nonce incremented
-        assert_eq!(NextNonce::<T>::get(source, sender), 1);
+    /// Open the external bridge surface through the pallet's own governance calls, in the order the
+    /// pallet requires: the audit gate first, then the toggle that checks it.
+    fn enable_external_bridges<T: Config>() -> Result<(), BenchmarkError> {
+        Pallet::<T>::set_external_bridge_audit_gate(RawOrigin::Root.into(), true)
+            .map_err(|_| BenchmarkError::Weightless)?;
+        Pallet::<T>::set_external_bridges_enabled(RawOrigin::Root.into(), true)
+            .map_err(|_| BenchmarkError::Weightless)
     }
 
     #[benchmark]
-    fn nonce_reservation_batch_100() {
-        let source = DomainId::X3Native;
-        let sender = AccountBytes::new_native(vec![1u8; 32]);
-        
-        // Prime the batch allocation
+    fn set_external_bridge_audit_gate() -> Result<(), BenchmarkError> {
         #[extrinsic_call]
-        {
-            // Simulate 100 batch reservations
-            for _ in 0..100 {
-                let _nonce = NextNonce::<T>::mutate(source, sender.clone(), |n| {
-                    let cur = *n;
-                    *n = n.saturating_add(1);
-                    cur
-                });
-            }
-        }
+        set_external_bridge_audit_gate(RawOrigin::Root, true);
 
-        // Verify 100 nonces incremented
-        assert_eq!(NextNonce::<T>::get(source, sender), 100);
+        assert!(ExternalBridgeAuditGate::<T>::get());
+        Ok(())
     }
 
     #[benchmark]
-    fn route_lookup_cached() {
-        // Establish asset and route
-        let asset_id = AssetId::Native;
-        let source = DomainId::X3Native;
-        let destination = DomainId::X3Evm;
-        
+    fn set_external_bridges_enabled() -> Result<(), BenchmarkError> {
+        Pallet::<T>::set_external_bridge_audit_gate(RawOrigin::Root.into(), true)
+            .map_err(|_| BenchmarkError::Weightless)?;
+
         #[extrinsic_call]
-        {
-            let _route = T::Registry::route(&asset_id, source, destination);
-        }
+        set_external_bridges_enabled(RawOrigin::Root, true);
+
+        assert!(ExternalBridgesEnabled::<T>::get());
+        Ok(())
     }
 
     #[benchmark]
-    fn ledger_debit_operation() {
-        let asset_id = AssetId::Native;
-        let source = DomainId::X3Native;
-        let amount = 1_000_000u128;
-        
+    fn emergency_pause_bridge() -> Result<(), BenchmarkError> {
+        enable_external_bridges::<T>()?;
+        let reason: Vec<u8> = vec![b'p', b'a', b'u', b's', b'e'];
+
         #[extrinsic_call]
-        {
-            let _result = T::Ledger::debit_source_to_pending(&asset_id, source, amount);
-        }
+        emergency_pause_bridge(RawOrigin::Root, EXTERNAL_CHAIN_ID, reason);
+
+        assert!(BridgePaused::<T>::contains_key(EXTERNAL_CHAIN_ID));
+        Ok(())
     }
+
+    impl_benchmark_test_suite!(Pallet, crate::tests::new_test_ext(), crate::tests::Test);
 }
-
-impl_benchmark_test_suite!(
-    crate::pallet::Pallet::<T>,
-    crate::tests::new_test_ext(),
-    crate::tests::Test,
-);
