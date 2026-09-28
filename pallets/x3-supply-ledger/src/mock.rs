@@ -108,6 +108,7 @@ impl pallet_x3_asset_registry::Config for Test {
     type RegistryOrigin = frame_system::EnsureRoot<u64>;
     type EmergencyPauseOrigin = frame_system::EnsureRoot<u64>;
     type MaxAssets = frame_support::traits::ConstU32<1_000>;
+    type WeightInfo = ();
 }
 
 /// A deterministic asset id.

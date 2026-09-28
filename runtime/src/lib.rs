@@ -2593,6 +2593,7 @@ impl pallet_x3_asset_registry::Config for Runtime {
     type RegistryOrigin = EnsureRootOrHalfCouncil;
     type EmergencyPauseOrigin = EnsureRootOrHalfCouncil;
     type MaxAssets = MaxRegistryAssets;
+    type WeightInfo = pallet_x3_asset_registry::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_x3_supply_ledger::Config for Runtime {

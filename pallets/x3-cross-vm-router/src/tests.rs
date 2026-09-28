@@ -154,6 +154,7 @@ impl pallet_x3_asset_registry::Config for Test {
     type RegistryOrigin = RootOrAny;
     type EmergencyPauseOrigin = RootOrAny;
     type MaxAssets = MaxAssets;
+    type WeightInfo = ();
 }
 
 impl pallet_x3_supply_ledger::Config for Test {
