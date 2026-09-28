@@ -128,6 +128,9 @@ pub enum HirErrorKind {
     EmitOutsideAgent,
     /// Agent initialization error.
     AgentInitError(String),
+    /// A top-level `let mut`: the chain compiler allocates no storage for module state, so a
+    /// mutable global has nowhere to live between the functions that would share it.
+    MutableGlobal(String),
     /// Invalid context access.
     InvalidContextAccess(String),
     /// VM intrinsic used in wrong context.
@@ -229,6 +232,12 @@ impl fmt::Display for HirErrorKind {
             HirErrorKind::AgentInitError(msg) => {
                 write!(f, "agent initialization error: {msg}")
             }
+            HirErrorKind::MutableGlobal(name) => write!(
+                f,
+                "top-level `let mut {name}` is not supported: top-level bindings are compile-time \
+                 constants on chain, and a mutable one would need storage the compiler does not \
+                 allocate"
+            ),
             HirErrorKind::InvalidContextAccess(field) => {
                 write!(f, "invalid context access: `{field}`")
             }
