@@ -1337,37 +1337,8 @@ impl<'m> Vm<'m> {
                 Ok(Step::Continue(ip + 3))
             }
 
-            // -------- Type Conversions --------
-            0x60 | 0x61 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()?;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x62 | 0x63 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()?;
-                self.regs[reg!(d)] = MiniValue::F64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x64 | 0x65 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()? as i64;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x66 | 0x67 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_f64()?;
-                self.regs[reg!(d)] = MiniValue::F64(v);
-                Ok(Step::Continue(ip + 3))
-            }
-            0x68 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_bool()?;
-                self.regs[reg!(d)] = MiniValue::Bool(v);
-                Ok(Step::Continue(ip + 3))
-            }
+            // -------- Type Conversions: refused (see `verify_code`, TICKET-149) --------
+            0x60..=0x68 => Err(X3Error::UnsupportedOpcode(op)),
 
             // -------- Aggregates: refused --------
             //
@@ -1380,19 +1351,12 @@ impl<'m> Vm<'m> {
             0x14 | 0x15 | 0x16 | 0x17 | 0x70..=0x75 => Err(X3Error::UnsupportedOpcode(op)),
 
             // -------- Context reads --------
-            // `ctx_gas` is real — the interpreter knows its own budget. The rest have no source of
-            // truth in the runtime: nothing hands `mini_x3` a sender, a block height, a timestamp,
-            // a value or the chain id, so answering one invents it. `0x85` used to answer a
-            // hard-coded `3375`, which is a magic constant pretending to be chain identity.
-            0x84 => {
-                let d = self.r8(ip + 1)? as usize;
-                set!(
-                    d,
-                    MiniValue::I64(self.gas_limit as i64 - self.gas_used as i64)
-                );
-                Ok(Step::Continue(ip + 2))
-            } // ctx_gas
-            0x80..=0x83 | 0x85 => Err(X3Error::UnsupportedOpcode(op)),
+            // None has a source of truth in the runtime: nothing hands `mini_x3` a sender, a block
+            // height, a timestamp, a value or the chain id, so answering one invents it (`0x85`
+            // used to answer a hard-coded `3375`). `ctx_gas` (0x84) was answered from this
+            // engine's own budget; it is refused now because the other engine may count gas
+            // differently (see `verify_code`, TICKET-149).
+            0x80..=0x85 => Err(X3Error::UnsupportedOpcode(op)),
 
             // -------- Atomic windows --------
             //
@@ -1781,6 +1745,19 @@ fn verify_code(module: &MiniModule) -> Result<(), X3Error> {
             0x30..=0x34 => return Err(X3Error::ForbiddenOnChain(op)),
             // DebugPrint, Breakpoint: `x3-vm`'s on-chain verifier forbids them too.
             0xF0 | 0xF1 => return Err(X3Error::ForbiddenOnChain(op)),
+            // The numeric conversions and `ctx_gas` are refused at intake (TICKET-149). This engine
+            // executed them and `crates/x3-vm` did not, so the same program answered on chain and
+            // failed everywhere else, and neither half was right:
+            // * The value model has only `i64` and `f64`, so the 32-bit conversions had no honest
+            //   meaning here: `I64ToI32` returned its input untruncated, `F64ToF32` did not round,
+            //   `F32ToI32` did not saturate — identities under names that promise otherwise.
+            // * `ctx_gas` returned this engine's remaining gas, and nothing holds the two engines to
+            //   the same per-opcode charges, so a program branching on it could take different
+            //   paths on the two. A value the engines might disagree about is not one to put in
+            //   consensus state.
+            // The chain compiler emits none of these (only `x3-backend`'s HIR-direct `lower.rs`,
+            // which the chain path does not use), so this refuses no compiled program.
+            0x60..=0x68 | 0x84 => return Err(X3Error::UnsupportedOpcode(op)),
             _ => {}
         }
         ip += len;
