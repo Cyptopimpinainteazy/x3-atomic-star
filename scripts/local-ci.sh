@@ -360,6 +360,12 @@ GATES_FAST=(
   "clippy runtime rc1:cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings"
   "clippy node rc1:cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings"
   "test x3-lang:cargo test --manifest-path x3-lang/Cargo.toml"
+  # The chain compiler — the pipeline `compile_source` runs and the on-chain `.x3` path depends on —
+  # had no gate of its own: its crates' tests ran only in `test workspace` (--deep), so a change
+  # to the optimizer or a lowering was checked here only as far as `test x3-integration` happens to
+  # exercise it. This runs every stage's own suite, including `optimizer_order.rs`, which holds the
+  # optimizer independent of function order.
+  "test x3 chain compiler:cargo test -p x3-common -p x3-semantics -p x3-typeck -p x3-hir -p x3-mir -p x3-opt -p x3-backend -p x3-compiler"
   # The Python half of `make test` (parser, typechecker, mocked e2e). Nothing else
   # in this gate set runs pytest, so without this line the x3-lang Python suites
   # were invisible to the CI of record.

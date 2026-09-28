@@ -205,17 +205,48 @@ impl MirBytecodeCompiler {
                             .map(|a| self.get_reg(*a))
                             .collect::<BackendResult<Vec<_>>>()?;
 
-                        let func_idx =
-                            self.function_indices.get(target).copied().ok_or_else(|| {
-                                BackendError::new(
-                                    BackendErrorKind::UnknownFunction {
-                                        name: format!("{target:?}"),
-                                    },
+                        // A host call is a call to a reserved symbol (`x3_common::intrinsics`):
+                        // it becomes the VM's opcode, not a call into the function table.
+                        if let Some(intrinsic) = x3_common::intrinsics::by_symbol(target.0) {
+                            if arg_regs.len() != intrinsic.arity {
+                                return Err(BackendError::new(
+                                    BackendErrorKind::Internal(format!(
+                                        "{} takes {} argument(s), MIR passed {}",
+                                        intrinsic.name,
+                                        intrinsic.arity,
+                                        arg_regs.len()
+                                    )),
                                     self.current_span,
-                                )
-                            })?;
+                                ));
+                            }
+                            if intrinsic == x3_common::intrinsics::EVM_SLOAD {
+                                self.emitter.emit_evm_sload(dst, arg_regs[0]);
+                            } else if intrinsic == x3_common::intrinsics::EVM_SSTORE {
+                                self.emitter.emit_evm_sstore(arg_regs[0], arg_regs[1]);
+                                // The call's value is unit, which this backend represents as 0.
+                                self.emitter.emit_int(dst, 0)?;
+                            } else {
+                                return Err(BackendError::new(
+                                    BackendErrorKind::Internal(format!(
+                                        "host call {} has no lowering",
+                                        intrinsic.name
+                                    )),
+                                    self.current_span,
+                                ));
+                            }
+                        } else {
+                            let func_idx =
+                                self.function_indices.get(target).copied().ok_or_else(|| {
+                                    BackendError::new(
+                                        BackendErrorKind::UnknownFunction {
+                                            name: format!("{target:?}"),
+                                        },
+                                        self.current_span,
+                                    )
+                                })?;
 
-                        self.emitter.emit_call(dst, func_idx, &arg_regs);
+                            self.emitter.emit_call(dst, func_idx, &arg_regs);
+                        }
                     }
                     MirRhs::Load { model, addr } => {
                         let addr_reg = self.get_reg(*addr)?;

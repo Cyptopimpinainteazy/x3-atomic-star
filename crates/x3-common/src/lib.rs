@@ -411,6 +411,63 @@ pub mod bytecode {
 // compiled `signing` — and failed, taking seven crates' no-default-features builds and the runtime's
 // WASM build with it. A scripted insertion anchored on a bare `pub mod X;` moves whatever attribute
 // precedes it; anchor on the attribute too.
+/// Host calls a chain program can make by name: the VM's storage opcodes, reachable from source.
+///
+/// `x3-backend` has emitted `evm_sload`/`evm_sstore` (0xB3/0xB4) and both interpreters have
+/// executed them (`crates/x3-vm`, and `mini_x3`, which a block runs) with one slot key and one
+/// value encoding, but no stage of the compiler would let a program *call* them: the resolver
+/// reported `undefined variable 'evm_sstore'`. This table is the one place the names, arities and
+/// value kinds live; the resolver, the type checker and HIR consult it only for a name the program
+/// has not declared itself, so a user's own `evm_sload` still wins.
+///
+/// A host call reaches MIR as an ordinary `Call` to a reserved symbol id at the top of the id
+/// space. Every optimizer pass already treats a call as having effects (dead-code elimination
+/// keeps it, hoisting refuses to move it, constant propagation does not look through it), which is
+/// the treatment a storage access needs: a load must not be merged across a store, and a store
+/// whose result is unused must not be deleted. The backend emits the opcode for a reserved id.
+pub mod intrinsics {
+    /// One host call.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Intrinsic {
+        pub name: &'static str,
+        /// Every parameter is a 64-bit integer.
+        pub arity: usize,
+        /// Whether the call produces an `i64` (otherwise it produces unit).
+        pub returns_value: bool,
+        /// The reserved symbol id the call is lowered to (`usize::MAX - n`).
+        pub symbol: usize,
+    }
+
+    /// `evm_sload(slot: i64) -> i64`: the slot's value, or 0 if it was never written.
+    pub const EVM_SLOAD: Intrinsic = Intrinsic {
+        name: "evm_sload",
+        arity: 1,
+        returns_value: true,
+        symbol: usize::MAX,
+    };
+
+    /// `evm_sstore(slot: i64, value: i64)`: write the slot. A negative slot fails at run time
+    /// (`InvalidStorageSlot`) on both engines.
+    pub const EVM_SSTORE: Intrinsic = Intrinsic {
+        name: "evm_sstore",
+        arity: 2,
+        returns_value: false,
+        symbol: usize::MAX - 1,
+    };
+
+    pub const ALL: [Intrinsic; 2] = [EVM_SLOAD, EVM_SSTORE];
+
+    pub fn by_name(name: &str) -> Option<Intrinsic> {
+        ALL.iter().copied().find(|intrinsic| intrinsic.name == name)
+    }
+
+    pub fn by_symbol(symbol: usize) -> Option<Intrinsic> {
+        ALL.iter()
+            .copied()
+            .find(|intrinsic| intrinsic.symbol == symbol)
+    }
+}
+
 #[cfg(feature = "std")]
 pub mod signing;
 #[cfg(feature = "std")]

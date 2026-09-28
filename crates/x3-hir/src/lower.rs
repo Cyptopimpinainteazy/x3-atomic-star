@@ -16,7 +16,7 @@ use x3_ast::{
     BinaryExpression, Expression, Function, GlobalLet, Item, Module, Statement, UnaryExpression,
 };
 use x3_common::Span;
-use x3_typeck::Type;
+use x3_typeck::{FunctionSignature, PrimitiveType, Type, TypeKind};
 
 use crate::error::{HirError, HirErrorKind, HirResult};
 use crate::hir::*;
@@ -254,6 +254,12 @@ impl HirLowerer {
 
     /// Lower a global declaration.
     fn lower_global(&mut self, global: GlobalLet, symbol: SymbolId) -> HirResult<HirGlobal> {
+        if global.mutable {
+            return Err(HirError::new(
+                HirErrorKind::MutableGlobal(global.name.name.clone()),
+                global.span,
+            ));
+        }
         let scope = ScopeStack::new();
         let initializer = self.lower_expression(&global.initializer, &scope)?;
         let ty = initializer.ty.clone();
@@ -764,9 +770,20 @@ impl HirLowerer {
     ) -> HirResult<HirStmt> {
         // Handle assignment specially
         if let Expression::Assign(assign) = expr {
-            let target_info = scope
-                .lookup(&assign.target.name)
-                .ok_or_else(|| HirError::unknown_symbol(&assign.target.name, assign.target.span))?;
+            let target_info = match scope.lookup(&assign.target.name) {
+                Some(info) => info,
+                // A top-level binding is a constant: assigning to one is an immutable assignment,
+                // not a reference to a name that does not exist.
+                None if self.top_level.contains_key(&assign.target.name) => {
+                    return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+                }
+                None => {
+                    return Err(HirError::unknown_symbol(
+                        &assign.target.name,
+                        assign.target.span,
+                    ))
+                }
+            };
 
             if !target_info.mutable {
                 return Err(HirError::immutable_assign(&assign.target.name, assign.span));
@@ -940,6 +957,21 @@ impl HirLowerer {
             } else if let Some(&symbol) = self.top_level.get(&callee.name) {
                 let ty = self.symbol_type(symbol).unwrap_or_else(Type::any);
                 (symbol, ty)
+            } else if let Some(intrinsic) = x3_common::intrinsics::by_name(&callee.name) {
+                // A host call: a call to its reserved symbol (see `x3_common::intrinsics`).
+                let i64_ty = || Type::new(TypeKind::Primitive(PrimitiveType::I64));
+                let sig = FunctionSignature::new(
+                    (0..intrinsic.arity).map(|_| i64_ty()).collect(),
+                    if intrinsic.returns_value {
+                        i64_ty()
+                    } else {
+                        Type::unit()
+                    },
+                );
+                (
+                    SymbolId(intrinsic.symbol),
+                    Type::new(TypeKind::Function(sig)),
+                )
             } else {
                 return Err(HirError::unknown_symbol(&callee.name, callee.span));
             };

@@ -637,8 +637,32 @@ impl TypeChecker {
 
     /// Infer type of a function call.
     fn infer_call_type(&mut self, call: &CallExpression, resolved: &ResolvedModule) -> Type {
+        // A host call the resolver left unbound (the program declares no such name) takes its
+        // signature from `x3_common::intrinsics`: every parameter an `i64`, and an `i64` or unit
+        // result.
+        let host_call = match &*call.callee {
+            Expression::Identifier(ident)
+                if self.symbol_used_at(ident.span, resolved).is_none() =>
+            {
+                x3_common::intrinsics::by_name(&ident.name)
+            }
+            _ => None,
+        };
         // Get the callee type
-        let callee_type = self.infer_expression_type(&call.callee, resolved);
+        let callee_type = match host_call {
+            Some(intrinsic) => {
+                let i64_ty = || Type::new(TypeKind::Primitive(PrimitiveType::I64));
+                Type::new(TypeKind::Function(FunctionSignature::new(
+                    (0..intrinsic.arity).map(|_| i64_ty()).collect(),
+                    if intrinsic.returns_value {
+                        i64_ty()
+                    } else {
+                        Type::unit()
+                    },
+                )))
+            }
+            None => self.infer_expression_type(&call.callee, resolved),
+        };
 
         match &callee_type.kind {
             TypeKind::Function(sig) => {
