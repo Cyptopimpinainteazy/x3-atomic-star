@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `953abcdab`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `2084743d1`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -482,12 +482,12 @@ alters the runtime, so the record and the code land together.
   branch would have missed the immediate-apply path a chain takes. Scanner
   `pallet-call-without-weights` 22 → 21.
 
-* `953abcdab` — **the token factory measures its launch, and a cross-crate regression the gate missed.**
+* `69a58d4fe` — **the token factory measures its launch, and a cross-crate regression the gate missed.**
   `pallets/x3-token-factory` charged literals for a token launch (60,000 picoseconds), a mint and a
   burn (20,000 each) and an authority handover (10,000), behind a `runtime-benchmarks` feature that
   had nothing in it. It carries a generated `weights.rs`, a `benchmarking.rs` and a `type WeightInfo`
-  now: compact 8887198 bytes (`0x4d48500b38458576e1a1898d030a4c91ea34cc73634b870a2e252ab9395e55b4`) — was 8,881,232 — and compressed 1530143
-  (`0x201adaf959694ab75a75090202afb61e2d6762a8cde9e8b5c1cc52065a0be1c5`) — was 1,526,056.
+  now: compact 8894628 bytes (`0xcaab18521a8364f1f0ea1ef3e036a357478ed50749c9fff8fa32de53433746c7`) — was 8,881,232 — and compressed 1524541
+  (`0x6399941a9a001b39f5cca3bd224a287d23c83417d12ec60842f146da58f05824`) — was 1,526,056.
 
   The launch benchmark drives the whole path a chain takes — register the asset, activate it,
   configure the internal routes, mint the initial supply — and the mint and burn benchmarks use the
@@ -501,3 +501,61 @@ alters the runtime, so the record and the code land together.
   to a pallet's `Config` touches every crate that wires it. `cargo check --workspace --all-targets` is
   the check that sees it, and it is now run after every weights pass. Scanner
   `pallet-call-without-weights` 21 → 20.
+
+* `891a47f96` — **the sequencer and the DA pallet measure their calls.** `pallets/x3-sequencer`
+  charged 10,000 picoseconds for `submit_transaction` while reserving a per-byte fee, bumping the
+  global sequence and pushing into the pending batch; `pallets/x3-da` charged 15,000 for a blob
+  commitment and 10,000 for a shard proof. Both declared `runtime-benchmarks` features with nothing
+  behind them. They carry generated weight files now: compact 8888569 bytes (`0x1570b59530b954d0e6e99ed64158728461acd3eb282a76320a08d040dc742d6a`)
+  — was 8,894,628 — and compressed 1524965 (`0xb8088b091b6116540d0a2e693e4e3bff9c0a1eca92c3848c34e9eb7ca23b8124`) — was 1,524,541.
+
+  The DA pallet's shard-proof benchmark commits the blob it attests to first, through the pallet's own
+  extrinsic, because `BlobNotFound` is the guard and the commitment has to exist. Both benchmarks
+  measure the fee reserve as part of the call, since `ReservableCurrency::reserve` is inside it.
+  Scanner `pallet-call-without-weights` 20 → 18.
+
+* `9f5446270` — **the flash loan and the reservation pallet measure their calls.** `pallets/x3-flashloan`
+  charged 10,000 picoseconds to borrow or repay and 5,000 to add liquidity; `pallets/x3-reservation`
+  charged 10,000 for each of its three root transitions — a request that locks real vault inventory
+  and increments the lane's unsettled notional, and the two terminal transitions that undo it. Both
+  declared `runtime-benchmarks` features with nothing behind them. They carry generated weight files
+  now: compact 8895788 bytes (`0x343f40ba483afd6550234e05810269abc4b73c4512a1ee8d196eaeb46673cebf`) — was 8,888,569 — and compressed 1524612
+  (`0x942851a920761e1d35ec741852572e4296c5f6de63bad1870aacbc193084b094`) — was 1,524,965.
+
+  Two traps live in this revision. `define_benchmarks!`'s location name must match the
+  `construct_runtime!` pallet alias exactly — `X3FlashLoan`, not `X3Flashloan` — because the macro
+  resolves that name at the crate root, where a `use` alias declared inside `mod benches` is not in
+  scope; the failure is reported as `cannot find type X3Flashloan in this scope` on the macro line.
+  And a benchmark's amounts have to clear the chain's existential deposit: the flash loan's 1,000-unit
+  pool passed in the mock and failed on the dev chain with "Account cannot exist with the funds that
+  would be given", so its amounts are multiples of `minimum_balance()` now. The reservation benchmark
+  requires the chain's balance to be `u128` and uses real amounts for the same class of reason: the
+  inventory helpers return early for zero, and a zero-amount benchmark measures the no-op path.
+  Scanner `pallet-call-without-weights` 18 → 16.
+
+* `382f4c8da` — **the domain registry and the reconciliation pallet measure their calls.**
+  `pallets/x3-domain-registry` charged 20,000 picoseconds to register a domain and 30,000 to set its
+  records; `pallets/x3-reconciliation` charged 10,000-30,000 across six calls — a chain supply report,
+  the canonical supply, the reconciliation run itself, the halt lift, and two governance-power calls.
+  Both declared `runtime-benchmarks` features with nothing behind them. They carry generated weight
+  files now: compact 8890492 bytes (`0x84ae71b3d391d407c06d7a4cb4789ae7d2e58cd480c6f13fc811e37201785db5`) — was 8,895,788 — and compressed
+  1526313 (`0xbe7d4de0bd5020c3ebc2c86ac4f21e83c1719da09e40f60328844d52fbd25a02`) — was 1,524,612.
+
+  A benchmark module also compiles into this runtime's WASM build, where `Vec` and `vec!` are not in
+  the prelude: the domain registry's `Vec<X3DnsRecord<T>>` helper needed `use sp_std::{vec, vec::Vec}`,
+  and the failure surfaced as `cannot find type Vec in this scope` from the build script, not from the
+  pallet's own test run, which passes with `std`. The reconciliation benchmarks set the state their
+  calls read through the pallet's own extrinsics. Scanner `pallet-call-without-weights` 16 → 14.
+
+* `2084743d1` — **the wrapped pallet and the sentinel measure their calls.** `pallets/x3-wrapped`
+  charged 8,000-20,000 picoseconds across seven calls; `pallets/x3-sentinel` charged 15,000 on each
+  of seven — and each of those is a security power: freezing an authority's supply-changing rights on
+  an asset, freezing the asset, enrolling it for guardian review, granting an approval. Both declared
+  `runtime-benchmarks` features with nothing behind them. They carry generated weight files now:
+  compact 8880606 bytes (`0x711de9175cf9fca94cfdee05bd9084b819e9ab575ba93caff16359942d60f54e`) — was 8,890,492 — and compressed 1524413
+  (`0x7f131976c94ca2044a5ae7f2551625bd71cd265af1cd0b665e815f20e86a5658`) — was 1,526,313.
+
+  The sentinel has no `mock.rs`; its test runtime lives in `tests.rs`, and `new_test_ext` had to
+  become `pub` for the benchmark test suite to link against it. Its argument shapes are not guessable
+  from the call names either — `freeze_authority(origin, asset, who, reason)` takes four and
+  `freeze_asset(origin, asset, reason)` three. Scanner `pallet-call-without-weights` 14 → 12.

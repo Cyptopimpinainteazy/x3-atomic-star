@@ -86,6 +86,7 @@ impl pallet_x3_da::Config for Test {
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = MaxShardProofs;
     type RetentionBlocks = RetentionBlocks;
+    type WeightInfo = pallet_x3_da::weights::SubstrateWeight<Test>;
 }
 
 /// Build genesis storage.

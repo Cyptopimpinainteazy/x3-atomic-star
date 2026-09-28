@@ -2646,6 +2646,7 @@ impl pallet_x3_domain_registry::Config for Runtime {
     type MaxRecordsPerDomain = MaxX3RecordsPerDomain;
     type MaxCnameLen = MaxX3CnameLen;
     type MaxTxtLen = MaxX3TxtLen;
+    type WeightInfo = pallet_x3_domain_registry::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Account Registry Pallet Configuration =====
@@ -2930,6 +2931,7 @@ impl pallet_x3_sequencer::Config for Runtime {
     type MaxPayloadSize = SeqMaxPayloadSize;
     type PerByteFee = SeqPerByteFee;
     type BaseFee = SeqBaseFee;
+    type WeightInfo = pallet_x3_sequencer::weights::SubstrateWeight<Runtime>;
 }
 
 // ── Fraud-proof trait implementations ─────────────────────────────────────────
@@ -2961,6 +2963,7 @@ impl pallet_x3_da::Config for Runtime {
     type PerByteFee = DaPerByteFee;
     type MaxShardProofs = DaMaxShardProofs;
     type RetentionBlocks = DaRetentionBlocks;
+    type WeightInfo = pallet_x3_da::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== Offchain transaction creation impls (required by pallet-x3-atomic-kernel) =====
@@ -3108,6 +3111,7 @@ parameter_types! {
 impl pallet_x3_reservation::Config for Runtime {
     type ReservationTtlBlocks = ReservationTtlBlocks;
     type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
+    type WeightInfo = pallet_x3_reservation::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Solvency Configuration =====
@@ -3203,6 +3207,7 @@ impl pallet_x3_reconciliation::Config for Runtime {
     type MintHaltThresholdBlocks = MintHaltThresholdBlocks;
     type ToleranceBps = ReconciliationToleranceBps;
     type GovernanceDivergenceAlertBps = ReconciliationGovDivergenceAlertBps;
+    type WeightInfo = pallet_x3_reconciliation::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Wrapped Token Configuration =====
@@ -3217,6 +3222,7 @@ impl pallet_x3_wrapped::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrTwoThirdsCouncil;
     type MaxChainsPerAsset = MaxChainsPerAsset;
     type MaxWrappedAssets = MaxWrappedAssets;
+    type WeightInfo = pallet_x3_wrapped::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Auction Configuration =====
@@ -3256,6 +3262,7 @@ impl pallet_x3_sentinel::Config for Runtime {
     // council/governance must be delegated explicitly at runtime-author-time;
     // this deliberately defaults to the strongest, easiest-to-audit origin.
     type FreezeOrigin = frame_system::EnsureRoot<AccountId>;
+    type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Launchpad Configuration =====
@@ -3437,6 +3444,7 @@ impl pallet_x3_flashloan::Config for Runtime {
     type Currency = Balances;
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
     type MaxLoanFraction = FlashLoanMaxLoanFraction;
+    type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== SVM Runtime Configuration =====
@@ -3553,8 +3561,38 @@ mod benches {
     // and a runtime feature list that did not enable it either.
     #[allow(unused_imports)]
     use pallet_x3_token_factory::Pallet as X3TokenFactory;
+    // Added 2026-09-27: `pallet-x3-sequencer` and `pallet-x3-da` charged literals on every call
+    // behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_da::Pallet as X3Da;
+    #[allow(unused_imports)]
+    use pallet_x3_sequencer::Pallet as X3Sequencer;
+    // Added 2026-09-27: `pallet-x3-flashloan` and `pallet-x3-reservation` charged literals on every
+    // call behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_flashloan::Pallet as X3FlashLoan;
+    #[allow(unused_imports)]
+    use pallet_x3_reservation::Pallet as X3Reservation;
+    // Added 2026-09-27: `pallet-x3-domain-registry` and `pallet-x3-reconciliation` charged literals
+    // on every call behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_domain_registry::Pallet as X3DomainRegistry;
+    #[allow(unused_imports)]
+    use pallet_x3_reconciliation::Pallet as X3Reconciliation;
+    // Added 2026-09-27: `pallet-x3-wrapped` and `pallet-x3-sentinel` charged literals on every call
+    // behind `runtime-benchmarks` features with nothing behind them.
+    #[allow(unused_imports)]
+    use pallet_x3_sentinel::Pallet as X3Sentinel;
+    #[allow(unused_imports)]
+    use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
+        [pallet_x3_wrapped, X3Wrapped]
+        [pallet_x3_sentinel, X3Sentinel]
+        [pallet_x3_domain_registry, X3DomainRegistry]
+        [pallet_x3_reconciliation, X3Reconciliation]
+        [pallet_x3_sequencer, X3Sequencer]
+        [pallet_x3_da, X3Da]
         [pallet_x3_token_factory, X3TokenFactory]
         [pallet_x3_treasury_policy, X3TreasuryPolicy]
         [pallet_x3_supply_ledger, X3SupplyLedger]
@@ -3565,6 +3603,8 @@ mod benches {
         [pallet_cross_chain_validator, CrossChainValidator]
         [pallet_x3_slash, X3Slash]
         [pallet_northern_swarm, NorthernSwarm]
+        [pallet_x3_flashloan, X3FlashLoan]
+        [pallet_x3_reservation, X3Reservation]
     );
 }
 

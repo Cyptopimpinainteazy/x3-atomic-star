@@ -15,6 +15,7 @@ name = "pallet_x3_sentinel"
 crate-type = ["rlib"]
 
 [dependencies]
+frame-benchmarking = { workspace = true, optional = true, default-features = false }
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 parity-scale-codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
@@ -34,6 +35,7 @@ sp-runtime = { workspace = true, default-features = false, features = ["std"] }
 [features]
 default = ["std"]
 std = [
+    "frame-benchmarking?/std",
     "frame-support/std",
     "frame-system/std",
     "parity-scale-codec/std",
@@ -49,6 +51,7 @@ try-runtime = [
     "frame-system/try-runtime",
 ]
 runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
 ]

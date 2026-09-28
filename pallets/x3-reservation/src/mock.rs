@@ -63,6 +63,7 @@ parameter_types! {
 impl pallet_x3_reservation::Config for Test {
     type ReservationTtlBlocks = ReservationTtlBlocks;
     type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
+    type WeightInfo = pallet_x3_reservation::weights::SubstrateWeight<Test>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
