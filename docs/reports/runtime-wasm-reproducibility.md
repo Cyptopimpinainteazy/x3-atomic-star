@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `41f386c3d`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `924a7c37e`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -574,3 +574,18 @@ alters the runtime, so the record and the code land together.
   the PR branch before master was merged into it, so the merged tree's bytes are new — compact
   8888737 bytes (`0x18d31490b724d8e5af91f0eb77436a3a3e95947d5576bb973022f125a16e63b1`) — was 8,880,606 — and compressed 1528341
   (`0x73df026fa625427bb4e02aaadda76b53be0a788d7876e3b7f46823af5bfac7b6`) — was 1,528,293, from two builds that agreed.
+
+* `924a7c37e` — **the asset registry joins the registered benchmark pallets, and the record follows.**
+  `pallets/x3-asset-registry`'s seven dispatchables charged literals with no `runtime-benchmarks`
+  feature at all. The benchmarks exist and pass in the pallet's own suite now (seven entries), and the
+  runtime registers the pallet in `mod benches`, which moves the recorded bytes by one: compact
+  8888737 (`0x7e761cc4692ac1baab78f4b81e8138dde9c42122e1e34b5868f21b2a1ad8d9a3`) — was 8,888,737 — and compressed 1528342 (`0xdc8e889f70c893f0bedc00e4e9b2e271e657c3e2cc55f36474eb753afc6c6854`)
+  — was 1,528,341, from two builds that agreed.
+
+  **No weights file yet, and the reason is a defect in this repository's benchmark build, not in the
+  pallet.** `cargo build --release -p x3-chain-node --features runtime-benchmarks` fails in the nested
+  WASM build with `E0463: can't find crate for 'std'` from `rustc-hex`/`bytes`, reached through
+  `evm/std`; the same command fails with every uncommitted edit stashed, so it predates this change,
+  and clearing the nested build cache does not help. The weights CLI cannot work around it either: a
+  node built with `SKIP_WASM_BUILD=1` refuses to start without an embedded runtime. Until that build is
+  fixed, no pallet's weights can be regenerated.
