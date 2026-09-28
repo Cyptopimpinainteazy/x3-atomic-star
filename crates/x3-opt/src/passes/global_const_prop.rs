@@ -96,10 +96,10 @@ impl GlobalConstPropPass {
                 Some(Literal::Integer(a.wrapping_mul(*b)))
             }
             (BinaryOp::Div, Literal::Integer(a), Literal::Integer(b)) if *b != 0 => {
-                Some(Literal::Integer(a / b))
+                Some(Literal::Integer(a.wrapping_div(*b)))
             }
             (BinaryOp::Mod, Literal::Integer(a), Literal::Integer(b)) if *b != 0 => {
-                Some(Literal::Integer(a % b))
+                Some(Literal::Integer(a.wrapping_rem(*b)))
             }
             (BinaryOp::Equal, Literal::Integer(a), Literal::Integer(b)) => {
                 Some(Literal::Bool(a == b))
@@ -128,7 +128,9 @@ impl GlobalConstPropPass {
     /// Evaluate a unary operation on a known constant.
     fn eval_unary(op: &x3_ast::UnaryOp, operand: &Literal) -> Option<Literal> {
         match (op, operand) {
-            (x3_ast::UnaryOp::Negate, Literal::Integer(n)) => Some(Literal::Integer(-n)),
+            (x3_ast::UnaryOp::Negate, Literal::Integer(n)) => {
+                Some(Literal::Integer(n.wrapping_neg()))
+            }
             (x3_ast::UnaryOp::Not, Literal::Bool(b)) => Some(Literal::Bool(!b)),
             _ => None,
         }

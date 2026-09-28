@@ -201,7 +201,12 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
 // WasmX3Adapter
 // ---------------------------------------------------------------------------
 
-/// X3 adapter backed by `mini_x3` in no-std and `x3-vm` in std.
+/// The runtime's X3 adapter: `X3Executor`'s on-chain engine, the same code in every build.
+///
+/// This used to call `X3Executor::execute`, which is `mini_x3` in the wasm build and `x3-vm` in a
+/// `std` one, so the chain ran one engine and the native runtime — its tests and its benchmarks —
+/// ran another (see `X3Executor::execute_on_chain`). `X3VmAdapter`, the native runtime's adapter,
+/// now delegates here as well.
 pub struct WasmX3Adapter;
 
 impl X3ExecutorAdapter for WasmX3Adapter {
@@ -228,15 +233,6 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        let mut config = x3_x3_integration::X3ExecutorConfig {
-            gas_limit,
-            ..Default::default()
-        };
-        // The engine refuses a demanding artifact unless the caller says a private channel exists,
-        // and the pallet is the component that knows: it holds `Config::PrivateSubmissionChannel`.
-        if private_channel_available {
-            config = config.with_private_submission_available();
-        }
         // The chain's slots in the executor's own shape. Loading them is what makes a program able
         // to read a slot an earlier comit persisted; without them every `evm_sload` on a block
         // answered EVM's zero.
@@ -244,51 +240,66 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             .iter()
             .map(|(key, value)| (key.to_fixed_bytes(), *value))
             .collect();
-        x3_x3_integration::X3Executor::execute_with_slots(payload, &[], config, &seeds)
-            .map(|rec| ExecutionReceipt {
-                version: crate::EXECUTION_RECEIPT_VERSION,
-                success: rec.success,
-                gas_used: rec.gas_used,
-                return_data: rec.return_data,
-                logs: Vec::new(),
-                state_changes: Vec::new(),
-                // Carry the executor's slot channel through unchanged. Both engines journal the
-                // slot writes they made (`mini_x3` on a block, `x3-vm` in std builds), and they
-                // must not be dropped on the way to the pallet or a contract's state would
-                // silently vanish between execution and the receipt the chain stores.
-                storage_writes: rec
-                    .storage_writes
-                    .into_iter()
-                    .map(|write| crate::StorageWrite {
-                        key: write.key,
-                        old_value: write.old_value,
-                        new_value: write.new_value,
-                    })
-                    .collect(),
-                protocol_version: 1,
-                migration_history: Vec::new(),
-                compatibility_flags: 0,
-                from: Vec::new(),
-                to: Vec::new(),
-                value: 0,
+        // The engine refuses an artifact that demands private submission unless the pallet, which
+        // holds `Config::PrivateSubmissionChannel`, says a private channel exists.
+        x3_x3_integration::X3Executor::execute_on_chain(
+            payload,
+            gas_limit,
+            &seeds,
+            private_channel_available,
+        )
+        .map(|rec| ExecutionReceipt {
+            version: crate::EXECUTION_RECEIPT_VERSION,
+            success: rec.success,
+            gas_used: rec.gas_used,
+            return_data: rec.return_data,
+            logs: Vec::new(),
+            state_changes: Vec::new(),
+            // Carry the executor's slot channel through unchanged. Both engines journal the
+            // slot writes they made (`mini_x3` on a block, `x3-vm` in std builds), and they
+            // must not be dropped on the way to the pallet or a contract's state would
+            // silently vanish between execution and the receipt the chain stores.
+            storage_writes: rec
+                .storage_writes
+                .into_iter()
+                .map(|write| crate::StorageWrite {
+                    key: write.key,
+                    old_value: write.old_value,
+                    new_value: write.new_value,
+                })
+                .collect(),
+            protocol_version: 1,
+            migration_history: Vec::new(),
+            compatibility_flags: 0,
+            from: Vec::new(),
+            to: Vec::new(),
+            value: 0,
+        })
+        .map_err(|error| {
+            DispatchError::Other(match error {
+                x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
+                    "X3 verification failed"
+                }
+                _ => "X3 execution failed",
             })
-            .map_err(|_| DispatchError::Other("X3 execution failed"))
+        })
     }
 
     fn validate(payload: &[u8]) -> Result<(), DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        x3_x3_integration::X3Executor::verify(payload, false)
-            .map_err(|_| DispatchError::Other("X3 validation failed"))
+        x3_x3_integration::X3Executor::verify_on_chain(payload)
+            .map_err(|_| DispatchError::Other("Invalid X3 bytecode"))
     }
 
     fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
-        x3_x3_integration::X3Executor::estimate_gas(payload)
-            .map_err(|_| DispatchError::Other("X3 gas estimation failed"))
+        Ok(x3_x3_integration::X3Executor::estimate_gas_on_chain(
+            payload,
+        ))
     }
 }
 

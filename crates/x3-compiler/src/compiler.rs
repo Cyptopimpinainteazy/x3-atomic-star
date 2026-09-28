@@ -60,8 +60,33 @@ impl Compiler {
         if options.verbose {
             eprintln!("  [1/5] Parsing source...");
         }
+        // Control characters other than tab, newline and carriage return are refused. The lexer
+        // skipped them, so a NUL or backspace inside a statement changed nothing the compiler
+        // reported while hiding what the source shows a reader (found by the `compile_and_run`
+        // fuzz target, whose inputs carried them into a program that then compiled).
+        if let Some((offset, ch)) = source
+            .char_indices()
+            .find(|(_, c)| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        {
+            return Err(CompilerError::Lexer(format!(
+                "control character U+{:04X} at byte {offset} is not allowed in source",
+                ch as u32
+            )));
+        }
         let ast = x3_parser::parse_program(source)
             .map_err(|e| CompilerError::Parser(format!("{:?}", e)))?;
+
+        // Phase 1b: resolve names and check types. The resolver and the type checker existed and
+        // were never called — `CompilerError::TypeCheck` had no producer — so a program adding a
+        // bool to an integer, returning a bool from an `i64` function, passing `true` for an `i64`
+        // parameter, branching on an integer or falling off the end of a function with a return
+        // type compiled, and ran with whatever meaning the VM gave the bytes.
+        let resolved = x3_semantics::Resolver::new()
+            .resolve(&ast)
+            .map_err(|errors| CompilerError::TypeCheck(format!("{errors:?}")))?;
+        x3_typeck::TypeChecker::new()
+            .check(&ast, &resolved)
+            .map_err(|errors| CompilerError::TypeCheck(format!("{errors:?}")))?;
 
         // Where `main` sits among the functions, computed here because the AST is consumed by the
         // HIR lowering below and the HIR keeps the same order (TICKET-130).
@@ -73,6 +98,32 @@ impl Compiler {
                 _ => None,
             })
             .position(|function| function.name.name == "main");
+
+        // The runtime executes function 0 with no arguments, and this pipeline puts `main` there.
+        // A program with no `main` compiled to a module the chain refuses (`FunctionNotFound`, found
+        // by the `compile_and_run` fuzz target on the empty program), and a `main` with parameters
+        // to one it refuses too (the entry would run on registers no caller wrote). Both are the
+        // program's error, so they are reported here, against the source.
+        let Some(entry) = entry_function_index else {
+            return Err(CompilerError::TypeCheck(
+                "a program must declare `fn main()`: it is the function the chain executes".into(),
+            ));
+        };
+        let main_params = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                x3_ast::Item::Function(function) => Some(function),
+                _ => None,
+            })
+            .nth(entry)
+            .map(|function| function.params.len())
+            .unwrap_or(0);
+        if main_params != 0 {
+            return Err(CompilerError::TypeCheck(format!(
+                "`main` takes {main_params} parameter(s), but the chain calls it with none"
+            )));
+        }
 
         // Phase 2: Lower AST to HIR
         if options.verbose {
@@ -337,6 +388,10 @@ mod tests {
             fn add(a: i64, b: i64) -> i64 {
                 return a + b;
             }
+
+            fn main() -> i64 {
+                return add(1, 2);
+            }
         "#;
 
         let options = CompilationOptions::opt2()
@@ -361,6 +416,10 @@ mod tests {
                 let a = x * 2;
                 let b = a + 10;
                 return b;
+            }
+
+            fn main() -> i64 {
+                return compute(4);
             }
         "#;
 
@@ -389,6 +448,10 @@ mod tests {
         let source = r#"
             fn compute(a: i64, b: i64) -> i64 {
                 return a + b;
+            }
+
+            fn main() -> i64 {
+                return compute(2, 3);
             }
         "#;
 

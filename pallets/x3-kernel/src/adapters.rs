@@ -554,12 +554,16 @@ pub mod real_adapters {
         }
     }
 
-    /// Production X3 VM adapter using x3-vm
+    /// The native runtime's X3 adapter. It delegates to `WasmX3Adapter`, so the native and the
+    /// wasm runtime execute X3 programs with the same engine; it used to run `x3-vm`, which no node
+    /// executing the wasm runtime ever runs (see `X3Executor::execute_on_chain`).
     pub struct X3VmAdapter;
 
     impl super::X3ExecutorAdapter for X3VmAdapter {
         fn execute(payload: &[u8], gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-            Self::execute_with_slots(payload, gas_limit, &[])
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute(
+                payload, gas_limit,
+            )
         }
 
         fn execute_with_slots(
@@ -567,9 +571,9 @@ pub mod real_adapters {
             gas_limit: u64,
             slots: &[(H256, [u8; 32])],
         ) -> Result<ExecutionReceipt, DispatchError> {
-            // No posture supplied: the fail-closed default, so a program whose compiled policy
-            // demands private submission is refused by the engine rather than run in the clear.
-            Self::execute_with_slots_and_policy(payload, gas_limit, slots, false)
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute_with_slots(
+                payload, gas_limit, slots,
+            )
         }
 
         fn execute_with_slots_and_policy(
@@ -578,99 +582,20 @@ pub mod real_adapters {
             slots: &[(H256, [u8; 32])],
             private_channel_available: bool,
         ) -> Result<ExecutionReceipt, DispatchError> {
-            use x3_x3_integration::{X3Executor, X3ExecutorConfig};
-
-            let mut config = X3ExecutorConfig::on_chain().with_gas_limit(gas_limit);
-            if private_channel_available {
-                config = config.with_private_submission_available();
-            }
-
-            // The chain's slots, in the executor's own key/value shape. The executor loads them as
-            // inherited state, so a program reads what a previous comit persisted.
-            let seeds: Vec<([u8; 32], [u8; 32])> = slots
-                .iter()
-                .map(|(key, value)| (key.to_fixed_bytes(), *value))
-                .collect();
-
-            let receipt =
-                X3Executor::execute_with_slots(payload, &[], config, &seeds).map_err(|e| {
-                    DispatchError::Other(match e {
-                        x3_x3_integration::X3IntegrationError::VerificationFailed(_) => {
-                            "X3 verification failed"
-                        }
-                        x3_x3_integration::X3IntegrationError::InvalidBytecode(_) => {
-                            "Invalid X3 bytecode"
-                        }
-                        x3_x3_integration::X3IntegrationError::GasExhausted { .. } => {
-                            "X3 out of gas"
-                        }
-                        x3_x3_integration::X3IntegrationError::ExecutionFailed(_) => {
-                            "X3 execution failed"
-                        }
-                        x3_x3_integration::X3IntegrationError::StackOverflow => "X3 stack overflow",
-                        x3_x3_integration::X3IntegrationError::MemoryOutOfBounds => {
-                            "X3 memory error"
-                        }
-                        _ => "X3 VM error",
-                    })
-                })?;
-
-            // Convert X3 receipt to pallet ExecutionReceipt
-            Ok(ExecutionReceipt {
-                version: crate::EXECUTION_RECEIPT_VERSION,
-                success: receipt.success,
-                gas_used: receipt.gas_used,
-                return_data: receipt.return_data,
-                logs: receipt
-                    .logs
-                    .into_iter()
-                    .map(|log| ExecutionLog {
-                        address: vec![0u8; 32], // X3 uses module-level logging
-                        topics: vec![log.topic],
-                        data: log.data,
-                        block_number: 0,
-                    })
-                    .collect(),
-                state_changes: receipt
-                    .state_changes
-                    .into_iter()
-                    .map(|change| StateChange {
-                        address: vec![0u8; 32], // X3 module address
-                        key: change.key,
-                        value: H256::from_slice(change.new_value.get(..32).unwrap_or(&[0u8; 32])),
-                    })
-                    .collect(),
-                // The typed slot channel: `key`/`old`/`new` are carried through verbatim so the
-                // kernel can apply them to `X3ContractStorage`. Nothing is fabricated here, and a
-                // failed execution's receipt already carries no writes (`X3Executor::execute`).
-                storage_writes: receipt
-                    .storage_writes
-                    .into_iter()
-                    .map(|write| crate::StorageWrite {
-                        key: write.key,
-                        old_value: write.old_value,
-                        new_value: write.new_value,
-                    })
-                    .collect(),
-                protocol_version: 1,
-                migration_history: Vec::new(),
-                compatibility_flags: 0,
-                from: Vec::new(),
-                to: Vec::new(),
-                value: 0,
-            })
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute_with_slots_and_policy(
+                payload,
+                gas_limit,
+                slots,
+                private_channel_available,
+            )
         }
 
         fn validate(payload: &[u8]) -> Result<(), DispatchError> {
-            use x3_x3_integration::X3Executor;
-            X3Executor::verify(payload, false)
-                .map_err(|_| DispatchError::Other("Invalid X3 bytecode"))
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::validate(payload)
         }
 
         fn estimate_gas(payload: &[u8]) -> Result<u64, DispatchError> {
-            use x3_x3_integration::X3Executor;
-            X3Executor::estimate_gas(payload)
-                .map_err(|_| DispatchError::Other("X3 gas estimation failed"))
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::estimate_gas(payload)
         }
     }
 

@@ -138,3 +138,14 @@ jobs:
         run: make test-node-build
       - name: Mainnet Check
         run: make mainnet-check
+      # srtool builds in a container as its `builder` user (uid 1001), leaving
+      # runtime/target/srtool owned by that uid inside this workspace. The next
+      # job on this runner then fails at `actions/checkout` with EACCES while
+      # cleaning the workspace (production-gate run 36286954346). Remove it as
+      # the same uid, whatever this job's outcome was.
+      - name: Remove srtool build output (owned by the container's uid)
+        if: always()
+        run: |
+          if [ -d runtime/target/srtool ]; then
+            docker run --rm --user 1001:1001 -v "$PWD/runtime/target":/t alpine rm -rf /t/srtool
+          fi

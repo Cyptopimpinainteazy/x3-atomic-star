@@ -1129,6 +1129,9 @@ pub mod pallet {
         /// rather than a submission-time option. It is raised at intake, before the adapter runs,
         /// so a program that requires privacy never executes in the clear.
         PrivateSubmissionUnavailable,
+        /// An X3 call asked for more gas than `DefaultX3GasLimit`, the most one extrinsic's weight
+        /// pays for.
+        X3GasBudgetExceedsLimit,
     }
 
     /// Storage for atomic settlement roots (per transaction ID).
@@ -1767,6 +1770,11 @@ pub mod pallet {
                 .saturating_add(
                     T::DbWeight::get().reads(T::MaxX3StorageSlots::get().saturating_add(1) as u64)
                 )
+                .saturating_add(if x3_payload.is_empty() {
+                    Weight::zero()
+                } else {
+                    Pallet::<T>::x3_execution_weight()
+                })
         )]
         pub fn submit_comit_v2(
             origin: OriginFor<T>,
@@ -2072,7 +2080,18 @@ pub mod pallet {
 
         /// Submit a cross-VM bridge operation for atomic execution (prepare + commit).
         #[pallet::call_index(10)]
-        #[pallet::weight(<T as Config>::WeightInfo::submit_comit_v2())]
+        #[pallet::weight(
+            <T as Config>::WeightInfo::submit_comit_v2().saturating_add(
+                if matches!(
+                    operation,
+                    CrossVmOperation::CallX3Vm { .. } | CrossVmOperation::AtomicTriSwap { .. }
+                ) {
+                    Pallet::<T>::x3_execution_weight()
+                } else {
+                    Weight::zero()
+                }
+            )
+        )]
         pub fn submit_cross_vm_operation(
             origin: OriginFor<T>,
             operation: CrossVmOperation,
@@ -2105,8 +2124,14 @@ pub mod pallet {
         }
 
         /// Commit a previously prepared cross-VM operation.
+        ///
+        /// The prepared operation is not visible to the weight, so an X3 call's worst case is always
+        /// paid for.
         #[pallet::call_index(12)]
-        #[pallet::weight(<T as Config>::WeightInfo::submit_comit_v2())]
+        #[pallet::weight(
+            <T as Config>::WeightInfo::submit_comit_v2()
+                .saturating_add(Pallet::<T>::x3_execution_weight())
+        )]
         pub fn commit_cross_vm_operation(origin: OriginFor<T>, comit_id: H256) -> DispatchResult {
             let who = ensure_signed(origin)?;
             // SEC-009: Emergency pause guard
@@ -2606,6 +2631,15 @@ pub mod pallet {
             }
         }
 
+        /// The weight of running an X3 program for the most gas one extrinsic may give it
+        /// (`DefaultX3GasLimit`). Every extrinsic that executes X3 charges this: it used to charge
+        /// nothing for the execution, while the measured cost of the old 6,000,000-gas limit was
+        /// 137 ms against a 150 ms block.
+        pub fn x3_execution_weight() -> Weight {
+            let gas = T::DefaultX3GasLimit::get().min(u32::MAX as u64) as u32;
+            <T as Config>::WeightInfo::x3_execute(gas)
+        }
+
         fn estimate_cross_vm_fee(
             operation: &CrossVmOperation,
         ) -> Result<T::Balance, DispatchError> {
@@ -2668,6 +2702,23 @@ pub mod pallet {
                     pubkey[..len].copy_from_slice(&svm_party[..len]);
                     let svm_balance = dispatcher.get_svm_balance(&pubkey) as u128;
                     ensure!(svm_balance >= *svm_amount, Error::<T>::InsufficientBalance);
+                }
+                // An X3 call's gas budget came from the caller and was unbounded, while every
+                // extrinsic that runs one is weighted for at most `DefaultX3GasLimit`: one
+                // operation with a looping program and a `u64::MAX` budget would run until the
+                // block author stalled. Refused here, before any fee is locked, and again where
+                // the call executes.
+                CrossVmOperation::CallX3Vm { call, .. } => {
+                    ensure!(
+                        call.gas_budget <= T::DefaultX3GasLimit::get(),
+                        Error::<T>::X3GasBudgetExceedsLimit
+                    );
+                }
+                CrossVmOperation::AtomicTriSwap { x3vm_call, .. } => {
+                    ensure!(
+                        x3vm_call.gas_budget <= T::DefaultX3GasLimit::get(),
+                        Error::<T>::X3GasBudgetExceedsLimit
+                    );
                 }
                 _ => {}
             }
@@ -3935,6 +3986,11 @@ pub mod pallet {
                 });
             }
 
+            // Checked at admission too (`cross_vm_prepare_checks`); this is the bound that holds
+            // whichever path reached the dispatcher.
+            if call.gas_budget > T::DefaultX3GasLimit::get() {
+                return Err(Error::<T>::X3GasBudgetExceedsLimit.into());
+            }
             // The chain's slots, so a cross-VM X3VM call reads the same state a direct comit does.
             // Its slot *writes* are deliberately not applied here: this path returns a receipt to a
             // caller that may still roll the whole cross-VM operation back, so applying storage at

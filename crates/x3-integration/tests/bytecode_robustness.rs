@@ -89,12 +89,43 @@ fn corpus() -> Vec<(&'static str, Vec<u8>)> {
 
 /// What each reader decided, without unwrapping anything: a panic inside is the failure mode
 /// this whole file exists to catch, so the readers are called for their verdict only.
+///
+/// `mini` is the runtime's *format* reader. Its on-chain validator (`validate_x3bc`) also checks
+/// the code, so it refuses modules both readers can read; it is called here too, for the panic
+/// check and for `the_on_chain_validator_never_admits_what_the_std_reader_refuses`.
 fn verdicts(bytes: &[u8]) -> (bool, bool, bool) {
-    let mini = mini_x3::validate_x3bc(bytes).is_ok();
+    let mini = mini_x3::read_x3bc(bytes).is_ok();
+    let _ = mini_x3::validate_x3bc(bytes);
     let backend = BytecodeModule::from_bytes(bytes).is_ok();
     let verifier =
         x3_vm::Verifier::verify_module_bytes(bytes, &x3_vm::VerifyOptions::on_chain()).is_ok();
     (mini, backend, verifier)
+}
+
+#[test]
+fn the_on_chain_validator_never_admits_what_the_std_reader_refuses() {
+    let mut admitted_unreadable = Vec::new();
+    for (name, bytes) in corpus() {
+        for offset in 0..bytes.len() {
+            for value in [0x00u8, 0xFF, 0x7F, 0x80, 0x01] {
+                let mut damaged = bytes.clone();
+                if damaged[offset] == value {
+                    continue;
+                }
+                damaged[offset] = value;
+                reseal(&mut damaged);
+                if mini_x3::validate_x3bc(&damaged).is_ok()
+                    && BytecodeModule::from_bytes(&damaged).is_err()
+                {
+                    admitted_unreadable.push(format!("{name}: byte[{offset}] = {value:#04x}"));
+                }
+            }
+        }
+    }
+    assert!(
+        admitted_unreadable.is_empty(),
+        "the runtime would run modules the std toolchain cannot read: {admitted_unreadable:?}"
+    );
 }
 
 #[test]
@@ -251,4 +282,37 @@ fn the_two_readers_agree_about_re_sealed_body_mutations() {
             .collect::<Vec<_>>()
             .join("\n")
     );
+}
+
+/// Found by the `x3bc_engines` fuzz target: x3-backend unpacked the version fields eight bits at a
+/// time, so a version of `0x4301_0000` (a high byte the format does not have) read as 1.0.0 there
+/// and was refused by the runtime's reader, and a `min_version` with a high byte set passed the
+/// std loader's gate. Both readers now apply `x3-common`'s gate to the full `u32`.
+#[test]
+fn a_version_field_with_a_high_byte_is_refused_by_both_readers() {
+    let crash: &[u8] = &[
+        0x58, 0x33, 0x42, 0x43, 0x00, 0x00, 0x01, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x5b, 0x00, 0x00, 0x42, 0x29, 0x36, 0xff, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00,
+    ];
+    let (mini, backend, _) = verdicts(crash);
+    assert_eq!(
+        mini, backend,
+        "the two readers must agree on the fuzzer's input"
+    );
+
+    for (name, offset) in [
+        ("version", VERSION_OFFSET),
+        ("min_version", MIN_VERSION_OFFSET),
+    ] {
+        let mut bytes = module_with_integer_const();
+        bytes[offset + 3] = 0x43; // the high byte of the little-endian u32
+        reseal(&mut bytes);
+        let (mini, backend, _) = verdicts(&bytes);
+        assert!(
+            !mini && !backend,
+            "{name} with a high byte: mini={mini} backend={backend}"
+        );
+    }
 }

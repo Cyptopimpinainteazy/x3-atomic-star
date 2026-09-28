@@ -200,6 +200,12 @@ pub enum X3Error {
     FunctionNotFound,
     GlobalOutOfBounds,
     RegisterOutOfBounds,
+    /// A call passed a different number of arguments than the callee declares parameters.
+    ArgumentCountMismatch,
+    /// The module is well-formed but not admissible on chain (see `validate_x3bc`).
+    ForbiddenOnChain(u8),
+    /// A jump or call target, or a function entry, that is not the start of an instruction.
+    InvalidJumpTarget(u32),
     UserPanic,
     /// The artifact's compiled policy requires private submission and this execution context has no
     /// private channel to offer it.
@@ -276,7 +282,6 @@ enum MiniConst {
 #[derive(Debug, Clone)]
 struct MiniFunc {
     entry: u32,
-    #[allow(dead_code)]
     param_count: u8,
     local_count: u16,
 }
@@ -369,15 +374,20 @@ impl<'a> Reader<'a> {
         Ok(v)
     }
     fn read_bytes(&mut self, n: usize) -> X3Result<Vec<u8>> {
-        if self.pos + n > self.data.len() {
+        // `n` comes from the input, and the runtime is wasm32: `pos + n` can wrap a 32-bit
+        // `usize`, pass a `> len` check, and then panic in the slice. Compare against what is left.
+        if n > self.data.len().saturating_sub(self.pos) {
             return Err(X3Error::UnexpectedEof);
         }
         let v = self.data[self.pos..self.pos + n].to_vec();
         self.pos += n;
         Ok(v)
     }
+    fn peek_u8(&self) -> Option<u8> {
+        self.data.get(self.pos).copied()
+    }
     fn skip(&mut self, n: usize) -> X3Result<()> {
-        if self.pos + n > self.data.len() {
+        if n > self.data.len().saturating_sub(self.pos) {
             return Err(X3Error::UnexpectedEof);
         }
         self.pos += n;
@@ -512,6 +522,11 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
     let code_len = r.read_u32()? as usize;
     let code = r.read_bytes(code_len)?;
 
+    // Trailing sections. The runtime does not use them, but it has to accept exactly the modules
+    // `x3-backend` accepts: this reader used to stop after the code, so a module whose debug
+    // section was malformed was refused by the std reader and run by the chain.
+    skip_trailer(&mut r)?;
+
     Ok(MiniModule {
         const_pool,
         functions,
@@ -519,6 +534,51 @@ fn parse_module(bytes: &[u8]) -> X3Result<MiniModule> {
         code,
         requires_private_submission,
     })
+}
+
+/// Read past the optional debug and metadata sections with `x3-backend`'s acceptance rules
+/// (`BytecodeModule::from_bytes`): a section is present when its flag byte is 1, any other flag
+/// byte means absent, and a present section must be complete.
+fn skip_trailer(r: &mut Reader<'_>) -> X3Result<()> {
+    fn skip_u16_prefixed(r: &mut Reader<'_>) -> X3Result<()> {
+        let len = r.read_u16()? as usize;
+        r.skip(len)
+    }
+    fn skip_optional_string(r: &mut Reader<'_>) -> X3Result<()> {
+        if r.read_u8()? == 1 {
+            skip_u16_prefixed(r)?;
+        }
+        Ok(())
+    }
+
+    // Debug info.
+    if r.remaining() > 0 && r.read_u8()? == 1 {
+        let map_count = r.read_u32()? as usize;
+        for _ in 0..map_count {
+            r.skip(8)?; // code offset u32, line u16, column u16
+        }
+        let name_count = r.read_u32()? as usize;
+        for _ in 0..name_count {
+            r.skip(4)?; // symbol index
+            skip_u16_prefixed(r)?;
+        }
+    }
+    // Metadata.
+    if r.remaining() > 0 && r.peek_u8() == Some(1) {
+        r.skip(1)?;
+        skip_u16_prefixed(r)?; // compiler
+        skip_u16_prefixed(r)?; // compiler version
+        r.skip(8)?; // compiled at
+        skip_optional_string(r)?; // source file
+        skip_optional_string(r)?; // source hash
+        r.skip(1)?; // opt level
+        let annotations = r.read_u32()? as usize;
+        for _ in 0..annotations {
+            skip_u16_prefixed(r)?;
+            skip_u16_prefixed(r)?;
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -651,10 +711,6 @@ impl<'m> Vm<'m> {
         }
     }
 
-    fn resolve(&self, reg: usize) -> usize {
-        self.call_stack.last().map(|f| f.base).unwrap_or(0) + reg
-    }
-
     fn r8(&self, ip: usize) -> X3Result<u8> {
         self.module
             .code
@@ -738,11 +794,18 @@ impl<'m> Vm<'m> {
         // Capture base FIRST — this ends the immutable borrow before any mutable ops.
         let base = self.call_stack.last().map(|f| f.base).unwrap_or(0);
 
-        // Helper: absolute register index from relative reg operand
+        // Helper: absolute register index from relative reg operand, refused when it falls outside
+        // the register file. Operands are a `u8` added to the frame's base, so a callee frame could
+        // name a register past the end of `regs`, and indexing it panicked — inside the runtime,
+        // on bytes an extrinsic supplied. This is the rule `x3-vm` applies (`resolve_reg_checked`).
         macro_rules! reg {
-            ($r:expr) => {
-                base + $r as usize
-            };
+            ($r:expr) => {{
+                let index = base + $r as usize;
+                if index >= MAX_REGS {
+                    return Err(X3Error::RegisterOutOfBounds);
+                }
+                index
+            }};
         }
         macro_rules! rv {
             ($r:expr) => {
@@ -800,7 +863,7 @@ impl<'m> Vm<'m> {
                 let mut args = Vec::with_capacity(argc.min(MAX_REGS));
                 for i in 0..argc {
                     let ar = self.r8(ip + 8 + i)? as usize;
-                    args.push(self.regs[self.resolve(ar)].clone());
+                    args.push(self.regs[reg!(ar)].clone());
                 }
                 // The callee's window starts after the caller's whole frame (params + locals), not
                 // after its locals alone: see the note in the std VM's `Call` arm (TICKET-131).
@@ -816,8 +879,18 @@ impl<'m> Vm<'m> {
                     })
                     .unwrap_or((0, 0));
                 let callee_base = caller_base + caller_footprint;
-                if callee_base + func.local_count as usize >= MAX_REGS {
-                    return Err(X3Error::RegisterOutOfBounds);
+                // A call passes exactly the callee's parameters. The arguments are written into the
+                // callee's window below, and `argc` is a `u16` from the code stream, so a larger
+                // count wrote past the register file (a panic) and a smaller one left parameters
+                // holding whatever the previous frame left there.
+                if argc != func.param_count as usize {
+                    return Err(X3Error::ArgumentCountMismatch);
+                }
+                // The whole callee window — parameters and locals — has to fit. When it does not,
+                // the call stack's register budget is spent: that is a stack overflow, reported as
+                // one, not a bad register operand (which would be a compiler fault).
+                if callee_base + func.param_count as usize + func.local_count as usize > MAX_REGS {
+                    return Err(X3Error::StackOverflow);
                 }
                 for (i, a) in args.into_iter().enumerate() {
                     self.regs[callee_base + i] = a;
@@ -835,7 +908,7 @@ impl<'m> Vm<'m> {
             0x05 => {
                 // Ret
                 let s = self.r8(ip + 1)? as usize;
-                let v = self.regs[self.resolve(s)].clone();
+                let v = self.regs[reg!(s)].clone();
                 Ok(Step::Return(Some(v)))
             }
             0x06 => Ok(Step::Return(None)), // RetVoid
@@ -968,7 +1041,10 @@ impl<'m> Vm<'m> {
                 if vb == 0 {
                     return Err(X3Error::DivisionByZero);
                 }
-                let v = self.regs[reg!(a)].as_i64()? / vb;
+                // `i64::MIN / -1` panics in Rust, release builds included, and this engine runs
+                // inside the runtime: one extrinsic dividing those two values would abort block
+                // execution. Wrapping matches `x3-vm` and the other integer opcodes.
+                let v = self.regs[reg!(a)].as_i64()?.wrapping_div(vb);
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 4))
             }
@@ -983,7 +1059,8 @@ impl<'m> Vm<'m> {
                 if vb == 0 {
                     return Err(X3Error::DivisionByZero);
                 }
-                let v = self.regs[reg!(a)].as_i64()? % vb;
+                // `i64::MIN % -1` panics likewise; it wraps to 0.
+                let v = self.regs[reg!(a)].as_i64()?.wrapping_rem(vb);
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 4))
             }
@@ -993,18 +1070,6 @@ impl<'m> Vm<'m> {
                 self.regs[reg!(d)] = MiniValue::I64(v);
                 Ok(Step::Continue(ip + 3))
             } // NegI
-            0x26 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()? + 1;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            } // Inc
-            0x27 => {
-                let (d, s) = (self.r8(ip + 1)? as usize, self.r8(ip + 2)? as usize);
-                let v = self.regs[reg!(s)].as_i64()? - 1;
-                self.regs[reg!(d)] = MiniValue::I64(v);
-                Ok(Step::Continue(ip + 3))
-            } // Dec
 
             // -------- Float Arithmetic --------
             0x30 => {
@@ -1546,6 +1611,9 @@ pub fn execute_x3bc_with_slots_and_policy(
     if module.functions.is_empty() {
         return Err(X3Error::FunctionNotFound);
     }
+    // Execution admits exactly what validation admits: the runtime validates before it executes,
+    // and so does this, so no caller can run a module the validator would refuse.
+    verify_code(&module)?;
     let mut vm = Vm::new(&module, gas_limit);
     vm.seed_slots(seeds);
     let func_entry = module.functions[0].entry as usize;
@@ -1565,9 +1633,158 @@ pub fn execute_x3bc_with_slots_and_policy(
     })
 }
 
-/// Validate the X3BC binary format without executing.
+/// Read the X3BC envelope and tables — the format only, not the code — without executing.
+///
+/// This is the counterpart of `x3-backend`'s `BytecodeModule::from_bytes`, and the two are held to
+/// agreeing on every input (`tests/bytecode_robustness.rs`). Whether the module may *run* on chain
+/// is `validate_x3bc`'s question.
+pub fn read_x3bc(payload: &[u8]) -> Result<(), X3Error> {
+    parse_module(payload).map(|_| ())
+}
+
+/// Validate an X3BC module for on-chain execution, without executing it.
+///
+/// This used to parse the envelope and stop, so the runtime — whose X3 adapter validates with this
+/// function in the wasm build — admitted any instruction stream behind a well-formed header, while
+/// the std build refused the same bytes with `x3-vm`'s verifier. Beyond the envelope this now checks
+/// the code the way the interpreter will read it:
+///
+/// - the code decodes from its first byte to its last into instructions this engine implements;
+/// - every function entry and every jump target is the start of an instruction;
+/// - every call names an existing function with exactly its parameter count;
+/// - every constant and global index is in range;
+/// - the entry function (index 0, which the runtime calls with no arguments) has no parameters,
+///   and every function's frame fits the register file;
+/// - float arithmetic, which the on-chain verifier of `x3-vm` forbids, is refused.
 pub fn validate_x3bc(payload: &[u8]) -> Result<(), X3Error> {
-    let _ = parse_module(payload)?;
+    let module = parse_module(payload)?;
+    verify_code(&module)
+}
+
+/// The length of the instruction at `ip`, or an error if it is not one this engine implements.
+fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
+    let op = *code.get(ip).ok_or(X3Error::UnexpectedEof)?;
+    // One row per arm of `Vm::exec`: the implemented opcodes with their widths, the opcodes it
+    // refuses by name, and everything else is not an opcode.
+    let len = match op {
+        0x00 | 0x06 | 0x07 | 0xF3 => 1,
+        0x05 | 0x19..=0x1B | 0x84 | 0x93 | 0xF0 | 0xF1 => 2,
+        0x11 | 0x18 | 0x25 | 0x35 | 0x53 | 0x5A | 0x60..=0x68 | 0x90..=0x92 | 0xB3 | 0xB4 => 3,
+        0x20..=0x24 | 0x30..=0x34 | 0x40..=0x4B | 0x50..=0x52 | 0x54..=0x56 | 0x58 | 0x59 => 4,
+        0x01 => 5,
+        0x02 | 0x03 | 0x10 | 0x12 | 0x13 | 0xF2 => 6,
+        0x04 => {
+            let argc = code
+                .get(ip + 6..ip + 8)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]) as usize)
+                .ok_or(X3Error::UnexpectedEof)?;
+            8 + argc
+        }
+        0x14..=0x17
+        | 0x70..=0x75
+        | 0x80..=0x83
+        | 0x85
+        | 0xA0..=0xA2
+        | 0xB0..=0xB2
+        | 0xB5..=0xB9
+        | 0xC0..=0xC7
+        | 0xD0..=0xD7 => return Err(X3Error::UnsupportedOpcode(op)),
+        _ => return Err(X3Error::InvalidOpcode(op)),
+    };
+    if ip + len > code.len() {
+        return Err(X3Error::UnexpectedEof);
+    }
+    Ok(len)
+}
+
+fn read_u32_at(code: &[u8], at: usize) -> u32 {
+    // Only called on an instruction `instruction_len` has already bounded.
+    u32::from_le_bytes([code[at], code[at + 1], code[at + 2], code[at + 3]])
+}
+
+fn verify_code(module: &MiniModule) -> Result<(), X3Error> {
+    let code = &module.code;
+    let entry = module.functions.first().ok_or(X3Error::FunctionNotFound)?;
+    if entry.param_count != 0 {
+        // The runtime calls the entry with no arguments; `x3-vm` refuses the same module.
+        return Err(X3Error::ArgumentCountMismatch);
+    }
+    for function in &module.functions {
+        if function.param_count as usize + function.local_count as usize > MAX_REGS {
+            return Err(X3Error::RegisterOutOfBounds);
+        }
+    }
+
+    // Pass 1: decode, and record where instructions start.
+    let mut starts = vec![false; code.len()];
+    let mut ip = 0;
+    while ip < code.len() {
+        starts[ip] = true;
+        ip += instruction_len(code, ip)?;
+    }
+    let is_start = |target: u32| (target as usize) < code.len() && starts[target as usize];
+
+    for function in &module.functions {
+        if !is_start(function.entry) {
+            return Err(X3Error::InvalidJumpTarget(function.entry));
+        }
+    }
+
+    // Pass 2: operands.
+    let mut ip = 0;
+    while ip < code.len() {
+        let op = code[ip];
+        let len = instruction_len(code, ip)?;
+        match op {
+            0x01 => {
+                let target = read_u32_at(code, ip + 1);
+                if !is_start(target) {
+                    return Err(X3Error::InvalidJumpTarget(target));
+                }
+            }
+            0x02 | 0x03 => {
+                let target = read_u32_at(code, ip + 2);
+                if !is_start(target) {
+                    return Err(X3Error::InvalidJumpTarget(target));
+                }
+            }
+            0x04 => {
+                let callee = read_u32_at(code, ip + 2) as usize;
+                let argc = len - 8;
+                let function = module
+                    .functions
+                    .get(callee)
+                    .ok_or(X3Error::FunctionNotFound)?;
+                if function.param_count as usize != argc {
+                    return Err(X3Error::ArgumentCountMismatch);
+                }
+            }
+            0x10 => {
+                if read_u32_at(code, ip + 2) as usize >= module.const_pool.len() {
+                    return Err(X3Error::ConstPoolOutOfBounds);
+                }
+            }
+            0x12 => {
+                if read_u32_at(code, ip + 2) as usize >= module.globals.len() {
+                    return Err(X3Error::GlobalOutOfBounds);
+                }
+            }
+            0x13 => {
+                if read_u32_at(code, ip + 1) as usize >= module.globals.len() {
+                    return Err(X3Error::GlobalOutOfBounds);
+                }
+            }
+            // AddF, SubF, MulF, DivF, ModF: forbidden on chain, as `x3-vm`'s
+            // `VerifyOptions::on_chain` forbids them. ModF was refused as unimplemented instead,
+            // so the engines gave different reasons for one policy (the `compile_and_run` fuzz
+            // target, on a program taking `%` of floats).
+            0x30..=0x34 => return Err(X3Error::ForbiddenOnChain(op)),
+            // DebugPrint, Breakpoint: `x3-vm`'s on-chain verifier forbids them too.
+            0xF0 | 0xF1 => return Err(X3Error::ForbiddenOnChain(op)),
+            _ => {}
+        }
+        ip += len;
+    }
     Ok(())
 }
 

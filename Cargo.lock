@@ -8721,6 +8721,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
+name = "libfuzzer-sys"
+version = "0.4.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9fd2f41a1cba099f79a0b6b6c35656cf7c03351a7bae8ff0f28f25270f929d2"
+dependencies = [
+ "arbitrary",
+ "cc",
+]
+
+[[package]]
 name = "libloading"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -26242,6 +26252,7 @@ dependencies = [
  "x3-mir",
  "x3-opt",
  "x3-parser",
+ "x3-semantics",
  "x3-typeck",
  "x3-verifier",
 ]
@@ -26771,6 +26782,17 @@ dependencies = [
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "x3-integration-fuzz"
+version = "0.0.0"
+dependencies = [
+ "libfuzzer-sys",
+ "x3-backend",
+ "x3-compiler",
+ "x3-vm",
+ "x3-x3-integration",
 ]
 
 [[package]]
@@ -27575,6 +27597,8 @@ dependencies = [
  "x3-common",
  "x3-compiler",
  "x3-evm-integration",
+ "x3-mir",
+ "x3-opt",
  "x3-svm-integration",
  "x3-verifier",
  "x3-vm",

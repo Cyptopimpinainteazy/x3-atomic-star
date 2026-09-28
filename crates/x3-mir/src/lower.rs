@@ -26,6 +26,14 @@ impl MirLowerer {
     }
 }
 
+/// The error for a construct the chain compiler has no meaning-preserving lowering for.
+fn unsupported(what: &str) -> MirError {
+    MirError::new(format!(
+        "{what} is not supported by the chain compiler: it has no lowering that preserves its \
+         meaning, so it is refused rather than compiled to a program that computes something else"
+    ))
+}
+
 /// Add every symbol `stmts` assigns to, recursing into branches and loop bodies.
 ///
 /// A name assigned anywhere is a cell for the whole function (see `MirFunctionBuilder::mutated`).
@@ -127,11 +135,14 @@ impl MirFunctionBuilder {
             self.params.push(value);
         }
         collect_mutated(&function.body, &mut self.mutated);
-        // A mutated parameter is a cell from the start: its incoming value is the cell's register.
+        // A mutated parameter gets a cell of its own, copied from the incoming value, for the same
+        // reason a mutated `let` does (see `new_cell`).
         for param in &function.params {
             if self.mutated.contains(&param.symbol) {
                 if let Some(&value) = self.value_map.get(&param.symbol) {
-                    self.slots.insert(param.symbol, value);
+                    let cell = self.new_cell(value);
+                    self.slots.insert(param.symbol, cell);
+                    self.value_map.insert(param.symbol, cell);
                 }
             }
         }
@@ -158,13 +169,17 @@ impl MirFunctionBuilder {
             HirStmt::Let { symbol, value, .. } => {
                 let evaluated = self.lower_expr(value)?;
                 if self.mutated.contains(symbol) {
-                    // The initial value *is* the cell: it has a register, writes store into it and
-                    // reads load from it, so the loop's back-edge sees the current value.
-                    self.slots.insert(*symbol, evaluated);
+                    // Writes store into the cell and reads load from it, so the loop's back-edge
+                    // sees the current value. The cell is a *copy* of the initial value (see
+                    // `new_cell`), never the initial value's own register.
+                    let cell = self.new_cell(evaluated);
+                    self.slots.insert(*symbol, cell);
                     let is_float = self.float_values.contains(&evaluated);
                     self.slot_float.insert(*symbol, is_float);
+                    self.value_map.insert(*symbol, cell);
+                } else {
+                    self.value_map.insert(*symbol, evaluated);
                 }
-                self.value_map.insert(*symbol, evaluated);
             }
             HirStmt::Assign {
                 target,
@@ -197,8 +212,8 @@ impl MirFunctionBuilder {
                         }
                     }
                     AssignTarget::Field { .. } | AssignTarget::Index { .. } => {
-                        // Field/index assignments require type layout from checker
-                        let _ = self.lower_expr(value)?;
+                        // This arm used to evaluate the value and drop the write.
+                        return Err(unsupported("assignment to a field or an index"));
                     }
                 }
             }
@@ -270,9 +285,10 @@ impl MirFunctionBuilder {
             } => {
                 self.push_atomic_end(MirAtomicBlockId(block_id.0 as u16), *commit);
             }
-            HirStmt::Emit { .. } | HirStmt::AgentInit { .. } => {
-                // Emit/agent init require event system
-            }
+            // Both were matched to an empty arm, so an `emit` compiled and emitted nothing: a
+            // program whose receipt is supposed to carry an event produced a receipt without one.
+            HirStmt::Emit { .. } => return Err(unsupported("`emit`")),
+            HirStmt::AgentInit { .. } => return Err(unsupported("agent initialisation")),
         }
         Ok(())
     }
@@ -385,42 +401,16 @@ impl MirFunctionBuilder {
                     args: mir_args,
                 }))
             }
-            HirExprKind::MethodCall {
-                receiver,
-                method: _,
-                args,
-            } => {
-                // Method calls require vtable or monomorphization
-                let _ = self.lower_expr(receiver)?;
-                for arg in args {
-                    self.lower_expr(arg)?;
-                }
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::Field { object, field: _ } => {
-                // Field access requires type layout from type checker; lowered as load with offset
-                self.lower_expr(object)
-            }
-            HirExprKind::Index { array, index } => {
-                // Index access requires bounds check + offset calculation
-                let _ = self.lower_expr(array)?;
-                let _ = self.lower_expr(index)?;
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::Array(elements) => {
-                // Array literals require allocation + element initialization
-                for elem in elements {
-                    self.lower_expr(elem)?;
-                }
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::Tuple(elements) => {
-                // Tuple literals require allocation + element initialization
-                for elem in elements {
-                    self.lower_expr(elem)?;
-                }
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
+            // Every kind below used to lower to *something*: a `Unit` literal (method calls,
+            // indexing, arrays, tuples and ranges, `if` expressions, context access, VM intrinsics,
+            // `self`) or its operand unchanged (a field access returned the whole object, a cast
+            // returned the uncast value). Each such program compiled, ran and returned a value the
+            // source did not compute. A construct with no lowering that keeps its meaning is refused.
+            HirExprKind::MethodCall { .. } => Err(unsupported("a method call")),
+            HirExprKind::Field { .. } => Err(unsupported("a field access")),
+            HirExprKind::Index { .. } => Err(unsupported("an index expression")),
+            HirExprKind::Array(_) => Err(unsupported("an array literal")),
+            HirExprKind::Tuple(_) => Err(unsupported("a tuple or range value")),
             HirExprKind::Block { stmts, expr } => {
                 self.lower_statements(stmts)?;
                 if let Some(e) = expr {
@@ -429,41 +419,33 @@ impl MirFunctionBuilder {
                     Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
                 }
             }
-            HirExprKind::IfExpr {
-                condition,
-                then_expr,
-                else_expr,
-            } => {
-                // If-expressions require phi node insertion for SSA form
-                let _ = self.lower_expr(condition)?;
-                let _ = self.lower_expr(then_expr)?;
-                let _ = self.lower_expr(else_expr)?;
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::Cast { expr, target_ty: _ } => {
-                // Casts require type-specific lowering (int/float conversion)
-                self.lower_expr(expr)
-            }
-            HirExprKind::ContextAccess(_field) => {
-                // Context access requires resolved context field offset
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::VmIntrinsic {
-                vm: _,
-                intrinsic: _,
-                args,
-            } => {
-                // VM intrinsics require resolved intrinsic ID from HIR
-                for arg in args {
-                    self.lower_expr(arg)?;
-                }
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
-            HirExprKind::SelfRef => {
-                // Self reference requires agent instance pointer
-                Ok(self.emit_assignment(MirRhs::Literal(x3_common::Literal::Unit)))
-            }
+            HirExprKind::IfExpr { .. } => Err(unsupported("an `if` expression")),
+            HirExprKind::Cast { .. } => Err(unsupported("a cast")),
+            HirExprKind::ContextAccess(_) => Err(unsupported("a context field")),
+            HirExprKind::VmIntrinsic { .. } => Err(unsupported("a VM intrinsic")),
+            HirExprKind::SelfRef => Err(unsupported("`self`")),
         }
+    }
+
+    /// A fresh register holding a copy of `initial`, to be a mutable variable's storage.
+    ///
+    /// The cell used to *be* the initial value: `let mut x = a` made `x`'s storage `a`'s register,
+    /// so `x = 7` overwrote `a`, and `let mut x = p` overwrote the parameter. Measured at O0:
+    /// `let a = 5; let mut x = a; x = 7; return a * 10 + x` returned 77, not 57. It also broke
+    /// every optimization level above O1, because the passes read the cell's defining statement as
+    /// an immutable SSA definition: an inner loop's `let mut j = 0` is a literal, a literal is
+    /// loop-invariant, and hoisting it out of the outer loop meant `j` was reset once instead of
+    /// per iteration (`nested_while` returned 6 instead of 120). A copy defined by a register load
+    /// is neither: loads are not hoisted or folded, and the copy aliases nothing.
+    fn new_cell(&mut self, initial: MirValue) -> MirValue {
+        let cell = self.emit_assignment(MirRhs::Load {
+            model: MemoryModel::Register,
+            addr: initial,
+        });
+        if self.float_values.contains(&initial) {
+            self.float_values.insert(cell);
+        }
+        cell
     }
 
     fn emit_literal(&mut self, literal: x3_common::Literal) -> MirValue {

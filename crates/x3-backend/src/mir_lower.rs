@@ -389,11 +389,17 @@ impl MirBytecodeCompiler {
             (BinaryOp::LogicalAnd, _) => self.emitter.emit_land(dst, left, right),
             (BinaryOp::LogicalOr, _) => self.emitter.emit_lor(dst, left, right),
             (BinaryOp::Pow, _) => {
-                // Emit a runtime call to the built-in `Pow` handler.
-                // The VM executor dispatches `CallBuiltin(Pow)` as a hostcall
-                // with the base (left) and exponent (right) as arguments.
-                // FuncIdx(0xFFFF) is reserved for the Pow builtin.
-                self.emitter.emit_call(dst, FuncIdx(0xFFFF), &[left, right]);
+                // This emitted `Call FuncIdx(0xFFFF)`, described as a reserved `Pow` builtin that
+                // no engine implements: every program using `^` compiled and was then refused by
+                // the chain (`FunctionNotFound`) — found by the `compile_and_run` fuzz target. There
+                // is no exponentiation instruction, so the operator is refused where it is lowered.
+                return Err(BackendError::new(
+                    BackendErrorKind::UnsupportedIntrinsic(
+                        "the `^` (power) operator: the X3VM has no exponentiation instruction"
+                            .into(),
+                    ),
+                    self.current_span,
+                ));
             }
         }
         Ok(())

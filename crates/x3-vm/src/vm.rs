@@ -365,11 +365,6 @@ impl VM {
         Ok(idx)
     }
 
-    /// Resolve register without IP (used in contexts where ip not available).
-    fn resolve_reg(&self, reg: usize) -> usize {
-        self.call_stack.last().map(|f| f.base).unwrap_or(0) + reg
-    }
-
     /// Call a function by index.
     pub fn call_function(&mut self, func_idx: usize, args: &[Value]) -> VMResult<ExecutionResult> {
         if matches!(
@@ -631,7 +626,7 @@ impl VM {
                 let mut args = Vec::with_capacity(argc);
                 for i in 0..argc {
                     let arg_reg = self.read_u8(ip + 8 + i)? as usize;
-                    let resolved = self.resolve_reg(arg_reg);
+                    let resolved = self.resolve_reg_checked(arg_reg, ip)?;
                     args.push(self.regs[resolved].clone());
                 }
 
@@ -655,12 +650,28 @@ impl VM {
                     .unwrap_or((0, 0));
                 let callee_base = caller_base + caller_footprint;
 
-                // Bounds check for callee window
-                if callee_base + func.local_count as usize >= MAX_REGISTERS {
+                // A call passes exactly the callee's parameters: the arguments are written into the
+                // callee's window below and `argc` is a `u16` from the code stream, so a larger
+                // count wrote past the register file and a smaller one left parameters holding a
+                // previous frame's values. `mini_x3` applies the same two rules.
+                if argc != func.param_count as usize {
                     return Err(self.error_at(
                         ip,
-                        VMErrorKind::RegisterOutOfBounds(
-                            (callee_base + func.local_count as usize) as u16,
+                        VMErrorKind::ArgumentCountMismatch(func.param_count as usize, argc),
+                    ));
+                }
+
+                // Bounds check for the callee window: parameters and locals both have to fit. A
+                // window that does not fit means the call stack's registers are spent — a stack
+                // overflow, as `mini_x3` reports it too, not a bad register operand.
+                if callee_base + func.param_count as usize + func.local_count as usize
+                    > MAX_REGISTERS
+                {
+                    return Err(self.error_at(
+                        ip,
+                        VMErrorKind::StackOverflow(
+                            self.call_stack.len(),
+                            self.config.max_call_depth,
                         ),
                     ));
                 }
@@ -835,7 +846,10 @@ impl VM {
                 if vb == 0 {
                     return Err(self.error_at(ip, VMErrorKind::DivisionByZero));
                 }
-                self.regs[dst] = Value::I64(va / vb);
+                // `i64::MIN / -1` overflows, and Rust panics on it in release builds too: a program
+                // dividing those two values would take the executor down with it. Integer
+                // arithmetic here wraps (add, sub, mul and neg already do), so division does too.
+                self.regs[dst] = Value::I64(va.wrapping_div(vb));
                 Ok(StepResult::Continue(ip + 4))
             }
 
@@ -848,7 +862,8 @@ impl VM {
                 if vb == 0 {
                     return Err(self.error_at(ip, VMErrorKind::DivisionByZero));
                 }
-                self.regs[dst] = Value::I64(va % vb);
+                // `i64::MIN % -1` panics for the same reason as the division above; it wraps to 0.
+                self.regs[dst] = Value::I64(va.wrapping_rem(vb));
                 Ok(StepResult::Continue(ip + 4))
             }
 
@@ -1289,11 +1304,14 @@ impl VM {
             //   GpuDeviceCount:    [0xD4] dst:u8                       → 2 bytes
             //   GpuBenchmark:      [0xD5] dst:u8 count:u8 streams:u8  → 4 bytes
             // ================================================================
+            // GPU intrinsics read their register operands frame-relative and checked, like every
+            // other instruction: they used to index `regs` with the raw operand, so inside a callee
+            // they read and wrote the caller's registers.
             Opcode::GpuSha256Batch => {
                 // gpu_sha256_batch(inputs: Bytes, count: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let inputs_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let inputs_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
                 let args = vec![self.regs[inputs_reg].clone(), self.regs[count_reg].clone()];
                 let result = self
                     .hostcalls
@@ -1307,9 +1325,9 @@ impl VM {
 
             Opcode::GpuEd25519Verify => {
                 // gpu_ed25519_verify(sigs: Bytes, count: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let sigs_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let sigs_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
                 let args = vec![self.regs[sigs_reg].clone(), self.regs[count_reg].clone()];
                 let result = self
                     .hostcalls
@@ -1323,10 +1341,10 @@ impl VM {
 
             Opcode::GpuPohChain => {
                 // gpu_poh_chain(seeds: Bytes, num_chains: I64, chain_length: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let seeds_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
-                let chain_len_reg = self.read_u8(ip + 4)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let seeds_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let chain_len_reg = self.resolve_reg_checked(self.read_u8(ip + 4)? as usize, ip)?;
                 let args = vec![
                     self.regs[seeds_reg].clone(),
                     self.regs[count_reg].clone(),
@@ -1344,10 +1362,10 @@ impl VM {
 
             Opcode::GpuSha256Streamed => {
                 // gpu_sha256_streamed(inputs: Bytes, count: I64, streams: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let inputs_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
-                let streams_reg = self.read_u8(ip + 4)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let inputs_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let streams_reg = self.resolve_reg_checked(self.read_u8(ip + 4)? as usize, ip)?;
                 let args = vec![
                     self.regs[inputs_reg].clone(),
                     self.regs[count_reg].clone(),
@@ -1365,7 +1383,7 @@ impl VM {
 
             Opcode::GpuDeviceCount => {
                 // gpu_device_count() → I64
-                let dst = self.read_u8(ip + 1)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
                 let result = self
                     .hostcalls
                     .invoke(0xD4, &[])
@@ -1378,9 +1396,9 @@ impl VM {
 
             Opcode::GpuBenchmark => {
                 // gpu_benchmark(count: I64, streams: I64) → Bytes (JSON)
-                let dst = self.read_u8(ip + 1)? as usize;
-                let count_reg = self.read_u8(ip + 2)? as usize;
-                let streams_reg = self.read_u8(ip + 3)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let streams_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
                 let args = vec![self.regs[count_reg].clone(), self.regs[streams_reg].clone()];
                 let result = self
                     .hostcalls
@@ -1394,9 +1412,9 @@ impl VM {
 
             Opcode::GpuKeccak256Batch => {
                 // gpu_keccak256_batch(inputs: Bytes, count: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let inputs_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let inputs_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
                 let args = vec![self.regs[inputs_reg].clone(), self.regs[count_reg].clone()];
                 let result = self
                     .hostcalls
@@ -1410,9 +1428,9 @@ impl VM {
 
             Opcode::GpuSecp256k1Verify => {
                 // gpu_secp256k1_verify(sigs: Bytes, count: I64) → Bytes
-                let dst = self.read_u8(ip + 1)? as usize;
-                let sigs_reg = self.read_u8(ip + 2)? as usize;
-                let count_reg = self.read_u8(ip + 3)? as usize;
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let sigs_reg = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let count_reg = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
                 let args = vec![self.regs[sigs_reg].clone(), self.regs[count_reg].clone()];
                 let result = self
                     .hostcalls

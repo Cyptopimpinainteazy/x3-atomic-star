@@ -417,9 +417,11 @@ impl BytecodeModule {
         let version_packed = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
         let version = VersionInfo::from_packed(version_packed);
 
-        // Check if we support this version
-        let current = VersionInfo::current();
-        if !current.can_read(version) {
+        // Check if we support this version. The gate is `x3-common`'s, on the full `u32`: the
+        // unpacked `VersionInfo` keeps eight bits per field, so `0x4301_0000` read as 1.0.0 here while
+        // the runtime's reader (which applies this same gate) refused it — found by the
+        // `x3bc_engines` fuzz target.
+        if !x3_common::bytecode::version_is_readable(version_packed) {
             return Err(BackendError::without_span(
                 BackendErrorKind::UnsupportedVersion(version_packed),
             ));
@@ -440,17 +442,17 @@ impl BytecodeModule {
                 },
             ));
         }
-        let min_version = VersionInfo::from_packed(u32::from_le_bytes([
-            bytes[16], bytes[17], bytes[18], bytes[19],
-        ]));
+        let min_version_packed = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+        let min_version = VersionInfo::from_packed(min_version_packed);
         let features = FeatureFlags(u32::from_le_bytes([
             bytes[20], bytes[21], bytes[22], bytes[23],
         ]));
 
         // Check minimum version requirement
-        if !current.satisfies(min_version) {
+        // Also on the full `u32`, for the same reason as the version gate above.
+        if !x3_common::bytecode::loader_satisfies(min_version_packed) {
             return Err(BackendError::without_span(
-                BackendErrorKind::UnsupportedVersion(min_version.to_packed()),
+                BackendErrorKind::UnsupportedVersion(min_version_packed),
             ));
         }
 

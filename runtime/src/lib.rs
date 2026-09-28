@@ -427,7 +427,10 @@ parameter_types! {
     pub const MinAuthorities: u32 = 1;  // Minimum 1 authority required
     pub const DefaultEvmGasLimit: u64 = 12_000_000;  // tuned for 200ms slots on commodity validators
     pub const DefaultSvmComputeLimit: u64 = 200_000;  // 200k compute units for SVM
-    pub const DefaultX3GasLimit: u64 = 6_000_000;  // tuned for 200ms slots on commodity validators
+    // Derived from the `x3_execute` benchmark (22.95 ns per gas in the wasm executor): 1,000,000 gas
+    // is ~23.5 ms, a sixth of the 150 ms block. The previous 6,000,000 measured 137 ms, which an
+    // honestly weighted extrinsic could never fit in a block (see `an_x3_extrinsic_fits_in_a_block`).
+    pub const DefaultX3GasLimit: u64 = 1_000_000;
     pub const CrossVmPrepareTtl: BlockNumber = 50; // 50 blocks (~10s at 200ms)
     pub const MaxPreparedCrossVmOps: u32 = 1024;
     pub const MaxPreparedOpsPerBlock: u32 = 64;
@@ -5839,6 +5842,28 @@ mod runtime_upgrade_rehearsal {
             "runtime upgrade needs {} ref_time but a block only allows {}",
             weight.ref_time(),
             max_block.ref_time()
+        );
+    }
+
+    /// An extrinsic that executes X3 is weighted for its worst case, `DefaultX3GasLimit` of the
+    /// measured `x3_execute` cost; that weight has to fit a normal-class extrinsic in a block, or
+    /// every X3 submission would be refused as exhausting resources.
+    #[test]
+    fn an_x3_extrinsic_fits_in_a_block() {
+        use frame_support::dispatch::DispatchClass;
+        use pallet_x3_kernel::WeightInfo as _;
+        let worst = <Runtime as pallet_x3_kernel::Config>::WeightInfo::submit_comit_v2()
+            .saturating_add(pallet_x3_kernel::Pallet::<Runtime>::x3_execution_weight());
+        let limits = <Runtime as frame_system::Config>::BlockWeights::get();
+        let max_extrinsic = limits
+            .get(DispatchClass::Normal)
+            .max_extrinsic
+            .expect("normal extrinsics are bounded");
+        assert!(
+            worst.ref_time() <= max_extrinsic.ref_time() / 2,
+            "an X3 extrinsic's worst case ({} ps) must leave room for others in a normal block ({} ps)",
+            worst.ref_time(),
+            max_extrinsic.ref_time()
         );
     }
 

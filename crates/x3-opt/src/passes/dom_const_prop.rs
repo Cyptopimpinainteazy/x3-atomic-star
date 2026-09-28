@@ -164,7 +164,7 @@ impl DomConstPropPass {
         use Literal::*;
 
         match (op, val) {
-            (Negate, Integer(n)) => Some(Integer(-n)),
+            (Negate, Integer(n)) => Some(Integer(n.wrapping_neg())),
             (Negate, Float(f)) => Some(Float(-f)),
             (Not, Bool(b)) => Some(Bool(!b)),
             _ => None,

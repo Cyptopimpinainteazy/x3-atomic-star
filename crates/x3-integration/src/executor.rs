@@ -297,12 +297,44 @@ impl X3Executor {
         config: X3ExecutorConfig,
         seeds: &[([u8; 32], [u8; 32])],
     ) -> X3Result<X3ExecutionReceipt> {
-        use crate::mini_x3;
-        match mini_x3::execute_x3bc_with_slots_and_policy(
+        Self::execute_on_chain(
             bytecode,
             config.gas_limit,
             seeds,
             config.allow_private_submission,
+        )
+    }
+
+    /// Execute a program the way the chain does, in **every** build.
+    ///
+    /// The runtime's X3 adapters called `execute`, which is `x3-vm` behind a `std` feature and
+    /// `mini_x3` without it — so the native runtime (its unit tests and its FRAME benchmarks) ran
+    /// one engine and every node, executing the wasm runtime, ran another, with different gas
+    /// schedules (`x3-vm` prices opcodes, `mini_x3` charges one per instruction), different
+    /// validation (the full verifier against a header parse) and a different split of failures
+    /// between `Err` and an unsuccessful receipt. A test of the native runtime was a test of an
+    /// engine no block ever runs. This function is the one engine, whichever way the crate is built.
+    ///
+    /// `seeds` are the chain's contract slots, loaded as inherited state, and
+    /// `private_channel_available` is whether the caller can honour an artifact that demands
+    /// private submission (see `mini_x3::execute_x3bc_with_slots_and_policy`).
+    ///
+    /// The module is validated first (`verify_on_chain`); a refusal there is `VerificationFailed`.
+    /// Running out of gas is an unsuccessful receipt charged the whole limit; any other runtime
+    /// fault is `ExecutionFailed`, naming it.
+    pub fn execute_on_chain(
+        bytecode: &[u8],
+        gas_limit: u64,
+        seeds: &[([u8; 32], [u8; 32])],
+        private_channel_available: bool,
+    ) -> X3Result<X3ExecutionReceipt> {
+        use crate::mini_x3;
+        Self::verify_on_chain(bytecode)?;
+        match mini_x3::execute_x3bc_with_slots_and_policy(
+            bytecode,
+            gas_limit,
+            seeds,
+            private_channel_available,
         ) {
             Ok(res) => Ok(X3ExecutionReceipt {
                 success: true,
@@ -310,30 +342,53 @@ impl X3Executor {
                 return_data: res.return_val.to_bytes(),
                 logs: vec![],
                 state_changes: vec![],
-                // The no_std interpreter journals its slot writes now, in the same key and payload
-                // encoding `crates/x3-vm` uses (`mini_x3::evm_slot_key`), so this is the line that
-                // carries a write made by a program running on a *block* to the kernel. Reporting
-                // `vec![]` here would leave the channel unreachable from the chain's own execution
-                // path, which is the one caller that matters.
+                // The interpreter journals its slot writes in the key and payload encoding
+                // `crates/x3-vm` uses (`mini_x3::evm_slot_key`): this is the line that carries a
+                // write made by a program running on a block to the kernel.
                 storage_writes: res.storage_writes,
                 function_index: 0,
                 instructions_executed: res.instructions_executed,
             }),
             Err(mini_x3::X3Error::GasExhausted) => Ok(X3ExecutionReceipt {
                 success: false,
-                gas_used: config.gas_limit,
+                gas_used: gas_limit,
                 return_data: b"gas exhausted".to_vec(),
                 logs: vec![],
                 state_changes: vec![],
                 storage_writes: vec![],
                 function_index: 0,
                 // Not a stand-in: this interpreter charges exactly one gas per instruction
-                // (`mini_x3::Vm::run`), so at exhaustion the count is the limit. The field used to
-                // carry the gas figure on *successful* runs too, where that equality does not hold.
-                instructions_executed: config.gas_limit,
+                // (`mini_x3::Vm::run`), so at exhaustion the count is the limit.
+                instructions_executed: gas_limit,
             }),
-            Err(e) => Err(X3IntegrationError::ExecutionFailed(format!("{:?}", e))),
+            // A validated program that faults while running (a division by zero, a rolled-back
+            // atomic window, an unsupported opcode reached at run time) is an unsuccessful
+            // receipt naming the fault, the convention `x3-vm` and the kernel's storage channel
+            // use: the caller learns *that* the program ran and failed, and the receipt carries
+            // no slot writes, however many the program journaled before the fault. The
+            // interpreter does not report the gas a faulted run consumed, so none is claimed.
+            Err(e) => Ok(X3ExecutionReceipt {
+                success: false,
+                gas_used: 0,
+                return_data: format!("{:?}", e).into_bytes(),
+                logs: vec![],
+                state_changes: vec![],
+                storage_writes: vec![],
+                function_index: 0,
+                instructions_executed: 0,
+            }),
         }
+    }
+
+    /// Validate a program the way the chain does, in every build (see `execute_on_chain`).
+    pub fn verify_on_chain(bytecode: &[u8]) -> X3Result<()> {
+        crate::mini_x3::validate_x3bc(bytecode)
+            .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))
+    }
+
+    /// The chain's gas estimate for a program, in every build (see `execute_on_chain`).
+    pub fn estimate_gas_on_chain(bytecode: &[u8]) -> u64 {
+        crate::mini_x3::estimate_gas_x3bc(bytecode)
     }
 
     /// Verify bytecode without execution
@@ -352,9 +407,7 @@ impl X3Executor {
     /// Verify bytecode (no_std — uses mini_x3 validator)
     #[cfg(not(feature = "std"))]
     pub fn verify(bytecode: &[u8], _allow_debug_ops: bool) -> X3Result<()> {
-        use crate::mini_x3;
-        mini_x3::validate_x3bc(bytecode)
-            .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))
+        Self::verify_on_chain(bytecode)
     }
 
     /// Estimate gas for bytecode execution
@@ -377,8 +430,7 @@ impl X3Executor {
     /// Estimate gas (no_std — uses mini_x3 estimator)
     #[cfg(not(feature = "std"))]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
-        use crate::mini_x3;
-        Ok(mini_x3::estimate_gas_x3bc(bytecode))
+        Ok(Self::estimate_gas_on_chain(bytecode))
     }
 
     /// Compute code hash for bytecode

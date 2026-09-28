@@ -1,12 +1,50 @@
 # RFC t5-6: Numeric Literal Coercion and Argument Type Error Policy
 
-**Status:** ACCEPTED for X3Lang 1.0 baseline
+**Status:** ACCEPTED for X3Lang 1.0 baseline — **amended 2026-09-26** (literal typing; see "Amendment 1")
 **Scope:** canonical Rust compiler path under `x3-lang/compiler`; root `crates/x3-typeck` remains a compatibility/integration implementation and must not define divergent language semantics
 **Risk:** MEDIUM — affects language semantics and diagnostic consistency
 
 ---
 
-## Decision
+## Amendment 1 (2026-09-26): an unsuffixed literal takes its context's integer type
+
+Rules 1, 2 and the literal examples below are superseded by this amendment; rules 3–6 stand for
+**typed** values.
+
+- An unsuffixed integer literal takes the integer type its use requires — a parameter, a
+  declared binding, a return type, or the other operand of an arithmetic or comparison
+  operator — provided every value it stands for fits that type.
+- `-n` (negation applied to a literal) is one literal with a negative value, so it satisfies
+  signed types only.
+- A literal no context constrains defaults to `i64`, the X3VM's integer.
+- There is still no implicit conversion between typed integers: a `u64` variable does not satisfy
+  an `i64` or `u32` parameter, and a `u32` does not widen to `u64`.
+
+Why: the X3VM's one integer representation is `i64`, and every program the chain compiler,
+both X3 engines and the live-node tests run is written `fn main() -> i64 { return 42; }`. Under
+the original rule 1 each of those is ill-typed, so the chain compiler could not run a type checker
+at all — and without one, bool arithmetic, wrong return and argument types, non-bool conditions
+and functions that fall off their end compiled and executed. Literal-range-aware inference was
+already listed below as future work; this adopts it, deterministically and without any coercion
+of typed values. Decided by the project owner.
+
+Required examples under the amendment:
+
+| source | verdict |
+|---|---|
+| `fn f(x: i64) {}  f(1)` | accepted (`1` takes `i64`) |
+| `fn f(x: u32) {}  f(1)` | accepted (`1` fits `u32`) |
+| `fn f(x: u8) {}  f(300)` | `X3E0202` (does not fit) |
+| `fn f(x: u64) {}  f(-1)` | `X3E0202` (negative) |
+| `let v: u64 = 1; fn f(x: i64) {}  f(v)` | `X3E0202` (typed value, no coercion) |
+| `let v: u32 = 1; fn f(x: u64) {}  f(v)` | `X3E0202` (no widening) |
+
+Implemented in `x3-lang/compiler/src/numeric.rs` (tests `x3-lang/compiler/tests/test_numeric_policy.rs`)
+and in the chain compiler's checker `crates/x3-typeck/src/checker.rs` (tests
+`crates/x3-typeck/tests/golden.rs`, and `crates/x3-integration/tests/differential.rs` for programs
+the chain compiler must refuse).
+
+## Decision (original, 1.0 baseline)
 
 X3Lang 1.0 uses a conservative, deterministic integer policy:
 

@@ -1539,6 +1539,43 @@ fn kernel_dispatcher_executes_x3vm_and_reads_storage_backed_escrows() {
         });
 }
 
+/// An X3 call's gas budget is the caller's number, and nothing bounded it while every extrinsic
+/// that executes one is weighted for at most `DefaultX3GasLimit`: a looping program with a
+/// `u64::MAX` budget would run until the block author stalled. Refused at execution by name.
+#[test]
+fn an_x3_call_budget_above_the_gas_limit_is_refused() {
+    ExtBuilder::default()
+        .balances(vec![(ALICE, INITIAL_BALANCE)])
+        .authorized_accounts(vec![ALICE])
+        .build()
+        .execute_with(|| {
+            let dispatcher = KernelCrossVmDispatcher::<Test>::new();
+            let limit = <<Test as crate::Config>::DefaultX3GasLimit as frame_support::traits::Get<u64>>::get();
+            for (budget, allowed) in [(limit, true), (limit + 1, false), (u64::MAX, false)] {
+                let call = CrossVmCall::new(
+                    VmId::X3Vm,
+                    VmId::X3Vm,
+                    [0u8; 4],
+                    vec![0x58, 0x33, 0x01],
+                    budget,
+                    1,
+                    100,
+                )
+                .expect("x3vm test payload fits cross-vm call");
+                let result = dispatcher.execute_x3vm_tx(&[0u8; 32], &call);
+                if allowed {
+                    assert!(result.is_ok(), "a budget at the limit executes");
+                } else {
+                    assert_eq!(
+                        result.unwrap_err(),
+                        crate::Error::<Test>::X3GasBudgetExceedsLimit.into(),
+                        "budget {budget} must be refused"
+                    );
+                }
+            }
+        });
+}
+
 // ============= AUTHORIZATION TESTS (H-2 Security Fix) =============
 
 #[test]
