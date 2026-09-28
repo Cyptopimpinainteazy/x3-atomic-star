@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `4c76fe691`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `10b7f5c5d`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -628,4 +628,16 @@ alters the runtime, so the record and the code land together.
   (`0x49f94a7524542c747ce42ed2e470f9d2b86c6d00449d65b7b20dea046579d0b1`) — was 8,899,373 — and
   compressed 1529033
   (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
+  builds that agreed.
+
+* `10b7f5c5d` — **the account registry and the dApp hub charge measured weights too.** Both pallets
+  charged literals on every dispatchable and neither had a `benchmarking.rs`, while this runtime
+  already enabled their `runtime-benchmarks` features — a feature that named a capability the pallet
+  could not provide. `pallet-x3-account-registry` now carries three benchmarks and
+  `pallet-x3-dapp-hub` eight, both are registered in `mod benches`, and both charge
+  `type WeightInfo` from the generated files. Scanner `pallet-call-without-weights` reached 9 from
+  12; runtime configs wired to generated weights 50 -> 53. The bytes move: compact 8903183
+  (`0x0871ced5f0fcea528a13125d54d61d113f73cc750b9e25f029b9e720288ab38f`) — was 8,902,436 — and
+  compressed 1529715
+  (`0x63f5ad963d515a4667f31fa2c261e699db09454996adbf36f6fd28ee2a39b3c8`) — was 1,529,033, from two
   builds that agreed.
