@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `e39297afb`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `4c76fe691`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -614,3 +614,18 @@ alters the runtime, so the record and the code land together.
   `crates/x3-gulfstream` (GHSA-rhfx-m35p-ff5j) and records the two unfixable alerts in
   `.github/dependabot.yml`; those three files are outside the runtime's graph, which is why only this
   one moved the hashes. Detail: `.ai/reports/dependabot-jobs-triage-20260928.md`.
+
+* `4c76fe691` — **the asset registry charges measured weights, and the benchmark build works again.**
+  Two changes travel together because neither is useful alone. `pallets/x3-settlement-engine` enabled
+  its optional `rlp` dependency from `runtime-benchmarks` with `default-features` on, and the
+  runtime's `runtime-benchmarks` feature is linked into the WASM blob built for `wasm32v1-none`;
+  `rlp/std` turns on `bytes/std` and `rustc-hex/std`, so that build died with E0463 before any
+  pallet's weights could be regenerated. With `rlp` on its `no_std` path the benchmark node builds
+  again, and `pallets/x3-asset-registry` (seven benchmarks that already existed) finally has the
+  generated file — real measurements at STEPS 50 / REPEAT 20, not the
+  `Weight::from_parts(10_000, 0)` literals it charged before. The runtime now points
+  `type WeightInfo` at them, which is why the bytes move: compact 8902436
+  (`0x49f94a7524542c747ce42ed2e470f9d2b86c6d00449d65b7b20dea046579d0b1`) — was 8,899,373 — and
+  compressed 1529033
+  (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
+  builds that agreed.
