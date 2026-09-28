@@ -2,6 +2,13 @@ use crate::atomic_lock::{LockPhase, ReleaseReason};
 use crate::btc_gateway::{BtcAdaptorSignature, BtcHtlcParams, BtcSignature65, BtcSpvProof};
 use crate::mock::{new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB};
 use crate::mock::{RuntimeEvent, RuntimeOrigin};
+use crate::proof_fixtures::{receipt_trie, PROOF_HEIGHT, RECEIPT_INDEX};
+
+/// The tests keep the fixture's old shape: they unwrap the fallible builder here, where the panic is
+/// inside `cfg(test)` and the production panic ratchet does not count it.
+fn create_evm_receipt_proof() -> SettlementProof {
+    crate::proof_fixtures::create_evm_receipt_proof().expect("the fixture is within its bounds")
+}
 use crate::types::{
     AssetSpec, BtcBlockHeader, ExternalChainId, IntentState, ProofType, SettlementProof, TokenId,
 };
@@ -11,15 +18,6 @@ use sp_core::{ed25519, Pair, H256};
 use x3_atomic_swap::{
     CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
 };
-
-/// The height every fixture proof states.
-///
-/// It is the EVM block number / SVM slot the proof is about, and it is stated
-/// rather than derived: the value that looks up the canonical header used to be
-/// the first eight bytes of `tx_hash`, which made it proof data (TICKET-061). The
-/// mock validator accepts any height, so this is a fixed number rather than a
-/// chain-accurate one; the tests that care about the value use their own.
-const PROOF_HEIGHT: u64 = 18_000_000;
 
 #[test]
 fn create_and_request_withdrawal() {
@@ -476,109 +474,6 @@ fn atomic_lock_event_emitted_on_timeout() {
 // ============================================================================
 // SETTLEMENT INTEGRATION TEST HELPERS
 // ============================================================================
-
-/// The single-leaf receipts trie for `receipt_rlp` at `index`, and the RLP proof
-/// that binds it: `(root, proof)`.
-///
-/// Built from the standard convention — key `rlp(index)`, leaf
-/// `rlp([compact_leaf_path(nibbles(key)), receipt_rlp])`, root `keccak(leaf)` — and
-/// *not* from any helper the verifier shares, so a fixture cannot agree with a bug
-/// in the verifier about what a proof looks like (TICKET-064's lesson).
-fn receipt_trie(receipt_rlp: &[u8], index: u32) -> (H256, Vec<u8>) {
-    fn rlp_bytes(bytes: &[u8]) -> Vec<u8> {
-        let mut stream = rlp::RlpStream::new();
-        stream.append(&bytes.to_vec());
-        stream.out().to_vec()
-    }
-    fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
-        let mut stream = rlp::RlpStream::new_list(items.len());
-        for item in items {
-            stream.append_raw(item, 1);
-        }
-        stream.out().to_vec()
-    }
-    // The receipts-trie key is `rlp(index)`, the RLP of the integer.
-    let key = if index == 0 {
-        vec![0x80]
-    } else {
-        let be = index.to_be_bytes();
-        let first = be
-            .iter()
-            .position(|byte| *byte != 0)
-            .unwrap_or(be.len() - 1);
-        let significant = &be[first..];
-        if significant.len() == 1 && significant[0] < 0x80 {
-            vec![significant[0]]
-        } else {
-            let mut out = vec![0x80 + significant.len() as u8];
-            out.extend_from_slice(significant);
-            out
-        }
-    };
-    // Hex-prefix leaf encoding of the key's nibbles (yellow paper appendix C).
-    let mut nibbles = Vec::new();
-    for byte in &key {
-        nibbles.push(byte >> 4);
-        nibbles.push(byte & 0x0F);
-    }
-    let mut path = Vec::new();
-    if nibbles.len() % 2 == 0 {
-        path.push(0x20 | (nibbles.len() / 2) as u8);
-        for pair in nibbles.chunks(2) {
-            path.push((pair[0] << 4) | pair[1]);
-        }
-    } else {
-        path.push(0x30 | (nibbles.len() / 2) as u8);
-        path.push(nibbles[0] << 4 | nibbles[1]);
-        for pair in nibbles[2..].chunks(2) {
-            path.push((pair[0] << 4) | pair[1]);
-        }
-    }
-    let leaf = rlp_list(&[rlp_bytes(&path), rlp_bytes(receipt_rlp)]);
-    let root = H256::from(sp_io::hashing::keccak_256(&leaf));
-    let proof = rlp_list(&[rlp_bytes(&leaf)]);
-    (root, proof)
-}
-
-/// Helper to create a valid EVM receipt proof for testing
-/// Creates a proof with RLP-encoded receipt and matching Keccak256 hash
-fn create_evm_receipt_proof() -> SettlementProof {
-    // RLP-encoded receipt: must be a valid list with at least 3 elements
-    // Receipt format: [status/root, gas_used, logs, contractAddress?]
-    // We create: [0x01 (status), 0x00 (0 gas), 0xc0 (empty logs list)]
-    // RLP encoding: 0xc3 (list with 3 bytes) + 0x01 + 0x00 + 0xc0
-    let receipt_data = vec![0xc3, 0x01, 0x00, 0xc0];
-
-    // Compute Keccak256 hash of the receipt
-    let tx_hash = H256::from(sp_io::hashing::keccak_256(&receipt_data));
-
-    // The receipts root the proof is walked against, and the path that binds the
-    // receipt to it: this is what makes the fixture evidence rather than a copy of
-    // the header's public fields (TICKET-063).
-    let (receipts_root, trie_proof) = receipt_trie(&receipt_data, RECEIPT_INDEX);
-
-    SettlementProof {
-        proof_type: ProofType::MerkleTrie,
-        tx_hash,
-        block_hash: H256::from([2u8; 32]),
-        confirmations: 12,
-        chain_height: Some(PROOF_HEIGHT),
-        // Two entries, because the module verifies the proof against the
-        // first two: a state root and the receipts root. A one-entry proof used to
-        // have its second root invented as thirty-two zero bytes; see
-        // `a_proof_that_does_not_carry_both_roots_is_refused`.
-        merkle_proof: (vec![H256::from([3u8; 32]), receipts_root])
-            .try_into()
-            .unwrap(),
-        receipt_data: receipt_data.try_into().unwrap(),
-        receipt_index: Some(RECEIPT_INDEX),
-        trie_proof: Some(trie_proof.try_into().unwrap()),
-    }
-}
-
-/// The index of the fixture receipt in its block: the trie key is `rlp(1)`, which
-/// the standard encodes as the single byte `0x01`.
-const RECEIPT_INDEX: u32 = 1;
 
 /// Helper to create a valid Solana proof for testing
 /// Creates a proof with proper Ed25519 signature and message structure

@@ -362,31 +362,12 @@ benchmarks! {
             1_000_000u128,
             vec![2u8; 64],
         ).ok();
-        let receipt_data = vec![0xc3, 0x80, 0x80, 0x80];
-        let proof = SettlementProof {
-            proof_type: ProofType::MerkleTrie,
-            tx_hash: H256::from(sp_io::hashing::keccak_256(&receipt_data)),
-            block_hash: H256::from_low_u64_be(3),
-            // The height the proof is about. Stated rather than derived from
-            // `tx_hash`, which is what the benchmark's proof used to imply
-            // (TICKET-061).
-            chain_height: Some(18_000_000),
-            confirmations: 12u32,
-            // Two entries: the state root and the receipt root, which is what the
-            // EVM path verifies against (see `proof_roots`).
-            merkle_proof: vec![H256::zero(), H256::zero()]
-                .try_into()
-                .expect("two-item proof is within the configured maximum"),
-            receipt_data: receipt_data
-                .try_into()
-                .expect("four-byte receipt is within the configured maximum"),
-            // The EVM path reads neither: `receipt_index` is the BTC/SPV position
-            // and `trie_proof` is the Merkle-Patricia path, which this benchmark's
-            // proof deliberately does not carry (it exercises the shape check, and
-            // the proof is refused for exactly that reason).
-            receipt_index: None,
-            trie_proof: None,
-        };
+        // The proof the EVM path accepts: a receipt that walks to its own receipts root. The
+        // benchmark used to hand the pallet a two-zero-root proof with no trie path and no receipt
+        // index, which the verification added in PR #520 refuses (`InvalidProof`) — and the
+        // `benchmarks!` macro asserts the extrinsic succeeds, so that benchmark could never pass.
+        let proof = crate::proof_fixtures::create_evm_receipt_proof()
+            .map_err(|_| BenchmarkError::Weightless)?;
 
         let origin = RawOrigin::Signed(maker.clone());
     }: _(origin, intent_id, ExternalChainId::Ethereum, proof)

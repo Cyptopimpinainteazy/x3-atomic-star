@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `eac5255ce`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `41f386c3d`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -559,3 +559,18 @@ alters the runtime, so the record and the code land together.
   become `pub` for the benchmark test suite to link against it. Its argument shapes are not guessable
   from the call names either — `freeze_authority(origin, asset, who, reason)` takes four and
   `freeze_asset(origin, asset, reason)` three. Scanner `pallet-call-without-weights` 14 → 12.
+
+* `41f386c3d` — **the settlement proof fixture moves out of `cfg(test)`, and the record catches up with
+  the merge.** PR #520 tightened the EVM settlement path to walk a real receipts trie, which left that
+  pallet's `submit_proof` benchmark handing the verifier a proof with no trie path and no receipt
+  index; the `benchmarks!` macro asserts the extrinsic succeeds, so the benchmark could never pass, and
+  `cargo test -p pallet-x3-settlement-engine --features runtime-benchmarks` was red on master. The
+  fixture (`receipt_trie`, `create_evm_receipt_proof`, their two constants) now lives in
+  `src/proof_fixtures.rs`, compiled under `cfg(any(test, feature = "runtime-benchmarks"))`, so the
+  benchmark's CLI run — which is not `cfg(test)` — can reach the same evidence the tests use. The suite
+  is 176 passed with the feature on, where it was 175 and one failing.
+
+  The same change carries the record forward: the merge's attestation (`eac5255ce`) was taken inside
+  the PR branch before master was merged into it, so the merged tree's bytes are new — compact
+  8888737 bytes (`0x18d31490b724d8e5af91f0eb77436a3a3e95947d5576bb973022f125a16e63b1`) — was 8,880,606 — and compressed 1528341
+  (`0x73df026fa625427bb4e02aaadda76b53be0a788d7876e3b7f46823af5bfac7b6`) — was 1,528,293, from two builds that agreed.
