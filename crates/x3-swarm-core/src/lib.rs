@@ -14,6 +14,7 @@ pub mod memory;
 pub mod misconduct;
 pub mod permissions;
 pub mod policy;
+pub mod reconcile;
 pub mod report;
 pub mod scheduler;
 pub mod scoreboard;
@@ -35,6 +36,9 @@ pub use misconduct::{
     MisconductEngine, MisconductError, Sanction, ViolationClass, ViolationRecord,
 };
 pub use policy::{default_agent_policies, AgentPolicy, ApprovalRequirement};
+pub use reconcile::{
+    reconcile, ClaimArbiter, ClaimVerdict, Eviction, ReconcileReport, Replica, Unresolved,
+};
 pub use report::SwarmReport;
 pub use scheduler::SwarmScheduler;
 pub use scoreboard::SwarmScoreboard;
