@@ -3094,7 +3094,9 @@ impl pallet_x3_proof_carrying_agent::Config for Runtime {
 }
 
 // ===== X3 Wallet Pallet Configuration =====
-impl pallet_x3_wallet_pallet::Config for Runtime {}
+impl pallet_x3_wallet_pallet::Config for Runtime {
+    type WeightInfo = pallet_x3_wallet_pallet::weights::SubstrateWeight<Runtime>;
+}
 
 // ===== X3 Inventory Configuration =====
 parameter_types! {
@@ -3615,6 +3617,8 @@ mod benches {
     #[allow(unused_imports)]
     use pallet_x3_partner::Pallet as X3Partner;
     #[allow(unused_imports)]
+    use pallet_x3_wallet_pallet::Pallet as X3WalletPallet;
+    #[allow(unused_imports)]
     use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
@@ -3622,6 +3626,7 @@ mod benches {
         [pallet_x3_dapp_hub, X3DappHub]
         [pallet_x3_partner, X3Partner]
         [pallet_x3_custody, X3Custody]
+        [pallet_x3_wallet_pallet, X3WalletPallet]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]

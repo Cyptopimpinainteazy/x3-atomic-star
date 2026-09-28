@@ -363,6 +363,7 @@ runtime-benchmarks = [
 	"pallet-x3-consensus/runtime-benchmarks",
 	"pallet-x3-cross-vm-router/runtime-benchmarks",
 	"pallet-x3-crosschain-gateway/runtime-benchmarks",
+	"pallet-x3-wallet-pallet/runtime-benchmarks",
 	"pallet-x3-partner/runtime-benchmarks",
 	"pallet-x3-custody/runtime-benchmarks",
 	"pallet-x3-da/runtime-benchmarks",
