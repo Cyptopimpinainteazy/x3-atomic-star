@@ -89,6 +89,7 @@ impl pallet_x3_sequencer::Config for Test {
     type MaxPayloadSize = MaxPayloadSize;
     type PerByteFee = PerByteFee;
     type BaseFee = BaseFee;
+    type WeightInfo = pallet_x3_sequencer::weights::SubstrateWeight<Test>;
 }
 
 /// Build genesis storage.

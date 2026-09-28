@@ -142,6 +142,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
 
 impl pallet_x3_sentinel::Config for Test {
     type FreezeOrigin = RootOrAny;
+    type WeightInfo = pallet_x3_sentinel::weights::SubstrateWeight<Test>;
 }
 
 impl pallet_x3_token_factory::Config for Test {

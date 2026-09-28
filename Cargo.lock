@@ -12349,6 +12349,7 @@ dependencies = [
 name = "pallet-x3-da"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12398,6 +12399,7 @@ dependencies = [
 name = "pallet-x3-domain-registry"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12415,6 +12417,7 @@ dependencies = [
 name = "pallet-x3-flashloan"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12609,6 +12612,7 @@ dependencies = [
 name = "pallet-x3-reconciliation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12624,6 +12628,7 @@ dependencies = [
 name = "pallet-x3-reservation"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "pallet-x3-inventory",
@@ -12640,6 +12645,7 @@ dependencies = [
 name = "pallet-x3-sentinel"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
@@ -12655,6 +12661,7 @@ dependencies = [
 name = "pallet-x3-sequencer"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -12853,6 +12860,7 @@ dependencies = [
 name = "pallet-x3-wrapped"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",

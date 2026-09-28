@@ -9152,3 +9152,145 @@ registration, with the outcome per file:
   feature-list exclusion comment still names ~12 pallets with their first compile error, and every
   one of those is the same shape of work: add `frame-benchmarking`, write `benchmarking.rs`, register
   in `mod benches`, enable the feature, generate, then wire.
+
+## 2026-09-27 (fifth weights pass) — the token factory, and two traps the release gate taught
+
+- **`pallets/x3-token-factory` charged 60,000 picoseconds for a token launch and 20,000 for a mint or
+  burn**, all four calls literals, behind a `runtime-benchmarks` feature with nothing in it. Measured
+  and wired now: scanner `pallet-call-without-weights` **21 → 20** (five pallets, 24 literals).
+  Its launch benchmark drives the whole path a chain takes — register the asset, activate it,
+  configure the internal routes, mint the initial supply. `CappedMintable` permits a post-launch mint
+  and `Burnable` permits a burn, and **no class allows both**, so the mint and burn benchmarks launch
+  different classes.
+- **Trap 1 — adding `type WeightInfo` to a pallet `Config` breaks every other crate that implements
+  it, and `make mainnet-check` does not see it.** The supply ledger's new associated type (commit
+  `af80888a6`) quietly broke `cargo test -p pallet-x3-token-factory` and
+  `cargo test -p pallet-x3-cross-vm-router`: their test runtimes wire the ledger, and a new associated
+  type is a required item in each impl. The release gate runs a *subset* of packages, so it stayed
+  green for two commits. Found only because this pass built the token factory's tests.
+  `cargo check --workspace --all-targets` is the check that sees this class — run it after every
+  weights pass, and when adding an associated type, grep for `impl <pallet>::Config for` across the
+  whole tree (tests, mocks, other pallets' test runtimes).
+- **Trap 2 — the panic/unwrap ratchet counts a `#[cfg(feature = "runtime-benchmarks")]` module.**
+  Three `.expect("…")` calls on `BoundedVec::try_from` in the new benchmark module grew the baseline
+  440 → 443 and failed `make mainnet-check` on the otherwise-green commit `d9817e154` (the srtool
+  rebuild and every other step had passed). Benchmarks are not `#[cfg(test)]`; use
+  `.map_err(|_| BenchmarkError::Weightless)?`. Fixed in `5a0b9707e`, ratchet back to 440/440.
+- **Evidence**: `cargo test -p pallet-x3-token-factory` 18 passed; `--features runtime-benchmarks`
+  22 passed (4 entries); `cargo test -p pallet-x3-cross-vm-router` 85 passed;
+  `cargo check --workspace --all-targets` clean (that is what found trap 1);
+  `make mainnet-check` PASS after two agreeing srtool builds recorded revision `69a58d4fe`
+  (compact 8,894,628 `0xcaab1852…`, compressed 1,524,541 `0x6399941a…`);
+  `check-runtime-weights-wired.py` 41 wired configs; `X3-GPU-003` 69 → 70.
+- **Next seeds:** 20 pallets remain. Money path first — `x3-wrapped`, `x3-wallet-pallet`,
+  `x3-cross-vm-router`, `x3-asset-registry`, `x3-reservation`, `x3-custody`. Note `x3-cross-vm-router`
+  already has benchmarks (`benchmarks/` gate) so it is the *cheap* class; `x3-wrapped` is heavy.
+  After each pass: fmt, scanner re-baseline, panic ratchet, `--workspace --all-targets`, attestation,
+  release gate.
+- **UPDATE (xxxstar-main-2d, 2026-09-27 22:30 UTC):**
+  - **PR #520** (`feat/x3-htlc-onchain`): native X3 HTLC legs (`ExternalChainId::X3Native` in pallet-x3-settlement-engine)
+    now hold real funds — before, lock/finalize/refund moved nothing while events reported amounts. Live on real nodes:
+    native lifecycle 4/4 incl. a new restart-recovery test, EVM gate 7/7 (anvil), SVM gate 2/2 (solana-test-validator).
+    The live suites no longer have the maker lock the taker's native leg (refused now). Runtime-affecting.
+  - **PR #518** merged with master (280 commits): master's mini_x3 fail-closed/atomic/slots/privacy work kept, this
+    branch's safety fixes (checked registers, argc, div overflow, wasm32 reader, full on-chain validator) layered on;
+    840 tests + runtime 60 green. A runtime fault in the on-chain engine is now an unsuccessful receipt (master's
+    storage-channel convention), a validation refusal stays an error.
+  - Both PRs' production gates dispatched with merge-on-success watchers. Last #518 gate attempt died at the 90-min job
+    timeout in srtool (box heavily loaded), before that the artifact storage quota.
+
+## 2026-09-27 (sixth weights pass) — two small pallets in one attestation
+
+- **Batch small pallets, attest once.** `pallets/x3-sequencer` (one call) and `pallets/x3-da` (two)
+  both charged literals behind empty `runtime-benchmarks` features. Doing them in one pass costs one
+  srtool double-build instead of two, and the per-pallet work is small when the pallet has no sibling
+  trait in its `Config` — `Currency: ReservableCurrency` plus a mock is the whole dependency story.
+  Scanner `pallet-call-without-weights` **20 → 18** (seven pallets measured, 28 literals).
+- **Recipe additions from this pass:**
+  * `frame-benchmarking` must be added to `[dependencies]` as well as to the feature list — adding
+    `"frame-benchmarking/runtime-benchmarks"` to `runtime-benchmarks` without the dependency fails
+    manifest load with `feature ... includes ... but frame-benchmarking is not a dependency`.
+  * Fund a caller with `T::Currency::make_free_balance_be(&caller, 10_000_000u32.into())` (the idiom
+    `pallets/x3-settlement-engine` already uses) — `u32.into()` works for `BalanceOf<T>`, and the
+    runtime's sequencing/DA fees are 10 and 5 per byte, so it covers a 1 KiB payload with room.
+  * A benchmark whose call has a precondition creates it through the pallet's own extrinsic where one
+    exists: the DA shard-proof benchmark commits the blob first (`BlobNotFound` is the guard) and the
+    commitment then exists exactly as a chain would have it.
+- **Evidence**: `cargo test -p pallet-x3-sequencer` 15 passed / `--features runtime-benchmarks` 16;
+  `-p pallet-x3-da` 15 / 17; `cargo check --workspace --all-targets` clean;
+  `panic_unwrap_audit.sh` PASS 440/440; `make mainnet-check` PASS after two agreeing srtool builds
+  recorded revision `891a47f96` (compact 8,888,569 `0x1570b595…`, compressed 1,524,965 `0xb8088b09…`);
+  `check-runtime-weights-wired.py` 43 wired configs; `X3-GPU-003` 70 → 72.
+- **Next seeds:** 18 findings left, of which 4 are the documented `T::DbWeight::get().reads_writes`
+  form (depin-marketplace, private-execution, x3-jury-anchor, x3-rebalance) that the lane brief says to
+  leave — so **14 real pallets remain**. Cheapest first by call count: `x3-account-registry` (3),
+  `x3-flashloan` (3), `x3-domain-registry` (3), `x3-reservation` (3), `x3-wallet-pallet` (3), then
+  `x3-reconciliation` (6), `x3-sentinel` (7), `x3-wrapped` (7), `x3-asset-registry` (7), `x3-dapp-hub`
+  (8), `x3-cross-vm-router` (8), `x3-custody` (10), `x3-crosschain-gateway` (11). `x3-cross-vm-router`
+  is special: it already has a benchmark module but for internal helpers, and its
+  `register_external_root` is refused by the runtime's `RefuseExternalRoots`, so that one call cannot
+  be measured on the dev chain and needs the documented-exception path.
+
+## 2026-09-27 (seventh weights pass) — flash loan + reservation, and three traps worth the price
+
+- **`pallets/x3-flashloan`** (borrow/repay 10,000 ps, add_liquidity 5,000) and **`pallets/x3-reservation`**
+  (three root transitions at 10,000) both charged literals behind empty `runtime-benchmarks` features.
+  Nine pallets measured now; scanner `pallet-call-without-weights` **18 → 16** (30 literals).
+- **Trap 1 — `define_benchmarks!`'s location name must match the `construct_runtime!` alias exactly.**
+  I wrote `X3Flashloan` for a runtime whose variant is `X3FlashLoan`, and the error was
+  `cannot find type X3Flashloan in this scope`, pointing at the macro list line — the `use … as`
+  alias inside `mod benches` is *not* what resolves there. The macro captures `$locations:ty` and
+  expands at the crate root, where only the `construct_runtime!`-generated type exists. Case matters.
+- **Trap 2 — benchmark amounts must clear the chain's existential deposit.** The flash loan's
+  1,000-unit pool passed in the mock (tiny deposit) and failed on the dev chain with
+  `Account cannot exist with the funds that would be given`. Amounts are now multiples of
+  `T::Currency::minimum_balance()`, which is correct on both.
+- **Trap 3 — an added `type WeightInfo` breaks every Config impl in the tree, again.** This time
+  `pallets/x3-solvency/src/mock.rs` (it wires the reservation pallet). `cargo check --workspace
+  --all-targets` found it in ~30s; `make mainnet-check` would not have. Always run it before committing.
+- **Also worth keeping:** the reservation benchmark needs real (non-zero) amounts, because
+  `inventory::reserve_inventory` returns early for zero and a zero-amount benchmark would measure the
+  no-op path; the inventory `Balance` is generic with no `From<u32>`, so the module carries
+  `#[benchmarks(where T: Config + pallet_x3_inventory::pallet::Config<Balance = u128>)]` and the
+  runtime/mock are both `u128`.
+- **Evidence**: flashloan 12 passed / 15 with the feature; reservation 18 / 21;
+  `cargo check --workspace --all-targets` clean; panic ratchet 440/440; `make mainnet-check` PASS after
+  two agreeing srtool builds recorded revision `9f5446270` (compact 8,895,788 `0x343f40ba…`,
+  compressed 1,524,612 `0x942851a9…`); `check-runtime-weights-wired.py` 45 wired configs;
+  `X3-GPU-003` 72 → 73.
+- **Next seeds:** 16 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form
+  (leave those), so **12 real pallets**: `x3-account-registry` (3 calls, **no mock and no tests at
+  all** — it needs a test runtime before it can be benchmarked), `x3-domain-registry` (3),
+  `x3-wallet-pallet` (3), `x3-reconciliation` (6), `x3-sentinel` (7), `x3-wrapped` (7),
+  `x3-asset-registry` (7), `x3-dapp-hub` (8), `x3-cross-vm-router` (8, and its
+  `register_external_root` cannot be measured on a dev chain — the runtime refuses every external
+  root by design), `x3-custody` (10), `x3-crosschain-gateway` (11).
+
+## 2026-09-27 (eighth weights pass) — domain registry + reconciliation, and the WASM-prelude trap
+
+- **`pallets/x3-domain-registry`** (3 calls: 20,000/30,000/30,000) and **`pallets/x3-reconciliation`**
+  (6 calls: 10,000-30,000) both charged literals behind empty `runtime-benchmarks` features.
+  Eleven pallets measured now; scanner `pallet-call-without-weights` **16 → 14** (39 literals).
+- **Trap: a benchmark module also compiles into the runtime's WASM build.** There, `Vec` and `vec!` are
+  not in the prelude — the domain registry's `Vec<X3DnsRecord<T>>` helper needed
+  `use sp_std::{vec, vec::Vec};`. The `cargo test -p <pallet> --features runtime-benchmarks` run passes
+  first (it has `std`), so the failure only appears when the *node* is built:
+  `cannot find type Vec in this scope` from the runtime's build script. Build the node before believing
+  a new benchmark module is finished.
+- **Wiring recipe confirmation:** `pub mod weights;` + `pub use weights::WeightInfo;` at the crate
+  root, `use crate::weights::WeightInfo;` inside `pub mod pallet`, `type WeightInfo: WeightInfo;` at
+  the *end* of the `Config` trait (an anchor that matches the middle of the trait silently splits it —
+  the domain registry's `MaxRecordsPerDomain` anchor did exactly that and produced
+  `unexpected closing delimiter: }`).
+- **Evidence**: domain-registry 7 passed / 10 with the feature; reconciliation 32 / 38;
+  `cargo check --workspace --all-targets` clean; panic ratchet 440/440; `make mainnet-check` PASS after
+  two agreeing srtool builds recorded revision `382f4c8da` (compact 8,890,492 `0x84ae71b3…`,
+  compressed 1,526,313 `0xbe7d4de0…`); `check-runtime-weights-wired.py` 47 wired configs;
+  `X3-GPU-003` 73 → 74.
+- **Next seeds:** 14 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form
+  (leave those), so **10 real pallets**: `x3-wallet-pallet` (12 calls — the biggest), `x3-crosschain-gateway`
+  (11), `x3-custody` (10), `x3-dapp-hub` (8), `x3-cross-vm-router` (8; `register_external_root` cannot
+  be measured on a dev chain because the runtime refuses every external root — needs the
+  documented-exception path), `x3-wrapped` (7), `x3-asset-registry` (7), `x3-sentinel` (7),
+  `x3-account-registry` (3, and it has **no mock and no tests at all** — it needs a test runtime before
+  it can be benchmarked).

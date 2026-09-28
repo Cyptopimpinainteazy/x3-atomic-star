@@ -2,14 +2,14 @@
   "schema": 1,
   "root": "/home/lojak/Desktop/xxxstar-main",
   "counts": {
-    "pallet-call-without-weights": 20
+    "pallet-call-without-weights": 12
   },
   "structural_counts": {
     "stale-registry-test": 0,
     "missing-registry-path": 0,
     "stale-proof-report": 0,
     "unregistered-pallet": 0,
-    "pallet-call-without-weights": 20,
+    "pallet-call-without-weights": 12,
     "ungated-crate": 0
   },
   "documented_unwired": [
@@ -24,7 +24,7 @@
     {
       "gate": "stub / marker ratchet",
       "status": "pass",
-      "detail": "critical-marker=443, explicit-stub=74, marker=1185"
+      "detail": "critical-marker=444, explicit-stub=74, marker=1185"
     },
     {
       "gate": "fake-code scan",
@@ -34,7 +34,7 @@
     {
       "gate": "panic / unwrap ratchet",
       "status": "pass",
-      "detail": "pallet-call=0, production=443, runtime-hook=0"
+      "detail": "pallet-call=0, production=440, runtime-hook=0"
     }
   ],
   "findings": [
@@ -104,19 +104,6 @@
       "patch_eligible": false
     },
     {
-      "id": "462a031b55b221c8",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-da/src/lib.rs",
-      "line": 213,
-      "symbol": "x3-da::Weight::from_parts(15_000, 0",
-      "why": "2 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-da --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
       "id": "ae270b6375793ccb",
       "kind": "pallet-call-without-weights",
       "severity": "high",
@@ -126,32 +113,6 @@
       "why": "8 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
       "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
       "test_required": "cargo test -p x3-dapp-hub --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "176efbaafb7b3dc8",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-domain-registry/src/lib.rs",
-      "line": 212,
-      "symbol": "x3-domain-registry::frame_support::weights::Weight::from_parts(20_000, 0",
-      "why": "3 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-domain-registry --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "21db505e5fbddcfb",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-flashloan/src/lib.rs",
-      "line": 110,
-      "symbol": "x3-flashloan::Weight::from_parts(10_000, 0",
-      "why": "3 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-flashloan --features runtime-benchmarks",
       "gate_affected": "runtime identity / benchmarks",
       "patch_eligible": false
     },
@@ -169,58 +130,6 @@
       "patch_eligible": false
     },
     {
-      "id": "3b36ca414d8858aa",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-reconciliation/src/lib.rs",
-      "line": 263,
-      "symbol": "x3-reconciliation::Weight::from_parts(15_000, 0",
-      "why": "6 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-reconciliation --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "97485f84208fe7e4",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-reservation/src/lib.rs",
-      "line": 239,
-      "symbol": "x3-reservation::Weight::from_parts(10_000, 0",
-      "why": "3 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-reservation --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "f02935bb98289364",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-sentinel/src/lib.rs",
-      "line": 218,
-      "symbol": "x3-sentinel::Weight::from_parts(15_000, 0",
-      "why": "7 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-sentinel --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "48e9b957ac4f27ab",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-sequencer/src/lib.rs",
-      "line": 246,
-      "symbol": "x3-sequencer::Weight::from_parts(10_000, 0",
-      "why": "1 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-sequencer --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
       "id": "b9033896ff6205da",
       "kind": "pallet-call-without-weights",
       "severity": "high",
@@ -230,19 +139,6 @@
       "why": "12 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
       "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
       "test_required": "cargo test -p x3-wallet-pallet --features runtime-benchmarks",
-      "gate_affected": "runtime identity / benchmarks",
-      "patch_eligible": false
-    },
-    {
-      "id": "e76afd632d1f8b4f",
-      "kind": "pallet-call-without-weights",
-      "severity": "high",
-      "path": "pallets/x3-wrapped/src/lib.rs",
-      "line": 278,
-      "symbol": "x3-wrapped::Weight::from_parts(10_000, 0",
-      "why": "7 extrinsic(s) charge an invented literal weight and the pallet has no generated weights at all, while being registered in runtime/src/lib.rs",
-      "suggested_fix": "add a WeightInfo trait, generate weights with the FRAME benchmark CLI (`scripts/run-frame-benchmarks.sh`), and point the runtime at SubstrateWeight<Runtime>",
-      "test_required": "cargo test -p x3-wrapped --features runtime-benchmarks",
       "gate_affected": "runtime identity / benchmarks",
       "patch_eligible": false
     },

@@ -70,6 +70,7 @@ impl pallet_x3_reconciliation::Config for Test {
     type MintHaltThresholdBlocks = MintHaltThresholdBlocks;
     type ToleranceBps = ToleranceBps;
     type GovernanceDivergenceAlertBps = GovernanceDivergenceAlertBps;
+    type WeightInfo = pallet_x3_reconciliation::weights::SubstrateWeight<Test>;
 }
 
 /// Build clean test externalities starting at block 1.

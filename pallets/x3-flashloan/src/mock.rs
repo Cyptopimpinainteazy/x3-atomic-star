@@ -32,6 +32,7 @@ impl pallet_x3_flashloan::Config for Test {
     type Currency = Balances;
     type FeeBasisPoints = FeeBasisPoints;
     type MaxLoanFraction = MaxLoanFraction;
+    type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Test>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

@@ -395,7 +395,9 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     let alice_uri = dev_uri("Alice");
     let primary = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
         .expect("X3 primary signer");
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
+    // The taker locks its own native side: the settlement engine holds a native X3 leg as real
+    // funds from its depositor, so the maker may not lock the taker's leg.
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &dev_uri("Bob"))
         .expect("X3 second-leg signer");
 
     let prepared = primary
@@ -613,7 +615,9 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
         .resolve_intent_id(&prepared, finalized_hash)
         .expect("resolve runtime intent id");
     signer.bind_intent(local_id, runtime_intent_id).unwrap();
-    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
+    // The taker locks its own native side: the settlement engine holds a native X3 leg as real
+    // funds from its depositor, so the maker may not lock the taker's leg.
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &dev_uri("Bob"))
         .expect("X3 refund second-leg signer");
     second_leg.bind_intent(local_id, runtime_intent_id).unwrap();
 
