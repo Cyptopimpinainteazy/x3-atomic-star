@@ -9294,3 +9294,33 @@ registration, with the outcome per file:
   documented-exception path), `x3-wrapped` (7), `x3-asset-registry` (7), `x3-sentinel` (7),
   `x3-account-registry` (3, and it has **no mock and no tests at all** — it needs a test runtime before
   it can be benchmarked).
+
+## 2026-09-28 — claude (x3-lang / X3 HTLC agent) update
+- MERGED #520 (native X3 HTLC custody in settlement-engine: reserve on lock, repatriate on finalize, unreserve on refund) as bbbb0a33c. Runtime re-attested (compressed 0xe3d3a6f7…6d8c).
+- NOW: #518 (fix/x3lang-finish, worktree /tmp/x3lang-finish) merged with master, running local CI --cross sequentially (uses live ports 19944-19946). Will re-attest runtime hashes and merge after. Please avoid live suites on those ports for the next ~1-2h.
+
+## 2026-09-27 (ninth weights pass) — wrapped + sentinel, and the sentinel has no mock
+
+- **`pallets/x3-wrapped`** (7 calls, 8,000-20,000 ps) and **`pallets/x3-sentinel`** (7 calls, all
+  15,000 — and every one a security power: freeze an authority, freeze an asset, enrol for review,
+  grant an approval). Thirteen pallets measured now; scanner `pallet-call-without-weights`
+  **14 → 12** (53 literals).
+- **The sentinel has no `mock.rs`.** Its test runtime lives in `src/tests.rs`, and `new_test_ext` had
+  to become `pub` for `impl_benchmark_test_suite!(Pallet, crate::tests::new_test_ext(), crate::tests::Test)`
+  to link. Same shape as `x3-token-factory`, which is the other pallet whose mock is its test module.
+- **Read the call signatures; they are not guessable from the names.** The sentinel's
+  `freeze_authority(origin, asset, who, reason)` takes four arguments and `freeze_asset(origin, asset,
+  reason)` three — my first pass assumed two and the compiler named each one in turn.
+- **Adding `type WeightInfo` to the sentinel broke `pallets/x3-token-factory`'s test runtime**, which
+  wires the sentinel. That is the third crate this class has caught (supply-ledger → token-factory +
+  cross-vm-router; reservation → solvency; sentinel → token-factory again). `cargo check --workspace
+  --all-targets` finds it in ~30 seconds and is not optional before a commit.
+- **Evidence**: wrapped 26 passed / 33 with the feature; sentinel 7 / 14; `cargo check --workspace
+  --all-targets` clean; panic ratchet 440/440; `make mainnet-check` PASS after two agreeing srtool
+  builds recorded revision `2084743d1` (compact 8,880,606 `0x711de917…`, compressed 1,524,413
+  `0x7f131976…`); `check-runtime-weights-wired.py` 49 wired configs; `X3-GPU-003` 74 → 75.
+- **Next seeds:** 12 findings left, 4 of them the documented `T::DbWeight::get().reads_writes` form
+  (leave those), so **8 real pallets**: `x3-wallet-pallet` (12 calls — the biggest), `x3-crosschain-gateway`
+  (11), `x3-custody` (10), `x3-dapp-hub` (8), `x3-cross-vm-router` (8; `register_external_root` is
+  refused by the runtime by design and needs the documented-exception path), `x3-asset-registry` (7),
+  `x3-account-registry` (3, **no mock and no tests at all** — its own turn).
