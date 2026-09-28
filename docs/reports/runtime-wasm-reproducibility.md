@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `1b9b04e5d`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `b8a73a01d`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -628,6 +628,19 @@ alters the runtime, so the record and the code land together.
   (`0x49f94a7524542c747ce42ed2e470f9d2b86c6d00449d65b7b20dea046579d0b1`) — was 8,899,373 — and
   compressed 1529033
   (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
+  builds that agreed.
+
+* `b8a73a01d` — **the cross-chain gateway charges measured weights.** All eleven dispatchables
+  charged `Weight::from_parts(20_000..60_000, 0)` with no read or write count. The benchmarks build
+  their state through the pallet's own extrinsics, and the route they use is `X3Internal` — the
+  verification level whose verifier this repository can actually satisfy, which is what makes the
+  deposit and release proof paths measurable rather than mocked. Scanner
+  `pallet-call-without-weights` reached 5 from 6; `x3-cross-vm-router` is the last pallet that still
+  charges a literal, and the other four findings are the documented `T::DbWeight::get().reads_writes`
+  form. The bytes move: compact 8905964
+  (`0x108225d763aa5f41b39d59b4ad69e284b3da1546d4af3dab84f7df1470986bec`) — was 8,899,712 — and
+  compressed 1530061
+  (`0x7904649cf82fb1dc80076f6c7b16c1cf104d9705988e78d20c9a38fdc87b0acd`) — was 1,530,072, from two
   builds that agreed.
 
 * `1b9b04e5d` — **the wallet pallet charges measured weights.** `pallet-x3-wallet` (aliased here as
