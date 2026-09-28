@@ -155,12 +155,13 @@ impl Compiler {
         }
         let (mir_optimized, opt_stats) = Self::optimize_mir(&mir_unoptimized, &options)?;
 
-        // The reorder happens **after** the optimizer, not before: the optimizer's passes are what
-        // walk this function list, and moving the entry in front of them changed their input order
-        // for programs with more than one function — measured, `fib.x3` then failed to compile with
-        // `MIR value MirValue(1) not found in register map` (four of the compiler's own e2e tests).
         // The contract being met is about the emitted module's function table, which is built from
-        // this order, so reordering here is enough and the optimizer sees the program as written.
+        // this order, so reordering here is enough. It once *had* to be here: moving the entry in
+        // front of the optimizer made `fib.x3` fail with `MIR value MirValue(1) not found in
+        // register map` (four of this crate's e2e tests), because PRE kept one expression table
+        // across functions. PRE is per function now, and `tests/optimizer_order.rs` requires every
+        // fixture to optimize identically in every function order, so the position of this
+        // reorder is no longer load-bearing.
         let mut mir_optimized = mir_optimized;
         if let Some(entry) = entry_function_index {
             if entry < mir_optimized.functions.len() {

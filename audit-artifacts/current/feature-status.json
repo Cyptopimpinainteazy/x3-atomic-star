@@ -2830,7 +2830,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 61,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2838,12 +2838,12 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 72,
+      "implemented": 80,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Proven for the swept operand kinds and the compiler's fixture corpus, including a `while` loop with a mutated local, `break`/`continue`, and float arithmetic with the on-chain refusal asserted; not proven for match statements, strings or host calls. The optimizer is order-sensitive: moving the entry function in front of it made four of the compiler's own e2e programs stop compiling"
+        "Re-measured 2026-09-28. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`, with a load not merged across a store and the on-chain receipt journalling the writes), top-level constants (inlined, cycles and effectful initializers refused, `let mut` at top level refused by name) and strings (bound, passed and returned; any operator on one refused at compile time rather than failing at run time). The optimizer's order-sensitivity is gone (#518's per-function PRE) and held by `optimizer_order.rs`, which fails on the pre-#518 tree. `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: `emit` (refused: no lowering preserves it), mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2859,8 +2859,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 78,
-      "tests": "tested score 78% (no named test list on this row)"
+      "tested": 85,
+      "tests": "tested score 85% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3050,7 +3050,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 67,
+      "composite": 68,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
@@ -3063,19 +3063,20 @@
       "mainnet_ready": 45,
       "missing_work": [
         "Re-measured 2026-09-26: the row's blocker (\"Needs real stateful verifier\") was stale. `verify_trading_sequences` (x3-lang/compiler/src/verify.rs) walks the flat operation list with `open_debts`/`closed_debts` and refuses, by name, a commit with an open debt, a close for a debt that was never opened, a second close of one debt, a repay before its borrow, and an operation after the commit. It is called from `verify_ir`, which `ir_level_errors` calls from `run_pre_emission_layers_with_context` and from lowering, so it guards the real compile path and nested `atomic` bodies \u2014 it is not test-only.",
-        "What that does not establish: the rule set is one hand-written state machine with no independent second implementation to disagree with it, no property/fuzz test over generated operation sequences, and no proof that the same refusal happens when a hostile IR arrives from a network peer rather than from the local compiler."
+        "2026-09-28: two of the three gaps the 2026-09-26 re-measure left open are closed. **A hostile IR from a network peer is now held to the same rules**: `TradingVm::execute_atomic` took its operation list on trust and, on the fixture trade, committed five sequences `verify_ir` refuses (no minimum-profit guard, no all-debts guard, an operation after the commit, a second receipt, a receipt before the guards). It now runs `verify_trading_program` (the trading rules of `verify_ir`) before its first host call and refuses with `RefusedByVerifier`. **Property test**: `the_vm_runs_exactly_the_programs_the_verifier_accepts` (proptest, 512 cases) edits the fixture trade (drop / duplicate / move) and requires the VM to commit only what the verifier accepts and to refuse the rest before the host is touched. Removing the VM's verifier call turns both new tests red. Still open: the rule set is one hand-written state machine with no independent second implementation to disagree with it."
       ],
       "name": "Stateful trading IR verifier",
       "paths": [
-        "x3-lang/compiler"
+        "x3-lang/compiler",
+        "x3-lang/vm"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 85,
-      "tests": "tested score 85% (no named test list on this row)"
+      "tested": 90,
+      "tests": "tested score 90% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4945,7 +4946,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cb69676ec6752d0e68cef87e6fa1e6bc36e54eab4d4d4ed492b1c5d01c7ab899",
+    "source_digest": "6ab5caab7c345510fb91974b1419f254f8d378b3473c797aae564abe7ec8994d",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4956,7 +4957,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "8df11439821a2561c8fae35bd0a0cf341dd34a08e73554ee9b3efd4491feec41",
+      "feature-matrix/language-trading.toml": "a70e3258586cb3566362a72c81d8f34eb19efd8ff7576eac38101f0ae513f1cd",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
