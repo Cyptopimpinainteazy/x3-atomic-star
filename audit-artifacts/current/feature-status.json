@@ -4944,10 +4944,10 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5002e54d4e2bed21c6a0096a27f24987afe72a0713bcf22155631131dbaa219f",
+    "source_digest": "fd1955f24d9f71a21a1925674ae0f9e20f8d969518afc578fc944173778f52cf",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
-      "FEATURE_REGISTRY.toml": "7a27ab993f64a1e258007ce1614f7764e5e72f3f28e6a887866254abc3e31101",
+      "FEATURE_REGISTRY.toml": "9777e638b11380842cbfe456460385f15dc4a494fdf4d63d95c35ee5cb6a6978",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
@@ -5228,6 +5228,38 @@
     },
     {
       "blockers": [
+        "Not wired into any live cross-VM route \u2014 no caller in the atomic router or crates/cross-vm-coordinator; the live SVM route runs the sibling programs/svm/x3_atomic_swap program",
+        "Local validator and in-process SVM only \u2014 no devnet or mainnet deployment has been performed",
+        "No external audit of the program or its client",
+        "claim_htlc does not check the timelock, so a funded-but-expired escrow is still claimable until the refund lands (asserted by expiry_lifecycle_on_the_compiled_program; a decision to review, not a double-spend \u2014 status still prevents paying twice)"
+      ],
+      "crate_or_service": "X3-contracts/svm/programs/x3_htlc",
+      "feature": "svm_x3_htlc_program",
+      "mode": "SIM_TESTNET",
+      "proof_report": "",
+      "readiness_score": 45,
+      "required_tests": [
+        "funded_htlc_expires_after_timelock",
+        "preimage_hash_matches_recorded_hashlock",
+        "timelock_cannot_exceed_seven_days",
+        "timelock_must_be_more_than_one_hour_out",
+        "htlc_pda_is_deterministic_and_distinct",
+        "htlc_vault_pda_derives_from_escrow_account",
+        "discriminator_matches_anchor_known_answer",
+        "instruction_discriminators_are_distinct_and_stable",
+        "create_htlc_data_layout_is_48_bytes_after_discriminator",
+        "claim_and_refund_data_layouts_match_program",
+        "claim_and_refund_target_the_named_escrow_not_the_signer",
+        "escrow_pda_binds_initiator_recipient_and_hashlock",
+        "compiled_message_preserves_program_account_order",
+        "load_payer_fails_closed_without_a_keypair_path",
+        "program_id_constant_is_the_declared_id",
+        "status_instruction_is_a_readonly_view_of_the_escrow",
+        "expiry_lifecycle_on_the_compiled_program"
+      ]
+    },
+    {
+      "blockers": [
         "Desktop UI only \u2014 not part of blockchain runtime",
         "Six console domains have no command: agents, compute providers, benchmarks, settlement, logs, alerts",
         "launch_node / stop_node were deleted (they returned a fabricated success); a real spawn with a tracked child handle is unwritten",
@@ -5304,34 +5336,26 @@
     },
     {
       "blockers": [
-        "Not wired into any live cross-VM route \u2014 no caller in the atomic router or crates/cross-vm-coordinator; the live SVM route runs the sibling programs/svm/x3_atomic_swap program",
-        "Local validator and in-process SVM only \u2014 no devnet or mainnet deployment has been performed",
-        "No external audit of the program or its client",
-        "claim_htlc does not check the timelock, so a funded-but-expired escrow is still claimable until the refund lands (asserted by expiry_lifecycle_on_the_compiled_program; a decision to review, not a double-spend \u2014 status still prevents paying twice)"
+        "No external audit of the settlement engine's custody path",
+        "No multi-validator or public-testnet run of a native HTLC; the live evidence is a single dev node (plus the cross-domain gates)",
+        "Native currency only: a leg on X3 that declares an X3 asset or a contract token is refused at lock, because X3-asset custody is not implemented"
       ],
-      "crate_or_service": "X3-contracts/svm/programs/x3_htlc",
+      "crate_or_service": "pallets/x3-settlement-engine",
       "feature": "x3_htlc",
-      "mode": "SIM_TESTNET",
+      "mode": "GUARDED_TESTNET",
       "proof_report": "",
-      "readiness_score": 45,
+      "readiness_score": 60,
       "required_tests": [
-        "funded_htlc_expires_after_timelock",
-        "preimage_hash_matches_recorded_hashlock",
-        "timelock_cannot_exceed_seven_days",
-        "timelock_must_be_more_than_one_hour_out",
-        "htlc_pda_is_deterministic_and_distinct",
-        "htlc_vault_pda_derives_from_escrow_account",
-        "discriminator_matches_anchor_known_answer",
-        "instruction_discriminators_are_distinct_and_stable",
-        "create_htlc_data_layout_is_48_bytes_after_discriminator",
-        "claim_and_refund_data_layouts_match_program",
-        "claim_and_refund_target_the_named_escrow_not_the_signer",
-        "escrow_pda_binds_initiator_recipient_and_hashlock",
-        "compiled_message_preserves_program_account_order",
-        "load_payer_fails_closed_without_a_keypair_path",
-        "program_id_constant_is_the_declared_id",
-        "status_instruction_is_a_readonly_view_of_the_escrow",
-        "expiry_lifecycle_on_the_compiled_program"
+        "a_native_lock_holds_the_depositors_funds",
+        "a_native_lock_beyond_the_depositors_balance_is_refused",
+        "a_native_lock_must_lock_the_amount_the_intent_declares",
+        "a_native_leg_declaring_a_non_native_token_cannot_be_locked",
+        "finalization_pays_the_native_leg_to_the_counterparty_and_conserves_issuance",
+        "a_refund_returns_the_native_leg_to_its_depositor",
+        "a_claim_after_a_refund_is_refused_and_moves_nothing",
+        "a_claim_after_the_timeout_is_refused_and_the_refund_still_returns_everything",
+        "a_refund_after_finalization_is_refused_and_moves_nothing",
+        "a_refund_by_a_third_party_or_before_the_timeout_is_refused"
       ]
     },
     {
@@ -5494,9 +5518,9 @@
       "STUB": 1
     },
     "matrix_features": 153,
-    "registry_features": 22,
+    "registry_features": 23,
     "registry_max_readiness": 88,
-    "registry_mean_readiness": 62.86,
+    "registry_mean_readiness": 62.74,
     "registry_min_readiness": 42
   }
 }

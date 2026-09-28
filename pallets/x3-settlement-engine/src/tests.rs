@@ -5209,6 +5209,58 @@ fn a_native_lock_must_lock_the_amount_the_intent_declares() {
     });
 }
 
+/// The custodian holds the chain's native currency and nothing else. A leg declared as an X3
+/// asset (or a contract token) on X3 must not be "locked" by reserving native coins of the same
+/// amount: the counterparty would be paid in a different asset than the intent promised.
+#[test]
+fn a_native_leg_declaring_a_non_native_token_cannot_be_locked() {
+    new_test_ext().execute_with(|| {
+        for (seed, token) in [
+            (11u8, TokenId::X3Asset(7)),
+            (12u8, TokenId::Contract([1u8; 32])),
+        ] {
+            let secret_hash = H256::from(sp_io::hashing::sha2_256(&[seed; 32]));
+            assert_ok!(Pallet::<Test>::create_intent(
+                RuntimeOrigin::signed(ALICE),
+                BOB,
+                AssetSpec {
+                    chain: ExternalChainId::X3Native,
+                    token: token.clone(),
+                    amount: NATIVE_AMOUNT
+                },
+                AssetSpec {
+                    chain: ExternalChainId::Ethereum,
+                    token: TokenId::Native,
+                    amount: EXTERNAL_AMOUNT
+                },
+                secret_hash,
+                Some(3_600),
+            ));
+            let intent_id = SettlementIntents::<Test>::iter()
+                .find(|(_, intent)| intent.secret_hash == secret_hash)
+                .map(|(id, _)| id)
+                .expect("intent exists");
+            let balances = (free(ALICE), reserved(ALICE));
+            assert_noop!(
+                Pallet::<Test>::lock_escrow(
+                    RuntimeOrigin::signed(ALICE),
+                    intent_id,
+                    0,
+                    ExternalChainId::X3Native,
+                    NATIVE_AMOUNT,
+                    vec![],
+                ),
+                Error::<Test>::InvalidAssetSpec
+            );
+            assert_eq!(
+                (free(ALICE), reserved(ALICE)),
+                balances,
+                "{token:?}: no native coins are held for a leg that declares another asset"
+            );
+        }
+    });
+}
+
 #[test]
 fn finalization_pays_the_native_leg_to_the_counterparty_and_conserves_issuance() {
     new_test_ext().execute_with(|| {
@@ -5292,6 +5344,43 @@ fn a_claim_after_a_refund_is_refused_and_moves_nothing() {
         assert_eq!(
             (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB)),
             balances
+        );
+    });
+}
+
+/// The timelock separates the two exits: once the intent has timed out, even the right secret with
+/// a complete claim proof set cannot take the native leg, and the depositor's refund still returns
+/// all of it. (The SVM `x3_htlc` program lacks this rule; its `claim_htlc` gates on status only.)
+#[test]
+fn a_claim_after_the_timeout_is_refused_and_the_refund_still_returns_everything() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([8u8; 32]);
+        let alice_before = free(ALICE);
+        let intent_id = native_for_ethereum_intent(secret);
+        submit_canonical_claim_proof_set(intent_id);
+        past_timeout();
+
+        let balances = (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB));
+        assert_noop!(
+            Pallet::<Test>::claim_settlement(RuntimeOrigin::signed(BOB), intent_id, secret),
+            Error::<Test>::TimeoutExpired
+        );
+        assert_eq!(
+            (free(ALICE), reserved(ALICE), free(BOB), reserved(BOB)),
+            balances,
+            "a refused late claim moves nothing"
+        );
+
+        submit_canonical_proof_set(intent_id, x3_atomic_swap::CrossDomainOperation::Refund);
+        assert_ok!(Pallet::<Test>::refund_settlement(
+            RuntimeOrigin::signed(ALICE),
+            intent_id
+        ));
+        assert_eq!(reserved(ALICE), 0);
+        assert_eq!(
+            free(ALICE),
+            alice_before,
+            "the refund returns the whole leg"
         );
     });
 }
