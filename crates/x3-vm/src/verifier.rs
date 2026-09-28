@@ -906,7 +906,20 @@ impl Verifier {
                     | Opcode::GpuDeviceCount
                     | Opcode::GpuBenchmark
                     | Opcode::GpuKeccak256Batch
-                    | Opcode::GpuSecp256k1Verify,
+                    | Opcode::GpuSecp256k1Verify
+                    // The runtime interpreter refuses these at intake (TICKET-149): the 32-bit
+                    // conversions have no honest meaning in an `i64`/`f64` value model, and
+                    // `ctx_gas` answers with a count the two engines are not held to agree on.
+                    | Opcode::I32ToI64
+                    | Opcode::I64ToI32
+                    | Opcode::I32ToF32
+                    | Opcode::I64ToF64
+                    | Opcode::F32ToI32
+                    | Opcode::F64ToI64
+                    | Opcode::F32ToF64
+                    | Opcode::F64ToF32
+                    | Opcode::ToBool
+                    | Opcode::CtxGas,
                 ) => {
                     return Err(VerifierError::new(
                         VerifierErrorKind::ForbiddenOnChain(instr.opcode),
@@ -1224,6 +1237,31 @@ mod tests {
             result.unwrap_err().kind,
             VerifierErrorKind::ForbiddenOnChain(_)
         ));
+    }
+
+    #[test]
+    fn verify_conversions_and_ctx_gas_forbidden_on_chain() {
+        // TICKET-149: the runtime interpreter refuses these at intake, so the on-chain verifier
+        // must too, or the two readers of one artifact disagree about whether it may run.
+        for (op, len) in [
+            (Opcode::I32ToI64, 3usize),
+            (Opcode::I64ToI32, 3),
+            (Opcode::I64ToF64, 3),
+            (Opcode::F64ToI64, 3),
+            (Opcode::F64ToF32, 3),
+            (Opcode::ToBool, 3),
+            (Opcode::CtxGas, 2),
+        ] {
+            let mut code = vec![op.to_byte(), 0x00, 0x01][..len].to_vec();
+            code.push(Opcode::Halt.to_byte());
+            let module = make_simple_module(code);
+            let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+                .expect_err("refused on chain");
+            assert!(
+                matches!(refusal.kind, VerifierErrorKind::ForbiddenOnChain(byte) if byte == op.to_byte()),
+                "{op:?}: {refusal:?}"
+            );
+        }
     }
 
     #[test]
