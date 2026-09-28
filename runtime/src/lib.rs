@@ -3155,6 +3155,7 @@ parameter_types! {
 impl pallet_x3_partner::Config for Runtime {
     type MaxApprovedLanesPerPartner = MaxApprovedLanesPerPartner;
     type MaxPartnersPerLane = MaxPartnersPerLane;
+    type WeightInfo = pallet_x3_partner::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Treasury Policy Configuration =====
@@ -3189,6 +3190,7 @@ impl pallet_x3_custody::Config for Runtime {
     type MaxVaultsPerSigner = CustodyMaxVaultsPerSigner;
     type MaxPoliciesPerTier = CustodyMaxPoliciesPerTier;
     type KeyRotationPeriod = CustodyKeyRotationPeriod;
+    type WeightInfo = pallet_x3_custody::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Reconciliation Configuration (Phase 5) =====
@@ -3604,12 +3606,22 @@ mod benches {
     // `pallet-x3-dapp-hub/runtime-benchmarks`.
     #[allow(unused_imports)]
     use pallet_x3_dapp_hub::Pallet as X3DappHub;
+    // Added 2026-09-28: `pallet-x3-partner` and `pallet-x3-custody` charged hand-written
+    // literals on all eight / ten calls — up to 70,000,000 picoseconds plus hand-counted
+    // reads and writes — and neither was registered here. `custody`'s runtime feature was
+    // already on; `partner`'s was not.
+    #[allow(unused_imports)]
+    use pallet_x3_custody::Pallet as X3Custody;
+    #[allow(unused_imports)]
+    use pallet_x3_partner::Pallet as X3Partner;
     #[allow(unused_imports)]
     use pallet_x3_wrapped::Pallet as X3Wrapped;
 
     frame_benchmarking::define_benchmarks!(
         [pallet_x3_account_registry, X3AccountRegistry]
         [pallet_x3_dapp_hub, X3DappHub]
+        [pallet_x3_partner, X3Partner]
+        [pallet_x3_custody, X3Custody]
         [pallet_x3_asset_registry, X3AssetRegistry]
         [pallet_x3_wrapped, X3Wrapped]
         [pallet_x3_sentinel, X3Sentinel]

@@ -64,6 +64,7 @@ impl pallet_x3_custody::Config for Test {
     type MaxVaultsPerSigner = MaxVaultsPerSigner;
     type MaxPoliciesPerTier = MaxPoliciesPerTier;
     type KeyRotationPeriod = KeyRotationPeriod;
+    type WeightInfo = ();
 }
 
 /// Build externalities whose genesis authorizes the given gateway accounts.

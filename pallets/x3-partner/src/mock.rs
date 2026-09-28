@@ -68,6 +68,7 @@ parameter_types! {
 impl pallet_x3_partner::Config for Test {
     type MaxApprovedLanesPerPartner = MaxApprovedLanesPerPartner;
     type MaxPartnersPerLane = MaxPartnersPerLane;
+    type WeightInfo = ();
 }
 
 /// Build a clean test externalities environment with block number set to 1.
