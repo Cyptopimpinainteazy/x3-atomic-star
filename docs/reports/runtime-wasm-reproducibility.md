@@ -342,7 +342,7 @@ bytes**:
   reads.
 
   Both records were written by `./scripts/update-runtime-hashes.sh` after two from-scratch builds
-  agreed. The current one names `10b7f5c5d`, the revision the runtime's dependency graph last moved
+  agreed. The current one names `8981b29c9`, the revision the runtime's dependency graph last moved
   at; `runtime hash freshness` is what keeps that true, and it is the reason the `c62f93200` record
   was retaken rather than assumed. Earlier in the night it read as a 40-minute false positive on
   `runtime/runtime-identity.baseline.json` — a checked-in *record* that no source names, which
@@ -628,6 +628,20 @@ alters the runtime, so the record and the code land together.
   (`0x49f94a7524542c747ce42ed2e470f9d2b86c6d00449d65b7b20dea046579d0b1`) — was 8,899,373 — and
   compressed 1529033
   (`0x7c38de390e6a5cd4afbcdf0ecc7d09a5bfd10103d917a21573a3410a36fa51a9`) — was 1,530,897, from two
+  builds that agreed.
+
+* `8981b29c9` — **the capacity manager and the custody registry charge measured weights.** They
+  charged 45,000,000-70,000,000 and 4,000-12,000 picoseconds respectively on every call, neither was
+  registered in `mod benches`, and `pallet-x3-partner`'s runtime feature was not enabled at all.
+  Both carry benchmarks now and charge `type WeightInfo`; `custody`'s governance/operator calls take
+  their origin from `try_successful_origin()`, because the mock models an operator as any signed
+  account while this runtime requires root or half the council. Scanner
+  `pallet-call-without-weights` reached 7 from 9 (four of the seven are the documented
+  `T::DbWeight::get().reads_writes` form). The bytes move — and *shrink*, because the measured
+  numbers replace 60,000,000-picosecond guesses: compact 8898068
+  (`0x9a109392dab2c1dbe474f7c49e97fb811775bb0d25428be94046c2fa82aec4fc`) — was 8,903,183 — and
+  compressed 1529260
+  (`0xafdc7d331d9bf8b5cfa5cd6b69c22f0178d03f8887499fd7bea337b073963d39`) — was 1,529,715, from two
   builds that agreed.
 
 * `10b7f5c5d` — **the account registry and the dApp hub charge measured weights too.** Both pallets
