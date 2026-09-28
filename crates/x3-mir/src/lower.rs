@@ -12,11 +12,11 @@ pub struct MirLowerer;
 
 impl MirLowerer {
     pub fn lower(module: &HirModule) -> Result<MirModule, MirError> {
+        let constants = std::rc::Rc::new(constants_of(module)?);
         let mut functions = Vec::new();
         for function in &module.functions {
-            #[allow(unused_mut)]
-            // Mutated during block creation but clippy can't see it in this scope.
             let mut builder = MirFunctionBuilder::new(function.symbol, function.span);
+            builder.constants = constants.clone();
             functions.push(builder.lower_function(function)?);
         }
         Ok(MirModule {
@@ -24,6 +24,81 @@ impl MirLowerer {
             span: module.span,
         })
     }
+}
+
+/// The module's top-level bindings (`const` and immutable `let`), by symbol.
+///
+/// They are compile-time constants: a use of one is lowered as its initializer, at the use site,
+/// through the same `lower_expr` every other expression goes through, so a constant computes
+/// exactly what the same expression written inline would, with no second evaluator to disagree
+/// with the VM. That only preserves meaning if evaluating the initializer has no effects and
+/// terminates, so an initializer may use literals, operators and other constants only, and the
+/// references between constants must not form a cycle.
+fn constants_of(module: &HirModule) -> Result<HashMap<SymbolId, HirExpr>, MirError> {
+    let constants: HashMap<SymbolId, HirExpr> = module
+        .globals
+        .iter()
+        .map(|global| (global.symbol, global.initializer.clone()))
+        .collect();
+
+    fn check_pure(
+        expr: &HirExpr,
+        constants: &HashMap<SymbolId, HirExpr>,
+        refs: &mut Vec<SymbolId>,
+    ) -> Result<(), MirError> {
+        match &expr.kind {
+            HirExprKind::Literal(_) => Ok(()),
+            HirExprKind::Var(symbol) if constants.contains_key(symbol) => {
+                refs.push(*symbol);
+                Ok(())
+            }
+            HirExprKind::Binary { left, right, .. } => {
+                check_pure(left, constants, refs)?;
+                check_pure(right, constants, refs)
+            }
+            HirExprKind::Unary { operand, .. } => check_pure(operand, constants, refs),
+            _ => Err(MirError::new(
+                "a top-level binding must be initialized by a constant expression (literals, \
+                 operators and other top-level constants); calls and other effects are refused",
+            )),
+        }
+    }
+
+    let mut edges: HashMap<SymbolId, Vec<SymbolId>> = HashMap::new();
+    for (symbol, initializer) in &constants {
+        let mut refs = Vec::new();
+        check_pure(initializer, &constants, &mut refs)?;
+        edges.insert(*symbol, refs);
+    }
+
+    // Depth-first search for a cycle: `const A = B; const B = A;` has no value.
+    fn visit(
+        symbol: SymbolId,
+        edges: &HashMap<SymbolId, Vec<SymbolId>>,
+        state: &mut HashMap<SymbolId, bool>,
+    ) -> Result<(), MirError> {
+        match state.get(&symbol) {
+            Some(true) => return Ok(()),
+            Some(false) => {
+                return Err(MirError::new(
+                    "top-level constants refer to each other in a cycle, so none of them has a \
+                     value",
+                ))
+            }
+            None => {}
+        }
+        state.insert(symbol, false);
+        for next in edges.get(&symbol).into_iter().flatten() {
+            visit(*next, edges, state)?;
+        }
+        state.insert(symbol, true);
+        Ok(())
+    }
+    let mut state = HashMap::new();
+    for symbol in edges.keys() {
+        visit(*symbol, &edges, &mut state)?;
+    }
+    Ok(constants)
 }
 
 /// The error for a construct the chain compiler has no meaning-preserving lowering for.
@@ -98,6 +173,8 @@ struct MirFunctionBuilder {
     /// labelled one is refused rather than approximated.
     loops: Vec<LoopTargets>,
     next_value: usize,
+    /// The module's constants (see [`constants_of`]): a `Var` that is not a local is one of these.
+    constants: std::rc::Rc<HashMap<SymbolId, HirExpr>>,
 }
 
 /// Where the innermost loop's `break` and `continue` go.
@@ -122,6 +199,7 @@ impl MirFunctionBuilder {
             slot_float: HashMap::new(),
             loops: Vec::new(),
             next_value: 0,
+            constants: std::rc::Rc::new(HashMap::new()),
         };
         let entry = builder.create_block();
         builder.current_block = entry;
@@ -366,12 +444,32 @@ impl MirFunctionBuilder {
                     }
                     return Ok(loaded);
                 }
-                self.value_map
-                    .get(symbol)
-                    .copied()
-                    .ok_or_else(|| MirError::new(format!("value for symbol {symbol:?} missing")))
+                if let Some(&value) = self.value_map.get(symbol) {
+                    return Ok(value);
+                }
+                if let Some(initializer) = self.constants.get(symbol).cloned() {
+                    return self.lower_expr(&initializer);
+                }
+                Err(MirError::new(format!(
+                    "value for symbol {symbol:?} missing"
+                )))
             }
             HirExprKind::Binary { op, left, right } => {
+                // The chain's value model has integers, bools and (in simulation) floats. A string
+                // or byte string reaches the VM as a constant-pool reference, and an operator on
+                // one ran as an integer operation that failed at run time with `TypeMismatch` on
+                // both engines — a program the type checker accepted and no chain could run. It is
+                // refused here instead, where the source position is still known.
+                for operand in [left, right] {
+                    if matches!(
+                        operand.ty.kind,
+                        x3_typeck::TypeKind::String | x3_typeck::TypeKind::Bytes
+                    ) {
+                        return Err(unsupported(&format!(
+                            "`{op:?}` on a string or byte-string value"
+                        )));
+                    }
+                }
                 let left_val = self.lower_expr(left)?;
                 let right_val = self.lower_expr(right)?;
                 let float =

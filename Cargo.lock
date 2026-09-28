@@ -26908,6 +26908,7 @@ dependencies = [
  "x3-common",
  "x3-hir",
  "x3-parser",
+ "x3-typeck",
 ]
 
 [[package]]

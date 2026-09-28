@@ -615,8 +615,21 @@ impl Resolver {
     }
 
     fn resolve_call_expression(&mut self, call: &CallExpression) {
+        // A host call (`x3_common::intrinsics`) resolves to no symbol, and only when the program
+        // has not declared the name itself: a user's own `evm_sload` shadows the host call.
+        let host_call = match &*call.callee {
+            Expression::Identifier(ident) => {
+                self.scopes
+                    .lookup(self.current_scope, &ident.name)
+                    .is_none()
+                    && x3_common::intrinsics::by_name(&ident.name).is_some()
+            }
+            _ => false,
+        };
         // Resolve the callee
-        self.resolve_expression(&call.callee);
+        if !host_call {
+            self.resolve_expression(&call.callee);
+        }
 
         // Resolve arguments
         for arg in &call.args {
