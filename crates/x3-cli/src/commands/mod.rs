@@ -13,6 +13,7 @@ pub mod docgen;
 pub mod init;
 #[cfg(feature = "sdk")]
 pub mod query;
+pub mod registry_trust;
 pub mod repl;
 #[cfg(feature = "sdk")]
 pub mod simulate;
@@ -49,6 +50,9 @@ pub enum Commands {
 
     /// Verify a `.x3b` against its detached attestation and an artifact key registry
     VerifyArtifact(verify_artifact::VerifyArtifactArgs),
+
+    /// Sign an artifact key registry with a root key (writes `<registry>.sig.json`)
+    SignRegistry(registry_trust::SignRegistryArgs),
 
     #[cfg(feature = "sdk")]
     /// Deploy contracts to the network

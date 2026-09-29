@@ -2903,19 +2903,19 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 66,
+      "composite": 68,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #9"
       ],
       "id": "X3-LANG-003",
-      "implemented": 88,
+      "implemented": 92,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 35,
       "missing_work": [
-        "Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what was missing was a key registry or rotation story, since keys were named per invocation. **Closed 2026-09-28:** `ReceiptKeyRegistry` records each key as `active`, `retired` (rotated out: still verifies what it signed, `may_sign` is false) or `revoked` (compromised: refused by name, including for receipts signed before the revocation). A registry that could be misread is refused at load: a duplicate id, one public key under two ids, no active key, a malformed key, or unknown fields. `x3c receipt verify --trusted-registry <file>` uses it and satisfies mainnet's trusted-key requirement. Disabling the revocation check turns the VM and CLI tests red. **Signing side closed 2026-09-29:** `x3c receipt execute --key-id <id> --signing-registry <file>` signs only if the key is active under that id and the registry lists the signing key own public key there, and it verifies the signed receipt against the same registry before writing it. A retired, revoked or unlisted key, or a key the registry does not list under the id, is refused before anything is written (`cli_receipt_execute_signs_only_with_an_active_registry_key`; removing either check turns it red). Still open: nothing distributes or signs the registry file itself."
+        "Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what was missing was a key registry or rotation story, since keys were named per invocation. **Closed 2026-09-28:** `ReceiptKeyRegistry` records each key as `active`, `retired` (rotated out: still verifies what it signed, `may_sign` is false) or `revoked` (compromised: refused by name, including for receipts signed before the revocation). A registry that could be misread is refused at load: a duplicate id, one public key under two ids, no active key, a malformed key, or unknown fields. `x3c receipt verify --trusted-registry <file>` uses it and satisfies mainnet's trusted-key requirement. Disabling the revocation check turns the VM and CLI tests red. **Signing side closed 2026-09-29:** `x3c receipt execute --key-id <id> --signing-registry <file>` signs only if the key is active under that id and the registry lists the signing key own public key there, and it verifies the signed receipt against the same registry before writing it. A retired, revoked or unlisted key, or a key the registry does not list under the id, is refused before anything is written (`cli_receipt_execute_signs_only_with_an_active_registry_key`; removing either check turns it red). **Registry signing closed 2026-09-29:** `x3c registry sign <file> --key-hex <root seed>` writes a detached `<file>.sig.json` over the file exact bytes (domain `x3-receipt-key-registry-v1`), and `receipt verify` / `receipt execute` load a registry only if it verifies under the root passed as `--registry-root`, which mainnet requires. Refused: no root on mainnet, an unsigned registry, another root, a key appended after signing, an attacker signature relabelled as the trusted root (`cli_a_mainnet_key_registry_must_be_signed_by_the_named_root`, `a_registry_edited_after_signing_or_signed_by_another_root_does_not_load`); removing the root check, the digest check or the mainnet rule turns them red. Still open: how the root key itself is distributed and rotated is an operator decision (it is named per invocation)."
       ],
       "name": "Signed / attested trading receipts",
       "paths": [
@@ -2929,8 +2929,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 85,
-      "tests": "tested score 85% (no named test list on this row)"
+      "tested": 88,
+      "tests": "tested score 88% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3115,7 +3115,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 67,
+      "composite": 70,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/src/mini_x3.rs",
@@ -3123,12 +3123,12 @@
         "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"
       ],
       "id": "X3-LANG-009",
-      "implemented": 85,
+      "implemented": 90,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 38,
       "missing_work": [
-        "**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. **Closed 2026-09-29:** a `.x3`/X3BC artifact distributed out of band now has an attestation of its own. `x3_common::artifact` signs a **detached** claim \u2014 the artifact's bytes are untouched, so both readers of the format and their byte-parity suite are unaffected \u2014 over the whole artifact, header included, because a signature over the body alone would let an edit clear `FEATURE_PRIVATE_SUBMISSION_REQUIRED` and stay valid. The key lifecycle matches the receipts' registry: retired keys still verify what they signed, revoked keys verify nothing, and a registry a reader could misread (duplicate id, one key under two ids, no active key, malformed key) is refused when it is built. `X3Executor::execute_attested` checks the claim *before* parsing, so bytes nobody vouched for reach neither the verifier nor an engine. Break-it-first: not comparing the digest, skipping the revocation check, and trusting the attestation's own carried key each redden their tests; the key-id binding in the signing digest is covered by `a_claim_cannot_be_relabelled_as_another_identity_of_the_same_key` (one key legitimately listed under different ids by two registries). The public-key binding in that digest is defence in depth that no test distinguishes, because the registry comparison subsumes it, and the module says so rather than implying coverage. **Build step closed 2026-09-29:** `x3 compile --sign-key-hex <seed> --key-id <id> --signing-registry <file>` signs the artifact only with a key that is active in the registry, verifies the new attestation against the registry, and only then writes the artifact and `<artifact>.sig.json`; `x3 verify-artifact <x3b> --registry <file>` checks one. Doing this found that `x3 compile` and `x3 build` wrote `output.bytecode.code` (the code section alone: no magic, header, function table or checksum), so no reader of the format could load the `.x3b` they produced; they now write the whole envelope. crates/x3-cli/tests/artifact.rs runs the real binary (the artifact loads and a two-function program returns 42; a signed artifact verifies, a one-byte edit and a revoked signer are refused; a retired, unlisted or mismatched key writes nothing), and restoring the code-only write, the may-sign check or the post-sign verification each turns it red. The crate is gated as `test x3-cli`. Still open: nothing distributes or signs the registry file itself."
+        "**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. **Closed 2026-09-29:** a `.x3`/X3BC artifact distributed out of band now has an attestation of its own. `x3_common::artifact` signs a **detached** claim \u2014 the artifact's bytes are untouched, so both readers of the format and their byte-parity suite are unaffected \u2014 over the whole artifact, header included, because a signature over the body alone would let an edit clear `FEATURE_PRIVATE_SUBMISSION_REQUIRED` and stay valid. The key lifecycle matches the receipts' registry: retired keys still verify what they signed, revoked keys verify nothing, and a registry a reader could misread (duplicate id, one key under two ids, no active key, malformed key) is refused when it is built. `X3Executor::execute_attested` checks the claim *before* parsing, so bytes nobody vouched for reach neither the verifier nor an engine. Break-it-first: not comparing the digest, skipping the revocation check, and trusting the attestation's own carried key each redden their tests; the key-id binding in the signing digest is covered by `a_claim_cannot_be_relabelled_as_another_identity_of_the_same_key` (one key legitimately listed under different ids by two registries). The public-key binding in that digest is defence in depth that no test distinguishes, because the registry comparison subsumes it, and the module says so rather than implying coverage. **Build step closed 2026-09-29:** `x3 compile --sign-key-hex <seed> --key-id <id> --signing-registry <file>` signs the artifact only with a key that is active in the registry, verifies the new attestation against the registry, and only then writes the artifact and `<artifact>.sig.json`; `x3 verify-artifact <x3b> --registry <file>` checks one. Doing this found that `x3 compile` and `x3 build` wrote `output.bytecode.code` (the code section alone: no magic, header, function table or checksum), so no reader of the format could load the `.x3b` they produced; they now write the whole envelope. crates/x3-cli/tests/artifact.rs runs the real binary (the artifact loads and a two-function program returns 42; a signed artifact verifies, a one-byte edit and a revoked signer are refused; a retired, unlisted or mismatched key writes nothing), and restoring the code-only write, the may-sign check or the post-sign verification each turns it red. The crate is gated as `test x3-cli`. **Registry signing closed 2026-09-29:** `x3 sign-registry <file> --key-hex <root seed>` writes `<file>.sig.json` (domain `x3-artifact-key-registry-v1`, distinct from receipts), and `x3 compile --signing-registry` and `x3 verify-artifact` trust a registry only under `--registry-root`; an unsigned one must be asked for by name (`--unsigned-registry`), otherwise refused with nothing written (`a_registry_is_trusted_only_under_the_named_root`; removing the root check, the digest check or the default refusal turns it red). Still open: how the root key itself is distributed and rotated is an operator decision (it is named per invocation)."
       ],
       "name": "Checksum-verified bytecode decoder",
       "paths": [
@@ -3142,8 +3142,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 90,
-      "tests": "tested score 90% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4952,7 +4952,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "10fa1d10269090c2a29246fddf6a67dbc5f3f42f48104064c242b0213d7916df",
+    "source_digest": "622c7dcc3eae6f6d555b51534dd89c42d651be8aa2cf93cb6223c78525de512f",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4963,7 +4963,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "36ab70e0b55b1c8fe165de6953fedcfd227f84ed87511c6ae3d581630eb841ad",
+      "feature-matrix/language-trading.toml": "5d7583ef088d56653a98ef754ef8bd9372cf79ea92a791c653694877b0045565",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",

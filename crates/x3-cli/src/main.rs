@@ -55,6 +55,7 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Build(args) => commands::build::execute(args).await,
         Commands::Compile(args) => commands::compile::execute(args).await,
         Commands::VerifyArtifact(args) => commands::verify_artifact::execute(args).await,
+        Commands::SignRegistry(args) => commands::registry_trust::execute(args).await,
         #[cfg(feature = "sdk")]
         Commands::Deploy(args) => commands::deploy::execute(args).await,
         Commands::Test(args) => commands::test::execute(args).await,

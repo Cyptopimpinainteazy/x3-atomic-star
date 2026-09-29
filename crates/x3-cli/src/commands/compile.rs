@@ -79,6 +79,10 @@ pub struct CompileArgs {
     #[arg(long, value_name = "FILE", requires = "sign_key_hex")]
     pub signing_registry: Option<PathBuf>,
 
+    /// How the signing registry is trusted (`--registry-root` or `--unsigned-registry`).
+    #[command(flatten)]
+    pub registry_trust: crate::commands::registry_trust::RegistryTrust,
+
     /// Disable optimization (shorthand for -O0)
     #[arg(long = "no-opt")]
     pub no_opt: bool,
@@ -169,6 +173,7 @@ pub async fn execute(args: CompileArgs) -> Result<()> {
             args.signing_registry
                 .as_ref()
                 .expect("clap requires --signing-registry"),
+            &args.registry_trust,
         )?),
         None => None,
     };
@@ -262,10 +267,11 @@ fn sign_artifact(
     seed_hex: &str,
     key_id: &str,
     registry_path: &PathBuf,
+    trust: &crate::commands::registry_trust::RegistryTrust,
 ) -> Result<x3_common::artifact::ArtifactAttestation> {
     use sp_core::Pair as _;
 
-    let registry = load_artifact_registry(registry_path)?;
+    let registry = crate::commands::registry_trust::load_trusted_registry(registry_path, trust)?;
     if !registry.may_sign(key_id) {
         let status = registry
             .status(key_id)
