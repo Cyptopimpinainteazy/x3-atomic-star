@@ -226,15 +226,17 @@ fn compile_x3_file(
     let out_dir = project.out_dir();
     std::fs::create_dir_all(&out_dir)?;
 
+    // The whole X3BC envelope, not the code section alone (see `compile.rs`).
+    let artifact = output.bytecode.to_bytes();
     let bytecode_file = out_dir.join(format!("{}.x3b", file_stem));
-    std::fs::write(&bytecode_file, &output.bytecode.code)?;
+    std::fs::write(&bytecode_file, &artifact)?;
 
     println!(
         "  {} Compiled: {} → {} ({} bytes)",
         "✓".green(),
         file.display(),
         bytecode_file.display(),
-        output.bytecode.code.len()
+        artifact.len()
     );
 
     // Write stats if requested

@@ -25,6 +25,10 @@ x3-sdk = { path = "../x3-sdk", optional = true }
 # X3 Compiler
 x3-compiler = { path = "../x3-compiler" }
 
+# Artifact attestation (X3-LANG-009): `x3 compile --sign-key-hex` and `x3 verify-artifact`.
+x3-common = { path = "../x3-common" }
+sp-core = { workspace = true, features = ["std"] }
+
 # X3 VM (for REPL)
 x3-vm = { path = "../x3-vm" }
 

@@ -365,6 +365,10 @@ GATES_FAST=(
   # to the optimizer or a lowering was checked here only as far as `test x3-integration` happens to
   # exercise it. This runs every stage's own suite, including `optimizer_order.rs`, which holds the
   # optimizer independent of function order.
+  # `x3 compile` / `x3 build` / `x3 verify-artifact`: the CLI had no gate, and its compile command
+  # wrote the code section alone (an artifact no reader of the format could load) with
+  # nothing to notice. `tests/artifact.rs` loads what it writes and checks its signatures.
+  "test x3-cli:env SKIP_WASM_BUILD=1 cargo test -p x3-cli"
   "test x3 chain compiler:cargo test -p x3-common -p x3-semantics -p x3-typeck -p x3-hir -p x3-mir -p x3-opt -p x3-backend -p x3-compiler"
   # The Python half of `make test` (parser, typechecker, mocked e2e). Nothing else
   # in this gate set runs pytest, so without this line the x3-lang Python suites
