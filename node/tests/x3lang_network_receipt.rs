@@ -240,42 +240,30 @@ fn x3_receipt_storage_key(comit_id: H256) -> String {
     format!("0x{}", hex::encode(key))
 }
 
-/// `main() { sstore(slot: 0, value: 7); return; }`, assembled with the compiler's own envelope
-/// writer.
+/// The state-carrying programs, as `.x3` source.
 ///
-/// The `.x3` front end has no storage primitive yet, so the program that exercises the state
-/// channel is assembled rather than compiled — the same fixture the kernel's own end-to-end test
-/// uses, kept in step with it by assertion rather than by copy: the slot key and the payload the
-/// chain must hold are both recomputed here from the layout.
-fn module_with_code(code: Vec<u8>) -> Vec<u8> {
-    let mut module = x3_backend::BytecodeModule::new();
-    module.functions.push(x3_backend::FunctionEntry {
-        name: "main".to_string(),
-        entry_point: 0,
-        param_count: 0,
-        local_count: 8,
-        max_stack: 8,
-        return_type_tag: 1,
-    });
-    module.code = code;
-    module.to_bytes()
+/// These used to be hand-assembled X3BC (`LoadImm`/`EvmSstore`/`EvmSload` bytes pushed through the
+/// envelope writer), because the language had no storage primitive: the resolver called
+/// `evm_sstore` an undefined variable. `evm_sload`/`evm_sstore` are callable from source now
+/// (`x3_common::intrinsics`), so the state round trip below is the compiler's output end to end,
+/// like the receipt half above. The slot key and the payload the chain must hold are still
+/// recomputed here from the layout, so a compiler that stored somewhere else would be caught.
+const STORE_SOURCE: &str = "fn main() -> i64 {\n    evm_sstore(0, 7);\n    return 0;\n}\n";
+const LOAD_SOURCE: &str = "fn main() -> i64 {\n    return evm_sload(0);\n}\n";
+
+fn compiled(source: &str) -> Vec<u8> {
+    let program = x3_x3_integration::compiler_bridge::compile_source(source)
+        .unwrap_or_else(|e| panic!("{source:?} must compile: {e}"));
+    assert!(program.starts_with(X3BC_MAGIC), "the compiler emits X3BC");
+    program
 }
 
 fn store_seven_in_slot_zero() -> Vec<u8> {
-    module_with_code(vec![
-        0x18, 0x01, 0x00, // LoadImm r1, 0  (slot)
-        0x18, 0x02, 0x07, // LoadImm r2, 7  (value)
-        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
-        0x06, // RetVoid
-    ])
+    compiled(STORE_SOURCE)
 }
 
 fn load_slot_zero() -> Vec<u8> {
-    module_with_code(vec![
-        0x18, 0x01, 0x00, // LoadImm r1, 0 (slot)
-        0xB3, 0x00, 0x01, // EvmSload dst=r0 slot=r1
-        0x05, 0x00, // Ret r0
-    ])
+    compiled(LOAD_SOURCE)
 }
 
 /// The slot key the VM derives for slot `n`: `"X3EVM_SL"` little-endian, then the slot number.
