@@ -334,10 +334,12 @@ name = "Stateful trading IR verifier"
 subsystem = "language_trading"
 source = "master"
 paths = ["x3-lang/compiler", "x3-lang/vm"]
-implemented = 80
-# 2026-09-28: tested 85 -> 90 (peer-program refusal and a 512-case property test over edited
-# programs); implemented and mainnet_ready unchanged. 0.35*80 + 0.25*90 + 0.40*45 = 68.5 -> 69
-tested = 90
+implemented = 85
+# 2026-09-29: tested 90 -> 95 (an independent reference statement of the rules and a
+# differential proptest, break-checked with nine verdict-changing mutations); implemented 80 -> 85
+# (the stateful verifier now has a second statement of its rules, and the VM runs it on peer programs).
+# 0.35*85 + 0.25*95 + 0.40*45 = 29.75 + 23.75 + 18 = 71.5 -> 72
+tested = 95
 mainnet_ready = 45
 priority = "P0"
 confidence = "high"
@@ -345,7 +347,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "Re-measured 2026-09-26: the row's blocker (\"Needs real stateful verifier\") was stale. `verify_trading_sequences` (x3-lang/compiler/src/verify.rs) walks the flat operation list with `open_debts`/`closed_debts` and refuses, by name, a commit with an open debt, a close for a debt that was never opened, a second close of one debt, a repay before its borrow, and an operation after the commit. It is called from `verify_ir`, which `ir_level_errors` calls from `run_pre_emission_layers_with_context` and from lowering, so it guards the real compile path and nested `atomic` bodies — it is not test-only.",
-  "2026-09-28: two of the three gaps the 2026-09-26 re-measure left open are closed. **A hostile IR from a network peer is now held to the same rules**: `TradingVm::execute_atomic` took its operation list on trust and, on the fixture trade, committed five sequences `verify_ir` refuses (no minimum-profit guard, no all-debts guard, an operation after the commit, a second receipt, a receipt before the guards). It now runs `verify_trading_program` (the trading rules of `verify_ir`) before its first host call and refuses with `RefusedByVerifier`. **Property test**: `the_vm_runs_exactly_the_programs_the_verifier_accepts` (proptest, 512 cases) edits the fixture trade (drop / duplicate / move) and requires the VM to commit only what the verifier accepts and to refuse the rest before the host is touched. Removing the VM's verifier call turns both new tests red. Still open: the rule set is one hand-written state machine with no independent second implementation to disagree with it.",
+  "2026-09-28: two of the three gaps the 2026-09-26 re-measure left open are closed. **A hostile IR from a network peer is now held to the same rules**: `TradingVm::execute_atomic` took its operation list on trust and, on the fixture trade, committed five sequences `verify_ir` refuses (no minimum-profit guard, no all-debts guard, an operation after the commit, a second receipt, a receipt before the guards). It now runs `verify_trading_program` (the trading rules of `verify_ir`) before its first host call and refuses with `RefusedByVerifier`. **Property test**: `the_vm_runs_exactly_the_programs_the_verifier_accepts` (proptest, 512 cases) edits the fixture trade (drop / duplicate / move) and requires the VM to commit only what the verifier accepts and to refuse the rest before the host is touched. Removing the VM's verifier call turns both new tests red. **The last gap closed 2026-09-29: there is now an independent second statement of the rules.** `x3-lang/compiler/tests/trading_rules_reference.rs` restates every trading-sequence rule as a predicate over the whole sequence, with no running state (`no swap at any index after a bridge`, `a close has an open before it and no close since`). Three proptests require it and `verify_trading_program` to agree: arbitrary sequences (4096 cases); valid trades with one to three insert/drop/duplicate/move edits, which reach each rule boundary; and trades built to satisfy every rule. Break-it-first on the verifier: nine verdict-changing mutations each turn a differential test red (profit guard before the all-debts guard, the guards before the receipt, one bridge, bridge assets differ, the debt binding asset, one invariant, the invariant before the receipt, reopening a closed debt, a swap after the guards). A tenth, disabling the double-close check, is equivalent: the closed-before-opened rule still refuses the sequence. The first two generators initially let three mutations through; a free binding name and the edited-trade generator closed that.",
 ]
 required_tests = [
   "rejects_commit_with_an_open_debt",
@@ -356,10 +358,14 @@ required_tests = [
   "the_operations_a_hyperarb_lowers_to_pass_the_structural_verifier",
   "a_program_the_verifier_refuses_is_refused_before_the_host_is_touched",
   "the_vm_runs_exactly_the_programs_the_verifier_accepts",
+  "the_verifier_and_the_reference_agree_on_arbitrary_sequences",
+  "the_verifier_and_the_reference_agree_next_to_every_valid_trade",
+  "both_accept_every_trade_built_to_the_rules",
 ]
 test_evidence = [
   "x3-lang/compiler/tests/test_ir_verifier.rs",
   "x3-lang/vm/tests/trading_execution.rs",
+  "x3-lang/compiler/tests/trading_rules_reference.rs",
   "note: 42 tests pass; the three debt-sequence cases above assert *which* rule fired by matching the verifier's diagnostic message, so they cannot pass because of an unrelated refusal",
   "note: `cargo test --manifest-path x3-lang/Cargo.toml -p x3-lang-compiler --test test_ir_verifier` -> test result: ok. 42 passed; 0 failed; 0 ignored",
 ]
