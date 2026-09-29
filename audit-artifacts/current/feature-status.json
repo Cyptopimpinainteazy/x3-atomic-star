@@ -3013,7 +3013,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 74,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -3022,16 +3022,16 @@
         "note: TICKET-147 in TESTNET_GAP_LEDGER.md"
       ],
       "id": "X3-LANG-006",
-      "implemented": 82,
+      "implemented": 88,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 58,
+      "mainnet_ready": 60,
       "missing_work": [
         "Re-measured 2026-09-26. The old blocker (\"not yet driven from the kernel\") no longer describes the tree twice over: `node/tests/x3lang_network_receipt.rs` submits a compiled `.x3` program through the atomic kernel on a three-validator chain and reads the receipt back from two of them, and as of `23350ca0c` the kernel test `pallets/x3-kernel/tests/x3_storage_channel.rs` drives the *production* `X3VmAdapter` with a real `evm_sstore` module through the real `submit_comit_v2` and reads the slot back out of chain storage, with a reverted window and a failed execution asserted to reach no state.",
         "**2026-09-26 \u2014 the two halves are joined on a live chain, and the join is asserted with a control.** `node/tests/x3lang_network_receipt.rs` now drives four comits through the real extrinsic on three validators: a control read of slot 0 before anything stored one (which must return the interpreter's zero, and the chain must hold no slot), a comit whose hand-assembled `evm_sstore` program writes 7 to slot 0 (whose slot must then be readable from the *observer* node's chain storage, and whose receipt must carry a state change), and a third comit whose program reads slot 0 and returns 7 while its own receipt claims no write. Measured: the gate `X3Lang across validators` PASSes in 153 s on a three-validator local3 network, printing the store hash and the read value, with all three validators finalizing the same blocks. Without the seeding half the third comit returns 0, so the assertion is load-bearing rather than incidental.",
         "What that still does not establish: the `.x3` *language* cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip on the live chain uses hand-assembled X3BC rather than compiled source; and no public network, independent operator or generated-program campaign has exercised any of it.",
         "The corpus is still the compiler's fixtures plus the storage module; there is no generated-program campaign over the shapes the compiler can emit.",
-        "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. Still not joined: no validator network has finalized a state-carrying program and read its state from a second node, and the `.x3` *language* still cannot emit a storage operation (`x3-parser`/`x3-ast` produce no `VmIntrinsic`, `x3-mir` discards it, `x3-backend` refuses it), so the state round trip is proven with hand-assembled X3BC rather than compiled source."
+        "**2026-09-26 (`19445a914`) - the kernel's half of the state story is complete: it reads its own storage back into execution.** The slot channel was write-only, so a second comit saw EVM's zero for a slot the first one had persisted. `X3ContractStorage` is now the view an execution starts from on both engines (`mini_x3` and `crates/x3-vm` take it as inherited, unjournaled state), a store over a seeded slot reports the chain's value as `old_value`, a payload this ISA did not write is refused at the read (`CorruptStorageSlot`), and the read is bounded by `Config::MaxX3StorageSlots` with `submit_comit_v2`'s weight pricing the bound and `X3StorageViewTooLarge` as the refusal. `X3ExecutorAdapter::execute_with_slots` is required (no default), so every adapter states its stance. **Joined 2026-09-29.** `node/tests/x3lang_network_receipt.rs` (gate `X3Lang across validators`) now drives the state round trip with *compiled* `.x3`: `fn main() -> i64 { evm_sstore(0, 7); return 0; }` and `fn main() -> i64 { return evm_sload(0); }`, compiled in the test by `compile_source` (host calls reach source since #533, `x3_common::intrinsics`). Measured on a 3-validator local3 network: the programs are submitted to Alice only; Charlie, which submitted nothing, answers every read; a control read before any store returns 0 with no slot in chain storage; the store finalizes and slot 0 holds the encoded 7 in `X3ContractStorage` on Charlie; a later compiled read returns 7 from chain state and its receipt claims no write (test result: ok, 147.88s). The slot key and the payload the chain must hold are still recomputed in the test from the layout, so a compiler that stored elsewhere would fail it."
       ],
       "name": "Decoded bytecode \u2192 TradingVm execution",
       "paths": [
@@ -3043,11 +3043,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "language_trading",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3159,7 +3159,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 50,
       "missing_work": [
-        "Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) \u2014 the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). What remains is the authentication note: a checksum is not authentication (see X3-LANG-009). Added 2026-09-26 (TICKET-148, CLOSED): the envelope's second reader is also a second *interpreter*, and it was answering 44 opcodes it had no implementation for (see the test_evidence note and `.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`). That class is closed - nothing is fabricated any more. Added 2026-09-26 (TICKET-149, part 1 CLOSED): slot storage is the one divergence that was resolved rather than recorded. `mini_x3` - the interpreter a block runs - implements `evm_sstore`/`evm_sload` (0xB4/0xB3) against the same key and payload encoding `crates/x3-vm` journals (EVM domain tag + little-endian slot, then tag + length + at most 30 bytes), the atomic window unwinds a rolled-back window's writes in reverse, and `crates/x3-integration/tests/interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key for key and value for value instead of asserting that both merely work. **TICKET-149 closed 2026-09-28**, measured on both engines and on-chain validation: aggregates, `inc`/`dec` and `mod_f` were already refused by both (the note had gone stale). The numeric conversions `0x60`-`0x68` and `ctx_gas` (`0x84`) were the real divergence: the runtime interpreter executed them and `crates/x3-vm` refused them. The 32-bit conversions had no honest meaning in the runtime's `i64`/`f64` value model (`I64ToI32` returned its input untruncated, `F64ToF32` did not round). `ctx_gas` answered with a gas count the two engines are not held to agree on. Both engines now refuse them at intake: `mini_x3::verify_code` returns `UnsupportedOpcode`, and `x3-vm`'s on-chain verifier returns `ForbiddenOnChain`. The chain compiler emits none of them. `neither_interpreter_executes_an_opcode_the_other_one_refuses` covers them now, and restoring the identity conversions turns it red; `verify_conversions_and_ctx_gas_forbidden_on_chain` holds the verifier side."
+        "Both readers enforce the version and min-version, and the body parity this row asked for now covers the whole body (function table with a call and arguments, global table, trailing debug/metadata, and the version cases) \u2014 the parity work found and fixed a real divergence: a patch bump was accepted by x3-backend and refused by the no-std reader (TICKET-137). Still true from the old note:  `x3-common::bytecode` now defines the envelope once and `mini_x3::parse_module` reads version, checksum and min-version instead of skipping them, so the literal `skip(20)` and the 'neither reader verifies it' claim no longer describe the tree; the regression is `test_a_corrupted_body_is_rejected` / `test_a_future_format_version_is_rejected` / `test_a_module_requiring_a_newer_loader_is_rejected`. What was still open on this row is that the body encoding is written twice - `x3-backend` (std) and `mini_x3` (no-std) - with nothing pinning the two together. That gap was real and is now closed for the constant pool: the string arm decoded to an empty value in no-std while std returned the real bytes, fixed 2026-09-24 in `mini_x3` with `crates/x3-integration/tests/bc_const_pool_parity.rs` as the regression. That gap is now closed for the rest of the body too: `bc_const_pool_parity.rs` drives the function table (a callee at index 1 with a longer name, called with two arguments), the global table (stored then loaded), the trailing debug and metadata sections, and the version bounds through both readers (added 2026-09-24, TICKET-137). The authentication note (a checksum is not authentication) is answered in X3-LANG-009: a standalone artifact carries a detached ed25519 attestation checked against a key registry (#537), and `x3 compile --sign-key-hex` / `x3 verify-artifact` make that a build step (#547). Added 2026-09-26 (TICKET-148, CLOSED): the envelope's second reader is also a second *interpreter*, and it was answering 44 opcodes it had no implementation for (see the test_evidence note and `.ai/runlogs/2026-09-26-onchain-interpreter-fail-closed.md`). That class is closed - nothing is fabricated any more. Added 2026-09-26 (TICKET-149, part 1 CLOSED): slot storage is the one divergence that was resolved rather than recorded. `mini_x3` - the interpreter a block runs - implements `evm_sstore`/`evm_sload` (0xB4/0xB3) against the same key and payload encoding `crates/x3-vm` journals (EVM domain tag + little-endian slot, then tag + length + at most 30 bytes), the atomic window unwinds a rolled-back window's writes in reverse, and `crates/x3-integration/tests/interpreter_agreement.rs::slot_storage_is_implemented_by_both_engines_and_names_the_same_slot` compares the two journals key for key and value for value instead of asserting that both merely work. **TICKET-149 closed 2026-09-28**, measured on both engines and on-chain validation: aggregates, `inc`/`dec` and `mod_f` were already refused by both (the note had gone stale). The numeric conversions `0x60`-`0x68` and `ctx_gas` (`0x84`) were the real divergence: the runtime interpreter executed them and `crates/x3-vm` refused them. The 32-bit conversions had no honest meaning in the runtime's `i64`/`f64` value model (`I64ToI32` returned its input untruncated, `F64ToF32` did not round). `ctx_gas` answered with a gas count the two engines are not held to agree on. Both engines now refuse them at intake: `mini_x3::verify_code` returns `UnsupportedOpcode`, and `x3-vm`'s on-chain verifier returns `ForbiddenOnChain`. The chain compiler emits none of them. `neither_interpreter_executes_an_opcode_the_other_one_refuses` covers them now, and restoring the identity conversions turns it red; `verify_conversions_and_ctx_gas_forbidden_on_chain` holds the verifier side."
       ],
       "name": "Versioned runtime bytecode envelope",
       "paths": [
@@ -4950,7 +4950,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "8534a6eb876af42d259548b70fcda34e6cbc6b6dc3ff0ae0f51472961f0585d5",
+    "source_digest": "6bdc6d16ad68c0c26fd638c4613b010b1542c1e845d2e8d3769628b20337a929",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4961,7 +4961,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "584597471775fc400ad0bd926947f6a3b4c762e00483ee95ed141cb76f4ca41e",
+      "feature-matrix/language-trading.toml": "0df0463f0fc05a0c2f253b45aaf21aaca70b6501d7d8f23a4e9c11b076fbff1f",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
@@ -5520,10 +5520,10 @@
     "by_state": {
       "BROKEN": 0,
       "COMPLETE": 10,
-      "FUNCTIONAL BUT UNHARDENED": 62,
+      "FUNCTIONAL BUT UNHARDENED": 63,
       "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
-      "PARTIAL": 71,
+      "PARTIAL": 70,
       "STUB": 1
     },
     "matrix_features": 153,
