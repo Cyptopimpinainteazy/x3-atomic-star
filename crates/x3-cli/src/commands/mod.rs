@@ -22,6 +22,7 @@ pub mod test;
 pub mod trace;
 #[cfg(feature = "sdk")]
 pub mod tx;
+pub mod verify_artifact;
 
 /// x3 - X3 Chain CLI
 #[derive(Parser)]
@@ -45,6 +46,9 @@ pub enum Commands {
 
     /// Compile a single X3 source file (standalone)
     Compile(compile::CompileArgs),
+
+    /// Verify a `.x3b` against its detached attestation and an artifact key registry
+    VerifyArtifact(verify_artifact::VerifyArtifactArgs),
 
     #[cfg(feature = "sdk")]
     /// Deploy contracts to the network
