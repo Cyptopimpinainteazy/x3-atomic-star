@@ -66,6 +66,18 @@ fn agreed_refusals() -> Vec<(u8, &'static str)> {
         (0xA0, "agent_self"),
         (0xA1, "agent_init"),
         (0xA2, "emit"),
+        // TICKET-149: the runtime interpreter used to execute these and `crates/x3-vm` did not.
+        // Both refuse them now; see `mini_x3::verify_code` for why neither half was right.
+        (0x60, "i32_to_i64"),
+        (0x61, "i64_to_i32"),
+        (0x62, "i32_to_f32"),
+        (0x63, "i64_to_f64"),
+        (0x64, "f32_to_i32"),
+        (0x65, "f64_to_i64"),
+        (0x66, "f32_to_f64"),
+        (0x67, "f64_to_f32"),
+        (0x68, "to_bool"),
+        (0x84, "ctx_gas"),
     ];
     // `0xB3`/`0xB4` (`EvmSload`/`EvmSstore`) are excluded because both engines now genuinely
     // implement them; the test below is what holds that pair rather than this refusal table.
@@ -288,12 +300,13 @@ fn both_engines_read_the_seeded_slot_and_report_it_as_the_old_value() {
     );
 }
 
-// Known remaining divergences, none of which is a fabricated value:
+// Divergences that have been closed, kept so the reasoning is not lost:
 //
-// * `0x26`/`0x27` (`inc`/`dec`), `0x34` (`mod_f`), the numeric conversions `0x60`-`0x68`, and
-//   `0x84` (`ctx_gas`) execute in the runtime interpreter and are refused by the `std` one. The
-//   runtime is the stricter-fail direction of this pair: a program using them runs on chain and
-//   fails off-chain, never the reverse. Closing it means implementing them in `crates/x3-vm`.
+// * `0x26`/`0x27` (`inc`/`dec`) and `0x34` (`mod_f`) are refused by both engines (measured
+//   2026-09-28: `InvalidOpcode` / `ForbiddenOnChain` in the runtime, `UnimplementedOpcode` in the
+//   `std` VM). The numeric conversions `0x60`-`0x68` and `0x84` (`ctx_gas`) executed in the runtime
+//   interpreter only; they are refused at intake by both now (TICKET-149) and are in the table
+//   above.
 // * `0x90`/`0x91` (`AtomicBegin`/`AtomicCommit`) execute in the `std` VM and, before this change,
 //   were silently skipped by the runtime one; the runtime interpreter now implements the window
 //   over globals, so both engines have a real implementation.

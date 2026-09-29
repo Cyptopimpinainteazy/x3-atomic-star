@@ -77,12 +77,26 @@ fn unexecutable_instructions() -> Vec<(&'static str, Vec<u8>)> {
         ("new_tuple", vec![0x74, 0x00, 0x02, 0x00, 0x01]),
         ("tuple_get", vec![0x75, 0x00, 0x01, 0x00, 0x00]),
         // Execution context — nothing supplies it to the runtime interpreter, so a value here is
-        // invented. `ctx_gas` (0x84) is deliberately absent: the interpreter knows its own gas.
+        // invented. `ctx_gas` (0x84) used to be the exception, answered from this engine's own
+        // budget; it is refused now because the `std` engine is not held to the same per-opcode
+        // charges, so the two could answer differently (TICKET-149).
+        ("ctx_gas", vec![0x84, 0x00]),
         ("ctx_sender", vec![0x80, 0x00]),
         ("ctx_block_height", vec![0x81, 0x00]),
         ("ctx_timestamp", vec![0x82, 0x00]),
         ("ctx_value", vec![0x83, 0x00]),
         ("ctx_chain_id", vec![0x85, 0x00]),
+        // Numeric conversions (TICKET-149): the 32-bit ones were identities under names that
+        // promise truncation, rounding or saturation, and the value model has no 32-bit types.
+        ("i32_to_i64", vec![0x60, 0x00, 0x01]),
+        ("i64_to_i32", vec![0x61, 0x00, 0x01]),
+        ("i32_to_f32", vec![0x62, 0x00, 0x01]),
+        ("i64_to_f64", vec![0x63, 0x00, 0x01]),
+        ("f32_to_i32", vec![0x64, 0x00, 0x01]),
+        ("f64_to_i64", vec![0x65, 0x00, 0x01]),
+        ("f32_to_f64", vec![0x66, 0x00, 0x01]),
+        ("f64_to_f32", vec![0x67, 0x00, 0x01]),
+        ("to_bool", vec![0x68, 0x00, 0x01]),
         // Agents and events — no agent registry and no event sink reach this interpreter.
         ("agent_self", vec![0xA0, 0x00]),
         ("agent_init", vec![0xA1, 0x00, 0x00, 0x00]),
