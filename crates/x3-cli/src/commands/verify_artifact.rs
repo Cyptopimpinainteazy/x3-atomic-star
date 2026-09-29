@@ -6,7 +6,7 @@
 //! authenticated only by this: the attestation `x3 compile --sign-key-hex` wrote next to it, checked
 //! against a registry the reader trusts.
 
-use crate::commands::compile::{attestation_path, load_artifact_registry};
+use crate::commands::compile::attestation_path;
 use crate::error::{CliError, Result};
 use clap::Args;
 use colored::Colorize;
@@ -25,6 +25,10 @@ pub struct VerifyArtifactArgs {
     /// The artifact key registry the signer must be in (`{"keys": [...]}`).
     #[arg(long, required = true)]
     pub registry: PathBuf,
+
+    /// How the registry is trusted (`--registry-root` or `--unsigned-registry`).
+    #[command(flatten)]
+    pub registry_trust: crate::commands::registry_trust::RegistryTrust,
 }
 
 pub async fn execute(args: VerifyArtifactArgs) -> Result<()> {
@@ -38,7 +42,10 @@ pub async fn execute(args: VerifyArtifactArgs) -> Result<()> {
         .map_err(|e| CliError::Build(format!("read {}: {e}", sidecar.display())))?;
     let attestation: x3_common::artifact::ArtifactAttestation = serde_json::from_str(&body)
         .map_err(|e| CliError::Build(format!("attestation {}: {e}", sidecar.display())))?;
-    let registry = load_artifact_registry(&args.registry)?;
+    let registry = crate::commands::registry_trust::load_trusted_registry(
+        &args.registry,
+        &args.registry_trust,
+    )?;
 
     attestation.verify(&artifact, &registry).map_err(|e| {
         CliError::Build(format!(
