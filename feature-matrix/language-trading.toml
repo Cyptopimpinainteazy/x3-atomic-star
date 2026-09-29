@@ -89,8 +89,11 @@ paths = [
   "x3-lang/crates/x3-tools/src/bin/x3c.rs",
   "x3-lang/crates/x3-tools/tests/cli.rs",
 ]
-implemented = 85
-tested = 85
+# 2026-09-29: implemented 85 -> 90 (max_gas and the oracle firewall re-derived at replay; receipt
+# format 4), tested 85 -> 88 (3 tests, each break-checked).
+# 0.35*90 + 0.25*88 + 0.40*55 = 31.5 + 22 + 22 = 75.5 -> 76 (half to even) (was 73)
+implemented = 90
+tested = 88
 mainnet_ready = 55
 priority = "P0"
 confidence = "high"
@@ -99,7 +102,7 @@ claim_risk = false
 blockers = [
   "Re-measured 2026-09-26 (TICKET-150). The previous note described checks the command did not run: `cmd_replay` called `verify_receipt` — the hash and the accounting invariants — while printing that the economics had been checked, and `receipt verify` promised \"hash + economic invariants\" in its own text without calling `verify_receipt_economics` either. Both now run the economic replay, and `replay` first binds the receipt's operation sequence to the artifact's compiled program (`decode_trading_program`), which is what makes the floors and ceilings inside it the artifact's rather than figures the receipt chose: a receipt re-hashed with a 900 bps ceiling against an artifact compiling 30 used to replay as ok.",
   "The floors and ceilings are now re-derived from the receipt's own figures: `AssertMinNetProfit` and the policy's `minimum_net_profit` are enforced against the delta of the asset each is denominated in (`ProfitBelowCompiledFloor`, `ProfitFloorWithoutAsset`), `max_slippage_bps` against each leg's recorded realized slippage (receipt format 3; a missing figure is refused, not read as zero), `max_flash_fee_bps` against each debt's principal and fee, and the pre-existing quote-freshness, price-impact, MEV-leakage and cost-kind checks stay. `basis_points_of` is now the single place the fee and slippage ratios are computed, so the figure execution enforces and the figure a receipt carries cannot drift.",
-  "What a receipt and an artifact still cannot decide, and what the command prints as unchecked rather than passing over: the finality references, the host inputs (a receipt records what happened, not what was asked), and the balances behind the `state_commitment` (a receipt carries the commitment, not the state it commits to). The per-run cost the host reports is re-derived only for the ceilings the receipt carries, so the `max_gas` and oracle-deviation halves of \"correct risk checks\" remain unreproducible from the pair.",
+  "What a receipt and an artifact still cannot decide, and what the command prints as unchecked rather than passing over: the finality references, the host inputs (a receipt records what happened, not what was asked), and the balances behind the `state_commitment` (a receipt carries the commitment, not the state it commits to). **2026-09-29: `max_gas` and the oracle firewall are re-derived too.** The receipt already carried every committed cost with its asset (the ledger the VM rolls up per asset), so replay now sums the costs in the policy gas asset and refuses a total past `max_gas` (`GasCeilingExceeded`). The oracle sources are host inputs a receipt cannot carry, so each leg window now records the largest deviation the run measured against them (receipt format 4, computed by `basis_points_of`, the function the firewall enforces with), and replay refuses a leg past `max_oracle_deviation_bps` or a window without the figure (`OracleDeviationExceeded`, `MissingOracleDeviation`). Tests `a_receipt_records_the_largest_oracle_deviation_and_replays_clean`, `a_receipt_past_the_oracle_ceiling_or_without_the_figure_is_refused`, `a_receipt_whose_costs_pass_the_gas_ceiling_is_refused`; removing either replay check or recording a false deviation turns its test red.",
 ]
 required_tests = [
   "receipt_below_its_compiled_profit_floor_fails_economic_replay",
@@ -111,6 +114,9 @@ required_tests = [
   "cli_replay_refuses_a_receipt_whose_policy_is_not_the_artifacts",
   "cli_replay_enforces_the_artifacts_profit_floor",
   "cli_receipt_verify_refuses_a_receipt_whose_figures_contradict_themselves",
+  "a_receipt_records_the_largest_oracle_deviation_and_replays_clean",
+  "a_receipt_past_the_oracle_ceiling_or_without_the_figure_is_refused",
+  "a_receipt_whose_costs_pass_the_gas_ceiling_is_refused",
 ]
 test_evidence = [
   "x3-lang/vm/tests/trading_receipts.rs",
