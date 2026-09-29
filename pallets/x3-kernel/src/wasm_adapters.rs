@@ -442,4 +442,53 @@ mod an_accepted_evm_payload_is_refused {
             "`MOV64_IMM r0, …; EXIT` returns successfully"
         );
     }
+
+    /// The EVM the production (WASM) runtime runs keeps no state between executions: each call
+    /// starts `mini_evm` from an empty storage map, with no deployed contracts or accounts. A slot
+    /// one execution writes is gone for the next, even though the same execution reads its own
+    /// write back. This is why a cross-VM call from `.x3` (`evm_call`, ...) has nothing to reach
+    /// and is refused at compile time (X3-LANG-001), and why a test built with the runtime's
+    /// `frontier` feature (which swaps in `pallet_evm` for the native build only) is not evidence
+    /// about the chain's EVM.
+    #[test]
+    fn the_chains_evm_keeps_no_state_between_executions() {
+        use crate::adapters::EvmExecutorAdapter;
+
+        // PUSH1 0x42; PUSH1 0; SSTORE; PUSH1 0; SLOAD; PUSH1 0; MSTORE; PUSH1 32; PUSH1 0; RETURN
+        let store_then_load: &[u8] = &[
+            0x60, 0x42, 0x60, 0x00, 0x55, 0x60, 0x00, 0x54, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60,
+            0x00, 0xf3,
+        ];
+        // PUSH1 0x42; PUSH1 0; SSTORE; STOP
+        let store: &[u8] = &[0x60, 0x42, 0x60, 0x00, 0x55, 0x00];
+        // PUSH1 0; SLOAD; PUSH1 0; MSTORE; PUSH1 32; PUSH1 0; RETURN
+        let load: &[u8] = &[
+            0x60, 0x00, 0x54, 0x60, 0x00, 0x52, 0x60, 0x20, 0x60, 0x00, 0xf3,
+        ];
+        let word = |value: u8| {
+            let mut word = [0u8; 32];
+            word[31] = value;
+            word.to_vec()
+        };
+
+        // Within one execution the interpreter's storage works: the control.
+        let same = WasmEvmAdapter::execute(store_then_load, 100_000).expect("runs");
+        assert!(same.success);
+        assert_eq!(same.return_data, word(0x42));
+
+        // Across executions it does not persist.
+        let stored = WasmEvmAdapter::execute(store, 100_000).expect("runs");
+        assert!(stored.success);
+        assert!(
+            stored.state_changes.is_empty() && stored.storage_writes.is_empty(),
+            "the adapter reports no state change for the chain to keep"
+        );
+        let loaded = WasmEvmAdapter::execute(load, 100_000).expect("runs");
+        assert!(loaded.success);
+        assert_eq!(
+            loaded.return_data,
+            word(0),
+            "a later execution reads an empty slot: nothing the first one wrote survived"
+        );
+    }
 }

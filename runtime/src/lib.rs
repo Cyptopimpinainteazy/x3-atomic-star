@@ -1770,6 +1770,14 @@ impl pallet_x3_kernel::Config for Runtime {
     // VM adapters:
     // - Native runtime (std + frontier): use real native adapters with EVM.
     // - WASM runtime / non-frontier: use inline interpreter adapters.
+    //
+    // These are two different EVMs, and the chain runs the second. Nodes execute the WASM runtime,
+    // which is built without `frontier`, so on chain the kernel's EVM is `mini_evm`: every execution
+    // starts from empty storage, with no deployed contract or account, and nothing it writes
+    // persists (`the_chains_evm_keeps_no_state_between_executions`). `pallet_evm` is wired in only
+    // for a native build with `frontier`, so a test run that way (`test runtime frontier`) is
+    // evidence about that build, not about the chain. This is also why `.x3` cannot make a
+    // cross-VM call: there is no stateful EVM or SVM for it to reach (X3-LANG-001).
     #[cfg(all(feature = "std", feature = "frontier"))]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
     #[cfg(all(feature = "std", feature = "frontier"))]

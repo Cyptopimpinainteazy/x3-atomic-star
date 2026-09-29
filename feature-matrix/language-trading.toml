@@ -26,7 +26,7 @@ id = "X3-LANG-001"
 name = "Compile→encode→decode→execute→receipt E2E"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler", "crates/x3-mir", "crates/x3-opt"]
+paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x3-compiler", "crates/x3-mir", "crates/x3-opt", "pallets/x3-kernel", "crates/x3-semantics"]
 # Re-derived 2026-09-28 (this row's formula: 0.35*implemented + 0.25*tested + 0.40*mainnet_ready).
 #   implemented 80 (was 72): host calls, top-level constants and the string refusal now reach the chain.
 #     What is still not expressible: `emit` (refused, no lowering), module state other than storage
@@ -45,7 +45,7 @@ priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."]
+blockers = ["Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). **Scope decided 2026-09-29 (owner): cross-VM calls from `.x3` are a documented non-goal for now.** Measured: the production (WASM) runtime runs the kernel EVM as `mini_evm` and its SVM as the payload own program, and both start from empty state every execution, with no deployed contract, account or balance, so an `evm_call`/`svm_*` has nothing to reach (`the_chains_evm_keeps_no_state_between_executions`: a slot one EVM execution writes reads 0 in the next). `pallet_evm` is wired in only for a native build with the non-default `frontier` feature, so `test runtime frontier` is evidence about that build, not about the chain; the adapter selection in runtime/src/lib.rs and that gate now say so. The compiler refuses a cross-VM intrinsic by name with that reason (`UnavailableCrossVmCall`, `a_cross_vm_call_is_refused_with_the_reason_it_cannot_run`; removing the check reverts it to an unknown-identifier error, red). Making these calls real needs a stateful EVM in the WASM runtime, a runtime decision beyond the language. Mutable module state other than storage slots is not expressible by design: `evm_sload`/`evm_sstore` are the persistent state."]
 required_tests = [
   "compile_encode_decode_execute_receipt_end_to_end",
   "every_operand_kind_compiles_verifies_and_executes",
@@ -66,6 +66,8 @@ required_tests = [
   "the_optimizer_does_not_delete_an_event_nobody_reads",
   "a_faulted_program_journals_nothing",
   "emit_without_an_event_is_refused",
+  "a_cross_vm_call_is_refused_with_the_reason_it_cannot_run",
+  "the_chains_evm_keeps_no_state_between_executions",
 ]
 test_evidence = [
   "crates/x3-integration/tests/events.rs",
