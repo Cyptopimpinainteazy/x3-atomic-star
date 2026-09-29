@@ -137,7 +137,9 @@ required_tests = [
   "cli_receipt_verify_honours_a_key_registry",
 ]
 # 2026-09-28: implemented 75 -> 82 (key registry with rotation and revocation, wired into x3c),
-# tested 75 -> 82 (6 tests, break-checked). 0.35*82 + 0.25*82 + 0.40*35 = 49.2 -> 49 (was 45)
+# tested 75 -> 82 (6 tests, break-checked). 0.35*82 + 0.25*82 + 0.40*35 = 63.2 -> 63 (was 59).
+# The first version of this line said "49.2 -> 49 (was 45)", which is simply wrong arithmetic; the
+# generated artifacts computed 63 from the fields all along, so only this comment was off.
 implemented = 82
 tested = 82
 mainnet_ready = 35
@@ -393,16 +395,26 @@ id = "X3-LANG-009"
 name = "Checksum-verified bytecode decoder"
 subsystem = "language_trading"
 source = "master"
-paths = ["crates/x3-integration", "node/tests/x3vm_live_lifecycle.rs"]
-implemented = 60
-tested = 78
+paths = ["crates/x3-integration", "crates/x3-common", "node/tests/x3vm_live_lifecycle.rs"]
+# 2026-09-29: implemented 60 -> 78 (an out-of-band artifact can carry a signature and a key
+# lifecycle; the build does not yet emit one), tested 78 -> 88 (15 tests, four mutations).
+# 0.35*78 + 0.25*88 + 0.40*38 = 27.3 + 22 + 15.2 = 64.5 -> 64 (the generator rounds half to even,
+# which is why this is 64 and not 65) (was 56)
+implemented = 78
+tested = 88
 mainnet_ready = 38
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. What remains open is the case this note names: a `.x3`/X3BC artifact distributed out of band has no signature or attestation of its own, and no phase of the spec asks for one."]
-required_tests = ["test_invalid_magic", "test_parse_minimal_module", "a_tampered_artifact_cannot_be_executed_under_the_original_signature"]
+blockers = ["**2026-09-26 \u2014 the chain path does authenticate the artifact; a standalone artifact still does not.** The rest of this note is right that the envelope carries an unkeyed digest and no signature. What it did not say is that the path the chain actually executes is bound to the signer: the program is an argument of the signed extrinsic, so the signature covers it. `a_tampered_artifact_cannot_be_executed_under_the_original_signature` (gate `X3-native lifecycles`) flips one byte of the payload inside the signed bytes and submits it with the signature intact \u2014 the node refuses it (`RPC call failed: JSON-RPC error 1010: Invalid Transaction`), and the control (the same extrinsic, untampered) finalizes with the value the source states, so the refusal is the tampering and not the account or the nonce. **Closed 2026-09-29:** a `.x3`/X3BC artifact distributed out of band now has an attestation of its own. `x3_common::artifact` signs a **detached** claim — the artifact's bytes are untouched, so both readers of the format and their byte-parity suite are unaffected — over the whole artifact, header included, because a signature over the body alone would let an edit clear `FEATURE_PRIVATE_SUBMISSION_REQUIRED` and stay valid. The key lifecycle matches the receipts' registry: retired keys still verify what they signed, revoked keys verify nothing, and a registry a reader could misread (duplicate id, one key under two ids, no active key, malformed key) is refused when it is built. `X3Executor::execute_attested` checks the claim *before* parsing, so bytes nobody vouched for reach neither the verifier nor an engine. Break-it-first: not comparing the digest, skipping the revocation check, and trusting the attestation's own carried key each redden their tests; the key-id binding in the signing digest is covered by `a_claim_cannot_be_relabelled_as_another_identity_of_the_same_key` (one key legitimately listed under different ids by two registries). The public-key binding in that digest is defence in depth that no test distinguishes, because the registry comparison subsumes it, and the module says so rather than implying coverage. Still open: nothing distributes or signs the registry file itself, and `x3 compile` does not yet emit a sidecar, so signing an artifact is a library call rather than a step of the build."]
+required_tests = [
+  "a_signed_artifact_runs_and_returns_what_its_source_computes",
+  "a_forged_artifact_with_a_repaired_checksum_is_refused_before_it_runs",
+  "an_unattested_payload_is_refused_without_being_parsed",
+  "rotating_a_signing_key_keeps_old_artifacts_runnable_and_revoking_it_does_not",
+  "an_artifact_signed_by_a_stranger_does_not_run",
+  "a_claim_cannot_be_relabelled_as_another_identity_of_the_same_key","test_invalid_magic", "test_parse_minimal_module", "a_tampered_artifact_cannot_be_executed_under_the_original_signature"]
 test_evidence = ["note: the no-std decoder is crates/x3-integration/src/mini_x3.rs::parse_module, whose tests are test_invalid_magic / test_parse_minimal_module / test_execute_returns_42 / test_gas_exhausted; measured on master 2026-09-23"]
 evidence = ["crates/x3-integration/src/mini_x3.rs", "note: Known .x3 integration requirement", "pr #129 merged 2026-09-18; provenance recorded 2026-09-22; tests measured 2026-09-23"]
 

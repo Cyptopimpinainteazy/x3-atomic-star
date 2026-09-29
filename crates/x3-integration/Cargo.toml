@@ -39,6 +39,8 @@ log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.10"
+# An artifact attestation travels as a JSON sidecar beside the artifact; the test round-trips one.
+serde_json = { workspace = true }
 # The differential tests run each optimizer pass on its own against the unoptimized program.
 x3-opt = { path = "../x3-opt" }
 x3-mir = { path = "../x3-mir" }

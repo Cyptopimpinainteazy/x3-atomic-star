@@ -4,26 +4,26 @@
   "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
   "srtool": "0.18.4",
   "rustc": "1.93.0",
-  "recorded_at": "2026-09-28",
-  "recorded_revision": "b7ceed962",
+  "recorded_at": "2026-09-29",
+  "recorded_revision": "bb5e8a27d",
   "runtime_version": "x3-chain-20 (x3-chain-1.tx1.au1)",
   "metadata": "V14",
   "runtimes": {
     "compact": {
       "size": "8904085",
-      "set_code": "0x461de1997d8a983bc5f672321aaf814aa8ec466f4c10f03a05ed81521a1dc9ad",
-      "authorize_upgrade": "0x52dca8e75954afc9c81b8fbc92034954899534bc2127ecebc9497ac7e684493f",
-      "ipfs": "QmXDKLQrubZCAuKZYtJ4tRLDsmJh3yaLxz1R2JQ21sjTgN",
-      "blake2_256": "0x42c9a024777af008b64d042d7d7e4459d62c3c52b35e2d6c74dcb248d6bfdb14",
+      "set_code": "0x3416a7d317597ba655aea4c41b58f54de1bea064172e1902a3df6be9be79c5a1",
+      "authorize_upgrade": "0x7d3d1d081d319a41629f7ad76944ab9b64583243de3ff0b9e7ed747dbe019c00",
+      "ipfs": "QmUTfxu2g3bW2eG6UcW53AuGbWSwguSXT3u2ptWQ2gCVw6",
+      "blake2_256": "0xc998fd28e5c8630de8944f9ed6eb9e512e8d0818781c480bb0de6f4c1286b4c9",
       "version": "x3-chain-20 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     },
     "compressed": {
-      "size": "1529824",
-      "set_code": "0x628ce22eeb61f49b5be71c52d67ebbc80a22141146ae4e039268a37d9c475c1e",
-      "authorize_upgrade": "0x134dfcefa268d8fdef557cf0a850960f4ccd802a6b6754ddcce98b55c0795bfc",
-      "ipfs": "QmdqnCFg2jxrFeRAEU9RHytmknYPe3rPxhFkRDv83J9Q9R",
-      "blake2_256": "0x994923ea589fe7f52f03a17f743aa43c3acbdf3e616d660b1aaf5c5a5fe05a84",
+      "size": "1529828",
+      "set_code": "0xa472a3b619bd7a6b71c9e2187477d4a9a90675106039e11b7786d939a40a211b",
+      "authorize_upgrade": "0x22dc1d5f10b3f8fbb8eedf9283d188db73eb38be630c6380de939aac2840281e",
+      "ipfs": "QmeL94iBH8tz1nGBnaGB8jK1oeYXeEpYFdDbYBjro1cPrg",
+      "blake2_256": "0xa23987aa282c9713a6fcaf0139ed7e29adeb9b14801f4d63ecbbbccab2bb9d91",
       "version": "x3-chain-20 (x3-chain-1.tx1.au1)",
       "metadata": "V14"
     }

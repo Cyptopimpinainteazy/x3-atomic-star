@@ -496,6 +496,12 @@ pub mod intrinsics {
     }
 }
 
+/// Signing and verifying a standalone X3BC artifact (see the module docs). `std` only: the chain
+/// path authenticates an artifact through the extrinsic that carries it, so the runtime's no_std
+/// build has no use for this.
+#[cfg(feature = "std")]
+pub mod artifact;
+
 #[cfg(feature = "std")]
 pub mod signing;
 #[cfg(feature = "std")]

@@ -122,6 +122,30 @@ impl X3Executor {
         Self::execute_with_slots(bytecode, args, config, &[])
     }
 
+    /// Verify a standalone artifact's detached attestation, then execute it.
+    ///
+    /// For an artifact that arrived **out of band** — a `.x3b` from a release page, a file copied
+    /// between machines — rather than as the argument of a signed extrinsic. On the chain path the
+    /// transaction's own signature already covers the program's bytes, so this adds nothing there;
+    /// off it, nothing did (X3-LANG-009). The envelope's checksum is a corruption check anyone can
+    /// recompute over a forged body, so a loader that trusts it is trusting arithmetic, not a key.
+    ///
+    /// The attestation is checked **before** the bytes reach the verifier or the engine: an
+    /// artifact nobody the caller trusts has vouched for is not parsed, not verified and not run.
+    #[cfg(feature = "std")]
+    pub fn execute_attested(
+        bytecode: &[u8],
+        attestation: &x3_common::artifact::ArtifactAttestation,
+        registry: &x3_common::artifact::ArtifactKeyRegistry,
+        args: &[X3Value],
+        config: X3ExecutorConfig,
+    ) -> X3Result<X3ExecutionReceipt> {
+        attestation
+            .verify(bytecode, registry)
+            .map_err(|refusal| X3IntegrationError::UnattestedArtifact(format!("{refusal}")))?;
+        Self::execute(bytecode, args, config)
+    }
+
     /// Execute X3 bytecode with the chain's contract slots visible to the program.
     ///
     /// `seeds` is the chain's `X3ContractStorage`: the 32-byte slot keys and the tagged payloads a
