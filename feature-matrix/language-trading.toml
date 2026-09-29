@@ -135,19 +135,22 @@ required_tests = [
   "an_ambiguous_registry_is_refused",
   "a_registry_file_parses_and_refuses_unknown_fields",
   "cli_receipt_verify_honours_a_key_registry",
+  "cli_receipt_execute_signs_only_with_an_active_registry_key",
 ]
 # 2026-09-28: implemented 75 -> 82 (key registry with rotation and revocation, wired into x3c),
 # tested 75 -> 82 (6 tests, break-checked). 0.35*82 + 0.25*82 + 0.40*35 = 63.2 -> 63 (was 59).
 # The first version of this line said "49.2 -> 49 (was 45)", which is simply wrong arithmetic; the
 # generated artifacts computed 63 from the fields all along, so only this comment was off.
-implemented = 82
-tested = 82
+# 2026-09-29: implemented 82 -> 88 (the signing side consults the registry), tested 82 -> 85
+# (one more break-checked CLI test). 0.35*88 + 0.25*85 + 0.40*35 = 30.8 + 21.25 + 14 = 66.05 -> 66
+implemented = 88
+tested = 85
 mainnet_ready = 35
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what was missing was a key registry or rotation story, since keys were named per invocation. **Closed 2026-09-28:** `ReceiptKeyRegistry` records each key as `active`, `retired` (rotated out: still verifies what it signed, `may_sign` is false) or `revoked` (compromised: refused by name, including for receipts signed before the revocation). A registry that could be misread is refused at load: a duplicate id, one public key under two ids, no active key, a malformed key, or unknown fields. `x3c receipt verify --trusted-registry <file>` uses it and satisfies mainnet's trusted-key requirement. Disabling the revocation check turns the VM and CLI tests red. Still open: nothing distributes or signs the registry file itself, and the signing side (`receipt execute`) does not consult it, so a retired key is marked as not signing but is not prevented from signing"]
+blockers = ["Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what was missing was a key registry or rotation story, since keys were named per invocation. **Closed 2026-09-28:** `ReceiptKeyRegistry` records each key as `active`, `retired` (rotated out: still verifies what it signed, `may_sign` is false) or `revoked` (compromised: refused by name, including for receipts signed before the revocation). A registry that could be misread is refused at load: a duplicate id, one public key under two ids, no active key, a malformed key, or unknown fields. `x3c receipt verify --trusted-registry <file>` uses it and satisfies mainnet's trusted-key requirement. Disabling the revocation check turns the VM and CLI tests red. **Signing side closed 2026-09-29:** `x3c receipt execute --key-id <id> --signing-registry <file>` signs only if the key is active under that id and the registry lists the signing key own public key there, and it verifies the signed receipt against the same registry before writing it. A retired, revoked or unlisted key, or a key the registry does not list under the id, is refused before anything is written (`cli_receipt_execute_signs_only_with_an_active_registry_key`; removing either check turns it red). Still open: nothing distributes or signs the registry file itself."]
 evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
 
 [[feature]]
