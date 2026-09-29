@@ -17,7 +17,7 @@
 //! 0x70..0x75   arrays and tuples           dst = I64(0) / Unit, or a silent no-op
 //! 0x80..0x85   context reads               a zero sender, height, timestamp, value, or 3375
 //! 0x90..0x93   atomic window               tracked and skipped, nothing ever reverted
-//! 0xA0..0xA2   agent / emit                Unit, or the event dropped
+//! 0xA0..0xA1   agent                       Unit
 //! 0xB0..0xB9, 0xC0..0xC7, 0xD0..0xD7       EVM / SVM / GPU  dst = I64(0), skip six bytes
 //! ```
 //!
@@ -97,10 +97,10 @@ fn unexecutable_instructions() -> Vec<(&'static str, Vec<u8>)> {
         ("f32_to_f64", vec![0x66, 0x00, 0x01]),
         ("f64_to_f32", vec![0x67, 0x00, 0x01]),
         ("to_bool", vec![0x68, 0x00, 0x01]),
-        // Agents and events — no agent registry and no event sink reach this interpreter.
+        // Agents — no agent registry reaches this interpreter. `emit` (0xA2) is not here: it is
+        // implemented, and `tests/events.rs` holds it to the `std` engine's journal.
         ("agent_self", vec![0xA0, 0x00]),
         ("agent_init", vec![0xA1, 0x00, 0x00, 0x00]),
-        ("emit", vec![0xA2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
     ];
 
     // Cross-VM and GPU intrinsics. Each is a real opcode with a defined encoding; none has a host

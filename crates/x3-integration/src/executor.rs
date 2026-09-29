@@ -13,7 +13,7 @@ use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
 // The `std` path names the type to build each entry from the VM's journal. The `no_std` path takes
 // an already-typed `res.storage_writes` from `mini_x3`, so the import is only needed under `std`.
 #[cfg(feature = "std")]
-use crate::types::X3StorageWrite;
+use crate::types::{X3ExecutionLog, X3StorageWrite};
 
 #[cfg(feature = "std")]
 use x3_vm::{BytecodeModule, VMConfig, Verifier, VerifyOptions, VM};
@@ -234,11 +234,30 @@ impl X3Executor {
                     })
                     .collect();
 
+                // The events the program emitted, in order. This field was `vec![]` with a note
+                // saying collection was "deferred to runtime integration" — the buffer existed,
+                // nothing filled it, and `emit` was refused at lowering, so a program whose
+                // receipt is supposed to carry an event produced a receipt without one.
+                // `drain_events` returns only the committed ones, so a rolled-back atomic
+                // window's events are not here, exactly as its slot writes are not.
+                let logs = vm
+                    .drain_events()
+                    .into_iter()
+                    .map(|event| X3ExecutionLog {
+                        topic: event
+                            .topics
+                            .first()
+                            .map(|topic| H256::from(*topic))
+                            .unwrap_or_default(),
+                        data: event.data,
+                    })
+                    .collect();
+
                 Ok(X3ExecutionReceipt {
                     success: true,
                     gas_used,
                     return_data,
-                    logs: vec![], // Hostcall log collection deferred to runtime integration
+                    logs,
                     state_changes: vec![], // Hostcall state change collection deferred to runtime integration
                     storage_writes,
                     function_index: 0,
@@ -340,7 +359,8 @@ impl X3Executor {
                 success: true,
                 gas_used: res.gas_used,
                 return_data: res.return_val.to_bytes(),
-                logs: vec![],
+                // What the program emitted, journalled by the interpreter a block runs.
+                logs: res.events,
                 state_changes: vec![],
                 // The interpreter journals its slot writes in the key and payload encoding
                 // `crates/x3-vm` uses (`mini_x3::evm_slot_key`): this is the line that carries a

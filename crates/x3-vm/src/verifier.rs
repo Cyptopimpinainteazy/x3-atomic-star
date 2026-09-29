@@ -491,16 +491,20 @@ impl Verifier {
                 Ok((4 + count, operands))
             }
 
-            // Emit: opcode event_id:u32 argc:u16 [args:u8...] (variable)
+            // Emit: opcode name:u8 argc:u16 [args:u8...] (variable)
+            //
+            // The name was a `u32` constant-pool index here too. Nothing emitted the opcode, so
+            // nothing had ever disagreed; the moment the compiler did, this decoder walked past
+            // the end of the instruction and reported `OperandOutOfBounds` for a well-formed one.
             Opcode::Emit => {
-                let event_id = read_u32(1)? as u64;
-                let argc = read_u16(5)? as usize;
-                let mut operands = vec![event_id, argc as u64];
+                let name = read_u8(1)? as u64;
+                let argc = read_u16(2)? as usize;
+                let mut operands = vec![name, argc as u64];
                 for i in 0..argc {
-                    let arg = read_u8(7 + i)? as u64;
+                    let arg = read_u8(4 + i)? as u64;
                     operands.push(arg);
                 }
-                Ok((7 + argc, operands))
+                Ok((4 + argc, operands))
             }
 
             // Agent init: opcode agent:u8 field_count:u16 [field_idx:u8 val:u8...] (variable)
@@ -1481,21 +1485,22 @@ mod tests {
 
     #[test]
     fn decode_emit_variable_length() {
-        // Emit - variable: opcode + event_id:u32 + argc:u16 + [args:u8...]
+        // Emit - variable: opcode + name:u8 + argc:u16 + [args:u8...]
+        //
+        // The name was `event_id:u32` here, matching an encoder no caller could use: the backend
+        // lowers values to registers and cannot hand back the constant index a `LoadConst` filled
+        // one from. It is a register now, like every other operand.
         let code = vec![
             Opcode::Emit.to_byte(),
-            0x0A,
-            0x00,
-            0x00,
-            0x00, // event_id: 10
+            0x03, // name: r3
             0x01,
             0x00, // argc: 1
             0x07, // arg0: r7
         ];
         let instrs = Verifier::decode_all_instructions(&code).unwrap();
         assert_eq!(instrs.len(), 1);
-        assert_eq!(instrs[0].size, 8); // 7 + 1
-        assert_eq!(instrs[0].operands, vec![10, 1, 7]);
+        assert_eq!(instrs[0].size, 5); // 4 + 1
+        assert_eq!(instrs[0].operands, vec![3, 1, 7]);
     }
 
     #[test]

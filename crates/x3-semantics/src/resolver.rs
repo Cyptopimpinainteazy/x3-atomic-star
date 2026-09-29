@@ -576,8 +576,20 @@ impl Resolver {
         self.current_scope = prev_scope;
     }
 
+    /// `emit Name(args)`: the arguments are expressions, the event's name is not.
+    ///
+    /// Resolving the whole call expression reported `undefined variable 'Name'` for every event a
+    /// program emitted, because an event is not declared anywhere and is not a value. Only the
+    /// arguments are resolved; the name travels to HIR as itself.
     fn resolve_emit_statement(&mut self, emit: &EmitStatement) {
-        self.resolve_expression(&emit.value);
+        match &emit.value {
+            Expression::Call(call) if matches!(&*call.callee, Expression::Identifier(_)) => {
+                for arg in &call.args {
+                    self.resolve_expression(arg);
+                }
+            }
+            other => self.resolve_expression(other),
+        }
     }
 
     fn resolve_expression(&mut self, expr: &Expression) {

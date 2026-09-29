@@ -32,7 +32,8 @@ use sp_std::vec::Vec;
 
 use sp_std::collections::btree_map::BTreeMap;
 
-use crate::types::X3StorageWrite;
+use crate::types::{X3ExecutionLog, X3StorageWrite};
+use sp_core::H256;
 
 // ---------------------------------------------------------------------------
 // Contract slot storage
@@ -53,10 +54,15 @@ const SLOT_PAYLOAD_MAX: usize = 30;
 ///
 /// A tag is what makes a store/load round trip exact. Without it a payload cannot tell
 /// `Bytes([1, 2])` from `Bytes([1, 2, 0])`, or either from `I64(197_121)`.
-const SLOT_TAG_INT: u8 = 1;
-const SLOT_TAG_BOOL: u8 = 2;
-const SLOT_TAG_F64: u8 = 3;
-const SLOT_TAG_BYTES: u8 = 5;
+/// Bytes of payload one event may carry, and events one execution may journal. A receipt is
+/// consensus state, so both are bounded here rather than by whatever gas the program happens to
+/// have; the `std` engine's `EventBuffer` applies the same data bound.
+const MAX_EVENT_DATA: usize = 4_096;
+const MAX_EVENTS: usize = 64;
+
+use x3_common::value_tags::{
+    BOOL as SLOT_TAG_BOOL, BYTES as SLOT_TAG_BYTES, F64 as SLOT_TAG_F64, INT as SLOT_TAG_INT,
+};
 
 fn evm_slot_key(slot: u64) -> [u8; 32] {
     let mut key = [0u8; 32];
@@ -81,25 +87,43 @@ fn slot_number(value: &MiniValue) -> X3Result<u64> {
 /// slot is a value the program asked to persist and cannot, so reporting success would persist
 /// something else. `Unit` is refused for the same reason (`StoreGlobal` ignores it, which is a
 /// different, also-wrong behaviour).
-fn encode_slot_payload(value: &MiniValue) -> X3Result<[u8; 32]> {
+/// A value as `(tag, data)`, the form both a storage slot and an event payload are built from.
+///
+/// The `std` engine has the same function over its own value type; `interpreter_agreement.rs`
+/// holds the two to the same answers, as it already does for the slot journals.
+fn tagged_value(value: &MiniValue) -> X3Result<(u8, Vec<u8>)> {
     let (tag, data): (u8, Vec<u8>) = match value {
         MiniValue::I64(n) => (SLOT_TAG_INT, n.to_le_bytes().to_vec()),
         MiniValue::Bool(b) => (SLOT_TAG_BOOL, vec![u8::from(*b)]),
         MiniValue::F64(f) => (SLOT_TAG_F64, f.to_bits().to_le_bytes().to_vec()),
-        MiniValue::Bytes(bytes) => {
-            if bytes.len() > SLOT_PAYLOAD_MAX {
-                return Err(X3Error::UnencodableStorageValue(
-                    "byte-string is longer than a slot holds",
-                ));
-            }
-            (SLOT_TAG_BYTES, bytes.clone())
-        }
+        MiniValue::Bytes(bytes) => (SLOT_TAG_BYTES, bytes.clone()),
         MiniValue::Unit => {
             return Err(X3Error::UnencodableStorageValue(
                 "unit is not a storable value",
             ))
         }
     };
+    if data.len() > u8::MAX as usize {
+        return Err(X3Error::UnencodableStorageValue(
+            "value is longer than a tagged value carries",
+        ));
+    }
+    Ok((tag, data))
+}
+
+/// Encode a value into a 32-byte slot payload, refusing anything that does not fit.
+///
+/// `crates/x3-vm` records why this is a refusal and not a truncation: a byte-string longer than the
+/// slot is a value the program asked to persist and cannot, so reporting success would persist
+/// something else. `Unit` is refused for the same reason (`StoreGlobal` ignores it, which is a
+/// different, also-wrong behaviour).
+fn encode_slot_payload(value: &MiniValue) -> X3Result<[u8; 32]> {
+    let (tag, data) = tagged_value(value)?;
+    if data.len() > SLOT_PAYLOAD_MAX {
+        return Err(X3Error::UnencodableStorageValue(
+            "byte-string is longer than a slot holds",
+        ));
+    }
     let mut out = [0u8; 32];
     out[0] = tag;
     out[1] = data.len() as u8;
@@ -189,6 +213,8 @@ pub enum X3Error {
     InvalidStorageSlot(&'static str),
     /// A value that cannot be carried by a 32-byte slot, refused rather than truncated.
     UnencodableStorageValue(&'static str),
+    /// An `emit` the engine refused rather than journalling something the program did not say.
+    UnjournalableEvent(&'static str),
     /// A slot payload whose tag, length or width this ISA did not write, so it carries no value.
     CorruptStorageSlot,
     DivisionByZero,
@@ -602,6 +628,11 @@ pub struct X3ExecResult {
     /// keys are the 32-byte EVM-domain keys (`evm_slot_key`), disjoint from the global keyspace, so
     /// the kernel can apply them to its contract-storage map instead of the balance ledger.
     pub storage_writes: Vec<X3StorageWrite>,
+    /// Events the execution journalled, in order.
+    ///
+    /// Bounded like the slot journal: an execution that fails returns `Err` rather than a partial
+    /// list, so every entry is an event that survived.
+    pub events: Vec<X3ExecutionLog>,
 }
 
 // ---------------------------------------------------------------------------
@@ -649,6 +680,8 @@ struct Vm<'m> {
     /// entry's `old_value` is the value the execution started from. Seeded entries are not
     /// journaled: they are the state this execution inherited, not a change it made.
     slots: BTreeMap<[u8; 32], [u8; 32]>,
+    /// Events this execution journalled, in order (see opcode `0xA2`).
+    events: Vec<X3ExecutionLog>,
     /// Every slot write this execution has made, in order.
     writes: Vec<X3StorageWrite>,
     /// `(key, previous)` for every write, so a rolled-back window is undone in reverse without
@@ -688,6 +721,7 @@ impl<'m> Vm<'m> {
             call_stack: Vec::with_capacity(MAX_DEPTH),
             globals,
             slots: BTreeMap::new(),
+            events: Vec::new(),
             writes: Vec::new(),
             undo_log: Vec::new(),
             atomic_frames: Vec::new(),
@@ -1420,7 +1454,47 @@ impl<'m> Vm<'m> {
             // There is no agent registry in the runtime interpreter, and no event sink: `0xA0` used
             // to answer `Unit` (an invented identity) and `0xA2` dropped the event while reporting
             // success. A dropped event is lost evidence, so it is refused instead.
-            0xA0..=0xA2 => Err(X3Error::UnsupportedOpcode(op)),
+            0xA0 | 0xA1 => Err(X3Error::UnsupportedOpcode(op)),
+
+            // `emit name:reg argc:u16 args:reg*`. Implemented in both engines now: this arm and
+            // the `std` VM's build the same journal entry — the topic is SHA-256 of the event's
+            // name, the payload is each argument as `[tag][len][data]`.
+            0xA2 => {
+                let name_reg = self.r8(ip + 1)? as usize;
+                let argc = self.r16(ip + 2)? as usize;
+                let name = match &self.regs[reg!(name_reg)] {
+                    MiniValue::Bytes(bytes) => bytes.clone(),
+                    _ => {
+                        return Err(X3Error::UnjournalableEvent(
+                            "an event's name must be a byte string",
+                        ))
+                    }
+                };
+                if name.is_empty() {
+                    return Err(X3Error::UnjournalableEvent("an event must be named"));
+                }
+                let mut data = Vec::new();
+                for index in 0..argc {
+                    let arg = self.r8(ip + 4 + index)? as usize;
+                    let (tag, bytes) = tagged_value(&self.regs[reg!(arg)])?;
+                    data.push(tag);
+                    data.push(bytes.len() as u8);
+                    data.extend_from_slice(&bytes);
+                }
+                if data.len() > MAX_EVENT_DATA {
+                    return Err(X3Error::UnjournalableEvent("event payload is too large"));
+                }
+                if self.events.len() >= MAX_EVENTS {
+                    return Err(X3Error::UnjournalableEvent(
+                        "too many events in one execution",
+                    ));
+                }
+                self.events.push(X3ExecutionLog {
+                    topic: H256::from(sp_io::hashing::sha2_256(&name)),
+                    data,
+                });
+                Ok(Step::Continue(ip + 4 + argc))
+            }
 
             // -------- Contract slot storage --------
             //
@@ -1594,6 +1668,7 @@ pub fn execute_x3bc_with_slots_and_policy(
         gas_used: vm.gas_used,
         instructions_executed: vm.instructions_executed,
         storage_writes: vm.writes,
+        events: vm.events,
     })
 }
 
@@ -1644,11 +1719,19 @@ fn instruction_len(code: &[u8], ip: usize) -> Result<usize, X3Error> {
                 .ok_or(X3Error::UnexpectedEof)?;
             8 + argc
         }
+        0xA2 => {
+            let argc = code
+                .get(ip + 2..ip + 4)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]) as usize)
+                .ok_or(X3Error::UnexpectedEof)?;
+            4 + argc
+        }
         0x14..=0x17
         | 0x70..=0x75
         | 0x80..=0x83
         | 0x85
-        | 0xA0..=0xA2
+        | 0xA0
+        | 0xA1
         | 0xB0..=0xB2
         | 0xB5..=0xB9
         | 0xC0..=0xC7

@@ -198,8 +198,9 @@ fn opcodes_without_an_implementation_are_refused_not_faked() {
         ("ctx_sender", vec![0x80, 0], 0x80),
         // CtxChainId: a hard-coded 3375.
         ("ctx_chain_id", vec![0x85, 0], 0x85),
-        // Emit event 0 with no arguments: skipped.
-        ("emit", vec![0xA2, 0, 0, 0, 0, 0, 0], 0xA2),
+        // `emit` (0xA2) was here — it skipped the event and reported success — and is gone
+        // because it is implemented in both engines now, which is what this list is the absence
+        // of. `tests/events.rs` compares the two engines' journals for it.
         // LoadIndex: 0.
         ("load_index", vec![0x14, 0, 1, 2], 0x14),
     ];

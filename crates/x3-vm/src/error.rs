@@ -159,6 +159,10 @@ pub enum VMErrorKind {
     #[error("value cannot be stored in a 32-byte slot: {0}")]
     UnencodableStorageValue(String),
 
+    #[error("event: {0}")]
+    /// An `emit` the engine refused rather than journalling something the program did not say.
+    UnjournalableEvent(String),
+
     #[error("stored slot payload does not decode: {0}")]
     CorruptStorageSlot(String),
 

@@ -761,9 +761,16 @@ impl BytecodeEmitter {
         self.emit_reg(dst);
     }
 
-    pub fn emit_emit(&mut self, event_id: u32, args: &[Register]) {
+    /// Emit an event: `emit name:reg argc:u16 args:reg*`.
+    ///
+    /// The name is a **register**, holding the byte string the event is called. It was a `u32`
+    /// index into the constant pool, which no caller could produce: the backend lowers MIR values
+    /// to registers and has no way back from a register to the constant a `LoadConst` filled it
+    /// from. Nothing had ever emitted this opcode, so the operand became a register like every
+    /// other one, and both engines read the name the same way they read any other value.
+    pub fn emit_emit(&mut self, name: Register, args: &[Register]) {
         self.emit_byte(Opcode::Emit.to_byte());
-        self.emit_u32(event_id);
+        self.emit_reg(name);
         self.emit_u16(args.len() as u16);
         for arg in args {
             self.emit_reg(*arg);

@@ -477,9 +477,22 @@ impl TypeChecker {
     }
 
     /// Type check an emit statement.
+    /// `emit Name(args)`: the arguments have types, the event's name does not.
+    ///
+    /// Inferring the call as a whole looked the name up as a value and reported it not callable,
+    /// which is the resolver's story repeated a phase later. An event's payload is checked; its
+    /// name is a name.
     fn check_emit_statement(&mut self, emit: &x3_ast::EmitStatement, resolved: &ResolvedModule) {
-        // Type check the emitted value
-        self.infer_expression_type(&emit.value, resolved);
+        match &emit.value {
+            Expression::Call(call) if matches!(&*call.callee, Expression::Identifier(_)) => {
+                for arg in &call.args {
+                    self.infer_expression_type(arg, resolved);
+                }
+            }
+            other => {
+                self.infer_expression_type(other, resolved);
+            }
+        }
     }
 
     /// Infer the type of an expression.

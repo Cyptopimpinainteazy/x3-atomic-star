@@ -484,17 +484,38 @@ impl HirLowerer {
                 Ok(stmts)
             }
             Statement::Emit(emit_stmt) => {
-                // For emit, we just lower the value expression
-                // The emit value should be an event expression
-                let value = self.lower_expression(&emit_stmt.value, scope)?;
-
-                // For now, emit becomes an expression statement
-                // In a full implementation, we'd extract event name and args
-                Ok(vec![HirStmt::Emit {
-                    event_name: "event".to_string(), // Event name extraction requires emit expression AST node
-                    args: vec![value],
-                    span: emit_stmt.span,
-                }])
+                // `emit Name(a, b)`: the name and the payload, taken apart. Every event used to be
+                // named the literal string "event" — a fabricated name, so two different events
+                // were indistinguishable in anything that read them — and the whole call was
+                // lowered as the single argument.
+                match &emit_stmt.value {
+                    Expression::Call(call) => {
+                        let Expression::Identifier(name) = &*call.callee else {
+                            return Err(HirError::new(
+                                HirErrorKind::InvalidAssignTarget,
+                                emit_stmt.span,
+                            ));
+                        };
+                        let args = call
+                            .args
+                            .iter()
+                            .map(|arg| self.lower_expression(arg, scope))
+                            .collect::<HirResult<Vec<_>>>()?;
+                        Ok(vec![HirStmt::Emit {
+                            event_name: name.name.clone(),
+                            args,
+                            span: emit_stmt.span,
+                        }])
+                    }
+                    // `emit x;` names no event. The chain compiler refuses it rather than
+                    // inventing a name for it.
+                    other => Err(HirError::new(
+                        HirErrorKind::UnknownSymbol(
+                            "emit needs an event: `emit Name(args)`".into(),
+                        ),
+                        other.span(),
+                    )),
+                }
             }
         }
     }

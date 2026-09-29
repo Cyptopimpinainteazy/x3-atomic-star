@@ -28,10 +28,6 @@ pub struct BytecodeCompiler {
     errors: BackendErrors,
     /// Function symbol → index mapping.
     function_indices: HashMap<SymbolId, FuncIdx>,
-    /// Event name → ID mapping.
-    event_ids: HashMap<String, u32>,
-    /// Next event ID.
-    next_event_id: u32,
     /// Debug mode.
     debug: bool,
 }
@@ -43,8 +39,6 @@ impl BytecodeCompiler {
             layout: LayoutComputer::new(),
             errors: BackendErrors::new(),
             function_indices: HashMap::new(),
-            event_ids: HashMap::new(),
-            next_event_id: 0,
             debug: false,
         }
     }
@@ -283,12 +277,12 @@ impl BytecodeCompiler {
             } => {
                 self.emitter.set_span(*span);
 
-                // Get or create event ID
-                let event_id = *self.event_ids.entry(event_name.clone()).or_insert_with(|| {
-                    let id = self.next_event_id;
-                    self.next_event_id += 1;
-                    id
-                });
+                // The event's name, in a register. It used to be a per-compilation counter
+                // (`event_ids`/`next_event_id`): a number that meant nothing outside the one
+                // module that produced it, and that no engine could resolve back to the name the
+                // source wrote. The name itself travels, as a string constant.
+                let name_reg = self.alloc_temp();
+                self.emitter.emit_string(name_reg, event_name)?;
 
                 // Compile arguments
                 let arg_regs: Vec<Register> = args
@@ -296,7 +290,7 @@ impl BytecodeCompiler {
                     .map(|arg| self.compile_expr(hir, arg))
                     .collect::<BackendResult<_>>()?;
 
-                self.emitter.emit_emit(event_id, &arg_regs);
+                self.emitter.emit_emit(name_reg, &arg_regs);
                 Ok(())
             }
 

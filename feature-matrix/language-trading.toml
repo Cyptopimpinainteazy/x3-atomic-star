@@ -34,14 +34,18 @@ paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x
 #   tested 85 (was 78): source_language.rs (8) and optimizer_order.rs (3) added; each fix has a break test.
 #   mainnet_ready 30: unchanged.
 #   0.35*80 + 0.25*85 + 0.40*30 = 28 + 21.25 + 12 = 61.25 -> 61
-implemented = 80
-tested = 85
+# 2026-09-29: implemented 80 -> 88 (`emit` works end to end, six defects behind it fixed; module
+# state and the other intrinsics are still not expressible), tested 85 -> 92 (7 tests across both
+# engines and the on-chain path, three mutations).
+# 0.35*88 + 0.25*92 + 0.40*30 = 30.8 + 23 + 12 = 65.8 -> 66 (was 61)
+implemented = 88
+tested = 92
 mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Re-measured 2026-09-28. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`, with a load not merged across a store and the on-chain receipt journalling the writes), top-level constants (inlined, cycles and effectful initializers refused, `let mut` at top level refused by name) and strings (bound, passed and returned; any operator on one refused at compile time rather than failing at run time). The optimizer's order-sensitivity is gone (#518's per-function PRE) and held by `optimizer_order.rs`, which fails on the pre-#518 tree. `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: `emit` (refused: no lowering preserves it), mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."]
+blockers = ["Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."]
 required_tests = [
   "compile_encode_decode_execute_receipt_end_to_end",
   "every_operand_kind_compiles_verifies_and_executes",
@@ -56,8 +60,15 @@ required_tests = [
   "a_constant_that_is_not_a_constant_is_refused_by_name",
   "an_operator_on_strings_is_refused_at_compile_time_not_at_run_time",
   "every_fixture_optimizes_the_same_in_every_function_order",
+  "an_emitted_event_reaches_the_receipt_with_its_name_and_arguments",
+  "different_events_have_different_topics",
+  "a_loop_journals_one_event_per_iteration_in_order",
+  "the_optimizer_does_not_delete_an_event_nobody_reads",
+  "a_faulted_program_journals_nothing",
+  "emit_without_an_event_is_refused",
 ]
 test_evidence = [
+  "crates/x3-integration/tests/events.rs",
   "crates/x3-integration/tests/source_language.rs",
   "crates/x3-compiler/tests/optimizer_order.rs",
   "crates/x3-integration/tests/compiler_bridge.rs",

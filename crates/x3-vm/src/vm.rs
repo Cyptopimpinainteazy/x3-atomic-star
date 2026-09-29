@@ -390,6 +390,11 @@ impl VM {
                 self.state_machine.signal_success().map_err(|err| {
                     VMError::without_ip(VMErrorKind::InvalidFunction(format!("{err:?}")))
                 })?;
+                // An execution that returns is the commit for anything still pending. `emit`
+                // outside an atomic window left its events pending for ever, and `drain_events`
+                // takes only committed ones — the mirror of the `rollback` below, which was the
+                // only half that existed while nothing emitted.
+                self.event_buffer.commit();
                 Ok(result)
             }
             Err(err) => {
@@ -1233,6 +1238,63 @@ impl VM {
                 Ok(StepResult::Continue(ip + 3))
             }
 
+            // ================================================================
+            // Events
+            // ================================================================
+            //
+            // `emit name:reg argc:u16 args:reg*`. The name is a byte string in a register; the
+            // event's topic is its SHA-256, so a reader who knows the name can find its events
+            // without the artifact. The payload is each argument as `[tag][len][data]`
+            // (`x3_common::value_tags`), the same tagging a storage slot uses, so one run of bytes
+            // decodes without knowing the argument types in advance.
+            //
+            // Nothing implemented this opcode in either engine: `EventBuffer` existed and no
+            // instruction ever filled it, and the compiler refused `emit` at lowering. A program
+            // whose receipt is supposed to carry an event produced a receipt without one.
+            Opcode::Emit => {
+                let name_reg = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let argc = self.read_u16(ip + 2)? as usize;
+                let name = match &self.regs[name_reg] {
+                    Value::Bytes(bytes) => bytes.clone(),
+                    Value::String(text) => text.as_bytes().to_vec(),
+                    other => {
+                        return Err(self.error_at(
+                            ip,
+                            VMErrorKind::UnjournalableEvent(format!(
+                                "an event's name must be a byte string, got {other:?}"
+                            )),
+                        ))
+                    }
+                };
+                if name.is_empty() {
+                    return Err(self.error_at(
+                        ip,
+                        VMErrorKind::UnjournalableEvent("an event must be named".to_string()),
+                    ));
+                }
+                let mut data = Vec::new();
+                for index in 0..argc {
+                    let arg =
+                        self.resolve_reg_checked(self.read_u8(ip + 4 + index)? as usize, ip)?;
+                    let (tag, bytes) = tagged_value(&self.regs[arg]).map_err(|reason| {
+                        self.error_at(ip, VMErrorKind::UnjournalableEvent(reason))
+                    })?;
+                    data.push(tag);
+                    data.push(bytes.len() as u8);
+                    data.extend_from_slice(&bytes);
+                }
+                let topic = sp_core::hashing::sha2_256(&name);
+                // The emitter is the contract identity, which this engine does not have: an
+                // execution here is a module, not a deployed account. It stays zero rather than
+                // inventing one, and the receipt carries the topic and the payload, not this field.
+                self.event_buffer
+                    .emit([0u8; 32], vec![topic], data)
+                    .map_err(|error| {
+                        self.error_at(ip, VMErrorKind::UnjournalableEvent(format!("{error:?}")))
+                    })?;
+                Ok(StepResult::Continue(ip + 4 + argc))
+            }
+
             Opcode::EvmSstore => {
                 let slot_reg = self.read_u8(ip + 1)? as usize;
                 let val_reg = self.read_u8(ip + 2)? as usize;
@@ -1572,12 +1634,10 @@ fn evm_slot_key(slot: u64) -> [u8; 32] {
 // `value_to_storage_value` uses) cannot tell `Bytes([1, 2, 3])` from `I64(197_121)`, and a
 // zero-padded variable-length payload cannot tell `Bytes([1, 2])` from `Bytes([1, 2, 0])`,
 // so either layout would hand a program back a value it never stored.
-const SLOT_TAG_INT: u8 = 1;
-const SLOT_TAG_BOOL: u8 = 2;
-const SLOT_TAG_F64: u8 = 3;
-const SLOT_TAG_ADDR: u8 = 4;
-const SLOT_TAG_BYTES: u8 = 5;
-const SLOT_TAG_STRING: u8 = 6;
+use x3_common::value_tags::{
+    ADDR as SLOT_TAG_ADDR, BOOL as SLOT_TAG_BOOL, BYTES as SLOT_TAG_BYTES, F64 as SLOT_TAG_F64,
+    INT as SLOT_TAG_INT, STRING as SLOT_TAG_STRING,
+};
 
 /// Bytes of data a slot can carry: the 32-byte word minus the tag and length bytes.
 const SLOT_PAYLOAD_MAX: usize = 30;
@@ -1596,36 +1656,50 @@ fn slot_number(value: &Value) -> Result<u64, String> {
 }
 
 /// Encode a value into a 32-byte slot payload, refusing anything that does not fit.
-fn encode_slot_payload(value: &Value) -> Result<[u8; 32], String> {
+/// A value as `(tag, data)`, the form both a storage slot and an event payload are built from.
+///
+/// One function, so a slot and an event can never disagree about what a value is. The length is
+/// one byte in both forms, so a value longer than 255 bytes has no tagged form at all; a slot is
+/// tighter still and applies its own limit on top.
+fn tagged_value(value: &Value) -> Result<(u8, Vec<u8>), String> {
     let (tag, data): (u8, Vec<u8>) = match value {
         Value::I64(n) => (SLOT_TAG_INT, n.to_le_bytes().to_vec()),
         Value::Bool(b) => (SLOT_TAG_BOOL, vec![u8::from(*b)]),
         Value::F64(f) => (SLOT_TAG_F64, f.to_bits().to_le_bytes().to_vec()),
         Value::Addr(a) => (SLOT_TAG_ADDR, a.to_le_bytes().to_vec()),
-        Value::Bytes(bytes) => {
-            if bytes.len() > SLOT_PAYLOAD_MAX {
-                return Err(format!(
-                    "{} bytes of byte-string, slot holds {SLOT_PAYLOAD_MAX}",
-                    bytes.len()
-                ));
-            }
-            (SLOT_TAG_BYTES, bytes.clone())
-        }
-        Value::String(text) => {
-            let bytes = text.as_bytes();
-            if bytes.len() > SLOT_PAYLOAD_MAX {
-                return Err(format!(
-                    "{} bytes of string, slot holds {SLOT_PAYLOAD_MAX}",
-                    bytes.len()
-                ));
-            }
-            (SLOT_TAG_STRING, bytes.to_vec())
-        }
-        // Unlike `StoreGlobal`, which ignores a Unit write, a contract store of Unit is
-        // refused: ignoring it would report success for a write the program asked for and
-        // did not get. Deleting a slot is not spelled this way.
+        Value::Bytes(bytes) => (SLOT_TAG_BYTES, bytes.clone()),
+        Value::String(text) => (SLOT_TAG_STRING, text.as_bytes().to_vec()),
+        // Unlike `StoreGlobal`, which ignores a Unit write, a contract store of Unit is refused:
+        // ignoring it would report success for a write the program asked for and did not get.
+        // Deleting a slot is not spelled this way, and an event argument that is Unit is a value
+        // the program never computed.
         Value::Unit => return Err("unit is not a storable value".to_string()),
     };
+    if data.len() > u8::MAX as usize {
+        return Err(format!(
+            "{} bytes of value; a tagged value carries at most {}",
+            data.len(),
+            u8::MAX
+        ));
+    }
+    Ok((tag, data))
+}
+
+/// Encode a value into a 32-byte slot payload, refusing anything that does not fit.
+///
+/// A slot holds a tag byte, a length byte and at most `SLOT_PAYLOAD_MAX` bytes of data, which is
+/// what makes a store/load round trip exact: the untagged layout `value_to_storage_value` uses
+/// cannot tell `Bytes([1, 2, 3])` from `I64(197_121)`, and a zero-padded variable-length payload
+/// cannot tell `Bytes([1, 2])` from `Bytes([1, 2, 0])`, so either would hand a program back a
+/// value it never stored. A byte-string longer than the slot is a refusal, not a truncation.
+fn encode_slot_payload(value: &Value) -> Result<[u8; 32], String> {
+    let (tag, data) = tagged_value(value)?;
+    if data.len() > SLOT_PAYLOAD_MAX {
+        return Err(format!(
+            "{} bytes of value, slot holds {SLOT_PAYLOAD_MAX}",
+            data.len()
+        ));
+    }
     let mut out = [0u8; 32];
     out[0] = tag;
     out[1] = data.len() as u8;

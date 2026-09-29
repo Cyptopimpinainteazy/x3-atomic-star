@@ -2830,7 +2830,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 61,
+      "composite": 66,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2838,12 +2838,12 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 80,
+      "implemented": 88,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 30,
       "missing_work": [
-        "Re-measured 2026-09-28. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`, with a load not merged across a store and the on-chain receipt journalling the writes), top-level constants (inlined, cycles and effectful initializers refused, `let mut` at top level refused by name) and strings (bound, passed and returned; any operator on one refused at compile time rather than failing at run time). The optimizer's order-sensitivity is gone (#518's per-function PRE) and held by `optimizer_order.rs`, which fails on the pre-#518 tree. `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: `emit` (refused: no lowering preserves it), mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."
+        "Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). Still not expressible on chain: mutable module state other than storage slots, and VM intrinsics beyond the two storage calls (evm_call, svm_*)."
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2859,8 +2859,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 85,
-      "tests": "tested score 85% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4948,7 +4948,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "7b5454e6cc96dbea9d8b78ea0fb556c41274e3224e380306072528a1d697b46a",
+    "source_digest": "b6d130202c1dd4585d5b5eef9aedfc00fe05132ae544f4542276ae6914a7d64c",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4959,7 +4959,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "fba058af81546c19901c8662e8f819f55bf103f6ec9e2a086832f853bd208435",
+      "feature-matrix/language-trading.toml": "4ac15ccef53a99be40c8247849b4ed8bdb1f3377b59e785ec97b2f783a91c233",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
