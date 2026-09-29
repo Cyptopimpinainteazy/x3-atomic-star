@@ -289,10 +289,33 @@ if [[ -n "$ARTIFACT_SPEC" && -n "$PRE_SPEC" && "$ARTIFACT_SPEC" == "$PRE_SPEC" ]
     note "the artifact names the running spec version ($PRE_SPEC) — the version check below must fail (negative control)"
 fi
 
+# ── the X3 program the upgraded runtime has to run (X3-LANG-004) ─────────────
+# Compiled here, by the real `x3 compile`, so what runs after the upgrade is the compiler's output
+# and not a fixture blob. It writes a slot and reads it back: 7 * 6 = 42.
+X3_CLI_BIN="${X3_CLI_BIN:-$ROOT_DIR/target/release/x3}"
+POST_UPGRADE_X3_SOURCE="$WORK_DIR/post_upgrade.x3"
+POST_UPGRADE_X3_ARTIFACT="$WORK_DIR/post_upgrade.x3b"
+POST_UPGRADE_X3_EXPECT=42
+printf 'fn main() -> i64 {\n    evm_sstore(0, 7);\n    return evm_sload(0) * 6;\n}\n' > "$POST_UPGRADE_X3_SOURCE"
+if [[ ! -x "$X3_CLI_BIN" ]]; then
+    info "building the x3 CLI (once)"
+    (cd "$ROOT_DIR" && SKIP_WASM_BUILD=1 cargo build -q --release -p x3-cli) || true
+fi
+POST_UPGRADE_X3_HEX=""
+if [[ -x "$X3_CLI_BIN" ]] && "$X3_CLI_BIN" compile "$POST_UPGRADE_X3_SOURCE" --output "$POST_UPGRADE_X3_ARTIFACT" >/dev/null 2>&1 \
+   && [[ "$(head -c 4 "$POST_UPGRADE_X3_ARTIFACT")" == "X3BC" ]]; then
+    POST_UPGRADE_X3_HEX="0x$(xxd -p "$POST_UPGRADE_X3_ARTIFACT" | tr -d '\n')"
+    pass "post_upgrade_x3_program_compiled"
+else
+    fail "post_upgrade_x3_program_compiled" "(x3 compile did not produce an X3BC artifact from $POST_UPGRADE_X3_SOURCE)"
+fi
+
 # ── run the governance upgrade ───────────────────────────────────────────────
 DRIVER_JSON="$EVIDENCE_DIR/governance_upgrade.json"
 mkdir -p "$EVIDENCE_DIR"
 if X3_WS_URL="ws://127.0.0.1:$A_RPC" \
+   X3_POST_UPGRADE_X3_PROGRAM_HEX="$POST_UPGRADE_X3_HEX" \
+   X3_POST_UPGRADE_X3_EXPECT="$POST_UPGRADE_X3_EXPECT" \
    X3_WASM_FILE="$ARTIFACT" \
    X3_EXPECT_OLD_SPEC_VERSION="$PRE_SPEC" \
    X3_OUT_JSON="$DRIVER_JSON" \
@@ -371,6 +394,17 @@ else
         "(transfer delta=$TRANSFER_DELTA block=$TRANSFER_BLOCK enactment=$ENACTMENT_BLOCK)"
 fi
 
+X3_RETURNED="$(jq -r '.post_upgrade_x3_program.returned // empty' "$DRIVER_JSON" 2>/dev/null || true)"
+X3_BLOCK="$(jq -r '.post_upgrade_x3_program.block_number // empty' "$DRIVER_JSON" 2>/dev/null || true)"
+if [[ -z "$ENACTMENT_BLOCK" ]]; then
+    skip "post_upgrade_x3_program" "the upgrade did not land, so there is no upgraded runtime to run it"
+elif [[ "$X3_RETURNED" == "$POST_UPGRADE_X3_EXPECT" && -n "$X3_BLOCK" && "$X3_BLOCK" -gt "$ENACTMENT_BLOCK" ]]; then
+    pass "post_upgrade_x3_program"
+else
+    fail "post_upgrade_x3_program" \
+        "(returned=${X3_RETURNED:-none} block=${X3_BLOCK:-none} enactment=$ENACTMENT_BLOCK, expected $POST_UPGRADE_X3_EXPECT after enactment)"
+fi
+
 # ── report ───────────────────────────────────────────────────────────────────
 mkdir -p "$(dirname "$REPORT")"
 {
@@ -416,6 +450,7 @@ mkdir -p "$(dirname "$REPORT")"
     echo "| best block | $POST_BEST |"
     echo "| finalized block | $POST_FINALIZED |"
     echo "| post-upgrade transfer | block ${TRANSFER_BLOCK:-unknown}, +${TRANSFER_DELTA:-0} planck |"
+    echo "| post-upgrade X3 program | block ${X3_BLOCK:-unknown}, returned ${X3_RETURNED:-none} (expected $POST_UPGRADE_X3_EXPECT) |"
     echo
     echo "## Checks"
     echo
@@ -432,7 +467,9 @@ mkdir -p "$(dirname "$REPORT")"
         code_hash_changed \
         all_validators_upgraded \
         blocks_and_finality_after_upgrade \
-        post_upgrade_state_operation; do
+        post_upgrade_state_operation \
+        post_upgrade_x3_program_compiled \
+        post_upgrade_x3_program; do
         echo "- $key: ${RESULTS[$key]:-NOT_RUN}"
     done
     echo

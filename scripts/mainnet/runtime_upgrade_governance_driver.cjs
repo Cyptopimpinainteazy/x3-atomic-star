@@ -43,6 +43,8 @@
 const fs = require('fs');
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/keyring');
+const { blake2AsU8a } = require('@polkadot/util-crypto');
+const { hexToU8a, u8aConcat, u8aToHex } = require('@polkadot/util');
 
 // ── the shape of the rehearsal ───────────────────────────────────────────────
 // Two members must approve a council motion: the runtime's half-council gate is
@@ -83,6 +85,11 @@ const WASM_FILE = requireEnv('X3_WASM_FILE');
 const OUT_JSON = process.env.X3_OUT_JSON || '';
 const EXPECTED_OLD_SPEC_VERSION = Number(requireEnv('X3_EXPECT_OLD_SPEC_VERSION'));
 const TRANSFER_PLANKS = BigInt(process.env.X3_TRANSFER_PLANKS || '1234567890');
+// A compiled `.x3` program (X3BC, hex) to run through the kernel after the upgrade, and the i64 it
+// must return. Optional: without it the rehearsal proves the upgrade and a balance transfer only.
+const POST_UPGRADE_X3_PROGRAM_HEX = process.env.X3_POST_UPGRADE_X3_PROGRAM_HEX || '';
+const POST_UPGRADE_X3_EXPECT = process.env.X3_POST_UPGRADE_X3_EXPECT || '';
+const POST_UPGRADE_X3_FEE = BigInt(process.env.X3_POST_UPGRADE_X3_FEE || '1000000');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -105,6 +112,7 @@ const evidence = {
   best_block_after: null,
   finalized_block_after: null,
   post_upgrade_transfer: null,
+  post_upgrade_x3_program: null,
   steps: [],
 };
 
@@ -488,6 +496,69 @@ async function main() {
   record('post-upgrade transfer moved value', {
     detail: `+${delta} planck to ${keyring.bob.address} in block ${transfer.blockNumber}`,
   });
+
+  // ── step 9: a compiled X3 program through the kernel after the upgrade ─────
+  // The transfer proves the chain still changes state. This proves the *upgraded* runtime still
+  // routes compiled X3 bytecode through the atomic kernel (X3-LANG-004): the program is submitted
+  // with `submit_comit_v2`, finalized, and its execution receipt is read back from chain state.
+  if (POST_UPGRADE_X3_PROGRAM_HEX) {
+    const program = hexToU8a(POST_UPGRADE_X3_PROGRAM_HEX);
+    const comitId = u8aToHex(blake2AsU8a(u8aConcat(
+      new TextEncoder().encode('x3-rehearsal-post-upgrade'),
+      program,
+    ), 256));
+    const nonce = BigInt((await api.query.atlasKernel.nonces(keyring.alice.address)).toString());
+    // `compute_prepare_root_v2`: blake2_256(comit_id ++ evm ++ svm ++ x3 ++ nonce_le_u64 ++ fee.encode()).
+    const nonceLe = new Uint8Array(8);
+    new DataView(nonceLe.buffer).setBigUint64(0, nonce, true);
+    const feeLe = api.createType('u128', POST_UPGRADE_X3_FEE.toString()).toU8a();
+    const prepareRoot = u8aToHex(blake2AsU8a(u8aConcat(hexToU8a(comitId), program, nonceLe, feeLe), 256));
+    const submitted = await submitAndConfirm(
+      api.tx.atlasKernel.submitComitV2(
+        comitId,
+        '0x',
+        '0x',
+        u8aToHex(program),
+        nonce.toString(),
+        POST_UPGRADE_X3_FEE.toString(),
+        prepareRoot,
+      ),
+      keyring.alice,
+      'post-upgrade X3 program',
+      (event) => api.events.atlasKernel.ComitFinalized.is(event)
+        && event.data[0].toHex() === comitId,
+    );
+    const stored = await api.query.atlasKernel.x3ExecutionReceipts.at(submitted.blockHash, comitId);
+    if (stored.isNone) {
+      throw new Error(`post-upgrade X3 program: no execution receipt stored for ${comitId}`);
+    }
+    const receipt = stored.unwrap();
+    const returnData = receipt.returnData.toU8a(true);
+    const returned = returnData.length === 8
+      ? new DataView(returnData.buffer, returnData.byteOffset, 8).getBigInt64(0, true)
+      : null;
+    const succeeded = receipt.success.isTrue;
+    if (!succeeded || (POST_UPGRADE_X3_EXPECT && String(returned) !== POST_UPGRADE_X3_EXPECT)) {
+      throw new Error(
+        `post-upgrade X3 program: success=${succeeded}, returned ${returned}, `
+        + `expected ${POST_UPGRADE_X3_EXPECT || '(any)'}`,
+      );
+    }
+    evidence.post_upgrade_x3_program = {
+      comit_id: comitId,
+      tx_hash: submitted.txHash,
+      block_number: submitted.blockNumber,
+      block_hash: submitted.blockHash,
+      program_bytes: program.length,
+      success: succeeded,
+      returned: returned === null ? null : returned.toString(),
+      gas_used: receipt.gasUsed.toString(),
+      storage_writes: receipt.storageWrites ? receipt.storageWrites.length : null,
+    };
+    record('post-upgrade X3 program executed', {
+      detail: `comit ${comitId} returned ${returned} in block ${submitted.blockNumber}`,
+    });
+  }
 
   evidence.best_block_after = (await api.rpc.chain.getHeader()).number.toNumber();
   evidence.finalized_block_after = (
