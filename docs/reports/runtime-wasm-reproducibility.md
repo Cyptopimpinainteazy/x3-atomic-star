@@ -692,8 +692,8 @@ alters the runtime, so the record and the code land together.
   `register_external_root`, which this runtime refuses at its `RefuseExternalRoots` verifier by
   policy. Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
   whole twelve-pallet burndown is closed, leaving only the documented
-  `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8904085
-  (`0xc998fd28e5c8630de8944f9ed6eb9e512e8d0818781c480bb0de6f4c1286b4c9`) — was 8,905,964 — and
-  compressed 1529828
-  (`0xa23987aa282c9713a6fcaf0139ed7e29adeb9b14801f4d63ecbbbccab2bb9d91`) — was 1,530,061, from two
+  `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8906530
+  (`0xd124d7da6dd19e0dce679ea4fa6e3690fa754e27f947335eab7df2bf4f54e859`) — was 8,905,964 — and
+  compressed 1530404
+  (`0x649d1b0bd86af6ff851d8a791535f55ec5cb8a3369f65cfe5f1b6e3e19006df7`) — was 1,530,061, from two
   builds that agreed.
