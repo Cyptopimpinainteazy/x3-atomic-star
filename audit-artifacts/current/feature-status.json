@@ -2901,32 +2901,34 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 59,
+      "composite": 63,
       "confidence": "high",
       "evidence": [
         "x3-lang/compiler",
         "note: Trading Core v1 gap #9"
       ],
       "id": "X3-LANG-003",
-      "implemented": 75,
+      "implemented": 82,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 35,
       "missing_work": [
-        "Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what is missing is a key registry or rotation story \u2014 keys are named per invocation"
+        "Receipts carry an ed25519 attestation with a key id, `receipt verify --trusted <key>` requires and validates it (a different key is refused by name), any edited field breaks the hash, and mainnet now *requires* a trusted key (TICKET-135); what was missing was a key registry or rotation story, since keys were named per invocation. **Closed 2026-09-28:** `ReceiptKeyRegistry` records each key as `active`, `retired` (rotated out: still verifies what it signed, `may_sign` is false) or `revoked` (compromised: refused by name, including for receipts signed before the revocation). A registry that could be misread is refused at load: a duplicate id, one public key under two ids, no active key, a malformed key, or unknown fields. `x3c receipt verify --trusted-registry <file>` uses it and satisfies mainnet's trusted-key requirement. Disabling the revocation check turns the VM and CLI tests red. Still open: nothing distributes or signs the registry file itself, and the signing side (`receipt execute`) does not consult it, so a retired key is marked as not signing but is not prevented from signing"
       ],
       "name": "Signed / attested trading receipts",
       "paths": [
         "x3-lang/vm/src/trading.rs",
-        "x3-lang/crates/x3-tools/src/bin/x3c.rs"
+        "x3-lang/crates/x3-tools/src/bin/x3c.rs",
+        "x3-lang/vm/tests/trading_receipts.rs",
+        "x3-lang/crates/x3-tools/tests/cli.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "language_trading",
-      "tested": 75,
-      "tests": "tested score 75% (no named test list on this row)"
+      "tested": 82,
+      "tests": "tested score 82% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4946,7 +4948,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "6ab5caab7c345510fb91974b1419f254f8d378b3473c797aae564abe7ec8994d",
+    "source_digest": "7b5454e6cc96dbea9d8b78ea0fb556c41274e3224e380306072528a1d697b46a",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4957,7 +4959,7 @@
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "a70e3258586cb3566362a72c81d8f34eb19efd8ff7576eac38101f0ae513f1cd",
+      "feature-matrix/language-trading.toml": "fba058af81546c19901c8662e8f819f55bf103f6ec9e2a086832f853bd208435",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "dc87270fc2a1df4f9c1237cf636de97bd2858964e623ecb53830cba0acb445ba",
       "feature-matrix/runtime-core.toml": "85b47963a28d9a2d5d2f2fed36d1ffec770a8f65c5fa6d0b66436331a51a099b",
