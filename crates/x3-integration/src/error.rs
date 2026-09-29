@@ -36,6 +36,8 @@ pub enum X3IntegrationError {
     ModuleNotFound,
     /// Compilation failed (when compile feature enabled)
     CompilationFailed(String),
+    /// A standalone artifact's attestation was refused, so it was not executed.
+    UnattestedArtifact(String),
 }
 
 #[cfg(feature = "std")]
@@ -58,6 +60,9 @@ impl std::fmt::Display for X3IntegrationError {
             Self::AtomicViolation(msg) => write!(f, "Atomic block violation: {}", msg),
             Self::ModuleNotFound => write!(f, "Module not found"),
             Self::CompilationFailed(msg) => write!(f, "Compilation failed: {}", msg),
+            Self::UnattestedArtifact(msg) => {
+                write!(f, "Artifact attestation refused: {}", msg)
+            }
         }
     }
 }
@@ -80,6 +85,7 @@ impl From<X3IntegrationError> for frame_support::pallet_prelude::DispatchError {
             X3IntegrationError::AtomicViolation(_) => "X3: Atomic violation",
             X3IntegrationError::ModuleNotFound => "X3: Module not found",
             X3IntegrationError::CompilationFailed(_) => "X3: Compilation failed",
+            X3IntegrationError::UnattestedArtifact(_) => "X3: Artifact attestation refused",
         })
     }
 }
