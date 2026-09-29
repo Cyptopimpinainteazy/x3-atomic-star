@@ -365,7 +365,33 @@ impl MirFunctionBuilder {
             }
             // Both were matched to an empty arm, so an `emit` compiled and emitted nothing: a
             // program whose receipt is supposed to carry an event produced a receipt without one.
-            HirStmt::Emit { .. } => return Err(unsupported("`emit`")),
+            // `emit Name(a, b)` lowers to a call to the reserved `emit` symbol whose first
+            // argument is the event's name. It was refused here — "compiled and emitted nothing"
+            // — because the opcode existed and no engine implemented it; both do now, and the
+            // receipt carries what they journal.
+            //
+            // A call is the right shape for the same reason a host call is: every optimizer pass
+            // already treats one as an effect, so an `emit` whose result nobody reads is not
+            // deleted and is not hoisted across a store.
+            HirStmt::Emit {
+                event_name, args, ..
+            } => {
+                if event_name.trim().is_empty() {
+                    return Err(MirError::new(
+                        "an event must be named: `emit` with an empty name would journal an entry \
+                         no reader could identify",
+                    ));
+                }
+                let name = self.emit_literal(x3_common::Literal::String(event_name.clone()));
+                let mut call_args = vec![name];
+                for arg in args {
+                    call_args.push(self.lower_expr(arg)?);
+                }
+                self.emit_assignment(MirRhs::Call {
+                    target: SymbolId(x3_common::intrinsics::EMIT_SYMBOL),
+                    args: call_args,
+                });
+            }
             HirStmt::AgentInit { .. } => return Err(unsupported("agent initialisation")),
         }
         Ok(())

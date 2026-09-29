@@ -65,7 +65,8 @@ fn agreed_refusals() -> Vec<(u8, &'static str)> {
         (0x85, "ctx_chain_id"),
         (0xA0, "agent_self"),
         (0xA1, "agent_init"),
-        (0xA2, "emit"),
+        // `0xA2` (`emit`) is deliberately absent: both engines implement it now, and
+        // `tests/events.rs` compares their journals rather than asserting they both refuse it.
         // TICKET-149: the runtime interpreter used to execute these and `crates/x3-vm` did not.
         // Both refuse them now; see `mini_x3::verify_code` for why neither half was right.
         (0x60, "i32_to_i64"),

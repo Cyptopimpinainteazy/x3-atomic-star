@@ -205,9 +205,22 @@ impl MirBytecodeCompiler {
                             .map(|a| self.get_reg(*a))
                             .collect::<BackendResult<Vec<_>>>()?;
 
-                        // A host call is a call to a reserved symbol (`x3_common::intrinsics`):
-                        // it becomes the VM's opcode, not a call into the function table.
-                        if let Some(intrinsic) = x3_common::intrinsics::by_symbol(target.0) {
+                        // `emit` is a call to its own reserved symbol, with the event's name as
+                        // the first argument and the payload after it.
+                        if target.0 == x3_common::intrinsics::EMIT_SYMBOL {
+                            let (name, payload) = arg_regs.split_first().ok_or_else(|| {
+                                BackendError::new(
+                                    BackendErrorKind::Internal(
+                                        "emit lowered without an event name".to_string(),
+                                    ),
+                                    self.current_span,
+                                )
+                            })?;
+                            self.emitter.emit_emit(*name, payload);
+                            // `emit` is a statement, so its MIR value is the unit this backend
+                            // represents as 0 — the same as a host call that returns nothing.
+                            self.emitter.emit_int(dst, 0)?;
+                        } else if let Some(intrinsic) = x3_common::intrinsics::by_symbol(target.0) {
                             if arg_regs.len() != intrinsic.arity {
                                 return Err(BackendError::new(
                                     BackendErrorKind::Internal(format!(

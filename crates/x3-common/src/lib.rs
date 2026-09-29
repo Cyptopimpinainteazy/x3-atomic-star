@@ -411,6 +411,25 @@ pub mod bytecode {
 // compiled `signing` — and failed, taking seven crates' no-default-features builds and the runtime's
 // WASM build with it. A scripted insertion anchored on a bare `pub mod X;` moves whatever attribute
 // precedes it; anchor on the attribute too.
+/// How a value is tagged when it leaves a program: in a storage slot, or in an event's payload.
+///
+/// Both interpreters write these, and a reader that disagrees about a tag hands a program back a
+/// value it never produced. They were `const SLOT_TAG_*` in `crates/x3-vm` and again in
+/// `x3-integration::mini_x3`, two copies that happened to agree; events made a third consumer, so
+/// the definition moved here, beside the envelope, for the reason the envelope is here
+/// (TICKET-108): one definition, both readers.
+///
+/// A tagged value is `[tag][len][data]`. A slot pads that to 32 bytes; an event payload
+/// concatenates them, so a reader walks the run without needing the values' types in advance.
+pub mod value_tags {
+    pub const INT: u8 = 1;
+    pub const BOOL: u8 = 2;
+    pub const F64: u8 = 3;
+    pub const ADDR: u8 = 4;
+    pub const BYTES: u8 = 5;
+    pub const STRING: u8 = 6;
+}
+
 /// Host calls a chain program can make by name: the VM's storage opcodes, reachable from source.
 ///
 /// `x3-backend` has emitted `evm_sload`/`evm_sstore` (0xB3/0xB4) and both interpreters have
@@ -456,6 +475,15 @@ pub mod intrinsics {
     };
 
     pub const ALL: [Intrinsic; 2] = [EVM_SLOAD, EVM_SSTORE];
+
+    /// The reserved symbol `emit` lowers to.
+    ///
+    /// Not in [`ALL`]: those are host calls a program writes as `name(args)` with a fixed arity and
+    /// `i64` operands. `emit` is a statement of the language, its first operand is the event's name
+    /// and the rest are the payload, and it takes as many as the program writes — so it is named
+    /// here, where both the lowering and the backend can see it, rather than pretending to be a
+    /// function.
+    pub const EMIT_SYMBOL: usize = usize::MAX - 2;
 
     pub fn by_name(name: &str) -> Option<Intrinsic> {
         ALL.iter().copied().find(|intrinsic| intrinsic.name == name)
