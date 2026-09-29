@@ -693,7 +693,7 @@ alters the runtime, so the record and the code land together.
   policy. Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
   whole twelve-pallet burndown is closed, leaving only the documented
   `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8904085
-  (`0x42c9a024777af008b64d042d7d7e4459d62c3c52b35e2d6c74dcb248d6bfdb14`) — was 8,905,964 — and
-  compressed 1529824
-  (`0x994923ea589fe7f52f03a17f743aa43c3acbdf3e616d660b1aaf5c5a5fe05a84`) — was 1,530,061, from two
+  (`0xc998fd28e5c8630de8944f9ed6eb9e512e8d0818781c480bb0de6f4c1286b4c9`) — was 8,905,964 — and
+  compressed 1529828
+  (`0xa23987aa282c9713a6fcaf0139ed7e29adeb9b14801f4d63ecbbbccab2bb9d91`) — was 1,530,061, from two
   builds that agreed.
