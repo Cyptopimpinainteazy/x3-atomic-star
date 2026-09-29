@@ -209,3 +209,24 @@ fn an_operator_on_strings_is_refused_at_compile_time_not_at_run_time() {
         2
     );
 }
+
+// ─── Cross-VM calls (X3-LANG-001) ───────────────────────────────────────────────────────────────
+
+/// The chain's EVM and SVM keep no state between executions (the production runtime runs
+/// `mini_evm` and the payload's own SVM program), so a cross-VM call has nothing to reach. It is
+/// refused by name with that reason, not reported as an unknown identifier.
+#[test]
+fn a_cross_vm_call_is_refused_with_the_reason_it_cannot_run() {
+    for call in ["evm_call(1, 2, 3, 4)", "svm_invoke(1, 2)", "evm_balance(1)"] {
+        let error = refusal(&format!("fn main() -> i64 {{ return {call}; }}"));
+        assert!(error.contains("UnavailableCrossVmCall"), "{call}: {error}");
+    }
+    // A program's own function with that name is still its own.
+    assert_eq!(
+        agreed_value(
+            "fn evm_call(a: i64) -> i64 { return a + 1; } \
+             fn main() -> i64 { return evm_call(41); }"
+        ),
+        42
+    );
+}

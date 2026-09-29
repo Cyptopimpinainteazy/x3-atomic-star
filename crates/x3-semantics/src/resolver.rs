@@ -626,6 +626,30 @@ impl Resolver {
         self.resolve_expression(&unary.expr);
     }
 
+    /// Cross-VM intrinsics the HIR names (`VmIntrinsic`) that the chain cannot serve. On the production
+    /// (WASM) runtime the kernel's EVM is `mini_evm` and its SVM runs the program in the payload: both
+    /// start from empty state every execution, so there is no deployed contract, account or balance for
+    /// one of these to reach. A program using one is refused by name, with that reason, rather than as
+    /// an unknown identifier (X3-LANG-001).
+    const UNAVAILABLE_CROSS_VM_CALLS: &[&str] = &[
+        "evm_call",
+        "evm_static_call",
+        "evm_delegate_call",
+        "evm_create",
+        "evm_create2",
+        "evm_log",
+        "evm_balance",
+        "evm_code_size",
+        "svm_invoke",
+        "svm_invoke_signed",
+        "svm_create_account",
+        "svm_transfer",
+        "svm_get_account_data",
+        "svm_set_account_data",
+        "svm_get_rent",
+        "svm_get_clock",
+    ];
+
     fn resolve_call_expression(&mut self, call: &CallExpression) {
         // A host call (`x3_common::intrinsics`) resolves to no symbol, and only when the program
         // has not declared the name itself: a user's own `evm_sload` shadows the host call.
@@ -638,6 +662,25 @@ impl Resolver {
             }
             _ => false,
         };
+        // A cross-VM intrinsic the chain has no host for: named as such, not as an unknown name.
+        if let Expression::Identifier(ident) = &*call.callee {
+            if !host_call
+                && self
+                    .scopes
+                    .lookup(self.current_scope, &ident.name)
+                    .is_none()
+                && Self::UNAVAILABLE_CROSS_VM_CALLS.contains(&ident.name.as_str())
+            {
+                self.errors.push(SemanticError::new(
+                    crate::error::SemanticErrorKind::UnavailableCrossVmCall(ident.name.clone()),
+                    ident.span,
+                ));
+                for arg in &call.args {
+                    self.resolve_expression(arg);
+                }
+                return;
+            }
+        }
         // Resolve the callee
         if !host_call {
             self.resolve_expression(&call.callee);
