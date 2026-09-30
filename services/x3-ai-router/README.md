@@ -31,9 +31,41 @@ A reservation is deleted only by `finish`, which runs in the request thread. If 
 
 ## Client compatibility
 
-The router implements the OpenAI **Chat Completions** API at `/v1/chat/completions`, streaming and non-streaming. `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature` and `seed` are forwarded unchanged; the router chooses the model, so the client's `model` is accepted and ignored. `GET /v1/models` lists `x3-auto` and `GET /v1/models/x3-auto` serves it, which is what clients probe before their first call.
+Two wire protocols are served, over the same provider chain, budgets, cooldowns
+and fallback:
 
-It does **not** implement the Responses API. `POST /v1/responses`, `/v1/embeddings` and `/v1/audio/*` answer `501` naming the gap rather than `404`, so a client that needs them fails visibly instead of looking like a wrong base URL. An agent that requires the Responses API cannot use this router yet; that is the largest remaining compatibility gap.
+- **Chat Completions** at `/v1/chat/completions`, streaming and non-streaming.
+  `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature`
+  and `seed` are forwarded unchanged.
+- **Responses** at `/v1/responses`, streaming and non-streaming. This is not a
+  passthrough: no provider this router talks to speaks the Responses protocol,
+  so requests are translated to Chat Completions and the answer is translated
+  back. `instructions` becomes a system message, `input` items become
+  messages / assistant tool calls / tool results, function tools are flattened
+  out of the Responses shape (namespaced tools are flattened too; `web_search`
+  is dropped, because the chat protocol has no equivalent and pretending
+  otherwise would misreport what ran), and the stream is re-emitted as
+  `response.created` → `response.output_item.added` →
+  `response.output_text.delta` / `response.function_call_arguments.delta` →
+  `...done` → `response.completed`.
+
+The Responses endpoint is what makes Codex usable with this router: Codex
+accepts only `wire_api = "responses"` for a custom provider. It was verified
+with real `codex exec` runs, including a tool round trip — `exec_command`
+reached the shell, its stdout came back as a `function_call_output`, and the
+model answered from it.
+
+The router chooses the model, so the client's `model` is accepted and ignored.
+`GET /v1/models` lists `x3-auto` and `GET /v1/models/x3-auto` serves it, which
+is what clients probe before their first call. `/v1/embeddings` and
+`/v1/audio/*` still answer `501` naming the gap rather than a `404` that reads
+as a wrong base URL.
+
+`max_input_tokens` bounds the request body in UTF-8 bytes and must exceed what
+the client actually sends. Codex sends ~94 KB for a trivial prompt, because the
+system prompt, tool schemas and project instructions all ride along; the
+default is 200000. A client rejected with `413` is usually this bound, not the
+provider's context window.
 
 ## Operational notes
 
@@ -45,7 +77,7 @@ Still missing, in the order they matter for relying on this with X3 agents:
 
 - **Verified escalation.** Fallback reacts to provider failures, not to patches that fail their checks. The feedback work records which patches pass, but nothing routes on it yet.
 - **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list.
-- **Context retrieval.** No repo index or context packets; prompts carry their own context.
+- **Context retrieval.** No repo index or context packets; prompts carry their own context, which is why a Codex turn arrives with ~19K input tokens.
 - **Operational security.** One router token, no per-agent credentials; the usage database is an unencrypted SQLite file.
 
 The service does not persist prompts or credentials.

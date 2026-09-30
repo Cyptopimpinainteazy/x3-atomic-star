@@ -320,8 +320,13 @@ class RouterTests(unittest.TestCase):
             # A client that reaches for the Responses API must be told plainly
             # rather than handed a 404 that looks like a wrong base URL.
             request = urllib.request.Request(url + "/v1/responses", b"{}", {"Content-Type": "application/json"})
-            with self.assertRaises(urllib.error.HTTPError) as unsupported:
+            with self.assertRaises(urllib.error.HTTPError) as malformed:
                 urllib.request.urlopen(request)
+            self.assertEqual(malformed.exception.code, 400, "the Responses endpoint exists and validates input")
+
+            embeddings = urllib.request.Request(url + "/v1/embeddings", b"{}", {"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError) as unsupported:
+                urllib.request.urlopen(embeddings)
             self.assertEqual(unsupported.exception.code, 501)
             self.assertIn("Chat Completions", unsupported.exception.read().decode())
 
@@ -332,6 +337,100 @@ class RouterTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+    # ── Responses API (the wire protocol Codex actually speaks) ──────────
+
+    def responses_body(self, **overrides):
+        body = {"model": "x3-auto", "stream": True, "instructions": "be brief",
+                "input": [{"type": "message", "role": "user",
+                           "content": [{"type": "input_text", "text": "hi"}]}]}
+        body.update(overrides)
+        return body
+
+    def serve(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    def test_responses_request_translation(self):
+        chat = router_module.responses_request_to_chat({
+            "instructions": "sys",
+            "input": [
+                {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "dev"}]},
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]},
+                {"type": "function_call", "call_id": "c1", "name": "exec_command",
+                 "arguments": "{\"cmd\":\"ls\"}"},
+                {"type": "function_call_output", "call_id": "c1", "output": "file.txt"},
+            ],
+            "tools": [
+                {"type": "function", "name": "exec_command", "description": "run it",
+                 "parameters": {"type": "object", "properties": {}}},
+                {"type": "namespace", "name": "ns", "tools": [
+                    {"type": "function", "name": "inner", "parameters": {"type": "object"}}]},
+                {"type": "web_search"},
+            ],
+            "tool_choice": "auto", "max_output_tokens": 64,
+        })
+        self.assertEqual([m["role"] for m in chat["messages"]],
+                         ["system", "system", "user", "assistant", "tool"])
+        self.assertEqual(chat["messages"][3]["tool_calls"][0]["function"]["name"], "exec_command")
+        self.assertEqual(chat["messages"][4]["tool_call_id"], "c1")
+        self.assertEqual([t["function"]["name"] for t in chat["tools"]], ["exec_command", "inner"],
+                         "namespaced tools flatten; web_search has no chat equivalent")
+        self.assertEqual(chat["tool_choice"], "auto")
+        self.assertEqual(chat["max_tokens"], 64)
+
+    def test_chat_message_maps_to_responses_output(self):
+        output = router_module.chat_message_to_response_output(
+            {"content": "hello", "tool_calls": [{"id": "c1", "function": {"name": "f", "arguments": "{}"}}]},
+            "resp_")
+        self.assertEqual([item["type"] for item in output], ["message", "function_call"])
+        self.assertEqual(output[0]["content"][0]["text"], "hello")
+        self.assertEqual(output[1]["call_id"], "c1")
+        self.assertEqual(output[1]["name"], "f")
+
+    def test_responses_endpoint_non_streaming(self):
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False, tools=[
+                {"type": "function", "name": "exec_command", "description": "run it",
+                 "parameters": {"type": "object", "properties": {}}}])).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(body["object"], "response")
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(body["output"][0]["type"], "message")
+        self.assertEqual(body["output"][0]["content"][0]["text"], "ok")
+        self.assertIn("usage", body)
+        self.assertEqual(Provider.requests[0]["messages"][0], {"role": "system", "content": "be brief"})
+        self.assertEqual(Provider.requests[0]["tools"][0]["function"]["name"], "exec_command")
+        self.assertEqual(self.router.stats()[0]["provider"], "up", "budget accounting still applies")
+
+    def test_responses_endpoint_streams_the_responses_event_sequence(self):
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body()).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        order = ["response.created", "response.output_item.added", "response.output_text.delta",
+                 "response.output_text.done", "response.output_item.done", "response.completed"]
+        positions = [raw.find('"type": "' + name + '"') for name in order]
+        self.assertNotIn(-1, positions, f"missing event; got {raw[:400]}")
+        self.assertEqual(positions, sorted(positions), "events must arrive in the order Codex expects")
+        self.assertIn('"text": "ok"', raw)
 
 
 if __name__ == "__main__":
