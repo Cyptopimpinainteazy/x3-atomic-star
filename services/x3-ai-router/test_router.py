@@ -268,6 +268,36 @@ class RouterTests(unittest.TestCase):
 
     # ── Provider cooldowns ───────────────────────────────────────────────
 
+    def test_budget_exhaustion_falls_through_to_a_free_provider(self):
+        """Running out of money must stop the spending, not stop the work."""
+        self.config["providers"]["local"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
+            "model": "local", "critical_allowed": True}
+        self.config["routes"]["critical"] = ["up"]
+        self.config["budget_fallback"] = ["local"]
+        self.config["daily_budget_usd"] = 0.000001
+        self.config["agent_daily_budget_usd"] = 0.000001
+
+        status, response = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+
+        self.assertEqual(status, 200, "the fallback provider must still answer")
+        self.assertEqual(response["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(Provider.requests[-1]["model"], "local")
+
+    def test_budget_exhaustion_still_refuses_paid_providers(self):
+        self.config["routes"]["critical"] = ["up"]
+        self.config["budget_fallback"] = []
+        self.config["daily_budget_usd"] = 0.000001
+        self.config["agent_daily_budget_usd"] = 0.000001
+
+        status, body = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+
+        self.assertEqual(status, 429)
+        self.assertEqual(body["error"]["type"], "budget_exceeded")
+        self.assertEqual(Provider.requests, [], "an over-budget paid provider must not be called")
+
     def test_failing_provider_is_cooled_down_and_skipped(self):
         status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
         self.assertEqual(status, 200, "the second provider still serves the request")

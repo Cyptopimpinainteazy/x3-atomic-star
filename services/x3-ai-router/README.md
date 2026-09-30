@@ -21,6 +21,30 @@ A reservation is an upper bound on one call, so the request must not be able to 
 
 `max_output_tokens` (32768), `default_max_output_tokens` (4096), `reservation_ttl_seconds` (900), `provider_cooldown_seconds` (60) and `provider_cooldown_max_seconds` (3600) are config knobs.
 
+## Running out of money degrades the model, it does not stop the work
+
+An exhausted budget used to end the request: `reserve()` returned nothing and
+the router answered `429` without trying anything else. Two things were wrong
+with that. A zero-cost provider could never get a reservation once spend passed
+the ceiling, so the free local model was blocked by a paid API being over
+budget — "stop spending" became "stop working". And a paid provider being
+unavailable was treated as fatal even when a free one could answer.
+
+`budget_fallback` is now appended after the configured route. It is only
+reached when nothing better answered, and naming a provider there is what lets
+it run for a critical request it is not otherwise cleared for. Providers that
+cannot bill need no reservation at all. If every provider in the chain *and*
+the fallback fails, the request gets a `429` with `type: budget_exceeded` and an
+`attempts` list naming each refusal.
+
+The default fallback is local Ollama first, then the two free cloud models, so
+code stays on the machine when it can and only leaves it if the local model
+cannot answer. Set `budget_fallback` to `[]` to restore hard-stop behaviour.
+Which model actually answered is visible in the response's `model` field and in
+`/v1/usage`; a fallback answer is not distinguished from a paid one beyond
+that, so watch for the local model name in accounting if you need to know how
+often the downgrade happened.
+
 ## Provider cooldowns
 
 A provider that fails is skipped for a doubling delay, capped, with `Retry-After` from an HTTP error taking precedence when the provider sends one. Without this, every request in turn paid the timeout of an endpoint that was already down. A success clears the record. `GET /v1/providers` shows consecutive failures and the remaining cooldown, and the skip reason is reported in the `502` body's `attempts`.

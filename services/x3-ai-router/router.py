@@ -327,6 +327,22 @@ class Router:
         tier = "critical" if any(term in text for term in CRITICAL) else "routine"
         return tier, self.config["routes"][tier]
 
+    def attempt_order(self, chain):
+        """The providers to try, in order, for one request.
+
+        `budget_fallback` is appended after the configured chain, so an
+        exhausted budget or an unusable paid provider degrades the model
+        instead of failing the request. Being named in that list is also what
+        lets a provider run for a critical request it is not otherwise
+        cleared for — and because it sits last, it is only reached when
+        nothing better answered.
+        """
+        order = list(chain)
+        for name in self.config.get("budget_fallback", []):
+            if name in self.config["providers"] and name not in order:
+                order.append(name)
+        return order
+
     def reserve(self, agent, estimate):
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
         with self.lock:
@@ -511,11 +527,13 @@ class Router:
             return 400, {"error": {"message": error}}
         tier, chain = self.choose(request)
         failures = []
-        for name in chain:
+        budget_refused = False
+        for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
-            if tier == "critical" and not provider.get("critical_allowed", False):
+            if tier == "critical" and not provider.get("critical_allowed", False) \
+                    and name not in self.config.get("budget_fallback", []):
                 continue
             cooldown = self.provider_cooldown(name)
             if cooldown > 0:
@@ -534,9 +552,18 @@ class Router:
             if provider.get("api_key_env") and not key:
                 failures.append(name + ": credential unavailable")
                 continue
-            reservation = self.reserve(agent, estimate)
-            if reservation is None:
-                return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded"}}
+            # A provider that cannot bill needs no reservation, and must not be
+            # blocked by a budget that is already spent. Refusing a free local
+            # model because a paid API is over its ceiling turns "stop spending"
+            # into "stop working".
+            if estimate <= 0:
+                reservation = None
+            else:
+                reservation = self.reserve(agent, estimate)
+                if reservation is None:
+                    budget_refused = True
+                    failures.append(name + ": daily budget exhausted")
+                    continue
             payload = dict(request)
             payload["model"] = model
             payload["stream"] = False
@@ -572,6 +599,9 @@ class Router:
                 self.finish(reservation, agent)
                 self.note_provider_failure(name, "unexpected error")
                 raise
+        if budget_refused:
+            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded",
+                                   "attempts": failures}}
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
     def stream(self, request, agent, start, send):
@@ -582,11 +612,13 @@ class Router:
             return 400, {"error": error}
         tier, chain = self.choose(request)
         failures = []
-        for name in chain:
+        budget_refused = False
+        for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
-            if tier == "critical" and not provider.get("critical_allowed", False):
+            if tier == "critical" and not provider.get("critical_allowed", False) \
+                    and name not in self.config.get("budget_fallback", []):
                 continue
             cooldown = self.provider_cooldown(name)
             if cooldown > 0:
@@ -603,9 +635,18 @@ class Router:
                 failures.append(name + ": credential unavailable")
                 continue
             estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
-            reservation = self.reserve(agent, estimate)
-            if reservation is None:
-                return 429, {"error": "Daily budget exhausted"}
+            # A provider that cannot bill needs no reservation, and must not be
+            # blocked by a budget that is already spent. Refusing a free local
+            # model because a paid API is over its ceiling turns "stop spending"
+            # into "stop working".
+            if estimate <= 0:
+                reservation = None
+            else:
+                reservation = self.reserve(agent, estimate)
+                if reservation is None:
+                    budget_refused = True
+                    failures.append(name + ": daily budget exhausted")
+                    continue
             payload = dict(request)
             payload["model"] = provider["model"]
             payload["stream"] = True
@@ -664,6 +705,9 @@ class Router:
                 self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
                 self.note_provider_failure(name, "unexpected error")
                 raise
+        if budget_refused:
+            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded",
+                                   "attempts": failures}}
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
 
