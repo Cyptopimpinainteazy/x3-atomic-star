@@ -213,6 +213,126 @@ class RouterTests(unittest.TestCase):
             os.environ.pop("X3_ENABLE_FREE_CLOUD_TEST", None)
             os.environ.pop("OPENROUTER_TEST_KEY", None)
 
+    # ── Budget validation ────────────────────────────────────────────────
+
+    def test_multiple_completions_are_refused(self):
+        """`n` multiplies the bill; the reservation only covers one completion."""
+        status, body = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10, "n": 2}, "alice")
+        self.assertEqual(status, 400)
+        self.assertIn("n must be 1", body["error"]["message"])
+        self.assertEqual(Provider.requests, [], "a refused request must not reach a provider")
+
+        status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10, "n": 1}, "alice")
+        self.assertEqual(status, 200)
+
+    def test_max_completion_tokens_is_bounded_and_reserved(self):
+        status, body = self.router.complete({"messages": [{"content": "format"}], "max_completion_tokens": 999999}, "alice")
+        self.assertEqual(status, 400)
+        self.assertIn("max_completion_tokens", body["error"]["message"])
+
+        # 32768 output tokens at $1/M plus the 1000-byte input bound is more than
+        # the 0.01 daily budget. The estimate used to read only `max_tokens` and
+        # fall back to 4096, so this request was served and billed afterwards.
+        status, _ = self.router.complete({"messages": [{"content": "format"}], "max_completion_tokens": 32768}, "alice")
+        self.assertEqual(status, 429)
+        self.assertEqual(Provider.requests, [])
+
+    def test_stream_refuses_multiple_completions(self):
+        chunks = []
+        status, body = self.router.stream({"messages": [{"content": "format"}], "max_tokens": 10, "n": 4},
+                                          "alice", lambda: None, chunks.append)
+        self.assertEqual(status, 400)
+        self.assertIn("n must be 1", body["error"])
+        self.assertEqual(chunks, [])
+
+    # ── Crash recovery ───────────────────────────────────────────────────
+
+    def test_orphaned_reservations_are_reclaimed_on_startup(self):
+        day = router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()
+        self.router.db.execute("INSERT INTO reservations VALUES (?,?,?,?,?)",
+                               ("orphan", day, "alice", 0.009, router_module.time.time() - 100_000))
+        self.router.db.commit()
+        self.assertGreater(self.router.snapshot()["reserved_usd"], 0)
+
+        restarted = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+        self.assertEqual(restarted.snapshot()["reserved_usd"], 0)
+        self.assertEqual(restarted.reconciled_orphans, 1)
+        self.assertIsNotNone(restarted.reserve("alice", 0.001), "the reclaimed budget must be usable again")
+
+    def test_a_live_reservation_is_not_reclaimed(self):
+        self.assertIsNotNone(self.router.reserve("alice", 0.009))
+        restarted = router_module.Router(self.config, self.tmp.name + "/usage.db")
+        self.assertEqual(restarted.reconciled_orphans, 0)
+        self.assertGreater(restarted.snapshot()["reserved_usd"], 0)
+
+    # ── Provider cooldowns ───────────────────────────────────────────────
+
+    def test_failing_provider_is_cooled_down_and_skipped(self):
+        status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
+        self.assertEqual(status, 200, "the second provider still serves the request")
+        self.assertGreater(self.router.provider_cooldown("down"), 0)
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertEqual(health["down"]["failures"], 1)
+
+        # A route holding only the cooled-down provider fails without calling it.
+        self.config["routes"]["routine"] = ["down"]
+        status, body = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
+        self.assertEqual(status, 502)
+        self.assertIn("cooling down", " ".join(body["error"]["attempts"]))
+        self.assertEqual(len(Provider.requests), 1, "the cooled-down endpoint must not be retried")
+
+    def test_retry_after_is_honoured_and_success_clears_it(self):
+        self.router.note_provider_failure("down", "HTTP 429", 120)
+        self.assertGreater(self.router.provider_cooldown("down"), 110)
+        self.router.note_provider_success("down")
+        self.assertEqual(self.router.provider_cooldown("down"), 0)
+
+    def test_cooldown_backs_off_across_consecutive_failures(self):
+        self.router.note_provider_failure("down", "timeout")
+        first = self.router.provider_cooldown("down")
+        self.router.note_provider_failure("down", "timeout")
+        second = self.router.provider_cooldown("down")
+        self.assertGreater(second, first)
+
+    # ── Client compatibility ─────────────────────────────────────────────
+
+    def test_tool_call_requests_are_forwarded_unchanged(self):
+        tools = [{"type": "function", "function": {"name": "read_file", "parameters": {"type": "object"}}}]
+        status, _ = self.router.complete({"messages": [{"role": "user", "content": "read a file"}],
+                                          "max_tokens": 10, "tools": tools, "tool_choice": "auto"}, "alice")
+        self.assertEqual(status, 200)
+        self.assertEqual(Provider.requests[0]["tools"], tools)
+        self.assertEqual(Provider.requests[0]["tool_choice"], "auto")
+        self.assertEqual(Provider.requests[0]["model"], "up", "the router picks the model, the client's is ignored")
+
+    def test_models_and_unsupported_endpoints(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}"
+            with urllib.request.urlopen(url + "/v1/models/x3-auto") as response:
+                self.assertEqual(json.loads(response.read())["id"], "x3-auto")
+            with self.assertRaises(urllib.error.HTTPError) as unknown:
+                urllib.request.urlopen(url + "/v1/models/gpt-9")
+            self.assertEqual(unknown.exception.code, 404)
+
+            # A client that reaches for the Responses API must be told plainly
+            # rather than handed a 404 that looks like a wrong base URL.
+            request = urllib.request.Request(url + "/v1/responses", b"{}", {"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError) as unsupported:
+                urllib.request.urlopen(request)
+            self.assertEqual(unsupported.exception.code, 501)
+            self.assertIn("Chat Completions", unsupported.exception.read().decode())
+
+            bad = json.dumps({"model": "x3-auto", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10, "n": 3}).encode()
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(urllib.request.Request(url + "/v1/chat/completions", bad, {"Content-Type": "application/json"}))
+            self.assertEqual(rejected.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()
