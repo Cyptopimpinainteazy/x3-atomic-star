@@ -300,6 +300,21 @@ def pricing_error(provider):
     return None
 
 
+def may_serve_critical(provider):
+    """Whether a provider may be handed a critical request.
+
+    Critical requests carry consensus and settlement code. A provider that
+    authenticates against a third party (`api_key_env` set) may only see one
+    when it is explicitly cleared with `critical_allowed`; being named in
+    `budget_fallback` is not clearance, because the default fallback includes
+    free cloud models whose operator logs prompts. A provider with no
+    credentials is talking to a model on this machine, so it cannot leak the
+    request to anyone and stays eligible — that is how a critical request keeps
+    working when a paid provider is unavailable or over budget.
+    """
+    return bool(provider.get("critical_allowed", False)) or not provider.get("api_key_env")
+
+
 class Router:
     def __init__(self, config, db_path):
         self.config = config
@@ -332,10 +347,11 @@ class Router:
 
         `budget_fallback` is appended after the configured chain, so an
         exhausted budget or an unusable paid provider degrades the model
-        instead of failing the request. Being named in that list is also what
-        lets a provider run for a critical request it is not otherwise
-        cleared for — and because it sits last, it is only reached when
-        nothing better answered.
+        instead of failing the request. Because it sits last, it is only
+        reached when nothing better answered, and it can keep a critical
+        request on this machine (a provider with no credentials cannot leak
+        it) — but it never clears a third-party provider for critical work.
+        See `may_serve_critical`.
         """
         order = list(chain)
         for name in self.config.get("budget_fallback", []):
@@ -532,8 +548,8 @@ class Router:
             provider = self.config["providers"][name]
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
-            if tier == "critical" and not provider.get("critical_allowed", False) \
-                    and name not in self.config.get("budget_fallback", []):
+            if tier == "critical" and not may_serve_critical(provider):
+                failures.append(name + ": not cleared for critical work")
                 continue
             cooldown = self.provider_cooldown(name)
             if cooldown > 0:
@@ -617,8 +633,8 @@ class Router:
             provider = self.config["providers"][name]
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
-            if tier == "critical" and not provider.get("critical_allowed", False) \
-                    and name not in self.config.get("budget_fallback", []):
+            if tier == "critical" and not may_serve_critical(provider):
+                failures.append(name + ": not cleared for critical work")
                 continue
             cooldown = self.provider_cooldown(name)
             if cooldown > 0:

@@ -6,7 +6,7 @@ Set a separate `X3_VERIFIER_TOKEN` on the router and only the verifier worker. O
 
 The bundled OpenRouter GPT-4.1 Mini and direct GPT-5 prices were checked on 2026-09-29. Paid providers are skipped after 30 days unless `pricing_checked_on` and the rates are refreshed together. The direct provider uses `max_completion_tokens` for GPT-5. Pricing is an estimate; reconcile the dashboard with provider invoices.
 
-Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models.
+Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models, not even through `budget_fallback` (see below).
 
 Start with `python3 router.py --db /path/to/usage.sqlite3`. Point an OpenAI-compatible client at `http://127.0.0.1:11435/v1`, model `x3-auto`. Set `X3_ROUTER_TOKEN` to require bearer authorization, and set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` for cloud providers. `X-X3-Agent` identifies a caller for per-agent budgets. `GET /v1/usage` returns spend accounting. The service binds to loopback; put authenticated TLS in front of it for remote access.
 
@@ -31,15 +31,23 @@ budget — "stop spending" became "stop working". And a paid provider being
 unavailable was treated as fatal even when a free one could answer.
 
 `budget_fallback` is now appended after the configured route. It is only
-reached when nothing better answered, and naming a provider there is what lets
-it run for a critical request it is not otherwise cleared for. Providers that
-cannot bill need no reservation at all. If every provider in the chain *and*
-the fallback fails, the request gets a `429` with `type: budget_exceeded` and an
-`attempts` list naming each refusal.
+reached when nothing better answered. Providers that cannot bill need no
+reservation at all. If every provider in the chain *and* the fallback fails,
+the request gets a `429` with `type: budget_exceeded` and an `attempts` list
+naming each refusal.
+
+The fallback cannot clear a provider for *critical* work. A critical request
+may only be served by a provider with `critical_allowed: true`, or by one that
+carries no credentials and therefore talks to a model on this machine
+(`may_serve_critical` in `router.py`). Being listed in `budget_fallback` is not
+clearance: the default list ends with the free cloud models, whose operator
+logs prompts. A critical request whose cleared providers are unavailable fails
+closed and names the refusal, instead of silently leaving the machine.
 
 The default fallback is local Ollama first, then the two free cloud models, so
-code stays on the machine when it can and only leaves it if the local model
-cannot answer. Set `budget_fallback` to `[]` to restore hard-stop behaviour.
+routine code stays on the machine when it can and only leaves it if the local
+model cannot answer. Set `budget_fallback` to `[]` to restore hard-stop
+behaviour.
 Which model actually answered is visible in the response's `model` field and in
 `/v1/usage`; a fallback answer is not distinguished from a paid one beyond
 that, so watch for the local model name in accounting if you need to know how
@@ -100,7 +108,7 @@ Streaming requests ask providers for a usage event. When usage is unavailable, t
 Still missing, in the order they matter for relying on this with X3 agents:
 
 - **Verified escalation.** Fallback reacts to provider failures, not to patches that fail their checks. The feedback work records which patches pass, but nothing routes on it yet.
-- **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list.
+- **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list (the critical tier refuses third-party providers, but nothing enforces a policy per task).
 - **Context retrieval.** No repo index or context packets; prompts carry their own context, which is why a Codex turn arrives with ~19K input tokens.
 - **Operational security.** One router token, no per-agent credentials; the usage database is an unencrypted SQLite file.
 

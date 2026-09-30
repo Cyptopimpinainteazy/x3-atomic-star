@@ -298,6 +298,64 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(body["error"]["type"], "budget_exceeded")
         self.assertEqual(Provider.requests, [], "an over-budget paid provider must not be called")
 
+    def test_critical_request_never_leaks_to_a_free_cloud_provider(self):
+        """A critical request must not leave this machine through the fallback.
+
+        `budget_fallback` lists the free OpenRouter models, and their operator
+        logs prompts. Critical requests carry consensus and settlement code, so
+        a paid provider being unavailable or over budget has to fail the request
+        closed rather than quietly downgrade it onto a third party.
+        """
+        checked = router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()
+        self.config["providers"]["paid"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "paid",
+            "api_key_env": "X3_UNSET_TEST_KEY", "input_usd_per_million": 1, "output_usd_per_million": 1,
+            "pricing_checked_on": checked}
+        self.config["providers"]["free"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "nvidia/example:free",
+            "free_model": True, "api_key_env": "OPENROUTER_TEST_KEY", "enabled_env": "X3_ENABLE_FREE_CLOUD_TEST",
+            "pricing_checked_on": checked}
+        self.config["routes"]["critical"] = ["paid"]
+        self.config["budget_fallback"] = ["free"]
+        os.environ["X3_ENABLE_FREE_CLOUD_TEST"] = "1"
+        os.environ["OPENROUTER_TEST_KEY"] = "test"
+        os.environ.pop("X3_UNSET_TEST_KEY", None)
+        request = {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}
+        chunks, started = [], []
+        try:
+            status, body = self.router.complete(request, "alice")
+            streamed = self.router.stream(request, "alice", lambda: started.append(True), chunks.append)
+        finally:
+            os.environ.pop("X3_ENABLE_FREE_CLOUD_TEST", None)
+            os.environ.pop("OPENROUTER_TEST_KEY", None)
+        self.assertNotEqual(status, 200)
+        self.assertEqual(Provider.requests, [], "critical code must never reach a free cloud model")
+        self.assertIn("not cleared for critical work", " ".join(body["error"]["attempts"]))
+        # The refusal has to hold on both entry points; a fix that lands in one
+        # and not the other is the failure mode this router already shipped once.
+        self.assertIsNotNone(streamed, "the streaming path must fail closed too")
+        self.assertNotEqual(streamed[0], 200)
+        self.assertIn("not cleared for critical work", " ".join(streamed[1]["error"]["attempts"]))
+        self.assertEqual((chunks, started), ([], []), "nothing may be streamed to the client")
+
+    def test_critical_falls_back_to_a_local_model_that_cannot_leak(self):
+        """Refusing third parties must not stop a critical request working locally."""
+        checked = router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()
+        self.config["providers"]["paid"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "paid",
+            "api_key_env": "X3_UNSET_TEST_KEY", "input_usd_per_million": 1, "output_usd_per_million": 1,
+            "pricing_checked_on": checked}
+        self.config["providers"]["local"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "local"}
+        self.config["routes"]["critical"] = ["paid"]
+        self.config["budget_fallback"] = ["local"]
+        os.environ.pop("X3_UNSET_TEST_KEY", None)
+        status, _ = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+        self.assertEqual(status, 200)
+        self.assertEqual(Provider.requests[-1]["model"], "local",
+                         "a model on this machine may still answer a critical request")
+
     def test_failing_provider_is_cooled_down_and_skipped(self):
         status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
         self.assertEqual(status, 200, "the second provider still serves the request")
