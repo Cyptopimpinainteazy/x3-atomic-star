@@ -943,7 +943,16 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             })?
             .phase;
 
-        Self::validate_phase_transition(current_phase, SwapPhase::ClaimingSlow)?;
+        // The guard must name the phase this call actually produces. It used to
+        // name `ClaimingSlow`, which is the phase `record_fast_claim` produces,
+        // and the transition table allows `ClaimingFast → ClaimingSlow`. So a
+        // caller could reach `ClaimingFast` and then call `record_slow_claim`
+        // directly: the swap was marked `Complete` with the fast-chain leg
+        // still `Funded`. The slow side had been paid, the fast side's HTLC was
+        // never claimed and would be refundable after its timelock — a false
+        // completion that loses the fast-side depositor their funds.
+        // `ClaimingSlow → Complete` is the only table entry into `Complete`.
+        Self::validate_phase_transition(current_phase, SwapPhase::Complete)?;
 
         {
             let session = self.sessions.get_mut(session_id).ok_or_else(|| {
@@ -980,6 +989,29 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         reason: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let current_phase = self
+            .sessions
+            .get(session_id)
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: session_id.to_string(),
+            })?
+            .phase;
+
+        // A retry of an abort that already landed is a no-op: the caller does
+        // not need to know whether it was the first message to arrive.
+        if current_phase == SwapPhase::Aborting {
+            return Ok(());
+        }
+
+        // Every other mutator on this type goes through the transition table;
+        // `abort` used to skip it. That let a `Complete` swap (both legs
+        // CLAIMED) be walked back to `Aborting` and then to `Refunded`, paying
+        // both sides twice — the double spend atomic swaps exist to prevent.
+        // `ClaimingSlow` is refused for the same reason: once the secret is on
+        // the fast chain it is public, so the slow leg must be claimed, not
+        // refunded.
+        Self::validate_phase_transition(current_phase, SwapPhase::Aborting)?;
+
         {
             let session = self.sessions.get_mut(session_id).ok_or_else(|| {
                 CoordinatorError::SessionNotFound {

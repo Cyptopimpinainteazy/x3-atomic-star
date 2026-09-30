@@ -397,6 +397,167 @@ fn test_abort_and_refund() {
     assert_eq!(session.phase, SwapPhase::Refunded);
 }
 
+/// A completed swap must not be refundable.
+///
+/// Regression: `abort()` used to skip the transition table, so
+/// `Complete → Aborting → Refunded` was reachable. Both legs had already been
+/// CLAIMED, so the refund paid both sides a second time.
+#[test]
+fn test_abort_refused_after_completion() {
+    let mut coordinator = SwapCoordinator::with_default_config();
+    let now = 1_700_000_000u64;
+
+    let (session_id, secret, hash) = coordinator
+        .setup_swap(VmTarget::X3Vm, VmTarget::Svm, vec![], now)
+        .unwrap();
+
+    let leg = |id: u8, vm: VmTarget, timelock: u64| HtlcRecord {
+        id: HtlcId::from_bytes(vec![id; 32]),
+        params: HtlcCreateParams {
+            vm,
+            recipient: vec![0x11; 32],
+            hash_lock: hash,
+            timelock,
+            asset: vec![0u8; 32],
+            amount: 1_000,
+        },
+        status: HtlcStatus::Funded,
+        created_at_block: 100,
+        confirmations_required: 1,
+        confirmations: 1,
+        params_hash: [id; 32],
+    };
+
+    coordinator
+        .record_htlc_fast(&session_id, leg(1, VmTarget::X3Vm, now + 3_600), now)
+        .unwrap();
+    coordinator
+        .record_htlc_slow(&session_id, leg(2, VmTarget::Svm, now + 7_200), now)
+        .unwrap();
+    coordinator
+        .begin_flash_execution(&session_id, now)
+        .unwrap();
+    coordinator.begin_settlement(&session_id, now).unwrap();
+    coordinator
+        .record_fast_claim(&session_id, secret, now)
+        .unwrap();
+    coordinator.record_slow_claim(&session_id, now).unwrap();
+
+    assert_eq!(
+        coordinator.get_session(&session_id).map(|s| s.phase),
+        Some(SwapPhase::Complete),
+        "precondition: the swap must reach Complete"
+    );
+
+    assert!(
+        coordinator
+            .abort(&session_id, "post-completion abort", now + 1)
+            .is_err(),
+        "abort must refuse a swap that already completed"
+    );
+    assert!(
+        coordinator.record_refunds(&session_id, now + 2).is_err(),
+        "a swap whose legs were both claimed must not be refundable"
+    );
+    assert_eq!(
+        coordinator.get_session(&session_id).map(|s| s.phase),
+        Some(SwapPhase::Complete),
+        "the refused attempts must leave the session Complete"
+    );
+}
+
+/// The slow-chain claim may only settle a swap that already revealed the
+/// secret on the fast chain.
+///
+/// Regression: `record_slow_claim` validated the transition into `ClaimingSlow`
+/// — the phase `record_fast_claim` produces — instead of into `Complete`, which
+/// it actually sets. From `ClaimingFast` that guard passed, so a swap could be
+/// marked `Complete` with the fast leg still `Funded`: the slow side paid, the
+/// fast side was never claimed, and its HTLC stayed refundable.
+#[test]
+fn test_slow_claim_refused_before_the_fast_claim() {
+    let mut coordinator = SwapCoordinator::with_default_config();
+    let now = 1_700_000_000u64;
+
+    let (session_id, _secret, hash) = coordinator
+        .setup_swap(VmTarget::X3Vm, VmTarget::Svm, vec![], now)
+        .unwrap();
+
+    let leg = |id: u8, vm: VmTarget, timelock: u64| HtlcRecord {
+        id: HtlcId::from_bytes(vec![id; 32]),
+        params: HtlcCreateParams {
+            vm,
+            recipient: vec![0x11; 32],
+            hash_lock: hash,
+            timelock,
+            asset: vec![0u8; 32],
+            amount: 1_000,
+        },
+        status: HtlcStatus::Funded,
+        created_at_block: 100,
+        confirmations_required: 1,
+        confirmations: 1,
+        params_hash: [id; 32],
+    };
+
+    coordinator
+        .record_htlc_fast(&session_id, leg(1, VmTarget::X3Vm, now + 3_600), now)
+        .unwrap();
+    coordinator
+        .record_htlc_slow(&session_id, leg(2, VmTarget::Svm, now + 7_200), now)
+        .unwrap();
+    coordinator
+        .begin_flash_execution(&session_id, now)
+        .unwrap();
+    coordinator.begin_settlement(&session_id, now).unwrap();
+
+    assert_eq!(
+        coordinator.get_session(&session_id).map(|s| s.phase),
+        Some(SwapPhase::ClaimingFast),
+        "precondition: settlement starts the fast-chain claim"
+    );
+
+    let early = coordinator.record_slow_claim(&session_id, now);
+    assert!(
+        matches!(
+            early,
+            Err(CoordinatorError::InvalidPhaseTransition { .. })
+        ),
+        "the slow claim must not settle a swap whose fast leg was never claimed, got {early:?}"
+    );
+
+    let session = coordinator.get_session(&session_id).unwrap();
+    assert_eq!(session.phase, SwapPhase::ClaimingFast);
+    assert_eq!(
+        session.htlc_fast.as_ref().map(|h| h.status),
+        Some(HtlcStatus::Funded),
+        "the refused call must not have marked the fast leg claimed"
+    );
+}
+
+/// An abort retry is idempotent rather than an error, so a duplicated control
+/// message cannot turn a healthy abort into a failed one.
+#[test]
+fn test_abort_is_idempotent_while_aborting() {
+    let mut coordinator = SwapCoordinator::with_default_config();
+    let now = 1_700_000_000u64;
+
+    let (session_id, _, _) = coordinator
+        .setup_swap(VmTarget::Svm, VmTarget::Evm { chain_id: 1 }, vec![], now)
+        .unwrap();
+
+    coordinator.abort(&session_id, "first", now).unwrap();
+    assert_eq!(
+        coordinator.get_session(&session_id).map(|s| s.phase),
+        Some(SwapPhase::Aborting)
+    );
+    coordinator.abort(&session_id, "retry", now + 1).unwrap();
+    assert_eq!(
+        coordinator.get_session(&session_id).map(|s| s.phase),
+        Some(SwapPhase::Aborting)
+    );
+}
+
 #[test]
 fn test_active_sessions_counter() {
     let mut coordinator = SwapCoordinator::with_default_config();
