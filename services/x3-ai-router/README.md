@@ -1,5 +1,9 @@
 # X3 AI router
 
+Task feedback: attach `X-X3-Task-ID`, `X-X3-Revision` (full candidate commit SHA), and `X-X3-Scope: router` to chat requests. `/v1/tasks` exposes scoped outcomes, request latency, and attributed spend. IDs bind permanently to agent/revision/scope and cannot be reused after finalization. This version records feedback; it does not automatically change routing based on that feedback.
+
+Set a separate `X3_VERIFIER_TOKEN` on the router and only the verifier worker. On a clean committed checkout, run `python3 services/x3-ai-router/verify_task.py --repo /path/to/xxxstar --task-id TASK`. The verifier runs the fixed router test suite, checks that the checkout stayed unchanged, and submits exit codes/output digests. Builder credentials cannot post outcomes. The trusted verifier credential is a trust boundary; the server cannot independently authenticate the truth of submitted check results. A `checks_passed` result covers only this scope, not a verified merge or blockchain-wide correctness.
+
 The bundled OpenRouter GPT-4.1 Mini and direct GPT-5 prices were checked on 2026-09-29. Paid providers are skipped after 30 days unless `pricing_checked_on` and the rates are refreshed together. The direct provider uses `max_completion_tokens` for GPT-5. Pricing is an estimate; reconcile the dashboard with provider invoices.
 
 Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models.
