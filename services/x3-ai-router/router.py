@@ -6,8 +6,10 @@ import datetime as dt
 import html
 import json
 import os
+import re
 import sqlite3
 import threading
+import time
 import uuid
 import urllib.error
 import urllib.request
@@ -41,7 +43,11 @@ class Router:
         self.config = config
         self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.lock = threading.Lock()
+        self.context = threading.local()
         self.db.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT, agent TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL)")
+        if "task_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(usage)")}:
+            self.db.execute("ALTER TABLE usage ADD COLUMN task_id TEXT")
+        self.db.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, agent TEXT, revision TEXT, scope TEXT, requests INTEGER DEFAULT 0, elapsed_ms REAL DEFAULT 0, outcome TEXT DEFAULT 'pending', evidence TEXT, in_flight INTEGER DEFAULT 0)")
         self.db.execute("CREATE TABLE IF NOT EXISTS reservations (id TEXT PRIMARY KEY, day TEXT, agent TEXT, cost_usd REAL)")
         self.db.commit()
 
@@ -72,13 +78,67 @@ class Router:
             self.db.execute("BEGIN IMMEDIATE")
             self.db.execute("DELETE FROM reservations WHERE id=?", (reservation,))
             if provider is not None:
-                self.db.execute("INSERT INTO usage VALUES (?,?,?,?,?,?,?)", (day, agent, provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost))
+                self.db.execute("INSERT INTO usage (day,agent,provider,model,input_tokens,output_tokens,cost_usd,task_id) VALUES (?,?,?,?,?,?,?,?)", (day, agent, provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost, getattr(self.context, "task_id", None)))
             self.db.commit()
 
     def stats(self):
         with self.lock:
             rows = self.db.execute("SELECT day,agent,provider,COUNT(*),ROUND(SUM(cost_usd),6) FROM usage GROUP BY day,agent,provider ORDER BY day DESC,agent").fetchall()
         return [{"day": d, "agent": a, "provider": p, "requests": n, "cost_usd": c} for d, a, p, n, c in rows]
+
+    def begin_task(self, task_id, agent, revision, scope):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", task_id) or not re.fullmatch(r"[0-9a-f]{40}", revision) or scope != "router":
+            raise ValueError("Expected task ID, 40-character revision, and router scope")
+        with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            existing = self.db.execute("SELECT agent,revision,scope,outcome FROM tasks WHERE id=?", (task_id,)).fetchone()
+            if existing and (existing[:3] != (agent, revision, scope) or existing[3] != "pending"):
+                self.db.rollback()
+                raise ValueError("Task binding differs or task is already finalized")
+            self.db.execute("INSERT OR IGNORE INTO tasks (id,agent,revision,scope) VALUES (?,?,?,?)", (task_id, agent, revision, scope))
+            self.db.execute("UPDATE tasks SET in_flight=in_flight+1 WHERE id=?", (task_id,))
+            self.db.commit()
+        self.context.task_id = task_id
+
+    def end_task_request(self, elapsed_ms):
+        task_id = getattr(self.context, "task_id", None)
+        if task_id:
+            with self.lock:
+                self.db.execute("UPDATE tasks SET requests=requests+1,elapsed_ms=elapsed_ms+?,in_flight=in_flight-1 WHERE id=?", (elapsed_ms, task_id))
+                self.db.commit()
+        self.context.task_id = None
+
+    def task_outcome(self, data):
+        if not isinstance(data, dict):
+            raise ValueError("Expected evidence object")
+        checks = data.get("checks")
+        if not isinstance(checks, list) or not checks or any(not isinstance(c, dict) or type(c.get("exit_code")) is not int or not re.fullmatch(r"[0-9a-f]{64}", c.get("output_sha256", "")) for c in checks):
+            raise ValueError("Expected check exit codes and output SHA-256 digests")
+        if data.get("scope") != "router" or [c.get("name") for c in checks] != ["router-tests"]:
+            raise ValueError("Unsupported verification scope/checks")
+        outcome = "checks_passed" if all(c["exit_code"] == 0 for c in checks) else "checks_failed"
+        with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            task = self.db.execute("SELECT revision,scope,outcome,in_flight FROM tasks WHERE id=?", (data.get("task_id"),)).fetchone()
+            if not task or task[:2] != (data.get("revision"), data.get("scope")) or task[2] != "pending" or task[3] != 0:
+                self.db.rollback()
+                raise ValueError("Unknown, mismatched, or finalized task")
+            self.db.execute("UPDATE tasks SET outcome=?,evidence=? WHERE id=?", (outcome, json.dumps(checks), data["task_id"]))
+            self.db.commit()
+        return {"task_id": data["task_id"], "outcome": outcome, "scope": "router"}
+
+    def task_stats(self):
+        with self.lock:
+            rows = self.db.execute("SELECT t.id,t.revision,t.scope,t.requests,t.elapsed_ms,t.outcome,COALESCE(SUM(u.cost_usd),0) FROM tasks t LEFT JOIN usage u ON u.task_id=t.id GROUP BY t.id ORDER BY t.rowid DESC LIMIT 100").fetchall()
+        return [dict(zip(("task_id", "revision", "scope", "requests", "elapsed_ms", "outcome", "cost_usd"), row)) for row in rows]
+
+    def learning_stats(self):
+        with self.lock:
+            rows = self.db.execute("SELECT u.provider,u.model,t.scope,COUNT(DISTINCT CASE WHEN t.outcome='checks_passed' THEN t.id END),COUNT(DISTINCT CASE WHEN t.outcome='checks_failed' THEN t.id END),SUM(CASE WHEN t.outcome IN ('checks_passed','checks_failed') THEN u.cost_usd ELSE 0 END) FROM usage u JOIN tasks t ON t.id=u.task_id GROUP BY u.provider,u.model,t.scope").fetchall()
+        return [{"provider": p, "model": m, "scope": s, "passed_tasks": ok, "failed_tasks": bad,
+                 "finalized_cost_usd": cost, "cost_per_passed_task_usd": cost / ok if ok else None,
+                 "pass_rate": ok / (ok + bad) if ok + bad else None}
+                for p, m, s, ok, bad, cost in rows]
 
     def snapshot(self):
         day = dt.datetime.now(dt.timezone.utc).date().isoformat()
@@ -282,6 +342,10 @@ def handler_for(router):
                 return self.reply(200, {"status": "ok"})
             if self.path == "/v1/usage":
                 return self.reply(200, {"usage": router.stats()})
+            if self.path == "/v1/tasks":
+                return self.reply(200, {"tasks": router.task_stats()})
+            if self.path == "/v1/learning":
+                return self.reply(200, {"routing_mode": "fixed", "models": router.learning_stats()})
             if self.path == "/v1/dashboard":
                 return self.raw(200, dashboard(router.snapshot()), "text/html; charset=utf-8")
             if self.path == "/metrics":
@@ -291,11 +355,23 @@ def handler_for(router):
             return self.reply(404, {"error": "Not found"})
 
         def do_POST(self):
+            if self.path == "/v1/tasks/outcome":
+                token = os.environ.get("X3_VERIFIER_TOKEN")
+                if not token or token == os.environ.get("X3_ROUTER_TOKEN") or self.headers.get("Authorization") != "Bearer " + token:
+                    return self.reply(403, {"error": "Independent verifier authorization required"})
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if not 0 < size <= 65536:
+                        return self.reply(413, {"error": "Invalid evidence size"})
+                    return self.reply(200, router.task_outcome(json.loads(self.rfile.read(size))))
+                except (ValueError, TypeError, KeyError):
+                    return self.reply(400, {"error": "Invalid verification evidence"})
             if not self.authorized():
                 return self.reply(401, {"error": "Unauthorized"})
             if self.path != "/v1/chat/completions":
                 return self.reply(404, {"error": "Not found"})
             try:
+                started = time.monotonic()
                 size = int(self.headers.get("Content-Length", "0"))
                 if size < 1 or size > MAX_BODY:
                     return self.reply(413, {"error": "Invalid request size"})
@@ -305,6 +381,9 @@ def handler_for(router):
                 if not isinstance(data.get("max_tokens", 4096), int) or not 1 <= data.get("max_tokens", 4096) <= 32768:
                     return self.reply(400, {"error": "Invalid max_tokens"})
                 agent = self.headers.get("X-X3-Agent", "default")[:80]
+                task_id = self.headers.get("X-X3-Task-ID")
+                if task_id:
+                    router.begin_task(task_id, agent, self.headers.get("X-X3-Revision", ""), self.headers.get("X-X3-Scope", "router"))
                 if data.get("stream"):
                     def start():
                         self.send_response(200)
@@ -326,6 +405,8 @@ def handler_for(router):
                 return self.reply(status, result)
             except (ValueError, TypeError, KeyError):
                 return self.reply(400, {"error": "Invalid request"})
+            finally:
+                router.end_task_request((time.monotonic() - started) * 1000)
     return Handler
 
 
