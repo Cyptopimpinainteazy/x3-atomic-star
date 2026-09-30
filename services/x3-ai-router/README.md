@@ -12,6 +12,40 @@ Start with `python3 router.py --db /path/to/usage.sqlite3`. Point an OpenAI-comp
 
 Edit `config.json` for installed Ollama models, provider models, prices, and budgets. Prices are examples and must be set to current provider rates before relying on cost limits. Paid providers with zero prices are skipped. Requests whose JSON exceeds `max_input_tokens` UTF-8 bytes are rejected as a conservative input bound. SQLite reservations enforce the configured budgets across concurrent workers; a provider returning no usage is charged the reserved estimate. Failed requests are not charged locally even if a provider billed them. Provider-side hidden tokens or prices that change without a config update can still produce a higher actual bill.
 
+## Request validation
+
+A reservation is an upper bound on one call, so the request must not be able to spend more than the reservation covers. Two shapes used to get through:
+
+- **A second output parameter.** The estimate read `max_tokens` and fell back to 4096, so a request that set `max_completion_tokens` instead — which is what GPT-5 on the direct provider requires — was reserved at the default and billed for whatever it asked. Both parameters are now validated against `max_output_tokens`, and the estimate uses whichever one the client set.
+- **Multiple completions.** `n` and `best_of` multiply the completions a provider bills for while the estimate assumed one. Anything other than `1` is refused with `400`.
+
+`max_output_tokens` (32768), `default_max_output_tokens` (4096), `reservation_ttl_seconds` (900), `provider_cooldown_seconds` (60) and `provider_cooldown_max_seconds` (3600) are config knobs.
+
+## Provider cooldowns
+
+A provider that fails is skipped for a doubling delay, capped, with `Retry-After` from an HTTP error taking precedence when the provider sends one. Without this, every request in turn paid the timeout of an endpoint that was already down. A success clears the record. `GET /v1/providers` shows consecutive failures and the remaining cooldown, and the skip reason is reported in the `502` body's `attempts`.
+
+## Crash recovery
+
+A reservation is deleted only by `finish`, which runs in the request thread. If the router died between reserving budget and calling the provider, nothing deleted the row: `reserved_usd` grew all day and the budget was consumed by requests that were not running. Reservations now carry `created_at`, and startup reclaims any older than `reservation_ttl_seconds`. The TTL is longer than any provider timeout, so a live request is never reclaimed. `reconciled_orphans` appears in the snapshot, on `/metrics` and in the dashboard.
+
+## Client compatibility
+
+The router implements the OpenAI **Chat Completions** API at `/v1/chat/completions`, streaming and non-streaming. `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature` and `seed` are forwarded unchanged; the router chooses the model, so the client's `model` is accepted and ignored. `GET /v1/models` lists `x3-auto` and `GET /v1/models/x3-auto` serves it, which is what clients probe before their first call.
+
+It does **not** implement the Responses API. `POST /v1/responses`, `/v1/embeddings` and `/v1/audio/*` answer `501` naming the gap rather than `404`, so a client that needs them fails visibly instead of looking like a wrong base URL. An agent that requires the Responses API cannot use this router yet; that is the largest remaining compatibility gap.
+
+## Operational notes
+
 Open `/v1/dashboard` for a local spend dashboard or scrape `/metrics` for Prometheus. When `X3_ROUTER_TOKEN` is set, the dashboard accepts HTTP Basic username `x3` and that token as password; API clients can keep using bearer auth. Both views require authentication and show daily spend, reservations, and completed requests.
 
-The endpoint accepts nonstreaming JSON and `stream: true` SSE chat completions. Streaming requests ask providers for a usage event. When usage is unavailable, the reserved estimate is charged. A provider may be retried before the first SSE event; a broken partial stream closes without switching models. It does not implement semantic caching, context retrieval, or verification feedback. Those require separate evidence and privacy policies; the service does not persist prompts or credentials.
+Streaming requests ask providers for a usage event. When usage is unavailable, the reserved estimate is charged. A provider may be retried before the first SSE event; a broken partial stream closes without switching models.
+
+Still missing, in the order they matter for relying on this with X3 agents:
+
+- **Verified escalation.** Fallback reacts to provider failures, not to patches that fail their checks. The feedback work records which patches pass, but nothing routes on it yet.
+- **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list.
+- **Context retrieval.** No repo index or context packets; prompts carry their own context.
+- **Operational security.** One router token, no per-agent credentials; the usage database is an unencrypted SQLite file.
+
+The service does not persist prompts or credentials.

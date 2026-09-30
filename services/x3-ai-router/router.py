@@ -17,6 +17,48 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CRITICAL = ("consensus", "finality", "settlement", "atomic", "cryptograph", "supply", "runtime upgrade", "slashing", "cross-vm")
 MAX_BODY = 2_000_000
+# A single completion may not ask for more output than this. The bound exists so
+# the per-request reservation is an upper bound on what the provider can bill.
+MAX_OUTPUT_TOKENS = 32_768
+DEFAULT_OUTPUT_TOKENS = 4_096
+# Endpoints OpenAI clients probe that this router deliberately does not
+# implement. A 501 names the gap; a 404 reads as a wrong base URL.
+UNSUPPORTED_PATHS = ("/v1/responses", "/v1/embeddings", "/v1/audio")
+
+
+def output_bound(request, config):
+    """The largest completion this request can be billed for.
+
+    The reservation is an upper bound, so it has to bound whichever output
+    parameter the client actually set. Reading only `max_tokens` let a request
+    that set `max_completion_tokens` instead be reserved at the 4096 default
+    while the provider billed for whatever it asked for.
+    """
+    for key in ("max_tokens", "max_completion_tokens"):
+        value = request.get(key)
+        if type(value) is int:
+            return value
+    return config.get("default_max_output_tokens", DEFAULT_OUTPUT_TOKENS)
+
+
+def request_error(request, config):
+    """Reject a request whose cost the reservation would not bound.
+
+    Two shapes defeat a per-request reservation: an output parameter the
+    estimate does not read, and `n`/`best_of`, which multiply the completions
+    the provider bills for while the estimate assumes exactly one.
+    """
+    for key in ("max_tokens", "max_completion_tokens"):
+        value = request.get(key)
+        if value is not None and (type(value) is not int or not 1 <= value <= config.get("max_output_tokens", MAX_OUTPUT_TOKENS)):
+            return "Invalid " + key
+    for key in ("n", "best_of"):
+        value = request.get(key)
+        if value is not None and value != 1:
+            return key + " must be 1 when set: one reservation covers one completion"
+    if request.get("model") is not None and not isinstance(request.get("model"), str):
+        return "Invalid model"
+    return None
 
 
 def pricing_error(provider):
@@ -49,7 +91,16 @@ class Router:
             self.db.execute("ALTER TABLE usage ADD COLUMN task_id TEXT")
         self.db.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, agent TEXT, revision TEXT, scope TEXT, requests INTEGER DEFAULT 0, elapsed_ms REAL DEFAULT 0, outcome TEXT DEFAULT 'pending', evidence TEXT, in_flight INTEGER DEFAULT 0)")
         self.db.execute("CREATE TABLE IF NOT EXISTS reservations (id TEXT PRIMARY KEY, day TEXT, agent TEXT, cost_usd REAL)")
+        # A reservation is only deleted by `finish`, which runs in the request
+        # thread. Without a timestamp there is no way to tell one that is still
+        # in flight from one whose process died, so the day's `reserved_usd`
+        # could only ever grow.
+        if "created_at" not in {row[1] for row in self.db.execute("PRAGMA table_info(reservations)")}:
+            self.db.execute("ALTER TABLE reservations ADD COLUMN created_at REAL")
+        self.db.execute("CREATE TABLE IF NOT EXISTS provider_health (provider TEXT PRIMARY KEY, failures INTEGER DEFAULT 0, cooldown_until REAL DEFAULT 0, last_error TEXT, last_failure_at REAL)")
         self.db.commit()
+        self.reconciled_orphans = 0
+        self.reconcile_reservations()
 
     def choose(self, request):
         text = " ".join(str(m.get("content", "")) for m in request.get("messages", [])).lower()
@@ -68,7 +119,7 @@ class Router:
                 self.db.commit()
                 return None
             reservation = uuid.uuid4().hex
-            self.db.execute("INSERT INTO reservations VALUES (?,?,?,?)", (reservation, day, agent, estimate))
+            self.db.execute("INSERT INTO reservations VALUES (?,?,?,?,?)", (reservation, day, agent, estimate, time.time()))
             self.db.commit()
             return reservation
 
@@ -85,6 +136,77 @@ class Router:
         with self.lock:
             rows = self.db.execute("SELECT day,agent,provider,COUNT(*),ROUND(SUM(cost_usd),6) FROM usage GROUP BY day,agent,provider ORDER BY day DESC,agent").fetchall()
         return [{"day": d, "agent": a, "provider": p, "requests": n, "cost_usd": c} for d, a, p, n, c in rows]
+
+    def reconcile_reservations(self, now=None):
+        """Reclaim reservations left behind by a router that died mid-request.
+
+        Nothing deletes a reservation except `finish`. If the process dies
+        between reserving budget and calling the provider, the row is never
+        removed: `reserved_usd` accumulates and the day's budget is consumed by
+        requests that are not running. Startup calls this, so the next process
+        to open the database starts from the truth.
+
+        The TTL is far longer than any provider timeout, so a genuinely
+        in-flight reservation is never reclaimed.
+        """
+        cutoff = (now if now is not None else time.time()) - self.config.get("reservation_ttl_seconds", 900)
+        with self.lock:
+            cursor = self.db.execute("DELETE FROM reservations WHERE created_at IS NULL OR created_at < ?", (cutoff,))
+            self.db.commit()
+            reclaimed = max(0, cursor.rowcount)
+        self.reconciled_orphans += reclaimed
+        return reclaimed
+
+    def provider_cooldown(self, name, now=None):
+        """Seconds this provider must be skipped for, or 0 when it is usable."""
+        now = now if now is not None else time.time()
+        with self.lock:
+            row = self.db.execute("SELECT cooldown_until FROM provider_health WHERE provider=?", (name,)).fetchone()
+        return max(0.0, (row[0] or 0) - now) if row else 0.0
+
+    def note_provider_failure(self, name, error, retry_after=None):
+        """Put a failing provider on cooldown so the next request skips it.
+
+        Without this, a dead or rate-limited endpoint is retried by every
+        request in turn: each one pays the timeout and the operators learn
+        nothing until they read the logs. The delay doubles per consecutive
+        failure and is capped, and an explicit `Retry-After` wins.
+        """
+        now = time.time()
+        if retry_after is not None:
+            try:
+                delay = max(0.0, float(retry_after))
+            except (TypeError, ValueError):
+                delay = None
+        else:
+            delay = None
+        with self.lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            row = self.db.execute("SELECT failures FROM provider_health WHERE provider=?", (name,)).fetchone()
+            failures = (row[0] or 0) + 1 if row else 1
+            if delay is None:
+                base = self.config.get("provider_cooldown_seconds", 60)
+                delay = min(base * (2 ** min(failures - 1, 10)), self.config.get("provider_cooldown_max_seconds", 3600))
+            self.db.execute(
+                "INSERT INTO provider_health (provider,failures,cooldown_until,last_error,last_failure_at) VALUES (?,?,?,?,?) "
+                "ON CONFLICT(provider) DO UPDATE SET failures=excluded.failures, cooldown_until=excluded.cooldown_until, "
+                "last_error=excluded.last_error, last_failure_at=excluded.last_failure_at",
+                (name, failures, now + delay, str(error)[:200], now))
+            self.db.commit()
+        return delay
+
+    def note_provider_success(self, name):
+        """A working provider starts its next request with a clean record."""
+        with self.lock:
+            self.db.execute("DELETE FROM provider_health WHERE provider=?", (name,))
+            self.db.commit()
+
+    def provider_health(self):
+        now = time.time()
+        with self.lock:
+            rows = self.db.execute("SELECT provider,failures,cooldown_until,last_error FROM provider_health").fetchall()
+        return [{"provider": p, "failures": f or 0, "cooldown_seconds": round(max(0.0, (u or 0) - now), 3), "last_error": e}
+                for p, f, u, e in rows]
 
     def begin_task(self, task_id, agent, revision, scope):
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", task_id) or not re.fullmatch(r"[0-9a-f]{40}", revision) or scope != "router":
@@ -154,6 +276,7 @@ class Router:
             ).fetchall()
         return {"day": day, "spent_usd": spent, "reserved_usd": reserved, "requests": requests,
                 "inflight": inflight, "input_tokens": inputs, "output_tokens": outputs,
+                "reconciled_orphans": self.reconciled_orphans,
                 "daily_budget_usd": self.config["daily_budget_usd"],
                 "breakdown": [{"agent": a, "provider": p, "requests": n, "cost_usd": c} for a, p, n, c in rows]}
 
@@ -163,6 +286,9 @@ class Router:
         # oversized requests instead of trusting a configured estimate.
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
             return 413, {"error": {"message": "Input exceeds configured budget bound"}}
+        error = request_error(request, self.config)
+        if error:
+            return 400, {"error": {"message": error}}
         tier, chain = self.choose(request)
         failures = []
         for name in chain:
@@ -170,6 +296,10 @@ class Router:
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
             if tier == "critical" and not provider.get("critical_allowed", False):
+                continue
+            cooldown = self.provider_cooldown(name)
+            if cooldown > 0:
+                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
                 continue
             model = provider["model"]
             price_in = provider.get("input_usd_per_million", 0)
@@ -179,7 +309,7 @@ class Router:
                 failures.append(name + ": " + error)
                 continue
             # Reserve against an upper-bound configured for each request before making the call.
-            estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
+            estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
             if provider.get("api_key_env") and not key:
                 failures.append(name + ": credential unavailable")
@@ -204,19 +334,32 @@ class Router:
                     raise ValueError("Provider response lacks choices")
                 usage = result.get("usage", {})
                 cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
+                self.note_provider_success(name)
                 self.finish(reservation, agent, name, model, usage, cost)
                 return 200, result
+            except urllib.error.HTTPError as exc:
+                # HTTPError is a subclass of URLError, so it has to be caught
+                # first to read a rate-limit `Retry-After` instead of guessing.
+                self.finish(reservation, agent)
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
+                failures.append(f"{name}: HTTP {exc.code}")
             except (urllib.error.URLError, TimeoutError, ValueError) as exc:
                 self.finish(reservation, agent)
+                self.note_provider_failure(name, type(exc).__name__)
                 failures.append(name + ": " + type(exc).__name__)
             except Exception:
                 self.finish(reservation, agent)
+                self.note_provider_failure(name, "unexpected error")
                 raise
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
     def stream(self, request, agent, start, send):
         if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
             return 413, {"error": "Input exceeds configured budget bound"}
+        error = request_error(request, self.config)
+        if error:
+            return 400, {"error": error}
         tier, chain = self.choose(request)
         failures = []
         for name in chain:
@@ -224,6 +367,10 @@ class Router:
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
             if tier == "critical" and not provider.get("critical_allowed", False):
+                continue
+            cooldown = self.provider_cooldown(name)
+            if cooldown > 0:
+                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
                 continue
             price_in = provider.get("input_usd_per_million", 0)
             price_out = provider.get("output_usd_per_million", 0)
@@ -235,7 +382,7 @@ class Router:
             if provider.get("api_key_env") and not key:
                 failures.append(name + ": credential unavailable")
                 continue
-            estimate = (request.get("max_tokens", 4096) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
+            estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
             reservation = self.reserve(agent, estimate)
             if reservation is None:
                 return 429, {"error": "Daily budget exhausted"}
@@ -275,16 +422,27 @@ class Router:
                 if not emitted:
                     raise ValueError("Empty SSE response")
                 cost = ((usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000) if usage else estimate
+                self.note_provider_success(name)
                 self.finish(reservation, agent, name, provider["model"], usage or {}, cost)
                 return None
+            except urllib.error.HTTPError as exc:
+                if emitted:
+                    self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
+                    return None
+                self.finish(reservation, agent)
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                self.note_provider_failure(name, "HTTP " + str(exc.code), retry_after)
+                failures.append(f"{name}: HTTP {exc.code}")
             except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
                 if emitted:
                     self.finish(reservation, agent, name, provider["model"], usage or {}, estimate)
                     return None  # A partial stream cannot be retried with another model.
                 self.finish(reservation, agent)
+                self.note_provider_failure(name, type(exc).__name__)
                 failures.append(name + ": " + type(exc).__name__)
             except Exception:
                 self.finish(reservation, agent, name if emitted else None, provider["model"], usage or {}, estimate if emitted else 0)
+                self.note_provider_failure(name, "unexpected error")
                 raise
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
@@ -304,7 +462,8 @@ def dashboard(snapshot):
 
 
 def metrics(snapshot):
-    fields = ("spent_usd", "reserved_usd", "requests", "inflight", "input_tokens", "output_tokens", "daily_budget_usd")
+    fields = ("spent_usd", "reserved_usd", "requests", "inflight", "input_tokens", "output_tokens",
+              "daily_budget_usd", "reconciled_orphans")
     return "".join(f"x3_ai_router_{name} {snapshot[name]}\n" for name in fields)
 
 
@@ -352,6 +511,12 @@ def handler_for(router):
                 return self.raw(200, metrics(router.snapshot()), "text/plain; version=0.0.4; charset=utf-8")
             if self.path == "/v1/models":
                 return self.reply(200, {"object": "list", "data": [{"id": "x3-auto", "object": "model"}]})
+            if self.path.startswith("/v1/models/"):
+                if self.path.rsplit("/", 1)[-1] == "x3-auto":
+                    return self.reply(200, {"id": "x3-auto", "object": "model"})
+                return self.reply(404, {"error": {"message": "No such model"}})
+            if self.path == "/v1/providers":
+                return self.reply(200, {"providers": router.provider_health()})
             return self.reply(404, {"error": "Not found"})
 
         def do_POST(self):
@@ -368,6 +533,8 @@ def handler_for(router):
                     return self.reply(400, {"error": "Invalid verification evidence"})
             if not self.authorized():
                 return self.reply(401, {"error": "Unauthorized"})
+            if any(self.path == path or self.path.startswith(path + "/") for path in UNSUPPORTED_PATHS):
+                return self.reply(501, {"error": {"message": self.path + " is not implemented: this router speaks the Chat Completions API at /v1/chat/completions"}})
             if self.path != "/v1/chat/completions":
                 return self.reply(404, {"error": "Not found"})
             try:
@@ -378,8 +545,9 @@ def handler_for(router):
                 data = json.loads(self.rfile.read(size))
                 if not isinstance(data.get("messages"), list) or not isinstance(data.get("stream", False), bool):
                     return self.reply(400, {"error": "Expected messages and boolean stream"})
-                if not isinstance(data.get("max_tokens", 4096), int) or not 1 <= data.get("max_tokens", 4096) <= 32768:
-                    return self.reply(400, {"error": "Invalid max_tokens"})
+                error = request_error(data, router.config)
+                if error:
+                    return self.reply(400, {"error": error})
                 agent = self.headers.get("X-X3-Agent", "default")[:80]
                 task_id = self.headers.get("X-X3-Task-ID")
                 if task_id:

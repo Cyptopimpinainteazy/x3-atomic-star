@@ -694,6 +694,10 @@ GATES_FAST=(
   # depth. The second run compiles and exercises it (`--offline --locked` for the
   # same reasons as above).
   "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml --features canonical-proofs"
+  # The router's suite had no gate anywhere. `verify_task.py` runs it, but only
+  # when an operator asks for it, so a change to router.py was covered by
+  # nothing on a normal commit. It is standard library only and takes seconds.
+  "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
   # `x3-sim` is the deterministic fault-injection simulator for that same
   # coordinator. It is its own workspace root for the same reason (it depends on
   # the coordinator by path), so `cargo test --workspace` never sees it and it
