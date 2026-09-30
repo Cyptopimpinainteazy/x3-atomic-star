@@ -155,6 +155,46 @@ class RouterTests(unittest.TestCase):
         free["model"] = "nvidia/example"
         self.assertIn("must use a :free ID", router_module.pricing_error(free))
 
+    def test_task_binding_cost_and_outcome(self):
+        revision = "a" * 40
+        self.router.begin_task("task-1", "alice", revision, "router")
+        status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
+        self.assertEqual(status, 200)
+        evidence = {"task_id": "task-1", "revision": revision, "scope": "router",
+                    "checks": [{"name": "router-tests", "exit_code": 0, "output_sha256": "b" * 64}]}
+        with self.assertRaises(ValueError):
+            self.router.task_outcome(evidence)  # Cannot finalize in-flight work.
+        self.router.end_task_request(123)
+        self.assertEqual(self.router.task_stats()[0]["cost_usd"], 0.000015)
+        self.assertEqual(self.router.task_stats()[0]["elapsed_ms"], 123)
+        with self.assertRaises(ValueError):
+            self.router.task_outcome(dict(evidence, revision="c" * 40))
+        self.assertEqual(self.router.task_outcome(evidence)["outcome"], "checks_passed")
+        self.assertEqual(self.router.learning_stats()[0]["pass_rate"], 1)
+        self.assertEqual(self.router.learning_stats()[0]["cost_per_passed_task_usd"], 0.000015)
+        with self.assertRaises(ValueError):
+            self.router.begin_task("task-1", "alice", revision, "router")
+
+    def test_builder_cannot_submit_verification(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        previous = {k: os.environ.get(k) for k in ("X3_ROUTER_TOKEN", "X3_VERIFIER_TOKEN")}
+        os.environ["X3_ROUTER_TOKEN"], os.environ["X3_VERIFIER_TOKEN"] = "builder", "verifier"
+        try:
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/tasks/outcome", b"{}",
+                                             {"Authorization": "Bearer builder"})
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                urllib.request.urlopen(request)
+            self.assertEqual(rejected.exception.code, 403)
+        finally:
+            for k, value in previous.items():
+                if value is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = value
+            server.shutdown()
+            server.server_close()
+
     def test_free_provider_requires_opt_in(self):
         self.config["routes"]["routine"] = ["free", "up"]
         self.config["providers"]["free"] = {"base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
