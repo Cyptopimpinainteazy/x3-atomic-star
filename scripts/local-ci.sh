@@ -698,6 +698,16 @@ GATES_FAST=(
   # when an operator asks for it, so a change to router.py was covered by
   # nothing on a normal commit. It is standard library only and takes seconds.
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
+  # `x3-sim` is the deterministic fault-injection simulator for that same
+  # coordinator. It is its own workspace root for the same reason (it depends on
+  # the coordinator by path), so `cargo test --workspace` never sees it and it
+  # would rot exactly the way the nested workspaces below did. It earns a gate
+  # rather than a `check` for the same reason `x3-swarm-core` did: its suite is
+  # the evidence that a failing simulation can be replayed, that the invariant
+  # checker actually fires, and that the refund-after-claim regression it found
+  # stays fixed. `--locked` against the committed lock, and its own target dir
+  # because it resolves the coordinator's dependency graph.
+  "test x3-sim:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
