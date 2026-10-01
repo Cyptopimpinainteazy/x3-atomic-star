@@ -161,6 +161,20 @@ SKIP_RES = (
     re.compile(r"\bxit\s*\("),
 )
 
+
+def is_skip_marker(rel: str, line: str) -> bool:
+    """Whether a candidate line is a skip marker rather than prose about one.
+
+    `#[ignore]` is a Rust attribute. The same characters inside a shell or
+    Python comment (e.g. `scripts/local-ci.sh` explaining that its Postgres
+    test is `#[ignore]`d because the gate runs it explicitly) describe a skip,
+    they do not create one — counting them grew the skip ratchet by a finding
+    that no test suite ever lost.
+    """
+    if rel.endswith(".rs") and SKIP_RES[0].search(line):
+        return True
+    return any(rx.search(line) for rx in SKIP_RES[1:])
+
 # Only a *definition or construction* of a mock counts. A bare word match fires
 # on every sentence that mentions mocks — including this file's own header.
 PROD_MOCK_RE = re.compile(
@@ -475,7 +489,7 @@ def scan_cheats() -> list[dict[str, object]]:
         kind = None
         if in_tests and _constant_assertion(line):
             kind = "constant-assert"
-        elif any(rx.search(line) for rx in SKIP_RES):
+        elif is_skip_marker(rel, line):
             kind = "skip"
         elif (
             # A mock *definition* on a production path. `crate::mock::…` inside a
