@@ -68,7 +68,8 @@ pub struct FailurePacket {
     /// re-run of the same seed files one packet, not a second one.
     pub failure_id: String,
     pub producer: String,
-    /// `X3_COMMIT` when the caller provides it, otherwise `"unknown"`.
+    /// `X3_COMMIT` when the caller provides it, otherwise the checkout's
+    /// `HEAD`, otherwise `"unknown"`.
     pub commit: String,
     pub seed: u64,
     pub scenario: String,
@@ -115,7 +116,12 @@ fn suspected_symbols(code: &str) -> Vec<SuspectedSymbol> {
             symbol(
                 state_machine,
                 "SwapCoordinator::record_fast_claim",
-                "the claim path must terminalize the session before a refund can run",
+                "the fast claim path must terminalize the session before a refund can run",
+            ),
+            symbol(
+                state_machine,
+                "SwapCoordinator::record_slow_claim",
+                "either leg can be the claimed one; the slow claim must terminalize the session too",
             ),
         ],
         "REFUND_AFTER_CLAIM" => vec![
@@ -130,28 +136,42 @@ fn suspected_symbols(code: &str) -> Vec<SuspectedSymbol> {
                 "the phase table is the single gate every mutator must pass through",
             ),
         ],
-        "DOUBLE_SETTLE" => vec![symbol(
-            state_machine,
-            "SwapCoordinator::begin_settlement",
-            "settlement must be single-shot per session; a second call is a double spend",
-        )],
-        "COMPLETE_WITHOUT_BOTH_CLAIMS" => vec![
+        "DOUBLE_SETTLE" => vec![
             symbol(
                 state_machine,
-                "SwapCoordinator::begin_settlement",
-                "phase must not advance to Complete before both legs are claimed",
+                "SwapCoordinator::record_fast_claim",
+                "the used-secret guard must refuse a secret already owned by another session",
             ),
             symbol(
                 state_machine,
                 "SwapCoordinator::record_slow_claim",
-                "the slow leg's claim is what closes the lifecycle",
+                "the slow leg shares the same replay guard; two completions against one lock mean it did not hold",
             ),
         ],
-        "DUPLICATE_JOURNAL_ENTRY" => vec![symbol(
-            state_machine,
-            "SwapCoordinator::record_operation",
-            "the operation journal must collapse duplicate deliveries; a duplicate entry means the idempotency check and the journal write disagree",
-        )],
+        "COMPLETE_WITHOUT_BOTH_CLAIMS" => vec![
+            symbol(
+                state_machine,
+                "SwapCoordinator::record_slow_claim",
+                "the slow leg's claim is what moves the session to Complete; it must require both legs claimed",
+            ),
+            symbol(
+                state_machine,
+                "SwapCoordinator::record_fast_claim",
+                "the fast claim must record the claimed leg, not just advance the phase",
+            ),
+        ],
+        "DUPLICATE_JOURNAL_ENTRY" => vec![
+            symbol(
+                state_machine,
+                "SwapCoordinator::operation_already_applied",
+                "the idempotency check must recognise a replayed operation before anything is written",
+            ),
+            symbol(
+                state_machine,
+                "SwapCoordinator::record_operation",
+                "the journal write must not append a receipt the idempotency check already owns",
+            ),
+        ],
         "PHASE_WITHOUT_FAST_HTLC" => vec![
             symbol(
                 state_machine,
@@ -181,13 +201,49 @@ fn suspected_symbols(code: &str) -> Vec<SuspectedSymbol> {
 }
 
 /// The regression test the fix must land with.
+///
+/// Where the repository already carries the covering test, name the real
+/// file; otherwise say what to add rather than invent a path that does not
+/// exist.
 fn required_regression_test(code: &str, failure_id: &str) -> String {
-    format!(
-        "tests/regression_{}.rs — reproduces {} (failure {}), asserts it stays fixed",
-        code.to_lowercase(),
-        code,
-        failure_id
-    )
+    let existing = match code {
+        "REFUND_AFTER_CLAIM" => Some((
+            "crates/x3-sim/tests/refund_after_claim.rs",
+            "completed_swap_cannot_be_refunded",
+        )),
+        _ => None,
+    };
+    match existing {
+        Some((file, test)) => format!(
+            "{file}::{test} — reproduces {code} (failure {failure_id}); add the case if it is not covered"
+        ),
+        None => format!(
+            "add a regression under crates/x3-sim/tests/ that reproduces {code} (failure {failure_id}) and fails if the violation returns"
+        ),
+    }
+}
+
+/// The commit this run was built from.
+///
+/// `X3_COMMIT` wins when the caller sets it; otherwise the checkout's `HEAD`
+/// is read, so a packet produced by the documented invocation pins its source
+/// revision instead of saying `unknown`.
+fn discover_commit() -> String {
+    if let Ok(commit) = std::env::var("X3_COMMIT") {
+        let commit = commit.trim().to_string();
+        if !commit.is_empty() {
+            return commit;
+        }
+    }
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|hash| hash.trim().to_string())
+        .filter(|hash| !hash.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 impl FailurePacket {
@@ -221,7 +277,10 @@ impl FailurePacket {
             config.nodes,
             violations
                 .iter()
-                .map(|violation| format!("{}:{}:{}", violation.code, violation.session, violation.detail))
+                .map(|violation| format!(
+                    "{}:{}:{}",
+                    violation.code, violation.session, violation.detail
+                ))
                 .collect::<Vec<_>>()
                 .join("+")
         );
@@ -231,7 +290,7 @@ impl FailurePacket {
             schema: PACKET_SCHEMA.to_string(),
             failure_id: failure_id.clone(),
             producer: "x3-sim".to_string(),
-            commit: std::env::var("X3_COMMIT").unwrap_or_else(|_| "unknown".to_string()),
+            commit: discover_commit(),
             seed: outcome.seed,
             scenario: outcome.scenario.clone(),
             config: PacketConfig {
@@ -258,6 +317,27 @@ impl FailurePacket {
         })
     }
 
+    /// What broke, independent of the seed that found it.
+    ///
+    /// Two runs that violate the same invariant, in the same session, with
+    /// the same detail are one defect seen twice — a hunt must count them
+    /// once, or `--max-failures` stops before it finds anything new.
+    pub fn violation_signature(&self) -> String {
+        let mut parts: Vec<String> = self
+            .all_violations
+            .iter()
+            .map(|violation| {
+                format!(
+                    "{}:{}:{}",
+                    violation.code, violation.session, violation.detail
+                )
+            })
+            .collect();
+        parts.sort();
+        parts.dedup();
+        parts.join("+")
+    }
+
     /// Attach a minimized reproducer, after verifying it still fails.
     pub fn attach_minimized(&mut self, minimized: MinimizedReproducer) {
         self.minimized = Some(minimized);
@@ -265,7 +345,11 @@ impl FailurePacket {
 
     /// The file stem, for evidence bundles.
     pub fn file_stem(&self) -> String {
-        format!("x3-failure-{}-{}", self.failure_id, self.invariant.to_lowercase())
+        format!(
+            "x3-failure-{}-{}",
+            self.failure_id,
+            self.invariant.to_lowercase()
+        )
     }
 
     /// Human-readable packet: the same facts, in the order an investigator
@@ -304,23 +388,51 @@ impl FailurePacket {
         }
         if let Some(before) = &self.state_before {
             let _ = writeln!(out, "\n## State before the bad step\n");
-            let _ = writeln!(out, "```json\n{}\n```", serde_json::to_string_pretty(before).unwrap_or_default());
+            let _ = writeln!(
+                out,
+                "```json\n{}\n```",
+                serde_json::to_string_pretty(before).unwrap_or_default()
+            );
         }
         if let Some(after) = &self.state_after {
             let _ = writeln!(out, "\n## State after the bad step\n");
-            let _ = writeln!(out, "```json\n{}\n```", serde_json::to_string_pretty(after).unwrap_or_default());
+            let _ = writeln!(
+                out,
+                "```json\n{}\n```",
+                serde_json::to_string_pretty(after).unwrap_or_default()
+            );
+        }
+        let _ = writeln!(out, "\n## All violations\n");
+        for violation in &self.all_violations {
+            let _ = writeln!(
+                out,
+                "- `{}` session=`{}` {}",
+                violation.code, violation.session, violation.detail
+            );
         }
         let _ = writeln!(out, "\n## Suspected code\n");
         if self.suspected_code.is_empty() {
-            let _ = writeln!(out, "No registered mapping for `{}`; start from the invariant and the state diff.", self.invariant);
+            let _ = writeln!(
+                out,
+                "No registered mapping for `{}`; start from the invariant and the state diff.",
+                self.invariant
+            );
         }
         for suspect in &self.suspected_code {
-            let _ = writeln!(out, "- `{}` in `{}` — {}", suspect.symbol, suspect.file, suspect.reason);
+            let _ = writeln!(
+                out,
+                "- `{}` in `{}` — {}",
+                suspect.symbol, suspect.file, suspect.reason
+            );
         }
         let _ = writeln!(out, "\n## Repro\n");
         let _ = writeln!(out, "```bash\n{}\n```", self.replay_command);
         if let Some(minimized) = &self.minimized {
-            let _ = writeln!(out, "\n## Minimized repro (verified: {})\n", minimized.verified);
+            let _ = writeln!(
+                out,
+                "\n## Minimized repro (verified: {})\n",
+                minimized.verified
+            );
             let _ = writeln!(out, "```bash\n{}\n```", minimized.replay_command);
         }
         let _ = writeln!(out, "\n## Required regression test\n");
@@ -383,17 +495,32 @@ mod tests {
 
     #[test]
     fn packet_identity_is_stable_and_config_sensitive() {
-        let config = SimConfig { seed: 41, sessions: 4, steps: 40, nodes: 4, ..SimConfig::default() };
+        let config = SimConfig {
+            seed: 41,
+            sessions: 4,
+            steps: 40,
+            nodes: 4,
+            ..SimConfig::default()
+        };
         let first = FailurePacket::from_outcome(&config, &outcome(41, "CLAIM_REFUND_MIX"))
             .expect("a failing outcome produces a packet");
-        let second = FailurePacket::from_outcome(&config, &outcome(41, "CLAIM_REFUND_MIX"))
-            .expect("packet");
+        let second =
+            FailurePacket::from_outcome(&config, &outcome(41, "CLAIM_REFUND_MIX")).expect("packet");
         assert_eq!(first.failure_id, second.failure_id);
 
-        let smaller = SimConfig { seed: 41, sessions: 2, steps: 40, nodes: 4, ..SimConfig::default() };
+        let smaller = SimConfig {
+            seed: 41,
+            sessions: 2,
+            steps: 40,
+            nodes: 4,
+            ..SimConfig::default()
+        };
         let third = FailurePacket::from_outcome(&smaller, &outcome(41, "CLAIM_REFUND_MIX"))
             .expect("packet");
-        assert_ne!(first.failure_id, third.failure_id, "a different config is a different failure");
+        assert_ne!(
+            first.failure_id, third.failure_id,
+            "a different config is a different failure"
+        );
     }
 
     #[test]
@@ -407,7 +534,9 @@ mod tests {
     fn known_invariants_name_real_symbols_and_knowledge_gaps_do_not() {
         let with_symbols = suspected_symbols("REFUND_AFTER_CLAIM");
         assert!(with_symbols.iter().any(|s| s.symbol.contains("abort")));
-        assert!(with_symbols.iter().any(|s| s.file.contains("state_machine.rs")));
+        assert!(with_symbols
+            .iter()
+            .any(|s| s.file.contains("state_machine.rs")));
 
         assert!(suspected_symbols("NOT_A_REAL_INVARIANT").is_empty());
     }
@@ -415,9 +544,8 @@ mod tests {
     #[test]
     fn markdown_carries_replay_and_minimized_repro() {
         let config = SimConfig::default();
-        let mut packet =
-            FailurePacket::from_outcome(&config, &outcome(41, "REFUND_AFTER_CLAIM"))
-                .expect("packet");
+        let mut packet = FailurePacket::from_outcome(&config, &outcome(41, "REFUND_AFTER_CLAIM"))
+            .expect("packet");
         packet.attach_minimized(MinimizedReproducer {
             sessions: 1,
             steps: 11,

@@ -27,8 +27,12 @@ PACKET_DIR="${X3_FAILURE_PACKET_DIR:-failure-packets}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --label) LABEL="${2:?--label needs a value}"; shift 2 ;;
-    --packet-dir) PACKET_DIR="${2:?--packet-dir needs a value}"; shift 2 ;;
+    --label)
+      if [ $# -lt 2 ]; then echo "x3-failure-packet: --label needs a value" >&2; exit 2; fi
+      LABEL="$2"; shift 2 ;;
+    --packet-dir)
+      if [ $# -lt 2 ]; then echo "x3-failure-packet: --packet-dir needs a value" >&2; exit 2; fi
+      PACKET_DIR="$2"; shift 2 ;;
     --root-cause) ROOT_CAUSE=1; shift ;;
     --) shift; break ;;
     -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
@@ -40,6 +44,12 @@ if [ -z "$LABEL" ] || [ $# -eq 0 ]; then
   echo "x3-failure-packet: usage: $0 --label <name> [--root-cause] -- <command...>" >&2
   exit 2
 fi
+
+# A label names a file, so refuse one that cannot be part of a filename. The
+# packet builder slugifies, but refusing early keeps the caller honest.
+case "$LABEL" in
+  */*|*\\*) echo "x3-failure-packet: --label must not contain '/' or '\\'" >&2; exit 2 ;;
+esac
 
 # `X3_FAILURE_PACKET_ROOT` lets the wrapper run a gate in another checkout
 # (for example a warm main tree while the wrapper itself is being reviewed in
@@ -63,8 +73,11 @@ if [ "$status" -eq 0 ]; then
   exit 0
 fi
 
-mkdir -p "$PACKET_DIR"
-PACKET_PATH="$(python3 - "$LABEL" "$status" "$LOG" "$PACKET_DIR" "$ROOT" "$@" <<'PY'
+if ! mkdir -p "$PACKET_DIR"; then
+  echo "x3-failure-packet: [$LABEL] FAIL (exit $status) — cannot create $(printf '%q' "$PACKET_DIR"); the gate result stands" >&2
+  exit "$status"
+fi
+if ! PACKET_PATH="$(python3 - "$LABEL" "$status" "$LOG" "$PACKET_DIR" "$ROOT" "$elapsed" "$@" <<'PY'
 import hashlib
 import json
 import re
@@ -74,7 +87,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-label, status, log_path, packet_dir, root, *command = sys.argv[1:]
+label, status, log_path, packet_dir, root, elapsed, *command = sys.argv[1:]
+slug = re.sub(r"[^A-Za-z0-9._-]+", "-", label).strip("-") or "gate"
 log = Path(log_path).read_text(errors="replace")
 lines = log.splitlines()
 
@@ -101,8 +115,16 @@ for line in lines:
         match = re.search(pattern, line)
         if match:
             locations.append({"file": match.group(1), "line": int(match.group(2))})
-locations = [dict(pair) for pair in {tuple(item.items()) for item in locations}]
-locations.sort(key=lambda item: (item["file"], item["line"]))
+# Keep log order: the first entry is where the failure actually surfaced, and
+# it is a better `suspected_file` than an alphabetical accident.
+unique = []
+seen_locations = set()
+for item in locations:
+    key = (item["file"], item["line"])
+    if key not in seen_locations:
+        seen_locations.add(key)
+        unique.append(item)
+locations = unique
 
 identity = f"{label}|{status}|{command}|{first_error}|{locations}|{failing_tests}"
 failure_id = hashlib.sha256(identity.encode()).hexdigest()[:16]
@@ -120,18 +142,21 @@ packet = {
     # exactly even when an argument contains spaces.
     "command": shlex.join(command),
     "exit_code": int(status),
-    "duration_seconds": None,
+    "duration_seconds": int(elapsed),
     "first_error": first_error,
     "failing_tests": failing_tests,
     "suspected_file": locations[0]["file"] if locations else "",
     "suspected_lines": sorted({item["line"] for item in locations}),
     "locations": locations,
     "log_excerpt": "\n".join(lines[-200:]),
-    "replay_command": shlex.join(command),
+    # The wrapper runs its command after `cd "$ROOT"`; a replay from another
+    # directory would exercise different code, so the directory is part of the
+    # reproduction.
+    "replay_command": f"cd {shlex.quote(root)} && " + shlex.join(command),
     "next_step": "Verify the cause before changing code: rerun the replay command, confirm the failure, then run the same command after the fix.",
 }
 
-stem = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{label}-{failure_id}"
+stem = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slug}-{failure_id}"
 json_path = Path(packet_dir) / f"{stem}.json"
 json_path.write_text(json.dumps(packet, indent=2) + "\n")
 
@@ -139,7 +164,7 @@ markdown = [
     f"# Gate failure packet {failure_id}",
     "",
     f"- gate: `{label}`",
-    f"- command: `{' '.join(command)}`",
+    f"- command: `{packet['command']}`",
     f"- exit code: {status}",
     f"- commit: `{packet['commit']}` on `{packet['branch']}` (dirty: {packet['worktree_dirty']})",
     f"- first error: {first_error}",
@@ -161,7 +186,12 @@ markdown = [
 (Path(packet_dir) / f"{stem}.md").write_text("\n".join(markdown) + "\n")
 print(json_path)
 PY
-)"
+)"; then
+  # The gate status is the contract: a broken packet builder must not replace
+  # a test failure with a tooling failure.
+  echo "x3-failure-packet: [$LABEL] FAIL (exit $status) — packet generation failed; the gate result stands" >&2
+  exit "$status"
+fi
 
 echo "x3-failure-packet: [$LABEL] FAIL (exit $status) — packet: $PACKET_PATH" >&2
 echo "x3-failure-packet: replay: $*" >&2

@@ -15,12 +15,18 @@ trap 'rm -rf "$WORK"' EXIT
 
 fail=0
 
+# Run a command, capturing its status without letting errexit (which is not
+# enabled) or a leaked `set -e` abort the rest of the test.
+run() {
+  local status=0
+  "$@" >/dev/null 2>&1 || status=$?
+  printf '%s' "$status"
+}
+
 echo "test_x3_failure_packet: failing gate must produce a packet"
-set +e
-bash scripts/x3-failure-packet.sh --label selftest-fail --packet-dir "$WORK/fail-packets" -- \
-  bash -c 'printf "running 1 test\n"; printf "thread '"'"'main'"'"' panicked at pallets/x3-supply-ledger/src/lib.rs:412:9:\nassertion `left == right` failed\n"; exit 101' >/dev/null 2>&1
-status=$?
-set -e
+fixture='printf "running 1 test\n"; printf "thread %s panicked at pallets/x3-supply-ledger/src/lib.rs:412:9:\nassertion \`left == right\` failed\n" "main"; exit 101'
+status="$(run bash scripts/x3-failure-packet.sh --label selftest-fail --packet-dir "$WORK/fail-packets" -- \
+  bash -c "$fixture")"
 
 if [ "$status" -ne 101 ]; then
   echo "  FAIL: wrapper exit was $status, expected the wrapped command's 101" >&2
@@ -43,23 +49,46 @@ assert packet["suspected_file"] == "pallets/x3-supply-ledger/src/lib.rs", packet
 assert 412 in packet["suspected_lines"], packet["suspected_lines"]
 assert "panicked at" in packet["first_error"], packet["first_error"]
 assert packet["commit"], "the packet must pin the commit it ran on"
+assert isinstance(packet["duration_seconds"], int), packet["duration_seconds"]
+assert packet["replay_command"].startswith("cd "), packet["replay_command"]
+assert "pallets/x3-supply-ledger/src/lib.rs" in packet["first_error"]
 print("  packet fields verified")
 PY
 fi
 
+echo "test_x3_failure_packet: a label that names no file is a usage error"
+status="$(run bash scripts/x3-failure-packet.sh --label bad/name --packet-dir "$WORK/slash" -- bash -c 'exit 101')"
+if [ "$status" -ne 2 ]; then
+  echo "  FAIL: slash label exit was $status, expected 2" >&2
+  fail=1
+fi
+if [ -d "$WORK/slash" ]; then
+  echo "  FAIL: a refused label still created a packet directory" >&2
+  fail=1
+fi
+
 echo "test_x3_failure_packet: passing gate must write no packet"
-bash scripts/x3-failure-packet.sh --label selftest-pass --packet-dir "$WORK/pass-packets" -- \
-  bash -c 'exit 0' >/dev/null 2>&1
+status="$(run bash scripts/x3-failure-packet.sh --label selftest-pass --packet-dir "$WORK/pass-packets" -- \
+  bash -c 'exit 0')"
+if [ "$status" -ne 0 ]; then
+  echo "  FAIL: passing gate exit was $status, expected 0" >&2
+  fail=1
+fi
 if [ -d "$WORK/pass-packets" ] && [ -n "$(find "$WORK/pass-packets" -type f 2>/dev/null)" ]; then
   echo "  FAIL: a passing gate wrote a packet" >&2
   fail=1
 fi
 
+echo "test_x3_failure_packet: a broken packet builder must not replace the gate status"
+status="$(run bash scripts/x3-failure-packet.sh --label selftest-broken-dir --packet-dir /dev/null/not-a-dir -- \
+  bash -c 'exit 101')"
+if [ "$status" -ne 101 ]; then
+  echo "  FAIL: wrapper exit was $status, expected the gate's 101 despite the packet failure" >&2
+  fail=1
+fi
+
 echo "test_x3_failure_packet: usage error must be exit 2"
-set +e
-bash scripts/x3-failure-packet.sh --label missing-command >/dev/null 2>&1
-status=$?
-set -e
+status="$(run bash scripts/x3-failure-packet.sh --label missing-command)"
 if [ "$status" -ne 2 ]; then
   echo "  FAIL: usage error exit was $status, expected 2" >&2
   fail=1

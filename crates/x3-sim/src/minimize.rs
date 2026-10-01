@@ -9,6 +9,13 @@
 //! Everything here is deterministic: the same starting config and predicate
 //! always produce the same minimized config, because the same seeds are tried
 //! in the same order.
+//!
+//! The search deliberately does not assume monotonicity. Every candidate value
+//! changes the seeded schedule, so a config that fails at one value says
+//! nothing about a smaller or larger one; a binary search over that predicate
+//! can walk past a smaller reproducer. Instead each dimension is scanned
+//! upwards from its floor — smallest candidates first — for a bounded number
+//! of runs.
 
 use serde::Serialize;
 
@@ -40,22 +47,14 @@ impl Minimized {
             scenario: self.config.scenario.as_str().to_string(),
             minimizer_runs: self.runs,
             verified: self.verified,
-            replay_command: replay_command(&self.config),
+            replay_command: self.config.replay_command(),
         }
     }
 }
 
-/// The `cargo run` line for a config, including every dimension the CLI reads.
-pub fn replay_command(config: &SimConfig) -> String {
-    format!(
-        "cargo run -p x3-sim -- --seed {} --scenario {} --sessions {} --steps {} --nodes {}",
-        config.seed,
-        config.scenario.as_str(),
-        config.sessions,
-        config.steps,
-        config.nodes
-    )
-}
+/// How many candidate values one dimension may try per pass. Small values are
+/// tried first, so this bounds the scan without skipping the smallest results.
+pub const SCAN_CAP: usize = 24;
 
 /// Shrink `start` until no dimension can be removed and the same violation
 /// still fires.
@@ -84,7 +83,11 @@ where
             return None;
         }
         if let Some(code) = target {
-            if !outcome.violations.iter().any(|violation| violation.code == code) {
+            if !outcome
+                .violations
+                .iter()
+                .any(|violation| violation.code == code)
+            {
                 return None;
             }
         }
@@ -98,33 +101,30 @@ where
     // Two passes: shrinking sessions and nodes changes how many steps the
     // schedule needs, so a dimension that could not shrink on the first pass
     // may shrink on the second.
-    for _pass in 0..2 {
+    'shrink: for _pass in 0..2 {
         for dimension in [Dimension::Sessions, Dimension::Steps, Dimension::Nodes] {
             let floor = dimension.floor();
             let ceiling = dimension.get(&current);
             if ceiling <= floor {
                 continue;
             }
-            // Binary search for the smallest reproducing value. The search
-            // assumes a failure that survives at a larger value usually
-            // survives near it; the verification run at the end is what
-            // makes the result trustworthy either way.
-            let mut low = floor;
-            let mut high = ceiling;
-            while low < high {
-                let mid = low + (high - low) / 2;
-                let mut candidate = current.clone();
-                dimension.set(&mut candidate, mid);
-                match reproduce(&candidate, &mut runner, &mut runs) {
-                    Some(outcome) => {
-                        high = mid;
-                        best = Some((candidate, outcome));
-                    }
-                    None => low = mid + 1,
+            // Ascending scan, smallest value first. A binary search would be
+            // unsound here: the predicate is not monotone, because changing
+            // sessions, steps or nodes changes the seeded schedule. Only the
+            // values actually observed are trusted.
+            let stop = ceiling.min(floor.saturating_add(SCAN_CAP));
+            for value in floor..=stop {
+                if runs + 1 >= max_runs {
+                    // Keep one run for the final verification.
+                    break 'shrink;
                 }
-            }
-            if let Some((config, _)) = &best {
-                current = config.clone();
+                let mut candidate = current.clone();
+                dimension.set(&mut candidate, value);
+                if let Some(outcome) = reproduce(&candidate, &mut runner, &mut runs) {
+                    current = candidate.clone();
+                    best = Some((candidate, outcome));
+                    break;
+                }
             }
         }
     }
@@ -241,21 +241,59 @@ mod tests {
         };
         // The synthetic property: the violation needs 3 sessions, 20 steps
         // and 4 nodes to occur at all.
-        let minimized = minimize(&start, Some("CLAIM_REFUND_MIX"), DEFAULT_MAX_RUNS, |config| {
-            if config.sessions >= 3 && config.steps >= 20 && config.nodes >= 4 {
-                outcome(config, "CLAIM_REFUND_MIX")
-            } else {
-                clean(config)
-            }
-        })
+        let minimized = minimize(
+            &start,
+            Some("CLAIM_REFUND_MIX"),
+            DEFAULT_MAX_RUNS,
+            |config| {
+                if config.sessions >= 3 && config.steps >= 20 && config.nodes >= 4 {
+                    outcome(config, "CLAIM_REFUND_MIX")
+                } else {
+                    clean(config)
+                }
+            },
+        )
         .expect("a reproducing start minimizes");
 
         assert_eq!(minimized.config.sessions, 3);
         assert_eq!(minimized.config.steps, 20);
         assert_eq!(minimized.config.nodes, 4);
-        assert!(!minimized.outcome.is_pass(), "the minimized run still fails");
-        assert!(minimized.verified, "the minimized reproducer was re-run and failed again");
+        assert!(
+            !minimized.outcome.is_pass(),
+            "the minimized run still fails"
+        );
+        assert!(
+            minimized.verified,
+            "the minimized reproducer was re-run and failed again"
+        );
         assert!(minimized.runs <= DEFAULT_MAX_RUNS);
+    }
+
+    #[test]
+    fn a_non_monotonic_predicate_still_shrinks_to_the_smallest_reproducing_value() {
+        let start = SimConfig {
+            seed: 3,
+            scenario: Scenario::HappyPath,
+            sessions: 64,
+            steps: 200,
+            nodes: 8,
+        };
+        // Sessions 3 and 64 reproduce; everything between them is clean. A
+        // binary search from 64 probes 32 first (clean), then 16, 8, 4, 2
+        // and 1 — and walks past the only small reproducer at 3.
+        let minimized = minimize(&start, None, DEFAULT_MAX_RUNS, |config| {
+            if config.sessions == 3 || config.sessions == 64 {
+                outcome(config, "CLAIM_REFUND_MIX")
+            } else {
+                clean(config)
+            }
+        })
+        .expect("the non-monotonic predicate reproduces");
+        assert_eq!(
+            minimized.config.sessions, 3,
+            "the scan must not skip the reproducer"
+        );
+        assert!(minimized.verified);
     }
 
     #[test]
@@ -264,7 +302,10 @@ mod tests {
         let minimized = minimize(&start, Some("REFUND_AFTER_CLAIM"), 40, |config| {
             outcome(config, "CLAIM_REFUND_MIX")
         });
-        assert!(minimized.is_none(), "the target invariant must be the one that survives");
+        assert!(
+            minimized.is_none(),
+            "the target invariant must be the one that survives"
+        );
     }
 
     #[test]

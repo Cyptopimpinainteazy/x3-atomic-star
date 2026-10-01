@@ -62,7 +62,10 @@ fn the_minimizer_drives_real_runs_and_verifies_its_result() {
 
     let minimized = minimize(&start, None, DEFAULT_MAX_RUNS, runner)
         .expect("the predicate survives minimization");
-    assert!(minimized.verified, "the minimized run was re-run and reproduced");
+    assert!(
+        minimized.verified,
+        "the minimized run was re-run and reproduced"
+    );
     assert!(
         minimized.config.sessions <= start.sessions
             && minimized.config.steps <= start.steps
@@ -82,9 +85,10 @@ fn the_minimizer_drives_real_runs_and_verifies_its_result() {
 }
 
 #[test]
-fn the_cli_replays_and_minimizes_a_recorded_packet_shape() {
-    // The packet's replay command must be the one the CLI accepts: run the
-    // binary with exactly those arguments and require the same verdict.
+fn the_cli_replays_a_recorded_config_to_the_same_trace_digest_and_verdict() {
+    // The replay command must be the one the CLI accepts, with every
+    // dimension the failing run used, and the CLI run must reach the same
+    // verdict as the library run.
     let config = SimConfig {
         seed: 7,
         scenario: Scenario::PartitionStorm,
@@ -94,23 +98,64 @@ fn the_cli_replays_and_minimizes_a_recorded_packet_shape() {
     };
     let outcome = run(&config);
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_x3-sim"))
-        .args([
-            "--seed",
-            "7",
-            "--scenario",
-            "partition-storm",
-            "--sessions",
-            "3",
-            "--steps",
-            "40",
-            "--nodes",
-            "3",
-        ])
+        .args(config.replay_args())
         .output()
         .expect("run the simulator binary");
+    assert!(
+        output.status.success(),
+        "the replay of a passing config must exit 0: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains(&outcome.trace_digest),
         "the CLI replay must produce the same trace digest as the library run: {stdout}"
     );
+}
+
+#[test]
+fn a_packet_replay_command_names_every_dimension_the_run_used() {
+    let config = SimConfig {
+        seed: 7,
+        scenario: Scenario::PartitionStorm,
+        sessions: 3,
+        steps: 40,
+        nodes: 3,
+    };
+    let mut outcome = run(&config);
+    // No reachable coordinator violation exists (#558 closed them), so the
+    // failing verdict here is a predicate-only code, never an invariant name.
+    outcome.violations.push(Violation {
+        code: "TEST_REFUSAL_PRESENT",
+        session_id: "<predicate>".to_string(),
+        detail: format!("rejected = {}", outcome.rejected),
+    });
+    let packet =
+        FailurePacket::from_outcome(&config, &outcome).expect("a failing run yields a packet");
+
+    assert_eq!(packet.replay_command, config.replay_command());
+    for expected in [
+        "--seed 7",
+        "--scenario partition-storm",
+        "--sessions 3",
+        "--steps 40",
+        "--nodes 3",
+    ] {
+        assert!(
+            packet.replay_command.contains(expected),
+            "the replay must pin `{expected}`: {}",
+            packet.replay_command
+        );
+    }
+    assert_ne!(
+        packet.commit, "unknown",
+        "the packet resolves the checkout HEAD"
+    );
+    assert_eq!(
+        packet.commit.len(),
+        40,
+        "HEAD is a full commit hash: {}",
+        packet.commit
+    );
+    assert!(packet.to_markdown().contains("## All violations"));
 }

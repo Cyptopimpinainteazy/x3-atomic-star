@@ -14,9 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use x3_sim::{
-    minimize, run, FailurePacket, Scenario, SimConfig, SimOutcome, DEFAULT_MAX_RUNS,
-};
+use x3_sim::{minimize, run, FailurePacket, Scenario, SimConfig, SimOutcome, DEFAULT_MAX_RUNS};
 
 const USAGE: &str = "\
 x3-sim — deterministic fault-injection simulator for X3 atomic swaps
@@ -121,6 +119,7 @@ fn main() -> ExitCode {
             root_cause,
             packet_dir.as_deref(),
             out.as_deref(),
+            json,
         );
     }
 
@@ -161,7 +160,14 @@ fn main() -> ExitCode {
         print_summary(&outcome);
     }
 
-    match report_failure(&config, &outcome, do_minimize, root_cause, packet_dir.as_deref(), json) {
+    match report_failure(
+        &config,
+        &outcome,
+        do_minimize,
+        root_cause,
+        packet_dir.as_deref(),
+        json,
+    ) {
         Ok(()) => ExitCode::FAILURE,
         Err(error) => {
             eprintln!("x3-sim: failure packet could not be completed: {error}");
@@ -250,7 +256,11 @@ fn dispatch_root_cause(packet_path: &Path) {
         return;
     }
     println!("root_cause: dispatching {}", packet_path.display());
-    match std::process::Command::new("python3").arg(script).arg(packet_path).status() {
+    match std::process::Command::new("python3")
+        .arg(script)
+        .arg(packet_path)
+        .status()
+    {
         Ok(status) if status.success() => {}
         Ok(status) => println!("root_cause: dispatcher exited with {status}; packet kept"),
         Err(error) => println!("root_cause: could not run python3 ({error}); packet kept"),
@@ -258,6 +268,7 @@ fn dispatch_root_cause(packet_path: &Path) {
 }
 
 /// Run `count` consecutive seeds and report every distinct failure.
+#[allow(clippy::too_many_arguments)]
 fn hunt_seeds(
     base: &SimConfig,
     count: usize,
@@ -266,6 +277,7 @@ fn hunt_seeds(
     root_cause: bool,
     packet_dir: Option<&Path>,
     out: Option<&Path>,
+    json: bool,
 ) -> ExitCode {
     let report = x3_sim::hunt(base, count, max_failures, do_minimize, run);
     // Dispatch needs the packet on disk, so `--root-cause` implies a default
@@ -280,7 +292,9 @@ fn hunt_seeds(
             }
         }
         if root_cause {
-            if let Some(path) = dir.map(|dir| dir.join(format!("{}.json", failure.packet.file_stem()))) {
+            if let Some(path) =
+                dir.map(|dir| dir.join(format!("{}.json", failure.packet.file_stem())))
+            {
                 dispatch_root_cause(&path);
             }
         }
@@ -294,38 +308,69 @@ fn hunt_seeds(
         }
     }
 
+    let summary = serde_json::json!({
+        "schema": "x3-sim-hunt-summary-v1",
+        "scenario": base.scenario.as_str(),
+        "first_seed": base.seed,
+        "seeds_requested": count,
+        "seeds_run": report.seeds_run,
+        "passes": report.passes,
+        "duplicates": report.duplicates,
+        "failures": report.failures.iter().map(|failure| serde_json::json!({
+            "seed": failure.config.seed,
+            "invariant": failure.packet.invariant,
+            "failure_id": failure.packet.failure_id,
+            "violations": failure.outcome.violations.len(),
+            "packet_stem": failure.packet.file_stem(),
+            "replay": failure.packet.replay_command,
+        })).collect::<Vec<_>>(),
+        "stopped_at_max_failures": report.stopped_at_max_failures,
+    });
+
     if let Some(dir) = out {
-        let summary = serde_json::json!({
-            "schema": "x3-sim-hunt-summary-v1",
-            "scenario": base.scenario.as_str(),
-            "first_seed": base.seed,
-            "seeds_requested": count,
-            "seeds_run": report.seeds_run,
-            "passes": report.passes,
-            "failures": report.failures.iter().map(|failure| serde_json::json!({
-                "seed": failure.config.seed,
-                "invariant": failure.packet.invariant,
-                "failure_id": failure.packet.failure_id,
-                "violations": failure.outcome.violations.len(),
-                "replay": failure.packet.replay_command,
-            })).collect::<Vec<_>>(),
-            "stopped_at_max_failures": report.stopped_at_max_failures,
-        });
-        let path = dir.join(format!("hunt-summary-{}-{}.json", base.scenario.as_str(), base.seed));
-        if let Err(error) = std::fs::create_dir_all(dir).and_then(|_| std::fs::write(&path, serde_json::to_string_pretty(&summary).unwrap_or_default() + "\n")) {
+        let path = dir.join(format!(
+            "hunt-summary-{}-{}.json",
+            base.scenario.as_str(),
+            base.seed
+        ));
+        if let Err(error) = std::fs::create_dir_all(dir).and_then(|_| {
+            std::fs::write(
+                &path,
+                serde_json::to_string_pretty(&summary).unwrap_or_default() + "\n",
+            )
+        }) {
             eprintln!("x3-sim: cannot write hunt summary: {error}");
             return ExitCode::from(2);
         }
     }
 
+    // `--json` means "one parseable JSON document on stdout", for a single
+    // run and for a hunt alike.
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&summary).unwrap_or_else(|_| "{}".to_string())
+        );
+        return if report.is_clean() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+
     println!(
-        "hunt: seeds {}..{}  run = {}  passes = {}  failures = {}{}",
+        "hunt: seeds {}..{}  run = {}  passes = {}  failures = {} duplicates = {}{}",
         base.seed,
         base.seed.wrapping_add(count as u64),
         report.seeds_run,
         report.passes,
         report.failures.len(),
-        if report.stopped_at_max_failures { format!(" (stopped at --max-failures {max_failures})") } else { String::new() }
+        report.duplicates,
+        if report.stopped_at_max_failures {
+            format!(" (stopped at --max-failures {max_failures})")
+        } else {
+            String::new()
+        }
     );
     if report.is_clean() {
         println!("no invariant violations in {} runs", count);
@@ -341,9 +386,16 @@ fn hunt_seeds(
             failure.outcome.replay_command()
         );
         if let Some(minimized) = &packet.minimized {
-            println!("    minimized (verified={}): {}", minimized.verified, minimized.replay_command);
+            println!(
+                "    minimized (verified={}): {}",
+                minimized.verified, minimized.replay_command
+            );
         }
-        println!("    packet: {}  id={}", packet.file_stem(), packet.failure_id);
+        println!(
+            "    packet: {}  id={}",
+            packet.file_stem(),
+            packet.failure_id
+        );
         match dir {
             Some(dir) => println!(
                 "    root cause: python3 crates/x3-sim/scripts/root_cause.py {}",
@@ -405,6 +457,9 @@ fn print_summary(outcome: &SimOutcome) {
 fn write_evidence(dir: &std::path::Path, outcome: &SimOutcome) -> std::io::Result<()> {
     let stem = format!("x3-sim-{}-{}", outcome.scenario, outcome.seed);
     std::fs::write(dir.join(format!("{stem}.json")), outcome.to_evidence_json())?;
-    std::fs::write(dir.join(format!("{stem}.trace.log")), outcome.trace.join("\n"))?;
+    std::fs::write(
+        dir.join(format!("{stem}.trace.log")),
+        outcome.trace.join("\n"),
+    )?;
     Ok(())
 }

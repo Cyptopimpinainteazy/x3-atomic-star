@@ -25,6 +25,9 @@ pub struct HuntReport {
     pub seeds_run: usize,
     pub passes: usize,
     pub failures: Vec<HuntFailure>,
+    /// Failing seeds whose violation was already collected under an earlier
+    /// seed. Counted, not stored: they are the same defect.
+    pub duplicates: usize,
     /// True when the hunt stopped because `max_failures` was reached rather
     /// than because the seed range was exhausted.
     pub stopped_at_max_failures: bool,
@@ -54,6 +57,7 @@ where
         seeds_run: 0,
         passes: 0,
         failures: Vec::new(),
+        duplicates: 0,
         stopped_at_max_failures: false,
     };
 
@@ -74,11 +78,22 @@ where
             Some(packet) => packet,
             None => continue,
         };
+        // `--max-failures` counts distinct defects, not seeds: the same
+        // violation found again must not consume the budget (or stop the
+        // hunt) before a different one is reached.
+        if report
+            .failures
+            .iter()
+            .any(|failure| failure.packet.violation_signature() == packet.violation_signature())
+        {
+            report.duplicates += 1;
+            continue;
+        }
         if minimize_failures {
             let code = packet.invariant.clone();
-            if let Some(minimized) =
-                minimize(&config, Some(&code), DEFAULT_MAX_RUNS, |candidate| runner(candidate))
-            {
+            if let Some(minimized) = minimize(&config, Some(&code), DEFAULT_MAX_RUNS, |candidate| {
+                runner(candidate)
+            }) {
                 packet.attach_minimized(minimized.to_reproducer());
             }
         }
@@ -129,7 +144,9 @@ mod tests {
             outcome.violations.push(Violation {
                 code: "CLAIM_REFUND_MIX",
                 session_id: "s".to_string(),
-                detail: "detail".to_string(),
+                // Seed-specific, so each failing seed is a distinct defect
+                // unless a test deliberately reuses a signature.
+                detail: format!("detail seed={}", config.seed),
             });
         }
         outcome
@@ -150,8 +167,46 @@ mod tests {
         });
         assert!(report.stopped_at_max_failures, "the limit stops the hunt");
         assert_eq!(report.failures.len(), 2);
-        assert_eq!(report.seeds_run, 6, "seeds 10,11,12,13,14,15: two failures then stop");
+        assert_eq!(
+            report.seeds_run, 6,
+            "seeds 10,11,12,13,14,15: two failures then stop"
+        );
         assert_eq!(report.passes, 4);
+    }
+
+    /// A failure whose signature does not depend on the seed: the same
+    /// defect, rediscovered.
+    fn outcome_with_fixed_violation(config: &SimConfig) -> SimOutcome {
+        let mut outcome = outcome_for(config, false);
+        outcome.violations.push(Violation {
+            code: "CLAIM_REFUND_MIX",
+            session_id: "s".to_string(),
+            detail: "identical detail".to_string(),
+        });
+        outcome
+    }
+
+    #[test]
+    fn repeated_failures_are_one_defect_and_do_not_consume_max_failures() {
+        let base = SimConfig {
+            seed: 0,
+            scenario: Scenario::ClaimRefundRace,
+            sessions: 3,
+            steps: 20,
+            nodes: 3,
+        };
+        let report = hunt(&base, 6, 2, false, outcome_with_fixed_violation);
+        assert_eq!(
+            report.failures.len(),
+            1,
+            "one defect, however many seeds found it"
+        );
+        assert_eq!(report.duplicates, 5);
+        assert_eq!(
+            report.seeds_run, 6,
+            "the hunt keeps looking past the duplicate"
+        );
+        assert!(!report.stopped_at_max_failures);
     }
 
     #[test]
@@ -166,6 +221,7 @@ mod tests {
         let report = hunt(&base, 7, 3, true, |config| outcome_for(config, false));
         assert!(report.is_clean());
         assert_eq!(report.seeds_run, 7);
+        assert_eq!(report.duplicates, 0);
         assert!(!report.stopped_at_max_failures);
     }
 }

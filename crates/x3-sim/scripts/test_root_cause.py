@@ -54,20 +54,32 @@ def sample_packet(failure_id="abc123", schema="x3-failure-packet-v1"):
 class ResponseServer(ThreadingHTTPServer):
     content = ""
     status = 200
+    finish_reason = "stop"
+    # When set, the handler sends this verbatim: the way to simulate a body
+    # that is not the completion envelope at all.
+    raw = None
 
 
 class ResponseHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         ResponseServer.last_body = json.loads(self.rfile.read(length))
-        payload = json.dumps(
-            {
-                "id": "resp_test",
-                "model": "x3-auto",
-                "usage": {"prompt_tokens": 10, "completion_tokens": 10},
-                "choices": [{"message": {"content": ResponseServer.content}}],
-            }
-        ).encode()
+        if ResponseServer.raw is not None:
+            payload = ResponseServer.raw.encode()
+        else:
+            payload = json.dumps(
+                {
+                    "id": "resp_test",
+                    "model": "x3-auto",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+                    "choices": [
+                        {
+                            "message": {"content": ResponseServer.content},
+                            "finish_reason": ResponseServer.finish_reason,
+                        }
+                    ],
+                }
+            ).encode()
         self.send_response(ResponseServer.status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
@@ -83,6 +95,12 @@ class RootCauseTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.packet_path = Path(self.tmp.name) / "packet.json"
         self.packet_path.write_text(json.dumps(sample_packet()))
+        # Server class state is shared between tests: reset it so one test's
+        # answer cannot leak into the next.
+        ResponseServer.content = ""
+        ResponseServer.status = 200
+        ResponseServer.finish_reason = "stop"
+        ResponseServer.raw = None
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -103,8 +121,17 @@ class RootCauseTests(unittest.TestCase):
             self.assertIn(expected, prompt)
 
     def test_dry_run_prints_the_request_without_network(self):
-        code = root_cause.main([str(self.packet_path), "--dry-run"])
+        import contextlib
+        import io
+
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = root_cause.main([str(self.packet_path), "--dry-run"])
         self.assertEqual(code, 0)
+        printed = captured.getvalue()
+        self.assertIn('"model"', printed, "the printed payload names its model")
+        self.assertIn("REFUND_AFTER_CLAIM", printed, "the printed payload carries the packet")
+        self.assertIn('"messages"', printed)
 
     def test_an_unsupported_schema_is_refused(self):
         bad = Path(self.tmp.name) / "bad.json"
@@ -112,9 +139,27 @@ class RootCauseTests(unittest.TestCase):
         self.assertEqual(root_cause.main([str(bad), "--dry-run"]), 2)
 
     def test_an_unreachable_router_stores_nothing(self):
+        import socket
+
+        # Bind an ephemeral port, learn it, then close it: connecting to that
+        # exact port is a refusal, where a fixed port like 9 could be
+        # answered or silently dropped by the environment.
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+
         out = Path(self.tmp.name) / "out"
         code = root_cause.main(
-            [str(self.packet_path), "--router", "http://127.0.0.1:9", "--out", str(out)]
+            [
+                str(self.packet_path),
+                "--router",
+                f"http://127.0.0.1:{port}",
+                "--out",
+                str(out),
+                "--timeout",
+                "5",
+            ]
         )
         self.assertEqual(code, 2)
         self.assertFalse(out.exists(), "no directory, no cause, when the router is down")
@@ -183,6 +228,7 @@ class RootCauseTests(unittest.TestCase):
 
     def test_an_empty_truncated_answer_is_exit_3_with_the_reason_recorded(self):
         ResponseServer.content = ""
+        ResponseServer.finish_reason = "length"
         server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
@@ -202,7 +248,7 @@ class RootCauseTests(unittest.TestCase):
 
         self.assertEqual(code, 3)
         raw = (out / "root-cause-abc123.invalid.txt").read_text()
-        self.assertIn("finish_reason", raw)
+        self.assertIn("finish_reason=length", raw)
 
     def test_a_cause_without_a_file_is_not_stored(self):
         ResponseServer.content = json.dumps(
@@ -320,6 +366,99 @@ class RootCauseTests(unittest.TestCase):
         stored = out / "root-cause-gate0001-pallet-x3-supply-ledger.md"
         self.assertTrue(stored.exists(), "the gate packet names its own kind, not 'None'")
         self.assertNotIn("None", stored.read_text().split("## Ranked causes")[0].split("- invariant:")[1].splitlines()[0])
+
+
+    def test_an_http_error_status_is_a_bad_answer_not_an_unreachable_router(self):
+        ResponseServer.status = 500
+        ResponseServer.content = "database is on fire"
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(self.packet_path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 3, "the router answered; the answer is the problem")
+        raw = (out / "root-cause-abc123.invalid.txt").read_text()
+        self.assertIn("database is on fire", raw)
+        self.assertFalse((out / "root-cause-abc123-refund_after_claim.json").exists())
+
+    def test_a_non_json_body_is_exit_3_not_an_unreachable_router(self):
+        ResponseServer.raw = "<html>gateway timeout</html>"
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(self.packet_path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 3)
+        self.assertIn("gateway timeout", (out / "root-cause-abc123.invalid.txt").read_text())
+
+    def test_a_malformed_envelope_takes_the_contract_path_instead_of_crashing(self):
+        for raw in (
+            json.dumps({"choices": []}),
+            json.dumps({"choices": ["not an object"]}),
+            json.dumps({"choices": [{"message": "not an object"}]}),
+            json.dumps({"choices": [{"message": {"content": 42}}]}),
+            json.dumps(["not", "an", "object"]),
+        ):
+            with self.subTest(raw=raw):
+                ResponseServer.raw = raw
+                server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+                threading.Thread(target=server.serve_forever, daemon=True).start()
+                try:
+                    out = Path(self.tmp.name) / "out"
+                    code = root_cause.main(
+                        [
+                            str(self.packet_path),
+                            "--router",
+                            f"http://127.0.0.1:{server.server_port}",
+                            "--out",
+                            str(out),
+                        ]
+                    )
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                self.assertEqual(code, 3, raw)
+
+    def test_a_gate_prompt_carries_the_failing_test_and_log_excerpt(self):
+        gate = {
+            "schema": "x3-gate-failure-packet-v1",
+            "failure_id": "gate0002",
+            "gate": "runtime",
+            "command": "cargo test -p x3-chain-runtime",
+            "exit_code": 101,
+            "first_error": "panicked at runtime/src/lib.rs:88:5",
+            "failing_tests": ["runtime::tests::supply_is_conserved"],
+            "log_excerpt": "thread 'main' panicked at runtime/src/lib.rs:88:5",
+        }
+        prompt = root_cause.build_prompt(gate)
+        self.assertIn("runtime::tests::supply_is_conserved", prompt)
+        self.assertIn("log excerpt", prompt)
+        self.assertIn("runtime/src/lib.rs:88:5", prompt)
+        self.assertIn("gate exit code: 101", prompt)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ lossy/partitionable network and a scheduled fault plan. A run is pinned by its
 seed, and a failing run prints the exact command that reproduces it.
 
 ```bash
-cargo run -p x3-sim -- --seed 948218671 --scenario partition-storm
+cargo run --manifest-path crates/x3-sim/Cargo.toml -- --seed 948218671 --scenario partition-storm
 ```
 
 It is its own cargo workspace root, for the same reason the coordinator is: it
@@ -48,9 +48,13 @@ state.
 | `--hunt <n>` | Run `n` consecutive seeds from `--seed`; report every distinct failure. |
 | `--max-failures <n>` | With `--hunt`, stop collecting after `n` failures (default 5). |
 | `--no-minimize` | Do not minimize a failing config automatically. |
-| `--json` | Print the evidence bundle instead of a summary. |
+| `--root-cause` | Dispatch every written packet to the root-cause agent. |
+| `--json` | Print one JSON document: evidence for a run, hunt summary for `--hunt`, the packet for a failure. |
 
-Exit codes: `0` all invariants held, `1` a violation was found, `2` usage error.
+Exit codes: `0` all invariants held, `1` a violation was found, `2` usage,
+I/O, evidence- or packet-writing error. `root_cause.py` has its own codes: `2`
+an unreachable router (nothing stored), `3` an answer that is not the required
+JSON contract (the raw answer is kept).
 
 ## Failure packets
 
@@ -63,19 +67,21 @@ first_bad_step / first_bad_op which step introduced it
 state_before / state_after    the violating session around that step
 active_faults                 partitions/restarts/loss that had fired
 suspected_code                coordinator symbols the invariant implicates
+all_violations                every invariant the run broke, not just the first
 trace_digest / state_digest   fingerprints of the exact run
 replay_command                the one-line reproduction
 minimized                     the smallest verified reproducer
-required_regression_test      what must exist after the fix
+required_regression_test      the exact test that must exist after the fix
 ```
 
 ```bash
-cargo run -p x3-sim -- --seed 948218671 --scenario partition-storm \
-    --packet /tmp/x3-packets
+cargo run --manifest-path crates/x3-sim/Cargo.toml -- --seed 948218671 \
+    --scenario partition-storm --packet /tmp/x3-packets
 ```
 
-Every field is derived from the run. Fields that cannot be known (the commit,
-outside a checkout) say `unknown` instead of guessing.
+Every field is derived from the run. The commit is `X3_COMMIT` when the caller
+sets it, otherwise the checkout's `HEAD`, otherwise `unknown` — it never
+guesses.
 
 ## Automatic minimization
 
@@ -87,18 +93,29 @@ to verify it before reporting `verified: true`. The search is bounded
 (`DEFAULT_MAX_RUNS`, 160 runs) and deterministic: the same seed minimises to
 the same config. `--no-minimize` turns it off.
 
+The scan is honest about what it can prove. Every candidate value changes the
+seeded schedule, so the failure predicate is not monotone: a config that fails
+at a large value says nothing about smaller ones. Instead of a binary search
+that could walk past a smaller reproducer, each dimension is scanned upwards
+from its floor for a bounded number of runs and only observed results are
+trusted. The result is the smallest reproducer *found*, verified by a fresh
+run — not a claim of global minimality.
+
 ## Hunting
 
 ```bash
-cargo run -p x3-sim -- --hunt 500 --scenario crash-recovery --packet /tmp/x3-packets
+cargo run --manifest-path crates/x3-sim/Cargo.toml -- --hunt 500 \
+    --scenario crash-recovery --packet /tmp/x3-packets
 ```
 
-Runs 500 seeds, writes one packet per distinct failure (bounded by
-`--max-failures`, which stops the hunt once it is reached), and exits `1` when
-anything failed — so it drops straight into CI. With `--out`, each failing run
-also gets its evidence bundle (JSON + trace) and the hunt writes a
-`hunt-summary-<scenario>-<seed>.json` recording how many seeds ran, how many
-passed, and each failure's invariant and replay command.
+Runs 500 seeds, writes one packet per **distinct** failure — the same violation
+found again is counted as a duplicate, not a second packet, and does not
+consume `--max-failures` — and exits `1` when anything failed, so it drops
+straight into CI. With `--out`, each failing run also gets its evidence bundle
+(JSON + trace) and the hunt writes a `hunt-summary-<scenario>-<seed>.json`
+recording how many seeds ran, how many passed, how many were duplicates, and
+each failure's invariant and replay command. `--json` prints that summary as
+one JSON document instead of the human lines.
 
 ## Root-cause dispatch
 
@@ -136,9 +153,11 @@ scripts/x3-failure-packet.sh --label pallet-x3-supply-ledger --root-cause -- \
 ```
 
 It runs the gate, and on failure extracts the first error, the failing tests,
-the `file:line` each panic points at, the commit, and the replay command into
-`failure-packets/<utc>-<label>-<id>.json` (+ `.md`). A passing gate writes
-nothing.
+the `file:line` each panic points at, the commit, the measured duration, and
+the replay command (prefixed with `cd <checkout> &&`, so the replay runs
+against the same source) into `failure-packets/<utc>-<label>-<id>.json`
+(+ `.md`). A passing gate writes nothing, a usage error is exit `2`, and a
+broken packet builder never replaces the gate's own exit code.
 
 ## Invariants checked
 
@@ -183,12 +202,16 @@ bash scripts/test_x3_failure_packet.sh
 * `tests/refund_after_claim.rs` — the reproduced defect, plus a positive control
   that a legitimate refund still works.
 * `tests/packet.rs` — a passing run produces no packet; the minimizer shrinks
-  real runs and verifies its result; the CLI replays library runs exactly.
-* `tests/minimize.rs` — `--hunt` over clean seeds exits 0 and writes nothing.
+  real runs and verifies its result; the packet's replay command pins every
+  dimension and the CLI reach the same trace digest and verdict.
+* `tests/minimize.rs` — `--hunt` over clean seeds exits 0 and writes nothing;
+  `--json` hunts print one parseable document; usage errors are exit 2.
 * `scripts/test_root_cause.py` — the dispatcher's prompt, fail-closed behaviour
-  on an unreachable router, contract validation, and provenance storage.
+  on an unreachable router, bad answers (HTTP error, non-JSON, malformed
+  envelope) kept as raw text, contract validation, and provenance storage.
 * `scripts/test_x3_failure_packet.sh` — a failing gate produces an accurate
-  packet; a passing gate produces none.
+  packet; a passing gate produces none; a broken packet builder preserves the
+  gate's exit code.
 
 ## Scope
 
