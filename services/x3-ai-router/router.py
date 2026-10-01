@@ -35,10 +35,14 @@ def request_text(request):
     for message in request.get("messages") or []:
         if isinstance(message, dict):
             parts.append(str(message.get("content", "")))
-    for item in request.get("input") or []:
+    response_input = request.get("input")
+    if isinstance(response_input, str):
+        parts.append(response_input)
+        response_items = []
+    else:
+        response_items = response_input or []
+    for item in response_items:
         if not isinstance(item, dict):
-            if isinstance(item, str):
-                parts.append(item)
             continue
         if item.get("type", "message") == "message":
             for part in item.get("content") or []:
@@ -71,7 +75,13 @@ def responses_messages(request):
     instructions = request.get("instructions")
     if isinstance(instructions, str) and instructions:
         messages.append({"role": "system", "content": instructions})
-    for item in request.get("input") or []:
+    response_input = request.get("input")
+    if isinstance(response_input, str):
+        messages.append({"role": "user", "content": response_input})
+        response_items = []
+    else:
+        response_items = response_input or []
+    for item in response_items:
         if not isinstance(item, dict):
             continue
         kind = item.get("type", "message")
@@ -1077,8 +1087,8 @@ def handler_for(router):
             `router.complete` / `router.stream`, and the answer is translated
             back.
             """
-            if not isinstance(data.get("input"), list):
-                return self.reply(400, {"error": {"message": "Expected an input list"}})
+            if not isinstance(data.get("input"), (list, str)):
+                return self.reply(400, {"error": {"message": "Expected input to be a string or list"}})
             chat = responses_request_to_chat(data)
             if not chat["messages"]:
                 return self.reply(400, {"error": {"message": "Expected at least one input message"}})
