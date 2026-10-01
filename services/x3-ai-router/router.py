@@ -1093,21 +1093,14 @@ def handler_for(router):
             self.end_headers()
 
         def serve_responses(self, data, agent):
-            """Serve `POST /v1/responses` by translating onto the chat path.
-
-            Codex accepts only the Responses wire protocol for a custom
-            provider, while every provider this router talks to speaks Chat
-            Completions. Rather than duplicate provider selection, budgets,
-            cooldowns and fallback, the request is translated and handed to
-            `router.complete` / `router.stream`, and the answer is translated
-            back.
-            """
-            if not isinstance(data.get("input"), (list, str)):
+            """Serve Responses natively when possible, then fall back to chat translation."""
+            response_input = data.get("input")
+            instructions = data.get("instructions")
+            if response_input is not None and not isinstance(response_input, (list, str)):
                 return self.reply(400, {"error": {"message": "Expected input to be a string or list"}})
-            chat = responses_request_to_chat(data)
-            if not chat["messages"]:
-                return self.reply(400, {"error": {"message": "Expected at least one input message"}})
-            error = request_error(chat, router.config)
+            if response_input is None and not (isinstance(instructions, str) and instructions):
+                return self.reply(400, {"error": {"message": "Expected input and/or instructions"}})
+            error = request_error(data, router.config)
             if error:
                 return self.reply(400, {"error": {"message": error}})
 
@@ -1120,6 +1113,15 @@ def handler_for(router):
                     return self.reply(200, native_result)
                 if native_status in (400, 413):
                     return self.reply(native_status, native_result)
+
+                chat = responses_request_to_chat(data)
+                if not chat["messages"]:
+                    return self.reply(native_status if native_attempted else 400,
+                                      native_result if native_attempted else
+                                      {"error": {"message": "Request cannot be represented for a Chat Completions fallback"}})
+                error = request_error(chat, router.config)
+                if error:
+                    return self.reply(400, {"error": {"message": error}})
                 status, result = router.complete(chat, agent)
                 if status != 200:
                     if native_attempted and isinstance(result.get("error"), dict):
@@ -1131,13 +1133,23 @@ def handler_for(router):
                                               result.get("usage"))
                 return self.reply(200, envelope)
 
-            native_outcome = router.native_responses_stream(data, agent, lambda: self._start_sse(), self.stream_chunk)
+            native_outcome = router.native_responses_stream(
+                data, agent, lambda: self._start_sse(), self.stream_chunk)
             if native_outcome is None:
                 self.close_connection = True
                 return
             native_status, native_result, native_attempted = native_outcome
             if native_status in (400, 413):
                 return self.reply(native_status, native_result)
+
+            chat = responses_request_to_chat(data)
+            if not chat["messages"]:
+                return self.reply(native_status if native_attempted else 400,
+                                  native_result if native_attempted else
+                                  {"error": {"message": "Request cannot be represented for a Chat Completions fallback"}})
+            error = request_error(chat, router.config)
+            if error:
+                return self.reply(400, {"error": {"message": error}})
 
             stream = ResponsesStream(self.stream_chunk, response_id, model)
 
@@ -1147,6 +1159,11 @@ def handler_for(router):
 
             outcome = router.stream(chat, agent, start, stream.on_line)
             if outcome is not None:
+                if native_attempted:
+                    status, result = outcome
+                    if isinstance(result, dict) and isinstance(result.get("error"), dict):
+                        result["error"].setdefault("attempts", [])[:0] = native_result.get("error", {}).get("attempts", [])
+                    return self.reply(status, result)
                 return self.reply(*outcome)
             stream.finish()
             self.close_connection = True
