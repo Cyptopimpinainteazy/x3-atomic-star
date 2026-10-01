@@ -2,11 +2,21 @@
 //!
 //! Exit codes follow the repository's fail-closed convention: `0` when every
 //! invariant held, `1` when a run produced a violation, `2` for a usage error.
+//!
+//! When a run fails, the simulator builds a **failure packet**: the exact run,
+//! the first step that broke an invariant, the state before and after it, the
+//! faults that were active, and the coordinator symbols the invariant
+//! implicates. `--minimize` (on by default for failing runs) then shrinks the
+//! config until no dimension can be removed while the same violation fires,
+//! and re-runs the smallest candidate to verify it. The packet's `root_cause`
+//! command line is what hands the failure to an investigation agent next.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use x3_sim::{run, Scenario, SimConfig, SimOutcome};
+use x3_sim::{
+    minimize, run, FailurePacket, Scenario, SimConfig, SimOutcome, DEFAULT_MAX_RUNS,
+};
 
 const USAGE: &str = "\
 x3-sim — deterministic fault-injection simulator for X3 atomic swaps
@@ -21,13 +31,26 @@ OPTIONS:
     --steps <n>           Scheduler steps (default 120)
     --nodes <n>           Node 0 is the coordinator, the rest are clients (default 4)
     --out <dir>           Write the evidence bundle (JSON + trace) here
+    --packet <dir>        Write the failure packet (JSON + Markdown) here on failure
+    --hunt <n>            Run n consecutive seeds from --seed; collect failures
+    --max-failures <n>    With --hunt, stop after n failures (default 5)
+    --no-minimize         Do not minimize a failing config automatically
     --json                Print the evidence bundle to stdout instead of a summary
     -h, --help            Show this help
+
+EXIT CODES:
+    0  every invariant held
+    1  at least one invariant was violated
+    2  usage, I/O, or evidence-writing error
 ";
 
 fn main() -> ExitCode {
     let mut config = SimConfig::default();
     let mut out: Option<PathBuf> = None;
+    let mut packet_dir: Option<PathBuf> = None;
+    let mut hunt: Option<usize> = None;
+    let mut max_failures = 5usize;
+    let mut do_minimize = true;
     let mut json = false;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -44,9 +67,18 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--json" => json = true,
+            "--no-minimize" => do_minimize = false,
             "--seed" => match value().and_then(|raw| raw.parse::<u64>().ok()) {
                 Some(parsed) => config.seed = parsed,
                 None => return usage_error("--seed requires an unsigned integer"),
+            },
+            "--hunt" => match value().and_then(|raw| raw.parse::<usize>().ok()) {
+                Some(parsed) if parsed > 0 => hunt = Some(parsed),
+                _ => return usage_error("--hunt requires a positive integer"),
+            },
+            "--max-failures" => match value().and_then(|raw| raw.parse::<usize>().ok()) {
+                Some(parsed) if parsed > 0 => max_failures = parsed,
+                _ => return usage_error("--max-failures requires a positive integer"),
             },
             "--sessions" => match value().and_then(|raw| raw.parse::<usize>().ok()) {
                 Some(parsed) => config.sessions = parsed,
@@ -68,9 +100,17 @@ fn main() -> ExitCode {
                 Some(path) => out = Some(PathBuf::from(path)),
                 None => return usage_error("--out requires a directory"),
             },
+            "--packet" => match value() {
+                Some(path) => packet_dir = Some(PathBuf::from(path)),
+                None => return usage_error("--packet requires a directory"),
+            },
             other => return usage_error(&format!("unknown argument '{other}'")),
         }
         index += 1;
+    }
+
+    if let Some(count) = hunt {
+        return hunt_seeds(&config, count, max_failures, do_minimize, packet_dir.as_deref(), out.as_deref());
     }
 
     if let Some(dir) = &out {
@@ -99,10 +139,134 @@ fn main() -> ExitCode {
     }
 
     if outcome.is_pass() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
+        return ExitCode::SUCCESS;
     }
+
+    match report_failure(&config, &outcome, do_minimize, packet_dir.as_deref(), json) {
+        Ok(()) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("x3-sim: failure packet could not be completed: {error}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// Build (and optionally minimize, verify, and persist) the failure packet for
+/// one failing run. Prints the packet and the next command either way.
+fn report_failure(
+    config: &SimConfig,
+    outcome: &SimOutcome,
+    do_minimize: bool,
+    packet_dir: Option<&Path>,
+    json: bool,
+) -> Result<(), String> {
+    let mut packet = FailurePacket::from_outcome(config, outcome)
+        .ok_or_else(|| "a failing run produced no packet".to_string())?;
+
+    if do_minimize {
+        let code = packet.invariant.clone();
+        if let Some(minimized) = minimize(config, Some(&code), DEFAULT_MAX_RUNS, x3_sim::run) {
+            packet.attach_minimized(minimized.to_reproducer());
+        }
+    }
+
+    if let Some(dir) = packet_dir {
+        let (json_path, md_path) = packet.write(dir).map_err(|error| error.to_string())?;
+        if !json {
+            println!("packet: {}", json_path.display());
+            println!("packet: {}", md_path.display());
+        }
+    }
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&packet).unwrap_or_else(|_| "{}".to_string())
+        );
+    } else {
+        println!();
+        println!("{}", packet.to_markdown());
+        println!("root_cause_command = {}", root_cause_command(&packet));
+    }
+    Ok(())
+}
+
+/// The exact command that hands this packet to the root-cause agent.
+fn root_cause_command(packet: &FailurePacket) -> String {
+    format!(
+        "python3 crates/x3-sim/scripts/root_cause.py <packet.json>  # packet {}",
+        packet.failure_id
+    )
+}
+
+/// Run `count` consecutive seeds and report every distinct failure.
+fn hunt_seeds(
+    base: &SimConfig,
+    count: usize,
+    max_failures: usize,
+    do_minimize: bool,
+    packet_dir: Option<&Path>,
+    out: Option<&Path>,
+) -> ExitCode {
+    if let Some(dir) = out {
+        if let Err(error) = std::fs::create_dir_all(dir) {
+            eprintln!("x3-sim: cannot create evidence directory: {error}");
+            return ExitCode::from(2);
+        }
+    }
+
+    let mut failures: Vec<(SimConfig, SimOutcome, FailurePacket)> = Vec::new();
+    let mut passes = 0usize;
+    for offset in 0..count {
+        let mut config = base.clone();
+        config.seed = base.seed.wrapping_add(offset as u64);
+        let outcome = run(&config);
+        if outcome.is_pass() {
+            passes += 1;
+            continue;
+        }
+        if failures.len() >= max_failures {
+            continue;
+        }
+        let mut packet = match FailurePacket::from_outcome(&config, &outcome) {
+            Some(packet) => packet,
+            None => continue,
+        };
+        if do_minimize {
+            let code = packet.invariant.clone();
+            if let Some(minimized) = minimize(&config, Some(&code), DEFAULT_MAX_RUNS, x3_sim::run) {
+                packet.attach_minimized(minimized.to_reproducer());
+            }
+        }
+        if let Some(dir) = packet_dir {
+            if let Err(error) = packet.write(dir) {
+                eprintln!("x3-sim: cannot write failure packet: {error}");
+                return ExitCode::from(2);
+            }
+        }
+        failures.push((config, outcome, packet));
+    }
+
+    println!("hunt: seeds {}..{}  passes = {}  failures = {}", base.seed, base.seed.wrapping_add(count as u64), passes, failures.len());
+    if failures.is_empty() {
+        println!("no invariant violations in {} runs", count);
+        return ExitCode::SUCCESS;
+    }
+    for (_, outcome, packet) in &failures {
+        println!(
+            "  seed={} invariant={} session={} replay=`{}`",
+            outcome.seed,
+            packet.invariant,
+            packet.session,
+            outcome.replay_command()
+        );
+        if let Some(minimized) = &packet.minimized {
+            println!("    minimized (verified={}): {}", minimized.verified, minimized.replay_command);
+        }
+        println!("    packet: {}  id={}", packet.file_stem(), packet.failure_id);
+        println!("    root cause: {}", root_cause_command(packet));
+    }
+    ExitCode::FAILURE
 }
 
 fn usage_error(message: &str) -> ExitCode {

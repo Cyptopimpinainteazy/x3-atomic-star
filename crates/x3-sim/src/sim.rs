@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use x3_cross_vm_coordinator::{
     CoordinatorConfig, HtlcCreateParams, HtlcId, HtlcRecord, HtlcSecret, HtlcStatus,
     InMemoryPersistence, SessionPersistence, SwapCoordinator, SwapPhase, SwapSession, VmTarget,
@@ -33,7 +33,7 @@ const FAST_TIMELOCK_SECS: u64 = 3_600;
 const SLOW_TIMELOCK_SECS: u64 = 7_200;
 
 /// Which adversarial schedule to run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Scenario {
     /// Every session walks the happy path once, in order.
     HappyPath,
@@ -76,7 +76,7 @@ impl Scenario {
 }
 
 /// Knobs for one run.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimConfig {
     pub seed: u64,
     pub scenario: Scenario,
@@ -163,9 +163,32 @@ pub struct SimOutcome {
     pub network: NetworkStats,
     pub trace_digest: String,
     pub state_digest: String,
+    /// Scheduler step whose execution introduced the first violation. `None`
+    /// when the violation appeared during the drain, after the last step.
+    pub first_bad_step: Option<u64>,
+    /// `"step N"` or `"drain"`, for humans.
+    pub first_bad_step_label: String,
+    /// The operation applied just before the first violation was observed.
+    pub first_bad_op: Option<String>,
+    /// Faults that had fired by the time the first violation appeared.
+    pub active_faults: Vec<String>,
+    /// The violating session's state immediately before the step that
+    /// introduced the first violation, when one step can be attributed.
+    pub state_before: Option<serde_json::Value>,
+    /// The same session's state after that step.
+    pub state_after: Option<serde_json::Value>,
     pub violations: Vec<Violation>,
     #[serde(skip)]
     pub trace: Vec<String>,
+}
+
+/// The last accepted operation, kept so the first violation can be attributed
+/// to the step that produced it rather than to the schedule as a whole.
+#[derive(Debug, Clone)]
+struct LastApplied {
+    op: String,
+    before: Option<serde_json::Value>,
+    after: Option<serde_json::Value>,
 }
 
 impl SimOutcome {
@@ -295,9 +318,17 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     let mut partitions = 0u64;
     let mut node_down_until_ms = 0u64;
     let mut last_op_index: Option<usize> = None;
+    let mut last_applied: Option<LastApplied> = None;
+    let mut first_bad_step: Option<u64> = None;
+    let mut first_bad_step_label: Option<String> = None;
+    let mut first_bad_op: Option<String> = None;
+    let mut fired_faults: Vec<String> = Vec::new();
+    let mut active_faults: Vec<String> = Vec::new();
+    let mut state_before: Option<serde_json::Value> = None;
+    let mut state_after: Option<serde_json::Value> = None;
 
     macro_rules! record_violations {
-        ($step:expr) => {{
+        ($trace:expr, $human:expr, $index:expr) => {{
             let mut sessions_now: Vec<SwapSession> = persistence.load_all().into_values().collect();
             sessions_now.sort_by(|a, b| a.session_id.cmp(&b.session_id));
             let mut found = check_sessions(&sessions_now);
@@ -306,8 +337,24 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                 for item in &found {
                     trace.push(format!(
                         "{} INVARIANT {} session={} {}",
-                        $step, item.code, item.session_id, item.detail
+                        $trace, item.code, item.session_id, item.detail
                     ));
+                }
+                if violations.is_empty() && !found.is_empty() {
+                    // The first violation is the one worth attributing; later
+                    // ones are often the same defect seen through other
+                    // sessions.
+                    first_bad_step = if $index == u64::MAX { None } else { Some($index) };
+                    first_bad_step_label = Some($human.to_string());
+                    if let Some(last) = &last_applied {
+                        first_bad_op = Some(last.op.clone());
+                        state_before = last.before.clone();
+                        state_after = last.after.clone();
+                    } else {
+                        state_before = None;
+                        state_after = None;
+                    }
+                    active_faults = fired_faults.clone();
                 }
                 violations.extend(found);
             }
@@ -325,10 +372,12 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                 FaultKind::Partition { group_a, group_b } => {
                     net.partition(&group_a, &group_b);
                     partitions += 1;
+                    fired_faults.push(format!("{step:04} partition {group_a:?}|{group_b:?}"));
                     trace.push(format!("{step:04} FAULT partition {group_a:?}|{group_b:?}"));
                 }
                 FaultKind::Heal => {
                     net.heal_all();
+                    fired_faults.push(format!("{step:04} heal"));
                     trace.push(format!("{step:04} FAULT heal"));
                 }
                 FaultKind::SlowLink {
@@ -337,6 +386,9 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                 } => {
                     net.set_latency(latency_ms, latency_ms / 4);
                     net.set_drop_percent(extra_drop_percent);
+                    fired_faults.push(format!(
+                        "{step:04} slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
+                    ));
                     trace.push(format!(
                         "{step:04} FAULT slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
                     ));
@@ -346,6 +398,9 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     coord = coordinator(&persistence);
                     restarts += 1;
                     node_down_until_ms = now_ms + duration_ms;
+                    fired_faults.push(format!(
+                        "{step:04} crash-restart down_for={duration_ms}ms dropped={dropped}"
+                    ));
                     trace.push(format!(
                         "{step:04} FAULT crash-restart down_for={duration_ms}ms dropped={dropped}"
                     ));
@@ -356,6 +411,7 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                             persistence.save(&previous);
                             coord = coordinator(&persistence);
                             stale_writes += 1;
+                            fired_faults.push(format!("{step:04} stale-write session={id}"));
                             trace.push(format!("{step:04} FAULT stale-write session={id}"));
                         }
                     }
@@ -408,10 +464,16 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             shadow.insert(id.clone(), persistence.load(&id).unwrap_or_else(|| {
                 panic!("session {id} vanished from persistence")
             }));
+            let before = serde_json::to_value(persistence.load(&id)).ok();
 
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {
                 Ok(()) => {
                     accepted += 1;
+                    last_applied = Some(LastApplied {
+                        op: entry.op.name().to_string(),
+                        before,
+                        after: serde_json::to_value(persistence.load(&id)).ok(),
+                    });
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} ok",
                         envelope.from,
@@ -420,6 +482,11 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     ));
                 }
                 Err(error) => {
+                    last_applied = Some(LastApplied {
+                        op: entry.op.name().to_string(),
+                        before,
+                        after: serde_json::to_value(persistence.load(&id)).ok(),
+                    });
                     rejected += 1;
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} rejected: {error}",
@@ -431,7 +498,7 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             }
         }
 
-        record_violations!(step);
+        record_violations!(format!("{step:04}"), format!("step {step}"), step as u64);
     }
 
     // ── Drain: let late messages land before judging the run ──────────────
@@ -451,7 +518,7 @@ pub fn run(config: &SimConfig) -> SimOutcome {
         }
     }
 
-    record_violations!("drain");
+    record_violations!("drain", "drain", u64::MAX);
 
     // ── Judge ─────────────────────────────────────────────────────────────
     let mut final_sessions: Vec<SwapSession> = persistence.load_all().into_values().collect();
@@ -493,6 +560,12 @@ pub fn run(config: &SimConfig) -> SimOutcome {
         network: net.stats(),
         trace_digest: trace_hasher.finalize().to_hex().to_string(),
         state_digest: state_hasher.finalize().to_hex().to_string(),
+        first_bad_step,
+        first_bad_step_label: first_bad_step_label.unwrap_or_else(|| "none".to_string()),
+        first_bad_op,
+        active_faults,
+        state_before,
+        state_after,
         violations,
         trace,
     }

@@ -714,6 +714,13 @@ GATES_FAST=(
   # stays fixed. `--locked` against the committed lock, and its own target dir
   # because it resolves the coordinator's dependency graph.
   "test x3-sim:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
+  # A failing simulation now produces a failure packet and hands it to a root-cause
+  # agent. The dispatcher's own contract (fail closed when the router is down,
+  # never store a non-conforming answer as a cause) is not covered by the Rust
+  # suite, and the gate wrapper's extraction is what every non-simulated
+  # subsystem (kernel, settlement, supply ledger, runtime) relies on next.
+  "test x3-sim root-cause:python3 crates/x3-sim/scripts/test_root_cause.py"
+  "test x3-failure-packet:bash scripts/test_x3_failure_packet.sh"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
