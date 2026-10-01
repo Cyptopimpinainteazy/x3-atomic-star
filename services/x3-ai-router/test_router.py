@@ -42,10 +42,76 @@ class Provider(BaseHTTPRequestHandler):
         pass
 
 
+class NativeResponsesProvider(BaseHTTPRequestHandler):
+    requests = []
+    paths = []
+    fail = False
+
+    def do_POST(self):
+        data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        type(self).requests.append(data)
+        type(self).paths.append(self.path)
+        if type(self).fail:
+            body = json.dumps({"error": {"message": "native provider failure"}}).encode()
+            self.send_response(503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path != "/responses":
+            body = json.dumps({"error": {"message": "wrong endpoint"}}).encode()
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if data.get("stream"):
+            events = [
+                b'event: response.created\ndata: {"type":"response.created","sequence_number":0,"response":{"id":"resp_native","object":"response","status":"in_progress","model":"deepseek-flash","output":[]}}\n\n',
+                b'event: response.output_item.added\ndata: {"type":"response.output_item.added","sequence_number":1,"output_index":0,"item":{"id":"msg_native","type":"message","role":"assistant","status":"in_progress","content":[]}}\n\n',
+                b'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","sequence_number":2,"item_id":"msg_native","output_index":0,"content_index":0,"delta":"native ok"}\n\n',
+                b'event: response.completed\ndata: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_native","object":"response","status":"completed","model":"deepseek-flash","output":[{"id":"msg_native","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"native ok","annotations":[]}]}],"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}\n\n',
+            ]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for event in events:
+                self.wfile.write(event)
+                self.wfile.flush()
+            return
+        body = json.dumps({
+            "id": "resp_native",
+            "object": "response",
+            "status": "completed",
+            "model": "deepseek-flash",
+            "output": [{
+                "id": "msg_native",
+                "type": "message",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "native ok", "annotations": []}],
+            }],
+            "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        }).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_):
+        pass
+
+
 class RouterTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         Provider.requests = []
+        NativeResponsesProvider.requests = []
+        NativeResponsesProvider.paths = []
+        NativeResponsesProvider.fail = False
         self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
         self.upstream_thread = threading.Thread(target=self.upstream.serve_forever, daemon=True)
         self.upstream_thread.start()
@@ -382,6 +448,118 @@ class RouterTests(unittest.TestCase):
         server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         return server
+
+    def start_native_responses_provider(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), NativeResponsesProvider)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    def configure_native_responses_provider(self, server):
+        os.environ["DEEPSEEK_TEST_KEY"] = "test-key"
+        self.config["providers"]["native"] = {
+            "base_url": f"http://127.0.0.1:{server.server_port}",
+            "model": "deepseek-flash",
+            "protocol": "responses",
+            "api_key_env": "DEEPSEEK_TEST_KEY",
+            "input_usd_per_million": 0.3,
+            "output_usd_per_million": 1.2,
+            "pricing_checked_on": router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat(),
+            "critical_allowed": True,
+        }
+        self.config["routes"]["routine"] = ["native", "up"]
+        self.config["routes"]["critical"] = ["native", "up"]
+
+    def test_responses_native_provider_uses_responses_endpoint(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(NativeResponsesProvider.paths, ["/responses"])
+        self.assertEqual(NativeResponsesProvider.requests[0]["model"], "deepseek-flash")
+        self.assertNotIn("stream_options", NativeResponsesProvider.requests[0])
+        self.assertEqual(body["object"], "response")
+        self.assertEqual(body["output"][0]["content"][0]["text"], "native ok")
+        self.assertEqual(self.router.stats()[0]["provider"], "native")
+        self.assertEqual(self.router.stats()[0]["cost_usd"], 0.000009)
+
+    def test_responses_native_stream_is_proxied_through_terminal_event(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=True)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(NativeResponsesProvider.paths, ["/responses"])
+        self.assertIn("event: response.completed", raw)
+        self.assertIn('"delta":"native ok"', raw)
+        self.assertNotIn("[DONE]", raw)
+        self.assertEqual(self.router.stats()[0]["provider"], "native")
+        self.assertEqual(self.router.stats()[0]["cost_usd"], 0.000009)
+
+    def test_responses_native_failure_falls_back_to_chat_provider(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        NativeResponsesProvider.fail = True
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(NativeResponsesProvider.paths, ["/responses"])
+        self.assertEqual(body["output"][0]["content"][0]["text"], "ok")
+        self.assertEqual(Provider.requests[-1]["model"], "up")
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("native", health)
+
+    def test_responses_budget_and_classifier_understand_responses_shape(self):
+        self.assertEqual(
+            router_module.output_bound({"max_output_tokens": 777}, self.config),
+            777,
+        )
+        self.assertEqual(
+            self.router.choose({"instructions": "review atomic finality", "input": []})[0],
+            "critical",
+        )
 
     def test_responses_request_translation(self):
         chat = router_module.responses_request_to_chat({
