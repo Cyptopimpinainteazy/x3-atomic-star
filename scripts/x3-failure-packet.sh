@@ -104,8 +104,14 @@ def git(*args):
 first_error = next(
     (line.strip() for line in lines
      if re.search(r"panicked at|^error(\[|:)| assertion|left == right|test result: FAILED", line)),
-    lines[-1].strip() if lines else "",
+    "",
 )
+if not first_error:
+    first_error = lines[-1].strip() if lines else ""
+if not first_error:
+    # A silent failure is still a failure: the dispatcher requires a
+    # non-empty first_error, so record the one fact that always exists.
+    first_error = f"{label} exited {status} with no output"
 failing_tests = sorted({
     match.group(1)
     for line in lines

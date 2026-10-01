@@ -298,6 +298,16 @@ fn hunt_seeds(
     // packet directory even when `--packet` is not given.
     let dir = packet_dir.or_else(|| root_cause.then(|| Path::new("target/x3-failure-packets")));
 
+    // Duplicates get no packet and no dispatch, but the run itself is
+    // evidence: `--out` must not silently drop it.
+    for failure in report.failures.iter().chain(report.duplicates.iter()) {
+        if let Some(dir) = out {
+            if let Err(error) = write_evidence(dir, &failure.outcome) {
+                eprintln!("x3-sim: cannot write evidence bundle: {error}");
+                return ExitCode::from(2);
+            }
+        }
+    }
     for failure in &report.failures {
         if let Some(dir) = dir {
             if let Err(error) = failure.packet.write(dir) {
@@ -312,14 +322,6 @@ fn hunt_seeds(
                 dispatch_root_cause(&path, json);
             }
         }
-        if let Some(dir) = out {
-            // The evidence bundle for the failing run itself: `--out` must not
-            // create a directory that stays empty.
-            if let Err(error) = write_evidence(dir, &failure.outcome) {
-                eprintln!("x3-sim: cannot write evidence bundle: {error}");
-                return ExitCode::from(2);
-            }
-        }
     }
 
     let summary = serde_json::json!({
@@ -329,7 +331,7 @@ fn hunt_seeds(
         "seeds_requested": count,
         "seeds_run": report.seeds_run,
         "passes": report.passes,
-        "duplicates": report.duplicates,
+        "duplicates": report.duplicates.len(),
         "failures": report.failures.iter().map(|failure| serde_json::json!({
             "seed": failure.config.seed,
             "invariant": failure.packet.invariant,
@@ -379,7 +381,7 @@ fn hunt_seeds(
         report.seeds_run,
         report.passes,
         report.failures.len(),
-        report.duplicates,
+        report.duplicates.len(),
         if report.stopped_at_max_failures {
             format!(" (stopped at --max-failures {max_failures})")
         } else {

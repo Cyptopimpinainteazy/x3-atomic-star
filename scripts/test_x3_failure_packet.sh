@@ -87,6 +87,36 @@ if [ "$status" -ne 101 ]; then
   fail=1
 fi
 
+echo "test_x3_failure_packet: a silent failing gate still yields a dispatchable packet"
+status="$(run bash scripts/x3-failure-packet.sh --label selftest-silent --packet-dir "$WORK/silent-packets" -- \
+  bash -c 'exit 7')"
+if [ "$status" -ne 7 ]; then
+  echo "  FAIL: silent gate exit was $status, expected 7" >&2
+  fail=1
+fi
+packet="$(find "$WORK/silent-packets" -name '*.json' | head -1)"
+if [ -z "$packet" ]; then
+  echo "  FAIL: a silent failure wrote no packet" >&2
+  fail=1
+else
+  # The producer and the dispatcher must agree: run the dispatcher's own
+  # validator over the packet the wrapper just wrote.
+  python3 - "$packet" <<'PY' || fail=1
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("crates/x3-sim/scripts")))
+import root_cause  # noqa: E402
+
+packet = json.load(open(sys.argv[1]))
+assert packet["first_error"].strip(), "a silent failure still needs a first_error"
+assert "7" in packet["first_error"], packet["first_error"]
+root_cause.load_packet(Path(sys.argv[1]))  # exits non-zero if not dispatchable
+print("  silent-failure packet is dispatchable")
+PY
+fi
+
 echo "test_x3_failure_packet: an unusable checkout is refused before the gate runs"
 marker="$WORK/gate-ran"
 status="$(X3_FAILURE_PACKET_ROOT="$WORK/missing-checkout" run bash scripts/x3-failure-packet.sh \

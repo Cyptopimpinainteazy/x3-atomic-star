@@ -26,8 +26,9 @@ pub struct HuntReport {
     pub passes: usize,
     pub failures: Vec<HuntFailure>,
     /// Failing seeds whose violation was already collected under an earlier
-    /// seed. Counted, not stored: they are the same defect.
-    pub duplicates: usize,
+    /// seed: the same defect, but each run is still evidence of it. They do
+    /// not consume `--max-failures` and get no second packet.
+    pub duplicates: Vec<HuntFailure>,
     /// True when the hunt stopped because `max_failures` was reached rather
     /// than because the seed range was exhausted.
     pub stopped_at_max_failures: bool,
@@ -57,7 +58,7 @@ where
         seeds_run: 0,
         passes: 0,
         failures: Vec::new(),
-        duplicates: 0,
+        duplicates: Vec::new(),
         stopped_at_max_failures: false,
     };
 
@@ -86,7 +87,11 @@ where
             .iter()
             .any(|failure| failure.packet.violation_signature() == packet.violation_signature())
         {
-            report.duplicates += 1;
+            report.duplicates.push(HuntFailure {
+                config: config.clone(),
+                outcome,
+                packet,
+            });
             continue;
         }
         if minimize_failures {
@@ -201,7 +206,11 @@ mod tests {
             1,
             "one defect, however many seeds found it"
         );
-        assert_eq!(report.duplicates, 5);
+        assert_eq!(
+            report.duplicates.len(),
+            5,
+            "each rediscovery is kept as evidence"
+        );
         assert_eq!(
             report.seeds_run, 6,
             "the hunt keeps looking past the duplicate"
@@ -230,7 +239,7 @@ mod tests {
             outcome
         });
         assert_eq!(report.failures.len(), 1, "one defect, not one per seed");
-        assert_eq!(report.duplicates, 4);
+        assert_eq!(report.duplicates.len(), 4);
     }
 
     #[test]
@@ -245,7 +254,7 @@ mod tests {
         let report = hunt(&base, 7, 3, true, |config| outcome_for(config, false));
         assert!(report.is_clean());
         assert_eq!(report.seeds_run, 7);
-        assert_eq!(report.duplicates, 0);
+        assert!(report.duplicates.is_empty());
         assert!(!report.stopped_at_max_failures);
     }
 }

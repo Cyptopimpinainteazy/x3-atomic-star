@@ -113,24 +113,32 @@ where
             if ceiling <= floor {
                 continue;
             }
-            // Ascending scan, smallest value first. A binary search would be
-            // unsound here: the predicate is not monotone, because changing
-            // sessions, steps or nodes changes the seeded schedule. Only the
-            // values actually observed are trusted.
-            let stop = ceiling.min(floor.saturating_add(SCAN_CAP));
-            for value in floor..=stop {
-                if runs + 1 >= max_runs {
-                    // Keep one run for the final verification.
-                    break 'shrink;
+            // Ascending scan, smallest value first, in windows of SCAN_CAP.
+            // A binary search would be unsound here: the predicate is not
+            // monotone, because changing sessions, steps or nodes changes the
+            // seeded schedule. Only the values actually observed are trusted.
+            //
+            // A window that finds nothing moves to the next one: the smallest
+            // reproducer may sit above the first window, and the global run
+            // budget is the real bound.
+            let mut window_start = floor;
+            'windows: while window_start <= ceiling {
+                let window_end = ceiling.min(window_start.saturating_add(SCAN_CAP - 1));
+                for value in window_start..=window_end {
+                    if runs + 1 >= max_runs {
+                        // Keep one run for the final verification.
+                        break 'shrink;
+                    }
+                    let mut candidate = current.clone();
+                    dimension.set(&mut candidate, value);
+                    if let Some(outcome) = reproduce(&candidate, &mut runner, &mut runs) {
+                        current = candidate.clone();
+                        best = Some((candidate, outcome));
+                        changed = true;
+                        break 'windows;
+                    }
                 }
-                let mut candidate = current.clone();
-                dimension.set(&mut candidate, value);
-                if let Some(outcome) = reproduce(&candidate, &mut runner, &mut runs) {
-                    current = candidate.clone();
-                    best = Some((candidate, outcome));
-                    changed = true;
-                    break;
-                }
+                window_start = window_end.saturating_add(1);
             }
         }
         if !changed {
@@ -276,6 +284,32 @@ mod tests {
             "the minimized reproducer was re-run and failed again"
         );
         assert!(minimized.runs <= DEFAULT_MAX_RUNS);
+    }
+
+    #[test]
+    fn a_reproducer_above_the_first_scan_window_is_still_found() {
+        let start = SimConfig {
+            seed: 5,
+            scenario: Scenario::HappyPath,
+            sessions: 4,
+            steps: 400,
+            nodes: 4,
+        };
+        // 30 steps is above the first window (floor + SCAN_CAP - 1 = 24): a
+        // scan that gave up after one window would return 400 steps.
+        let minimized = minimize(&start, None, DEFAULT_MAX_RUNS, |config| {
+            if config.steps >= 30 {
+                outcome(config, "CLAIM_REFUND_MIX")
+            } else {
+                clean(config)
+            }
+        })
+        .expect("the predicate reproduces");
+        assert_eq!(
+            minimized.config.steps, 30,
+            "later windows must be scanned too"
+        );
+        assert!(minimized.verified);
     }
 
     #[test]
