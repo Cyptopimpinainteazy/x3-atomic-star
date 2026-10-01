@@ -138,7 +138,10 @@ where
                         break 'windows;
                     }
                 }
-                window_start = window_end.saturating_add(1);
+                // The range is half-open, so the next window starts *at*
+                // `window_end`: advancing past it would silently skip one
+                // candidate at every window boundary.
+                window_start = window_end;
             }
         }
         if !changed {
@@ -308,6 +311,33 @@ mod tests {
         assert_eq!(
             minimized.config.steps, 30,
             "later windows must be scanned too"
+        );
+        assert!(minimized.verified);
+    }
+
+    #[test]
+    fn a_reproducer_exactly_at_a_window_boundary_is_found() {
+        let start = SimConfig {
+            seed: 5,
+            scenario: Scenario::HappyPath,
+            sessions: 4,
+            steps: 400,
+            nodes: 4,
+        };
+        // With floor 1 and SCAN_CAP 24, the first window covers 1..=24, so 25
+        // is the first value of the second window: a scan that advances past
+        // its half-open end skips exactly this candidate.
+        let minimized = minimize(&start, None, DEFAULT_MAX_RUNS, |config| {
+            if config.steps == 25 || config.steps == 400 {
+                outcome(config, "CLAIM_REFUND_MIX")
+            } else {
+                clean(config)
+            }
+        })
+        .expect("the predicate reproduces");
+        assert_eq!(
+            minimized.config.steps, 25,
+            "the first value of the second window must be probed"
         );
         assert!(minimized.verified);
     }

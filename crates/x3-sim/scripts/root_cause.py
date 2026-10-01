@@ -203,6 +203,8 @@ def build_prompt(packet: dict) -> str:
             )
     if packet.get("log_excerpt"):
         lines.append("log excerpt:\n" + _truncate(packet["log_excerpt"]))
+    if packet.get("required_regression_test"):
+        lines.append("required regression test: " + str(packet["required_regression_test"]))
     if packet.get("replay_command"):
         lines.append(f"replay: {packet['replay_command']}")
     if packet.get("minimized"):

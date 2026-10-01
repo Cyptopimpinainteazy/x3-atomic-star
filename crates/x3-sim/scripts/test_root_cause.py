@@ -44,6 +44,7 @@ def sample_packet(failure_id="abc123", schema="x3-failure-packet-v1"):
             }
         ],
         "replay_command": "cargo run -p x3-sim -- --seed 928441783 --scenario claim-refund-race",
+        "required_regression_test": "completed_swap_cannot_be_refunded",
         "minimized": {
             "verified": True,
             "replay_command": "cargo run -p x3-sim -- --seed 928441783 --scenario claim-refund-race --sessions 1 --steps 11 --nodes 3",
@@ -117,6 +118,7 @@ class RootCauseTests(unittest.TestCase):
             "state after the bad step",
             "minimized (verified)",
             "--sessions 1 --steps 11 --nodes 3",
+            "required regression test: completed_swap_cannot_be_refunded",
         ):
             self.assertIn(expected, prompt)
 
