@@ -6,7 +6,7 @@ Set a separate `X3_VERIFIER_TOKEN` on the router and only the verifier worker. O
 
 The bundled OpenRouter GPT-4.1 Mini and direct GPT-5 prices were checked on 2026-09-29. Paid providers are skipped after 30 days unless `pricing_checked_on` and the rates are refreshed together. The direct provider uses `max_completion_tokens` for GPT-5. Pricing is an estimate; reconcile the dashboard with provider invoices.
 
-Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models.
+Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models, not even through `budget_fallback` (see below).
 
 Start with `python3 router.py --db /path/to/usage.sqlite3`. Point an OpenAI-compatible client at `http://127.0.0.1:11435/v1`, model `x3-auto`. Set `X3_ROUTER_TOKEN` to require bearer authorization, and set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` for cloud providers. `X-X3-Agent` identifies a caller for per-agent budgets. `GET /v1/usage` returns spend accounting. The service binds to loopback; put authenticated TLS in front of it for remote access.
 
@@ -21,6 +21,38 @@ A reservation is an upper bound on one call, so the request must not be able to 
 
 `max_output_tokens` (32768), `default_max_output_tokens` (4096), `reservation_ttl_seconds` (900), `provider_cooldown_seconds` (60) and `provider_cooldown_max_seconds` (3600) are config knobs.
 
+## Running out of money degrades the model, it does not stop the work
+
+An exhausted budget used to end the request: `reserve()` returned nothing and
+the router answered `429` without trying anything else. Two things were wrong
+with that. A zero-cost provider could never get a reservation once spend passed
+the ceiling, so the free local model was blocked by a paid API being over
+budget — "stop spending" became "stop working". And a paid provider being
+unavailable was treated as fatal even when a free one could answer.
+
+`budget_fallback` is now appended after the configured route. It is only
+reached when nothing better answered. Providers that cannot bill need no
+reservation at all. If every provider in the chain *and* the fallback fails,
+the request gets a `429` with `type: budget_exceeded` and an `attempts` list
+naming each refusal.
+
+The fallback cannot clear a provider for *critical* work. A critical request
+may only be served by a provider with `critical_allowed: true`, or by one that
+carries no credentials and therefore talks to a model on this machine
+(`may_serve_critical` in `router.py`). Being listed in `budget_fallback` is not
+clearance: the default list ends with the free cloud models, whose operator
+logs prompts. A critical request whose cleared providers are unavailable fails
+closed and names the refusal, instead of silently leaving the machine.
+
+The default fallback is local Ollama first, then the two free cloud models, so
+routine code stays on the machine when it can and only leaves it if the local
+model cannot answer. Set `budget_fallback` to `[]` to restore hard-stop
+behaviour.
+Which model actually answered is visible in the response's `model` field and in
+`/v1/usage`; a fallback answer is not distinguished from a paid one beyond
+that, so watch for the local model name in accounting if you need to know how
+often the downgrade happened.
+
 ## Provider cooldowns
 
 A provider that fails is skipped for a doubling delay, capped, with `Retry-After` from an HTTP error taking precedence when the provider sends one. Without this, every request in turn paid the timeout of an endpoint that was already down. A success clears the record. `GET /v1/providers` shows consecutive failures and the remaining cooldown, and the skip reason is reported in the `502` body's `attempts`.
@@ -31,9 +63,41 @@ A reservation is deleted only by `finish`, which runs in the request thread. If 
 
 ## Client compatibility
 
-The router implements the OpenAI **Chat Completions** API at `/v1/chat/completions`, streaming and non-streaming. `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature` and `seed` are forwarded unchanged; the router chooses the model, so the client's `model` is accepted and ignored. `GET /v1/models` lists `x3-auto` and `GET /v1/models/x3-auto` serves it, which is what clients probe before their first call.
+Two wire protocols are served, over the same provider chain, budgets, cooldowns
+and fallback:
 
-It does **not** implement the Responses API. `POST /v1/responses`, `/v1/embeddings` and `/v1/audio/*` answer `501` naming the gap rather than `404`, so a client that needs them fails visibly instead of looking like a wrong base URL. An agent that requires the Responses API cannot use this router yet; that is the largest remaining compatibility gap.
+- **Chat Completions** at `/v1/chat/completions`, streaming and non-streaming.
+  `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature`
+  and `seed` are forwarded unchanged.
+- **Responses** at `/v1/responses`, streaming and non-streaming. This is not a
+  passthrough: no provider this router talks to speaks the Responses protocol,
+  so requests are translated to Chat Completions and the answer is translated
+  back. `instructions` becomes a system message, `input` items become
+  messages / assistant tool calls / tool results, function tools are flattened
+  out of the Responses shape (namespaced tools are flattened too; `web_search`
+  is dropped, because the chat protocol has no equivalent and pretending
+  otherwise would misreport what ran), and the stream is re-emitted as
+  `response.created` → `response.output_item.added` →
+  `response.output_text.delta` / `response.function_call_arguments.delta` →
+  `...done` → `response.completed`.
+
+The Responses endpoint is what makes Codex usable with this router: Codex
+accepts only `wire_api = "responses"` for a custom provider. It was verified
+with real `codex exec` runs, including a tool round trip — `exec_command`
+reached the shell, its stdout came back as a `function_call_output`, and the
+model answered from it.
+
+The router chooses the model, so the client's `model` is accepted and ignored.
+`GET /v1/models` lists `x3-auto` and `GET /v1/models/x3-auto` serves it, which
+is what clients probe before their first call. `/v1/embeddings` and
+`/v1/audio/*` still answer `501` naming the gap rather than a `404` that reads
+as a wrong base URL.
+
+`max_input_tokens` bounds the request body in UTF-8 bytes and must exceed what
+the client actually sends. Codex sends ~94 KB for a trivial prompt, because the
+system prompt, tool schemas and project instructions all ride along; the
+default is 200000. A client rejected with `413` is usually this bound, not the
+provider's context window.
 
 ## Operational notes
 
@@ -44,8 +108,8 @@ Streaming requests ask providers for a usage event. When usage is unavailable, t
 Still missing, in the order they matter for relying on this with X3 agents:
 
 - **Verified escalation.** Fallback reacts to provider failures, not to patches that fail their checks. The feedback work records which patches pass, but nothing routes on it yet.
-- **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list.
-- **Context retrieval.** No repo index or context packets; prompts carry their own context.
+- **Privacy controls.** There is no per-task local-only / trusted-cloud / public-code route enforcement. `routes.routine` is a single global list (the critical tier refuses third-party providers, but nothing enforces a policy per task).
+- **Context retrieval.** No repo index or context packets; prompts carry their own context, which is why a Codex turn arrives with ~19K input tokens.
 - **Operational security.** One router token, no per-agent credentials; the usage database is an unencrypted SQLite file.
 
 The service does not persist prompts or credentials.

@@ -268,6 +268,94 @@ class RouterTests(unittest.TestCase):
 
     # ── Provider cooldowns ───────────────────────────────────────────────
 
+    def test_budget_exhaustion_falls_through_to_a_free_provider(self):
+        """Running out of money must stop the spending, not stop the work."""
+        self.config["providers"]["local"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1",
+            "model": "local", "critical_allowed": True}
+        self.config["routes"]["critical"] = ["up"]
+        self.config["budget_fallback"] = ["local"]
+        self.config["daily_budget_usd"] = 0.000001
+        self.config["agent_daily_budget_usd"] = 0.000001
+
+        status, response = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+
+        self.assertEqual(status, 200, "the fallback provider must still answer")
+        self.assertEqual(response["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(Provider.requests[-1]["model"], "local")
+
+    def test_budget_exhaustion_still_refuses_paid_providers(self):
+        self.config["routes"]["critical"] = ["up"]
+        self.config["budget_fallback"] = []
+        self.config["daily_budget_usd"] = 0.000001
+        self.config["agent_daily_budget_usd"] = 0.000001
+
+        status, body = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+
+        self.assertEqual(status, 429)
+        self.assertEqual(body["error"]["type"], "budget_exceeded")
+        self.assertEqual(Provider.requests, [], "an over-budget paid provider must not be called")
+
+    def test_critical_request_never_leaks_to_a_free_cloud_provider(self):
+        """A critical request must not leave this machine through the fallback.
+
+        `budget_fallback` lists the free OpenRouter models, and their operator
+        logs prompts. Critical requests carry consensus and settlement code, so
+        a paid provider being unavailable or over budget has to fail the request
+        closed rather than quietly downgrade it onto a third party.
+        """
+        checked = router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()
+        self.config["providers"]["paid"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "paid",
+            "api_key_env": "X3_UNSET_TEST_KEY", "input_usd_per_million": 1, "output_usd_per_million": 1,
+            "pricing_checked_on": checked}
+        self.config["providers"]["free"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "nvidia/example:free",
+            "free_model": True, "api_key_env": "OPENROUTER_TEST_KEY", "enabled_env": "X3_ENABLE_FREE_CLOUD_TEST",
+            "pricing_checked_on": checked}
+        self.config["routes"]["critical"] = ["paid"]
+        self.config["budget_fallback"] = ["free"]
+        os.environ["X3_ENABLE_FREE_CLOUD_TEST"] = "1"
+        os.environ["OPENROUTER_TEST_KEY"] = "test"
+        os.environ.pop("X3_UNSET_TEST_KEY", None)
+        request = {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}
+        chunks, started = [], []
+        try:
+            status, body = self.router.complete(request, "alice")
+            streamed = self.router.stream(request, "alice", lambda: started.append(True), chunks.append)
+        finally:
+            os.environ.pop("X3_ENABLE_FREE_CLOUD_TEST", None)
+            os.environ.pop("OPENROUTER_TEST_KEY", None)
+        self.assertNotEqual(status, 200)
+        self.assertEqual(Provider.requests, [], "critical code must never reach a free cloud model")
+        self.assertIn("not cleared for critical work", " ".join(body["error"]["attempts"]))
+        # The refusal has to hold on both entry points; a fix that lands in one
+        # and not the other is the failure mode this router already shipped once.
+        self.assertIsNotNone(streamed, "the streaming path must fail closed too")
+        self.assertNotEqual(streamed[0], 200)
+        self.assertIn("not cleared for critical work", " ".join(streamed[1]["error"]["attempts"]))
+        self.assertEqual((chunks, started), ([], []), "nothing may be streamed to the client")
+
+    def test_critical_falls_back_to_a_local_model_that_cannot_leak(self):
+        """Refusing third parties must not stop a critical request working locally."""
+        checked = router_module.dt.datetime.now(router_module.dt.timezone.utc).date().isoformat()
+        self.config["providers"]["paid"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "paid",
+            "api_key_env": "X3_UNSET_TEST_KEY", "input_usd_per_million": 1, "output_usd_per_million": 1,
+            "pricing_checked_on": checked}
+        self.config["providers"]["local"] = {
+            "base_url": f"http://127.0.0.1:{self.upstream.server_port}/v1", "model": "local"}
+        self.config["routes"]["critical"] = ["paid"]
+        self.config["budget_fallback"] = ["local"]
+        os.environ.pop("X3_UNSET_TEST_KEY", None)
+        status, _ = self.router.complete(
+            {"messages": [{"content": "review this atomic settlement path"}], "max_tokens": 10}, "alice")
+        self.assertEqual(status, 200)
+        self.assertEqual(Provider.requests[-1]["model"], "local",
+                         "a model on this machine may still answer a critical request")
+
     def test_failing_provider_is_cooled_down_and_skipped(self):
         status, _ = self.router.complete({"messages": [{"content": "format"}], "max_tokens": 10}, "alice")
         self.assertEqual(status, 200, "the second provider still serves the request")
@@ -320,8 +408,13 @@ class RouterTests(unittest.TestCase):
             # A client that reaches for the Responses API must be told plainly
             # rather than handed a 404 that looks like a wrong base URL.
             request = urllib.request.Request(url + "/v1/responses", b"{}", {"Content-Type": "application/json"})
-            with self.assertRaises(urllib.error.HTTPError) as unsupported:
+            with self.assertRaises(urllib.error.HTTPError) as malformed:
                 urllib.request.urlopen(request)
+            self.assertEqual(malformed.exception.code, 400, "the Responses endpoint exists and validates input")
+
+            embeddings = urllib.request.Request(url + "/v1/embeddings", b"{}", {"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError) as unsupported:
+                urllib.request.urlopen(embeddings)
             self.assertEqual(unsupported.exception.code, 501)
             self.assertIn("Chat Completions", unsupported.exception.read().decode())
 
@@ -332,6 +425,100 @@ class RouterTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+    # ── Responses API (the wire protocol Codex actually speaks) ──────────
+
+    def responses_body(self, **overrides):
+        body = {"model": "x3-auto", "stream": True, "instructions": "be brief",
+                "input": [{"type": "message", "role": "user",
+                           "content": [{"type": "input_text", "text": "hi"}]}]}
+        body.update(overrides)
+        return body
+
+    def serve(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    def test_responses_request_translation(self):
+        chat = router_module.responses_request_to_chat({
+            "instructions": "sys",
+            "input": [
+                {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "dev"}]},
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]},
+                {"type": "function_call", "call_id": "c1", "name": "exec_command",
+                 "arguments": "{\"cmd\":\"ls\"}"},
+                {"type": "function_call_output", "call_id": "c1", "output": "file.txt"},
+            ],
+            "tools": [
+                {"type": "function", "name": "exec_command", "description": "run it",
+                 "parameters": {"type": "object", "properties": {}}},
+                {"type": "namespace", "name": "ns", "tools": [
+                    {"type": "function", "name": "inner", "parameters": {"type": "object"}}]},
+                {"type": "web_search"},
+            ],
+            "tool_choice": "auto", "max_output_tokens": 64,
+        })
+        self.assertEqual([m["role"] for m in chat["messages"]],
+                         ["system", "system", "user", "assistant", "tool"])
+        self.assertEqual(chat["messages"][3]["tool_calls"][0]["function"]["name"], "exec_command")
+        self.assertEqual(chat["messages"][4]["tool_call_id"], "c1")
+        self.assertEqual([t["function"]["name"] for t in chat["tools"]], ["exec_command", "inner"],
+                         "namespaced tools flatten; web_search has no chat equivalent")
+        self.assertEqual(chat["tool_choice"], "auto")
+        self.assertEqual(chat["max_tokens"], 64)
+
+    def test_chat_message_maps_to_responses_output(self):
+        output = router_module.chat_message_to_response_output(
+            {"content": "hello", "tool_calls": [{"id": "c1", "function": {"name": "f", "arguments": "{}"}}]},
+            "resp_")
+        self.assertEqual([item["type"] for item in output], ["message", "function_call"])
+        self.assertEqual(output[0]["content"][0]["text"], "hello")
+        self.assertEqual(output[1]["call_id"], "c1")
+        self.assertEqual(output[1]["name"], "f")
+
+    def test_responses_endpoint_non_streaming(self):
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False, tools=[
+                {"type": "function", "name": "exec_command", "description": "run it",
+                 "parameters": {"type": "object", "properties": {}}}])).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(body["object"], "response")
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(body["output"][0]["type"], "message")
+        self.assertEqual(body["output"][0]["content"][0]["text"], "ok")
+        self.assertIn("usage", body)
+        self.assertEqual(Provider.requests[0]["messages"][0], {"role": "system", "content": "be brief"})
+        self.assertEqual(Provider.requests[0]["tools"][0]["function"]["name"], "exec_command")
+        self.assertEqual(self.router.stats()[0]["provider"], "up", "budget accounting still applies")
+
+    def test_responses_endpoint_streams_the_responses_event_sequence(self):
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body()).encode()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/responses",
+                                             data, {"Content-Type": "application/json", "X-X3-Agent": "codex"})
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        order = ["response.created", "response.output_item.added", "response.output_text.delta",
+                 "response.output_text.done", "response.output_item.done", "response.completed"]
+        positions = [raw.find('"type": "' + name + '"') for name in order]
+        self.assertNotIn(-1, positions, f"missing event; got {raw[:400]}")
+        self.assertEqual(positions, sorted(positions), "events must arrive in the order Codex expects")
+        self.assertIn('"text": "ok"', raw)
 
 
 if __name__ == "__main__":
