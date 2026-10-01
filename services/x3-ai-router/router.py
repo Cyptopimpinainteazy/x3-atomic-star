@@ -26,6 +26,39 @@ DEFAULT_OUTPUT_TOKENS = 4_096
 UNSUPPORTED_PATHS = ("/v1/embeddings", "/v1/audio")
 
 
+def request_text(request):
+    """Extract routing text from either Chat Completions or Responses requests."""
+    parts = []
+    instructions = request.get("instructions")
+    if isinstance(instructions, str):
+        parts.append(instructions)
+    for message in request.get("messages") or []:
+        if isinstance(message, dict):
+            parts.append(str(message.get("content", "")))
+    for item in request.get("input") or []:
+        if not isinstance(item, dict):
+            if isinstance(item, str):
+                parts.append(item)
+            continue
+        if item.get("type", "message") == "message":
+            for part in item.get("content") or []:
+                if isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+        elif item.get("type") == "function_call_output":
+            parts.append(str(item.get("output", "")))
+    return " ".join(parts).lower()
+
+
+def usage_tokens(usage):
+    """Normalize Chat Completions and Responses token accounting."""
+    usage = usage or {}
+    input_tokens = usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0
+    output_tokens = usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0
+    return input_tokens, output_tokens
+
+
 def responses_messages(request):
     """Translate a Responses API request into Chat Completions messages.
 
@@ -254,7 +287,7 @@ def output_bound(request, config):
     that set `max_completion_tokens` instead be reserved at the 4096 default
     while the provider billed for whatever it asked for.
     """
-    for key in ("max_tokens", "max_completion_tokens"):
+    for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
         value = request.get(key)
         if type(value) is int:
             return value
@@ -268,7 +301,7 @@ def request_error(request, config):
     estimate does not read, and `n`/`best_of`, which multiply the completions
     the provider bills for while the estimate assumes exactly one.
     """
-    for key in ("max_tokens", "max_completion_tokens"):
+    for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
         value = request.get(key)
         if value is not None and (type(value) is not int or not 1 <= value <= config.get("max_output_tokens", MAX_OUTPUT_TOKENS)):
             return "Invalid " + key
@@ -323,7 +356,7 @@ class Router:
         self.reconcile_reservations()
 
     def choose(self, request):
-        text = " ".join(str(m.get("content", "")) for m in request.get("messages", [])).lower()
+        text = request_text(request)
         tier = "critical" if any(term in text for term in CRITICAL) else "routine"
         return tier, self.config["routes"][tier]
 
@@ -365,7 +398,8 @@ class Router:
             self.db.execute("BEGIN IMMEDIATE")
             self.db.execute("DELETE FROM reservations WHERE id=?", (reservation,))
             if provider is not None:
-                self.db.execute("INSERT INTO usage (day,agent,provider,model,input_tokens,output_tokens,cost_usd,task_id) VALUES (?,?,?,?,?,?,?,?)", (day, agent, provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost, getattr(self.context, "task_id", None)))
+                input_tokens, output_tokens = usage_tokens(usage)
+                self.db.execute("INSERT INTO usage (day,agent,provider,model,input_tokens,output_tokens,cost_usd,task_id) VALUES (?,?,?,?,?,?,?,?)", (day, agent, provider, model, input_tokens, output_tokens, cost, getattr(self.context, "task_id", None)))
             self.db.commit()
 
     def stats(self):
@@ -530,6 +564,8 @@ class Router:
         budget_refused = False
         for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
+            if provider.get("protocol", "chat_completions") != "chat_completions":
+                continue
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
             if tier == "critical" and not provider.get("critical_allowed", False) \
@@ -615,6 +651,8 @@ class Router:
         budget_refused = False
         for name in self.attempt_order(chain):
             provider = self.config["providers"][name]
+            if provider.get("protocol", "chat_completions") != "chat_completions":
+                continue
             if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
                 continue
             if tier == "critical" and not provider.get("critical_allowed", False) \
@@ -711,6 +749,241 @@ class Router:
         return 502, {"error": {"message": "No provider succeeded", "attempts": failures}}
 
 
+    def native_responses_complete(self, request, agent):
+        """Try Responses-native providers without translating through chat."""
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
+            return 413, {"error": {"message": "Input exceeds configured budget bound"}}, True
+        error = request_error(request, self.config)
+        if error:
+            return 400, {"error": {"message": error}}, True
+        tier, chain = self.choose(request)
+        failures = []
+        attempted = False
+        budget_refused = False
+        for name in self.attempt_order(chain):
+            provider = self.config["providers"][name]
+            if provider.get("protocol", "chat_completions") != "responses":
+                continue
+            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
+                continue
+            if tier == "critical" and not provider.get("critical_allowed", False) \
+                    and name not in self.config.get("budget_fallback", []):
+                continue
+            attempted = True
+            cooldown = self.provider_cooldown(name)
+            if cooldown > 0:
+                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
+                continue
+            price_in = provider.get("input_usd_per_million", 0)
+            price_out = provider.get("output_usd_per_million", 0)
+            error = pricing_error(provider)
+            if error:
+                failures.append(name + ": " + error)
+                continue
+            key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
+            if provider.get("api_key_env") and not key:
+                failures.append(name + ": credential unavailable")
+                continue
+            estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
+            if estimate <= 0:
+                reservation = None
+            else:
+                reservation = self.reserve(agent, estimate)
+                if reservation is None:
+                    budget_refused = True
+                    failures.append(name + ": daily budget exhausted")
+                    continue
+            payload = dict(request)
+            payload["model"] = provider["model"]
+            payload["stream"] = False
+            payload.pop("stream_options", None)
+            headers = {"Content-Type": "application/json"}
+            if key:
+                headers["Authorization"] = "Bearer " + key
+            try:
+                call = urllib.request.Request(provider["base_url"].rstrip("/") + "/responses",
+                                              json.dumps(payload).encode(), headers, method="POST")
+                with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
+                    result = json.load(response)
+                if not isinstance(result, dict) or result.get("object") != "response":
+                    raise ValueError("Provider response is not a Responses object")
+                usage = result.get("usage", {})
+                input_tokens, output_tokens = usage_tokens(usage)
+                cost = (input_tokens * price_in + output_tokens * price_out) / 1_000_000 if usage else estimate
+                self.note_provider_success(name)
+                self.finish(reservation, agent, name, provider["model"], usage, cost)
+                return 200, result, True
+            except urllib.error.HTTPError as exc:
+                self.finish(reservation, agent)
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                detail = f"HTTP {exc.code}"
+                try:
+                    raw = exc.read(4096).decode("utf-8", "replace")
+                    body = json.loads(raw)
+                    message = body.get("error", {}).get("message") if isinstance(body, dict) else None
+                    if message:
+                        detail += ": " + str(message)[:160]
+                except Exception:
+                    pass
+                self.note_provider_failure(name, detail, retry_after)
+                failures.append(name + ": " + detail)
+            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+                self.finish(reservation, agent)
+                detail = type(exc).__name__ + (": " + str(exc)[:160] if str(exc) else "")
+                self.note_provider_failure(name, detail)
+                failures.append(name + ": " + detail)
+        if budget_refused:
+            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded", "attempts": failures}}, attempted
+        return 502, {"error": {"message": "No native Responses provider succeeded", "attempts": failures}}, attempted
+
+    def native_responses_stream(self, request, agent, start, send):
+        """Proxy semantic Responses SSE and require an explicit terminal event."""
+        if len(json.dumps(request, ensure_ascii=False).encode("utf-8")) > self.config["max_input_tokens"]:
+            return 413, {"error": {"message": "Input exceeds configured budget bound"}}, True
+        error = request_error(request, self.config)
+        if error:
+            return 400, {"error": {"message": error}}, True
+        tier, chain = self.choose(request)
+        failures = []
+        attempted = False
+        budget_refused = False
+        for name in self.attempt_order(chain):
+            provider = self.config["providers"][name]
+            if provider.get("protocol", "chat_completions") != "responses":
+                continue
+            if provider.get("enabled_env") and os.environ.get(provider["enabled_env"]) != "1":
+                continue
+            if tier == "critical" and not provider.get("critical_allowed", False) \
+                    and name not in self.config.get("budget_fallback", []):
+                continue
+            attempted = True
+            cooldown = self.provider_cooldown(name)
+            if cooldown > 0:
+                failures.append(f"{name}: cooling down for {cooldown:.0f}s")
+                continue
+            price_in = provider.get("input_usd_per_million", 0)
+            price_out = provider.get("output_usd_per_million", 0)
+            error = pricing_error(provider)
+            if error:
+                failures.append(name + ": " + error)
+                continue
+            key = os.environ.get(provider.get("api_key_env", ""), "") if provider.get("api_key_env") else ""
+            if provider.get("api_key_env") and not key:
+                failures.append(name + ": credential unavailable")
+                continue
+            estimate = (output_bound(request, self.config) * price_out + self.config["max_input_tokens"] * price_in) / 1_000_000
+            if estimate <= 0:
+                reservation = None
+            else:
+                reservation = self.reserve(agent, estimate)
+                if reservation is None:
+                    budget_refused = True
+                    failures.append(name + ": daily budget exhausted")
+                    continue
+            payload = dict(request)
+            payload["model"] = provider["model"]
+            payload["stream"] = True
+            payload.pop("stream_options", None)
+            headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+            if key:
+                headers["Authorization"] = "Bearer " + key
+            emitted = False
+            terminal = False
+            usage = {}
+            max_sequence = -1
+            response_id = "resp_" + uuid.uuid4().hex
+            try:
+                call = urllib.request.Request(provider["base_url"].rstrip("/") + "/responses",
+                                              json.dumps(payload).encode(), headers, method="POST")
+                with urllib.request.urlopen(call, timeout=provider.get("timeout_seconds", 120)) as response:
+                    if "text/event-stream" not in response.headers.get("Content-Type", ""):
+                        raise ValueError("Provider did not return Responses SSE")
+                    for line in response:
+                        if len(line) > 1_000_000:
+                            raise ValueError("Oversized SSE line")
+                        if not emitted:
+                            start()
+                            emitted = True
+                        send(line)
+                        stripped = line.strip()
+                        if not stripped.startswith(b"data: "):
+                            continue
+                        raw = stripped[6:].strip()
+                        if not raw:
+                            continue
+                        event = json.loads(raw)
+                        if isinstance(event.get("sequence_number"), int):
+                            max_sequence = max(max_sequence, event["sequence_number"])
+                        response_obj = event.get("response") if isinstance(event, dict) else None
+                        if isinstance(response_obj, dict) and response_obj.get("id"):
+                            response_id = response_obj["id"]
+                        if event.get("type") in ("response.completed", "response.incomplete", "response.failed"):
+                            terminal = True
+                            if isinstance(response_obj, dict):
+                                usage = response_obj.get("usage") or {}
+                if not emitted:
+                    raise ValueError("Empty Responses SSE stream")
+                if not terminal:
+                    failed = {
+                        "type": "response.failed",
+                        "sequence_number": max_sequence + 1,
+                        "response": {
+                            "id": response_id,
+                            "object": "response",
+                            "status": "failed",
+                            "model": provider["model"],
+                            "output": [],
+                            "error": {"code": "upstream_stream_ended", "message": "Upstream Responses stream ended without a terminal event"},
+                        },
+                    }
+                    send(b"event: response.failed\n")
+                    send(("data: " + json.dumps(failed) + "\n\n").encode())
+                    self.finish(reservation, agent, name, provider["model"], usage, estimate)
+                    self.note_provider_failure(name, "Responses stream ended without terminal event")
+                    return None
+                input_tokens, output_tokens = usage_tokens(usage)
+                cost = (input_tokens * price_in + output_tokens * price_out) / 1_000_000 if usage else estimate
+                self.note_provider_success(name)
+                self.finish(reservation, agent, name, provider["model"], usage, cost)
+                return None
+            except urllib.error.HTTPError as exc:
+                if emitted:
+                    self.finish(reservation, agent, name, provider["model"], usage, estimate)
+                    self.note_provider_failure(name, "HTTP " + str(exc.code))
+                    return None
+                self.finish(reservation, agent)
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                detail = "HTTP " + str(exc.code)
+                self.note_provider_failure(name, detail, retry_after)
+                failures.append(name + ": " + detail)
+            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+                if emitted:
+                    failed = {
+                        "type": "response.failed",
+                        "sequence_number": max_sequence + 1,
+                        "response": {
+                            "id": response_id,
+                            "object": "response",
+                            "status": "failed",
+                            "model": provider["model"],
+                            "output": [],
+                            "error": {"code": "upstream_stream_error", "message": type(exc).__name__},
+                        },
+                    }
+                    send(b"event: response.failed\n")
+                    send(("data: " + json.dumps(failed) + "\n\n").encode())
+                    self.finish(reservation, agent, name, provider["model"], usage, estimate)
+                    self.note_provider_failure(name, type(exc).__name__)
+                    return None
+                self.finish(reservation, agent)
+                detail = type(exc).__name__ + (": " + str(exc)[:160] if str(exc) else "")
+                self.note_provider_failure(name, detail)
+                failures.append(name + ": " + detail)
+        if budget_refused:
+            return 429, {"error": {"message": "Daily budget exhausted", "type": "budget_exceeded", "attempts": failures}}, attempted
+        return 502, {"error": {"message": "No native Responses provider succeeded", "attempts": failures}}, attempted
+
+
 def dashboard(snapshot):
     rows = "".join("<tr>" + "".join(f"<td>{html.escape(str(item[key]))}</td>" for key in ("agent", "provider", "requests", "cost_usd")) + "</tr>"
                    for item in snapshot["breakdown"])
@@ -787,6 +1060,13 @@ def handler_for(router):
             self.wfile.write(chunk)
             self.wfile.flush()
 
+        def _start_sse(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
         def serve_responses(self, data, agent):
             """Serve `POST /v1/responses` by translating onto the chat path.
 
@@ -810,8 +1090,15 @@ def handler_for(router):
             model = data.get("model") if isinstance(data.get("model"), str) else "x3-auto"
 
             if not data.get("stream", True):
+                native_status, native_result, native_attempted = router.native_responses_complete(data, agent)
+                if native_status == 200:
+                    return self.reply(200, native_result)
+                if native_status in (400, 413):
+                    return self.reply(native_status, native_result)
                 status, result = router.complete(chat, agent)
                 if status != 200:
+                    if native_attempted and isinstance(result.get("error"), dict):
+                        result["error"].setdefault("attempts", [])[:0] = native_result.get("error", {}).get("attempts", [])
                     return self.reply(status, result)
                 message = (result.get("choices") or [{}])[0].get("message") or {}
                 envelope = responses_envelope(response_id, result.get("model", model),
@@ -819,14 +1106,18 @@ def handler_for(router):
                                               result.get("usage"))
                 return self.reply(200, envelope)
 
+            native_outcome = router.native_responses_stream(data, agent, lambda: self._start_sse(), self.stream_chunk)
+            if native_outcome is None:
+                self.close_connection = True
+                return
+            native_status, native_result, native_attempted = native_outcome
+            if native_status in (400, 413):
+                return self.reply(native_status, native_result)
+
             stream = ResponsesStream(self.stream_chunk, response_id, model)
 
             def start():
-                self.send_response(200)
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Cache-Control", "no-cache")
-                self.send_header("Connection", "close")
-                self.end_headers()
+                self._start_sse()
                 stream.start()
 
             outcome = router.stream(chat, agent, start, stream.on_line)
