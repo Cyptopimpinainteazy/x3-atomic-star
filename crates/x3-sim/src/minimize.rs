@@ -141,12 +141,9 @@ where
     // when the budget is already spent.
     if result.runs < max_runs {
         let candidate = result.config.clone();
-        match reproduce(&candidate, &mut runner, &mut runs) {
-            Some(outcome) => {
-                result.outcome = outcome;
-                result.verified = true;
-            }
-            None => {}
+        if let Some(outcome) = reproduce(&candidate, &mut runner, &mut runs) {
+            result.outcome = outcome;
+            result.verified = true;
         }
     }
     result.runs = runs;
