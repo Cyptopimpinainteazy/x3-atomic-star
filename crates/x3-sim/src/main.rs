@@ -34,6 +34,7 @@ OPTIONS:
     --packet <dir>        Write the failure packet (JSON + Markdown) here on failure
     --hunt <n>            Run n consecutive seeds from --seed; collect failures
     --max-failures <n>    With --hunt, stop after n failures (default 5)
+    --root-cause          Dispatch every failure packet to the root-cause agent
     --no-minimize         Do not minimize a failing config automatically
     --json                Print the evidence bundle to stdout instead of a summary
     -h, --help            Show this help
@@ -51,6 +52,7 @@ fn main() -> ExitCode {
     let mut hunt: Option<usize> = None;
     let mut max_failures = 5usize;
     let mut do_minimize = true;
+    let mut root_cause = false;
     let mut json = false;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -68,6 +70,7 @@ fn main() -> ExitCode {
             }
             "--json" => json = true,
             "--no-minimize" => do_minimize = false,
+            "--root-cause" => root_cause = true,
             "--seed" => match value().and_then(|raw| raw.parse::<u64>().ok()) {
                 Some(parsed) => config.seed = parsed,
                 None => return usage_error("--seed requires an unsigned integer"),
@@ -110,7 +113,15 @@ fn main() -> ExitCode {
     }
 
     if let Some(count) = hunt {
-        return hunt_seeds(&config, count, max_failures, do_minimize, packet_dir.as_deref(), out.as_deref());
+        return hunt_seeds(
+            &config,
+            count,
+            max_failures,
+            do_minimize,
+            root_cause,
+            packet_dir.as_deref(),
+            out.as_deref(),
+        );
     }
 
     if let Some(dir) = &out {
@@ -142,7 +153,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    match report_failure(&config, &outcome, do_minimize, packet_dir.as_deref(), json) {
+    match report_failure(&config, &outcome, do_minimize, root_cause, packet_dir.as_deref(), json) {
         Ok(()) => ExitCode::FAILURE,
         Err(error) => {
             eprintln!("x3-sim: failure packet could not be completed: {error}");
@@ -157,6 +168,7 @@ fn report_failure(
     config: &SimConfig,
     outcome: &SimOutcome,
     do_minimize: bool,
+    root_cause: bool,
     packet_dir: Option<&Path>,
     json: bool,
 ) -> Result<(), String> {
@@ -170,11 +182,21 @@ fn report_failure(
         }
     }
 
-    if let Some(dir) = packet_dir {
+    let mut packet_json: Option<PathBuf> = None;
+    let dir = packet_dir.or_else(|| root_cause.then(|| Path::new("target/x3-failure-packets")));
+    if let Some(dir) = dir {
         let (json_path, md_path) = packet.write(dir).map_err(|error| error.to_string())?;
         if !json {
             println!("packet: {}", json_path.display());
             println!("packet: {}", md_path.display());
+        }
+        packet_json = Some(json_path);
+    }
+
+    if root_cause {
+        match packet_json {
+            Some(path) => dispatch_root_cause(&path),
+            None => println!("root_cause_command = {}", root_cause_command(&packet)),
         }
     }
 
@@ -199,22 +221,52 @@ fn root_cause_command(packet: &FailurePacket) -> String {
     )
 }
 
+/// Run the dispatcher on a stored packet. Dispatch failing is not a reason to
+/// hide the violation: the run still reports its failure and exit code, and
+/// the packet remains on disk either way.
+fn dispatch_root_cause(packet_path: &Path) {
+    let script = Path::new("crates/x3-sim/scripts/root_cause.py");
+    if !script.exists() {
+        println!(
+            "root_cause: dispatcher not found at {}; packet kept at {}",
+            script.display(),
+            packet_path.display()
+        );
+        return;
+    }
+    println!("root_cause: dispatching {}", packet_path.display());
+    match std::process::Command::new("python3").arg(script).arg(packet_path).status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => println!("root_cause: dispatcher exited with {status}; packet kept"),
+        Err(error) => println!("root_cause: could not run python3 ({error}); packet kept"),
+    }
+}
+
 /// Run `count` consecutive seeds and report every distinct failure.
 fn hunt_seeds(
     base: &SimConfig,
     count: usize,
     max_failures: usize,
     do_minimize: bool,
+    root_cause: bool,
     packet_dir: Option<&Path>,
     out: Option<&Path>,
 ) -> ExitCode {
     let report = x3_sim::hunt(base, count, max_failures, do_minimize, run);
+    // Dispatch needs the packet on disk, so `--root-cause` implies a default
+    // packet directory even when `--packet` is not given.
+    let dir = packet_dir.or_else(|| root_cause.then(|| Path::new("target/x3-failure-packets")));
 
     for failure in &report.failures {
-        if let Some(dir) = packet_dir {
+        if let Some(dir) = dir {
             if let Err(error) = failure.packet.write(dir) {
                 eprintln!("x3-sim: cannot write failure packet: {error}");
                 return ExitCode::from(2);
+            }
+        }
+        if root_cause {
+            if let Some(path) = dir.map(|dir| dir.join(format!("{}.json", failure.packet.file_stem()))) {
+                dispatch_root_cause(&path);
             }
         }
         if let Some(dir) = out {

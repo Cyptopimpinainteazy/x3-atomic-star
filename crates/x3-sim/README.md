@@ -112,6 +112,10 @@ python3 crates/x3-sim/scripts/root_cause.py /tmp/x3-packets/x3-failure-<id>-<inv
 `root_cause.py` takes exactly one packet per invocation; a hunt that writes
 several packets gets one dispatch (and one stored answer) per packet.
 
+`--root-cause` runs that dispatcher for you as part of the failing run (it
+writes the packet to `target/x3-failure-packets` when `--packet` is not given);
+dispatch failing never hides the violation, it just leaves the packet on disk.
+
 The dispatcher posts the packet to the X3 AI router (`/v1/chat/completions`,
 default `http://127.0.0.1:11435`), requires a JSON answer of the shape
 `{"causes":[{symbol, file, confidence, reasoning}], "first_experiment", ...}`,
