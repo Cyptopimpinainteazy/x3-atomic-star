@@ -4,9 +4,9 @@ Task feedback: attach `X-X3-Task-ID`, `X-X3-Revision` (full candidate commit SHA
 
 Set a separate `X3_VERIFIER_TOKEN` on the router and only the verifier worker. On a clean committed checkout, run `python3 services/x3-ai-router/verify_task.py --repo /path/to/xxxstar --task-id TASK`. The verifier runs the fixed router test suite, checks that the checkout stayed unchanged, and submits exit codes/output digests. Builder credentials cannot post outcomes. The trusted verifier credential is a trust boundary; the server cannot independently authenticate the truth of submitted check results. A `checks_passed` result covers only this scope, not a verified merge or blockchain-wide correctness.
 
-The bundled OpenRouter GPT-4.1 Mini and direct GPT-5 prices were checked on 2026-09-29. Paid providers are skipped after 30 days unless `pricing_checked_on` and the rates are refreshed together. The direct provider uses `max_completion_tokens` for GPT-5. Pricing is an estimate; reconcile the dashboard with provider invoices.
+The bundled OpenRouter GPT-4.1 Mini and direct GPT-5 prices were checked on 2026-09-29. DeepSeek Flash pricing was checked on 2026-09-30 and is configured at the peak cache-miss input/output rates so reservations remain conservative. Paid providers are skipped after 30 days unless `pricing_checked_on` and the rates are refreshed together. The direct provider uses `max_completion_tokens` for GPT-5. Pricing is an estimate; reconcile the dashboard with provider invoices.
 
-Routine requests try local Ollama first, then two explicitly free NVIDIA models on OpenRouter, then paid models. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models.
+Responses requests try native DeepSeek first. Routine fallback then tries local Ollama, two explicitly free NVIDIA models on OpenRouter, and paid providers. To opt in to the free cloud endpoints, set `X3_ENABLE_FREE_CLOUD=1` and `OPENROUTER_API_KEY`. They have rate/availability limits and must retain a `:free` model ID with zero prices. NVIDIA warns that its free endpoints log prompts for product improvement; never send secrets or confidential code through them. For a local-only setup, remove cloud names from `routes.routine`. Critical requests never use the free models.
 
 Start with `python3 router.py --db /path/to/usage.sqlite3`. Point an OpenAI-compatible client at `http://127.0.0.1:11435/v1`, model `x3-auto`. Set `X3_ROUTER_TOKEN` to require bearer authorization, and set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` for cloud providers. `X-X3-Agent` identifies a caller for per-agent budgets. `GET /v1/usage` returns spend accounting. The service binds to loopback; put authenticated TLS in front of it for remote access.
 
@@ -61,17 +61,18 @@ and fallback:
 - **Chat Completions** at `/v1/chat/completions`, streaming and non-streaming.
   `tools`, `tool_choice`, `functions`, `response_format`, `stop`, `temperature`
   and `seed` are forwarded unchanged.
-- **Responses** at `/v1/responses`, streaming and non-streaming. This is not a
-  passthrough: no provider this router talks to speaks the Responses protocol,
-  so requests are translated to Chat Completions and the answer is translated
-  back. `instructions` becomes a system message, `input` items become
-  messages / assistant tool calls / tool results, function tools are flattened
-  out of the Responses shape (namespaced tools are flattened too; `web_search`
-  is dropped, because the chat protocol has no equivalent and pretending
-  otherwise would misreport what ran), and the stream is re-emitted as
-  `response.created` → `response.output_item.added` →
-  `response.output_text.delta` / `response.function_call_arguments.delta` →
-  `...done` → `response.completed`.
+- **Responses** at `/v1/responses`, streaming and non-streaming. Providers
+  declare their upstream protocol explicitly. A provider with
+  `"protocol": "responses"` receives the original Responses request at its
+  native `/responses` endpoint; DeepSeek is configured this way. Chat-only
+  fallbacks still use the translation layer: `instructions` becomes a system
+  message, `input` items become messages / assistant tool calls / tool
+  results, function tools are flattened, and unsupported hosted search tools
+  are not invented. Native Responses SSE is proxied unchanged and must end in
+  `response.completed`, `response.incomplete`, or `response.failed`. If an
+  upstream stream closes without a terminal event, the router emits an explicit
+  `response.failed` terminal event instead of silently closing the Codex
+  stream.
 
 The Responses endpoint is what makes Codex usable with this router: Codex
 accepts only `wire_api = "responses"` for a custom provider. It was verified
@@ -95,7 +96,7 @@ provider's context window.
 
 Open `/v1/dashboard` for a local spend dashboard or scrape `/metrics` for Prometheus. When `X3_ROUTER_TOKEN` is set, the dashboard accepts HTTP Basic username `x3` and that token as password; API clients can keep using bearer auth. Both views require authentication and show daily spend, reservations, and completed requests.
 
-Streaming requests ask providers for a usage event. When usage is unavailable, the reserved estimate is charged. A provider may be retried before the first SSE event; a broken partial stream closes without switching models.
+Streaming requests ask providers for usage and accept either Chat Completions `prompt_tokens` / `completion_tokens` or Responses `input_tokens` / `output_tokens`. When usage is unavailable, the reserved estimate is charged. A provider may be retried before the first SSE event. Once a native Responses stream has started, it is never replayed through a different model; if the upstream closes early, the router terminates it with `response.failed` so clients do not see an unexplained EOF.
 
 Still missing, in the order they matter for relying on this with X3 agents:
 
