@@ -228,6 +228,60 @@ class RootCauseTests(unittest.TestCase):
         self.assertEqual(code, 3, "a symbol with no file is not an actionable cause")
         self.assertFalse((out / "root-cause-abc123-refund_after_claim.json").exists())
 
+    def test_a_gate_packet_is_dispatched_with_its_error_as_the_invariant(self):
+        gate = {
+            "schema": "x3-gate-failure-packet-v1",
+            "failure_id": "gate0001",
+            "gate": "pallet-x3-supply-ledger",
+            "commit": "deadbeef",
+            "command": "cargo test -p pallet-x3-supply-ledger",
+            "exit_code": 101,
+            "first_error": "assertion `left == right` failed",
+            "suspected_file": "pallets/x3-supply-ledger/src/lib.rs",
+            "suspected_lines": [412],
+            "replay_command": "cargo test -p pallet-x3-supply-ledger",
+        }
+        path = Path(self.tmp.name) / "gate.json"
+        path.write_text(json.dumps(gate))
+        prompt = root_cause.build_prompt(gate)
+        self.assertIn("pallet-x3-supply-ledger", prompt)
+        self.assertIn("assertion `left == right` failed", prompt)
+        self.assertIn("412", prompt)
+
+        ResponseServer.content = json.dumps(
+            {
+                "causes": [
+                    {
+                        "symbol": "check_supply",
+                        "file": "pallets/x3-supply-ledger/src/lib.rs",
+                        "confidence": 0.6,
+                        "reasoning": "assertion at line 412",
+                    }
+                ]
+            }
+        )
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 0)
+        stored = out / "root-cause-gate0001-pallet-x3-supply-ledger.md"
+        self.assertTrue(stored.exists(), "the gate packet names its own kind, not 'None'")
+        self.assertNotIn("None", stored.read_text().split("## Ranked causes")[0].split("- invariant:")[1].splitlines()[0])
+
 
 if __name__ == "__main__":
     unittest.main()

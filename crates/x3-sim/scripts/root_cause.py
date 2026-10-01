@@ -155,9 +155,8 @@ def extract_contract(content: str) -> dict:
 
 def store(packet: dict, answer: dict, response: dict, model: str, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = "{}-{}".format(
-        packet.get("failure_id", "unknown"), str(packet.get("invariant", "failure")).lower()
-    )
+    kind = packet.get("invariant") or packet.get("gate") or "failure"
+    stem = "{}-{}".format(packet.get("failure_id", "unknown"), str(kind).lower().replace(" ", "-"))
     record = {
         "schema": "x3-root-cause-v1",
         "stored_at": datetime.now(timezone.utc).isoformat(),
@@ -174,7 +173,7 @@ def store(packet: dict, answer: dict, response: dict, model: str, out_dir: Path)
     md = [
         f"# Root cause candidate — {packet.get('failure_id')}",
         "",
-        f"- invariant: `{packet.get('invariant')}`",
+        f"- invariant: `{packet.get('invariant') or packet.get('first_error') or 'unknown'}`",
         f"- model: `{record['model']}`",
         f"- stored: {record['stored_at']}",
         "",
