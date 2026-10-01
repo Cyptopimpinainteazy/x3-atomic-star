@@ -46,6 +46,7 @@ class NativeResponsesProvider(BaseHTTPRequestHandler):
     requests = []
     paths = []
     fail = False
+    truncate_stream = False
 
     def do_POST(self):
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -68,6 +69,13 @@ class NativeResponsesProvider(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if data.get("stream"):
+            if type(self).truncate_stream:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                self.wfile.write(b'event: response.created\ndata: {"type":"response.created","sequence_number":0,"response":{"id":"resp_native","object":"response","status":"in_progress","model":"deepseek-flash","output":[]}}\n\n')
+                self.wfile.flush()
+                return
             events = [
                 b'event: response.created\ndata: {"type":"response.created","sequence_number":0,"response":{"id":"resp_native","object":"response","status":"in_progress","model":"deepseek-flash","output":[]}}\n\n',
                 b'event: response.output_item.added\ndata: {"type":"response.output_item.added","sequence_number":1,"output_index":0,"item":{"id":"msg_native","type":"message","role":"assistant","status":"in_progress","content":[]}}\n\n',
@@ -112,6 +120,7 @@ class RouterTests(unittest.TestCase):
         NativeResponsesProvider.requests = []
         NativeResponsesProvider.paths = []
         NativeResponsesProvider.fail = False
+        NativeResponsesProvider.truncate_stream = False
         self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
         self.upstream_thread = threading.Thread(target=self.upstream.serve_forever, daemon=True)
         self.upstream_thread.start()
@@ -560,6 +569,54 @@ class RouterTests(unittest.TestCase):
             self.router.choose({"instructions": "review atomic finality", "input": []})[0],
             "critical",
         )
+
+    def test_responses_native_accepts_string_input(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False, input="Reply with exactly native ok")).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(body["output"][0]["content"][0]["text"], "native ok")
+        self.assertEqual(NativeResponsesProvider.paths, ["/responses"])
+
+    def test_truncated_native_stream_gets_explicit_failed_terminal_event(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        NativeResponsesProvider.truncate_stream = True
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=True)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertIn("event: response.failed", raw)
+        self.assertIn("upstream_stream_ended", raw)
+        self.assertNotIn("response.completed", raw)
 
     def test_responses_request_translation(self):
         chat = router_module.responses_request_to_chat({
