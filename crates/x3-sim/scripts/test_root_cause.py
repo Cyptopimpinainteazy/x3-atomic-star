@@ -140,6 +140,16 @@ class RootCauseTests(unittest.TestCase):
         bad.write_text(json.dumps(sample_packet(schema="something-else")))
         self.assertEqual(root_cause.main([str(bad), "--dry-run"]), 2)
 
+    def test_a_v2_simulator_packet_is_accepted(self):
+        # v2 adds branch/worktree_dirty; a null worktree_dirty means git could
+        # not verify the checkout, and the dispatcher must still accept it.
+        packet = sample_packet(schema="x3-failure-packet-v2")
+        packet["branch"] = "main"
+        packet["worktree_dirty"] = None
+        path = Path(self.tmp.name) / "v2.json"
+        path.write_text(json.dumps(packet))
+        self.assertEqual(root_cause.main([str(path), "--dry-run"]), 0)
+
     def test_an_incomplete_packet_is_refused(self):
         for bad in (
             {"schema": "x3-failure-packet-v1"},

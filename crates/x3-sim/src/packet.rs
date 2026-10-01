@@ -20,7 +20,11 @@ use serde::{Deserialize, Serialize};
 use crate::sim::SimOutcome;
 
 /// Schema id so a consumer can refuse a packet it does not understand.
-pub const PACKET_SCHEMA: &str = "x3-failure-packet-v1";
+///
+/// `v2` adds `branch` and `worktree_dirty` (which is `null` when git cannot
+/// verify the checkout). `v1` packets with a boolean `worktree_dirty` field,
+/// or without it, are still accepted by the dispatcher.
+pub const PACKET_SCHEMA: &str = "x3-failure-packet-v2";
 
 /// One place in the coordinator the violated invariant points at.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

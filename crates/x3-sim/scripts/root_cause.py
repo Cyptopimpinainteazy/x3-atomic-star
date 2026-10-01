@@ -26,7 +26,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-SUPPORTED_SCHEMAS = ("x3-failure-packet-v1", "x3-gate-failure-packet-v1")
+SUPPORTED_SCHEMAS = (
+    "x3-failure-packet-v2",
+    "x3-failure-packet-v1",
+    "x3-gate-failure-packet-v1",
+)
 DEFAULT_ROUTER = "http://127.0.0.1:11435"
 DEFAULT_MODEL = "x3-auto"
 STATE_EXCERPT_CHARS = 4000
@@ -87,7 +91,7 @@ def load_packet(path: Path) -> dict:
             f"root_cause: {path} is not a supported failure packet "
             f"(schema must be one of {SUPPORTED_SCHEMAS})"
         )
-    if packet["schema"] == "x3-failure-packet-v1":
+    if packet["schema"].startswith("x3-failure-packet-"):
         _require_text_fields(packet, path, SIM_REQUIRED_FIELDS)
         if isinstance(packet.get("seed"), bool) or not isinstance(packet.get("seed"), int):
             raise SystemExit(f"root_cause: {path} has no numeric 'seed'")
