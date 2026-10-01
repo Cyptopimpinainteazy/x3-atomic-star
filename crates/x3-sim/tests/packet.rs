@@ -165,3 +165,53 @@ fn a_packet_replay_command_names_every_dimension_the_run_used() {
     }
     assert!(packet.to_markdown().contains("## All violations"));
 }
+
+#[test]
+fn a_packet_records_the_checkout_branch_and_dirtiness() {
+    let config = SimConfig {
+        seed: 13,
+        scenario: Scenario::CrashRecovery,
+        sessions: 4,
+        steps: 40,
+        nodes: 3,
+    };
+    let mut outcome = run(&config);
+    outcome.violations.push(Violation {
+        code: "TEST_REFUSAL_PRESENT",
+        session_id: "<predicate>".to_string(),
+        detail: format!("rejected = {}", outcome.rejected),
+    });
+    let packet = FailurePacket::from_outcome(&outcome).expect("a failing run yields a packet");
+
+    // The oracle is git itself, recomputed at assertion time: a worktree can
+    // be dirty while the suite runs (this very test file is an edit), so the
+    // packet and the checkout state must be compared as a pair.
+    let git = |args: &[&str]| -> Option<String> {
+        std::process::Command::new("git")
+            .args(args)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    };
+    let expected_branch = git(&["branch", "--show-current"])
+        .filter(|branch| !branch.is_empty())
+        .unwrap_or_else(|| "unknown".to_string());
+    let expected_dirty = git(&["status", "--porcelain"])
+        .map(|status| !status.is_empty())
+        .unwrap_or(false);
+
+    assert_eq!(
+        packet.branch, expected_branch,
+        "the packet records the branch it ran on"
+    );
+    assert_eq!(
+        packet.worktree_dirty, expected_dirty,
+        "the packet records whether the worktree was dirty"
+    );
+    let markdown = packet.to_markdown();
+    assert!(
+        markdown.contains(&format!("on `{expected_branch}` (dirty: {expected_dirty})")),
+        "the markdown pins the checkout state: {markdown}"
+    );
+}

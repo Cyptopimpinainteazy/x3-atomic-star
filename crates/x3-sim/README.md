@@ -72,6 +72,8 @@ trace_digest / state_digest   fingerprints of the exact run
 replay_command                the one-line reproduction
 minimized                     the smallest verified reproducer
 required_regression_test      the exact test that must exist after the fix
+branch / worktree_dirty       where the checkout stood; a dirty packet's commit
+                              no longer describes the whole tree
 ```
 
 ```bash
@@ -81,7 +83,9 @@ cargo run --manifest-path crates/x3-sim/Cargo.toml -- --seed 948218671 \
 
 Every field is derived from the run. The commit is `X3_COMMIT` when the caller
 sets it, otherwise the checkout's `HEAD`, otherwise `unknown` — it never
-guesses.
+guesses. The branch and worktree dirtiness are recorded next to it, because a
+failure from uncommitted code is still real evidence but the commit hash alone
+would overstate what it pins.
 
 ## Automatic minimization
 

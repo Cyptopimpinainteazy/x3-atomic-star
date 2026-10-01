@@ -51,6 +51,15 @@ case "$LABEL" in
   */*|*\\*) echo "x3-failure-packet: --label must not contain '/' or '\\'" >&2; exit 2 ;;
 esac
 
+# The command as a shell would need to see it again. `$*` loses the quoting,
+# so a line an operator copies back into a shell can silently run a different
+# command when an argument contains spaces.
+QUOTED_COMMAND=""
+for arg in "$@"; do
+  QUOTED_COMMAND+="$(printf '%q ' "$arg")"
+done
+QUOTED_COMMAND="${QUOTED_COMMAND% }"
+
 # `X3_FAILURE_PACKET_ROOT` lets the wrapper run a gate in another checkout
 # (for example a warm main tree while the wrapper itself is being reviewed in
 # a worktree). Defaults to the repository containing the script.
@@ -63,7 +72,7 @@ fi
 LOG="$(mktemp -t x3-gate-log.XXXXXX)"
 trap 'rm -f "$LOG"' EXIT
 
-echo "x3-failure-packet: running [$LABEL]: $*"
+echo "x3-failure-packet: running [$LABEL]: $QUOTED_COMMAND"
 started="$(date +%s)"
 set +e
 "$@" 2>&1 | tee "$LOG"
@@ -215,7 +224,7 @@ PY
 fi
 
 echo "x3-failure-packet: [$LABEL] FAIL (exit $status) — packet: $PACKET_PATH" >&2
-echo "x3-failure-packet: replay: $*" >&2
+echo "x3-failure-packet: replay: $QUOTED_COMMAND" >&2
 
 if [ "$ROOT_CAUSE" -eq 1 ]; then
   if [ ! -f "$ROOT/crates/x3-sim/scripts/root_cause.py" ]; then

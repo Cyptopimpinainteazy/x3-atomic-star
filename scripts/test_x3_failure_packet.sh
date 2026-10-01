@@ -60,6 +60,39 @@ print("  packet fields verified")
 PY
 fi
 
+echo "test_x3_failure_packet: replay lines quote arguments a shell must re-split"
+status=0
+bash scripts/x3-failure-packet.sh --label selftest-quoting --packet-dir "$WORK/quoting-packets" -- \
+  bash -c 'printf "thread main panicked at x.rs:1:1\n"; exit 101' -- "arg with spaces" \
+  >"$WORK/quoting.out" 2>"$WORK/quoting.err" || status=$?
+if [ "$status" -ne 101 ]; then
+  echo "  FAIL: quoting fixture exit was $status, expected 101" >&2
+  fail=1
+fi
+if ! grep -Fq 'arg\ with\ spaces' "$WORK/quoting.err"; then
+  echo "  FAIL: the replay line does not quote 'arg with spaces': $(cat "$WORK/quoting.err")" >&2
+  fail=1
+fi
+if grep -Fq -- "-- arg with spaces" "$WORK/quoting.err"; then
+  echo "  FAIL: the replay line re-splits 'arg with spaces'" >&2
+  fail=1
+fi
+packet="$(find "$WORK/quoting-packets" -name '*.json' | head -1)"
+if [ -z "$packet" ]; then
+  echo "  FAIL: quoting fixture wrote no packet" >&2
+  fail=1
+else
+  python3 - "$packet" <<'PY' || fail=1
+import json
+import sys
+
+packet = json.load(open(sys.argv[1]))
+assert "'arg with spaces'" in packet["command"], packet["command"]
+assert "'arg with spaces'" in packet["replay_command"], packet["replay_command"]
+print("  replay quoting verified")
+PY
+fi
+
 echo "test_x3_failure_packet: a label that names no file is a usage error"
 status="$(run bash scripts/x3-failure-packet.sh --label bad/name --packet-dir "$WORK/slash" -- bash -c 'exit 101')"
 if [ "$status" -ne 2 ]; then

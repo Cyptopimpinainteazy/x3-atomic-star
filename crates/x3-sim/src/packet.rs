@@ -71,6 +71,14 @@ pub struct FailurePacket {
     /// `X3_COMMIT` when the caller provides it, otherwise the checkout's
     /// `HEAD`, otherwise `"unknown"`.
     pub commit: String,
+    /// The checkout's branch when the packet was built, or `"unknown"`.
+    pub branch: String,
+    /// Whether the checkout had uncommitted changes (including untracked
+    /// files, as `git status --porcelain` reports them). A packet from a
+    /// dirty worktree is still a real failure packet, but its `commit` no
+    /// longer describes exactly the code that ran — the flag lets a consumer
+    /// see that instead of trusting the hash alone.
+    pub worktree_dirty: bool,
     pub seed: u64,
     pub scenario: String,
     pub config: PacketConfig,
@@ -223,6 +231,18 @@ fn required_regression_test(code: &str, failure_id: &str) -> String {
     }
 }
 
+/// One line of `git` output, or `None` when git is missing, the command
+/// fails, or the output is not UTF-8.
+fn git_stdout(args: &[&str]) -> Option<String> {
+    std::process::Command::new("git")
+        .args(args)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|out| out.trim_end().to_string())
+}
+
 /// The commit this run was built from.
 ///
 /// `X3_COMMIT` wins when the caller sets it; otherwise the checkout's `HEAD`
@@ -235,15 +255,23 @@ fn discover_commit() -> String {
             return commit;
         }
     }
-    std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|hash| hash.trim().to_string())
+    git_stdout(&["rev-parse", "HEAD"])
         .filter(|hash| !hash.is_empty())
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// The checkout's branch, or `"unknown"` outside one.
+fn discover_branch() -> String {
+    git_stdout(&["branch", "--show-current"])
+        .filter(|branch| !branch.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Whether the checkout had uncommitted changes when the packet was built.
+fn discover_worktree_dirty() -> bool {
+    git_stdout(&["status", "--porcelain"])
+        .map(|status| !status.is_empty())
+        .unwrap_or(false)
 }
 
 /// A seed-independent defect identity over `(code, detail)` pairs.
@@ -318,6 +346,8 @@ impl FailurePacket {
             failure_id: failure_id.clone(),
             producer: "x3-sim".to_string(),
             commit: discover_commit(),
+            branch: discover_branch(),
+            worktree_dirty: discover_worktree_dirty(),
             seed: outcome.seed,
             scenario: outcome.scenario.clone(),
             config: PacketConfig {
@@ -398,7 +428,11 @@ impl FailurePacket {
                 .map(|op| format!("(op `{op}`)"))
                 .unwrap_or_default()
         );
-        let _ = writeln!(out, "- commit: `{}`", self.commit);
+        let _ = writeln!(
+            out,
+            "- commit: `{}` on `{}` (dirty: {})",
+            self.commit, self.branch, self.worktree_dirty
+        );
         let _ = writeln!(out, "- trace digest: `{}`", self.trace_digest);
         let _ = writeln!(out, "- state digest: `{}`", self.state_digest);
         if !self.active_faults.is_empty() {
