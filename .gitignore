@@ -33,6 +33,7 @@ venv/
 .codex
 
 # Local validation/build outputs
+/failure-packets/
 target_phase2_validation/
 target_phase3_test/
 target_phase3_validation/

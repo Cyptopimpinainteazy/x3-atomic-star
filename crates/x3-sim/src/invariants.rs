@@ -168,19 +168,32 @@ pub fn check_sessions(sessions: &[SwapSession]) -> Vec<Violation> {
             .or_default()
             .push(session);
     }
-    for (lock, group) in by_lock {
+    for (_lock, group) in by_lock {
         if group.len() < 2 {
             continue;
         }
-        let completed = group
+        let mut completed: Vec<&SwapSession> = group
             .iter()
+            .copied()
             .filter(|s| s.phase == SwapPhase::Complete)
-            .count();
-        if completed > 1 {
+            .collect();
+        if completed.len() > 1 {
+            // Blame a real session, never a synthetic lock id: consumers key
+            // per-session state by session id (the simulator's before/after
+            // snapshots), and an id no session ever had makes that lookup
+            // miss. Sorting makes the choice deterministic; the detail stays
+            // seed-independent (no session names, no lock bytes), so two
+            // seeds that expose the same defect still dedupe to one
+            // signature.
+            completed.sort_by(|a, b| a.session_id.cmp(&b.session_id));
+            let blamed = completed.last().expect("completed.len() > 1");
             out.push(Violation {
                 code: "DOUBLE_SETTLE",
-                session_id: format!("hashlock-{}", hex::encode(&lock[..8])),
-                detail: format!("{completed} sessions completed against one hash lock"),
+                session_id: blamed.session_id.clone(),
+                detail: format!(
+                    "{} sessions completed against one hash lock",
+                    completed.len()
+                ),
             });
         }
     }
