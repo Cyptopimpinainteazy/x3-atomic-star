@@ -47,6 +47,7 @@ class NativeResponsesProvider(BaseHTTPRequestHandler):
     paths = []
     fail = False
     truncate_stream = False
+    terminal_failure = False
 
     def do_POST(self):
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -69,6 +70,13 @@ class NativeResponsesProvider(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if data.get("stream"):
+            if type(self).terminal_failure:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                self.wfile.write(b'event: response.failed\ndata: {"type":"response.failed","sequence_number":0,"response":{"id":"resp_native","object":"response","status":"failed","model":"deepseek-flash","output":[],"error":{"code":"provider_failed","message":"native terminal failure"},"usage":{"input_tokens":10,"output_tokens":0,"total_tokens":10}}}\n\n')
+                self.wfile.flush()
+                return
             if type(self).truncate_stream:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
@@ -92,16 +100,17 @@ class NativeResponsesProvider(BaseHTTPRequestHandler):
         body = json.dumps({
             "id": "resp_native",
             "object": "response",
-            "status": "completed",
+            "status": "failed" if type(self).terminal_failure else "completed",
             "model": "deepseek-flash",
-            "output": [{
+            "error": {"code": "provider_failed", "message": "native terminal failure"} if type(self).terminal_failure else None,
+            "output": [] if type(self).terminal_failure else [{
                 "id": "msg_native",
                 "type": "message",
                 "role": "assistant",
                 "status": "completed",
                 "content": [{"type": "output_text", "text": "native ok", "annotations": []}],
             }],
-            "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+            "usage": {"input_tokens": 10, "output_tokens": 0 if type(self).terminal_failure else 5, "total_tokens": 10 if type(self).terminal_failure else 15},
         }).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -121,6 +130,7 @@ class RouterTests(unittest.TestCase):
         NativeResponsesProvider.paths = []
         NativeResponsesProvider.fail = False
         NativeResponsesProvider.truncate_stream = False
+        NativeResponsesProvider.terminal_failure = False
         self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
         self.upstream_thread = threading.Thread(target=self.upstream.serve_forever, daemon=True)
         self.upstream_thread.start()
@@ -617,6 +627,58 @@ class RouterTests(unittest.TestCase):
         self.assertIn("event: response.failed", raw)
         self.assertIn("upstream_stream_ended", raw)
         self.assertNotIn("response.completed", raw)
+
+    def test_native_nonstream_failed_response_falls_back_and_marks_health(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        NativeResponsesProvider.terminal_failure = True
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=False)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(body["output"][0]["content"][0]["text"], "ok")
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("native", health)
+        self.assertIn("response.failed", health["native"]["last_error"])
+
+    def test_native_stream_failed_terminal_is_not_recorded_as_success(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        NativeResponsesProvider.terminal_failure = True
+        server = self.serve()
+        try:
+            data = json.dumps(self.responses_body(stream=True)).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertIn("event: response.failed", raw)
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertIn("native", health)
+        self.assertIn("response.failed", health["native"]["last_error"])
 
     def test_responses_request_translation(self):
         chat = router_module.responses_request_to_chat({
