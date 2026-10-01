@@ -14,6 +14,13 @@ NAME="x3-gateway-postgres-$PPID-$$"
 DB_USER="x3"
 DB_PASSWORD="x3-test-only"
 DB_NAME="x3_gateway_test"
+HOST_PORT="$(python3 - <<'PY'
+import socket
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+)"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "gateway-postgres-integration: docker is required; no Postgres test container was started" >&2
@@ -43,7 +50,7 @@ docker run --detach --rm \
   -e "POSTGRES_USER=$DB_USER" \
   -e "POSTGRES_PASSWORD=$DB_PASSWORD" \
   -e "POSTGRES_DB=$DB_NAME" \
-  -P \
+  -p "127.0.0.1:$HOST_PORT:5432" \
   "$IMAGE" >/dev/null
 
 ready=0
@@ -57,12 +64,6 @@ done
 
 if [ "$ready" -ne 1 ]; then
   echo "gateway-postgres-integration: Postgres did not become ready within 60 seconds" >&2
-  exit 1
-fi
-
-HOST_PORT="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "$NAME")"
-if [ -z "$HOST_PORT" ]; then
-  echo "gateway-postgres-integration: Docker did not publish Postgres port 5432" >&2
   exit 1
 fi
 
