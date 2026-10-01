@@ -94,17 +94,23 @@ cargo run -p x3-sim -- --hunt 500 --scenario crash-recovery --packet /tmp/x3-pac
 ```
 
 Runs 500 seeds, writes one packet per distinct failure (bounded by
-`--max-failures`), and exits `1` when anything failed — so it drops straight
-into CI.
+`--max-failures`, which stops the hunt once it is reached), and exits `1` when
+anything failed — so it drops straight into CI. With `--out`, each failing run
+also gets its evidence bundle (JSON + trace) and the hunt writes a
+`hunt-summary-<scenario>-<seed>.json` recording how many seeds ran, how many
+passed, and each failure's invariant and replay command.
 
 ## Root-cause dispatch
 
 A packet is written to be handed to an investigation agent:
 
 ```bash
-python3 crates/x3-sim/scripts/root_cause.py /tmp/x3-packets/x3-failure-*.json \
+python3 crates/x3-sim/scripts/root_cause.py /tmp/x3-packets/x3-failure-<id>-<invariant>.json \
     --out reports/root-cause
 ```
+
+`root_cause.py` takes exactly one packet per invocation; a hunt that writes
+several packets gets one dispatch (and one stored answer) per packet.
 
 The dispatcher posts the packet to the X3 AI router (`/v1/chat/completions`,
 default `http://127.0.0.1:11435`), requires a JSON answer of the shape

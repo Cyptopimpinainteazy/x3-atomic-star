@@ -146,6 +146,8 @@ def extract_contract(content: str) -> dict:
     for cause in answer["causes"]:
         if not isinstance(cause, dict) or not cause.get("symbol"):
             raise ValueError("every cause needs a 'symbol'")
+        if not isinstance(cause.get("file"), str) or not cause.get("file").strip():
+            raise ValueError("every cause needs a 'file'; a symbol without a file is not actionable")
         if not isinstance(cause.get("confidence"), (int, float)):
             raise ValueError("every cause needs a numeric 'confidence'")
     return answer

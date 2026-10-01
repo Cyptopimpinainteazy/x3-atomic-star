@@ -152,7 +152,11 @@ struct OpEntry {
 pub struct SimOutcome {
     pub seed: u64,
     pub scenario: String,
+    /// Sessions in the ledger for this run.
+    pub sessions: usize,
     pub steps: usize,
+    /// Nodes in the simulated topology.
+    pub nodes: usize,
     pub accepted: u64,
     pub rejected: u64,
     pub restarts: u64,
@@ -197,10 +201,14 @@ impl SimOutcome {
     }
 
     /// The `cargo run` line that reproduces this exact run.
+    ///
+    /// Every dimension the CLI reads is included: a replay that omitted
+    /// `--sessions/--steps/--nodes` would silently run the defaults instead of
+    /// the configuration that failed.
     pub fn replay_command(&self) -> String {
         format!(
-            "cargo run -p x3-sim -- --seed {} --scenario {}",
-            self.seed, self.scenario
+            "cargo run -p x3-sim -- --seed {} --scenario {} --sessions {} --steps {} --nodes {}",
+            self.seed, self.scenario, self.sessions, self.steps, self.nodes
         )
     }
 
@@ -549,7 +557,9 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     SimOutcome {
         seed: config.seed,
         scenario: config.scenario.as_str().to_string(),
+        sessions: config.sessions,
         steps: config.steps,
+        nodes: config.nodes,
         accepted,
         rejected,
         restarts,

@@ -196,7 +196,9 @@ mod tests {
         SimOutcome {
             seed: config.seed,
             scenario: config.scenario.as_str().to_string(),
+            sessions: config.sessions,
             steps: config.steps,
+            nodes: config.nodes,
             accepted: 1,
             rejected: 0,
             restarts: 0,

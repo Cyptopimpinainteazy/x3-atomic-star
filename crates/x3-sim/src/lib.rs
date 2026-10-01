@@ -24,6 +24,7 @@
 
 pub mod clock;
 pub mod faults;
+pub mod hunt;
 pub mod invariants;
 pub mod minimize;
 pub mod network;
@@ -33,6 +34,7 @@ pub mod sim;
 
 pub use clock::VirtualClock;
 pub use faults::{FaultEvent, FaultKind, FaultPlan};
+pub use hunt::{hunt, HuntFailure, HuntReport};
 pub use invariants::{check_session, check_sessions, Violation};
 pub use minimize::{minimize, Minimized, DEFAULT_MAX_RUNS};
 pub use network::{NetworkStats, VirtualNetwork};

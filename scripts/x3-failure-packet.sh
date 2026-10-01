@@ -68,6 +68,7 @@ PACKET_PATH="$(python3 - "$LABEL" "$status" "$LOG" "$PACKET_DIR" "$ROOT" "$@" <<
 import hashlib
 import json
 import re
+import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -115,7 +116,9 @@ packet = {
     "branch": git("branch", "--show-current"),
     "worktree_dirty": bool(git("status", "--porcelain")),
     "stored_at": datetime.now(timezone.utc).isoformat(),
-    "command": " ".join(command),
+    # Saved with shell quoting, so the replay line runs the failing command
+    # exactly even when an argument contains spaces.
+    "command": shlex.join(command),
     "exit_code": int(status),
     "duration_seconds": None,
     "first_error": first_error,
@@ -124,7 +127,7 @@ packet = {
     "suspected_lines": sorted({item["line"] for item in locations}),
     "locations": locations,
     "log_excerpt": "\n".join(lines[-200:]),
-    "replay_command": " ".join(command),
+    "replay_command": shlex.join(command),
     "next_step": "Verify the cause before changing code: rerun the replay command, confirm the failure, then run the same command after the fix.",
 }
 

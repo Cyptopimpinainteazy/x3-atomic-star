@@ -204,6 +204,30 @@ class RootCauseTests(unittest.TestCase):
         raw = (out / "root-cause-abc123.invalid.txt").read_text()
         self.assertIn("finish_reason", raw)
 
+    def test_a_cause_without_a_file_is_not_stored(self):
+        ResponseServer.content = json.dumps(
+            {"causes": [{"symbol": "SwapCoordinator::abort", "confidence": 0.5}]}
+        )
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(self.packet_path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 3, "a symbol with no file is not an actionable cause")
+        self.assertFalse((out / "root-cause-abc123-refund_after_claim.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

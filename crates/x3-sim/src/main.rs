@@ -208,57 +208,70 @@ fn hunt_seeds(
     packet_dir: Option<&Path>,
     out: Option<&Path>,
 ) -> ExitCode {
-    if let Some(dir) = out {
-        if let Err(error) = std::fs::create_dir_all(dir) {
-            eprintln!("x3-sim: cannot create evidence directory: {error}");
-            return ExitCode::from(2);
-        }
-    }
+    let report = x3_sim::hunt(base, count, max_failures, do_minimize, run);
 
-    let mut failures: Vec<(SimConfig, SimOutcome, FailurePacket)> = Vec::new();
-    let mut passes = 0usize;
-    for offset in 0..count {
-        let mut config = base.clone();
-        config.seed = base.seed.wrapping_add(offset as u64);
-        let outcome = run(&config);
-        if outcome.is_pass() {
-            passes += 1;
-            continue;
-        }
-        if failures.len() >= max_failures {
-            continue;
-        }
-        let mut packet = match FailurePacket::from_outcome(&config, &outcome) {
-            Some(packet) => packet,
-            None => continue,
-        };
-        if do_minimize {
-            let code = packet.invariant.clone();
-            if let Some(minimized) = minimize(&config, Some(&code), DEFAULT_MAX_RUNS, x3_sim::run) {
-                packet.attach_minimized(minimized.to_reproducer());
-            }
-        }
+    for failure in &report.failures {
         if let Some(dir) = packet_dir {
-            if let Err(error) = packet.write(dir) {
+            if let Err(error) = failure.packet.write(dir) {
                 eprintln!("x3-sim: cannot write failure packet: {error}");
                 return ExitCode::from(2);
             }
         }
-        failures.push((config, outcome, packet));
+        if let Some(dir) = out {
+            // The evidence bundle for the failing run itself: `--out` must not
+            // create a directory that stays empty.
+            if let Err(error) = write_evidence(dir, &failure.outcome) {
+                eprintln!("x3-sim: cannot write evidence bundle: {error}");
+                return ExitCode::from(2);
+            }
+        }
     }
 
-    println!("hunt: seeds {}..{}  passes = {}  failures = {}", base.seed, base.seed.wrapping_add(count as u64), passes, failures.len());
-    if failures.is_empty() {
+    if let Some(dir) = out {
+        let summary = serde_json::json!({
+            "schema": "x3-sim-hunt-summary-v1",
+            "scenario": base.scenario.as_str(),
+            "first_seed": base.seed,
+            "seeds_requested": count,
+            "seeds_run": report.seeds_run,
+            "passes": report.passes,
+            "failures": report.failures.iter().map(|failure| serde_json::json!({
+                "seed": failure.config.seed,
+                "invariant": failure.packet.invariant,
+                "failure_id": failure.packet.failure_id,
+                "violations": failure.outcome.violations.len(),
+                "replay": failure.packet.replay_command,
+            })).collect::<Vec<_>>(),
+            "stopped_at_max_failures": report.stopped_at_max_failures,
+        });
+        let path = dir.join(format!("hunt-summary-{}-{}.json", base.scenario.as_str(), base.seed));
+        if let Err(error) = std::fs::create_dir_all(dir).and_then(|_| std::fs::write(&path, serde_json::to_string_pretty(&summary).unwrap_or_default() + "\n")) {
+            eprintln!("x3-sim: cannot write hunt summary: {error}");
+            return ExitCode::from(2);
+        }
+    }
+
+    println!(
+        "hunt: seeds {}..{}  run = {}  passes = {}  failures = {}{}",
+        base.seed,
+        base.seed.wrapping_add(count as u64),
+        report.seeds_run,
+        report.passes,
+        report.failures.len(),
+        if report.stopped_at_max_failures { format!(" (stopped at --max-failures {max_failures})") } else { String::new() }
+    );
+    if report.is_clean() {
         println!("no invariant violations in {} runs", count);
         return ExitCode::SUCCESS;
     }
-    for (_, outcome, packet) in &failures {
+    for failure in &report.failures {
+        let packet = &failure.packet;
         println!(
             "  seed={} invariant={} session={} replay=`{}`",
-            outcome.seed,
+            failure.outcome.seed,
             packet.invariant,
             packet.session,
-            outcome.replay_command()
+            failure.outcome.replay_command()
         );
         if let Some(minimized) = &packet.minimized {
             println!("    minimized (verified={}): {}", minimized.verified, minimized.replay_command);

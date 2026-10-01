@@ -353,7 +353,9 @@ mod tests {
         SimOutcome {
             seed,
             scenario: "claim-refund-race".to_string(),
+            sessions: 2,
             steps: 40,
+            nodes: 4,
             accepted: 10,
             rejected: 2,
             restarts: 0,
