@@ -185,10 +185,12 @@ struct OpEntry {
 pub struct SimOutcome {
     pub seed: u64,
     pub scenario: String,
-    /// Sessions in the ledger for this run.
+    /// Effective sessions in the ledger for this run (`config.sessions`,
+    /// clamped to at least one).
     pub sessions: usize,
     pub steps: usize,
-    /// Nodes in the simulated topology.
+    /// Effective nodes in the simulated topology (`config.nodes`, clamped to
+    /// at least two).
     pub nodes: usize,
     pub accepted: u64,
     pub rejected: u64,
@@ -657,9 +659,11 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     SimOutcome {
         seed: config.seed,
         scenario: config.scenario.as_str().to_string(),
-        sessions: config.sessions,
+        // The effective sizes, not the requested ones: `run` clamps them
+        // above, and a packet must replay the run that actually happened.
+        sessions,
         steps: config.steps,
-        nodes: config.nodes,
+        nodes,
         accepted,
         rejected,
         restarts,

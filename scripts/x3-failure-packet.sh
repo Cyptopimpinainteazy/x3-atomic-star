@@ -191,6 +191,12 @@ markdown = [
     "```bash",
     packet["replay_command"],
     "```",
+    "",
+    "## Log excerpt (tail)",
+    "",
+    "```text",
+    packet["log_excerpt"],
+    "```",
 ]
 (Path(packet_dir) / f"{stem}.md").write_text("\n".join(markdown) + "\n")
 print(json_path)

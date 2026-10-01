@@ -41,6 +41,7 @@ else
   python3 - "$packet" <<'PY' || fail=1
 import json
 import sys
+from pathlib import Path
 
 packet = json.load(open(sys.argv[1]))
 assert packet["schema"] == "x3-gate-failure-packet-v1", packet["schema"]
@@ -52,6 +53,9 @@ assert packet["commit"], "the packet must pin the commit it ran on"
 assert isinstance(packet["duration_seconds"], int), packet["duration_seconds"]
 assert packet["replay_command"].startswith("cd "), packet["replay_command"]
 assert "pallets/x3-supply-ledger/src/lib.rs" in packet["first_error"]
+markdown = Path(sys.argv[1]).with_suffix(".md").read_text()
+assert "## Log excerpt (tail)" in markdown, "the markdown must carry the excerpt it points at"
+assert "panicked at" in markdown, "the markdown excerpt must contain the failure"
 print("  packet fields verified")
 PY
 fi

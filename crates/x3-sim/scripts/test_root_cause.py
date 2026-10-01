@@ -350,6 +350,76 @@ class RootCauseTests(unittest.TestCase):
         )
         self.assertEqual(answer["causes"], [])
 
+    def test_contract_requires_notes_and_the_regression_test(self):
+        cause = {
+            "symbol": "s",
+            "file": "f.rs",
+            "confidence": 0.5,
+            "reasoning": "r",
+        }
+        for bad in (
+            # Ranked answer without the regression test the contract promises.
+            {"causes": [cause], "first_experiment": "x", "notes": "n"},
+            # Ranked answer without notes: no stated assumptions or gaps.
+            {
+                "causes": [cause],
+                "first_experiment": "x",
+                "required_regression_test": "t",
+            },
+            # Negative answer that does not say why it found nothing.
+            {"causes": []},
+            {"causes": [], "notes": "   "},
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    root_cause.extract_contract(json.dumps(bad))
+
+    def test_a_namespaced_gate_label_stays_a_single_file(self):
+        gate = {
+            "schema": "x3-gate-failure-packet-v1",
+            "failure_id": "gate0003",
+            "gate": "crates/foo",
+            "commit": "deadbeef",
+            "command": "cargo test -p foo",
+            "exit_code": 101,
+            "first_error": "boom",
+            "replay_command": "cargo test -p foo",
+        }
+        path = Path(self.tmp.name) / "namespaced-gate.json"
+        path.write_text(json.dumps(gate))
+        ResponseServer.content = json.dumps(
+            {
+                "causes": [
+                    {"symbol": "foo", "file": "crates/foo/src/lib.rs", "confidence": 0.4,
+                     "reasoning": "boom at the assertion"},
+                ],
+                "first_experiment": "cargo test -p foo",
+                "required_regression_test": "foo_stays_green",
+                "notes": "gate label names a crate",
+            }
+        )
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 0)
+        stored = out / "root-cause-gate0003-crates-foo.md"
+        self.assertTrue(stored.exists(), "a namespaced gate must not escape the output dir")
+        self.assertFalse((out / "crates").exists(), "the separator must not create directories")
+
     def test_a_gate_packet_is_dispatched_with_its_error_as_the_invariant(self):
         gate = {
             "schema": "x3-gate-failure-packet-v1",
@@ -381,6 +451,8 @@ class RootCauseTests(unittest.TestCase):
                     }
                 ],
                 "first_experiment": "cargo test -p pallet-x3-supply-ledger check_supply",
+                "required_regression_test": "check_supply_rejects_burned_issuance",
+                "notes": "line numbers come from the packet",
             }
         )
         server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
@@ -403,7 +475,13 @@ class RootCauseTests(unittest.TestCase):
         self.assertEqual(code, 0)
         stored = out / "root-cause-gate0001-pallet-x3-supply-ledger.md"
         self.assertTrue(stored.exists(), "the gate packet names its own kind, not 'None'")
-        self.assertNotIn("None", stored.read_text().split("## Ranked causes")[0].split("- invariant:")[1].splitlines()[0])
+        invariant_line = next(
+            line
+            for line in stored.read_text().splitlines()
+            if line.startswith("- invariant:")
+        )
+        self.assertIn(gate["first_error"], invariant_line)
+        self.assertNotIn("None", invariant_line)
 
 
     def test_an_http_error_status_is_a_bad_answer_not_an_unreachable_router(self):
@@ -490,10 +568,12 @@ class RootCauseTests(unittest.TestCase):
             "exit_code": 101,
             "first_error": "panicked at runtime/src/lib.rs:88:5",
             "failing_tests": ["runtime::tests::supply_is_conserved"],
+            "locations": [{"file": "runtime/src/lib.rs", "line": 88}],
             "log_excerpt": "thread 'main' panicked at runtime/src/lib.rs:88:5",
         }
         prompt = root_cause.build_prompt(gate)
         self.assertIn("runtime::tests::supply_is_conserved", prompt)
+        self.assertIn("location: runtime/src/lib.rs:88", prompt)
         self.assertIn("log excerpt", prompt)
         self.assertIn("runtime/src/lib.rs:88:5", prompt)
         self.assertIn("gate exit code: 101", prompt)

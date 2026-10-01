@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -114,6 +115,12 @@ def _truncate(value, limit=STATE_EXCERPT_CHARS):
     return text[:limit] + f"\n... [{len(text) - limit} characters omitted]"
 
 
+def _safe_component(value: str) -> str:
+    """One filename component: no separators, no traversal, never empty."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-")
+    return cleaned or "unknown"
+
+
 def build_prompt(packet: dict) -> str:
     """Render the packet as the facts an investigator needs, in order."""
     lines = [
@@ -176,6 +183,13 @@ def build_prompt(packet: dict) -> str:
         lines.append("state after the bad step:\n" + _truncate(packet["state_after"]))
     if packet.get("suspected_lines"):
         lines.append("suspected lines: " + ", ".join(map(str, packet["suspected_lines"])))
+    for location in packet.get("locations") or []:
+        if isinstance(location, dict) and location.get("file"):
+            lines.append(
+                "location: {file}:{line}".format(
+                    file=location["file"], line=location.get("line", "?")
+                )
+            )
     if packet.get("log_excerpt"):
         lines.append("log excerpt:\n" + _truncate(packet["log_excerpt"]))
     if packet.get("replay_command"):
@@ -232,16 +246,27 @@ def extract_contract(content: str) -> dict:
         if not isinstance(reasoning, str) or not reasoning.strip():
             raise ValueError("every cause needs non-empty 'reasoning'")
     if answer.get("causes"):
-        first_experiment = answer.get("first_experiment")
-        if not isinstance(first_experiment, str) or not first_experiment.strip():
-            raise ValueError("a ranked answer needs a non-empty 'first_experiment'")
+        for field in ("first_experiment", "required_regression_test"):
+            value = answer.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"a ranked answer needs a non-empty '{field}'")
+    notes = answer.get("notes")
+    if not isinstance(notes, str) or not notes.strip():
+        # A negative answer has to say *why* it found nothing; a ranked one
+        # has to state its assumptions. Either way, silence is not a cause.
+        raise ValueError("the answer needs non-empty 'notes'")
     return answer
 
 
 def store(packet: dict, answer: dict, response: dict, model: str, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     kind = packet.get("invariant") or packet.get("gate") or "failure"
-    stem = "{}-{}".format(packet.get("failure_id", "unknown"), str(kind).lower().replace(" ", "-"))
+    # A gate may be named `crates/foo`: the kind and the id are pinned into a
+    # file name, so separators become dashes instead of subdirectories.
+    stem = "{}-{}".format(
+        _safe_component(str(packet.get("failure_id", "unknown"))),
+        _safe_component(str(kind).lower()),
+    )
     record = {
         "schema": "x3-root-cause-v1",
         "stored_at": datetime.now(timezone.utc).isoformat(),

@@ -21,7 +21,7 @@ fn a_passing_real_run_produces_no_packet() {
     let outcome = run(&config);
     assert!(outcome.is_pass(), "the positive control must pass");
     assert!(
-        FailurePacket::from_outcome(&config, &outcome).is_none(),
+        FailurePacket::from_outcome(&outcome).is_none(),
         "a passing run must never produce a failure packet"
     );
     assert!(outcome.state_before.is_none());
@@ -72,12 +72,12 @@ fn the_minimizer_drives_real_runs_and_verifies_its_result() {
             && minimized.config.nodes <= start.nodes,
         "minimization never grows the config"
     );
-    assert!(
-        minimized.config.sessions < start.sessions
-            || minimized.config.steps < start.steps
-            || minimized.config.nodes < start.nodes,
-        "at least one dimension must shrink on a reducible predicate"
-    );
+    // A strict `<` here would assert something about the coordinator's
+    // refusal distribution, not about the minimizer: a correct minimizer
+    // returns the start config when nothing smaller reproduces. The proof
+    // that a reducible predicate shrinks lives in `minimize.rs`, against a
+    // deterministic synthetic predicate; this integration test owns "real
+    // runs, never grown, verified".
     assert!(
         minimized.outcome.rejected >= 1,
         "the minimized run really reproduces the predicate"
@@ -130,8 +130,7 @@ fn a_packet_replay_command_names_every_dimension_the_run_used() {
         session_id: "<predicate>".to_string(),
         detail: format!("rejected = {}", outcome.rejected),
     });
-    let packet =
-        FailurePacket::from_outcome(&config, &outcome).expect("a failing run yields a packet");
+    let packet = FailurePacket::from_outcome(&outcome).expect("a failing run yields a packet");
 
     assert_eq!(packet.replay_command, config.replay_command());
     for expected in [

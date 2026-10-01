@@ -75,7 +75,7 @@ where
             report.passes += 1;
             continue;
         }
-        let mut packet = match FailurePacket::from_outcome(&config, &outcome) {
+        let mut packet = match FailurePacket::from_outcome(&outcome) {
             Some(packet) => packet,
             None => continue,
         };

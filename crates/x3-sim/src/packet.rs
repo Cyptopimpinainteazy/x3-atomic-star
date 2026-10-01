@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::sim::{SimConfig, SimOutcome};
+use crate::sim::SimOutcome;
 
 /// Schema id so a consumer can refuse a packet it does not understand.
 pub const PACKET_SCHEMA: &str = "x3-failure-packet-v1";
@@ -250,8 +250,11 @@ impl FailurePacket {
     /// Build a packet from a failing outcome, or `None` when nothing failed.
     ///
     /// The before/after states come from the run itself: the run loop captures
-    /// the violating session around the first bad step.
-    pub fn from_outcome(config: &SimConfig, outcome: &SimOutcome) -> Option<Self> {
+    /// the violating session around the first bad step. Every recorded
+    /// dimension is read from the outcome (which stores the *effective*
+    /// configuration), never from the requested one, so the packet's `config`
+    /// and its `replay_command` can never disagree.
+    pub fn from_outcome(outcome: &SimOutcome) -> Option<Self> {
         let first = outcome.violations.first()?.clone();
         let code = first.code.to_string();
         let violations: Vec<PacketViolation> = outcome
@@ -270,11 +273,11 @@ impl FailurePacket {
         let _ = write!(
             identity,
             "{}|{}|{}|{}|{}|{}",
-            config.seed,
+            outcome.seed,
             outcome.scenario,
-            config.sessions,
-            config.steps,
-            config.nodes,
+            outcome.sessions,
+            outcome.steps,
+            outcome.nodes,
             violations
                 .iter()
                 .map(|violation| format!(
@@ -294,9 +297,9 @@ impl FailurePacket {
             seed: outcome.seed,
             scenario: outcome.scenario.clone(),
             config: PacketConfig {
-                sessions: config.sessions,
-                steps: config.steps,
-                nodes: config.nodes,
+                sessions: outcome.sessions,
+                steps: outcome.steps,
+                nodes: outcome.nodes,
             },
             invariant: code.clone(),
             session: first.session_id.clone(),
@@ -457,14 +460,18 @@ mod tests {
     use super::*;
     use crate::invariants::Violation;
     use crate::network::NetworkStats;
+    use crate::sim::SimConfig;
 
-    fn outcome(seed: u64, code: &'static str) -> SimOutcome {
+    /// An outcome whose recorded dimensions come from `config`, exactly as
+    /// `run` would produce them. Hand-building a differently-sized outcome
+    /// next to a config is how `config` and `replay_command` drift apart.
+    fn outcome_for(config: &SimConfig, code: &'static str) -> SimOutcome {
         SimOutcome {
-            seed,
-            scenario: "claim-refund-race".to_string(),
-            sessions: 2,
-            steps: 40,
-            nodes: 4,
+            seed: config.seed,
+            scenario: config.scenario.as_str().to_string(),
+            sessions: config.sessions,
+            steps: config.steps,
+            nodes: config.nodes,
             accepted: 10,
             rejected: 2,
             restarts: 0,
@@ -499,10 +506,10 @@ mod tests {
             nodes: 4,
             ..SimConfig::default()
         };
-        let first = FailurePacket::from_outcome(&config, &outcome(41, "CLAIM_REFUND_MIX"))
+        let first = FailurePacket::from_outcome(&outcome_for(&config, "CLAIM_REFUND_MIX"))
             .expect("a failing outcome produces a packet");
-        let second =
-            FailurePacket::from_outcome(&config, &outcome(41, "CLAIM_REFUND_MIX")).expect("packet");
+        let second = FailurePacket::from_outcome(&outcome_for(&config, "CLAIM_REFUND_MIX"))
+            .expect("packet");
         assert_eq!(first.failure_id, second.failure_id);
 
         let smaller = SimConfig {
@@ -512,19 +519,28 @@ mod tests {
             nodes: 4,
             ..SimConfig::default()
         };
-        let third = FailurePacket::from_outcome(&smaller, &outcome(41, "CLAIM_REFUND_MIX"))
-            .expect("packet");
+        let third =
+            FailurePacket::from_outcome(&outcome_for(&smaller, "CLAIM_REFUND_MIX")).expect("packet");
         assert_ne!(
             first.failure_id, third.failure_id,
             "a different config is a different failure"
+        );
+        assert_eq!(
+            first.config.sessions, config.sessions,
+            "the packet records the config the run really used"
+        );
+        assert_eq!(
+            first.replay_command,
+            config.replay_command(),
+            "the packet's replay must reproduce the recorded config"
         );
     }
 
     #[test]
     fn a_passing_outcome_has_no_packet() {
-        let mut clean = outcome(3, "CLAIM_REFUND_MIX");
+        let mut clean = outcome_for(&SimConfig::default(), "CLAIM_REFUND_MIX");
         clean.violations.clear();
-        assert!(FailurePacket::from_outcome(&SimConfig::default(), &clean).is_none());
+        assert!(FailurePacket::from_outcome(&clean).is_none());
     }
 
     #[test]
@@ -540,9 +556,12 @@ mod tests {
 
     #[test]
     fn markdown_carries_replay_and_minimized_repro() {
-        let config = SimConfig::default();
-        let mut packet = FailurePacket::from_outcome(&config, &outcome(41, "REFUND_AFTER_CLAIM"))
-            .expect("packet");
+        let config = SimConfig {
+            seed: 41,
+            ..SimConfig::default()
+        };
+        let mut packet =
+            FailurePacket::from_outcome(&outcome_for(&config, "REFUND_AFTER_CLAIM")).expect("packet");
         packet.attach_minimized(MinimizedReproducer {
             sessions: 1,
             steps: 11,

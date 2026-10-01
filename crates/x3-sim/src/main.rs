@@ -186,7 +186,7 @@ fn report_failure(
     packet_dir: Option<&Path>,
     json: bool,
 ) -> Result<(), String> {
-    let mut packet = FailurePacket::from_outcome(config, outcome)
+    let mut packet = FailurePacket::from_outcome(outcome)
         .ok_or_else(|| "a failing run produced no packet".to_string())?;
 
     if do_minimize {
