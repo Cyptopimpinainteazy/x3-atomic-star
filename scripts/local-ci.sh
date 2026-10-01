@@ -374,7 +374,12 @@ GATES_FAST=(
   # in this gate set runs pytest, so without this line the x3-lang Python suites
   # were invisible to the CI of record.
   "test x3-lang python:pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py"
-  "test atomic-kernel:cargo test -p pallet-x3-atomic-kernel"
+  # The four critical subsystems run through scripts/x3-failure-packet.sh: on a
+  # failure it writes a packet (first error, file/line, failing tests, commit,
+  # replay command) under failure-packets/, so a red gate hands the next agent
+  # the exact failing surface instead of a raw log. The wrapper exits with the
+  # gate's own status, so BLOCKED classification and exit codes are unchanged.
+  "test atomic-kernel:bash scripts/x3-failure-packet.sh --label atomic-kernel -- cargo test -p pallet-x3-atomic-kernel"
   # `pallet-x3-kernel` is the pallet every X3 comit goes through — the atomic path, the X3 payload
   # route and the execution receipts all live there — and its 218-test suite was in no gate list, so
   # nothing ran it. A pallet whose tests only run when a human remembers is a pallet whose tests do
@@ -505,7 +510,7 @@ GATES_FAST=(
   # until 2026-09-25: the S0-1 tests build `SupplyLedger` structs by hand, so the three transition
   # functions every cross-domain operation runs through were untested. They are covered now, and this
   # gate is what keeps them covered.
-  "test x3-supply-ledger:cargo test -p pallet-x3-supply-ledger"
+  "test x3-supply-ledger:bash scripts/x3-failure-packet.sh --label x3-supply-ledger -- cargo test -p pallet-x3-supply-ledger"
   # The rest of the registry's cited crates, which had no gate either. `registry tests are gated`
   # found them (nine features in the KNOWN_UNGATED baseline); these eight suites pass today, so the
   # baseline shrinks to the one entry that cannot be gated from here — the orphan `x3_htlc` tree.
@@ -625,7 +630,7 @@ GATES_FAST=(
   # rehearsals, and **no gate ran them**: `FEATURE_REGISTRY.toml` lists the rehearsal test names as
   # required evidence, `check-readiness-consistency.sh` proves those names exist, and nothing in the
   # default set ever executed them. Measured cost: 22s including compile, 0.03s of test time.
-  "test runtime:cargo test -p x3-chain-runtime"
+  "test runtime:bash scripts/x3-failure-packet.sh --label runtime -- cargo test -p x3-chain-runtime"
   # ...but that suite runs with `frontier` OFF, so it cannot reach the native adapters, and the
   # variant dry-run in `GATES_VARIANTS` selects only `runtime_upgrade_rehearsal` under the feature.
   # `native_vm_adapters` (`NativeEvmAdapter`, `NativeSvmAdapter`) and every test in
@@ -640,7 +645,7 @@ GATES_FAST=(
   # in runtime/src/lib.rs and X3-LANG-001).
   "test runtime frontier:env SKIP_WASM_BUILD=1 cargo test -p x3-chain-runtime --no-default-features --features std,frontier"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
-  "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
+  "test settlement-engine:bash scripts/x3-failure-packet.sh --label settlement-engine -- cargo test -p pallet-x3-settlement-engine"
   # The snapshot format is the trust boundary for state sync: a mirror must not
   # be able to alter metadata or a chunk without the verifier noticing. Its
   # murder-test matrix (wrong chain, stale, wrong state root, corrupt /
