@@ -41,7 +41,10 @@ if [ -z "$LABEL" ] || [ $# -eq 0 ]; then
   exit 2
 fi
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# `X3_FAILURE_PACKET_ROOT` lets the wrapper run a gate in another checkout
+# (for example a warm main tree while the wrapper itself is being reviewed in
+# a worktree). Defaults to the repository containing the script.
+ROOT="${X3_FAILURE_PACKET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$ROOT"
 
 LOG="$(mktemp -t x3-gate-log.XXXXXX)"
