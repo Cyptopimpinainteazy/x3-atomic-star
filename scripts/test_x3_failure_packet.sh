@@ -87,6 +87,19 @@ if [ "$status" -ne 101 ]; then
   fail=1
 fi
 
+echo "test_x3_failure_packet: an unusable checkout is refused before the gate runs"
+marker="$WORK/gate-ran"
+status="$(X3_FAILURE_PACKET_ROOT="$WORK/missing-checkout" run bash scripts/x3-failure-packet.sh \
+  --label selftest-bad-root --packet-dir "$WORK/bad-root" -- bash -c "touch '$marker'; exit 0")"
+if [ "$status" -ne 2 ]; then
+  echo "  FAIL: bad checkout exit was $status, expected 2" >&2
+  fail=1
+fi
+if [ -e "$marker" ]; then
+  echo "  FAIL: the gate ran despite an unusable checkout" >&2
+  fail=1
+fi
+
 echo "test_x3_failure_packet: usage error must be exit 2"
 status="$(run bash scripts/x3-failure-packet.sh --label missing-command)"
 if [ "$status" -ne 2 ]; then

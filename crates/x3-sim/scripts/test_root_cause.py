@@ -138,6 +138,44 @@ class RootCauseTests(unittest.TestCase):
         bad.write_text(json.dumps(sample_packet(schema="something-else")))
         self.assertEqual(root_cause.main([str(bad), "--dry-run"]), 2)
 
+    def test_an_incomplete_packet_is_refused(self):
+        for bad in (
+            {"schema": "x3-failure-packet-v1"},
+            {"schema": "x3-failure-packet-v1", "failure_id": "x", "producer": "p",
+             "scenario": "s", "invariant": "i", "session": "s", "detail": "d"},  # no replay_command
+            dict(sample_packet(), seed="not-a-number"),
+            dict(sample_packet(), config={"sessions": 1, "steps": 2}),  # no nodes
+            {"schema": "x3-gate-failure-packet-v1", "failure_id": "g", "gate": "g",
+             "command": "c", "first_error": "e", "replay_command": "c"},  # no exit_code
+        ):
+            with self.subTest(bad=bad):
+                path = Path(self.tmp.name) / "incomplete.json"
+                path.write_text(json.dumps(bad))
+                self.assertEqual(
+                    root_cause.main([str(path), "--dry-run"]),
+                    2,
+                    "an incomplete packet is not dispatchable evidence",
+                )
+
+    def test_the_prompt_renders_every_violation(self):
+        packet = sample_packet()
+        packet["all_violations"] = [
+            {
+                "code": "CLAIM_REFUND_MIX",
+                "session": "sim-9",
+                "detail": "fast=Claimed slow=Refunded",
+            },
+            {
+                "code": "REFUND_AFTER_CLAIM",
+                "session": "sim-9",
+                "detail": "journal records a claim and then a refund",
+            },
+        ]
+        prompt = root_cause.build_prompt(packet)
+        self.assertIn("all violations in this run", prompt)
+        self.assertIn("CLAIM_REFUND_MIX", prompt)
+        self.assertIn("fast=Claimed slow=Refunded", prompt)
+
     def test_an_unreachable_router_stores_nothing(self):
         import socket
 

@@ -75,6 +75,42 @@ fn a_json_hunt_prints_one_parseable_json_document() {
 }
 
 #[test]
+fn a_json_hunt_with_root_cause_and_out_keeps_stdout_one_document() {
+    let out = fresh_dir("hunt-out");
+    let output = simulator(&[
+        "--hunt",
+        "3",
+        "--seed",
+        "1000",
+        "--scenario",
+        "happy-path",
+        "--sessions",
+        "2",
+        "--steps",
+        "60",
+        "--nodes",
+        "3",
+        "--json",
+        "--root-cause",
+        "--out",
+        &out.to_string_lossy(),
+    ]);
+    assert!(output.status.success(), "a clean hunt exits 0");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("--json must print exactly one JSON document");
+    assert_eq!(parsed["schema"], "x3-sim-hunt-summary-v1");
+    // `--out` with a directory that did not exist must still produce the
+    // hunt summary: the run is allowed to create its own evidence directory.
+    let summary = out.join("hunt-summary-happy-path-1000.json");
+    assert!(
+        summary.exists(),
+        "the hunt summary was written to a fresh --out dir"
+    );
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
 fn a_usage_error_exits_2_and_writes_no_packet_directory() {
     // Negative control for the hunt test above: a rejected invocation must
     // exit 2 and still write nothing.

@@ -448,7 +448,8 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                 FaultKind::Heal => {
                     net.heal_all();
                     live_partitions.clear();
-                    live_slow_link = None;
+                    // `heal_all` restores connectivity only; latency and drop
+                    // settings stay installed, so a slow link is still active.
                     fired_faults.push(format!("{step:04} heal"));
                     trace.push(format!("{step:04} FAULT heal"));
                 }

@@ -42,6 +42,40 @@ fact. If the packet does not identify a cause, say so in notes and return an
 empty causes list rather than guessing."""
 
 
+# Fields without which a packet cannot identify a failure. A file that names
+# a schema but omits these is not evidence, and dispatching it would let a
+# model answer about a failure nobody can see.
+SIM_REQUIRED_FIELDS = (
+    "failure_id",
+    "producer",
+    "scenario",
+    "invariant",
+    "session",
+    "detail",
+    "replay_command",
+)
+GATE_REQUIRED_FIELDS = (
+    "failure_id",
+    "gate",
+    "command",
+    "first_error",
+    "replay_command",
+)
+
+
+def _require_text_fields(packet: dict, path: Path, names) -> None:
+    missing = [
+        name
+        for name in names
+        if not isinstance(packet.get(name), str) or not packet[name].strip()
+    ]
+    if missing:
+        raise SystemExit(
+            f"root_cause: {path} is not a usable failure packet — "
+            f"missing non-empty field(s): {', '.join(missing)}"
+        )
+
+
 def load_packet(path: Path) -> dict:
     try:
         packet = json.loads(path.read_text())
@@ -52,6 +86,24 @@ def load_packet(path: Path) -> dict:
             f"root_cause: {path} is not a supported failure packet "
             f"(schema must be one of {SUPPORTED_SCHEMAS})"
         )
+    if packet["schema"] == "x3-failure-packet-v1":
+        _require_text_fields(packet, path, SIM_REQUIRED_FIELDS)
+        if isinstance(packet.get("seed"), bool) or not isinstance(packet.get("seed"), int):
+            raise SystemExit(f"root_cause: {path} has no numeric 'seed'")
+        config = packet.get("config")
+        if not isinstance(config, dict) or any(
+            isinstance(config.get(key), bool) or not isinstance(config.get(key), int)
+            for key in ("sessions", "steps", "nodes")
+        ):
+            raise SystemExit(
+                f"root_cause: {path} has no numeric config (sessions/steps/nodes)"
+            )
+    else:
+        _require_text_fields(packet, path, GATE_REQUIRED_FIELDS)
+        if isinstance(packet.get("exit_code"), bool) or not isinstance(
+            packet.get("exit_code"), int
+        ):
+            raise SystemExit(f"root_cause: {path} has no numeric 'exit_code'")
     return packet
 
 
@@ -105,6 +157,19 @@ def build_prompt(packet: dict) -> str:
             )
     if packet.get("suspected_file"):
         lines.append(f"suspected file: {packet['suspected_file']}")
+    violations = packet.get("all_violations") or []
+    if violations:
+        lines.append("all violations in this run:")
+        for violation in violations:
+            if not isinstance(violation, dict):
+                continue
+            lines.append(
+                "  - {} session={}: {}".format(
+                    violation.get("code", "?"),
+                    violation.get("session", "?"),
+                    violation.get("detail", ""),
+                )
+            )
     if packet.get("state_before") is not None:
         lines.append("state before the bad step:\n" + _truncate(packet["state_before"]))
     if packet.get("state_after") is not None:

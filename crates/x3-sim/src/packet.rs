@@ -319,19 +319,16 @@ impl FailurePacket {
 
     /// What broke, independent of the seed that found it.
     ///
-    /// Two runs that violate the same invariant, in the same session, with
-    /// the same detail are one defect seen twice — a hunt must count them
-    /// once, or `--max-failures` stops before it finds anything new.
+    /// Two runs that violate the same invariant with the same detail are one
+    /// defect seen twice — a hunt must count them once, or `--max-failures`
+    /// stops before it finds anything new. Session ids are deliberately
+    /// excluded: the simulator derives them from a seed-derived secret, so
+    /// including them would make every rediscovery look like a new defect.
     pub fn violation_signature(&self) -> String {
         let mut parts: Vec<String> = self
             .all_violations
             .iter()
-            .map(|violation| {
-                format!(
-                    "{}:{}:{}",
-                    violation.code, violation.session, violation.detail
-                )
-            })
+            .map(|violation| format!("{}:{}", violation.code, violation.detail))
             .collect();
         parts.sort();
         parts.dedup();

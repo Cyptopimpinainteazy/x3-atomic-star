@@ -98,8 +98,10 @@ seeded schedule, so the failure predicate is not monotone: a config that fails
 at a large value says nothing about smaller ones. Instead of a binary search
 that could walk past a smaller reproducer, each dimension is scanned upwards
 from its floor for a bounded number of runs and only observed results are
-trusted. The result is the smallest reproducer *found*, verified by a fresh
-run — not a claim of global minimality.
+trusted. Passes repeat until a whole pass changes nothing, so a shrink in one
+dimension still gets the chance to unlock a smaller value in another. The
+result is the smallest reproducer *found*, verified by a fresh run — not a
+claim of global minimality.
 
 ## Hunting
 

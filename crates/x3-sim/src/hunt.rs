@@ -210,6 +210,30 @@ mod tests {
     }
 
     #[test]
+    fn seed_derived_session_ids_do_not_defeat_deduplication() {
+        let base = SimConfig {
+            seed: 0,
+            scenario: Scenario::ClaimRefundRace,
+            sessions: 3,
+            steps: 20,
+            nodes: 3,
+        };
+        let report = hunt(&base, 5, 2, false, |config| {
+            let mut outcome = outcome_for(config, false);
+            // The real simulator derives session ids from a seed-derived
+            // secret, so the same defect never carries the same id twice.
+            outcome.violations.push(Violation {
+                code: "REFUND_AFTER_CLAIM",
+                session_id: format!("sim-{:016x}", config.seed),
+                detail: "journal records a claim and then a refund".to_string(),
+            });
+            outcome
+        });
+        assert_eq!(report.failures.len(), 1, "one defect, not one per seed");
+        assert_eq!(report.duplicates, 4);
+    }
+
+    #[test]
     fn a_clean_hunt_runs_the_whole_range() {
         let base = SimConfig {
             seed: 0,

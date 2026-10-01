@@ -209,7 +209,8 @@ fn report_failure(
 
     if root_cause {
         match &packet_json {
-            Some(path) => dispatch_root_cause(path),
+            Some(path) => dispatch_root_cause(path, json),
+            None if json => eprintln!("{}", root_cause_hint()),
             None => println!("{}", root_cause_hint()),
         }
     }
@@ -245,25 +246,38 @@ fn root_cause_hint() -> String {
 /// Run the dispatcher on a stored packet. Dispatch failing is not a reason to
 /// hide the violation: the run still reports its failure and exit code, and
 /// the packet remains on disk either way.
-fn dispatch_root_cause(packet_path: &Path) {
+fn dispatch_root_cause(packet_path: &Path, quiet: bool) {
+    let note = |message: String| {
+        if quiet {
+            eprintln!("{message}");
+        } else {
+            println!("{message}");
+        }
+    };
     let script = Path::new("crates/x3-sim/scripts/root_cause.py");
     if !script.exists() {
-        println!(
+        note(format!(
             "root_cause: dispatcher not found at {}; packet kept at {}",
             script.display(),
             packet_path.display()
-        );
+        ));
         return;
     }
-    println!("root_cause: dispatching {}", packet_path.display());
-    match std::process::Command::new("python3")
-        .arg(script)
-        .arg(packet_path)
-        .status()
-    {
+    note(format!("root_cause: dispatching {}", packet_path.display()));
+    let mut command = std::process::Command::new("python3");
+    command.arg(script).arg(packet_path);
+    if quiet {
+        // stdout is the packet JSON in this mode; the child gets its own.
+        command.stdout(std::process::Stdio::null());
+    }
+    match command.status() {
         Ok(status) if status.success() => {}
-        Ok(status) => println!("root_cause: dispatcher exited with {status}; packet kept"),
-        Err(error) => println!("root_cause: could not run python3 ({error}); packet kept"),
+        Ok(status) => note(format!(
+            "root_cause: dispatcher exited with {status}; packet kept"
+        )),
+        Err(error) => note(format!(
+            "root_cause: could not run python3 ({error}); packet kept"
+        )),
     }
 }
 
@@ -295,7 +309,7 @@ fn hunt_seeds(
             if let Some(path) =
                 dir.map(|dir| dir.join(format!("{}.json", failure.packet.file_stem())))
             {
-                dispatch_root_cause(&path);
+                dispatch_root_cause(&path, json);
             }
         }
         if let Some(dir) = out {
@@ -455,6 +469,9 @@ fn print_summary(outcome: &SimOutcome) {
 }
 
 fn write_evidence(dir: &std::path::Path, outcome: &SimOutcome) -> std::io::Result<()> {
+    // `--hunt --out <new dir>` reaches this before anything else creates the
+    // directory, so the evidence path owns its own parent.
+    std::fs::create_dir_all(dir)?;
     let stem = format!("x3-sim-{}-{}", outcome.scenario, outcome.seed);
     std::fs::write(dir.join(format!("{stem}.json")), outcome.to_evidence_json())?;
     std::fs::write(

@@ -55,7 +55,10 @@ esac
 # (for example a warm main tree while the wrapper itself is being reviewed in
 # a worktree). Defaults to the repository containing the script.
 ROOT="${X3_FAILURE_PACKET_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-cd "$ROOT"
+if ! cd "$ROOT"; then
+  echo "x3-failure-packet: cannot enter checkout '$ROOT' (set X3_FAILURE_PACKET_ROOT to a real checkout)" >&2
+  exit 2
+fi
 
 LOG="$(mktemp -t x3-gate-log.XXXXXX)"
 trap 'rm -f "$LOG"' EXIT

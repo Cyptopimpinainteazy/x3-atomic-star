@@ -56,6 +56,10 @@ impl Minimized {
 /// tried first, so this bounds the scan without skipping the smallest results.
 pub const SCAN_CAP: usize = 24;
 
+/// How many times the whole scan may run. A pass that changes nothing ends
+/// the loop, so this only bounds pathological back-and-forth.
+pub const MAX_PASSES: usize = 8;
+
 /// Shrink `start` until no dimension can be removed and the same violation
 /// still fires.
 ///
@@ -98,10 +102,11 @@ where
     let first = reproduce(&current, &mut runner, &mut runs)?;
     let mut best: Option<(SimConfig, SimOutcome)> = Some((current.clone(), first));
 
-    // Two passes: shrinking sessions and nodes changes how many steps the
-    // schedule needs, so a dimension that could not shrink on the first pass
-    // may shrink on the second.
-    'shrink: for _pass in 0..2 {
+    // Repeat until a whole pass changes nothing: shrinking nodes can make a
+    // smaller session or step count reproduce, so a fixed two-pass loop can
+    // stop early with a needlessly large reproducer.
+    'shrink: for _pass in 0..MAX_PASSES {
+        let mut changed = false;
         for dimension in [Dimension::Sessions, Dimension::Steps, Dimension::Nodes] {
             let floor = dimension.floor();
             let ceiling = dimension.get(&current);
@@ -123,9 +128,13 @@ where
                 if let Some(outcome) = reproduce(&candidate, &mut runner, &mut runs) {
                     current = candidate.clone();
                     best = Some((candidate, outcome));
+                    changed = true;
                     break;
                 }
             }
+        }
+        if !changed {
+            break;
         }
     }
 
