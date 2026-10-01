@@ -150,11 +150,18 @@ fn a_packet_replay_command_names_every_dimension_the_run_used() {
         packet.commit, "unknown",
         "the packet resolves the checkout HEAD"
     );
-    assert_eq!(
-        packet.commit.len(),
-        40,
-        "HEAD is a full commit hash: {}",
-        packet.commit
-    );
+    // `X3_COMMIT` overrides discovery and the contract accepts whatever it
+    // names, so the full-hash shape only holds for the checkout path.
+    let overridden = std::env::var("X3_COMMIT")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    if !overridden {
+        assert_eq!(
+            packet.commit.len(),
+            40,
+            "HEAD is a full commit hash: {}",
+            packet.commit
+        );
+    }
     assert!(packet.to_markdown().contains("## All violations"));
 }

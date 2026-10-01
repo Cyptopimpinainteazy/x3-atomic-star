@@ -144,8 +144,8 @@ fn suspected_symbols(code: &str) -> Vec<SuspectedSymbol> {
             ),
             symbol(
                 state_machine,
-                "SwapCoordinator::record_slow_claim",
-                "the slow leg shares the same replay guard; two completions against one lock mean it did not hold",
+                "SwapCoordinator::operation_already_applied",
+                "a replayed claim must be recognised before any state is written",
             ),
         ],
         "COMPLETE_WITHOUT_BOTH_CLAIMS" => vec![
@@ -246,6 +246,30 @@ fn discover_commit() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
+/// A seed-independent defect identity over `(code, detail)` pairs.
+///
+/// Session ids are deliberately excluded: the simulator derives them from a
+/// seed-derived secret, so including them would make every rediscovery look
+/// like a new defect. The algorithm lives once; the packet method and the
+/// hunt's pre-packet check are two adapters over it.
+fn signature_of<'a>(items: impl Iterator<Item = (&'a str, &'a str)>) -> String {
+    let mut parts: Vec<String> = items
+        .map(|(code, detail)| format!("{code}:{detail}"))
+        .collect();
+    parts.sort();
+    parts.dedup();
+    parts.join("+")
+}
+
+/// The defect identity of a run's violations, without building a packet.
+pub fn violation_signature(violations: &[crate::invariants::Violation]) -> String {
+    signature_of(
+        violations
+            .iter()
+            .map(|violation| (violation.code, violation.detail.as_str())),
+    )
+}
+
 impl FailurePacket {
     /// Build a packet from a failing outcome, or `None` when nothing failed.
     ///
@@ -328,14 +352,11 @@ impl FailurePacket {
     /// excluded: the simulator derives them from a seed-derived secret, so
     /// including them would make every rediscovery look like a new defect.
     pub fn violation_signature(&self) -> String {
-        let mut parts: Vec<String> = self
-            .all_violations
-            .iter()
-            .map(|violation| format!("{}:{}", violation.code, violation.detail))
-            .collect();
-        parts.sort();
-        parts.dedup();
-        parts.join("+")
+        signature_of(
+            self.all_violations
+                .iter()
+                .map(|violation| (violation.code.as_str(), violation.detail.as_str())),
+        )
     }
 
     /// Attach a minimized reproducer, after verifying it still fails.

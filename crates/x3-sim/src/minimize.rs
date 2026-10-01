@@ -56,10 +56,6 @@ impl Minimized {
 /// tried first, so this bounds the scan without skipping the smallest results.
 pub const SCAN_CAP: usize = 24;
 
-/// How many times the whole scan may run. A pass that changes nothing ends
-/// the loop, so this only bounds pathological back-and-forth.
-pub const MAX_PASSES: usize = 8;
-
 /// Shrink `start` until no dimension can be removed and the same violation
 /// still fires.
 ///
@@ -103,9 +99,11 @@ where
     let mut best: Option<(SimConfig, SimOutcome)> = Some((current.clone(), first));
 
     // Repeat until a whole pass changes nothing: shrinking nodes can make a
-    // smaller session or step count reproduce, so a fixed two-pass loop can
-    // stop early with a needlessly large reproducer.
-    'shrink: for _pass in 0..MAX_PASSES {
+    // smaller session or step count reproduce, so a fixed pass count can stop
+    // early with a needlessly large reproducer. The run budget is the only
+    // bound: every pass that changes something has already spent at least one
+    // run, and an unchanged pass ends the loop.
+    'shrink: loop {
         let mut changed = false;
         for dimension in [Dimension::Sessions, Dimension::Steps, Dimension::Nodes] {
             let floor = dimension.floor();
@@ -120,11 +118,13 @@ where
             //
             // A window that finds nothing moves to the next one: the smallest
             // reproducer may sit above the first window, and the global run
-            // budget is the real bound.
+            // budget is the real bound. The ceiling itself is never probed —
+            // it is the current config, so "reproducing" it would count as a
+            // change while shrinking nothing.
             let mut window_start = floor;
-            'windows: while window_start <= ceiling {
-                let window_end = ceiling.min(window_start.saturating_add(SCAN_CAP - 1));
-                for value in window_start..=window_end {
+            'windows: while window_start < ceiling {
+                let window_end = ceiling.min(window_start.saturating_add(SCAN_CAP));
+                for value in window_start..window_end {
                     if runs + 1 >= max_runs {
                         // Keep one run for the final verification.
                         break 'shrink;

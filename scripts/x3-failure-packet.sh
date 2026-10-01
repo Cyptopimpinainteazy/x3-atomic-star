@@ -169,6 +169,12 @@ stem = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slug}-{failure
 json_path = Path(packet_dir) / f"{stem}.json"
 json_path.write_text(json.dumps(packet, indent=2) + "\n")
 
+# Gate output is arbitrary text: a line of backticks must not close the
+# excerpt fence, so the fence is one backtick longer than the longest run in
+# the excerpt (at least three).
+excerpt = packet["log_excerpt"]
+fence = "`" * max([3] + [len(run) + 1 for run in re.findall(r"`+", excerpt)])
+
 markdown = [
     f"# Gate failure packet {failure_id}",
     "",
@@ -194,9 +200,9 @@ markdown = [
     "",
     "## Log excerpt (tail)",
     "",
-    "```text",
-    packet["log_excerpt"],
-    "```",
+    f"{fence}text",
+    excerpt,
+    fence,
 ]
 (Path(packet_dir) / f"{stem}.md").write_text("\n".join(markdown) + "\n")
 print(json_path)

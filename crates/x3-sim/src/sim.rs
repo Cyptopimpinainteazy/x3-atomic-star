@@ -369,9 +369,9 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     let mut first_bad_step: Option<u64> = None;
     let mut first_bad_step_label: Option<String> = None;
     let mut first_bad_op: Option<String> = None;
-    let mut fired_faults: Vec<String> = Vec::new();
-    // Faults in effect right now, as opposed to `fired_faults`, which is the
-    // whole event history: a partition that was healed is not active.
+    // Faults *in effect right now*: a partition that was healed is no longer
+    // active, and a slow link stays installed across a heal (the network's
+    // `heal_all` restores connectivity, not latency or drop settings).
     let mut live_partitions: Vec<String> = Vec::new();
     let mut live_slow_link: Option<String> = None;
     let mut live_node_down: Option<(u64, String)> = None;
@@ -444,7 +444,6 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     let label = format!("{step:04} partition {group_a:?}|{group_b:?}");
                     live_partitions.clear();
                     live_partitions.push(label.clone());
-                    fired_faults.push(label);
                     trace.push(format!("{step:04} FAULT partition {group_a:?}|{group_b:?}"));
                 }
                 FaultKind::Heal => {
@@ -452,7 +451,6 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     live_partitions.clear();
                     // `heal_all` restores connectivity only; latency and drop
                     // settings stay installed, so a slow link is still active.
-                    fired_faults.push(format!("{step:04} heal"));
                     trace.push(format!("{step:04} FAULT heal"));
                 }
                 FaultKind::SlowLink {
@@ -462,9 +460,6 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     net.set_latency(latency_ms, latency_ms / 4);
                     net.set_drop_percent(extra_drop_percent);
                     live_slow_link = Some(format!(
-                        "{step:04} slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
-                    ));
-                    fired_faults.push(format!(
                         "{step:04} slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
                     ));
                     trace.push(format!(
@@ -482,9 +477,6 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                             "{step:04} crash-restart down_for={duration_ms}ms dropped={dropped}"
                         ),
                     ));
-                    fired_faults.push(format!(
-                        "{step:04} crash-restart down_for={duration_ms}ms dropped={dropped}"
-                    ));
                     trace.push(format!(
                         "{step:04} FAULT crash-restart down_for={duration_ms}ms dropped={dropped}"
                     ));
@@ -499,7 +491,6 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                             persistence.save(&previous);
                             coord = coordinator(&persistence);
                             stale_writes += 1;
-                            fired_faults.push(format!("{step:04} stale-write session={id}"));
                             trace.push(format!("{step:04} FAULT stale-write session={id}"));
                         }
                     }

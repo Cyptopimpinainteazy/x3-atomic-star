@@ -208,10 +208,10 @@ fn report_failure(
     }
 
     if root_cause {
-        match &packet_json {
-            Some(path) => dispatch_root_cause(path, json),
-            None if json => eprintln!("{}", root_cause_hint()),
-            None => println!("{}", root_cause_hint()),
+        // `root_cause` always supplies a packet directory, and a failed
+        // packet write returned above, so the packet path exists here.
+        if let Some(path) = &packet_json {
+            dispatch_root_cause(path, json);
         }
     }
 
@@ -299,12 +299,16 @@ fn hunt_seeds(
     let dir = packet_dir.or_else(|| root_cause.then(|| Path::new("target/x3-failure-packets")));
 
     // Duplicates get no packet and no dispatch, but the run itself is
-    // evidence: `--out` must not silently drop it.
+    // evidence: `--out` must not silently drop it. An evidence-write error is
+    // recorded, not returned yet: the failure packets are the part a
+    // root-cause agent needs, so they are still written and dispatched.
+    let mut evidence_error: Option<String> = None;
     for failure in report.failures.iter().chain(report.duplicates.iter()) {
         if let Some(dir) = out {
             if let Err(error) = write_evidence(dir, &failure.outcome) {
-                eprintln!("x3-sim: cannot write evidence bundle: {error}");
-                return ExitCode::from(2);
+                if evidence_error.is_none() {
+                    evidence_error = Some(format!("cannot write evidence bundle: {error}"));
+                }
             }
         }
     }
@@ -323,6 +327,10 @@ fn hunt_seeds(
             }
         }
     }
+    if let Some(error) = evidence_error {
+        eprintln!("x3-sim: {error}");
+        return ExitCode::from(2);
+    }
 
     let summary = serde_json::json!({
         "schema": "x3-sim-hunt-summary-v1",
@@ -331,7 +339,8 @@ fn hunt_seeds(
         "seeds_requested": count,
         "seeds_run": report.seeds_run,
         "passes": report.passes,
-        "duplicates": report.duplicates.len(),
+        "duplicates": report.duplicates_seen,
+        "duplicate_evidence_samples": report.duplicates.len(),
         "failures": report.failures.iter().map(|failure| serde_json::json!({
             "seed": failure.config.seed,
             "invariant": failure.packet.invariant,
@@ -381,7 +390,7 @@ fn hunt_seeds(
         report.seeds_run,
         report.passes,
         report.failures.len(),
-        report.duplicates.len(),
+        report.duplicates_seen,
         if report.stopped_at_max_failures {
             format!(" (stopped at --max-failures {max_failures})")
         } else {

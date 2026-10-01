@@ -121,6 +121,12 @@ def _safe_component(value: str) -> str:
     return cleaned or "unknown"
 
 
+def _list_field(packet: dict, name: str) -> list:
+    """A renderable optional list: anything else is not evidence to prompt on."""
+    value = packet.get(name)
+    return value if isinstance(value, list) else []
+
+
 def build_prompt(packet: dict) -> str:
     """Render the packet as the facts an investigator needs, in order."""
     lines = [
@@ -135,7 +141,7 @@ def build_prompt(packet: dict) -> str:
         lines.append(f"gate command: {packet['command']}")
     if packet.get("exit_code") is not None:
         lines.append(f"gate exit code: {packet['exit_code']}")
-    for test in packet.get("failing_tests") or []:
+    for test in _list_field(packet, "failing_tests"):
         lines.append(f"failing test: {test}")
     if packet.get("seed") is not None:
         lines.append(
@@ -153,18 +159,23 @@ def build_prompt(packet: dict) -> str:
                 packet.get("first_bad_step_label"), packet.get("first_bad_op")
             )
         )
-    for fault in packet.get("active_faults") or []:
+    for fault in _list_field(packet, "active_faults"):
         lines.append(f"active fault: {fault}")
-    suspects = packet.get("suspected_code") or []
+    suspects = _list_field(packet, "suspected_code")
     if suspects:
         lines.append("suspected code (pointers, not verdicts):")
         for suspect in suspects:
-            lines.append(
-                "  - {symbol} in {file} — {reason}".format(**suspect)
-            )
+            if isinstance(suspect, dict):
+                lines.append(
+                    "  - {symbol} in {file} — {reason}".format(
+                        symbol=suspect.get("symbol", "?"),
+                        file=suspect.get("file", "?"),
+                        reason=suspect.get("reason", ""),
+                    )
+                )
     if packet.get("suspected_file"):
         lines.append(f"suspected file: {packet['suspected_file']}")
-    violations = packet.get("all_violations") or []
+    violations = _list_field(packet, "all_violations")
     if violations:
         lines.append("all violations in this run:")
         for violation in violations:
@@ -183,7 +194,7 @@ def build_prompt(packet: dict) -> str:
         lines.append("state after the bad step:\n" + _truncate(packet["state_after"]))
     if packet.get("suspected_lines"):
         lines.append("suspected lines: " + ", ".join(map(str, packet["suspected_lines"])))
-    for location in packet.get("locations") or []:
+    for location in _list_field(packet, "locations"):
         if isinstance(location, dict) and location.get("file"):
             lines.append(
                 "location: {file}:{line}".format(
@@ -329,7 +340,10 @@ def store_invalid(packet: dict, out_dir: Path, raw: str, reason: str) -> int:
     answer is preserved so a human can see exactly what the router said.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    raw_path = out_dir / f"root-cause-{packet.get('failure_id', 'unknown')}.invalid.txt"
+    raw_path = (
+        out_dir
+        / f"root-cause-{_safe_component(str(packet.get('failure_id', 'unknown')))}.invalid.txt"
+    )
     raw_path.write_text(raw if isinstance(raw, str) else json.dumps(raw, indent=2, default=str))
     print(
         f"root_cause: {reason}; nothing was stored, raw answer kept at {raw_path}",

@@ -7,8 +7,16 @@
 //! instead of only by a real hunt that has to find a real violation first.
 
 use crate::minimize::{minimize, DEFAULT_MAX_RUNS};
-use crate::packet::FailurePacket;
+use crate::packet::{violation_signature, FailurePacket};
 use crate::sim::{SimConfig, SimOutcome};
+
+/// How many duplicate runs keep their full outcome and packet as evidence.
+///
+/// A systematic defect can be found by every remaining seed in a large hunt;
+/// retaining all of them would make memory grow with the hunt size while the
+/// thousandth copy adds nothing a sample does not. `duplicates_seen` still
+/// counts every rediscovery.
+pub const MAX_DUPLICATE_SAMPLES: usize = 32;
 
 /// One failure, with the packet and the config that produced it.
 #[derive(Debug, Clone)]
@@ -26,9 +34,12 @@ pub struct HuntReport {
     pub passes: usize,
     pub failures: Vec<HuntFailure>,
     /// Failing seeds whose violation was already collected under an earlier
-    /// seed: the same defect, but each run is still evidence of it. They do
-    /// not consume `--max-failures` and get no second packet.
+    /// seed: the same defect, and each run is evidence of it, so the first
+    /// `MAX_DUPLICATE_SAMPLES` are kept whole (outcome + packet). They do not
+    /// consume `--max-failures` and get no second packet.
     pub duplicates: Vec<HuntFailure>,
+    /// Every rediscovery, including the ones beyond the retained samples.
+    pub duplicates_seen: usize,
     /// True when the hunt stopped because `max_failures` was reached rather
     /// than because the seed range was exhausted.
     pub stopped_at_max_failures: bool,
@@ -59,6 +70,7 @@ where
         passes: 0,
         failures: Vec::new(),
         duplicates: Vec::new(),
+        duplicates_seen: 0,
         stopped_at_max_failures: false,
     };
 
@@ -75,25 +87,34 @@ where
             report.passes += 1;
             continue;
         }
+        // `--max-failures` counts distinct defects, not seeds: the same
+        // violation found again must not consume the budget (or stop the
+        // hunt) before a different one is reached. The signature is computed
+        // from the outcome, before any packet exists, so a duplicate beyond
+        // the sample cap costs a comparison — not a packet (whose build runs
+        // `git rev-parse`).
+        let signature = violation_signature(&outcome.violations);
+        if report
+            .failures
+            .iter()
+            .any(|failure| failure.packet.violation_signature() == signature)
+        {
+            report.duplicates_seen += 1;
+            if report.duplicates.len() < MAX_DUPLICATE_SAMPLES {
+                if let Some(packet) = FailurePacket::from_outcome(&outcome) {
+                    report.duplicates.push(HuntFailure {
+                        config: config.clone(),
+                        outcome,
+                        packet,
+                    });
+                }
+            }
+            continue;
+        }
         let mut packet = match FailurePacket::from_outcome(&outcome) {
             Some(packet) => packet,
             None => continue,
         };
-        // `--max-failures` counts distinct defects, not seeds: the same
-        // violation found again must not consume the budget (or stop the
-        // hunt) before a different one is reached.
-        if report
-            .failures
-            .iter()
-            .any(|failure| failure.packet.violation_signature() == packet.violation_signature())
-        {
-            report.duplicates.push(HuntFailure {
-                config: config.clone(),
-                outcome,
-                packet,
-            });
-            continue;
-        }
         if minimize_failures {
             let code = packet.invariant.clone();
             if let Some(minimized) = minimize(&config, Some(&code), DEFAULT_MAX_RUNS, |candidate| {
@@ -240,6 +261,31 @@ mod tests {
         });
         assert_eq!(report.failures.len(), 1, "one defect, not one per seed");
         assert_eq!(report.duplicates.len(), 4);
+    }
+
+    #[test]
+    fn duplicate_samples_are_bounded_but_every_rediscovery_is_counted() {
+        let base = SimConfig {
+            seed: 0,
+            scenario: Scenario::ClaimRefundRace,
+            sessions: 3,
+            steps: 20,
+            nodes: 3,
+        };
+        let count = MAX_DUPLICATE_SAMPLES + 11;
+        let report = hunt(&base, count, 2, false, outcome_with_fixed_violation);
+        assert_eq!(report.failures.len(), 1, "still one defect");
+        assert_eq!(
+            report.duplicates_seen,
+            count - 1,
+            "a systematic defect cannot be hidden by the sample cap"
+        );
+        assert_eq!(
+            report.duplicates.len(),
+            MAX_DUPLICATE_SAMPLES,
+            "memory stays bounded on a long hunt"
+        );
+        assert_eq!(report.seeds_run, count);
     }
 
     #[test]

@@ -71,6 +71,37 @@ if [ -d "$WORK/slash" ]; then
   fail=1
 fi
 
+echo "test_x3_failure_packet: a backtick line cannot break the markdown fence"
+cat > "$WORK/fence-fixture.sh" <<'FIXTURE'
+printf 'before\n'
+printf '```\n'
+printf 'thread main panicked at x.rs:1:1\n'
+exit 101
+FIXTURE
+status="$(run bash scripts/x3-failure-packet.sh --label selftest-fence --packet-dir "$WORK/fence-packets" -- \
+  bash "$WORK/fence-fixture.sh")"
+if [ "$status" -ne 101 ]; then
+  echo "  FAIL: fence fixture exit was $status, expected 101" >&2
+  fail=1
+fi
+packet="$(find "$WORK/fence-packets" -name '*.json' | head -1)"
+if [ -z "$packet" ]; then
+  echo "  FAIL: no packet written for the fence fixture" >&2
+  fail=1
+else
+  python3 - "$packet" <<'PY' || fail=1
+import sys
+from pathlib import Path
+
+lines = Path(sys.argv[1]).with_suffix(".md").read_text().splitlines()
+start = lines.index("````text")
+end = lines.index("````", start + 1)
+excerpt = lines[start + 1 : end]
+assert "```" in "\n".join(excerpt), "the excerpt keeps its own backticks"
+print("  fence escaped")
+PY
+fi
+
 echo "test_x3_failure_packet: passing gate must write no packet"
 status="$(run bash scripts/x3-failure-packet.sh --label selftest-pass --packet-dir "$WORK/pass-packets" -- \
   bash -c 'exit 0')"

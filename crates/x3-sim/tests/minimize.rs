@@ -75,7 +75,13 @@ fn a_json_hunt_prints_one_parseable_json_document() {
 }
 
 #[test]
-fn a_json_hunt_with_root_cause_and_out_keeps_stdout_one_document() {
+fn a_clean_json_hunt_with_root_cause_keeps_stdout_one_document() {
+    // No reachable coordinator violation exists (#558 closed them), so the
+    // dispatch path cannot be driven from the CLI today: this pins the
+    // combination that *is* reachable (a clean `--json --root-cause` hunt
+    // stays one document). On a failing hunt the dispatcher's child stdout is
+    // redirected to null in quiet mode, so the summary printer is still the
+    // only writer to stdout.
     let out = fresh_dir("hunt-out");
     let output = simulator(&[
         "--hunt",

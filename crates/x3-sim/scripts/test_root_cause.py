@@ -420,6 +420,46 @@ class RootCauseTests(unittest.TestCase):
         self.assertTrue(stored.exists(), "a namespaced gate must not escape the output dir")
         self.assertFalse((out / "crates").exists(), "the separator must not create directories")
 
+    def test_scalar_optional_fields_do_not_crash_the_prompt(self):
+        packet = sample_packet()
+        # A malformed optional field is not evidence to prompt on, but it must
+        # not take the dispatcher down with it.
+        packet["active_faults"] = "not-a-list"
+        packet["suspected_code"] = {"symbol": "x"}
+        packet["all_violations"] = 7
+        packet["failing_tests"] = "one-test"
+        packet["locations"] = "file.rs:1"
+        prompt = root_cause.build_prompt(packet)
+        self.assertIn("REFUND_AFTER_CLAIM", prompt)
+
+    def test_an_invalid_answer_is_kept_under_a_sanitized_name(self):
+        packet = sample_packet()
+        packet["failure_id"] = "weird/../id"
+        path = Path(self.tmp.name) / "weird-packet.json"
+        path.write_text(json.dumps(packet))
+        ResponseServer.content = "not json at all"
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            out = Path(self.tmp.name) / "out"
+            code = root_cause.main(
+                [
+                    str(path),
+                    "--router",
+                    f"http://127.0.0.1:{server.server_port}",
+                    "--out",
+                    str(out),
+                ]
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        self.assertEqual(code, 3)
+        kept = sorted(out.glob("root-cause-*.invalid.txt"))
+        self.assertEqual(len(kept), 1, kept)
+        self.assertEqual(kept[0].parent, out, "the id must not escape --out")
+
     def test_a_gate_packet_is_dispatched_with_its_error_as_the_invariant(self):
         gate = {
             "schema": "x3-gate-failure-packet-v1",
