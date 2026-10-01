@@ -73,7 +73,8 @@ replay_command                the one-line reproduction
 minimized                     the smallest verified reproducer
 required_regression_test      the exact test that must exist after the fix
 branch / worktree_dirty       where the checkout stood; a dirty packet's commit
-                              no longer describes the whole tree
+                              no longer describes the whole tree, and
+                              worktree_dirty is null when git cannot say
 ```
 
 ```bash

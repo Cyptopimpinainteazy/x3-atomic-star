@@ -69,6 +69,14 @@ if [ "$status" -ne 101 ]; then
   echo "  FAIL: quoting fixture exit was $status, expected 101" >&2
   fail=1
 fi
+if ! grep -Fq 'arg\ with\ spaces' "$WORK/quoting.out"; then
+  echo "  FAIL: the running line does not quote 'arg with spaces': $(cat "$WORK/quoting.out")" >&2
+  fail=1
+fi
+if grep -Fq -- "-- arg with spaces" "$WORK/quoting.out"; then
+  echo "  FAIL: the running line re-splits 'arg with spaces'" >&2
+  fail=1
+fi
 if ! grep -Fq 'arg\ with\ spaces' "$WORK/quoting.err"; then
   echo "  FAIL: the replay line does not quote 'arg with spaces': $(cat "$WORK/quoting.err")" >&2
   fail=1

@@ -197,9 +197,7 @@ fn a_packet_records_the_checkout_branch_and_dirtiness() {
     let expected_branch = git(&["branch", "--show-current"])
         .filter(|branch| !branch.is_empty())
         .unwrap_or_else(|| "unknown".to_string());
-    let expected_dirty = git(&["status", "--porcelain"])
-        .map(|status| !status.is_empty())
-        .unwrap_or(false);
+    let expected_dirty = git(&["status", "--porcelain"]).map(|status| !status.is_empty());
 
     assert_eq!(
         packet.branch, expected_branch,
@@ -210,8 +208,15 @@ fn a_packet_records_the_checkout_branch_and_dirtiness() {
         "the packet records whether the worktree was dirty"
     );
     let markdown = packet.to_markdown();
+    let expected_dirty_label = match expected_dirty {
+        Some(true) => "yes",
+        Some(false) => "no",
+        None => "unknown",
+    };
     assert!(
-        markdown.contains(&format!("on `{expected_branch}` (dirty: {expected_dirty})")),
+        markdown.contains(&format!(
+            "on `{expected_branch}` (dirty: {expected_dirty_label})"
+        )),
         "the markdown pins the checkout state: {markdown}"
     );
 }

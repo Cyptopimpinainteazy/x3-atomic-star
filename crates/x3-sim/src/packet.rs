@@ -74,11 +74,12 @@ pub struct FailurePacket {
     /// The checkout's branch when the packet was built, or `"unknown"`.
     pub branch: String,
     /// Whether the checkout had uncommitted changes (including untracked
-    /// files, as `git status --porcelain` reports them). A packet from a
-    /// dirty worktree is still a real failure packet, but its `commit` no
-    /// longer describes exactly the code that ran — the flag lets a consumer
-    /// see that instead of trusting the hash alone.
-    pub worktree_dirty: bool,
+    /// files, as `git status --porcelain` reports them), or `None` when git
+    /// could not establish the state. A packet from a dirty worktree is still
+    /// a real failure packet, but its `commit` no longer describes exactly
+    /// the code that ran — and an unverified state must not be reported as
+    /// clean, so `None` (JSON `null`) means unknown rather than `false`.
+    pub worktree_dirty: Option<bool>,
     pub seed: u64,
     pub scenario: String,
     pub config: PacketConfig,
@@ -267,11 +268,10 @@ fn discover_branch() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Whether the checkout had uncommitted changes when the packet was built.
-fn discover_worktree_dirty() -> bool {
-    git_stdout(&["status", "--porcelain"])
-        .map(|status| !status.is_empty())
-        .unwrap_or(false)
+/// Whether the checkout had uncommitted changes when the packet was built,
+/// or `None` when git could not establish the state.
+fn discover_worktree_dirty() -> Option<bool> {
+    git_stdout(&["status", "--porcelain"]).map(|status| !status.is_empty())
 }
 
 /// A seed-independent defect identity over `(code, detail)` pairs.
@@ -428,10 +428,15 @@ impl FailurePacket {
                 .map(|op| format!("(op `{op}`)"))
                 .unwrap_or_default()
         );
+        let dirty = match self.worktree_dirty {
+            Some(true) => "yes",
+            Some(false) => "no",
+            None => "unknown",
+        };
         let _ = writeln!(
             out,
             "- commit: `{}` on `{}` (dirty: {})",
-            self.commit, self.branch, self.worktree_dirty
+            self.commit, self.branch, dirty
         );
         let _ = writeln!(out, "- trace digest: `{}`", self.trace_digest);
         let _ = writeln!(out, "- state digest: `{}`", self.state_digest);
