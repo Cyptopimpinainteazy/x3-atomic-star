@@ -186,8 +186,11 @@ pub struct SimOutcome {
     pub trace: Vec<String>,
 }
 
-/// The last accepted operation, kept so the first violation can be attributed
-/// to the step that produced it rather than to the schedule as a whole.
+/// The last operation that touched one session, kept so the first violation
+/// can be attributed to the step that produced it rather than to the schedule
+/// as a whole. Keyed by session: several deliveries on different sessions can
+/// happen between two invariant checks, and the first violation must be
+/// attributed to *its own* session, not to whichever ran last.
 #[derive(Debug, Clone)]
 struct LastApplied {
     op: String,
@@ -326,7 +329,7 @@ pub fn run(config: &SimConfig) -> SimOutcome {
     let mut partitions = 0u64;
     let mut node_down_until_ms = 0u64;
     let mut last_op_index: Option<usize> = None;
-    let mut last_applied: Option<LastApplied> = None;
+    let mut last_applied: HashMap<String, LastApplied> = HashMap::new();
     let mut first_bad_step: Option<u64> = None;
     let mut first_bad_step_label: Option<String> = None;
     let mut first_bad_op: Option<String> = None;
@@ -354,7 +357,8 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     // sessions.
                     first_bad_step = if $index == u64::MAX { None } else { Some($index) };
                     first_bad_step_label = Some($human.to_string());
-                    if let Some(last) = &last_applied {
+                    let blamed = found[0].session_id.clone();
+                    if let Some(last) = last_applied.get(&blamed) {
                         first_bad_op = Some(last.op.clone());
                         state_before = last.before.clone();
                         state_after = last.after.clone();
@@ -416,6 +420,10 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                 FaultKind::StaleWrite { session } => {
                     if let Some(id) = session_ids.get(session) {
                         if let Some(previous) = shadow.get(id).cloned() {
+                            // This session's state changed outside an
+                            // operation, so the last operation no longer
+                            // describes how it reached the current state.
+                            last_applied.remove(id);
                             persistence.save(&previous);
                             coord = coordinator(&persistence);
                             stale_writes += 1;
@@ -477,11 +485,14 @@ pub fn run(config: &SimConfig) -> SimOutcome {
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {
                 Ok(()) => {
                     accepted += 1;
-                    last_applied = Some(LastApplied {
-                        op: entry.op.name().to_string(),
-                        before,
-                        after: serde_json::to_value(persistence.load(&id)).ok(),
-                    });
+                    last_applied.insert(
+                        id.clone(),
+                        LastApplied {
+                            op: entry.op.name().to_string(),
+                            before,
+                            after: serde_json::to_value(persistence.load(&id)).ok(),
+                        },
+                    );
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} ok",
                         envelope.from,
@@ -490,11 +501,14 @@ pub fn run(config: &SimConfig) -> SimOutcome {
                     ));
                 }
                 Err(error) => {
-                    last_applied = Some(LastApplied {
-                        op: entry.op.name().to_string(),
-                        before,
-                        after: serde_json::to_value(persistence.load(&id)).ok(),
-                    });
+                    last_applied.insert(
+                        id.clone(),
+                        LastApplied {
+                            op: entry.op.name().to_string(),
+                            before,
+                            after: serde_json::to_value(persistence.load(&id)).ok(),
+                        },
+                    );
                     rejected += 1;
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} rejected: {error}",

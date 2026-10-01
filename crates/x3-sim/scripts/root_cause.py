@@ -148,8 +148,19 @@ def extract_contract(content: str) -> dict:
             raise ValueError("every cause needs a 'symbol'")
         if not isinstance(cause.get("file"), str) or not cause.get("file").strip():
             raise ValueError("every cause needs a 'file'; a symbol without a file is not actionable")
-        if not isinstance(cause.get("confidence"), (int, float)):
+        confidence = cause.get("confidence")
+        # `bool` is an `int` in Python; `true` is not a confidence.
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
             raise ValueError("every cause needs a numeric 'confidence'")
+        if not 0.0 <= float(confidence) <= 1.0:
+            raise ValueError("'confidence' must be between 0.0 and 1.0")
+        reasoning = cause.get("reasoning")
+        if not isinstance(reasoning, str) or not reasoning.strip():
+            raise ValueError("every cause needs non-empty 'reasoning'")
+    if answer.get("causes"):
+        first_experiment = answer.get("first_experiment")
+        if not isinstance(first_experiment, str) or not first_experiment.strip():
+            raise ValueError("a ranked answer needs a non-empty 'first_experiment'")
     return answer
 
 

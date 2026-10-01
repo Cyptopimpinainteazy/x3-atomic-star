@@ -228,6 +228,44 @@ class RootCauseTests(unittest.TestCase):
         self.assertEqual(code, 3, "a symbol with no file is not an actionable cause")
         self.assertFalse((out / "root-cause-abc123-refund_after_claim.json").exists())
 
+    def test_contract_rejects_boolean_confidence_missing_reasoning_and_no_experiment(self):
+        for bad in (
+            {
+                "causes": [
+                    {
+                        "symbol": "s",
+                        "file": "f.rs",
+                        "confidence": True,
+                        "reasoning": "r",
+                    }
+                ],
+                "first_experiment": "x",
+            },
+            {
+                "causes": [{"symbol": "s", "file": "f.rs", "confidence": 0.5}],
+                "first_experiment": "x",
+            },
+            {
+                "causes": [
+                    {"symbol": "s", "file": "f.rs", "confidence": 0.5, "reasoning": "r"}
+                ]
+            },
+            {
+                "causes": [
+                    {"symbol": "s", "file": "f.rs", "confidence": 1.5, "reasoning": "r"}
+                ],
+                "first_experiment": "x",
+            },
+        ):
+            with self.assertRaises(ValueError):
+                root_cause.extract_contract(json.dumps(bad))
+
+    def test_an_empty_causes_list_with_notes_is_a_valid_negative_answer(self):
+        answer = root_cause.extract_contract(
+            json.dumps({"causes": [], "notes": "the packet does not identify a cause"})
+        )
+        self.assertEqual(answer["causes"], [])
+
     def test_a_gate_packet_is_dispatched_with_its_error_as_the_invariant(self):
         gate = {
             "schema": "x3-gate-failure-packet-v1",
@@ -257,7 +295,8 @@ class RootCauseTests(unittest.TestCase):
                         "confidence": 0.6,
                         "reasoning": "assertion at line 412",
                     }
-                ]
+                ],
+                "first_experiment": "cargo test -p pallet-x3-supply-ledger check_supply",
             }
         )
         server = ThreadingHTTPServer(("127.0.0.1", 0), ResponseHandler)

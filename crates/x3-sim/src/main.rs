@@ -133,10 +133,12 @@ fn main() -> ExitCode {
 
     let outcome = run(&config);
 
-    if json {
-        println!("{}", outcome.to_evidence_json());
-    } else {
-        print_summary(&outcome);
+    if outcome.is_pass() {
+        if json {
+            println!("{}", outcome.to_evidence_json());
+        } else {
+            print_summary(&outcome);
+        }
     }
 
     if let Some(dir) = &out {
@@ -151,6 +153,12 @@ fn main() -> ExitCode {
 
     if outcome.is_pass() {
         return ExitCode::SUCCESS;
+    }
+
+    if !json {
+        // Failing, human mode: the summary, then the packet. In `--json` mode
+        // the packet *is* the document, so `stdout` stays parseable as one.
+        print_summary(&outcome);
     }
 
     match report_failure(&config, &outcome, do_minimize, root_cause, packet_dir.as_deref(), json) {
@@ -194,9 +202,9 @@ fn report_failure(
     }
 
     if root_cause {
-        match packet_json {
-            Some(path) => dispatch_root_cause(&path),
-            None => println!("root_cause_command = {}", root_cause_command(&packet)),
+        match &packet_json {
+            Some(path) => dispatch_root_cause(path),
+            None => println!("{}", root_cause_hint()),
         }
     }
 
@@ -208,17 +216,24 @@ fn report_failure(
     } else {
         println!();
         println!("{}", packet.to_markdown());
-        println!("root_cause_command = {}", root_cause_command(&packet));
+        match &packet_json {
+            Some(path) => println!(
+                "root_cause_command = python3 crates/x3-sim/scripts/root_cause.py {}",
+                path.display()
+            ),
+            // Printing a command with a path that does not exist would invite
+            // a failed run: say what to add instead.
+            None => println!("{}", root_cause_hint()),
+        }
     }
     Ok(())
 }
 
-/// The exact command that hands this packet to the root-cause agent.
-fn root_cause_command(packet: &FailurePacket) -> String {
-    format!(
-        "python3 crates/x3-sim/scripts/root_cause.py <packet.json>  # packet {}",
-        packet.failure_id
-    )
+/// What to run when no packet was persisted (so there is no path to name yet).
+fn root_cause_hint() -> String {
+    "root_cause: rerun with --packet <dir> (or --root-cause) to persist the packet, \
+     then: python3 crates/x3-sim/scripts/root_cause.py <written packet.json>"
+        .to_string()
 }
 
 /// Run the dispatcher on a stored packet. Dispatch failing is not a reason to
@@ -329,7 +344,13 @@ fn hunt_seeds(
             println!("    minimized (verified={}): {}", minimized.verified, minimized.replay_command);
         }
         println!("    packet: {}  id={}", packet.file_stem(), packet.failure_id);
-        println!("    root cause: {}", root_cause_command(packet));
+        match dir {
+            Some(dir) => println!(
+                "    root cause: python3 crates/x3-sim/scripts/root_cause.py {}",
+                dir.join(format!("{}.json", packet.file_stem())).display()
+            ),
+            None => println!("    {}", root_cause_hint()),
+        }
     }
     ExitCode::FAILURE
 }
