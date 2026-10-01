@@ -698,6 +698,12 @@ GATES_FAST=(
   # when an operator asks for it, so a change to router.py was covered by
   # nothing on a normal commit. It is standard library only and takes seconds.
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
+  # x3-gateway is Postgres-backed in production, but its normal unit/concurrency tests never
+  # connect to a server. This gate owns a disposable Postgres container, runs the crate's
+  # migrations through Database::connect(), and proves a Funding Swarm write/read/scoreboard
+  # round-trip through the production SQL path. The Rust test is #[ignore] so plain cargo test
+  # remains hermetic on machines without Docker; this wrapper is the one supported live entrypoint.
+  "gateway postgres integration:bash scripts/gateway-postgres-integration.sh"
   # `x3-sim` is the deterministic fault-injection simulator for that same
   # coordinator. It is its own workspace root for the same reason (it depends on
   # the coordinator by path), so `cargo test --workspace` never sees it and it
