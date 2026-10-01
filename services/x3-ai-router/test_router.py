@@ -680,6 +680,51 @@ class RouterTests(unittest.TestCase):
         self.assertIn("native", health)
         self.assertIn("response.failed", health["native"]["last_error"])
 
+    def test_native_responses_preserves_custom_tool_history_before_chat_fallback(self):
+        native = self.start_native_responses_provider()
+        self.configure_native_responses_provider(native)
+        server = self.serve()
+        custom_input = [
+            {
+                "type": "custom_tool_call",
+                "call_id": "patch-1",
+                "name": "apply_patch",
+                "input": "*** Begin Patch\n*** End Patch",
+            },
+            {
+                "type": "custom_tool_call_output",
+                "call_id": "patch-1",
+                "output": "Done!",
+            },
+        ]
+        try:
+            data = json.dumps({
+                "model": "x3-auto",
+                "stream": False,
+                "input": custom_input,
+                "tools": [{"type": "custom", "name": "apply_patch"}],
+            }).encode()
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/v1/responses",
+                data,
+                {"Content-Type": "application/json", "X-X3-Agent": "codex"},
+            )
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+        finally:
+            os.environ.pop("DEEPSEEK_TEST_KEY", None)
+            server.shutdown()
+            server.server_close()
+            native.shutdown()
+            native.server_close()
+
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(NativeResponsesProvider.requests[0]["input"], custom_input)
+        self.assertEqual(
+            NativeResponsesProvider.requests[0]["tools"],
+            [{"type": "custom", "name": "apply_patch"}],
+        )
+
     def test_responses_request_translation(self):
         chat = router_module.responses_request_to_chat({
             "instructions": "sys",
