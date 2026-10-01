@@ -9,6 +9,7 @@
   "provider_cooldown_max_seconds": 3600,
   "routes": {
     "routine": [
+      "deepseek",
       "ollama",
       "nemotron_lightning_free",
       "nemotron_ultra_free",
@@ -16,8 +17,10 @@
       "direct"
     ],
     "critical": [
-      "direct",
-      "openrouter"
+      "deepseek",
+      "ollama",
+      "openrouter",
+      "direct"
     ]
   },
   "budget_fallback": [
@@ -29,7 +32,7 @@
     "ollama": {
       "base_url": "http://127.0.0.1:11434/v1",
       "model": "qwen2.5-coder:7b",
-      "critical_allowed": false
+      "critical_allowed": true
     },
     "nemotron_lightning_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -67,6 +70,17 @@
       "pricing_checked_on": "2026-09-29",
       "output_token_parameter": "max_completion_tokens",
       "critical_allowed": true
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-flash",
+      "protocol": "responses",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "input_usd_per_million": 0.3,
+      "output_usd_per_million": 1.2,
+      "pricing_checked_on": "2026-09-30",
+      "critical_allowed": true,
+      "timeout_seconds": 180
     }
   }
 }
