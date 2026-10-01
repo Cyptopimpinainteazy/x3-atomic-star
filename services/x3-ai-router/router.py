@@ -820,6 +820,15 @@ class Router:
                 usage = result.get("usage", {})
                 input_tokens, output_tokens = usage_tokens(usage)
                 cost = (input_tokens * price_in + output_tokens * price_out) / 1_000_000 if usage else estimate
+                if result.get("status") == "failed":
+                    error_obj = result.get("error") if isinstance(result.get("error"), dict) else {}
+                    detail = "response.failed"
+                    if error_obj.get("message"):
+                        detail += ": " + str(error_obj["message"])[:160]
+                    self.finish(reservation, agent)
+                    self.note_provider_failure(name, detail)
+                    failures.append(name + ": " + detail)
+                    continue
                 self.note_provider_success(name)
                 self.finish(reservation, agent, name, provider["model"], usage, cost)
                 return 200, result, True
@@ -899,6 +908,7 @@ class Router:
                 headers["Authorization"] = "Bearer " + key
             emitted = False
             terminal = False
+            terminal_type = None
             usage = {}
             max_sequence = -1
             response_id = "resp_" + uuid.uuid4().hex
@@ -929,6 +939,7 @@ class Router:
                             response_id = response_obj["id"]
                         if event.get("type") in ("response.completed", "response.incomplete", "response.failed"):
                             terminal = True
+                            terminal_type = event.get("type")
                             if isinstance(response_obj, dict):
                                 usage = response_obj.get("usage") or {}
                 if not emitted:
@@ -953,6 +964,10 @@ class Router:
                     return None
                 input_tokens, output_tokens = usage_tokens(usage)
                 cost = (input_tokens * price_in + output_tokens * price_out) / 1_000_000 if usage else estimate
+                if terminal_type == "response.failed":
+                    self.finish(reservation, agent, name, provider["model"], usage, cost)
+                    self.note_provider_failure(name, "response.failed")
+                    return None
                 self.note_provider_success(name)
                 self.finish(reservation, agent, name, provider["model"], usage, cost)
                 return None
