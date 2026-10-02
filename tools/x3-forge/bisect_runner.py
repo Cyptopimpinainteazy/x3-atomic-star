@@ -24,10 +24,21 @@ Usage:
         [--repo PATH] [--timeout SECS] [--out DIR] [--json] \
         -- <reproducer argv...>
 
+    # or seed the search from a failure packet the rest of the forge already
+    # produces (x3-sim's `x3-failure-packet-v2`, the gate wrapper's
+    # `x3-gate-failure-packet-v1`):
+    python3 tools/x3-forge/bisect_runner.py \
+        --good <known-good-rev> --packet failure-packets/<id>.json
+
 The reproducer is executed with `argv` directly — never through a shell — and
 must exit 0 on `good` and non-zero on `bad`. Exit code 125 is passed through to
 git as "skip this commit" (its documented meaning), and any run that exceeds
 --timeout aborts the search rather than reporting a fabricated verdict.
+
+A packet's `replay_command` is a shell string, so it runs through `bash -lc`.
+Gate packets prefix it with `cd <original-checkout> &&`; that prefix is stripped
+(and recorded as `packet_cd_stripped`), because every probe must run in the
+checkout the search is moving, not in the checkout that recorded the failure.
 
 Exit codes: 0 first bad commit found; 1 nothing usable (refused or search
 aborted); 2 usage/IO error.
@@ -39,12 +50,43 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
 import time
 
 TIMEOUT_MARKER_ENV = "X3_BISECT_TIMEOUT_MARKER"
+
+PACKET_SCHEMAS = ("x3-failure-packet-v2", "x3-gate-failure-packet-v1")
+
+# `shlex.join` quotes the directory, so accept bare, single- and double-quoted
+# forms; only a single leading `cd … &&` is stripped.
+_CD_PREFIX = re.compile(r"""^cd\s+(?:'[^']*'|"[^"]*"|[^\s&]+)\s+&&\s+""")
+
+
+def reproducer_from_packet(data: dict) -> tuple[str, str, bool]:
+    """Return (shell command, failing commit, cd prefix stripped)."""
+    schema = str(data.get("schema", ""))
+    if schema not in PACKET_SCHEMAS:
+        fail(
+            f"packet schema {schema!r} is not one this tool understands "
+            f"(expected one of {', '.join(PACKET_SCHEMAS)})"
+        )
+    command = ""
+    if schema == "x3-failure-packet-v2":
+        # Prefer the verified minimal reproducer: it is the smallest run that
+        # still violates the invariant, and the generator only attaches it
+        # after re-running it.
+        minimized = data.get("minimized") or {}
+        command = str(minimized.get("replay_command") or data.get("replay_command") or "")
+    else:
+        command = str(data.get("replay_command") or "")
+    command = command.strip()
+    if not command:
+        fail("packet has no replay_command; there is nothing to bisect with")
+    stripped = _CD_PREFIX.sub("", command, count=1)
+    return stripped, str(data.get("commit") or "").strip(), stripped != command
 
 
 def git(repo: pathlib.Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -57,7 +99,10 @@ def git(repo: pathlib.Path, *args: str, check: bool = True) -> subprocess.Comple
 
 
 def rev_parse(repo: pathlib.Path, rev: str) -> str:
-    return git(repo, "rev-parse", "--verify", f"{rev}^{{commit}}").stdout.strip()
+    proc = git(repo, "rev-parse", "--verify", f"{rev}^{{commit}}", check=False)
+    if proc.returncode != 0:
+        fail(f"{rev!r} does not resolve to a commit in {repo}")
+    return proc.stdout.strip()
 
 
 def fail(message: str) -> None:
@@ -282,11 +327,15 @@ def render_markdown(packet: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="git bisect run wrapper that emits an X3 failure packet",
-        usage="bisect_runner.py --good REV --bad REV [--repo PATH] [--timeout SECS] "
-              "[--out DIR] [--json] -- REPRODUCER [ARGS...]",
+        usage="bisect_runner.py --good REV [--bad REV | --packet FILE] [--repo PATH] "
+              "[--timeout SECS] [--out DIR] [--json] -- REPRODUCER [ARGS...]",
     )
     parser.add_argument("--good", required=False, help="known-good revision")
-    parser.add_argument("--bad", required=False, default="HEAD", help="known-bad revision (default HEAD)")
+    parser.add_argument("--bad", required=False, default=None,
+                        help="known-bad revision (default: the packet's commit, else HEAD)")
+    parser.add_argument("--packet",
+                        help="failure packet (x3-failure-packet-v2 or x3-gate-failure-packet-v1) "
+                             "whose replay command and commit seed the search")
     parser.add_argument("--repo", default=".", help="repository to search (default: cwd)")
     parser.add_argument("--timeout", type=float, default=1800.0,
                         help="seconds allowed per reproducer run (default 1800)")
@@ -314,8 +363,29 @@ def main() -> int:
     if not args.good:
         parser.error("--good is required")
     argv = args.repro[1:] if args.repro and args.repro[0] == "--" else args.repro
+    source_packet = None
+    packet_commit = ""
+    if args.packet:
+        if argv:
+            parser.error("pass either --packet or an explicit reproducer after `--`, not both")
+        packet_path = pathlib.Path(args.packet)
+        try:
+            data = json.loads(packet_path.read_text())
+        except OSError as error:
+            print(f"bisect_runner: cannot read packet {packet_path}: {error}", file=sys.stderr)
+            return 2
+        except json.JSONDecodeError as error:
+            fail(f"packet {packet_path} is not valid JSON: {error}")
+        command, packet_commit, cd_stripped = reproducer_from_packet(data)
+        argv = ["bash", "-lc", command]
+        source_packet = {
+            "path": str(packet_path),
+            "schema": str(data.get("schema", "")),
+            "failure_id": str(data.get("failure_id", "")),
+            "cd_prefix_stripped": cd_stripped,
+        }
     if not argv:
-        parser.error("no reproducer given; pass it after `--`")
+        parser.error("no reproducer given; pass it after `--` or seed one with --packet")
 
     repo = pathlib.Path(args.repo).resolve()
     if not git(repo, "rev-parse", "--git-dir", check=False).stdout.strip():
@@ -325,7 +395,7 @@ def main() -> int:
     ensure_clean(repo)
     ensure_no_bisect_in_progress(repo)
     good = rev_parse(repo, args.good)
-    bad = rev_parse(repo, args.bad)
+    bad = rev_parse(repo, args.bad or packet_commit or "HEAD")
     if good == bad:
         fail("--good and --bad resolve to the same commit")
     ensure_ancestor(repo, good, bad)
@@ -333,6 +403,8 @@ def main() -> int:
 
     result = bisect(repo, good, bad, argv, args.timeout)
     packet = build_packet(repo, good, bad, argv, result)
+    if source_packet:
+        packet["source_packet"] = source_packet
 
     if args.out:
         out_dir = pathlib.Path(args.out)
