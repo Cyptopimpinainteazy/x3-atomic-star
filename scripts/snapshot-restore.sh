@@ -84,6 +84,12 @@ import sys
 base = os.path.realpath(sys.argv[1])
 if not Path('/proc').is_dir():
     sys.exit(2)
+for mount in Path('/proc/self/mountinfo').read_text().splitlines():
+    fields = mount.split()
+    if fields[4] == '/proc':
+        options = fields[5].split(',') + fields[-1].split(',')
+        if any(option.startswith('hidepid=') and option != 'hidepid=0' for option in options):
+            sys.exit(2)
 for process in Path('/proc').glob('[0-9]*/cmdline'):
     try:
         args = process.read_bytes().decode(errors='surrogateescape').rstrip('\0').split('\0')
@@ -91,10 +97,8 @@ for process in Path('/proc').glob('[0-9]*/cmdline'):
         continue
     except PermissionError:
         sys.exit(2)
-    if not args or Path(args[0]).name != 'x3-chain-node':
-        continue
     for index, arg in enumerate(args):
-        value = args[index + 1] if arg == '--base-path' and index + 1 < len(args) else None
+        value = args[index + 1] if arg in ('--base-path', '-d') and index + 1 < len(args) else None
         if arg.startswith('--base-path='):
             value = arg.split('=', 1)[1]
         if value is not None:
@@ -127,6 +131,9 @@ do_backup() {
         echo -e "${RED}❌ Validator base path not found: $BASE${NC}"
         exit 1
     fi
+
+    # Give tar a concrete root name even when the operator supplied . or ./.
+    BASE="$(cd "$BASE" && pwd -P)"
 
     check_validator_stopped "$BASE"
 

@@ -8,15 +8,20 @@ import tarfile
 import tempfile
 
 
+class TargetOccupied(Exception):
+    """The requested target, rather than the archive, prevents restoration."""
+
+
 def check_target(target):
     if target.is_symlink() or (target.exists() and
             (not target.is_dir() or any(target.iterdir()))):
-        raise FileExistsError(f"restore target must be an empty directory: {target}")
+        raise TargetOccupied(f"restore target must be an empty directory: {target}")
 
 
 def restore(archive, target):
     target = Path(os.path.abspath(target))
     check_target(target)
+    target_stat = target.stat() if target.exists() else None
     with tarfile.open(archive, "r:gz") as source:
         members = source.getmembers()
         roots = set()
@@ -40,6 +45,11 @@ def restore(archive, target):
             raise ValueError("archive must contain one top-level directory")
         target.parent.mkdir(parents=True, exist_ok=True)
         staging = Path(tempfile.mkdtemp(prefix=".x3-restore-", dir=target.parent))
+        root_member = next((member for member, relative in entries if not relative.parts), None)
+        owner = ((target_stat.st_uid, target_stat.st_gid) if target_stat else
+                 (root_member.uid, root_member.gid) if root_member else (os.getuid(), os.getgid()))
+        root_mode = (target_stat.st_mode & 0o777 if target_stat else
+                     root_member.mode & 0o777 if root_member else 0o700)
         try:
             for member, relative in entries:
                 destination = staging / relative
@@ -50,24 +60,38 @@ def restore(archive, target):
                     with source.extractfile(member) as reader, destination.open("xb") as writer:
                         shutil.copyfileobj(reader, writer)
                     os.chmod(destination, member.mode & 0o777)
+                os.chown(destination, *owner)
+            # Implicit parent directories also belong to the selected validator.
+            for directory, dirs, _ in os.walk(staging):
+                os.chown(directory, *owner)
+                for name in dirs:
+                    os.chown(Path(directory) / name, *owner)
             # Apply directory modes after extraction, children before parents,
             # so read-only archive directories cannot block their own files.
             for member, relative in sorted(entries, key=lambda entry: len(entry[1].parts), reverse=True):
                 if member.isdir():
                     os.chmod(staging / relative, member.mode & 0o777)
+            os.chmod(staging, root_mode)
             check_target(target)
             if target.exists():
                 target.rmdir()
             staging.rename(target)
         finally:
             if staging.exists():
+                # Restore traversal/write permissions before cleanup, including
+                # when archive directories were read-only or inaccessible.
+                os.chmod(staging, 0o700)
+                for directory, dirs, _ in os.walk(staging):
+                    os.chmod(directory, 0o700)
+                    for name in dirs:
+                        os.chmod(Path(directory) / name, 0o700)
                 shutil.rmtree(staging)
 
 
 def main():
     try:
         restore(sys.argv[1], sys.argv[2])
-    except FileExistsError as exc:
+    except TargetOccupied as exc:
         print(f"Restore refused: {exc}", file=sys.stderr)
         return 3
     except (OSError, ValueError, tarfile.TarError, EOFError) as exc:

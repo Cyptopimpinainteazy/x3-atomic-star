@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real archive/filesystem checks for the validator restore command."""
 import io
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -8,8 +9,12 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/snapshot-restore.sh"
+spec = importlib.util.spec_from_file_location('archive_restore', SCRIPT.with_name('snapshot-archive-restore.py'))
+archive_restore = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(archive_restore)
 
 
 class RestoreTests(unittest.TestCase):
@@ -25,9 +30,9 @@ class RestoreTests(unittest.TestCase):
             for name, content, kind in entries:
                 member = tarfile.TarInfo(name)
                 member.mode = 0o600
-                if kind == 'dir':
+                if kind in ('dir', 'readonly-dir'):
                     member.type = tarfile.DIRTYPE
-                    member.mode = 0o700
+                    member.mode = 0o500 if kind == 'readonly-dir' else 0o700
                     archive.addfile(member)
                 elif kind == "link":
                     member.type = tarfile.SYMTYPE
@@ -101,10 +106,55 @@ class RestoreTests(unittest.TestCase):
         self.assertEqual((self.target / 'private').stat().st_mode & 0o777, 0o700)
         self.assertEqual((self.target / 'private/state').stat().st_mode & 0o777, 0o600)
 
-    def test_running_node_for_exact_target_is_refused(self):
+    def test_existing_validator_owner_and_root_mode_are_preserved(self):
+        self.target.mkdir(mode=0o750)
+        before = self.target.stat()
+        self.archive_entries([('old/private', '', 'dir'), ('old/private/state', 'data', 'file')])
+        with patch.object(archive_restore.os, 'chown', wraps=os.chown) as ownership:
+            archive_restore.restore(self.archive, self.target)
+        self.assertTrue(ownership.call_args_list)
+        self.assertTrue(all(call.args[1:] == (before.st_uid, before.st_gid)
+                            for call in ownership.call_args_list))
+        after = self.target.stat()
+        self.assertEqual((after.st_uid, after.st_gid, after.st_mode & 0o777),
+                         (before.st_uid, before.st_gid, 0o750))
+
+    def test_file_directory_collisions_are_corrupt_archives(self):
+        for entries in ([('old/a', 'file', 'file'), ('old/a/sub', 'child', 'file')],
+                        [('old/a/sub', 'child', 'file'), ('old/a', 'file', 'file')]):
+            with self.subTest(entries=entries):
+                self.archive_entries(entries)
+                self.assertEqual(self.run_restore().returncode, 4)
+                self.assertFalse(self.target.exists())
+                self.assertEqual(list(self.root.glob('.x3-restore-*')), [])
+
+    def test_failed_install_cleans_readonly_directories(self):
+        self.archive_entries([('old/private', '', 'readonly-dir'), ('old/private/state', 'data', 'file')])
+        with patch.object(archive_restore.os, 'chmod', wraps=os.chmod) as modes:
+            with patch.object(archive_restore.Path, 'rename', side_effect=OSError('install failed')):
+                with self.assertRaisesRegex(OSError, 'install failed'):
+                    archive_restore.restore(self.archive, self.target)
+        self.assertFalse(self.target.exists())
+        self.assertEqual(list(self.root.glob('.x3-restore-*')), [])
+        self.assertTrue(modes.call_args_list)
+
+    def test_backup_dot_roundtrips_to_requested_target(self):
+        source = self.root / 'source'
+        source.mkdir()
+        (source / 'state').write_text('data')
+        snapshots = self.root / 'snapshots'
+        result = subprocess.run(['bash', str(SCRIPT), 'backup', '.'], cwd=source,
+            env={**os.environ, 'X3_SNAPSHOT_DIR': str(snapshots)},
+            text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.archive = next(snapshots.glob('*.tar.gz'))
+        self.assertEqual(self.run_restore().returncode, 0)
+        self.assertEqual((self.target / 'state').read_text(), 'data')
+
+    def running_target_is_refused(self, option, executable_name='x3-chain-node'):
         process = subprocess.Popen(
-            ['x3-chain-node', '-c', 'import time; print("ready", flush=True); time.sleep(30)',
-             '--base-path', str(self.target)], executable=sys.executable,
+            [executable_name, '-c', 'import time; print("ready", flush=True); time.sleep(30)',
+             option, str(self.target)], executable=sys.executable,
             stdout=subprocess.PIPE, text=True)
         try:
             self.assertEqual(process.stdout.readline().strip(), 'ready')
@@ -116,6 +166,12 @@ class RestoreTests(unittest.TestCase):
             process.kill()
             process.wait(timeout=5)
             process.stdout.close()
+
+    def test_running_node_for_exact_target_is_refused(self):
+        self.running_target_is_refused('--base-path')
+
+    def test_short_option_and_renamed_node_are_refused(self):
+        self.running_target_is_refused('-d', 'renamed-validator')
 
 
 if __name__ == "__main__":
