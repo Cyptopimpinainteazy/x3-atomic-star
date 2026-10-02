@@ -605,6 +605,11 @@ GATES_FAST=(
   "test x3 parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/parity-core/Cargo.toml"
   "test x3 gpu-parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-gpu-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml"
   "test x3-adapters:env CARGO_TARGET_DIR=/tmp/x3-nested-adapters cargo test --locked --all-targets --manifest-path adapters/Cargo.toml"
+  # `tools/tool-validation` is the known-good / known-bad fixture pair external testing tools are
+  # validated against (crash_if_magic.rs fuzz target + FORBIDDEN_TAG helpers). It has two unit
+  # tests that no gate ran, which the repo scanner ratchets as `ungated-crate` — the whole point
+  # of the fixture is that it is itself exercised, so gate it rather than baseline the debt.
+  "test x3-tool-validation:env CARGO_TARGET_DIR=/tmp/x3-nested-tool-validation cargo test --locked --manifest-path tools/tool-validation/Cargo.toml -p x3-tool-validation"
   # `programs/svm/x3_atomic_swap` — the on-chain half of the SVM swap — covers both packages in its
   # workspace. Ten tests pass; the three "ignored" a reader will see in the output are ```` ```ignore ````
   # documentation examples, not disabled tests.
