@@ -6,7 +6,9 @@
 // keeping that storage bounded. Nothing exercised the guard, so a mutation of
 // `current_block > HISTORICAL_PROOF_RETENTION_BLOCKS` to `==` survived the whole suite: with that
 // change the oldest proofs are never evicted after the boundary block. These tests pin the
-// boundary from below and above.
+// boundary from below and above, and pin the bound itself against a key that no live
+// finalization produces — a restored or migrated state can carry one, and it must not leave
+// the window one entry over the documented bound.
 
 use crate::mock::{asset, new_test_ext, register_asset, Test};
 use crate::{CurrentSupplyProof, HistoricalProofs, Pallet, HISTORICAL_PROOF_RETENTION_BLOCKS};
@@ -48,6 +50,52 @@ fn the_proof_window_is_pruned_to_the_retention_boundary() {
         finalize(boundary + 2);
         assert!(!HistoricalProofs::<Test>::contains_key(2));
         assert!(HistoricalProofs::<Test>::contains_key(3));
+    });
+}
+
+/// The window bound must hold even when storage already contains a proof below the first
+/// block a live chain finalizes (a restored snapshot or a migrated state can carry one).
+/// Block 0's proof has fallen out once block `RETENTION` finalizes, so it must be evicted
+/// there and the window must hold exactly `RETENTION` entries — a `current_block > RETENTION`
+/// guard skips that eviction and leaves one entry over the bound.
+#[test]
+fn the_window_bound_holds_even_for_keys_below_the_first_finalized_block() {
+    new_test_ext().execute_with(|| {
+        register_asset(asset(1), 1_000_000, 1_000_000);
+
+        let boundary = HISTORICAL_PROOF_RETENTION_BLOCKS;
+
+        finalize(0);
+        assert!(
+            HistoricalProofs::<Test>::contains_key(0),
+            "block 0 wrote a proof"
+        );
+
+        for block in 1..boundary {
+            finalize(block);
+        }
+        assert!(
+            HistoricalProofs::<Test>::contains_key(0),
+            "nothing falls out until the window is full"
+        );
+        assert_eq!(
+            HistoricalProofs::<Test>::iter().count(),
+            boundary as usize,
+            "the window holds exactly RETENTION entries before the boundary block"
+        );
+
+        finalize(boundary);
+        assert!(
+            !HistoricalProofs::<Test>::contains_key(0),
+            "block 0 falls out when block RETENTION finalizes"
+        );
+        assert_eq!(
+            HistoricalProofs::<Test>::iter().count(),
+            boundary as usize,
+            "the eviction keeps the window at exactly RETENTION entries"
+        );
+        assert!(HistoricalProofs::<Test>::contains_key(1));
+        assert!(HistoricalProofs::<Test>::contains_key(boundary));
     });
 }
 
