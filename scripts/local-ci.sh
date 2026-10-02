@@ -659,6 +659,7 @@ GATES_FAST=(
   # that is not canonical, a pruned anchor, a child trie) are the whole point of
   # it, and each one is a case against a real loopback JSON-RPC server.
   "snapshot export unit tests:python3 tests/test_snapshot_rpc_export.py"
+  "snapshot archive restore tests:python3 tests/test_snapshot_archive_restore.py"
   # The ceremony manifest's operator attestations: SS58 and SCALE decoding, the
   # ed25519 derivation the node's own CLI produces, the threshold rule, and every
   # way a signature can be wrong. The live four-validator half is the
