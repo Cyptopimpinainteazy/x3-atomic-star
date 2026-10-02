@@ -262,7 +262,16 @@ def iter_source_files() -> list[tuple[str, Path]]:
 
 
 def _rg_args() -> list[str]:
-    """rg arguments whose pruning matches `iter_source_files` exactly."""
+    """rg arguments whose pruning matches `iter_source_files` exactly.
+
+    Order matters: ripgrep resolves overlapping globs with *last match wins*,
+    so the exclude globs must come after the source-suffix include globs.
+    With the includes last (the pre-2026-10-02 order) `-g '*.js'` re-included
+    `apps/explorer/node_modules/decimal.js` and friends over
+    `-g '!**/node_modules/**'`, and the marker count depended on whether some
+    earlier gate had run `npm ci` in that worktree — a false red on a box and
+    a false green in a clean checkout for the same tree.
+    """
     args = ["rg", "--no-ignore", "--color", "never", "--no-heading"]
     # rg applies the last matching glob: exclusions must follow inclusions.
     for suffix in sorted(SOURCE_SUFFIXES):
