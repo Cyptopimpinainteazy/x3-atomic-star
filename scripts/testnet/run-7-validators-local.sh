@@ -79,6 +79,7 @@ Options:
   --node-bin PATH     Override NODE_BIN (default: ${NODE_BIN_DEFAULT})
   --log-dir PATH      Override LOG_DIR (default: ${LOG_DIR_DEFAULT})
   --keys-dir PATH     Override KEYS_DIR (default: ${KEYS_DIR})
+  --only N            Restart only validator N, leaving its peers running.
   -h, --help          Show this help.
 EOF
 }
@@ -127,6 +128,15 @@ done
 
 PID_DIR="${PID_DIR:-$BASE_DIR/pids}"
 CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN:-$BASE_DIR/chain-spec.json}"
+
+if ! [[ "$ONLY_INDEX" =~ ^[0-9]+$ ]] || [[ "$ONLY_INDEX" -gt "$COUNT" ]]; then
+  echo "--only takes a validator index between 1 and ${COUNT} (got: ${ONLY_INDEX})" >&2
+  exit 2
+fi
+if [[ "$ONLY_INDEX" != "0" && "$WIPE_BASE_DIR" == "1" ]]; then
+  echo "--only cannot be combined with --wipe: restarting one validator must preserve its peers." >&2
+  exit 2
+fi
 
 stop_nodes() {
   if [[ ! -d "$PID_DIR" ]]; then
@@ -494,7 +504,7 @@ wait_for_rpc() {
   # drill, say) have taken longer than a minute. The wait is still bounded, and the
   # message below says which port never answered.
   for _ in $(seq 1 180); do
-    if curl -s -H "Content-Type: application/json" \
+    if curl -s --connect-timeout 2 --max-time 5 -H "Content-Type: application/json" \
       -d '{"jsonrpc":"2.0","id":1,"method":"system_health","params":[]}' \
       "http://127.0.0.1:${rpc_port}" | grep -q '"isSyncing"'; then
       return 0
@@ -651,11 +661,17 @@ start_node() {
 }
 
 echo "Starting node 1 (bootnode)..."
-start_node 1
+if [[ "$ONLY_INDEX" == "0" || "$ONLY_INDEX" == "1" ]]; then
+  start_node 1
+  if [[ "$ONLY_INDEX" == "1" ]]; then
+    echo "Node 1 is back."
+    exit 0
+  fi
+fi
 
 peer_id=""
 for _ in $(seq 1 60); do
-  peer_id="$(curl -s -H "Content-Type: application/json" \
+  peer_id="$(curl -s --connect-timeout 2 --max-time 5 -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","id":1,"method":"system_localPeerId","params":[]}' \
     "http://127.0.0.1:${RPC_BASE}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
   if [[ -n "$peer_id" ]]; then

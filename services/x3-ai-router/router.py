@@ -1186,9 +1186,28 @@ def coerce_plan(candidate):
 class Router:
     def __init__(self, config, db_path):
         self.config = config
-        self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.lock = threading.Lock()
         self.context = threading.local()
+        self.db = None
+        self.reconciled_orphans = 0
+        self.capabilities = {}
+        # SQLite creates the file, but cannot create its parent directories.
+        # Preserve special in-memory databases used by embedded callers/tests.
+        db_path = os.fsdecode(db_path)
+        try:
+            if db_path and db_path != ":memory:":
+                parent = os.path.dirname(os.path.abspath(db_path))
+                os.makedirs(parent, exist_ok=True)
+            self.db = sqlite3.connect(db_path, check_same_thread=False)
+            self.initialize_database()
+            self.reconcile_reservations()
+        except (OSError, sqlite3.Error) as exc:
+            if self.db is not None:
+                self.db.close()
+            raise RuntimeError(f"Could not initialize router database {db_path!r}: {exc}") from exc
+
+    def initialize_database(self):
+        """Create tables and migrate older router databases on startup."""
         self.db.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT, agent TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL)")
         if "task_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(usage)")}:
             self.db.execute("ALTER TABLE usage ADD COLUMN task_id TEXT")
@@ -1212,9 +1231,6 @@ class Router:
             "input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, cost_usd REAL DEFAULT 0, "
             "PRIMARY KEY (provider, model))")
         self.db.commit()
-        self.reconciled_orphans = 0
-        self.capabilities = {}
-        self.reconcile_reservations()
 
     def choose(self, request):
         """Pick the tier, the provider order, and the reasoning behind them.

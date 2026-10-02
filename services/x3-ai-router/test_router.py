@@ -46,6 +46,47 @@ class Provider(BaseHTTPRequestHandler):
         pass
 
 
+class DatabaseStartupTests(unittest.TestCase):
+    def test_creates_nested_parent_and_preserves_usage_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state" / "router" / "usage.sqlite3"
+            router = router_module.Router({}, path)
+            router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
+                              ("2026-10-01", "alice", 0.25))
+            router.db.commit()
+            router.db.close()
+            restarted = router_module.Router({}, path)
+            try:
+                self.assertEqual(restarted.db.execute("SELECT agent, cost_usd FROM usage").fetchall(),
+                                 [("alice", 0.25)])
+            finally:
+                restarted.db.close()
+
+    def test_memory_database_remains_supported(self):
+        router = router_module.Router({}, ":memory:")
+        try:
+            self.assertEqual(router.db.execute("PRAGMA database_list").fetchone()[2], "")
+        finally:
+            router.db.close()
+
+    def test_parent_file_reports_database_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "file"
+            parent.write_text("keep me", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, parent / "usage.sqlite3")
+            self.assertIn(str(parent), str(failure.exception))
+            self.assertEqual(parent.read_text(encoding="utf-8"), "keep me")
+
+    def test_invalid_database_reports_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "usage.sqlite3"
+            path.write_bytes(b"not a sqlite database")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, path)
+            self.assertIn(str(path), str(failure.exception))
+
+
 class RouterTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
