@@ -9,7 +9,7 @@
 // boundary from below and above.
 
 use crate::mock::{asset, new_test_ext, register_asset, Test};
-use crate::{HistoricalProofs, Pallet, HISTORICAL_PROOF_RETENTION_BLOCKS};
+use crate::{CurrentSupplyProof, HistoricalProofs, Pallet, HISTORICAL_PROOF_RETENTION_BLOCKS};
 use frame_support::traits::Hooks;
 
 /// Finalize a block the way the runtime would.
@@ -48,5 +48,32 @@ fn the_proof_window_is_pruned_to_the_retention_boundary() {
         finalize(boundary + 2);
         assert!(!HistoricalProofs::<Test>::contains_key(2));
         assert!(HistoricalProofs::<Test>::contains_key(3));
+    });
+}
+
+/// The proof is stamped with the block that built it. `current_timestamp` reads the block
+/// number, but nothing asserted the stored `timestamp`, so replacing its body with 0 or 1
+/// survived the suite; two different blocks must stamp two different values.
+#[test]
+fn the_supply_proof_is_stamped_with_the_block_number() {
+    new_test_ext().execute_with(|| {
+        register_asset(asset(1), 1_000_000, 1_000_000);
+
+        frame_system::Pallet::<Test>::set_block_number(7);
+        finalize(7);
+        let proof = CurrentSupplyProof::<Test>::get().expect("block 7 wrote a proof");
+        assert_eq!(proof.block_number, 7, "the proof names its own block");
+        assert_eq!(
+            proof.timestamp, 7,
+            "the timestamp is the finalized block number"
+        );
+
+        frame_system::Pallet::<Test>::set_block_number(9);
+        finalize(9);
+        let proof = CurrentSupplyProof::<Test>::get().expect("block 9 wrote a proof");
+        assert_eq!(
+            proof.timestamp, 9,
+            "a different block stamps a different value"
+        );
     });
 }

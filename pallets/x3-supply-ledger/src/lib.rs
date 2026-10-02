@@ -38,9 +38,13 @@ mod tests_conservation;
 #[cfg(test)]
 mod tests_halt;
 #[cfg(test)]
-mod tests_s0_1;
+mod tests_public_api;
 #[cfg(test)]
 mod tests_retention;
+#[cfg(test)]
+mod tests_s0_1;
+#[cfg(test)]
+mod tests_weights;
 
 #[frame_support::pallet]
 pub mod pallet {

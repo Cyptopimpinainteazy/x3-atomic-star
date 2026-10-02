@@ -56,7 +56,28 @@ campaign over `pallet-x3-supply-ledger` — the pallet that enforces the king
 invariant. Every surviving mutant is a behaviour change no test observed; the
 first campaign (2026-10-02) found two survivors in the `on_finalize` proof
 pruning guard that the whole suite missed, now pinned by `tests_retention.rs`
-(#576). A full campaign is minutes of parallel cargo builds, so it is opt-in like
+(#576).
+
+The campaign compiles the pallet with `runtime-benchmarks`
+(`X3_MUTANTS_FEATURES`). `benchmarking.rs` is
+`#![cfg(feature = "runtime-benchmarks")]`; without the feature the module is not
+in the test build at all, so mutants there can only "survive" — mutations of code
+no test compiles (6 of them in the second campaign). With the feature, the
+benchmark helper mutation is caught and bodies erased to `Ok(())` no longer
+compile (UNVIABLE): the erasure removes the `#[extrinsic_call]` the macro needs.
+
+The second campaign (#577) produced the first honest survivorship picture at
+`241264807`: of 125 mutants, 33 survived the whole suite — constant bodies for the
+nonce/metadata/policy queries, `current_timestamp`, `ledger` and `is_halted`; the
+`DomainId::X3Svm` arm of `domain_slot_mut`; the `SupplyLedgerGovern` mint/burn
+shims; a zero merkle combinator; and every `WeightInfo` body (a zero weight is a
+free extrinsic). All 33 are now resolved: 28 pinned by tests and 5 body-erasures
+that do not compile under the gate's feature set. The pins live in
+`tests_public_api.rs`, `tests_weights.rs` (`every_dispatch_weight_is_nonzero`),
+and additions to `tests_conservation.rs`, `tests_retention.rs` and
+`supply_verification.rs`.
+
+A full campaign is tens of minutes of parallel cargo builds, so it is opt-in like
 `--loom`/`--fuzz`; `X3_MUTANTS_JOBS` (default 4) and `X3_MUTANTS_TIMEOUT`
 (default 600s, generous enough that build contention under `--jobs` cannot turn a
 caught mutant into a build timeout) tune it. The suite runs under

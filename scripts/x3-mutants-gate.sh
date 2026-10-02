@@ -39,6 +39,12 @@ TIMEOUT="${X3_MUTANTS_TIMEOUT:-600}"
 # cargo-mutants has no flag to pass a nextest profile, but nextest reads this
 # env var in the child process. The profile is defined in .config/nextest.toml.
 NEXTEST_PROFILE="${X3_MUTANTS_NEXTEST_PROFILE:-mutants}"
+# `benchmarking.rs` is `#![cfg(feature = "runtime-benchmarks")]`. Without the feature the
+# module is not in the test build at all, so cargo-mutants "tests" mutated benchmark bodies
+# that cannot run: they survive as no-ops and masquerade as survivors (observed 2026-10-02:
+# 6 mutants in benchmarking.rs). Enabling the feature compiles the module and lets
+# `impl_benchmark_test_suite!` execute the benchmarks, so those mutants get a real trial.
+FEATURES="${X3_MUTANTS_FEATURES:-runtime-benchmarks}"
 
 if ! cargo mutants --version >/dev/null 2>&1; then
   echo "x3-mutants: cargo-mutants is not installed (cargo install cargo-mutants --locked)"
@@ -53,8 +59,8 @@ fi
 
 rc=0
 for package in "${PACKAGES[@]}"; do
-  echo "x3-mutants: cargo mutants -p $package (jobs=$JOBS, timeout=${TIMEOUT}s, test-tool=nextest profile=$NEXTEST_PROFILE)"
-  if ! NEXTEST_PROFILE="$NEXTEST_PROFILE" cargo mutants -p "$package" --jobs "$JOBS" --timeout "$TIMEOUT" --test-tool nextest; then
+  echo "x3-mutants: cargo mutants -p $package (features=$FEATURES, jobs=$JOBS, timeout=${TIMEOUT}s, test-tool=nextest profile=$NEXTEST_PROFILE)"
+  if ! NEXTEST_PROFILE="$NEXTEST_PROFILE" cargo mutants -p "$package" --features "$FEATURES" --jobs "$JOBS" --timeout "$TIMEOUT" --test-tool nextest; then
     echo "x3-mutants: survivors or campaign failure in $package (see mutants.out/)"
     rc=1
   fi
