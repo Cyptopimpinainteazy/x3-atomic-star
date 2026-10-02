@@ -405,6 +405,7 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
 
     started = time.time()
     start_head = rpc.call("chain_getFinalizedHead", [])
+    start_number = read_header_number(rpc, start_head, "start.number")
 
     if args.at:
         anchor = read_anchor(rpc, args.at)
@@ -487,7 +488,7 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
         "source_spec": args.from_spec,
         "spec": args.out,
         "node_was_never_stopped": True,
-        "finalized_head_before": read_header_number(rpc, start_head, "start.number"),
+        "finalized_head_before": start_number,
         "finalized_head_after": end_number,
         "finalized_head_advanced_by": None,
         "elapsed_seconds": round(time.time() - started, 3),
@@ -497,7 +498,7 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
         report["finalized_head_after"] - report["finalized_head_before"]
     )
     # Finish every RPC check before replacing either artifact. An endpoint that
-    # loses the start header during the final report read must preserve old data.
+    # loses the end header during the final report read must preserve old data.
     write_json(args.out, spec, args.force)
     if args.report:
         write_json(args.report, report, args.force)

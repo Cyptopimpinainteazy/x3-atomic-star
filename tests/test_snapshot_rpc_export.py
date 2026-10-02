@@ -328,7 +328,7 @@ class ExportCase(unittest.TestCase):
             def header(self, block_hash):
                 if self.finishing:
                     self.finishing_reads += 1
-                    if self.finishing_reads == 2:
+                    if self.finishing_reads == 1:
                         return None
                 return super().header(block_hash)
 
@@ -340,6 +340,29 @@ class ExportCase(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(spec.read_text(), "old snapshot")
         self.assertEqual(report.read_text(), "old report")
+
+    def test_report_does_not_reread_pruned_start_header(self):
+        class PruningChain(Chain):
+            finished = False
+            start = None
+
+            def dispatch(self, method, params):
+                if method == 'chain_getFinalizedHead' and self.start is None:
+                    self.start = self.hash_at(self.height)
+                if method == 'state_getRuntimeVersion':
+                    self.finished = True
+                    self.height += 1
+                return super().dispatch(method, params)
+
+            def header(self, block_hash):
+                if self.finished and block_hash == self.start:
+                    return None
+                return super().header(block_hash)
+
+        code, spec, report = self.run_export(PruningChain())
+        self.assertEqual(code, 0)
+        self.assertTrue(spec.exists())
+        self.assertEqual(json.loads(report.read_text())['finalized_head_advanced_by'], 1)
 
     def test_export_writes_the_served_state_and_the_chains_anchor(self) -> None:
         chain = Chain(height=4, state={"0x01": "0xaa", "0x02": "0xbb", "0x03": "0x"})
