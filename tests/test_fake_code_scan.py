@@ -41,7 +41,27 @@ class CheatScannerTests(unittest.TestCase):
             ("skip", "tests/feature.py"), ("skip", "tests/feature.ts"), ("skip", "tests/live.rs")])
 
     def test_python_fallback_matches_rg_detection(self):
+        self.assertIsNotNone(scanner.shutil.which('rg'), 'Install rg to verify both scan paths')
         self.assertEqual(self.findings(), self.findings(fallback=True))
+
+    def test_installed_dependencies_and_build_outputs_are_excluded(self):
+        self.assertIsNotNone(scanner.shutil.which('rg'), 'Install rg to verify glob exclusions')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in scanner.PRUNE_DIR_NAMES - {'.git'}:
+                path = root / 'apps' / 'wallet' / name / 'dependency.js'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('// TO' + 'DO dependency\n' + 'test.sk' + "ip('dependency')\n")
+            source = root / 'src' / 'feature.js'
+            source.parent.mkdir()
+            source.write_text('// TO' + 'DO project\n')
+            with patch.object(scanner, 'REPO_ROOT', root):
+                for scan in (scanner.scan_stubs, scanner.scan_cheats):
+                    actual = scan()
+                    with patch.object(scanner.shutil, 'which', return_value=None):
+                        fallback = scan()
+                    self.assertEqual(actual, fallback)
+                    self.assertTrue(all(f['path'] == 'src/feature.js' for f in actual))
 
 
 if __name__ == "__main__":

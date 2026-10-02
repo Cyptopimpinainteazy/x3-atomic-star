@@ -726,6 +726,7 @@ class ProtocolTests(unittest.TestCase):
     def test_malformed_choices_fail_closed_without_booking_success(self):
         for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}],
                         [{"message": {}}], [{"message": {"role": "assistant", "content": 123}}],
+                        [{"message": {"role": "assistant", "refusal": 123}}],
                         [{"message": {"role": "assistant", "tool_calls": "invalid"}}],
                         [{"message": {"role": "assistant", "tool_calls": [{}]}}],
                         [{"message": {"role": "user", "content": "wrong role"}}]):
@@ -748,7 +749,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_provider_recovers_after_persisted_cooldown_and_router_restart(self):
         self.config["retry_attempts"] = 0
-        self.config["provider_cooldown_seconds"] = 0.5
+        self.config["provider_cooldown_seconds"] = 2
         self.config["providers"]["backup"] = {**self.config["providers"]["up"], "model": "backup"}
         self.config["routes"]["routine"] = ["up", "backup"]
         healthy = False
@@ -779,7 +780,7 @@ class ProtocolTests(unittest.TestCase):
         status, response = self.router.complete(request, "alice")
         self.assertEqual((status, response["model"]), (200, "backup"))
         self.assertEqual([r["model"] for r in ScriptedProvider.requests[count:]], ["backup"])
-        deadline = time.monotonic() + 2
+        deadline = time.monotonic() + 5
         while self.router.provider_cooldown("up") > 0 and time.monotonic() < deadline:
             time.sleep(0.01)
         self.assertEqual(self.router.provider_cooldown("up"), 0)

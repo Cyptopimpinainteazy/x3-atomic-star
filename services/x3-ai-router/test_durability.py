@@ -22,7 +22,7 @@ import importlib.util, sys
 spec = importlib.util.spec_from_file_location("router", sys.argv[1])
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
-router = module.Router({}, sys.argv[2])
+router = module.Router({"provider_cooldown_seconds": 3600}, sys.argv[2])
 router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
                   ("2026-10-01", "committed", 0.25))
 router.db.commit()

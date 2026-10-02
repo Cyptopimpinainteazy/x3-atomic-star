@@ -134,6 +134,11 @@ done
 
 PID_DIR="${PID_DIR:-$BASE_DIR/pids}"
 CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN:-$BASE_DIR/chain-spec.json}"
+RPC_READY_TIMEOUT_SECONDS="${RPC_READY_TIMEOUT_SECONDS:-180}"
+if ! [[ "$RPC_READY_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "RPC_READY_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+fi
 
 if ! [[ "$COUNT" =~ ^[1-7]$ ]]; then
   echo "COUNT must be between 1 and 7 (got: ${COUNT})" >&2
@@ -157,8 +162,54 @@ if [[ "$ONLY_INDEX" != "0" ]]; then
   if [[ -f "$target_pid_file" ]]; then
     target_pid="$(cat "$target_pid_file")"
     if [[ "$target_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$target_pid" 2>/dev/null; then
-      echo "Validator ${ONLY_INDEX} PID ${target_pid} is still running; stop it before restarting." >&2
-      exit 2
+      # A crashed node's numeric PID can be reused by an unrelated process.
+      python3 - "$target_pid" "$BASE_DIR/node-$ONLY_INDEX" "$NODE_BIN" <<'PY'
+import os
+from pathlib import Path
+import sys
+process = None
+# /proc may be mounted from an ancestor PID namespace. Match the caller's
+# namespace and namespace-local PID instead of assuming directory names agree.
+namespace = os.readlink('/proc/self/ns/pid')
+inaccessible = False
+for candidate in Path('/proc').glob('[0-9]*'):
+    try:
+        status = (candidate / 'status').read_text()
+        local_pid = next(line.split()[-1] for line in status.splitlines() if line.startswith('NSpid:'))
+        if local_pid != sys.argv[1]:
+            continue
+        if os.readlink(candidate / 'ns/pid') == namespace:
+            process = candidate
+            break
+    except FileNotFoundError:
+        continue
+    except (OSError, StopIteration) as exc:
+        inaccessible = True
+if process is None:
+    if inaccessible:
+        print('Cannot verify restart PID identity: process information inaccessible', file=sys.stderr)
+        sys.exit(2)
+    sys.exit(0)
+try:
+    args = (process / 'cmdline').read_bytes().decode(errors='surrogateescape').rstrip('\0').split('\0')
+except FileNotFoundError:
+    sys.exit(0)
+except OSError as exc:
+    print(f'Cannot verify restart PID identity: {exc}', file=sys.stderr)
+    sys.exit(2)
+if not args or Path(args[0]).name != Path(sys.argv[3]).name:
+    sys.exit(0)
+for index, arg in enumerate(args):
+    value = args[index + 1] if arg == '--base-path' and index + 1 < len(args) else None
+    if arg.startswith('--base-path='):
+        value = arg.split('=', 1)[1]
+    if value is not None:
+        if not os.path.isabs(value):
+            value = str(process / 'cwd' / value)
+        if os.path.realpath(value) == os.path.realpath(sys.argv[2]):
+            print(f'Validator PID {sys.argv[1]} is still running; stop it before restarting.', file=sys.stderr)
+            sys.exit(2)
+PY
     fi
   fi
   python3 - "$((RPC_BASE + ONLY_INDEX - 1))" <<'PY'
