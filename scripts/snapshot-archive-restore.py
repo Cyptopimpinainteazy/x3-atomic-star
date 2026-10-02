@@ -21,6 +21,7 @@ def restore(archive, target):
         members = source.getmembers()
         roots = set()
         entries = []
+        seen = set()
         for member in members:
             path = PurePosixPath(member.name)
             if path.is_absolute() or ".." in path.parts or not path.parts:
@@ -31,6 +32,9 @@ def restore(archive, target):
             relative = Path(*path.parts[1:])
             if not path.parts[1:] and not member.isdir():
                 raise ValueError("archive must contain one top-level directory")
+            if relative in seen:
+                raise ValueError(f"duplicate archive path: {member.name}")
+            seen.add(relative)
             entries.append((member, relative))
         if len(roots) != 1:
             raise ValueError("archive must contain one top-level directory")
@@ -46,6 +50,11 @@ def restore(archive, target):
                     with source.extractfile(member) as reader, destination.open("xb") as writer:
                         shutil.copyfileobj(reader, writer)
                     os.chmod(destination, member.mode & 0o777)
+            # Apply directory modes after extraction, children before parents,
+            # so read-only archive directories cannot block their own files.
+            for member, relative in sorted(entries, key=lambda entry: len(entry[1].parts), reverse=True):
+                if member.isdir():
+                    os.chmod(staging / relative, member.mode & 0o777)
             check_target(target)
             if target.exists():
                 target.rmdir()

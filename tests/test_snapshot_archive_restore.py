@@ -25,7 +25,11 @@ class RestoreTests(unittest.TestCase):
             for name, content, kind in entries:
                 member = tarfile.TarInfo(name)
                 member.mode = 0o600
-                if kind == "link":
+                if kind == 'dir':
+                    member.type = tarfile.DIRTYPE
+                    member.mode = 0o700
+                    archive.addfile(member)
+                elif kind == "link":
                     member.type = tarfile.SYMTYPE
                     member.linkname = str(self.root / "neighbor")
                     archive.addfile(member)
@@ -83,6 +87,19 @@ class RestoreTests(unittest.TestCase):
         self.assertEqual(self.run_restore().returncode, 3)
         self.assertTrue(self.target.is_symlink())
         self.assertEqual(list(neighbor.iterdir()), [])
+
+    def test_duplicate_file_is_corrupt_archive_and_preserves_empty_target(self):
+        self.target.mkdir()
+        self.archive_entries([('old/state', 'first', 'file'), ('old/state', 'second', 'file')])
+        self.assertEqual(self.run_restore().returncode, 4)
+        self.assertEqual(list(self.target.iterdir()), [])
+        self.assertEqual(list(self.root.glob('.x3-restore-*')), [])
+
+    def test_directory_and_file_permissions_are_preserved(self):
+        self.archive_entries([('old/private', '', 'dir'), ('old/private/state', 'data', 'file')])
+        self.assertEqual(self.run_restore().returncode, 0)
+        self.assertEqual((self.target / 'private').stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.target / 'private/state').stat().st_mode & 0o777, 0o600)
 
     def test_running_node_for_exact_target_is_refused(self):
         process = subprocess.Popen(
