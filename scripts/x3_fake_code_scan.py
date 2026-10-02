@@ -250,14 +250,15 @@ def iter_source_files() -> list[tuple[str, Path]]:
 def _rg_args() -> list[str]:
     """rg arguments whose pruning matches `iter_source_files` exactly."""
     args = ["rg", "--no-ignore", "--color", "never", "--no-heading"]
+    # rg applies the last matching glob: exclusions must follow inclusions.
+    for suffix in sorted(SOURCE_SUFFIXES):
+        args += ["-g", f"*{suffix}"]
     for rel in sorted(SELF_EXCLUDES):
         args += ["-g", f"!{rel}"]
     for name in sorted(PRUNE_DIR_NAMES):
         args += ["-g", f"!**/{name}/**"]
     for prefix in PRUNE_DIR_PREFIXES:
         args += ["-g", f"!**/{prefix}*/**"]
-    for suffix in sorted(SOURCE_SUFFIXES):
-        args += ["-g", f"*{suffix}"]
     return args
 
 
@@ -464,6 +465,11 @@ def scan_cheats() -> list[dict[str, object]]:
         if line.lstrip().startswith(("//", "/*", "*")):
             # A commented-out assertion is not an assertion. Rust `#[ignore]`
             # arrives as `#...`, so this does not hide the skip class.
+            continue
+        # A leading hash is a comment in shell/Python files, but a Rust
+        # attribute can disable an executable test. Keep Rust attributes visible.
+        if (Path(rel).suffix in {".py", ".sh"}
+                and line.lstrip().startswith("#")):
             continue
         in_tests = rel in test_files
         kind = None
