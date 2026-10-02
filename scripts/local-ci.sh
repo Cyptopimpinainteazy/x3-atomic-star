@@ -12,6 +12,7 @@
 #   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
+#   scripts/local-ci.sh --fuzz          # + the cargo-fuzz gate (needs a nightly toolchain)
 #   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --testnet       # + the testnet ceremony drill (records and verifies a launch)
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
@@ -117,6 +118,7 @@ RUN_RELEASE=0
 RUN_VARIANTS=0
 RUN_DEEP=0
 RUN_LOOM=0
+RUN_FUZZ=0
 RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
@@ -144,8 +146,9 @@ while [ "$#" -gt 0 ]; do
     --soak) RUN_SOAK=1 ;;
     --rotation) RUN_ROTATION=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
     --loom) RUN_LOOM=1 ;;
+    --fuzz) RUN_FUZZ=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -977,6 +980,18 @@ GATES_LOOM=(
   "loom concurrency tests:bash scripts/run-loom-tests.sh"
 )
 
+# External-toolchain fuzzing. Opt-in like `--loom`, and for the same reason: it
+# needs a nightly toolchain (cargo-fuzz passes -Zsanitizer, which stable
+# rejects) and it compiles with ASAN. The gate does two bounded things: it builds
+# and runs the X3-language fuzz targets, and it proves the toolchain actually
+# detects a defect before we trust it on real code (a known-good fixture must
+# stay clean and a deliberately-broken one must crash). Until this gate, 98 fuzz
+# targets existed and none of them had ever been executed by anything. A box
+# without the nightly reports BLOCKED, which is the honest answer.
+GATES_FUZZ=(
+  "fuzz x3-language and detection:bash scripts/external-toolchain/fuzz-gate.sh"
+)
+
 # What the consensus network does when validators die. Opt-in and separate from
 # `--live` because it boots four to seven validators, kills a minority and then a
 # supermajority-breaking number, and restarts them: finality must continue in the
@@ -1100,6 +1115,8 @@ describe_all() {
   printf '  - %s\n' "${GATES_VARIANTS[@]%%:*}"
   echo "loom gates (--loom, also implied by --all):"
   printf '  - %s\n' "${GATES_LOOM[@]%%:*}"
+  echo "fuzz gates (--fuzz, also implied by --all; needs a nightly toolchain):"
+  printf '  - %s\n' "${GATES_FUZZ[@]%%:*}"
   echo
   echo "failure drills (--failure, also implied by --all):"
   printf '  - %s\n' "${GATES_FAILURE[@]%%:*}"
@@ -1178,6 +1195,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_SOAK" = 1 ] && for spec in "${GATES_SOAK[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_FUZZ" = 1 ] && for spec in "${GATES_FUZZ[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
 if [ -n "$ONLY" ]; then
@@ -1310,7 +1328,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM fuzz=$RUN_FUZZ failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the
@@ -1345,6 +1363,19 @@ run_gate() {
     if grep -qE "Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency|you're using offline mode|toolchain '[^']*' is not installed" "$gate_log"; then
       status=BLOCKED
       reason=network
+    # A required external tool (cargo-fuzz) or an uninstalled rustup target is
+    # the same kind of gap as a missing toolchain: nothing ran, so nothing was
+    # verified. Classified separately so the failure line names the real cause
+    # instead of blaming the network.
+    elif grep -qE "cargo-fuzz is not installed|target '[^']*' is not installed for" "$gate_log"; then
+      status=BLOCKED
+      reason=tool-missing
+    # A heavy ASAN build killed by memory pressure (systemd-oomd) is not a code
+    # diagnostic either. The gate names it explicitly so it is classified here
+    # instead of reading as a defect in the change under test.
+    elif grep -qE "fuzz build was terminated" "$gate_log"; then
+      status=BLOCKED
+      reason=resource
     # This box periodically rewrites ~/.rustup / ~/.cargo and loses files under
     # the shared target dir mid-build (see #330 and the header of this script).
     # The named path exists again moments later — this is not a diagnostic
@@ -1383,6 +1414,12 @@ run_gate() {
       "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   elif [ "$status" = "BLOCKED" ] && [ "$reason" = "environment" ]; then
     printf 'BLOCKED %-31s %ss — this box lost rustc/cargo or a target-dir file mid-build; not a code diagnostic (%s)\n' \
+      "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
+  elif [ "$status" = "BLOCKED" ] && [ "$reason" = "tool-missing" ]; then
+    printf 'BLOCKED %-31s %ss — a required external tool is not installed; nothing verified (%s)\n' \
+      "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
+  elif [ "$status" = "BLOCKED" ] && [ "$reason" = "resource" ]; then
+    printf 'BLOCKED %-31s %ss — the build was killed under memory pressure; nothing verified (%s)\n' \
       "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   elif [ "$status" = "BLOCKED" ]; then
     printf 'BLOCKED %-31s %ss — environment could not fetch dependencies; nothing verified (%s)\n' \

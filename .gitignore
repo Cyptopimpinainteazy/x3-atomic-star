@@ -1,5 +1,9 @@
 Build artifacts
 target/
+# Dedicated target dir for the nightly/ASAN cargo-fuzz gate. Keeping nightly
+# artifacts out of the shared target/ is deliberate: mixing them makes the next
+# stable gate fail with "compiled by an incompatible version of rustc".
+/target-fuzz/
 /bin/x3-chain-node-fresh
 *.wasm
 *.o

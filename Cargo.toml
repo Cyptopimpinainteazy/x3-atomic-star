@@ -37,6 +37,11 @@ exclude = [
     # than green. This was the last entry in
     # `.ai/workspace-membership-baseline.txt`.
     "tests/loom-concurrency",
+    # External-toolchain validation fixtures: a standalone workspace holding an
+    # intentionally-defective (and a known-good) fixture used to prove that
+    # testing tools actually detect defects before we trust them on X3 code.
+    # See scripts/external-toolchain/validate-fuzz-detection.sh.
+    "tools/tool-validation",
 ]
 members = [
     "pallets/x3-kernel",
