@@ -243,6 +243,15 @@ GATES_FAST=(
   # modules counted as production and the release gate read 570 against a 516
   # baseline. This pins the classification and the empty result for runtime/src.
   "panic scan self-test:python3 scripts/audit/panic_unwrap_self_test.py"
+  # The verification harness (Kani, Miri, Shuttle, sanitizers, cargo-mutants)
+  # used to end every section with `|| echo "FAILED"` and exit 0, so a run
+  # where every tool failed still read as "harness complete" to anything
+  # checking the status. This pins the honest classification: all pass -> 0,
+  # a failing tool -> 1, a tool that is missing -> 2 (BLOCKED, skip loudly),
+  # and a failure does not hide the sections after it. The full harness stays
+  # operator-invoked (it compiles with Kani/Miri and takes hours); this gate
+  # covers the contract that makes its exit status worth reading.
+  "verification harness self-test:bash scripts/x3-verification-harness.sh --self-test"
   # The two detectors `AGENTS.md` names under "Forbidden" had never completed: they walked build
   # output and vendored trees (`x3fronend/out/_next`, `*/node_modules`, a `.wt-*` worktree's
   # `tauri-vendor/cc`) and died at the 240 s timeout, so a mandated check read as satisfied while it
