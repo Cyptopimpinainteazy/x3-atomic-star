@@ -155,6 +155,80 @@ class BisectFixture(unittest.TestCase):
 
     # ── hung reproducer ──────────────────────────────────────────────────
 
+    # ── failure-packet input ─────────────────────────────────────────────
+
+    def write_packet(self, packet: dict) -> str:
+        path = pathlib.Path(self.tmp.name) / "packet.json"
+        path.write_text(json.dumps(packet))
+        return str(path)
+
+    def test_a_gate_packet_seeds_the_search(self):
+        # The gate wrapper's packets replay with `cd <original-root> && …`;
+        # that prefix must be stripped or every probe would run in the
+        # original checkout instead of the commit under test.
+        packet = self.write_packet({
+            "schema": "x3-gate-failure-packet-v1",
+            "failure_id": "deadbeefdeadbeef",
+            "commit": self.head,
+            "replay_command": (
+                f"cd '{self.repo}' && {sys.executable} -c "
+                "\"import sys; sys.exit(0 if open('version.txt').read().strip() != 'broken' else 1)\""
+            ),
+        })
+        result = self.run_tool("--good", "master~4", "--packet", packet, "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out = json.loads(result.stdout)
+        self.assertEqual(out["first_bad_commit"], self.bad_sha)
+        self.assertEqual(out["bad_requested"], self.head)
+        self.assertEqual(out["source_packet"]["failure_id"], "deadbeefdeadbeef")
+        self.assertTrue(out["source_packet"]["cd_prefix_stripped"])
+
+    def test_a_sim_packet_prefers_the_minimized_reproducer(self):
+        # replay_command passes everywhere; only the minimized form
+        # distinguishes the ends. If the tool used the wrong one, the
+        # endpoint verification would refuse the search.
+        packet = self.write_packet({
+            "schema": "x3-failure-packet-v2",
+            "commit": self.head,
+            "replay_command": f"{sys.executable} -c \"import sys; sys.exit(0)\"",
+            "minimized": {"replay_command": (
+                f"{sys.executable} -c "
+                "\"import sys; sys.exit(0 if open('version.txt').read().strip() != 'broken' else 1)\""
+            )},
+        })
+        result = self.run_tool("--good", "master~4", "--packet", packet, "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["first_bad_commit"], self.bad_sha)
+
+    def test_packet_without_a_replay_command_is_refused(self):
+        packet = self.write_packet({
+            "schema": "x3-gate-failure-packet-v1",
+            "commit": self.head,
+        })
+        result = self.run_tool("--good", "master~4", "--packet", packet)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no replay_command", result.stderr)
+
+    def test_unknown_packet_schema_is_refused(self):
+        packet = self.write_packet({
+            "schema": "x3-failure-packet-v9",
+            "commit": self.head,
+            "replay_command": "true",
+        })
+        result = self.run_tool("--good", "master~4", "--packet", packet)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not one this tool understands", result.stderr)
+
+    def test_a_packet_commit_missing_from_the_repo_is_refused(self):
+        packet = self.write_packet({
+            "schema": "x3-gate-failure-packet-v1",
+            "commit": "0" * 40,
+            "replay_command": "true",
+        })
+        result = self.run_tool("--good", "master~4", "--packet", packet)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("does not resolve", result.stderr)
+
     def test_a_hung_reproducer_aborts_instead_of_guessing(self):
         # A dedicated three-commit range so "hang" is the only commit between
         # the ends and bisect is guaranteed to probe it. The reproducer then
