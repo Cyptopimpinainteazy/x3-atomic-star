@@ -219,3 +219,14 @@ apps/x3-desktop/dist/
 # process-scoped state, not evidence: it exists so a second run of either one
 # refuses instead of racing the first through `runtime/target/srtool`.
 .x3-release-build.lock
+
+# Coq compiler output produced by the formal gate (`x3-proof formal` runs
+# coqc, directly or via the tools/coqc docker fallback). These are build
+# products, not evidence: the tracked source is SupplyInvariant.v, and the
+# gate reruns coqc. Without these the gate dirties the tree and the next
+# `git add -A` can commit stale proof objects.
+formal-proofs/coq/*.vo
+formal-proofs/coq/*.vok
+formal-proofs/coq/*.vos
+formal-proofs/coq/*.glob
+formal-proofs/coq/.*.aux
