@@ -24,6 +24,7 @@ KEYSTORE_PASSWORD_FILE="${KEYSTORE_PASSWORD_FILE:-}"
 # the base path, keystore and node key are already there, and a Live spec carries
 # the bootnodes, so it rejoins on its own.
 ONLY_INDEX="${ONLY_INDEX:-0}"
+ONLY_REQUESTED=0
 # Per-validator seeds written by `scripts/testnet/build-x3-testnet-spec.py`. A spec
 # built from fresh keys and nodes started from the built-in dev seeds is a network
 # whose authorities hold none of its keys: it starts, and authors nothing. Prefer
@@ -111,6 +112,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --only)
+      ONLY_REQUESTED=1
+      if [[ $# -lt 2 ]]; then
+        echo "--only requires a validator index" >&2
+        exit 2
+      fi
       ONLY_INDEX="${2:-}"
       shift 2
       ;;
@@ -129,13 +135,43 @@ done
 PID_DIR="${PID_DIR:-$BASE_DIR/pids}"
 CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN:-$BASE_DIR/chain-spec.json}"
 
-if ! [[ "$ONLY_INDEX" =~ ^[0-9]+$ ]] || [[ "$ONLY_INDEX" -gt "$COUNT" ]]; then
+if ! [[ "$COUNT" =~ ^[1-7]$ ]]; then
+  echo "COUNT must be between 1 and 7 (got: ${COUNT})" >&2
+  exit 2
+fi
+if ! [[ "$ONLY_INDEX" =~ ^[0-7]$ ]] || [[ "$ONLY_INDEX" -gt "$COUNT" ]] \
+  || [[ "$ONLY_REQUESTED" == "1" && "$ONLY_INDEX" == "0" ]]; then
   echo "--only takes a validator index between 1 and ${COUNT} (got: ${ONLY_INDEX})" >&2
   exit 2
 fi
+
 if [[ "$ONLY_INDEX" != "0" && "$WIPE_BASE_DIR" == "1" ]]; then
   echo "--only cannot be combined with --wipe: restarting one validator must preserve its peers." >&2
   exit 2
+fi
+
+if [[ "$ONLY_INDEX" != "0" ]]; then
+  # Refuse a live target rather than killing an unverified PID or mistaking its
+  # RPC for readiness of a replacement that failed to bind.
+  target_pid_file="${PID_DIR}/node-${ONLY_INDEX}.pid"
+  if [[ -f "$target_pid_file" ]]; then
+    target_pid="$(cat "$target_pid_file")"
+    if [[ "$target_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$target_pid" 2>/dev/null; then
+      echo "Validator ${ONLY_INDEX} PID ${target_pid} is still running; stop it before restarting." >&2
+      exit 2
+    fi
+  fi
+  python3 - "$((RPC_BASE + ONLY_INDEX - 1))" <<'PY'
+import socket
+import sys
+with socket.socket() as sock:
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(("127.0.0.1", int(sys.argv[1])))
+    except (OSError, ValueError) as exc:
+        print(f"Restart target RPC port {sys.argv[1]} is unavailable: {exc}", file=sys.stderr)
+        sys.exit(2)
+PY
 fi
 
 stop_nodes() {
@@ -499,14 +535,33 @@ validate_keys() {
 wait_for_rpc() {
   local rpc_port="$1"
   local log_file="${2:-}"
+  local node_pid="${3:-}"
+  local timeout="${RPC_READY_TIMEOUT_SECONDS:-180}"
+  if ! [[ "$timeout" =~ ^[1-9][0-9]*$ ]]; then
+    echo "RPC_READY_TIMEOUT_SECONDS must be a positive integer" >&2
+    return 1
+  fi
   # 180s, not 60: a cold debug-build node reads a 17 MB spec and a fresh keystore
   # before it answers RPC, and back-to-back launches (a drill followed by another
   # drill, say) have taken longer than a minute. The wait is still bounded, and the
   # message below says which port never answered.
-  for _ in $(seq 1 180); do
-    if curl -s --connect-timeout 2 --max-time 5 -H "Content-Type: application/json" \
+  local deadline=$((SECONDS + timeout))
+  local remaining request_timeout
+  while (( SECONDS < deadline )); do
+    if [[ -n "$node_pid" ]] && ! kill -0 "$node_pid" 2>/dev/null; then
+      echo "Node process ${node_pid} exited before RPC readiness on port ${rpc_port}" >&2
+      return 1
+    fi
+    remaining=$((deadline - SECONDS))
+    request_timeout=5
+    if (( remaining < request_timeout )); then request_timeout="$remaining"; fi
+    if curl -s --connect-timeout 2 --max-time "$request_timeout" -H "Content-Type: application/json" \
       -d '{"jsonrpc":"2.0","id":1,"method":"system_health","params":[]}' \
       "http://127.0.0.1:${rpc_port}" | grep -q '"isSyncing"'; then
+      if [[ -n "$node_pid" ]] && ! kill -0 "$node_pid" 2>/dev/null; then
+        echo "Node process ${node_pid} exited during RPC readiness" >&2
+        return 1
+      fi
       return 0
     fi
     # A node that has already died will never answer, so waiting the full three
@@ -524,7 +579,7 @@ wait_for_rpc() {
         "'--features runtime-benchmarks'. Rebuild it with 'cargo build --release -p x3-chain-node'." >&2
       return 1
     fi
-    sleep 1
+    if (( SECONDS < deadline )); then sleep 1; fi
   done
   echo "RPC not ready on port ${rpc_port}"
   return 1
@@ -653,15 +708,23 @@ start_node() {
     "${boot_args[@]}" \
     > "$log_file" 2>&1 &
 
-  echo $! > "${PID_DIR}/node-${i}.pid"
+  local node_pid=$!
+  echo "$node_pid" > "${PID_DIR}/node-${i}.pid"
   echo "Started ${name} (p2p=${p2p_port}, rpc=${rpc_port}, prom=${prom_port})"
 
-  wait_for_rpc "$rpc_port" "$log_file"
+  wait_for_rpc "$rpc_port" "$log_file" "$node_pid"
   echo "Node ${name} ready"
 }
 
-echo "Starting node 1 (bootnode)..."
+# X3_LAUNCH_SELECTION_BEGIN
+if [[ "$ONLY_INDEX" != "0" && "$SKIP_BOOTNODE_MEMBERSHIP_CHECK" == "1" ]]; then
+  echo "Starting only node ${ONLY_INDEX} using the chain spec's published bootnodes"
+  start_node "$ONLY_INDEX"
+  echo "Node ${ONLY_INDEX} is back."
+  exit 0
+fi
 if [[ "$ONLY_INDEX" == "0" || "$ONLY_INDEX" == "1" ]]; then
+  echo "Starting node 1 (bootnode)..."
   start_node 1
   if [[ "$ONLY_INDEX" == "1" ]]; then
     echo "Node 1 is back."

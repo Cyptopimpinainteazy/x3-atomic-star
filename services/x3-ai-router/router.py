@@ -625,13 +625,44 @@ def responses_request_to_chat(request):
     return responses_request(request)[0]
 
 
+def valid_completion_message(message):
+    """Validate the assistant payload before accepting upstream success."""
+    if not isinstance(message, dict) or message.get("role") != "assistant":
+        return False
+    content, refusal, calls = message.get("content"), message.get("refusal"), message.get("tool_calls")
+    if content is not None and not isinstance(content, str):
+        return False
+    if refusal is not None and not isinstance(refusal, str):
+        return False
+    if calls is not None:
+        if not isinstance(calls, list):
+            return False
+        ids = set()
+        for call in calls:
+            if not isinstance(call, dict) or call.get("type") != "function":
+                return False
+            identifier, function = call.get("id"), call.get("function")
+            if (not isinstance(identifier, str) or not identifier or identifier in ids
+                    or not isinstance(function, dict)
+                    or not isinstance(function.get("name"), str) or not function["name"]
+                    or not isinstance(function.get("arguments"), str)):
+                return False
+            ids.add(identifier)
+    return bool(content or refusal or calls)
+
+
 def chat_message_to_response_output(message, prefix, custom=frozenset()):
     """Chat Completions message -> the Responses `output` list."""
     output = []
     content = message.get("content")
+    parts = []
     if content:
+        parts.append({"type": "output_text", "text": content, "annotations": []})
+    if message.get("refusal"):
+        parts.append({"type": "refusal", "refusal": message["refusal"]})
+    if parts:
         output.append({"id": prefix + "msg", "type": "message", "role": "assistant", "status": "completed",
-                       "content": [{"type": "output_text", "text": content, "annotations": []}]})
+                       "content": parts})
     for index, call in enumerate(message.get("tool_calls") or []):
         function = call.get("function") or {}
         name = function.get("name", "")
@@ -1201,7 +1232,7 @@ class Router:
             self.db = sqlite3.connect(db_path, check_same_thread=False)
             self.initialize_database()
             self.reconcile_reservations()
-        except (OSError, sqlite3.Error) as exc:
+        except Exception as exc:
             if self.db is not None:
                 self.db.close()
             raise RuntimeError(f"Could not initialize router database {db_path!r}: {exc}") from exc
@@ -1998,7 +2029,7 @@ class Router:
                         choices = result.get("choices") if isinstance(result, dict) else None
                         if (not isinstance(choices, list) or not choices
                                 or any(not isinstance(choice, dict)
-                                       or not isinstance(choice.get("message"), dict)
+                                       or not valid_completion_message(choice.get("message"))
                                        for choice in choices)):
                             raise ValueError("Provider response has invalid completion choices")
                     usage = normalize_usage(result.get("usage", {}))

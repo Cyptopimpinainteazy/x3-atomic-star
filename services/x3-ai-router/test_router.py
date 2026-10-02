@@ -10,6 +10,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,10 +52,12 @@ class DatabaseStartupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state" / "router" / "usage.sqlite3"
             router = router_module.Router({}, path)
-            router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
-                              ("2026-10-01", "alice", 0.25))
-            router.db.commit()
-            router.db.close()
+            try:
+                router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
+                                  ("2026-10-01", "alice", 0.25))
+                router.db.commit()
+            finally:
+                router.db.close()
             restarted = router_module.Router({}, path)
             try:
                 self.assertEqual(restarted.db.execute("SELECT agent, cost_usd FROM usage").fetchall(),
@@ -85,6 +88,27 @@ class DatabaseStartupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
                 router_module.Router({}, path)
             self.assertIn(str(path), str(failure.exception))
+
+    def test_all_startup_failures_close_the_opened_connection(self):
+        original = router_module.sqlite3.connect
+        for config, corrupt in (({"reservation_ttl_seconds": "invalid"}, False), ({}, True)):
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "usage.sqlite3"
+                if corrupt:
+                    path.write_bytes(b"not a database")
+                connections = []
+
+                def connect(*args, **kwargs):
+                    connection = original(*args, **kwargs)
+                    connections.append(connection)
+                    return connection
+
+                with patch.object(router_module.sqlite3, "connect", side_effect=connect):
+                    with self.assertRaisesRegex(RuntimeError, "initialize router database"):
+                        router_module.Router(config, path)
+                self.assertEqual(len(connections), 1)
+                with self.assertRaises(router_module.sqlite3.ProgrammingError):
+                    connections[0].execute("SELECT 1")
 
 
 class RouterTests(unittest.TestCase):
@@ -700,7 +724,11 @@ class ProtocolTests(unittest.TestCase):
         return body
 
     def test_malformed_choices_fail_closed_without_booking_success(self):
-        for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}]):
+        for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}],
+                        [{"message": {}}], [{"message": {"role": "assistant", "content": 123}}],
+                        [{"message": {"role": "assistant", "tool_calls": "invalid"}}],
+                        [{"message": {"role": "assistant", "tool_calls": [{}]}}],
+                        [{"message": {"role": "user", "content": "wrong role"}}]):
             with self.subTest(choices=choices):
                 self.router.note_provider_success("up")
 
@@ -758,6 +786,38 @@ class ProtocolTests(unittest.TestCase):
         status, response = self.router.complete(request, "alice")
         self.assertEqual((status, response["model"]), (200, "up-model"))
         self.assertNotIn("up", [row["provider"] for row in self.router.provider_health()])
+
+    def test_valid_tool_calls_and_refusals_survive_responses_translation(self):
+        messages = [
+            {"role": "assistant", "content": None, "tool_calls": [{
+                "id": "call_1", "type": "function",
+                "function": {"name": "read_file", "arguments": '{"path":"README.md"}'}}]},
+            {"role": "assistant", "content": None, "refusal": "I cannot fulfill that request."},
+        ]
+        server = self.serve()
+        try:
+            for message in messages:
+                with self.subTest(message=message):
+                    def respond(handler, body):
+                        payload = json.dumps({"choices": [{"message": message}]}).encode()
+                        handler.send_response(200)
+                        handler.send_header("Content-Length", str(len(payload)))
+                        handler.end_headers()
+                        handler.wfile.write(payload)
+
+                    ScriptedProvider.script = respond
+                    status, raw = self.post(server, self.responses_body(stream=False))
+                    self.assertEqual(status, 200, raw)
+                    output = json.loads(raw)["output"]
+                    if message.get("tool_calls"):
+                        self.assertEqual(output[0]["type"], "function_call")
+                        self.assertEqual(output[0]["call_id"], "call_1")
+                        self.assertEqual(output[0]["arguments"], '{"path":"README.md"}')
+                    else:
+                        self.assertEqual(output[0]["content"], [{"type": "refusal", "refusal": message["refusal"]}])
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_malformed_completion_is_reported_as_upstream_failure_on_responses_endpoint(self):
         def malformed(handler, body):

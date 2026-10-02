@@ -465,6 +465,11 @@ def scan_cheats() -> list[dict[str, object]]:
             # A commented-out assertion is not an assertion. Rust `#[ignore]`
             # arrives as `#...`, so this does not hide the skip class.
             continue
+        # A leading hash is a comment in shell/Python/config files, but a Rust
+        # attribute can disable an executable test. Keep Rust attributes visible.
+        if (Path(rel).suffix in {".py", ".sh", ".yaml", ".yml", ".toml"}
+                and line.lstrip().startswith("#")):
+            continue
         in_tests = rel in test_files
         kind = None
         if in_tests and _constant_assertion(line):
