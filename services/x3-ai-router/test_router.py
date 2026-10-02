@@ -482,6 +482,7 @@ class RouterTests(unittest.TestCase):
         body.update(overrides)
         return body
 
+
     def serve(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -697,6 +698,86 @@ class ProtocolTests(unittest.TestCase):
                            "content": [{"type": "input_text", "text": "hi"}]}]}
         body.update(overrides)
         return body
+
+    def test_malformed_choices_fail_closed_without_booking_success(self):
+        for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}]):
+            with self.subTest(choices=choices):
+                self.router.note_provider_success("up")
+
+                def malformed(handler, body):
+                    payload = json.dumps({"choices": choices}).encode()
+                    handler.send_response(200)
+                    handler.send_header("Content-Length", str(len(payload)))
+                    handler.end_headers()
+                    handler.wfile.write(payload)
+
+                ScriptedProvider.script = malformed
+                status, _ = self.router.complete({"messages": [{"role": "user", "content": "hello"}],
+                                                  "max_tokens": 10}, "alice")
+                self.assertEqual(status, 502)
+                self.assertEqual(self.router.stats(), [])
+                self.assertEqual(self.router.snapshot()["reserved_usd"], 0)
+
+    def test_provider_recovers_after_persisted_cooldown_and_router_restart(self):
+        self.config["retry_attempts"] = 0
+        self.config["provider_cooldown_seconds"] = 0.5
+        self.config["providers"]["backup"] = {**self.config["providers"]["up"], "model": "backup"}
+        self.config["routes"]["routine"] = ["up", "backup"]
+        healthy = False
+
+        def respond(handler, body):
+            if body["model"] == "up-model" and not healthy:
+                handler.send_response(503)
+                handler.send_header("Content-Length", "2")
+                handler.end_headers()
+                handler.wfile.write(b"{}")
+            else:
+                payload = json.dumps({"model": body["model"], "choices": [{
+                    "message": {"role": "assistant", "content": "recovered"}}]}).encode()
+                handler.send_response(200)
+                handler.send_header("Content-Length", str(len(payload)))
+                handler.end_headers()
+                handler.wfile.write(payload)
+
+        ScriptedProvider.script = respond
+        request = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 10}
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertGreater(self.router.provider_cooldown("up"), 0)
+        self.router.db.close()
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+        healthy = True
+        count = len(ScriptedProvider.requests)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertEqual([r["model"] for r in ScriptedProvider.requests[count:]], ["backup"])
+        deadline = time.monotonic() + 2
+        while self.router.provider_cooldown("up") > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(self.router.provider_cooldown("up"), 0)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "up-model"))
+        self.assertNotIn("up", [row["provider"] for row in self.router.provider_health()])
+
+    def test_malformed_completion_is_reported_as_upstream_failure_on_responses_endpoint(self):
+        def malformed(handler, body):
+            payload = b'{"choices":null}'
+            handler.send_response(200)
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        ScriptedProvider.script = malformed
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(stream=False))
+            self.assertEqual(status, 502)
+            self.assertEqual(json.loads(raw)["error"]["type"], "no_provider_succeeded")
+            self.assertEqual(self.router.stats(), [])
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
     # ── Named tool_choice ────────────────────────────────────────────────
 

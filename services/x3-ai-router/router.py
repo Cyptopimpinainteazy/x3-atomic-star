@@ -1994,8 +1994,13 @@ class Router:
                             self.note_provider_failure(name, detail)
                             failures.append(self.diagnostic(name, None, detail))
                             break
-                    elif not isinstance(result, dict) or "choices" not in result:
-                        raise ValueError("Provider response lacks choices")
+                    else:
+                        choices = result.get("choices") if isinstance(result, dict) else None
+                        if (not isinstance(choices, list) or not choices
+                                or any(not isinstance(choice, dict)
+                                       or not isinstance(choice.get("message"), dict)
+                                       for choice in choices)):
+                            raise ValueError("Provider response has invalid completion choices")
                     usage = normalize_usage(result.get("usage", {}))
                     cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
                     self.note_attempt(name, model, self.elapsed_ms(started), True, attempt_index > 0, usage, cost)
