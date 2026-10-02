@@ -732,6 +732,14 @@ GATES_FAST=(
   # subsystem (kernel, settlement, supply ledger, runtime) relies on next.
   "test x3-sim root-cause:python3 crates/x3-sim/scripts/test_root_cause.py"
   "test x3-failure-packet:bash scripts/test_x3_failure_packet.sh"
+  # The forge tools that turn a failure into reusable evidence are code too,
+  # and their contracts are refusals: failure_memory must deduplicate by
+  # fingerprint, and bisect_runner must refuse a dirty tree, a non-ancestor
+  # range, and a reproducer that cannot tell the two ends apart — and must
+  # discard its verdict (not guess one) when a probe hangs. test_failure_memory
+  # only ran when the router suite happened to find it; neither had a gate.
+  # Standard library only, seconds to run.
+  "test x3-forge tools:python3 -m unittest discover -s tools/x3-forge -p 'test_*.py'"
   # The crates below are `exclude`d from the root workspace: each declares its
   # own `[workspace]` (or path-depends on one that does), and cargo refuses to
   # have them as members ("multiple workspace roots found in the same
