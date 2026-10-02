@@ -76,9 +76,35 @@ usage() {
 # ── Pre-checks ──────────────────────────────────────────────────────────────
 check_validator_stopped() {
     local base="$1"
-    # Check if x3-chain-node is running on this base path
-    if pgrep -f "x3-chain-node.*$base" > /dev/null 2>&1; then
-        echo -e "${RED}❌ Validator appears to be running on base path: $base${NC}"
+    # Inspect node argv, never arbitrary command text containing the base path.
+    if ! python3 - "$base" <<'PY'
+import os
+from pathlib import Path
+import sys
+base = os.path.realpath(sys.argv[1])
+if not Path('/proc').is_dir():
+    sys.exit(2)
+for process in Path('/proc').glob('[0-9]*/cmdline'):
+    try:
+        args = process.read_bytes().decode(errors='surrogateescape').rstrip('\0').split('\0')
+    except FileNotFoundError:
+        continue
+    except PermissionError:
+        sys.exit(2)
+    if not args or Path(args[0]).name != 'x3-chain-node':
+        continue
+    for index, arg in enumerate(args):
+        value = args[index + 1] if arg == '--base-path' and index + 1 < len(args) else None
+        if arg.startswith('--base-path='):
+            value = arg.split('=', 1)[1]
+        if value is not None:
+            if not os.path.isabs(value):
+                value = str(process.parent / 'cwd' / value)
+            if os.path.realpath(value) == base:
+                sys.exit(2)
+PY
+    then
+        echo -e "${RED}❌ Validator is running or its stopped state could not be checked: $base${NC}"
         echo "   Stop the validator first: systemctl stop x3-validator (or Ctrl+C / pkill)"
         exit 2
     fi
@@ -252,8 +278,9 @@ do_restore() {
 
     echo -e "${BLUE}🔄 Restoring snapshot to $TARGET ...${NC}"
 
-    mkdir -p "$(dirname "$TARGET")"
-    tar -xzf "$TAR" -C "$(dirname "$TARGET")"
+    # Accept one root directory containing regular files/directories only.
+    # Extract in isolation before installing at the requested base path.
+    python3 "$(dirname "${BASH_SOURCE[0]}")/snapshot-archive-restore.py" "$TAR" "$TARGET"
 
     echo -e "${GREEN}✅ Snapshot restored to $TARGET${NC}"
     echo ""
@@ -301,13 +328,15 @@ case "$ACTION" in
         TMP_SRC=$(mktemp -d)
         TMP_TAR=$(mktemp -d)
         TMP_TARGET=$(mktemp -d)
+        trap 'rm -rf "$TMP_SRC" "$TMP_TAR" "$TMP_TARGET"' EXIT
         echo "test-data-$(date +%s)" > "$TMP_SRC/test-file"
         tar -czf "$TMP_TAR/test-restore.tar.gz" -C "$(dirname "$TMP_SRC")" "$(basename "$TMP_SRC")"
         do_restore "$TMP_TAR/test-restore.tar.gz" "$TMP_TARGET"
-        if [[ -f "$TMP_TARGET/$(basename "$TMP_SRC")/test-file" ]]; then
+        if cmp -s "$TMP_SRC/test-file" "$TMP_TARGET/test-file"; then
             echo -e "${GREEN}✅ restore-path smoke test passed${NC}"
         else
             echo -e "${RED}❌ restore-path smoke test failed${NC}"
+            exit 4
         fi
         rm -rf "$TMP_SRC" "$TMP_TAR" "$TMP_TARGET"
         ;;

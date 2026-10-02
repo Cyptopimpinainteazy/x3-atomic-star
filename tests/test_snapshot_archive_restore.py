@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Real archive/filesystem checks for the validator restore command."""
+import io
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tarfile
+import tempfile
+import unittest
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts/snapshot-restore.sh"
+
+
+class RestoreTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.archive = self.root / "snapshot.tar.gz"
+        self.target = self.root / "new-validator"
+
+    def archive_entries(self, entries):
+        with tarfile.open(self.archive, "w:gz") as archive:
+            for name, content, kind in entries:
+                member = tarfile.TarInfo(name)
+                member.mode = 0o600
+                if kind == "link":
+                    member.type = tarfile.SYMTYPE
+                    member.linkname = str(self.root / "neighbor")
+                    archive.addfile(member)
+                else:
+                    data = content.encode()
+                    member.size = len(data)
+                    archive.addfile(member, io.BytesIO(data))
+
+    def run_restore(self):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("X3_SNAPSHOT_")}
+        return subprocess.run(["bash", str(SCRIPT), "restore", str(self.archive), str(self.target)],
+                              env=env, text=True, capture_output=True, timeout=10)
+
+    def test_restores_to_requested_name_without_touching_original_directory(self):
+        original = self.root / "old-validator"
+        original.mkdir()
+        (original / "state").write_text("preserve")
+        self.archive_entries([("old-validator/chains/state", "restored", "file")])
+        result = self.run_restore()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.target / "chains/state").read_text(), "restored")
+        self.assertEqual((original / "state").read_text(), "preserve")
+        self.assertFalse((original / "chains").exists())
+
+    def test_unsafe_or_ambiguous_archives_leave_target_and_neighbors_untouched(self):
+        neighbor = self.root / "neighbor"
+        neighbor.write_text("preserve")
+        for entries in ([('old/../../neighbor', 'overwrite', 'file')],
+                        [('old/link', '', 'link'), ('old/link/state', 'overwrite', 'file')],
+                        [('old/state', 'a', 'file'), ('other/state', 'b', 'file')]):
+            with self.subTest(entries=entries):
+                self.archive_entries(entries)
+                self.assertNotEqual(self.run_restore().returncode, 0)
+                self.assertEqual(neighbor.read_text(), "preserve")
+                self.assertFalse(self.target.exists())
+                self.assertEqual(list(self.root.glob('.x3-restore-*')), [])
+
+    def test_nonempty_target_is_preserved(self):
+        self.target.mkdir()
+        (self.target / "state").write_text("preserve")
+        self.archive_entries([("old/state", "overwrite", "file")])
+        self.assertEqual(self.run_restore().returncode, 3)
+        self.assertEqual((self.target / "state").read_text(), "preserve")
+
+    def test_corrupt_archive_does_not_create_target(self):
+        self.archive.write_bytes(b"invalid gzip")
+        self.assertEqual(self.run_restore().returncode, 4)
+        self.assertFalse(self.target.exists())
+
+    def test_target_symlink_is_preserved(self):
+        neighbor = self.root / 'neighbor-dir'
+        neighbor.mkdir()
+        self.target.symlink_to(neighbor, target_is_directory=True)
+        self.archive_entries([('old/state', 'overwrite', 'file')])
+        self.assertEqual(self.run_restore().returncode, 3)
+        self.assertTrue(self.target.is_symlink())
+        self.assertEqual(list(neighbor.iterdir()), [])
+
+    def test_running_node_for_exact_target_is_refused(self):
+        process = subprocess.Popen(
+            ['x3-chain-node', '-c', 'import time; print("ready", flush=True); time.sleep(30)',
+             '--base-path', str(self.target)], executable=sys.executable,
+            stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(process.stdout.readline().strip(), 'ready')
+            self.archive_entries([('old/state', 'restore', 'file')])
+            self.assertEqual(self.run_restore().returncode, 2)
+            self.target = self.root / 'another-validator'
+            self.assertEqual(self.run_restore().returncode, 0)
+        finally:
+            process.kill()
+            process.wait(timeout=5)
+            process.stdout.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
