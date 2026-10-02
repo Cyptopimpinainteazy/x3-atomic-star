@@ -13,6 +13,7 @@
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
 #   scripts/local-ci.sh --fuzz          # + the cargo-fuzz gate (needs a nightly toolchain)
+#   scripts/local-ci.sh --mutants       # + the cargo-mutants campaign on the supply ledger
 #   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --testnet       # + the testnet ceremony drill (records and verifies a launch)
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
@@ -29,6 +30,8 @@
 #   --skip a,b        drop these gate slugs; the summary records the skip loudly
 #   --dry-run         print the gate list that would run, then exit
 #   --fail-fast       stop scheduling new gates once one has failed
+#   --publish-status  post the verdict as the x3/local-ci GitHub commit status
+#                     for the tested SHA (needs gh; success only on a clean tree)
 #   --changed-from R  add gates implied by the files changed in R...HEAD
 #   --pre-push        the push-time set: fast gates + diff-scoped gates, plus the
 #                     release/variant gates when pushing the default branch
@@ -119,6 +122,7 @@ RUN_VARIANTS=0
 RUN_DEEP=0
 RUN_LOOM=0
 RUN_FUZZ=0
+RUN_MUTANTS=0
 RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
@@ -126,6 +130,7 @@ RUN_ROTATION=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
+PUBLISH_STATUS=0
 FAIL_FAST=0
 JOBS="${X3_LOCAL_CI_JOBS:-3}"
 CARGO_JOBS="${CARGO_BUILD_JOBS:-10}"
@@ -146,13 +151,15 @@ while [ "$#" -gt 0 ]; do
     --soak) RUN_SOAK=1 ;;
     --rotation) RUN_ROTATION=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
     --loom) RUN_LOOM=1 ;;
     --fuzz) RUN_FUZZ=1 ;;
+    --mutants) RUN_MUTANTS=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
     --dry-run) DRY_RUN=1 ;;
     --fail-fast) FAIL_FAST=1 ;;
+    --publish-status) PUBLISH_STATUS=1 ;;
     --jobs) JOBS="${2:-}"; shift ;;
     --cargo-jobs) CARGO_JOBS="${2:-}"; shift ;;
     --only) ONLY="${2:-}"; shift ;;
@@ -1017,6 +1024,15 @@ GATES_FUZZ=(
   "fuzz x3-language and detection:bash scripts/external-toolchain/fuzz-gate.sh"
 )
 
+# Mutation testing on the money path. Opt-in like `--loom`/`--fuzz`: a full campaign is
+# minutes of parallel cargo builds, not a fast gate. The first campaign found two survivors
+# in the supply ledger's `on_finalize` proof pruning that no test observed (#576); this gate
+# keeps that loop running so the next survivor fails a gate instead of shipping. A box
+# without cargo-mutants reports BLOCKED, which is the honest answer.
+GATES_MUTANTS=(
+  "mutants supply ledger:bash scripts/x3-mutants-gate.sh"
+)
+
 # What the consensus network does when validators die. Opt-in and separate from
 # `--live` because it boots four to seven validators, kills a minority and then a
 # supermajority-breaking number, and restarts them: finality must continue in the
@@ -1142,6 +1158,8 @@ describe_all() {
   printf '  - %s\n' "${GATES_LOOM[@]%%:*}"
   echo "fuzz gates (--fuzz, also implied by --all; needs a nightly toolchain):"
   printf '  - %s\n' "${GATES_FUZZ[@]%%:*}"
+  echo "mutants gates (--mutants, also implied by --all; needs cargo-mutants):"
+  printf '  - %s\n' "${GATES_MUTANTS[@]%%:*}"
   echo
   echo "failure drills (--failure, also implied by --all):"
   printf '  - %s\n' "${GATES_FAILURE[@]%%:*}"
@@ -1156,7 +1174,7 @@ describe_all() {
   printf '  - %s\n' "${GATES_ROTATION[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
-  echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
+  echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast --publish-status"
 }
 
 if [ "$LIST_ONLY" = 1 ]; then
@@ -1221,6 +1239,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_FUZZ" = 1 ] && for spec in "${GATES_FUZZ[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_MUTANTS" = 1 ] && for spec in "${GATES_MUTANTS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
 if [ -n "$ONLY" ]; then
@@ -1305,7 +1324,13 @@ if [ -n "${CARGO_TARGET_DIR:-}" ] && [ "$CARGO_TARGET_DIR" != "$ROOT/target" ]; 
     # are not materialized in every checkout — a failed touch on those is
     # harmless (nothing to mark fresh), so stderr is discarded rather than
     # letting a wall of "No such file or directory" bury the real warning.
-    git ls-files -z 2>/dev/null | xargs -0 -r touch 2>/dev/null
+    # -h (no-dereference) is load-bearing: plain `touch` follows dangling
+    # tracked symlinks and materializes their missing targets as untracked
+    # 0-byte files — apps/x3-funding/node_modules (via
+    # apps/x3-transparency/node_modules), libproto_lib/usr/share/doc/
+    # libprotobuf23 (via libprotobuf-dev), and ./ralph (via ralph-coding) —
+    # dirtying the tree that --publish-status requires to be clean.
+    git ls-files -z 2>/dev/null | xargs -0 -r touch -h 2>/dev/null
   fi
   printf '%s' "$TARGET_DIR_STAMP" >"$TARGET_DIR_MARKER"
 fi
@@ -1353,7 +1378,7 @@ export CARGO_TERM_COLOR=never
   echo "local-ci $STAMP"
   echo "root=$ROOT"
   echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM fuzz=$RUN_FUZZ failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS loom=$RUN_LOOM fuzz=$RUN_FUZZ mutants=$RUN_MUTANTS failure=$RUN_FAILURE testnet=$RUN_TESTNET soak=$RUN_SOAK rotation=$RUN_ROTATION jobs=$JOBS cargo_jobs=$CARGO_JOBS"
 } >"$LOG"
 
 # run_gate <name> <slug> <command> — one process per gate so the parent keeps the
@@ -1635,6 +1660,43 @@ fi
 } >"$LOG_DIR/local-ci-$STAMP-summary.json"
 
 echo "local-ci: summary json -> .ai/runlogs/local-ci-$STAMP-summary.json"
+
+# Opt-in: post the verdict for the exact commit this run tested. `success` means
+# "the gate of record passed for this SHA", so it is only posted when every gate
+# passed, the tree was clean, and the run was the unscoped set — a subset posts
+# `error`, because branch protection must not accept a two-gate run as the bar.
+if [ "$PUBLISH_STATUS" = 1 ]; then
+  pub_state="success"
+  pub_desc="all gates passed"
+  if [ "$FAILED" = 1 ]; then
+    n_failed=0
+    n_blocked=0
+    for i in "${!GATE_STATUS[@]}"; do
+      case "${GATE_STATUS[$i]}" in
+        FAIL) n_failed=$((n_failed + 1)) ;;
+        BLOCKED) n_blocked=$((n_blocked + 1)) ;;
+      esac
+    done
+    if [ "$n_failed" -gt 0 ]; then
+      pub_state="failure"
+      pub_desc="$n_failed gate(s) failed"
+    else
+      pub_state="error"
+      pub_desc="$n_blocked gate(s) BLOCKED - no verdict"
+    fi
+  elif [ -n "$ONLY" ] || [ -n "$SKIP" ] || [ -n "$CHANGED_FROM" ] || [ "$RUN_PREPUSH" = 1 ]; then
+    pub_state="error"
+    pub_desc="scoped run - not the full gate set"
+  elif [ "$DIRTY" != "clean" ]; then
+    pub_state="error"
+    pub_desc="dirty tree - not evidence for this SHA"
+  fi
+  if bash scripts/x3-publish-status.sh --state "$pub_state" --sha "$HEAD_SHA" --description "$pub_desc"; then
+    :
+  else
+    echo "local-ci: WARNING: could not publish the x3/local-ci commit status for $HEAD_SHA"
+  fi
+fi
 
 if [ "$FAILED" = 1 ]; then
   echo ""

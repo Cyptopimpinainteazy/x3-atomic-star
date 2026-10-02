@@ -24,11 +24,13 @@ scripts/local-ci.sh --live          # + EVM/SVM contract lifecycles (anvil, sola
 scripts/local-ci.sh --cross         # + X3-native and cross-domain lifecycles
 scripts/local-ci.sh --variants      # + runtime migration dry-run, all six variants
 scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
+scripts/local-ci.sh --mutants       # + cargo-mutants over the supply ledger
 scripts/local-ci.sh --release       # + make mainnet-check
 scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
 scripts/local-ci.sh --all           # everything (the release bar)
 scripts/local-ci.sh --list          # show the gate list, run nothing
 scripts/local-ci.sh --pre-push      # what the hook runs
+scripts/local-ci.sh --publish-status # post the verdict as the x3/local-ci commit status
 ```
 
 Equivalent make targets: `make local-ci`, `local-ci-live`, `local-ci-cross`,
@@ -49,6 +51,34 @@ automated check the repository has (all test targets in all workspace members;
 5,068 tests across 358 binaries as of 2026-09-18). It is slow, so it is opt-in
 and `--all`/`make local-ci-deep` include it for release-candidate runs.
 
+`--mutants` adds `bash scripts/x3-mutants-gate.sh`, a bounded `cargo-mutants`
+campaign over `pallet-x3-supply-ledger` — the pallet that enforces the king
+invariant. Every surviving mutant is a behaviour change no test observed; the
+first campaign (2026-10-02) found two survivors in the `on_finalize` proof
+pruning guard that the whole suite missed, now pinned by `tests_retention.rs`
+(#576). A full campaign is minutes of parallel cargo builds, so it is opt-in like
+`--loom`/`--fuzz`; `X3_MUTANTS_JOBS` (default 4) and `X3_MUTANTS_TIMEOUT`
+(default 600s, generous enough that build contention under `--jobs` cannot turn a
+caught mutant into a build timeout) tune it. The suite runs under
+`cargo-nextest` with the `mutants` profile from `.config/nextest.toml`, whose
+60-second per-test watchdog converts a mutant that hangs a test into an ordinary
+test failure (CAUGHT) instead of a cargo-mutants TIMEOUT (not caught). Without
+`cargo-mutants` or `cargo-nextest` installed the gate reports **BLOCKED**, not
+PASS.
+
+### Publishing the verdict
+
+Every workflow in this repository is `workflow_dispatch` on a local runner, so no
+GitHub check runs automatically against a pull request. `--publish-status` posts
+the run's verdict as the commit status `x3/local-ci` on the exact SHA the run
+tested (`scripts/x3-publish-status.sh` wraps the API call). `success` is posted
+only when every gate passed, the tree was clean, **and** the run was the
+unscoped default set. A dirty tree or a scoped run (`--only`/`--skip`/
+`--changed-from`/`--pre-push`) posts `error`, because the status means "the gate
+of record passed for this SHA" and neither case is evidence of that. That is the
+status branch protection requires, so a red gate cannot merge and a green local
+run is attributable to exactly one commit.
+
 ### Scheduling and scoping
 
 | flag | meaning |
@@ -58,6 +88,7 @@ and `--all`/`make local-ci-deep` include it for release-candidate runs.
 | `--only a,b` | run exactly these gate slugs (slugs come from `--list`) |
 | `--skip a,b` | drop these gates; the summary records each skip loudly |
 | `--changed-from REF` | add the gates the diff `REF...HEAD` implies |
+| `--publish-status` | post `x3/local-ci` success/failure/error for the tested SHA (needs `gh`) |
 | `--dry-run` | print what would run |
 | `--fail-fast` | stop scheduling once a gate has failed |
 
