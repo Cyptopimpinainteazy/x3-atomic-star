@@ -39,6 +39,8 @@ mod tests_conservation;
 mod tests_halt;
 #[cfg(test)]
 mod tests_s0_1;
+#[cfg(test)]
+mod tests_retention;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -57,7 +59,7 @@ pub mod pallet {
     };
 
     /// Keep only the latest N block proofs to prevent unbounded storage growth.
-    const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
+    pub const HISTORICAL_PROOF_RETENTION_BLOCKS: u32 = 1_000;
 
     /// Runtime response policy when a supply invariant violation is detected
     /// during block finalization.
