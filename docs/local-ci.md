@@ -24,7 +24,7 @@ scripts/local-ci.sh --live          # + EVM/SVM contract lifecycles (anvil, sola
 scripts/local-ci.sh --cross         # + X3-native and cross-domain lifecycles
 scripts/local-ci.sh --variants      # + runtime migration dry-run, all six variants
 scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
-scripts/local-ci.sh --mutants       # + cargo-mutants over the supply ledger
+scripts/local-ci.sh --mutants       # + cargo-mutants over the P0 packages
 scripts/local-ci.sh --release       # + make mainnet-check
 scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
 scripts/local-ci.sh --all           # everything (the release bar)
@@ -76,6 +76,22 @@ that do not compile under the gate's feature set. The pins live in
 `tests_public_api.rs`, `tests_weights.rs` (`every_dispatch_weight_is_nonzero`),
 and additions to `tests_conservation.rs`, `tests_retention.rs` and
 `supply_verification.rs`.
+
+The third campaign extended the gate to `pallet-x3-atomic-kernel`, which had
+never been mutated. Its first run left 141 survivors: 57 in `lib.rs` (the
+off-chain worker's storage protocol, auto-expiry in `on_initialize`, every
+`ValidateUnsigned` guard, the revert-failure counter, read-only getters) and 84
+in `vm_revert.rs` (bound checks in the four diff decoders, storage-key
+derivations, log-only counters). All are resolved: the decoders were rewritten
+around a checked `DiffReader` (removing two real panic paths on truncated
+diffs), the guards that only gated log lines were folded into the adjacent
+unconditional logs, and the behavior is pinned by `tests_vm_revert_hardening.rs`,
+`tests_weights.rs` and `tests_gate_pins.rs`. Pinning the expiry path surfaced a
+real defect: `on_initialize` slashed the 5% penalty without ever unreserving the
+rest of the bond, and `RolledBack` is terminal, so the remainder was locked
+forever — it now unreserves before slashing, mirroring rollback. Final campaign:
+187 mutants, 150 caught, 37 unviable, 0 missed, 0 TIMEOUT (six shards in
+parallel, ~20 minutes wall on a 32-core box).
 
 A full campaign is tens of minutes of parallel cargo builds, so it is opt-in like
 `--loom`/`--fuzz`; `X3_MUTANTS_JOBS` (default 4) and `X3_MUTANTS_TIMEOUT`
