@@ -10,7 +10,7 @@ scale-info = { workspace = true, default-features = false, features = ["derive"]
 sp-std = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-core = { workspace = true, default-features = false, features = ["full_crypto"] }
-thiserror = "1.0"
+thiserror = "2.0"
 
 [features]
 default = ["std"]
