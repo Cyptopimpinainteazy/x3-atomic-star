@@ -230,3 +230,18 @@ formal-proofs/coq/*.vok
 formal-proofs/coq/*.vos
 formal-proofs/coq/*.glob
 formal-proofs/coq/.*.aux
+
+# cargo-mutants output; the gate moves a previous run aside to mutants.out.old
+mutants.out/
+mutants.out.old/
+
+
+# Referents that dangling tracked symlinks (or their tooling) can materialize
+# as untracked files: an `npm install` under apps/x3-funding, a `dpkg-deb -x`
+# of libprotobuf, or a local ralph checkout. local-ci's freshness touch uses
+# `touch -h`, but ignoring the referents keeps `git status` clean (required by
+# --publish-status) even when other tools create them. The symlinks stay
+# tracked.
+apps/x3-funding/node_modules
+libproto_lib/usr/share/doc/libprotobuf23
+/ralph
