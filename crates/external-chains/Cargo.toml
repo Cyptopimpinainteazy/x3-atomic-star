@@ -34,7 +34,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 # Log and block responses are arrays of objects, which the module's string
 # scanning cannot read safely. `alloc` keeps this available in a no_std build.
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-hex-literal = "0.4"
+hex-literal = "1.1"
 
 # Utilities
 hex = "0.4"
