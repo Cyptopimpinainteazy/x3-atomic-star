@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# X3 mutation gate — cargo-mutants on the supply ledger, bounded and loud.
+# X3 mutation gate — cargo-mutants on the P0 money path, bounded and loud.
 #
 # The verification harness (scripts/x3-verification-harness.sh) runs cargo-mutants as an
 # operator-invoked section over crates/x3-common, crates/x3-fees and crates/x3-packet-schema. No
-# gate ran mutants against the pallet that enforces the king invariant. The first campaign
-# (2026-10-02, master 2cfa3f06) found two survivors in `on_finalize` proof pruning that the whole
-# suite missed — the guard and the subtraction that keep `HistoricalProofs` bounded. Both are now
-# pinned by tests_retention.rs (#576). This gate keeps the campaign running: every surviving
-# mutant is a behaviour change no test observed, and the gate fails until a test pins it.
+# gate ran mutants against the pallets that enforce the king invariant and own the bundle
+# lifecycle. The first campaign (2026-10-02, master 2cfa3f06) found two survivors in the supply
+# ledger's `on_finalize` proof pruning that the whole suite missed — the guard and the
+# subtraction that keep `HistoricalProofs` bounded. Both are now pinned by tests_retention.rs
+# (#576). The second package is pallet-x3-atomic-kernel: submit/finalize/rollback, bond
+# accounting, deadline bookkeeping and per-VM state reversion. Its first campaign (2026-10-03,
+# after e1246e477) left 141 survivors (57 lib.rs, 84 vm_revert.rs); the diff decoders were
+# rewritten around a checked reader, an expiry bond-lock defect was found and fixed, and every
+# survivor is now pinned. The re-run at that revision: 187 mutants, 150 caught, 37 unviable,
+# 0 missed. Every surviving mutant is a behaviour change no test observed, and the gate fails
+# until a test pins it.
 #
 # Opt-in (--mutants), like --loom/--fuzz: a full campaign is minutes, not seconds.
 #
@@ -25,9 +31,17 @@
 #   2  cargo-mutants or cargo-nextest is not installed — BLOCKED, skip loudly
 set -u
 
-PACKAGES=(
-  pallet-x3-supply-ledger
-)
+# One gate entry per package: a full campaign is hours of cargo builds, so local-ci exposes
+# `--only 'mutants supply ledger'` / `--only 'mutants atomic kernel'` and invokes this script
+# with the package as an argument. With no argument, mutate every package in the P0 set.
+if [ "$#" -gt 0 ]; then
+  PACKAGES=("$@")
+else
+  PACKAGES=(
+    pallet-x3-supply-ledger
+    pallet-x3-atomic-kernel
+  )
+fi
 JOBS="${X3_MUTANTS_JOBS:-4}"
 # An over-timeout mutant is classed TIMEOUT, not CAUGHT (cargo-mutants exit 3),
 # so a tight cap under parallel load turns real signal into noise (observed:

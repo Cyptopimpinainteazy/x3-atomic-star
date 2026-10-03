@@ -13,7 +13,7 @@
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
 #   scripts/local-ci.sh --fuzz          # + the cargo-fuzz gate (needs a nightly toolchain)
-#   scripts/local-ci.sh --mutants       # + the cargo-mutants campaign on the supply ledger
+#   scripts/local-ci.sh --mutants       # + the cargo-mutants campaigns on the P0 packages
 #   scripts/local-ci.sh --failure       # + the validator failure drill (boots and kills validators)
 #   scripts/local-ci.sh --testnet       # + the testnet ceremony drill (records and verifies a launch)
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
@@ -1025,12 +1025,15 @@ GATES_FUZZ=(
 )
 
 # Mutation testing on the money path. Opt-in like `--loom`/`--fuzz`: a full campaign is
-# minutes of parallel cargo builds, not a fast gate. The first campaign found two survivors
+# hours of parallel cargo builds, not a fast gate. The first campaign found two survivors
 # in the supply ledger's `on_finalize` proof pruning that no test observed (#576); this gate
-# keeps that loop running so the next survivor fails a gate instead of shipping. A box
+# keeps that loop running so the next survivor fails a gate instead of shipping. The atomic
+# kernel (submit/finalize/rollback, bond accounting, VM reversion) is the second package.
+# One entry per package so `--only 'mutants atomic kernel'` scopes the campaign. A box
 # without cargo-mutants reports BLOCKED, which is the honest answer.
 GATES_MUTANTS=(
-  "mutants supply ledger:bash scripts/x3-mutants-gate.sh"
+  "mutants supply ledger:bash scripts/x3-mutants-gate.sh pallet-x3-supply-ledger"
+  "mutants atomic kernel:bash scripts/x3-mutants-gate.sh pallet-x3-atomic-kernel"
 )
 
 # What the consensus network does when validators die. Opt-in and separate from
