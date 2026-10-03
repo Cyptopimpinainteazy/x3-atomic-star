@@ -13226,6 +13226,7 @@ dependencies = [
  "fixedbitset 0.5.7",
  "hashbrown 0.15.5",
  "indexmap 2.14.2",
+ "serde",
 ]
 
 [[package]]
@@ -14525,7 +14526,7 @@ dependencies = [
  "nalgebra 0.32.6",
  "ndarray",
  "num-complex 0.4.6",
- "petgraph 0.6.5",
+ "petgraph 0.8.3",
  "proptest",
  "rand 0.8.8",
  "rand_chacha 0.3.1",
