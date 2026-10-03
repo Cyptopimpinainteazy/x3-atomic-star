@@ -31,7 +31,7 @@ futures = "0.3"
 async-trait = "0.1"
 
 # Networking
-libp2p = { version = "0.53", features = ["tokio", "tcp", "noise", "yamux", "gossipsub", "mdns", "kad", "identify", "ping", "macros"] }
+libp2p = { version = "0.54", features = ["tokio", "tcp", "noise", "yamux", "gossipsub", "mdns", "kad", "identify", "ping", "macros"] }
 hyper-util = "0.1"
 
 # Serialization
