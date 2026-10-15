@@ -62,7 +62,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 prometheus = "0.14.0"
 
 # HTTP admin UI and web server
-axum = "0.7"
+axum = "0.8"
 hyper = "1.8"
 tiny_http = "0.12"
 tower-http = { version = "0.4", features = ["fs", "trace"] }
