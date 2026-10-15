@@ -37,7 +37,7 @@ jobs:
           target: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Install Java 17 for K Framework
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
