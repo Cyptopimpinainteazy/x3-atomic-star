@@ -460,7 +460,7 @@ dependencies = [
  "dotenvy",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-postgres",
  "tracing",
@@ -554,7 +554,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -1635,7 +1635,7 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "x3-vm",
 ]
@@ -2579,7 +2579,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -2926,7 +2926,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -3477,7 +3477,7 @@ dependencies = [
  "sp-runtime",
  "sp-std 14.0.0",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-cron-scheduler",
  "tracing",
@@ -4564,7 +4564,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo 0.32.1",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -6842,7 +6842,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tiny_http",
  "tokio",
  "tokio-test",
@@ -8694,7 +8694,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "toml 0.8.23",
  "walkdir",
 ]
@@ -10881,7 +10881,7 @@ dependencies = [
  "sp-core",
  "subxt 0.50.3",
  "subxt-signer 0.50.3",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -14069,7 +14069,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -14248,7 +14248,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "walkdir",
 ]
@@ -14506,7 +14506,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "subtle 2.6.1",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tracing",
  "zeroize",
 ]
@@ -14533,7 +14533,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -22518,7 +22518,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -24038,7 +24038,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -25672,7 +25672,7 @@ dependencies = [
  "keccak-hash",
  "secp256k1 0.28.2",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-accel-wgpu",
 ]
 
@@ -25684,7 +25684,7 @@ dependencies = [
  "keccak-hash",
  "pollster",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "wgpu 0.20.1",
 ]
 
@@ -25707,7 +25707,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-fees",
  "x3-proof",
  "x3-slash",
@@ -25727,7 +25727,7 @@ dependencies = [
  "sp-io",
  "sp-std 14.0.0",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "toml 0.8.23",
 ]
 
@@ -25812,7 +25812,7 @@ name = "x3-backend"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-common",
  "x3-hir",
@@ -25921,7 +25921,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-cross-vm-bridge",
  "x3-vm",
 ]
@@ -25931,7 +25931,7 @@ name = "x3-bridge-security-council"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -25956,7 +25956,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "ureq",
  "x3-atomic-swap",
@@ -26215,7 +26215,7 @@ dependencies = [
  "serde_json",
  "sp-core",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "toml 0.8.23",
  "tracing",
@@ -26252,7 +26252,7 @@ dependencies = [
  "jsonschema",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-backend",
  "x3-common",
@@ -26274,7 +26274,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-proof",
 ]
 
@@ -26286,7 +26286,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-agent",
  "x3-intent",
  "x3-proof",
@@ -26391,7 +26391,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlx",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "time",
  "tokio",
  "tower 0.4.13",
@@ -26490,7 +26490,7 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -26511,7 +26511,7 @@ dependencies = [
  "sha2 0.10.9",
  "sp-core",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]
@@ -26523,7 +26523,7 @@ dependencies = [
  "hex",
  "serde",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-court",
  "x3-fees",
  "x3-intent",
@@ -26543,7 +26543,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]
@@ -26568,7 +26568,7 @@ dependencies = [
  "sha2 0.10.9",
  "sp-core",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "uuid 1.21.0",
@@ -26604,7 +26604,7 @@ dependencies = [
  "rust_decimal_macros",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]
@@ -26631,7 +26631,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tower 0.5.3",
@@ -26681,7 +26681,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -26718,7 +26718,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "toml 0.8.23",
@@ -26747,7 +26747,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -26759,7 +26759,7 @@ name = "x3-hir"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-common",
  "x3-parser",
@@ -26785,7 +26785,7 @@ dependencies = [
  "sqlx",
  "subxt 0.50.3",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tower-http 0.5.2",
@@ -26811,7 +26811,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-fees",
  "x3-proof",
  "x3-slash",
@@ -26838,7 +26838,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-constitution",
  "x3-proof",
 ]
@@ -26872,7 +26872,7 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tower-lsp",
@@ -26888,7 +26888,7 @@ version = "1.0.0"
 dependencies = [
  "chrono",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio-test",
 ]
 
@@ -26907,7 +26907,7 @@ dependencies = [
 name = "x3-mir"
 version = "0.1.0"
 dependencies = [
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-common",
  "x3-hir",
@@ -26930,7 +26930,7 @@ dependencies = [
  "serde",
  "sha2 0.10.9",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "url 2.5.8",
@@ -26947,7 +26947,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-backend",
  "x3-common",
@@ -26974,7 +26974,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.10.9",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tracing",
 ]
 
@@ -26991,7 +26991,7 @@ dependencies = [
  "serde_json",
  "sled",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -27007,7 +27007,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -27060,7 +27060,7 @@ name = "x3-parser"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-common",
  "x3-lexer",
@@ -27091,7 +27091,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-std 14.0.0",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -27176,7 +27176,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tokio-util 0.7.19",
@@ -27224,7 +27224,7 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tps-tracker",
  "tracing",
@@ -27252,7 +27252,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -27297,7 +27297,7 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-runtime",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tokio-tungstenite 0.29.0",
@@ -27363,7 +27363,7 @@ dependencies = [
  "sp-state-machine",
  "sp-trie",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -27457,7 +27457,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-test",
  "tracing",
@@ -27471,7 +27471,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-common",
  "x3-parser",
@@ -27486,7 +27486,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-fees",
  "x3-intent",
  "x3-ixl",
@@ -27524,7 +27524,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-ast",
  "x3-backend",
  "x3-common",
@@ -27544,7 +27544,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "sp-core",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "tracing",
  "x3-backend",
  "x3-common",
@@ -27603,7 +27603,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "x3-backend",
  "x3-common",
  "x3-compiler",

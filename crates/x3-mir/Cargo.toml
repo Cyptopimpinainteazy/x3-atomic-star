@@ -11,7 +11,7 @@ x3-hir = { path = "../x3-hir" }
 x3-common = { path = "../x3-common" }
 # The types HIR expressions carry; MIR refuses operators on the ones the chain cannot compute.
 x3-typeck = { path = "../x3-typeck" }
-thiserror = "1.0"
+thiserror = "2.0"
 
 [dev-dependencies]
 x3-parser = { path = "../x3-parser" }

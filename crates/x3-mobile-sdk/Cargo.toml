@@ -20,7 +20,7 @@ bip32 = "0.5"
 bip39 = "2.0"
 rand = "0.8"
 chrono = "0.4"
-thiserror = "1.0"
+thiserror = "2.0"
 tracing = "0.1"
 bytes = "1.5"
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
