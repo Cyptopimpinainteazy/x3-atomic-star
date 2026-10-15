@@ -1939,7 +1939,7 @@ checksum = "90dbd31c98227229239363921e60fcf5e558e43ec69094d46fc4996f08d1d5bc"
 dependencies = [
  "bitcoin_hashes",
  "rand 0.8.8",
- "rand_core 0.5.1",
+ "rand_core 0.6.4",
  "serde",
  "unicode-normalization",
 ]
@@ -4673,6 +4673,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
  "pkcs8",
+ "serde",
  "signature 2.2.0",
 ]
 
@@ -4719,21 +4720,6 @@ dependencies = [
 
 [[package]]
 name = "ed25519-zebra"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c24f403d068ad0b359e577a77f92392118be3f3c927538f2bb544a5ecd828c6"
-dependencies = [
- "curve25519-dalek 3.2.0",
- "hashbrown 0.12.3",
- "hex",
- "rand_core 0.6.4",
- "serde",
- "sha2 0.9.9",
- "zeroize",
-]
-
-[[package]]
-name = "ed25519-zebra"
 version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "775765289f7c6336c18d3d66127527820dd45ffd9eb3b6b8ee4708590e6c20f5"
@@ -4743,6 +4729,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "pkcs8",
  "rand_core 0.6.4",
+ "serde",
  "sha2 0.10.9",
  "subtle 2.6.1",
  "zeroize",
@@ -17616,7 +17603,7 @@ dependencies = [
  "chacha20 0.9.1",
  "crossbeam-queue",
  "derive_more 2.1.1",
- "ed25519-zebra 4.2.0",
+ "ed25519-zebra",
  "either",
  "event-listener 5.4.2",
  "fnv",
@@ -17676,7 +17663,7 @@ dependencies = [
  "chacha20 0.9.1",
  "crossbeam-queue",
  "derive_more 2.1.1",
- "ed25519-zebra 4.2.0",
+ "ed25519-zebra",
  "either",
  "event-listener 5.4.2",
  "fastbloom",
@@ -20980,7 +20967,7 @@ dependencies = [
  "bounded-collections",
  "bs58",
  "dyn-clone",
- "ed25519-zebra 4.2.0",
+ "ed25519-zebra",
  "futures 0.3.34",
  "hash-db",
  "hash256-std-hasher",
@@ -26923,7 +26910,7 @@ dependencies = [
  "bip39",
  "bytes",
  "chrono",
- "ed25519-zebra 3.1.0",
+ "ed25519-zebra",
  "hex",
  "k256",
  "rand 0.8.8",
