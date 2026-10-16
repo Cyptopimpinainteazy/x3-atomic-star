@@ -31,7 +31,7 @@ async-trait = { version = "0.1", optional = true }
 futures = { workspace = true }
 
 # Data structures and storage
-dashmap = { version = "5.0", optional = true }
+dashmap = { version = "6.2", optional = true }
 parking_lot = "0.12"
 priority-queue = "1.2"
 
