@@ -29,7 +29,7 @@
     "@polkadot/util-crypto": "^13.3.1",
     "@solana/web3.js": "^1.98.2",
     "bech32": "^2.0.0",
-    "bitcoinjs-lib": "^6.1.7",
+    "bitcoinjs-lib": "^6.1.8",
     "bs58": "^6.0.0",
     "ecpair": "^2.1.0",
     "eventemitter3": "^5.0.1",
@@ -43,7 +43,7 @@
     "@types/node": "^20.0.0",
     "ethers": "^6.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6",
+    "vite": "^7.3.7",
     "vitest": "^5.0.0"
   },
   "files": [
