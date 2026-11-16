@@ -1,0 +1,678 @@
+.cargo/audit.toml
+  h_e41068bed968d7 43-73,96-115
+.github/workflows/blockchain-core.yml
+  h_e41068bed968d7 1-25
+.gitignore
+  h_e41068bed968d7 100-102,242-245,249-267
+AGENTS.md
+  h_e41068bed968d7 83-131
+Cargo.lock
+  h_e41068bed968d7 1067-1068,1070,1072-1081,1085-1086,1088,1090-1092,1261,1270,1389-1390,1392,2165-2172,2174,2176,2180-2181,2183,2185-2187,2191-2192,2194,2207,2479,2481,2488,2490,2497,2499,2506,2508,2516,2518,2543,2545,2556,2558,2562,2564,2571,2573,2582,2584,2594,2596,2600,2602,2611,2613,2696,2835,2837,2894,3236,3276,3454,3485,3500,3502,3504,3508-3509,3511,3513-3516,4001-4003,4015,4033,4035-4038,4044-4051,4053,4055-4056,4060-4061,4063,4065-4066,4070-4072,4074-4084,4086,4090-4092,4094-4096,4101-4103,4105-4108,4112-4114,4119,4450,4479,4507,4517-4528,4599,4640-4641,4685,4765,4998,5077,5168,5178,5897,5901,5950,6339,6702,6751,6755,6869,6902,6985-6986,6988,6990-6991,6996,6998,7031-7035,7037-7042,7044-7046,7048,7061,7063,7073,7075,7116,7134,7136,7178,7180,7203,7205,7221-7222,7224-7226,7242,7267,7269,7286,7288,7293,7310,7312,7322,7324,7330,7332,7341,7366,7381,7385,7401-7402,7417,7437,7554,7556,7604,7688-7689,7691,7693,7697-7698,7700,7703-7704,7706,7708,7712-7713,7715-7733,8181,8350,8352,8359,8364-8365,8969,8987,9027,9164,9183,9192,9278,9298,9335,9383,9434,9528,9549,9629,9645,9663,9682,9686-9699,9713,9734,9749,9765,9786,9801,9825,9845,9869-9870,9889,9907,9922,9938,9958,9975-9976,9994,10011,10028,10051,10057,10060,10062,10076-10077,10091,10107,10124,10143,10159,10175,10192-10207,10222,10241,10269,10273,10293,10313,10333,10354,10372-10387,10404,10420,10437,10454,10494,10653,10779-10780,10782,10785-10786,10788,10790,10794-10795,10797,10799-10801,10805-10806,10808,10811-10812,10814,10817-10818,10820,10822-10824,10828-10829,11065,11123,11245,11418,11420-11421,11768,11770,11780,11782,11907-11908,11917,11919,11929,11941,11943,11948,12393,12403,12419,12508,12524-12525,12527,12530-12531,12533,12546,12657,12659,12665,12712,12715,12719,12733,12736,12739,12761,12763,13047,13356,13503,13750,13884,13911,14093,14696,14766,14826,16389,16594,17080,17342,17393,17584,17611,17643,17668,17697,17720,17949,17953,17962,17973,18233,18252,18353,18438,18445,18586,18653,18660,18667-18668,18694,18706-18707,18731,18964,19004,19014-19017,19037-19038,19052,19056,19059,19068,19083,19100-19103,19113,19132,19135,19139,19163,19600,19602,19616-19617,19619,19652,19718,20168,20187,20189,20399,20816,20818,20864,20866,20889,20891,20898,20900,20918,20920,20945,20947,20961,20963,20973,20975,20985,20987,20994,20996,21000,21002,21013,21015,21024,21026,21065,21070,21072,21098,21103,21105,21122-21123,21131-21133,21150,21152,21159-21160,21171,21178-21179,21181,21189-21190,21194,21204,21209-21210,21212,21226,21267,21278,21280,21367-21368,21370-21371,21430-21431,21820,21836,21847,21861,21896,21908,21916,21924,21963,21966,21970,21980,21998,22078,22081,22121,22149,22158,22179,22186,22190,22196,22198,22215-22216,22226,22263,22295,22309,22327,22335,22394,22403,22438,22440,22459,22462-22475,22478,22482-22483,22485-22488,22492,22495,22499-22502,22506,22509-22512,22516,22519-22521,22525-22527,22544,22556,22584-22585,22594,22605,22615,22640,22733,22767,22804,22860,22877,22913,22941,22944,22950,22963,22977,22985,22996,23002-23003,23008-23016,23341,23343
+Cargo.toml
+  h_e41068bed968d7 17,19,21,45-46,52-57,60,64,67-69,72,74,76,78-82,84-86,88-91,94,97,99-102,105,107-109,112-114,116-121,124-132,134-179,398-399
+README.md
+  h_e41068bed968d7 1,3,5,7,9,11,13,15,18-21,24,27-28,31,33,35,37
+WIKI.md
+  h_e41068bed968d7 1-13
+audit-artifacts/migration/provenance.json
+  h_e41068bed968d7 1-248
+audit-artifacts/migration/source-files.json
+  h_e41068bed968d7 1-12222
+audit-artifacts/migration/testnet-port.json
+  h_e41068bed968d7 1-132
+audit-artifacts/migration/verification.json
+  h_e41068bed968d7 1-91
+crates/evm-integration/src/lib.rs
+  h_e41068bed968d7 25,129-130
+crates/evm-integration/src/mini_evm.rs
+  h_e41068bed968d7 49,63-99,145-149,165-166,195-198,209-211,219-230,274-275
+crates/evm-integration/src/persistent.rs
+  h_e41068bed968d7 1-329
+crates/parallel-proposer/src/substrate.rs
+  h_e41068bed968d7 491,503-510
+crates/x3-accel-wgpu/examples/gpu_parity.rs
+  h_e41068bed968d7 1-389
+crates/x3-accel-wgpu/src/lib.rs
+  h_e41068bed968d7 7-12,14-24,41,46-49,52-65,68-69,71-72,85,93-120,122,129-131,138-139,145-147,173,175-182,184-191,193-198,200-202,204-218,220-240,242-243,248-271,273-294,296-302,304-309,311-323,325-328,332,335-336,339-346,353,357,367,369,371,373-377,379-416,418,420-432,435-437,439-461,463-493,498-505,508-539,542-551,554-556,572-576,579-582,584-585,588-594,596-597,599-604,606,683-685,689-693,706,709,754,756-763,777-797,938-940,944-948,958,960-962,1030-1047,1052,1066-1080,1082-1098,1102-1134,1139
+crates/x3-accel-wgpu/src/secp256k1.rs
+  h_e41068bed968d7 1-982
+crates/x3-accel/Cargo.toml
+  h_e41068bed968d7 20-26
+crates/x3-accel/examples/secp256k1_gpu_bench.rs
+  h_e41068bed968d7 1-139
+crates/x3-accel/src/lib.rs
+  h_e41068bed968d7 12-16,98-101,117-130,279-334,345,347-363,374-376,380-382,658,755-788
+crates/x3-accel/src/multi_device.rs
+  h_e41068bed968d7 1-458
+crates/x3-accel/src/shadow.rs
+  h_e41068bed968d7 1-469
+crates/x3-accel/tests/secp256k1_gpu_parity.rs
+  h_e41068bed968d7 1-406
+crates/x3-asset-kernel-types/src/lib.rs
+  h_e41068bed968d7 766-822,1115-1305
+crates/x3-ast/src/lib.rs
+  h_e41068bed968d7 19-78,132-151,297-308,322-327,378-436
+crates/x3-automation/src/lib.rs
+  h_e41068bed968d7 5-15,25-34,39,41-44,46-48,50-51,53-75,78-81,86-94,96-116,119,124,126,128,130,132,134,136,138-139,142,144-153,156,158,160,162,164,168-221,270-274,277-278,312-316,323-326,329-336,368,379,382,384,387,389,391-402,411-453
+crates/x3-backend/Cargo.toml
+  h_e41068bed968d7 10-21,26,28,30-33
+crates/x3-backend/src/bc_format.rs
+  h_e41068bed968d7 1,3-5,7,9-10,12-18,20-21,23-24,26-27,29-30,32-33,35
+crates/x3-backend/src/bc_format_helpers.rs
+  h_e41068bed968d7 1-2,4
+crates/x3-backend/src/error.rs
+  h_e41068bed968d7 3-4,7,30,48-49,80,228
+crates/x3-backend/src/layout.rs
+  h_e41068bed968d7 281
+crates/x3-backend/src/lib.rs
+  h_e41068bed968d7 1,88-102,106-111,113,115,126,129,131,133
+crates/x3-backend/src/lower.rs
+  h_e41068bed968d7 422-431,525-532,827-833
+crates/x3-backend/src/mir_lower.rs
+  h_e41068bed968d7 34-35,53,189-191,229-233,252-259,472-541
+crates/x3-backend/src/opcode.rs
+  h_e41068bed968d7 1,3-5,7
+crates/x3-bridge-adapters/src/lib.rs
+  h_e41068bed968d7 799-800,802
+crates/x3-btc-spv/Cargo.toml
+  h_e41068bed968d7 1-13
+crates/x3-btc-spv/src/client.rs
+  h_e41068bed968d7 1-263
+crates/x3-btc-spv/src/lib.rs
+  h_e41068bed968d7 1-384
+crates/x3-btc-spv/src/tx.rs
+  h_e41068bed968d7 1-114
+crates/x3-btc-spv/src/u256.rs
+  h_e41068bed968d7 1-268
+crates/x3-btc-spv/tests/consensus.rs
+  h_e41068bed968d7 1-512
+crates/x3-common/Cargo.toml
+  h_e41068bed968d7 12-13,24
+crates/x3-common/src/lib.rs
+  h_e41068bed968d7 79-88,116-120,214,216-218,220,248-254,301-348,359-386
+crates/x3-compiler/Cargo.toml
+  h_e41068bed968d7 38
+crates/x3-compiler/src/gateway.rs
+  h_e41068bed968d7 103-108,147-159,238,256-312,316-331,556-559,562,577-595,599,613,618,627-664
+crates/x3-compiler/tests/never_panics.rs
+  h_e41068bed968d7 1-403
+crates/x3-crosschain-intent/Cargo.toml
+  h_e41068bed968d7 19,27-28
+crates/x3-crosschain-intent/src/proof/btc.rs
+  h_e41068bed968d7 20-31,53-64,75,120-123,170-181,193-196,198-199,202-203,208,212,218,237-275,277,280-284,289,299-300,302-305,307-308,311-345,347,349-355,359-365,369-371,373,375-376,379-382,386-405,409-410,412-425,431-433,435-436,438,440-441,446-447,449-462
+crates/x3-gpu-validator-swarm/Cargo.toml
+  h_e41068bed968d7 49,103-104
+crates/x3-gpu-validator-swarm/src/bin/wallet_sync.rs
+  h_e41068bed968d7 55-56,65,83-86,172,175-207,214
+crates/x3-gpu-validator-swarm/src/deterministic.rs
+  h_e41068bed968d7 15,391-402,531,847-877,1021-1140
+crates/x3-gpu-validator-swarm/src/gpu_bytecode.rs
+  h_e41068bed968d7 7,22,24,48,66-67,71-74,76,100,118-119,122-125,130,134-178
+crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs
+  h_e41068bed968d7 7,12-13,47-55,95,107,115-120,122,190,203-207,315-356,412,414-417,432,454,475,495,515
+crates/x3-gpu-validator-swarm/src/payment.rs
+  h_e41068bed968d7 519-520,525,527-529,531,572-575,577-606,625-686,689-712,774,776-783,785-874
+crates/x3-gpu-validator-swarm/src/x3_kernel_versioning.rs
+  h_e41068bed968d7 10,309-321,326-329,339-340,346-366,368-371,373-374,379-382,385-387,389-390,392-405,544-560,568,570,577-578,580-615
+crates/x3-hir/src/lower.rs
+  h_e41068bed968d7 44-46,60,63,107-112,167-168,174-267,291-307,327-330,948-1024,1092-1104,1117-1230,1298-1325,1332-1346
+crates/x3-integration/Cargo.toml
+  h_e41068bed968d7 9-13,16-19,46-49,73-75,78-79
+crates/x3-integration/src/error.rs
+  h_e41068bed968d7 41-43,69-72,96-98
+crates/x3-integration/src/executor.rs
+  h_e41068bed968d7 13,18-26,239-244,323,355-359,361-363,365-370,377,382-489,491-494,496-497,502,508-511,513-514,518-521,523-524,540,546-551,554-555,558,574-600
+crates/x3-integration/src/lib.rs
+  h_e41068bed968d7 56-61,63-64,79-80
+crates/x3-integration/src/mini_x3.rs
+  h_e41068bed968d7 456-463,1939-1940
+crates/x3-integration/src/trading.rs
+  h_e41068bed968d7 1-490
+crates/x3-integration/tests/bc_const_pool_parity.rs
+  h_e41068bed968d7 342
+crates/x3-integration/tests/bytecode_robustness.rs
+  h_e41068bed968d7 179
+crates/x3-integration/tests/bytecode_version_compat.rs
+  h_e41068bed968d7 69,95
+crates/x3-integration/tests/chain_engine.rs
+  h_e41068bed968d7 1-223
+crates/x3-integration/tests/differential.rs
+  h_e41068bed968d7 3-7,670-752
+crates/x3-integration/tests/events.rs
+  h_e41068bed968d7 195-226
+crates/x3-integration/tests/interpreter_agreement.rs
+  h_e41068bed968d7 3-7,55-57,59-60
+crates/x3-integration/tests/mini_x3_fail_closed.rs
+  h_e41068bed968d7 3-7
+crates/x3-integration/tests/opcode_differential.rs
+  h_e41068bed968d7 1-278
+crates/x3-integration/tests/source_language.rs
+  h_e41068bed968d7 233-549
+crates/x3-integration/tests/trading_support/mod.rs
+  h_e41068bed968d7 1-185
+crates/x3-integration/tests/x3lang_trading_differential.rs
+  h_e41068bed968d7 1-250
+crates/x3-integration/tests/x3lang_trading_negative.rs
+  h_e41068bed968d7 1-310
+crates/x3-integration/tests/x3lang_trading_production_e2e.rs
+  h_e41068bed968d7 1-249
+crates/x3-integration/tests/x3lang_trading_receipt_replay.rs
+  h_e41068bed968d7 1-208
+crates/x3-integration/tests/x3lang_trading_rollback.rs
+  h_e41068bed968d7 1-238
+crates/x3-mir/src/lower.rs
+  h_e41068bed968d7 124-134,303-349,588-598,601-623
+crates/x3-opt/src/rule_miner.rs
+  h_e41068bed968d7 89
+crates/x3-parser/src/parser.rs
+  h_e41068bed968d7 6-12,21-23,32,52-53,122-207,224-317,345-365,367-448,454,458-482,484-487,550,568,776,814-852,937-940,944-956,958-967,983,996-1005,1020,1022-1031
+crates/x3-parser/src/tokens.rs
+  h_e41068bed968d7 8-16
+crates/x3-parser/src/validator.rs
+  h_e41068bed968d7 16-18,20,58-59,137-208,221-222,487-523,544-745
+crates/x3-parser/tests/automation_grammar.rs
+  h_e41068bed968d7 1-353
+crates/x3-relayer/src/relayer.rs
+  h_e41068bed968d7 901,1556
+crates/x3-runtime-signer/src/lib.rs
+  h_e41068bed968d7 45,216-227,254-255
+crates/x3-semantics/src/resolver.rs
+  h_e41068bed968d7 126-128,272-273,363-364,612-641,737-744,750-751,756-757
+crates/x3-typeck/src/checker.rs
+  h_e41068bed968d7 64-65,84,111-112,121-217,306-323,360-378,398-399,663-740,864-887,970,972-994,1022-1154,1238-1261
+crates/x3-typeck/src/infer.rs
+  h_e41068bed968d7 275-277
+crates/x3-typeck/src/lib.rs
+  h_e41068bed968d7 53
+crates/x3-typeck/src/types.rs
+  h_e41068bed968d7 290-293,310-327,609
+crates/x3-verification-router/Cargo.toml
+  h_e41068bed968d7 33-34
+crates/x3-verification-router/src/bitcoin_spv.rs
+  h_e41068bed968d7 1-260
+crates/x3-verification-router/src/evm_receipt.rs
+  h_e41068bed968d7 1430,1579,1806,1825,1863
+crates/x3-verification-router/src/lib.rs
+  h_e41068bed968d7 23,39-42,97-99,127-132,157-165,282,624
+crates/x3-verification-router/tests/bitcoin_deposit.rs
+  h_e41068bed968d7 1-289
+crates/x3-vm/Cargo.toml
+  h_e41068bed968d7 11-14,23-24,27,30-31,33-34,37,41-42,46-48,50-53,57
+crates/x3-vm/src/context.rs
+  h_e41068bed968d7 1-37
+crates/x3-vm/src/error.rs
+  h_e41068bed968d7 3-4,31,39-42,117-131,159,252-263,293-297
+crates/x3-vm/src/events.rs
+  h_e41068bed968d7 7-8,35-36,43-48,79-81,175-194
+crates/x3-vm/src/execution_guards.rs
+  h_e41068bed968d7 1
+crates/x3-vm/src/hostcall.rs
+  h_e41068bed968d7 7-10,15-25,214,222,230
+crates/x3-vm/src/isolation.rs
+  h_e41068bed968d7 7-8
+crates/x3-vm/src/lib.rs
+  h_e41068bed968d7 1,66-79,81,83,87,89,92,94,100,102-103,107,111,113,116,123,125,130
+crates/x3-vm/src/state.rs
+  h_e41068bed968d7 6-7
+crates/x3-vm/src/storage.rs
+  h_e41068bed968d7 6-7
+crates/x3-vm/src/trading.rs
+  h_e41068bed968d7 1-1033
+crates/x3-vm/src/verifier.rs
+  h_e41068bed968d7 17-18,20,22-23,49-52,63,77-85,90-102,179-181,185-187,193-194,201-353,360,415-416,418-421,429-436,438,441-447,449-459,461-463,467,509-606,697-700,702-713,728-729,743-751,754,777,927-1084,1104-1110,1540-1541
+crates/x3-vm/src/vm.rs
+  h_e41068bed968d7 29,33,38,46-70,119-123,129-135,137-197,293-294,311-313,315-316,376,385-386,426-456,463,614-625,652-660,777,779-788,1092-1104,1343-1350,1355-1357,1372-1374,1379-1604,1618-1620,1707-1712,1934-1983,1994-2023,2070-2087,2089-2100,2183-2187,2291-2293,2949,3206-3724
+crates/x3-vm/tests/gpu_integration.rs
+  h_e41068bed968d7 35
+crates/x3-vm/tests/opcode_spec_exhaustive.rs
+  h_e41068bed968d7 1-122
+crates/x3-vm/tests/robustness.rs
+  h_e41068bed968d7 1-186
+crates/x3bc-core/Cargo.toml
+  h_e41068bed968d7 1-18
+crates/x3bc-core/src/amm.rs
+  h_e41068bed968d7 1-194
+crates/x3bc-core/src/bytecode.rs
+  h_e41068bed968d7 1-263
+crates/x3bc-core/src/codec.rs
+  h_e41068bed968d7 1-299
+crates/x3bc-core/src/economics.rs
+  h_e41068bed968d7 1-478
+crates/x3bc-core/src/error.rs
+  h_e41068bed968d7 1-95
+crates/x3bc-core/src/format.rs
+  h_e41068bed968d7 1-1751
+crates/x3bc-core/src/format_helpers.rs
+  h_e41068bed968d7 1-411
+crates/x3bc-core/src/hash.rs
+  h_e41068bed968d7 1-39
+crates/x3bc-core/src/lib.rs
+  h_e41068bed968d7 1-44
+crates/x3bc-core/src/opcode.rs
+  h_e41068bed968d7 1-1440
+crates/x3bc-core/src/receipt.rs
+  h_e41068bed968d7 1-580
+crates/x3bc-core/src/spec.rs
+  h_e41068bed968d7 1-1483
+crates/x3bc-core/src/state.rs
+  h_e41068bed968d7 1-349
+crates/x3bc-core/src/trading.rs
+  h_e41068bed968d7 1-972
+crates/x3bc-core/src/trap.rs
+  h_e41068bed968d7 1-158
+node/Cargo.toml
+  h_e41068bed968d7 105-107,183-185
+node/src/atomic_gateway.rs
+  h_e41068bed968d7 36-37,41,52-60,64,86-105,274-279,283,286-291
+node/src/atomic_service.rs
+  h_e41068bed968d7 17,27,30,91-127,138-139,150-151,154,178-179,182,198-202,209-214,223,225,254,258,279-295,301-314,316-317,320-332,334-346,349-360,362,364-367,428,438,440,482-536,559-636
+node/src/chain_spec.rs
+  h_e41068bed968d7 15-17,534,583,636,685,742,796,863,927,1045-1062,1082-1085,1109,1115-1124,1162,1326-1418
+node/src/command.rs
+  h_e41068bed968d7 344
+node/src/disk_guard.rs
+  h_e41068bed968d7 151-157,161,165,225-228,238-239
+node/src/eth_index.rs
+  h_e41068bed968d7 1-681
+node/src/lib.rs
+  h_e41068bed968d7 32-35
+node/src/rpc.rs
+  h_e41068bed968d7 951-952
+node/src/rpc_frontier.rs
+  h_e41068bed968d7 14-16,389,391,394-395,570-595,597-599,601-602,604-619,642-655,779-784,818-831,842,858-860,897-898,1236,1309-1310,1316,1327-1343,1352,1394-1395,1401,1412-1428
+node/src/service.rs
+  h_e41068bed968d7 325-334,607,1506-1513
+node/src/validator_rotation.rs
+  h_e41068bed968d7 289-292,305
+node/tests/supply_invariant_distributed.rs
+  h_e41068bed968d7 33-37,91-92,635-638,867-871,970-974,976,985,994,1003,1012,1021,1467-2139,2227-2237,2452,2562-2567
+pallets/atomic-trade-engine/src/lib.rs
+  h_e41068bed968d7 89-92,149,153-154,388,441-447,677-685,705-740,768-779,1110-1117,1203,1217-1223,1262-1266,1276-1280,1370-1436,1523,1588,1596-1601,1643,1652,1658,1661,2518-2519
+pallets/atomic-trade-engine/src/mock.rs
+  h_e41068bed968d7 13,103-137,140-148,153-155,377,382,392,411
+pallets/atomic-trade-engine/src/tests.rs
+  h_e41068bed968d7 25-334,358-390,1259-1411
+pallets/meme-overlord/src/lib.rs
+  h_e41068bed968d7 173-189,464-465,493,563-566,569,574,590,668,820
+pallets/meme-overlord/src/mock.rs
+  h_e41068bed968d7 1-9,11,13-71
+pallets/meme-overlord/src/tests.rs
+  h_e41068bed968d7 1-102,106-188
+pallets/x3-app-registry/Cargo.toml
+  h_e41068bed968d7 1-45
+pallets/x3-app-registry/src/lib.rs
+  h_e41068bed968d7 1-966
+pallets/x3-app-registry/src/tests.rs
+  h_e41068bed968d7 1-611
+pallets/x3-app-registry/src/weights.rs
+  h_e41068bed968d7 1-130
+pallets/x3-asset-registry/src/lib.rs
+  h_e41068bed968d7 285-288,304-321,421,736-845,1227-1280
+pallets/x3-atomic-kernel/fuzz/Cargo.lock
+  h_e41068bed968d7 21,31-32,34,36-37,63-64,66,85,87,90,94-257,262-263,265,267-271,275-276,278-400,431-436,449,453,477-488,490,492-494,496-505,548,558,567,572,574,576,644-645,723,735-736,778-785,787,831,862,889-890,900-901,910-912,915,920,922,924-926,929,933-944,961,966,971-990,1063-1064,1066-1072,1076-1077,1088-1094,1100,1102,1112-1113,1116-1117,1132-1136,1139-1141,1143-1147,1153-1154,1158-1159,1162,1167,1173-1174,1177,1185-1186,1195-1196,1199,1205-1209,1366,1387-1405,1423,1425,1427,1432,1434-1444,1446-1448,1458-1459,1461,1470-1471,1473,1475,1488-1489,1491,1493-1494,1498-1499,1501,1503-1504,1508-1509,1511,1513-1517,1521-1522,1524,1527-1528,1530,1533-1534,1536,1538-1548,1550,1554-1555,1557,1559-1564,1568-1569,1571,1573,1577-1578,1580,1582-1584,1589,1591,1646-1647,1649,1651,1656,1658-1667,1679-1680,1682,1684-1691,1695-1696,1698,1700-1713,1726,1848,1850,1860,1862,1865,1874,1876,1885,1887,1896,1898,1900,1921,1923,1925,1927,1951-1961,1983-1991,2011-2016,2023,2087-2092,2102,2111,2128,2164-2165,2167-2172,2175-2176,2178,2182,2184,2187,2191-2192,2194,2213-2223,2225,2227,2230-2257,2279,2281,2285,2326,2328,2345-2346,2348,2350-2355,2493-2494,2505,2520,2589,2601,2612,2614-2615,2617,2619,2639,2641,2648,2650,2657,2659,2690-2700,2742-2743,2745,2747-2748,2761,2823-2828,2842-2845,2847-2848,2853-2854,2856,2861-2869,2875-2876,2881,2889-2890,2895-2896,2901-2902,2904,2915-2916,2918,2920,2924-2925,2931-2932,2935,2942,2946-2951,2956,2961-2963,2974-2976,2979,2985-2986,2995-2996,3000,3005-3006,3008-3009,3011-3012,3017-3018,3024,3030-3031,3034-3035,3039,3042-3049,3056-3057,3061-3062,3067-3068,3077-3078,3086-3087,3089-3091,3096,3102-3112,3117-3118,3123-3129,3135-3136,3139-3140,3148-3149,3155-3156,3161-3162,3170-3173,3181-3182,3186-3187,3193,3198-3199,3202,3209-3211,3213-3218,3221,3224-3226,3235-3236,3243-3246,3252-3253,3256,3264-3265,3275-3276,3278,3283-3284,3319-3320,3322,3324-3348,3352-3365,3395-3396,3398,3402,3450-3451,3453,3455-3460,3464-3465,3467-3473,3475-3476,3480-3481,3483,3485,3503-3531,3568,3582,3609,3638,3640,3649,3651,3654-3656,3660,3668,3670,3693-3698,3719,3721,3763-3764,3766,3768-3781,3785-3786,3788,3790-3795,3799-3800,3802,3804-3811,3815-3816,3818,3820-3827,3831-3832,3834,3836-3837,3841-3842,3844,3847-3848,3850,3853-3854,3856,3858,3893,3951-3952,3954-3960
+pallets/x3-atomic-kernel/fuzz/Cargo.toml
+  h_e41068bed968d7 16-18
+pallets/x3-atomic-kernel/src/benchmarking.rs
+  h_e41068bed968d7 37-41,69,97,128,132-146,179,207
+pallets/x3-atomic-kernel/src/chain_legs.rs
+  h_e41068bed968d7 1-193
+pallets/x3-atomic-kernel/src/lib.rs
+  h_e41068bed968d7 90-92,122,139,208-211,288-310,457-462,539-562,623-624,629-634,636-665,667-668,670-677,680-689,692-696,723-724,728,760-763,808-810,812-815,849,958,985,1014,1016-1019,1024-1026,1029-1030,1032-1067,1072-1077,1079-1105,1107-1108,1111,1156-1159,1169-1188,1191-1201,1203-1213,1216-1228,1230,1232-1263,1266-1274,1276-1284,1338-1340,1391,1397-1398,1549-1552
+pallets/x3-atomic-kernel/src/mock.rs
+  h_e41068bed968d7 12,294-462
+pallets/x3-atomic-kernel/src/tests.rs
+  h_e41068bed968d7 31-64,81-93,114,131,150,168,211,224-237,241,256-267,1153,1178,1264,1301,1323,1353,1423,1425,1427-1432,1435,1437,1439,1442-1446,1449-1450,1453,1459-1460,1465-1466,1468,1471-1496,1502-1503,1505-1789,1803,1820,1833,1845,1862,1884,2005-2069
+pallets/x3-atomic-kernel/src/tests_gate_pins.rs
+  h_e41068bed968d7 31-35,75,170-171,173,188,195,202-203,236-237,239,260-263,319-320,322,334-335,339,341-342,363,378-391,397,440-444,447-450,576-635
+pallets/x3-atomic-kernel/src/tests_vm_revert_hardening.rs
+  h_e41068bed968d7 643-646,648,650,654-655,658-678,680-686
+pallets/x3-atomic-kernel/src/vm_revert.rs
+  h_e41068bed968d7 37-40,120-122,839-857,859,863,1110-1113,1115,1119-1122,1127,1131-1134,1146,1148-1151,1224,1234-1237,1241-1243,1245,1266,1268,1270-1271
+pallets/x3-atomic-kernel/tests/proptest_tests.rs
+  h_e41068bed968d7 1,3-5,9-14,16-27,29-31,33-44,46-48,50-53,56-57,59-64,67-69,71-78,80-93,96-97,99-105,107-119
+pallets/x3-automation/src/lib.rs
+  h_e41068bed968d7 21-38,62-64,66-68,71-73,86-101,111,119-132,159-170,176,179-181,187,208-228,238,241-242,245-258,266-267,284,290-294,320-325,346,351,354,362,376,379,389-399,406,408-413,417,419,422-430,432-494,496-511,513,517-519,521-526,529-530,533,536-541,543-549,552-557,560-590,592-600,603-604,607-647,650-658,660-673,675-676,678,680,683-685,688-708
+pallets/x3-automation/src/mock.rs
+  h_e41068bed968d7 5,8,14,126-196,203-204,208-213
+pallets/x3-automation/src/tests.rs
+  h_e41068bed968d7 214-859
+pallets/x3-coin/src/mock.rs
+  h_e41068bed968d7 154,165
+pallets/x3-cross-vm-router/src/lib.rs
+  h_e41068bed968d7 15-32
+pallets/x3-crosschain-gateway/Cargo.toml
+  h_e41068bed968d7 53-54
+pallets/x3-crosschain-gateway/src/lib.rs
+  h_e41068bed968d7 416-419,1200-1202,1324-1330,1373
+pallets/x3-crosschain-gateway/src/mock.rs
+  h_e41068bed968d7 76,391-421
+pallets/x3-crosschain-gateway/src/tests.rs
+  h_e41068bed968d7 1489-1594
+pallets/x3-da/src/benchmarking.rs
+  h_e41068bed968d7 11,26-31,45-50
+pallets/x3-da/src/lib.rs
+  h_e41068bed968d7 42-46,49,52-54,60-64,189-193,206-208,266,358-398
+pallets/x3-da/src/mock.rs
+  h_e41068bed968d7 56,76-80,90,105-110
+pallets/x3-da/src/tests.rs
+  h_e41068bed968d7 317-370
+pallets/x3-dex/src/benchmarking.rs
+  h_e41068bed968d7 6,8-15,26,28,32,49,51,55,65,74,76,80,90,100-101,110,112,116,126
+pallets/x3-dex/src/lib.rs
+  h_e41068bed968d7 8-17,30-31,42,45-46,61-76,92-101,105-106,108-113,145-150,167-176,194-195,197-198,201-216,220,241,244,256-271,273-284,297,319,324-331,334,342-368,372-375,408,415-424,426-446,471-567
+pallets/x3-dex/src/mock.rs
+  h_e41068bed968d7 5,60-108,115-119,122-131,140-144
+pallets/x3-dex/src/tests.rs
+  h_e41068bed968d7 6,8-11
+pallets/x3-dex/src/tests_custody.rs
+  h_e41068bed968d7 1-261
+pallets/x3-dex/src/tests_liquidity_provision.rs
+  h_e41068bed968d7 5,7-10
+pallets/x3-dex/src/tests_swapping.rs
+  h_e41068bed968d7 6,8-103,191
+pallets/x3-flashloan/Cargo.toml
+  h_e41068bed968d7 22,42
+pallets/x3-flashloan/src/benchmarking.rs
+  h_e41068bed968d7 53-54,57-61,63,74-83
+pallets/x3-flashloan/src/lib.rs
+  h_e41068bed968d7 12-23,35,37-38,57-72,75-80,106-122,143-158,175-191,208-359,406,434,474-490
+pallets/x3-flashloan/src/mock.rs
+  h_e41068bed968d7 31-78,84-85,108-111
+pallets/x3-flashloan/src/tests.rs
+  h_e41068bed968d7 9,22,31,33,42,64,91,100,107-307
+pallets/x3-kernel/Cargo.toml
+  h_e41068bed968d7 40-41,75-76,106-108
+pallets/x3-kernel/src/adapters.rs
+  h_e41068bed968d7 21-55,63-70,122-138,150-157,204-211,285-292,642-643,677-692
+pallets/x3-kernel/src/benchmarking.rs
+  h_e41068bed968d7 442-492
+pallets/x3-kernel/src/lib.rs
+  h_e41068bed968d7 70-76,494-497,506-508,603-609,644-647,694-737,815-821,945-947,984-994,1105-1143,1262-1295,1387-1514,1618-1622,1875-1879,2166-2170,2210,2215,2316-2319,2321-2333,2386-2387,2957-2963,3929-3954,3982-4046,4050,4068-4073,4076-4078,4355-4356,4358,4360-4366,4438-4439,4444,5211-5214
+pallets/x3-kernel/src/mock.rs
+  h_e41068bed968d7 2,183-196,200-220,502,507,565,668-670,673-675,734-905
+pallets/x3-kernel/src/test_helpers.rs
+  h_e41068bed968d7 77-78,80-81
+pallets/x3-kernel/src/tests.rs
+  h_e41068bed968d7 24-93,2325,2356,2377
+pallets/x3-kernel/src/tests_trading.rs
+  h_e41068bed968d7 1-1155
+pallets/x3-kernel/src/trading.rs
+  h_e41068bed968d7 1-927
+pallets/x3-kernel/src/wasm_adapters.rs
+  h_e41068bed968d7 5,25-30,42,44-46,53-62,68,74,76-96,98-111,132-175,290-293,316-332,346,351,358-370,372-375,535-538,563,565-636
+pallets/x3-kernel/src/weights.rs
+  h_e41068bed968d7 67,249-263,456-470
+pallets/x3-kernel/tests/x3_storage_channel.rs
+  h_e41068bed968d7 37,179,184,215,404-450,670-802
+pallets/x3-launchpad/Cargo.toml
+  h_e41068bed968d7 25,40
+pallets/x3-launchpad/src/lib.rs
+  h_e41068bed968d7 5-16,43,105-106,108,114-123,126-139,171-181,183,256-260,320-325,351-358,387-397,478-481,483-494,540-542,544-547,552,556,564-580,582-583,586-589,591-593,596-598,600-612,616,618,624-652,670-675,700-706,708-713,722-724,731-739,758-770,782-789
+pallets/x3-launchpad/src/mock.rs
+  h_e41068bed968d7 57-119,121,125,127-128,132-135,137-159,163-165,169-172,179-183,192-196
+pallets/x3-launchpad/src/tests.rs
+  h_e41068bed968d7 1,285-289,291-292,303,347-352,360-361,367-368,382-384,386-391,396,402-426,429-444,446-447,482-601
+pallets/x3-security-gate/Cargo.toml
+  h_e41068bed968d7 1-45
+pallets/x3-security-gate/src/lib.rs
+  h_e41068bed968d7 1-937
+pallets/x3-security-gate/src/tests.rs
+  h_e41068bed968d7 1-706
+pallets/x3-security-gate/src/weights.rs
+  h_e41068bed968d7 1-106
+pallets/x3-sequencer/src/benchmarking.rs
+  h_e41068bed968d7 11,20,27-32
+pallets/x3-sequencer/src/lib.rs
+  h_e41068bed968d7 45-49,52,55-57,63-67,188-192,205-207,297,332-372
+pallets/x3-sequencer/src/mock.rs
+  h_e41068bed968d7 59,79-83,93,108-113
+pallets/x3-sequencer/src/tests.rs
+  h_e41068bed968d7 4-7,351-399
+pallets/x3-settlement-engine/Cargo.toml
+  h_e41068bed968d7 49-50,94
+pallets/x3-settlement-engine/src/lib.rs
+  h_e41068bed968d7 393-403,830-833,966-967,1046,1979-1982,1984,3307-3308,3563-3575,3812,3821-3870
+pallets/x3-settlement-engine/src/mock.rs
+  h_e41068bed968d7 184,190,203
+pallets/x3-settlement-engine/src/tests.rs
+  h_e41068bed968d7 5465-5664
+pallets/x3-token-factory/src/lib.rs
+  h_e41068bed968d7 25-29,61-62,162-167,182-185,231-237,297-394,396-404,470-471,475-486,506,509-516,518,521-525,529-532,534,537-542
+pallets/x3-token-factory/src/tests.rs
+  h_e41068bed968d7 156,160-208,210,833-922
+pallets/x3-trust-gate/Cargo.toml
+  h_e41068bed968d7 1-45
+pallets/x3-trust-gate/src/lib.rs
+  h_e41068bed968d7 1-556
+pallets/x3-trust-gate/src/tests.rs
+  h_e41068bed968d7 1-545
+pallets/x3-trust-gate/src/weights.rs
+  h_e41068bed968d7 1-62
+patches/sqlx-sqlite/.cargo_vcs_info.json
+  h_e41068bed968d7 1-6
+patches/sqlx-sqlite/Cargo.toml
+  h_e41068bed968d7 1-176
+patches/sqlx-sqlite/Cargo.toml.orig
+  h_e41068bed968d7 1-77
+patches/sqlx-sqlite/LICENSE-APACHE
+  h_e41068bed968d7 1-201
+patches/sqlx-sqlite/LICENSE-MIT
+  h_e41068bed968d7 1-25
+patches/sqlx-sqlite/UPSTREAM.json
+  h_e41068bed968d7 1-80
+patches/sqlx-sqlite/src/any.rs
+  h_e41068bed968d7 1-237
+patches/sqlx-sqlite/src/arguments.rs
+  h_e41068bed968d7 1-155
+patches/sqlx-sqlite/src/column.rs
+  h_e41068bed968d7 1-28
+patches/sqlx-sqlite/src/connection/collation.rs
+  h_e41068bed968d7 1-155
+patches/sqlx-sqlite/src/connection/describe.rs
+  h_e41068bed968d7 1-94
+patches/sqlx-sqlite/src/connection/establish.rs
+  h_e41068bed968d7 1-303
+patches/sqlx-sqlite/src/connection/execute.rs
+  h_e41068bed968d7 1-130
+patches/sqlx-sqlite/src/connection/executor.rs
+  h_e41068bed968d7 1-100
+patches/sqlx-sqlite/src/connection/explain.rs
+  h_e41068bed968d7 1-1779
+patches/sqlx-sqlite/src/connection/handle.rs
+  h_e41068bed968d7 1-100
+patches/sqlx-sqlite/src/connection/intmap.rs
+  h_e41068bed968d7 1-179
+patches/sqlx-sqlite/src/connection/mod.rs
+  h_e41068bed968d7 1-611
+patches/sqlx-sqlite/src/connection/preupdate_hook.rs
+  h_e41068bed968d7 1-160
+patches/sqlx-sqlite/src/connection/serialize.rs
+  h_e41068bed968d7 1-297
+patches/sqlx-sqlite/src/connection/worker.rs
+  h_e41068bed968d7 1-563
+patches/sqlx-sqlite/src/database.rs
+  h_e41068bed968d7 1-39
+patches/sqlx-sqlite/src/error.rs
+  h_e41068bed968d7 1-131
+patches/sqlx-sqlite/src/lib.rs
+  h_e41068bed968d7 1-140
+patches/sqlx-sqlite/src/logger.rs
+  h_e41068bed968d7 1-443
+patches/sqlx-sqlite/src/migrate.rs
+  h_e41068bed968d7 1-213
+patches/sqlx-sqlite/src/options/auto_vacuum.rs
+  h_e41068bed968d7 1-38
+patches/sqlx-sqlite/src/options/connect.rs
+  h_e41068bed968d7 1-77
+patches/sqlx-sqlite/src/options/journal_mode.rs
+  h_e41068bed968d7 1-50
+patches/sqlx-sqlite/src/options/locking_mode.rs
+  h_e41068bed968d7 1-38
+patches/sqlx-sqlite/src/options/mod.rs
+  h_e41068bed968d7 1-578
+patches/sqlx-sqlite/src/options/parse.rs
+  h_e41068bed968d7 1-231
+patches/sqlx-sqlite/src/options/synchronous.rs
+  h_e41068bed968d7 1-44
+patches/sqlx-sqlite/src/query_result.rs
+  h_e41068bed968d7 1-40
+patches/sqlx-sqlite/src/regexp.rs
+  h_e41068bed968d7 1-233
+patches/sqlx-sqlite/src/row.rs
+  h_e41068bed968d7 1-89
+patches/sqlx-sqlite/src/statement/handle.rs
+  h_e41068bed968d7 1-371
+patches/sqlx-sqlite/src/statement/mod.rs
+  h_e41068bed968d7 1-79
+patches/sqlx-sqlite/src/statement/unlock_notify.rs
+  h_e41068bed968d7 1-65
+patches/sqlx-sqlite/src/statement/virtual.rs
+  h_e41068bed968d7 1-203
+patches/sqlx-sqlite/src/testing/mod.rs
+  h_e41068bed968d7 1-89
+patches/sqlx-sqlite/src/transaction.rs
+  h_e41068bed968d7 1-48
+patches/sqlx-sqlite/src/type_checking.rs
+  h_e41068bed968d7 1-51
+patches/sqlx-sqlite/src/type_info.rs
+  h_e41068bed968d7 1-161
+patches/sqlx-sqlite/src/types/bool.rs
+  h_e41068bed968d7 1-33
+patches/sqlx-sqlite/src/types/bytes.rs
+  h_e41068bed968d7 1-103
+patches/sqlx-sqlite/src/types/chrono.rs
+  h_e41068bed968d7 1-220
+patches/sqlx-sqlite/src/types/float.rs
+  h_e41068bed968d7 1-54
+patches/sqlx-sqlite/src/types/int.rs
+  h_e41068bed968d7 1-118
+patches/sqlx-sqlite/src/types/json.rs
+  h_e41068bed968d7 1-35
+patches/sqlx-sqlite/src/types/mod.rs
+  h_e41068bed968d7 1-240
+patches/sqlx-sqlite/src/types/str.rs
+  h_e41068bed968d7 1-124
+patches/sqlx-sqlite/src/types/text.rs
+  h_e41068bed968d7 1-37
+patches/sqlx-sqlite/src/types/time.rs
+  h_e41068bed968d7 1-315
+patches/sqlx-sqlite/src/types/uint.rs
+  h_e41068bed968d7 1-107
+patches/sqlx-sqlite/src/types/uuid.rs
+  h_e41068bed968d7 1-93
+patches/sqlx-sqlite/src/value.rs
+  h_e41068bed968d7 1-244
+runtime/Cargo.toml
+  h_e41068bed968d7 65-68,95-96,102-103,106,121-123,186-187,241-242,267-269,294,301,303,430-431,443-445
+runtime/src/ethereum_tx.rs
+  h_e41068bed968d7 1-389
+runtime/src/fraud_proofs/committee.rs
+  h_e41068bed968d7 204-236
+runtime/src/fraud_proofs/freeze.rs
+  h_e41068bed968d7 177-203
+runtime/src/fraud_proofs/scheduler_v1.rs
+  h_e41068bed968d7 72-76,99-101,117,142-294
+runtime/src/fraud_proofs/witness_v1.rs
+  h_e41068bed968d7 230-236,368-611
+runtime/src/lib.rs
+  h_e41068bed968d7 136-137,149-156,405-432,435,645-647,726-728,796-798,878-880,962-964,969,972-1006,1150-1153,1161-1166,1176-1273,1281-1282,1284,1286,1967-1968,1989,2001-2176,2260,2306-2315,2334-2335,2384,2978-3022,3025,3050-3051,3197-3200,3204-3218,3364,3397,3443-3618,3884-4004,4018-4020,4044-4046,4050,4056-4057,4061,4065,4068-4071,4074-4075,4077-4081,4083-4097,4104-4106,4118-4122,4191-4193,4625-4630,5931-5935,6065-6069
+runtime/src/tests.rs
+  h_e41068bed968d7 11,212-233,307-315,319,331-337,400,409,452,472,504,983-1489
+runtime/src/tests_launchpad.rs
+  h_e41068bed968d7 1-154
+runtime/src/tests_trading.rs
+  h_e41068bed968d7 1-420
+runtime/tests/automation_execution.rs
+  h_e41068bed968d7 1-331
+runtime/tests/dex_atomic_rollback.rs
+  h_e41068bed968d7 1-217
+runtime/tests/factory_router_accounting.rs
+  h_e41068bed968d7 1-334
+scripts/run-dev-node.sh
+  h_e41068bed968d7 1-9
+scripts/testnet/build-x3-testnet-spec.py
+  h_e41068bed968d7 30,45-55,62,135
+scripts/testnet/run-7-validators-local.sh
+  h_e41068bed968d7 9-12,32,50-52,66,229-231,243-250,256-259
+scripts/testnet/stop-owned-nodes.py
+  h_e41068bed968d7 1-104
+scripts/testnet/x3_testnet_up.sh
+  h_e41068bed968d7 34,38-39,101-102,119
+scripts/verify-core-snapshot.py
+  h_e41068bed968d7 1-23
+x3-lang/Cargo.lock
+  h_e41068bed968d7 2087,2129,2136-2143
+x3-lang/compiler/Cargo.toml
+  h_e41068bed968d7 14-16
+x3-lang/compiler/src/formatter.rs
+  h_e41068bed968d7 2151-2159,2161-2167,2177-2183,2287-2297,2301-2311
+x3-lang/compiler/src/fusion.rs
+  h_e41068bed968d7 166-167
+x3-lang/compiler/src/lib.rs
+  h_e41068bed968d7 48,440-449,459-462
+x3-lang/compiler/src/lowering.rs
+  h_e41068bed968d7 1777-1781,1831-1989,1992,2254-2255,2263-2271
+x3-lang/compiler/src/numeric.rs
+  h_e41068bed968d7 14,46-48,115-122,126-148,150-160,163-167,169-177,180-187,191-221,223-224,232,235,237,244,248-265,267-268,274-275,277,281-282,284-292,294-295,303,306-317,320,322-325,328,341,347,351-352,355,358,360,363,365-366,373-374,376,379-384,386-390,393
+x3-lang/compiler/src/parser.rs
+  h_e41068bed968d7 19,67,81-86,159-161,210-232,234,237,1533,2024,3225,3257,3294,3298,3362,3366,3419,3423,3427,4947,4955,4961,4965,4968,4972,4974,4978,4980,5361-5394,5400-5402,5434,5436-5447,5535,5586-5589,5591,5593,5600,5602,5609,6078,6083,6233-6236,6239,6249-6254,6258,6267,6271-6276,6296-6314,6316,6342,6424-6426,6431,6433-6436,6557,6559-6576,6623-6650,6684-6686,6713-6720
+x3-lang/compiler/src/risk.rs
+  h_e41068bed968d7 315-317
+x3-lang/compiler/src/semantic.rs
+  h_e41068bed968d7 1436-1442,1444-1445
+x3-lang/compiler/src/trading_semantic.rs
+  h_e41068bed968d7 104-109
+x3-lang/compiler/src/x3bc.rs
+  h_e41068bed968d7 1-511
+x3-lang/compiler/tests/test_compiler_pipeline.rs
+  h_e41068bed968d7 496-501
+x3-lang/compiler/tests/test_constant_bindings.rs
+  h_e41068bed968d7 1-155
+x3-lang/compiler/tests/test_control_flow_e2e.rs
+  h_e41068bed968d7 81-93
+x3-lang/compiler/tests/test_measured_branch.rs
+  h_e41068bed968d7 323-338
+x3-lang/compiler/tests/test_numeric_policy.rs
+  h_e41068bed968d7 60-280
+x3-lang/compiler/tests/test_parser_coverage.rs
+  h_e41068bed968d7 193-355
+x3-lang/compiler/tests/test_refused_statements.rs
+  h_e41068bed968d7 55,58
+x3-lang/compiler/tests/test_x3bc_lowering.rs
+  h_e41068bed968d7 1-141
+x3-lang/crates/x3-common/src/token.rs
+  h_e41068bed968d7 150-170
+x3-lang/crates/x3-lexer/src/lexer.rs
+  h_e41068bed968d7 1,44-46,63-74,109-111,116,119-140,142-149,195-197,281-340
+x3-lang/crates/x3-lexer/tests/trading_tokens.rs
+  h_e41068bed968d7 5-31,146-175
+x3-lang/crates/x3-tools/Cargo.toml
+  h_e41068bed968d7 21-23
+x3-lang/crates/x3-tools/tests/cli.rs
+  h_e41068bed968d7 5055-5069
+x3-lang/crates/x3-tools/tests/cli_integration.rs
+  h_e41068bed968d7 52
+x3-lang/examples/x3chain_flash_arb.x3
+  h_e41068bed968d7 1-42
+x3-lang/spec/opcodes.rs
+  h_e41068bed968d7 175-177
+x3-lang/vm/src/trading.rs
+  h_e41068bed968d7 7,819-833,1044-1052,2282,2481
+x3-lang/vm/src/verifier.rs
+  h_e41068bed968d7 678,682
+x3-lang/vm/tests/trading_execution.rs
+  h_e41068bed968d7 79,117,176-181,2130-2187
+x3-lang/vm/tests/trading_receipts.rs
+  h_e41068bed968d7 225-250,729-741
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b74015420efcded666bdc61d46436d23202801f9",
+  "prompts": {},
+  "humans": {
+    "h_e41068bed968d7": {
+      "author": "crypto pimpim <cryptopimpinainteazy@gmail.com>"
+    }
+  }
+}
