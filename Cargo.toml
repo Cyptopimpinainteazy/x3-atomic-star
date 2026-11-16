@@ -14,10 +14,11 @@ exclude = [
     "programs/svm/*",
     # Cross-VM coordinator is intentionally a standalone crate.
     "crates/cross-vm-coordinator",
-    # x3-sim is a standalone workspace root: it drives the excluded
+    # x3-sim and x3-mc are standalone workspace roots: they drive the excluded
     # cross-vm-coordinator crate, which the parent workspace does not build.
-    # Its own gate is `test x3-sim` in scripts/local-ci.sh.
+    # Each has its own gate in scripts/local-ci.sh (`test x3-sim`, `test x3-mc`).
     "crates/x3-sim",
+    "crates/x3-mc",
     # Each of these declares its own `[workspace]` (or path-depends on one that
     # does), so cargo refuses to have them as members: "multiple workspace roots
     # found in the same workspace". They are built by the `nested workspaces`
@@ -41,266 +42,141 @@ exclude = [
     # than green. This was the last entry in
     # `.ai/workspace-membership-baseline.txt`.
     "tests/loom-concurrency",
+    # Exercises the patched optional SQLite driver independently of production Postgres.
+    "tests/sqlite-binding-compat",
     # External-toolchain validation fixtures: a standalone workspace holding an
     # intentionally-defective (and a known-good) fixture used to prove that
     # testing tools actually detect defects before we trust them on X3 code.
     # See scripts/external-toolchain/validate-fuzz-detection.sh.
     "tools/tool-validation",
+    # The X3 Lang language workspace (its own `[workspace]`, CI'd by
+    # `.github/workflows/x3-lang-nested-workspace.yml`). `crates/x3-integration` path-depends on its
+    # compiler and reference VM for the production trading suites; without this entry cargo would
+    # adopt those path dependencies as members of *this* workspace and resolve their
+    # `*.workspace = true` keys against the wrong root.
+    "x3-lang",
 ]
 members = [
-    "pallets/x3-kernel",
-    "pallets/atomic-trade-engine",
-    "pallets/governance",
-    "pallets/treasury",
-    "pallets/agent-accounts",
-    "pallets/agent-memory",
-    "pallets/svm-runtime",
-    "pallets/evolution-core",
-    "pallets/x3-verifier",
-    "pallets/x3-domain-registry",
-    "pallets/x3-settlement-engine",
-    "pallets/meme-overlord",
-    "pallets/swarm",
-    "pallets/x3-wallet-pallet",
-    "crates/svm-integration",  # RE-ENABLED (tested 2026-09-03): builds green independently
-    "crates/svm-counter",       # RE-ENABLED (tested 2026-09-03)
-    "crates/x3-gateway",
-    "runtime",
-    "node",
-    "apps/analytics/analytics-service",
-    "crates/invariant-macros",
-    "pallets/depin-marketplace",
-    "pallets/private-execution",
-    # Phase 3-6: Audit implementation — Flash Finality, PoH, Atomic Kernel, Parallel Proposer
-    "pallets/x3-atomic-kernel",
-    "pallets/x3-sequencer",
-    "pallets/x3-da",
-    "pallets/fraud-proofs",
-    "pallets/x3-slash",
-    # vΩ-1.0 Master Architecture additions — constitutional engine, epoch proofs, launch validator
-    # On-chain invariant enforcement pallet (Article IV / checklist §10)
-    "pallets/x3-invariants",
-    # Agent Law pallet for policy enforcement (SECURITY-CRITICAL)
-    "pallets/x3-agent-law",
-    # Native oracle pallet for decentralized price feeds
-    "pallets/x3-oracle",
-    # VRF pallet for verifiable randomness
-    "pallets/x3-vrf",
-    # Automation pallet for keeper network
-    "pallets/x3-automation",
-    # DEX pallet for AMM operations
-    "pallets/x3-dex",
-    # LP Locker pallet for anti-rug LP token locking
-    "pallets/x3-lp-locker",
-    # Sentinel guard pallet — freeze/review gate over token-factory mint authority
-    "pallets/x3-sentinel",
-    # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
-    # Phase 4: Unified RPC operational policy layer (health scoring + failover)
-    "tests/e2e",
-        # Phase 4.5: Liquidity, Inventory, and Solvency control plane
-        "pallets/x3-inventory",
-        "pallets/x3-reservation",
-        "pallets/x3-solvency",
-        "pallets/x3-rebalance",
-        "pallets/x3-partner",
-        "pallets/x3-treasury-policy",
-        # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
-        "pallets/x3-asset-registry",
-        "pallets/x3-account-registry",
-        "pallets/x3-supply-ledger",
-        "pallets/x3-cross-vm-router",
-        "pallets/x3-token-factory",
-        "tools/launchops",
-        # Dispute resolution (Article III: Deterministic Court)
-        "pallets/x3-jury-anchor",
-        # Phase 0: Sprint 0 Infrastructure
-        # v0.4 internal-mainnet path: packet lifecycle + IXL instruction layer
-        # On-chain custody map and signer separation (validator key vs. treasury key)
-        "pallets/x3-custody",
-        # Phase 3: Canonical accounting event types for the X3 revenue spine
-        # Phase 9: Canonical truth types — identity, asset, and treasury models (shared types lib)
-        # Phase 2: Canonical security event types for the security swarm spine
-        # ProofForge: Complete proof system for X3 blockchain (v0-v7)
-        "proof-forge",
-        # Phase 1: Testnet proving harness binary
-        "proving",
-        # Note: crates/dylint-determinism is intentionally NOT listed here.
-    # It is a standalone workspace (has its own [workspace
+    "crates/atomic-swap-orchestrator",
     "crates/cross-vm-bridge",
     "crates/evm-integration",
     "crates/flash-finality",
+    "crates/invariant-macros",
     "crates/parallel-proposer",
     "crates/poh-generator",
-    "crates/x3-accounting-events",
+    "crates/quantum-crypto",
+    "crates/svm-counter",
+    "crates/svm-integration",
     "crates/x3-accel",
     "crates/x3-accel-wgpu",
-    "crates/x3-order-window",
-    "crates/x3-threshold-core",
+    "crates/x3-accounting-events",
     "crates/x3-asset-kernel-types",
-    "crates/x3-atomic-trade",
+    "crates/x3-ast",
     "crates/x3-atomic-swap",
+    "crates/x3-atomic-trade",
     "crates/x3-automation",
+    "crates/x3-backend",
+    "crates/x3-bitcoin-vault",
+    "crates/x3-bridge-adapters",
+    "crates/x3-btc-spv",
+    "crates/x3-circuit-breaker",
     "crates/x3-common",
+    "crates/x3-compiler",
+    "crates/x3-crosschain-gateway",
+    "crates/x3-crosschain-intent",
     "crates/x3-dex",
+    "crates/x3-external-route-registry",
+    "crates/x3-finality-oracle",
+    "crates/x3-gateway-indexer",
+    "crates/x3-gateway-insurance",
     "crates/x3-gateway-risk-engine",
     "crates/x3-gpu-validator-swarm",
-    "crates/x3-readiness",
+    "crates/x3-hir",
     "crates/x3-integration",
-    "crates/x3-integration/fuzz",       # libFuzzer targets for the X3 language path (cargo fuzz, nightly)
     "crates/x3-ixl",
+    "crates/x3-lexer",
     "crates/x3-liquidity-core",
+    "crates/x3-mir",
+    "crates/x3-opt",
+    "crates/x3-orchestra-control-plane",
+    "crates/x3-order-window",
     "crates/x3-packet-schema",
     "crates/x3-packet-standard",
+    "crates/x3-parser",
     "crates/x3-proof",
+    "crates/x3-proof-dispute",
+    "crates/x3-proof-envelope",
+    "crates/x3-relayer",
     "crates/x3-revenue-sharing",
     "crates/x3-rpc",
+    "crates/x3-runtime-signer",
+    "crates/x3-security-events",
+    "crates/x3-semantics",
     "crates/x3-slash",
-    "crates/x3-swap-router",
-    "crates/x3-svm",
+    "crates/x3-threshold-core",
+    "crates/x3-typeck",
+    "crates/x3-validator-attestation",
+    "crates/x3-verification-router",
+    "crates/x3-verifier",
+    "crates/x3-vm",
     "crates/x3-vrf",
     "crates/x3-wallet",
-# ] and rust-toolchain.toml)
-    # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.
-        # Phase 5: Supply reconciliation and governance power mapping
-        "pallets/x3-reconciliation",
-        # Phase 5: On-chain wrapped X3 token — cross-chain mint/burn + governance power
-        "pallets/x3-wrapped",
-        # Phase 6: English auction pallet
-        "pallets/x3-auction",
-        # Phase 7: Token launchpad/presale pallet
-        "pallets/x3-launchpad",
-        # Phase 8: On-chain dApp hub — listing, compliance tier, throttle, revenue share
-        "pallets/x3-dapp-hub",
-        # Phase 8: Revenue-split types crate (shared by dApp hub and marketplace)
-        # Phase 10: AI compute marketplace — bot rental, premium execution, swarm sessions
-        "pallets/x3-compute-market",
-        # Phase 11: Weekly chain proving cycle — onboarding pipeline types and scoring model
-        # Phase 12: A-tier hard metrics tracking — throughput, TVL, routes, DAU, incidents
-        # Flash loan pallet: atomic borrow-use-repay with repay-or-revert invariant
-        "pallets/x3-flashloan",
-    # Northern Swarm RC1: off-chain executor
-    "crates/northern-swarm",
-    # Northern Swarm RC2: on-chain registry v2
+    "crates/x3bc-core",
+    "node",
+    "pallets/agent-accounts",
+    "pallets/agent-memory",
+    "pallets/atomic-trade-engine",
+    "pallets/depin-marketplace",
+    "pallets/evolution-core",
+    "pallets/governance",
+    "pallets/meme-overlord",
     "pallets/northern-swarm",
-    # P0-FIX: excluded crates referenced as path deps by workspace members
-    "crates/quantum-crypto",           # <- runtime/Cargo.toml
-    "crates/x3-bridge",                # <- node/Cargo.toml
-    "crates/x3-bridge-adapters",       # <- node/Cargo.toml
-    "crates/x3-fees",                  # <- tests/e2e/Cargo.toml
-    "crates/x3-finality-oracle",
-    "crates/x3-flashloan",       # <- node/Cargo.toml
-    "crates/x3-proof-dispute",         # <- node/Cargo.toml
-    "crates/x3-security-events",       # <- pallets/atomic-trade-engine, pallets/x3-invariants, runtime
-    "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
-    "crates/x3-validator-attestation", # <- node/Cargo.toml
-    "crates/x3-runtime-signer",        # <- node/Cargo.toml, crates/x3-relayer
-    "crates/x3-verification-router",   # <- node/Cargo.toml
-    "crates/x3-circuit-breaker",       # <- crosschain-gateway, pallets
-    "crates/x3-external-route-registry", # <- crosschain-gateway, pallets
-    "crates/x3-gateway-indexer",       # <- crosschain-gateway
-    "crates/x3-gateway-insurance",     # <- crosschain-gateway
-    "crates/x3-proof-envelope",        # <- crosschain-gateway, proof-attestation
-    "crates/x3-crosschain-gateway",    # <- external-bridge core lib; re-enabled 2026-09-03 for testnet integration (was excluded from v0.4 internal testnet build per TESTNET_FEATURE_FLAGS.toml atomic_gateway GUARDED_TESTNET)
-    "pallets/x3-crosschain-gateway",   # <- crosschain-gateway pallet
-    # P1-FIX: excluded crates referenced as path deps by workspace members (x3-gateway, x3-gpu-validator-swarm, x3-integration)
-    # Direct imports (level-1):
-    "crates/x3-orchestra-control-plane", # <- x3-gateway, x3-gpu-validator-swarm (required)
-    "crates/x3-vm",                      # <- x3-gpu-validator-swarm (required), x3-integration (optional)
-    "crates/x3-backend",                 # <- x3-gpu-validator-swarm (required), x3-integration (optional), x3-vm
-    "crates/x3-compiler",                # <- x3-integration (optional)
-    "crates/x3-verifier",                # <- x3-integration (optional), x3-compiler (note: separate from pallets/x3-verifier)
-    # Transitive path deps (level-2+, compiler/language toolchain):
-    "crates/x3-ast",                     # <- x3-backend, x3-hir, x3-mir, x3-typeck, x3-parser, x3-opt, x3-semantics, x3-verifier
-    "crates/x3-hir",                     # <- x3-backend, x3-mir, x3-opt, x3-compiler
-    "crates/x3-mir",                     # <- x3-backend, x3-opt, x3-compiler
-    "crates/x3-typeck",                  # <- x3-backend, x3-hir, x3-compiler
-    "crates/x3-parser",                  # <- x3-backend, x3-hir, x3-mir, x3-typeck, x3-semantics, x3-verifier
-    "crates/x3-lexer",                   # <- x3-backend, x3-parser, x3-compiler
-    "crates/x3-opt",                     # <- x3-compiler
-    "crates/x3-semantics",               # <- x3-typeck
-    # Cross-chain intent system: user-facing intent language, compiler, lifecycle, simulation
-    "crates/x3-crosschain-intent",
-    "crates/x3-court",
-    "crates/x3-agent",
-    "crates/x3-intent",
-    "crates/x3-flashloan",
-    # CI canonical crate paths: required workspace members
-    "crates/atomic-swap-orchestrator",
-    "crates/x3-relayer",
-    "crates/x3-bridge-security-council",
-    "crates/x3-genesis-builder",
-    "crates/x3-foundry-core",
-    "crates/x3-foundry-auditor",
-    "crates/x3-foundry-revenue",
-    "crates/x3-foundry-indexer",
-    "crates/x3-oracle",
-    # X3 Cross-VM Atomic Swap Proof Mode — HTLC hashlocks, timelocks, relayer, scoreboard
-    "crates/x3-atomic-swap",
-    # Bitcoin vault — threshold multisig vault with SPV proof accounting
-    "crates/x3-bitcoin-vault",
-    # Chain health monitor daemon — merged from USB lineage 2026-09-04 (polls metrics, writes health proofs)
-    "crates/x3-chain-health-daemon",
-    # External-chain adapter library + the position manager built on it. Both
-    # were absent from `members` and from `exclude`, which left them in limbo:
-    # they use `workspace = true` dependencies, so cargo refused to build them
-    # standalone ("believes it's in a workspace when it's not") and nothing in
-    # the workspace pulled them in either — their tests never ran anywhere.
-    "crates/external-chains",
-    "crates/cross-chain-position-manager",
-    # Burn-down batch 1 (issue #274): crates that were in neither `members` nor
-    # `exclude`, so nothing compiled or tested them.
-    "crates/quantum-swarm",
-    "crates/x3-constitution",
-    "crates/private-mempool",
-    "crates/x3-cli",
-    # Burn-down batch 2 (issue #274).
-    "crates/x3-appzone-factory",
-    "crates/x3-atomic-client",
-    "crates/x3-bench",
-    "crates/x3-bot",
-    "crates/x3-canonical-truth",
-    "crates/x3-state-snapshot",
-    # Burn-down batch 3 (issue #274).
-    "crates/x3-runtime-params",
-    "crates/x3-parallel-executor",
-    "crates/x3-rpc-policy",
-    "crates/x3-readiness-report",
-    # Burn-down batch 4 (issue #274).
-    "crates/x3-launch-validator",
-    "crates/x3-turbine",
-    "crates/x3-gulfstream",
-    "crates/x3-evolution-core",
-    # Burn-down batch 5 (issue #274).
-    "crates/x3-dns-server",
-    "crates/x3-marketplace",
-    # Burn-down batch 6 (issue #274): real confidential threshold DKG.
-    "crates/confidential-gpu",
-    # Burn-down batch 7 (issue #274).
-    "crates/gpu-sig-verifier",
-    "crates/chronos-flash",
-    "crates/import-queue-wrapper",
-    "crates/x3-chain-onboarding",
-    "crates/x3-lsp",
-    # Burn-down batch 8 (issue #274).
-    "crates/apotheosis-tx",
-    "crates/dream-mining",
-    "crates/swarm-media",
-    "crates/voice-to-x3",
-    # Burn-down batch 9 (issue #274).
-    "crates/x3-indexer",
-    "crates/treasury",
-    # Burn-down batch 11 (issue #274).
-    "crates/x3-wallet-cli",
-    # Burn-down batch 12 (issue #274).
-    "crates/orchestra",
-    # Burn-down batch 13 (issue #274).
-    "pallets/pallet-x3-control",
-    # Burn-down batch 14 (issue #274).
-    "crates/x3-pq",
-    # Burn-down batch 15 (issue #274).
-    "crates/x3-mobile-sdk",
-    # Salvaged from the x3-chain-master snapshot: distributed GPU compute swarm.
-    "crates/gpu-swarm",
+    "pallets/private-execution",
+    "pallets/svm-runtime",
+    "pallets/swarm",
+    "pallets/treasury",
+    "pallets/x3-account-registry",
+    "pallets/x3-agent-law",
+    "pallets/x3-app-registry",
+    "pallets/x3-asset-registry",
+    "pallets/x3-atomic-kernel",
+    "pallets/x3-auction",
+    "pallets/x3-automation",
+    "pallets/x3-compute-market",
+    "pallets/x3-cross-vm-router",
+    "pallets/x3-crosschain-gateway",
+    "pallets/x3-custody",
+    "pallets/x3-da",
+    "pallets/x3-dapp-hub",
+    "pallets/x3-dex",
+    "pallets/x3-domain-registry",
+    "pallets/x3-flashloan",
+    "pallets/x3-invariants",
+    "pallets/x3-inventory",
+    "pallets/x3-jury-anchor",
+    "pallets/x3-kernel",
+    "pallets/x3-launchpad",
+    "pallets/x3-lp-locker",
+    "pallets/x3-oracle",
+    "pallets/x3-partner",
+    "pallets/x3-rebalance",
+    "pallets/x3-reconciliation",
+    "pallets/x3-reservation",
+    "pallets/x3-security-gate",
+    "pallets/x3-sentinel",
+    "pallets/x3-sequencer",
+    "pallets/x3-settlement-engine",
+    "pallets/x3-slash",
+    "pallets/x3-solvency",
+    "pallets/x3-supply-ledger",
+    "pallets/x3-token-factory",
+    "pallets/x3-treasury-policy",
+    "pallets/x3-trust-gate",
+    "pallets/x3-verifier",
+    "pallets/x3-vrf",
+    "pallets/x3-wallet-pallet",
+    "pallets/x3-wrapped",
+    "runtime",
 ]
 default-members = ["node"]
 resolver = "2"
@@ -519,6 +395,8 @@ codegen-units = 16
 
 # Patches for Substrate dependencies - using consistent git rev
 [patch.crates-io]
+# Keep SQLx 0.8 API/MSRV while optional lockfile SQLite uses the patched C library.
+sqlx-sqlite = { path = "patches/sqlx-sqlite" }
 # Pin home to a rustc 1.85 compatible release (local patch).
 home = { path = "patches/home" }
 # Enable bulk-memory opcode parsing (0xFC prefix) so Substrate can deserialize rustc-generated WASM.

@@ -1,0 +1,132 @@
+{
+  "source_commit": "69234c1897d9e80424cb0a652d48cd4ee6511deb",
+  "candidate": "/home/lojak/workspace/x3-atomic-star-core-20261116",
+  "generated_at_utc": "2026-11-16T19:24:50.477265+00:00",
+  "copied": [
+    {
+      "path": "scripts/testnet/x3_testnet_up.sh",
+      "source_sha256": "800e5a0df39f5d2dc75e9ecca4ea29969e2f8909d81fda1d1f4e8f01fd627a60",
+      "candidate_sha256": "f19d0370abc9cd166b821ccbf17ba7e7d593ae7bedb9e105972ed9b0e8799000"
+    },
+    {
+      "path": "scripts/testnet/run-7-validators-local.sh",
+      "source_sha256": "38e74e7473f82788350a0d5275b9e6d1f2be4920e624caf48cc7b5c5ca4386cd",
+      "candidate_sha256": "e85ffa402f3289484be1239ab6883cfb907584b9fd9d594d2241191be2e0c576"
+    },
+    {
+      "path": "scripts/testnet/build-x3-testnet-spec.py",
+      "source_sha256": "7f158e6abfdd093dde1a3c323e5322c31115d261d560f1099861e1f670e13301",
+      "candidate_sha256": "6301f38ca80161cd71abeff3eac8eec85a5ac18a7630f4cedae51e7284b0e949"
+    },
+    {
+      "path": "scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+      "source_sha256": "7ac98aa5fda94e9186516f6dc74a4f7df30635c86d8aac5b7817684e8dd3c813",
+      "candidate_sha256": "7ac98aa5fda94e9186516f6dc74a4f7df30635c86d8aac5b7817684e8dd3c813"
+    }
+  ],
+  "modified": [
+    "scripts/testnet/x3_testnet_up.sh",
+    "scripts/testnet/run-7-validators-local.sh",
+    "scripts/testnet/build-x3-testnet-spec.py"
+  ],
+  "added": [
+    "scripts/testnet/stop-owned-nodes.py"
+  ],
+  "checks": [
+    {
+      "name": "Python compile scripts/testnet/build-x3-testnet-spec.py",
+      "passed": true
+    },
+    {
+      "name": "Python compile scripts/testnet/stop-owned-nodes.py",
+      "passed": true
+    },
+    {
+      "name": "Python compile scripts/mainnet/peer-id-from-ed25519-pubkey.py",
+      "passed": true
+    },
+    {
+      "name": "bash syntax scripts/testnet/x3_testnet_up.sh",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "help scripts/testnet/x3_testnet_up.sh",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "bash syntax scripts/testnet/run-7-validators-local.sh",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "help scripts/testnet/run-7-validators-local.sh",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "wrapper missing node",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "name": "launcher missing node",
+      "exit_code": 1,
+      "passed": true
+    },
+    {
+      "name": "builder missing node",
+      "exit_code": 2,
+      "passed": true
+    },
+    {
+      "name": "builder invalid count",
+      "exit_code": 2,
+      "passed": true
+    },
+    {
+      "name": "builder help",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "failure/help no state or key writes",
+      "passed": true
+    },
+    {
+      "name": "cleanup skips unrelated current process without signals",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "cleanup rejects outside pid dir",
+      "exit_code": 2,
+      "passed": true
+    },
+    {
+      "name": "reject nonempty unknown state",
+      "exit_code": 2,
+      "passed": true
+    },
+    {
+      "name": "reject different owner",
+      "exit_code": 2,
+      "passed": true
+    },
+    {
+      "name": "upstream launcher orchestration regressions",
+      "tests": 8,
+      "passed": true,
+      "scope": "shell harness + fail-before-launch, not blockchain execution"
+    }
+  ],
+  "nodes_launched": false,
+  "keys_generated": false,
+  "network_mutations": false,
+  "source_repository_modified": false,
+  "limitations": [
+    "No actual validator launch, chain-spec generation, signal delivery or partition recovery executed.",
+    "Parent owns ignore-policy/provenance updates for local state, generated specs and intentional script ports."
+  ]
+}

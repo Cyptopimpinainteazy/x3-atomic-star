@@ -1,1 +1,0 @@
-no bootnode in the plain spec: the node refuses a Live spec in raw form without one, and bootnode deployment is allowed to be pending at RC6

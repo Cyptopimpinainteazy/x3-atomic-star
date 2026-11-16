@@ -1,9 +1,0 @@
-# Crates that are neither workspace `members` nor `exclude`d.
-#
-# Each entry is a crate whose code and tests are never compiled: it uses
-# `workspace = true` dependencies, so cargo will not build it standalone
-# either. Burn the list down by moving each crate to `members` (it joins
-# `cargo test --workspace`) or to `exclude` with a self-contained manifest
-# plus its own gate. `scripts/check-workspace-membership.py` fails when a
-# crate appears in neither list, or when a fixed entry stays here.
-

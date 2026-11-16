@@ -1,0 +1,91 @@
+{
+  "source_commit": "69234c1897d9e80424cb0a652d48cd4ee6511deb",
+  "destination_parent": "acadaa00f6ae8bea89e0d1a1ebdb414bc98feb7f",
+  "environment": {
+    "device": "x3gpu1",
+    "platform": "Linux x86_64",
+    "rust": "1.90.0",
+    "cargo": "1.90.0",
+    "python": "3.12"
+  },
+  "checks": [
+    {
+      "command": "python3 scripts/verify-core-snapshot.py",
+      "status": "PASS",
+      "copied_source_files": 2419,
+      "explicit_workspace_members": 120
+    },
+    {
+      "command": "cargo metadata --locked --format-version 1",
+      "status": "PASS"
+    },
+    {
+      "command": "cargo check --locked -p x3-chain-node",
+      "status": "PASS",
+      "elapsed_seconds": 638,
+      "embedded_wasm_built": true
+    },
+    {
+      "command": "cargo test --manifest-path crates/x3bc-core/Cargo.toml --offline --locked",
+      "status": "PASS",
+      "tests": 68
+    },
+    {
+      "command": "cargo test --locked -p x3-compiler --test schema_validator",
+      "status": "PASS",
+      "tests": 3
+    },
+    {
+      "command": "launcher syntax/help/ownership/failure checks",
+      "status": "PASS",
+      "check_entries": 18,
+      "upstream_regression_tests": 8,
+      "detail": "testnet-port.json"
+    },
+    {
+      "command": "source-manifest tamper probe, then original-byte restoration",
+      "status": "PASS"
+    },
+    {
+      "command": "semantic root Cargo.toml comparison",
+      "status": "PASS",
+      "change": "workspace.members only"
+    },
+    {
+      "command": "lockfile package identity comparison",
+      "status": "PASS",
+      "before": 2125,
+      "after": 1818,
+      "added": 0
+    },
+    {
+      "command": "gitleaks git --staged --redact=100",
+      "status": "PASS",
+      "findings": 0,
+      "scope": "staged diff, not all private history"
+    },
+    {
+      "command": "git diff --cached --check on authored/ported files",
+      "status": "PASS"
+    }
+  ],
+  "limitations": [
+    "No actual node binary launch, validator network, live signal delivery, partition recovery or settlement was executed.",
+    "Node cargo check and embedded runtime compilation do not establish complete integration or consensus equivalence.",
+    "Hosted CI workflow added but not run; no push or pull request created.",
+    "Unmerged XXXSTAR branch features were inventoried, not indiscriminately merged.",
+    "Full staged whitespace check flags inherited upstream whitespace; authored/ported file check passes.",
+    "Repository history is retained; size reduction describes the selected tracked source tree, not all historical Git objects."
+  ],
+  "xxxstar": {
+    "remains_active": true,
+    "source_worktree_changed": false,
+    "hosted_refs_changed": false
+  },
+  "publication": {
+    "performed": false,
+    "source_private": true,
+    "destination_public": true,
+    "approval_recorded": false
+  }
+}

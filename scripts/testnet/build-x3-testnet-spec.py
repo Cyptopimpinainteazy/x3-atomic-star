@@ -27,7 +27,7 @@ uses to insert both block-author keys at boot, so a validator started with
 
 TESTNET-ONLY key material under $OUT_DIR/validator-keys. SURIs are NOT committed.
 """
-import json, os, re, subprocess, sys, secrets, datetime
+import argparse, json, os, re, subprocess, sys, secrets, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 # The node binary: honour X3_NODE_BIN, else the usual target paths.
@@ -42,19 +42,24 @@ NODE = os.environ.get("X3_NODE_BIN") or next(
     ),
     os.path.join(ROOT, "target", "release", "x3-chain-node"),
 )
-COUNT = int(sys.argv[1]) if len(sys.argv) > 1 else 7
-# Plain is the default because that is the form the node loads for a Live chain.
-# `--raw` additionally emits the raw form (distribution tooling); `--skip-raw` is
-# still accepted so existing callers keep working.
-make_raw = "--raw" in sys.argv
-COUNT = max(1, min(COUNT, 12))
+parser = argparse.ArgumentParser(description="Build a local X3 Atomic Star testnet spec; generates fresh TESTNET-ONLY keys.")
+parser.add_argument("count", nargs="?", type=int, default=7)
+parser.add_argument("--raw", action="store_true")
+parser.add_argument("--skip-raw", action="store_true")
+args = parser.parse_args()
+COUNT = args.count
+if not 1 <= COUNT <= 7:
+    parser.error("count must be between 1 and 7")
+if not os.path.isfile(NODE) or not os.access(NODE, os.X_OK):
+    parser.error("node binary not found or not executable: " + NODE)
+make_raw = args.raw
 # Its own directory, ignored by git. `deployment/chain-specs/fresh/*.json` is a
 # tracked fixture shared by the `run-fresh-*` / mesh tooling, and this script used to
 # overwrite it along with `authorities.json` and friends — leaving a dirty tree and,
 # worse, a spec whose authorities matched the *new* seeds while the committed fixture
 # still looked authoritative. `OUT_DIR` overrides.
 outdir = os.environ.get("OUT_DIR") or os.path.join(
-    ROOT, "deployment", "chain-specs", "fresh", "generated"
+    ROOT, "deployment", "chain-specs", "x3-atomic-star-local", "generated"
 )
 keysdir = os.path.join(outdir, "validator-keys")
 os.makedirs(keysdir, exist_ok=True)
@@ -127,7 +132,7 @@ if public_bootnodes:
             )
 # The bootnode addresses have to be the p2p ports the launcher will actually listen on
 # (`P2P_BASE`); the *RPC* base is orthogonal and need not match.
-p2p_base = int(os.environ.get("P2P_BASE", "30333"))
+p2p_base = int(os.environ.get("P2P_BASE", "43333"))
 for i in range(1, COUNT + 1):
     master = "0x" + secrets.token_hex(32)
     rec = os.path.join(keysdir, f"validator-{i}.suri")

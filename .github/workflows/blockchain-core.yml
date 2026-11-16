@@ -1,0 +1,25 @@
+name: Blockchain core
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang llvm libclang-dev libssl-dev pkg-config
+      - name: Verify copied source and workspace
+        run: |
+          python3 scripts/verify-core-snapshot.py
+          cargo metadata --locked --no-deps --format-version 1 > /tmp/core-metadata.json
+          bash -n scripts/run-dev-node.sh
+      - name: Test canonical bytecode
+        run: cargo test --locked -p x3bc-core
+      - name: Check actual node and embedded runtime build
+        run: cargo check --locked -p x3-chain-node
