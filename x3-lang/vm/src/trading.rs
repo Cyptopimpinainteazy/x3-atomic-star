@@ -4,7 +4,7 @@
 //! readiness. Venue and provider behavior is supplied through an explicit
 //! [`TradingHost`] capability implementation.
 
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
@@ -816,10 +816,22 @@ impl TradingVm {
                         )));
                     }
                     self.check_fee_bps(result.principal, result.fee, self.compiled_policy().max_flash_fee_bps)?;
+                    // The fee is owed here and paid with the repayment; it is accrued as a cost
+                    // once, when it is paid (below). Accruing it here as well counted it twice —
+                    // once as a cost and once inside the repayment debit — which the production
+                    // engine's differential suite exposed (x3lang_trading_differential.rs).
+                    if result.fee > 0
+                        && !self
+                            .compiled_policy()
+                            .allowed_cost_kinds
+                            .contains(&CostKind::FlashLiquidityFee)
+                    {
+                        return Err(TradingExecError::CostKindNotAllowed {
+                            kind: CostKind::FlashLiquidityFee,
+                            asset: asset.clone(),
+                        });
+                    }
                     self.credit(asset, result.principal)?;
-                    // Borrowing is debt financing, so its fee is a
-                    // flash-liquidity cost, not a venue swap fee.
-                    self.accrue_cost(asset, result.fee, CostKind::FlashLiquidityFee)?;
                     self.trading_state.open_debts.insert(
                         debt_id.clone(),
                         DebtRecord {
@@ -1029,10 +1041,15 @@ impl TradingVm {
                             "repayment for {debt_id} is below principal plus fee"
                         )));
                     }
-                    self.debit(&record.asset, paid)?;
-                    // Closing a debt is the other half of the same
-                    // financing instrument opened above.
-                    self.accrue_cost(&record.asset, result.fee, CostKind::FlashLiquidityFee)?;
+                    // The repayment returns the principal and pays the fee owed since the borrow:
+                    // the principal (and any overpayment) is a debit, the fee a flash-liquidity cost
+                    // — counted once — plus any further fee the provider charged on repayment.
+                    let fee_paid = record
+                        .fee
+                        .checked_add(result.fee)
+                        .ok_or(TradingExecError::AccountingOverflow)?;
+                    self.debit(&record.asset, paid - fee_paid)?;
+                    self.accrue_cost(&record.asset, fee_paid, CostKind::FlashLiquidityFee)?;
                     self.trading_state.open_debts.remove(debt_id);
                     self.trading_state.closed_debts.insert(debt_id.clone());
                     self.trading_state.closed_debt_records.insert(
@@ -2262,7 +2279,7 @@ pub fn verify_receipt_attestation(
         .map_err(|_| ReceiptError::InvalidAttestation)?;
     let signature = Signature::from_bytes(&signature_bytes);
     verifying_key
-        .verify(&receipt.receipt_hash, &signature)
+        .verify_strict(&receipt.receipt_hash, &signature)
         .map_err(|_| ReceiptError::InvalidAttestation)
 }
 
@@ -2461,7 +2478,7 @@ pub fn verify_registry_signature(
     let bytes = bytes_of_hex(&signature.signature)
         .and_then(|bytes| <[u8; 64]>::try_from(bytes.as_slice()).ok())
         .ok_or_else(|| "registry signature: signature is not 64 bytes of hex".to_string())?;
-    key.verify(&registry_signing_digest(registry_bytes), &Signature::from_bytes(&bytes))
+    key.verify_strict(&registry_signing_digest(registry_bytes), &Signature::from_bytes(&bytes))
         .map_err(|_| "the registry signature does not verify under the trusted root".to_string())
 }
 

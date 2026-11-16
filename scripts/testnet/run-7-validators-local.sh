@@ -6,10 +6,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NODE_BIN_DEFAULT="$ROOT_DIR/target/release/x3-chain-node"
-CHAIN_SPEC_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-testnet-raw.json"
-CHAIN_SPEC_PLAIN_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-testnet-plain.json"
-BASE_DIR_DEFAULT="$HOME/.local/share/x3/testnet-local"
-LOG_DIR_DEFAULT="$ROOT_DIR/logs/testnet"
+CHAIN_SPEC_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-atomic-star-local/generated/x3-testnet-plain.json"
+CHAIN_SPEC_PLAIN_DEFAULT="$ROOT_DIR/deployment/chain-specs/x3-atomic-star-local/generated/x3-testnet-plain.json"
+BASE_DIR_DEFAULT="$ROOT_DIR/.local-state/testnet"
+LOG_DIR_DEFAULT="$ROOT_DIR/.local-state/testnet-logs"
 
 NODE_BIN="${NODE_BIN:-$NODE_BIN_DEFAULT}"
 CHAIN_SPEC="${CHAIN_SPEC:-$CHAIN_SPEC_DEFAULT}"
@@ -29,7 +29,7 @@ ONLY_REQUESTED=0
 # built from fresh keys and nodes started from the built-in dev seeds is a network
 # whose authorities hold none of its keys: it starts, and authors nothing. Prefer
 # the seed files whenever they are there.
-KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/fresh/generated/validator-keys}"
+KEYS_DIR="${KEYS_DIR:-$ROOT_DIR/deployment/chain-specs/x3-atomic-star-local/generated/validator-keys}"
 # A node needs a libp2p identity. Without `--node-key` (or a pre-existing
 # `network/secret_ed25519` under the base path) this node build exits with
 # `NetworkKeyNotFound`, which is why the launcher could not start anything. One key
@@ -47,9 +47,9 @@ SKIP_BOOTNODE_MEMBERSHIP_CHECK="${SKIP_BOOTNODE_MEMBERSHIP_CHECK:-0}"
 # of the tooling expects, so they stay the defaults — but a second network (another
 # agent, a soak beside a drill) has to be able to move them, and until these were
 # overridable two runs would silently share ports and one side would lose its RPC.
-P2P_BASE="${P2P_BASE:-30333}"
-RPC_BASE="${RPC_BASE:-9944}"
-PROM_BASE="${PROM_BASE:-9615}"
+P2P_BASE="${P2P_BASE:-43333}"
+RPC_BASE="${RPC_BASE:-14944}"
+PROM_BASE="${PROM_BASE:-19615}"
 COUNT="${COUNT:-7}"
 LISTEN_IP="${LISTEN_IP:-127.0.0.1}"
 PROMETHEUS="${PROMETHEUS:-0}"
@@ -63,7 +63,7 @@ NODE_TRIE_CACHE_BYTES="${NODE_TRIE_CACHE_BYTES:-}"
 WIPE_BASE_DIR=0
 
 usage() {
-  cat <<EOF
+  cat <<'EOF'
 Usage: $(basename "$0") [--wipe] [--base-dir PATH] [--chain-spec PATH] [--node-bin PATH] [--log-dir PATH] [--keys-dir PATH]
 
 Testnet-only local 7-validator launcher.
@@ -226,30 +226,9 @@ PY
 fi
 
 stop_nodes() {
-  if [[ ! -d "$PID_DIR" ]]; then
-    return 0
-  fi
-
-  shopt -s nullglob
-  local pids=("$PID_DIR"/node-*.pid)
-  shopt -u nullglob
-  if [[ ${#pids[@]} -eq 0 ]]; then
-    return 0
-  fi
-
-  for pid_file in "${pids[@]}"; do
-    local pid
-    pid="$(cat "$pid_file" 2>/dev/null || true)"
-    if [[ -n "$pid" ]]; then
-      kill "$pid" 2>/dev/null || true
-    fi
-  done
-
-  # A pid file can be stale (a `--only` restart rewrites one), so the pid-file kill
-  # above can miss the process actually holding the ports. Sweep by base path too.
-  pkill -f -- "--base-path ${BASE_DIR}/node-" 2>/dev/null || true
-
-  sleep 1
+  python3 "$ROOT_DIR/scripts/testnet/stop-owned-nodes.py" \
+    --base-dir "$BASE_DIR" --pid-dir "$PID_DIR" --node-bin "$NODE_BIN" \
+    --owner "$ROOT_DIR"
 }
 
 wipe_base_dir() {
@@ -261,17 +240,23 @@ wipe_base_dir() {
   rm -rf "$dir"
 }
 
+# Validate before creating directories, deleting state, or stopping any process.
+if [[ ! -x "$NODE_BIN" ]]; then
+  echo "Node binary not found: $NODE_BIN" >&2
+  exit 1
+fi
+python3 "$ROOT_DIR/scripts/testnet/stop-owned-nodes.py" \
+  --base-dir "$BASE_DIR" --pid-dir "$PID_DIR" --node-bin "$NODE_BIN" \
+  --owner "$ROOT_DIR" --claim-only
 if [[ "$WIPE_BASE_DIR" -eq 1 ]]; then
   stop_nodes
   wipe_base_dir "$BASE_DIR"
 fi
-
 mkdir -p "$BASE_DIR" "$LOG_DIR" "$PID_DIR"
-
-if [[ ! -x "$NODE_BIN" ]]; then
-  echo "Node binary not found: $NODE_BIN"
-  exit 1
-fi
+# A wiped directory needs its candidate ownership marker restored.
+python3 "$ROOT_DIR/scripts/testnet/stop-owned-nodes.py" \
+  --base-dir "$BASE_DIR" --pid-dir "$PID_DIR" --node-bin "$NODE_BIN" \
+  --owner "$ROOT_DIR" --claim-only
 
 # Key insertion uses the node binary itself (`keys insert` / `keys list`, which
 # open a `LocalKeystore` and write the same `<key-type-hex><public-key-hex>` files

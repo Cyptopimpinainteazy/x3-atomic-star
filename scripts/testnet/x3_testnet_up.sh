@@ -31,12 +31,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCHER="$ROOT_DIR/scripts/testnet/run-7-validators-local.sh"
 BUILDER="$ROOT_DIR/scripts/testnet/build-x3-testnet-spec.py"
-GENERATED_SPEC="$ROOT_DIR/deployment/chain-specs/fresh/generated/x3-testnet-plain.json"
+GENERATED_SPEC="$ROOT_DIR/deployment/chain-specs/x3-atomic-star-local/generated/x3-testnet-plain.json"
 
 NODE_BIN="${NODE_BIN:-}"
 CHAIN_SPEC="${CHAIN_SPEC:-}"
-BASE_DIR="${BASE_DIR:-$HOME/.local/share/x3/testnet}"
-LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs/testnet}"
+BASE_DIR="${BASE_DIR:-$ROOT_DIR/.local-state/testnet}"
+LOG_DIR="${LOG_DIR:-$ROOT_DIR/.local-state/testnet-logs}"
 KEYS_DIR="${KEYS_DIR:-}"
 COUNT="${COUNT:-7}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
@@ -98,8 +98,8 @@ fi
 echo "[node] $NODE_BIN"
 
 if [[ "$SKIP_BUILD" == "0" ]]; then
-  echo "[build] cargo build --release -p x3-chain-node --features ${BUILD_FEATURES} (--skip-build to reuse the binary above)"
-  ( cd "$ROOT_DIR" && cargo build --release -p x3-chain-node --features "$BUILD_FEATURES" ) || {
+  echo "[build] cargo build --locked --release -p x3-chain-node --features ${BUILD_FEATURES} (--skip-build to reuse the binary above)"
+  ( cd "$ROOT_DIR" && cargo build --locked --release -p x3-chain-node --features "$BUILD_FEATURES" ) || {
     echo "[error] build failed; re-run with --skip-build to use the existing binary" >&2
     exit 1
   }
@@ -116,7 +116,7 @@ case "${CHAIN_SPEC:-}" in
 esac
 if [[ -z "$CHAIN_SPEC" || ! -f "$CHAIN_SPEC" ]]; then
   echo "[spec] no plain spec at '${CHAIN_SPEC:-<unset>}'; building one for ${COUNT} authorities"
-  X3_NODE_BIN="$NODE_BIN" python3 "$BUILDER" "$COUNT" || {
+  OUT_DIR="$(dirname "$GENERATED_SPEC")" X3_NODE_BIN="$NODE_BIN" python3 "$BUILDER" "$COUNT" || {
     echo "[error] could not build a spec (see the builder output above)" >&2
     exit 1
   }
