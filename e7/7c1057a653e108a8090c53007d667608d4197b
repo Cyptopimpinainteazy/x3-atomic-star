@@ -1,0 +1,497 @@
+.github/workflows/blockchain-core.yml
+  s_cd9ce9aa4476de::t_a71a00d1f9ba13 19-20,26-29,32-48
+CURRENT_MAINNET_STATUS.md
+  s_cd9ce9aa4476de::t_ad526d9834a5ba 1,3,5
+Cargo.lock
+  s_cd9ce9aa4476de::t_e383ba4033eb02 1736-1745,2180-2189,5220-5232,6996-7010,11643-11665,20472-20473,22042-22058,22333-22344,22499-22508,22642-22654,22818-22854,23005-23019
+Cargo.toml
+  s_cd9ce9aa4476de::t_37e6143bbeceb2 82,86,95,100,113-114,122,186-187,189
+FEATURE_REGISTRY.toml
+  s_cd9ce9aa4476de::t_697c0c941f7c79 1-1149
+LAUNCH_SCOPE.md
+  s_cd9ce9aa4476de::t_ec4bd9f5dc8202 1,3,5
+README.md
+  s_cd9ce9aa4476de::t_0e0a2015995bec 1,3,5,7,9,12,15,17,19,21
+RELEASE_GATES.md
+  s_cd9ce9aa4476de::t_a754d7952342e8 1-21
+TESTNET_FEATURE_FLAGS.toml
+  s_cd9ce9aa4476de::t_791085e5bbab5f 1-50
+WIKI.md
+  s_cd9ce9aa4476de::t_089f8dac3bb621 1,3,5-10,12
+audit-artifacts/migration/source-files.json
+  s_cd9ce9aa4476de::t_963e08fcf2ff56 26,30,39,44,57-58,66,130-133,157-159,171-175,406-555,1381-1390,1581-1620,1926-1940,2441-2470,2511-2585,3201-3245,3561-3675,3751-3770,4307-4319,4321-4322,4325,4327-4328,4331,4333-4334,4337,4339-4340,4343,4345-4346,4349,4351-4352,4355,4357-4358,4361,4363-4364,4401-4515,11666-11926,12077-12181
+audit-artifacts/organization/restored-modules.json
+  s_cd9ce9aa4476de::t_576b9e1b418654 1-1210
+audit-artifacts/organization/verification.json
+  s_cd9ce9aa4476de::t_16e5579f2e2764 1-57
+crates/cross-vm-coordinator/Cargo.lock
+  s_cd9ce9aa4476de::t_446a290c914ca1 1-6591
+crates/cross-vm-coordinator/Cargo.toml
+  s_cd9ce9aa4476de::t_1c59eba126f67d 1-64
+crates/cross-vm-coordinator/src/abi.rs
+  s_cd9ce9aa4476de::t_34c37b7f44d325 1-291
+crates/cross-vm-coordinator/src/attempt_ledger.rs
+  s_cd9ce9aa4476de::t_4935dd5d13279b 1-420
+crates/cross-vm-coordinator/src/bridge_integration_tests.rs
+  s_cd9ce9aa4476de::t_a01cf90424f200 1-622
+crates/cross-vm-coordinator/src/concurrent.rs
+  s_cd9ce9aa4476de::t_65cf39171fe5b5 1-748
+crates/cross-vm-coordinator/src/config.rs
+  s_cd9ce9aa4476de::t_fff0183feba661 1-160
+crates/cross-vm-coordinator/src/flashloan_adapter.rs
+  s_cd9ce9aa4476de::t_232b0366e51aa2 1-156
+crates/cross-vm-coordinator/src/htlc.rs
+  s_cd9ce9aa4476de::t_4de3c1c5a8798e 1-883
+crates/cross-vm-coordinator/src/intent_binding.rs
+  s_cd9ce9aa4476de::t_10e41607af0b88 1-129
+crates/cross-vm-coordinator/src/lease.rs
+  s_cd9ce9aa4476de::t_c8e6b871b38a31 1-718
+crates/cross-vm-coordinator/src/lib.rs
+  s_cd9ce9aa4476de::t_fc4e501ad1c962 1-82
+crates/cross-vm-coordinator/src/merkle_settlement.rs
+  s_cd9ce9aa4476de::t_d3d17f0f37f4f6 1-9
+crates/cross-vm-coordinator/src/persistence.rs
+  s_cd9ce9aa4476de::t_997c1e1aa9b4e6 1-637
+crates/cross-vm-coordinator/src/proof_binding.rs
+  s_cd9ce9aa4476de::t_6215fef74f6281 1-178
+crates/cross-vm-coordinator/src/proof_vault.rs
+  s_cd9ce9aa4476de::t_98c946ff9b9f2e 1-356
+crates/cross-vm-coordinator/src/recovery.rs
+  s_cd9ce9aa4476de::t_ba1dd891c9645f 1-275
+crates/cross-vm-coordinator/src/relayer.rs
+  s_cd9ce9aa4476de::t_fc1a6128ba81f3 1-172
+crates/cross-vm-coordinator/src/rpc_client.rs
+  s_cd9ce9aa4476de::t_45673e3c5c93df 1-337
+crates/cross-vm-coordinator/src/settlement_finality.rs
+  s_cd9ce9aa4476de::t_91867f146f95cf 1-533
+crates/cross-vm-coordinator/src/settlement_outbox.rs
+  s_cd9ce9aa4476de::t_e8a03296a9caed 1-529
+crates/cross-vm-coordinator/src/settlement_reconcile.rs
+  s_cd9ce9aa4476de::t_12a76d70ed36f9 1-518
+crates/cross-vm-coordinator/src/settlement_submission.rs
+  s_cd9ce9aa4476de::t_531c7f7add5fba 1-324
+crates/cross-vm-coordinator/src/state_machine.rs
+  s_cd9ce9aa4476de::t_3b50c0bdbcfd8e 1-1548
+crates/cross-vm-coordinator/src/tests.rs
+  s_cd9ce9aa4476de::t_db5f929af84744 1-1044
+crates/cross-vm-coordinator/src/types.rs
+  s_cd9ce9aa4476de::t_91713e1f29f489 1-439
+crates/cross-vm-coordinator/src/valkey.rs
+  s_cd9ce9aa4476de::t_2f06b27003586f 1-1575
+crates/cross-vm-coordinator/tests/distributed_chaos.rs
+  s_cd9ce9aa4476de::t_77188754402d8f 1-315
+crates/cross-vm-coordinator/tests/security_regression.rs
+  s_cd9ce9aa4476de::t_9f0fc8f0849657 1-1421
+crates/cross-vm-coordinator/tests/valkey_live.rs
+  s_cd9ce9aa4476de::t_b322bb526a3ead 1-417
+crates/x3-chain-health-daemon/Cargo.toml
+  s_cd9ce9aa4476de::t_608f7d6a4e2dc2 1-19
+crates/x3-chain-health-daemon/README.md
+  s_cd9ce9aa4476de::t_9ee71b85684a3f 1-3
+crates/x3-chain-health-daemon/src/main.rs
+  s_cd9ce9aa4476de::t_b10841d9f1e68a 1-418
+crates/x3-constitution/Cargo.toml
+  s_cd9ce9aa4476de::t_7337b76c354623 1-16
+crates/x3-constitution/src/amendment.rs
+  s_cd9ce9aa4476de::t_9845a9d5f90ede 1-210
+crates/x3-constitution/src/articles.rs
+  s_cd9ce9aa4476de::t_072f1f8c3e046d 1-143
+crates/x3-constitution/src/engine.rs
+  s_cd9ce9aa4476de::t_0af4b6f6dd0f8a 1-306
+crates/x3-constitution/src/error.rs
+  s_cd9ce9aa4476de::t_d5606a425efa3b 1-28
+crates/x3-constitution/src/invariants.rs
+  s_cd9ce9aa4476de::t_2dc5252605b7b1 1-262
+crates/x3-constitution/src/lib.rs
+  s_cd9ce9aa4476de::t_d4e791b02852eb 1-33
+crates/x3-constitution/src/types.rs
+  s_cd9ce9aa4476de::t_638c967343c2a0 1-114
+crates/x3-genesis-builder/Cargo.toml
+  s_cd9ce9aa4476de::t_aa951010f2f03a 1-19
+crates/x3-genesis-builder/src/lib.rs
+  s_cd9ce9aa4476de::t_af8cd6d456cac2 1-78
+crates/x3-genesis-builder/src/main.rs
+  s_cd9ce9aa4476de::t_4ec04bdc272c0b 1-39
+crates/x3-launch-validator/Cargo.toml
+  s_cd9ce9aa4476de::t_f5a74ee181d8fa 1-19
+crates/x3-launch-validator/src/checklist.rs
+  s_cd9ce9aa4476de::t_5921cc15d200d9 1-306
+crates/x3-launch-validator/src/checks.rs
+  s_cd9ce9aa4476de::t_73334391bbde9f 1-310
+crates/x3-launch-validator/src/lib.rs
+  s_cd9ce9aa4476de::t_d92d75c92f9c58 1-20
+crates/x3-launch-validator/src/main.rs
+  s_cd9ce9aa4476de::t_80f5f096e9f075 1-79
+crates/x3-launch-validator/src/reporter.rs
+  s_cd9ce9aa4476de::t_95cba94a32d2c1 1-65
+crates/x3-mc/Cargo.lock
+  s_cd9ce9aa4476de::t_0d7287cdeec9b2 1-5420
+crates/x3-mc/Cargo.toml
+  s_cd9ce9aa4476de::t_e73349b78f65fd 1-29
+crates/x3-mc/README.md
+  s_cd9ce9aa4476de::t_588957c585beee 1-197
+crates/x3-mc/campaigns/mc-x3-atomic-001.json
+  s_cd9ce9aa4476de::t_e79b69c6d0e5c6 1-80
+crates/x3-mc/src/campaign.rs
+  s_cd9ce9aa4476de::t_ab9da97be9aa41 1-172
+crates/x3-mc/src/distribution.rs
+  s_cd9ce9aa4476de::t_0242acaa93622d 1-444
+crates/x3-mc/src/engine.rs
+  s_cd9ce9aa4476de::t_754c9087d1102a 1-477
+crates/x3-mc/src/evidence.rs
+  s_cd9ce9aa4476de::t_d9a083b38c9cd5 1-203
+crates/x3-mc/src/lib.rs
+  s_cd9ce9aa4476de::t_e6c5690ea7dcfc 1-53
+crates/x3-mc/src/main.rs
+  s_cd9ce9aa4476de::t_045ffa3304d142 1-409
+crates/x3-mc/src/minimize.rs
+  s_cd9ce9aa4476de::t_f9928ef1fbc9bb 1-176
+crates/x3-mc/src/rng.rs
+  s_cd9ce9aa4476de::t_60ac5dc906b282 1-150
+crates/x3-mc/src/scenarios/atomic.rs
+  s_cd9ce9aa4476de::t_3376a48846bba0 1-238
+crates/x3-mc/src/scenarios/mod.rs
+  s_cd9ce9aa4476de::t_dc2a59785ddde9 1-10
+crates/x3-mc/tests/engine.rs
+  s_cd9ce9aa4476de::t_a7695368a71f96 1-387
+crates/x3-readiness-report/Cargo.toml
+  s_cd9ce9aa4476de::t_45ff12ad812517 1-17
+crates/x3-readiness-report/src/collector.rs
+  s_cd9ce9aa4476de::t_ee13d5ee5c12a9 1-307
+crates/x3-readiness-report/src/formatter.rs
+  s_cd9ce9aa4476de::t_6c94f4f62fd531 1-115
+crates/x3-readiness-report/src/lib.rs
+  s_cd9ce9aa4476de::t_b9575b1703c938 1-15
+crates/x3-readiness-report/src/tests.rs
+  s_cd9ce9aa4476de::t_b49d49aa3628dc 1-134
+crates/x3-readiness-report/src/types.rs
+  s_cd9ce9aa4476de::t_4e71bd0599f024 1-202
+crates/x3-readiness/Cargo.toml
+  s_cd9ce9aa4476de::t_0cc97e245c74fe 1-14
+crates/x3-readiness/src/lib.rs
+  s_cd9ce9aa4476de::t_293ddd32086ea5 1-842
+crates/x3-readiness/src/main.rs
+  s_cd9ce9aa4476de::t_4cbe1b964567ae 1-432
+crates/x3-sim/Cargo.lock
+  s_cd9ce9aa4476de::t_def59d64abe7cb 1-5407
+crates/x3-sim/Cargo.toml
+  s_cd9ce9aa4476de::t_a1f9a95c6dc5dd 1-34
+crates/x3-sim/README.md
+  s_cd9ce9aa4476de::t_bd3d4e89e13ae7 1-228
+crates/x3-sim/scripts/root_cause.py
+  s_cd9ce9aa4476de::t_a11ad69f99c663 1-468
+crates/x3-sim/scripts/test_root_cause.py
+  s_cd9ce9aa4476de::t_a4c263f0b4033d 1-635
+crates/x3-sim/src/clock.rs
+  s_cd9ce9aa4476de::t_d2ea258ffd6e57 1-39
+crates/x3-sim/src/faults.rs
+  s_cd9ce9aa4476de::t_63026aca649ffb 1-239
+crates/x3-sim/src/hunt.rs
+  s_cd9ce9aa4476de::t_d91192e0838560 1-306
+crates/x3-sim/src/invariants.rs
+  s_cd9ce9aa4476de::t_8470984ae7ea8e 1-204
+crates/x3-sim/src/lib.rs
+  s_cd9ce9aa4476de::t_0b171fd2f7f42b 1-48
+crates/x3-sim/src/main.rs
+  s_cd9ce9aa4476de::t_f21d1caa50a6c5 1-493
+crates/x3-sim/src/minimize.rs
+  s_cd9ce9aa4476de::t_f6fb6dd820693b 1-390
+crates/x3-sim/src/network.rs
+  s_cd9ce9aa4476de::t_63f20fec089f8e 1-187
+crates/x3-sim/src/packet.rs
+  s_cd9ce9aa4476de::t_a79d9f9d88e2b9 1-644
+crates/x3-sim/src/params.rs
+  s_cd9ce9aa4476de::t_1ac978ecffee23 1-129
+crates/x3-sim/src/rng.rs
+  s_cd9ce9aa4476de::t_6a3a014f97fd13 1-59
+crates/x3-sim/src/sim.rs
+  s_cd9ce9aa4476de::t_984eb61d6be267 1-810
+crates/x3-sim/tests/determinism.rs
+  s_cd9ce9aa4476de::t_ecc490a91690c8 1-68
+crates/x3-sim/tests/invariants.rs
+  s_cd9ce9aa4476de::t_16bcd6fb677990 1-186
+crates/x3-sim/tests/minimize.rs
+  s_cd9ce9aa4476de::t_e9a1597b022a66 1-127
+crates/x3-sim/tests/packet.rs
+  s_cd9ce9aa4476de::t_7e4e3a0a163f47 1-222
+crates/x3-sim/tests/params.rs
+  s_cd9ce9aa4476de::t_da9839cfb3ee40 1-205
+crates/x3-sim/tests/refund_after_claim.rs
+  s_cd9ce9aa4476de::t_c47e65b4635826 1-146
+crates/x3-state-snapshot/Cargo.toml
+  s_cd9ce9aa4476de::t_17d3dfc2cfe2aa 1-26
+crates/x3-state-snapshot/src/lib.rs
+  s_cd9ce9aa4476de::t_6e0d1441b8d6e4 1-1405
+crates/x3-state-snapshot/src/main.rs
+  s_cd9ce9aa4476de::t_675d74ec1a1e3c 1-836
+crates/x3-state-snapshot/src/tests.rs
+  s_cd9ce9aa4476de::t_5c09103c0bb87c 1-1198
+docs/README.md
+  s_cd9ce9aa4476de::t_433bedd5bc8ec4 1-14
+docs/architecture/README.md
+  s_cd9ce9aa4476de::t_19a26fbab9ab16 1-27
+docs/archive/README.md
+  s_cd9ce9aa4476de::t_d215593d75ca23 1-5
+docs/archive/xxxstar-69234c18/CURRENT_MAINNET_STATUS.md
+  s_cd9ce9aa4476de::t_da48ce63bc8c7f 1-96
+docs/archive/xxxstar-69234c18/LAUNCH_SCOPE.md
+  s_cd9ce9aa4476de::t_43f87c3c0734f9 1-148
+docs/archive/xxxstar-69234c18/docs/current/BRIDGED_TESTNET_RUNBOOK.md
+  s_cd9ce9aa4476de::t_c6988c087d623d 1-130
+docs/archive/xxxstar-69234c18/docs/current/CODEBASE_CAPABILITIES.md
+  s_cd9ce9aa4476de::t_964fcfca78b2ec 1-112
+docs/archive/xxxstar-69234c18/docs/current/FAILURES_AND_TODOS.md
+  s_cd9ce9aa4476de::t_f9cf2f0eb47cb3 1-289
+docs/archive/xxxstar-69234c18/docs/current/MAINNET_GAMEPLAN.md
+  s_cd9ce9aa4476de::t_77ba624c43d437 1-340
+docs/archive/xxxstar-69234c18/docs/current/MASTER_CHECKLIST_STATUS.md
+  s_cd9ce9aa4476de::t_594396f001fe45 1-266
+docs/archive/xxxstar-69234c18/docs/current/READINESS_GRAPH.md
+  s_cd9ce9aa4476de::t_7e75fa47e1be2a 1-263
+docs/archive/xxxstar-69234c18/docs/current/README.md
+  s_cd9ce9aa4476de::t_1375addec7d103 1-76
+docs/archive/xxxstar-69234c18/docs/current/VERIFICATION_EVIDENCE.md
+  s_cd9ce9aa4476de::t_2d635839db0d7c 1-127
+docs/archive/xxxstar-69234c18/proving/README.md
+  s_cd9ce9aa4476de::t_71536fcd15b10a 1-44
+docs/current/BRIDGED_TESTNET_RUNBOOK.md
+  s_cd9ce9aa4476de::t_678eb52e97a71d 1,3,5
+docs/current/CODEBASE_CAPABILITIES.md
+  s_cd9ce9aa4476de::t_c5c7d09bbc4932 1,3,5
+docs/current/FAILURES_AND_TODOS.md
+  s_cd9ce9aa4476de::t_504f0157f754ce 1,3,5
+docs/current/MAINNET_GAMEPLAN.md
+  s_cd9ce9aa4476de::t_0300c7d8a22eb6 1,3,5
+docs/current/MASTER_CHECKLIST_STATUS.md
+  s_cd9ce9aa4476de::t_b181b91f464c13 1,3,5
+docs/current/READINESS_GRAPH.md
+  s_cd9ce9aa4476de::t_2e6b5d7497ccba 1,3,5
+docs/current/README.md
+  s_cd9ce9aa4476de::t_98c7bf2504aad2 1,3,5
+docs/current/VERIFICATION_EVIDENCE.md
+  s_cd9ce9aa4476de::t_a1e31c5c39c83c 1,3,5
+docs/development/README.md
+  s_cd9ce9aa4476de::t_fa7494242624c0 1-18
+docs/operations/README.md
+  s_cd9ce9aa4476de::t_a725f4eacb0a7e 1-16
+docs/release/STATUS.md
+  s_cd9ce9aa4476de::t_cfe8eb47d4958c 1-28
+docs/verification/EXPERIMENTAL.md
+  s_cd9ce9aa4476de::t_6955c46101cacd 1-13
+docs/verification/README.md
+  s_cd9ce9aa4476de::t_f594473acab55b 1-29
+formal-proofs/README.md
+  s_cd9ce9aa4476de::t_4529885fc6879c 1-44
+formal-proofs/coq/README.md
+  s_cd9ce9aa4476de::t_120e0d8c5dc0e6 1-21
+formal-proofs/coq/SupplyInvariant.v
+  s_cd9ce9aa4476de::t_b4b2069457f052 1-36
+formal-proofs/k/README.md
+  s_cd9ce9aa4476de::t_790c83ae2eae6d 1-18
+formal-proofs/k/x3vm-claims.k
+  s_cd9ce9aa4476de::t_7898ebe66e5322 1-6
+formal-proofs/k/x3vm-spec.k
+  s_cd9ce9aa4476de::t_e1d42353bcd523 1-16
+formal-proofs/tla/asset_kernel/AssetKernelSupply.cfg
+  s_cd9ce9aa4476de::t_86bbcc0bc77d08 1-13
+formal-proofs/tla/asset_kernel/AssetKernelSupply.tla
+  s_cd9ce9aa4476de::t_d512bb1135ac28 1-63
+formal-proofs/tla/atomic_settlement/AtomicSettlement.cfg
+  s_cd9ce9aa4476de::t_bbe341ace44771 1-20
+formal-proofs/tla/atomic_settlement/AtomicSettlement.legacy.cfg
+  s_cd9ce9aa4476de::t_cf969b8af75cf3 1-33
+formal-proofs/tla/atomic_settlement/AtomicSettlement.tla
+  s_cd9ce9aa4476de::t_1b4c46fcc08aa8 1-253
+formal-proofs/tla/consensus/X3Consensus.cfg
+  s_cd9ce9aa4476de::t_2895b784a4ec38 1-12
+formal-proofs/tla/consensus/X3Consensus.tla
+  s_cd9ce9aa4476de::t_66831effd55953 1-50
+formal-proofs/tla/contracts/CrossVmParity.cfg
+  s_cd9ce9aa4476de::t_9414e29f25c246 1-12
+formal-proofs/tla/contracts/CrossVmParity.tla
+  s_cd9ce9aa4476de::t_fa97cd87a005b3 1-88
+formal-proofs/tla/evolution/Evolution.cfg
+  s_cd9ce9aa4476de::t_cbb008c978bdc7 1-16
+formal-proofs/tla/evolution/Evolution.tla
+  s_cd9ce9aa4476de::t_3e411ace4afebb 1-110
+formal-proofs/tla/funding/MilestoneReceipts.cfg
+  s_cd9ce9aa4476de::t_ad034b527f1247 1-24
+formal-proofs/tla/funding/MilestoneReceipts.tla
+  s_cd9ce9aa4476de::t_1b86e249f97e49 1-129
+formal-proofs/tla/gpu/CpuGpuParity.cfg
+  s_cd9ce9aa4476de::t_b3b0c7cc616b39 1-20
+formal-proofs/tla/gpu/CpuGpuParity.tla
+  s_cd9ce9aa4476de::t_623f23601c4f01 1-116
+formal-proofs/tla/onboarding/OnboardingTtfv.cfg
+  s_cd9ce9aa4476de::t_3675ce30dc30c7 1-22
+formal-proofs/tla/onboarding/OnboardingTtfv.tla
+  s_cd9ce9aa4476de::t_ee324ae5490fe6 1-120
+proof-forge/Cargo.toml
+  s_cd9ce9aa4476de::t_3ad0a9de788a4f 1-29
+proof-forge/src/dashboard/mod.rs
+  s_cd9ce9aa4476de::t_eb540a9847e331 1-295
+proof-forge/src/feature_proof.rs
+  s_cd9ce9aa4476de::t_dfe3bdd1417c6b 1-940
+proof-forge/src/gap_proof.rs
+  s_cd9ce9aa4476de::t_d1c0dc5037a0e7 1-490
+proof-forge/src/lib.rs
+  s_cd9ce9aa4476de::t_3634712ca5ac90 1-14
+proof-forge/src/main.rs
+  s_cd9ce9aa4476de::t_912e4027c1b69c 1-889
+proof-forge/src/proof.rs
+  s_cd9ce9aa4476de::t_66c5c177f1305d 1-289
+proof-forge/src/receipt.rs
+  s_cd9ce9aa4476de::t_0657b426517f58 1-477
+proof-forge/src/registry/claims.rs
+  s_cd9ce9aa4476de::t_bda564cadab493 1-23
+proof-forge/src/registry/mod.rs
+  s_cd9ce9aa4476de::t_113b745a04f8e0 1-125
+proof-forge/src/runners/asset_kernel.rs
+  s_cd9ce9aa4476de::t_b22e999c45f532 1-303
+proof-forge/src/runners/atomic.rs
+  s_cd9ce9aa4476de::t_b7b2a9223efe38 1-294
+proof-forge/src/runners/bridge.rs
+  s_cd9ce9aa4476de::t_9e04353430bb1a 1-83
+proof-forge/src/runners/bug_bounty.rs
+  s_cd9ce9aa4476de::t_458f3d86f6ece8 1-88
+proof-forge/src/runners/consensus.rs
+  s_cd9ce9aa4476de::t_7b71c03f155dc4 1-136
+proof-forge/src/runners/cross_vm.rs
+  s_cd9ce9aa4476de::t_a8666cc115f05a 1-122
+proof-forge/src/runners/custody.rs
+  s_cd9ce9aa4476de::t_a5ef48ebee0e1a 1-89
+proof-forge/src/runners/dex.rs
+  s_cd9ce9aa4476de::t_56734f4b719482 1-129
+proof-forge/src/runners/ecosystem_quality.rs
+  s_cd9ce9aa4476de::t_1fd6474c9a90e2 1-79
+proof-forge/src/runners/flashloans.rs
+  s_cd9ce9aa4476de::t_810907a8c41b42 1-200
+proof-forge/src/runners/formal_proofs.rs
+  s_cd9ce9aa4476de::t_c5842383019017 1-616
+proof-forge/src/runners/governance.rs
+  s_cd9ce9aa4476de::t_c6d22d7987f4cd 1-123
+proof-forge/src/runners/gpu.rs
+  s_cd9ce9aa4476de::t_df58a81acbaa17 1-349
+proof-forge/src/runners/incident_response.rs
+  s_cd9ce9aa4476de::t_3ca538c86361c8 1-91
+proof-forge/src/runners/launchpad.rs
+  s_cd9ce9aa4476de::t_762c9adf30a8de 1-134
+proof-forge/src/runners/mod.rs
+  s_cd9ce9aa4476de::t_4dc7bb5512b68b 1-1396
+proof-forge/src/runners/operational.rs
+  s_cd9ce9aa4476de::t_f40da77e39285c 1-861
+proof-forge/src/runners/oracle.rs
+  s_cd9ce9aa4476de::t_e228af284fb1ee 1-132
+proof-forge/src/runners/runtime.rs
+  s_cd9ce9aa4476de::t_79ebe7e842e309 1-116
+proof-forge/src/runners/smart_contracts.rs
+  s_cd9ce9aa4476de::t_8e241680dadc45 1-254
+proof-forge/src/runners/social_consensus.rs
+  s_cd9ce9aa4476de::t_0d61afb3f970a5 1-91
+proof-forge/src/runners/treasury.rs
+  s_cd9ce9aa4476de::t_033b64c6334272 1-127
+proof-forge/src/runners/upgrade_safety.rs
+  s_cd9ce9aa4476de::t_8162d71167c407 1-88
+proof-forge/src/runners/x3language.rs
+  s_cd9ce9aa4476de::t_05b88568114e71 1-179
+proof-forge/src/runners/x3vm.rs
+  s_cd9ce9aa4476de::t_f9f2720516be1a 1-121
+proof-forge/src/scoring/formula.rs
+  s_cd9ce9aa4476de::t_8734960aa79029 1-70
+proof-forge/src/scoring/mod.rs
+  s_cd9ce9aa4476de::t_67692fe8a65381 1-111
+proof-forge/src/todo_proof.rs
+  s_cd9ce9aa4476de::t_3401b2ecdb1361 1-349
+proof/claims/registry.yml
+  s_cd9ce9aa4476de::t_1c25f028afea3b 1-375
+proof/features/feature_matrix.yml
+  s_cd9ce9aa4476de::t_a5ccac5a0b1107 1-1477
+proof/policies/gap_policy.yml
+  s_cd9ce9aa4476de::t_6a2a39bcc666f5 1-207
+proof/policies/proof_levels.yml
+  s_cd9ce9aa4476de::t_c1fa752b396e51 1-96
+proof/policies/quantum_crypto_policy.yml
+  s_cd9ce9aa4476de::t_797364a2f69b4e 1-123
+proof/policies/quantum_red_team_policy.yml
+  s_cd9ce9aa4476de::t_229fc3e0663139 1-52
+proof/policies/release_gates.yml
+  s_cd9ce9aa4476de::t_d4b0989c27cd57 1-143
+proof/policies/security_policy.yml
+  s_cd9ce9aa4476de::t_f81353e919a5e3 1-156
+proof/policies/todo_policy.yml
+  s_cd9ce9aa4476de::t_09198b77da0d25 1-176
+proving/Cargo.toml
+  s_cd9ce9aa4476de::t_0f78066da3ba92 1-19
+proving/README.md
+  s_cd9ce9aa4476de::t_72225e7c720c52 1-3
+proving/src/checks.rs
+  s_cd9ce9aa4476de::t_800a1577a430fd 1-312
+proving/src/main.rs
+  s_cd9ce9aa4476de::t_85c47a884944b2 1-270
+proving/src/report.rs
+  s_cd9ce9aa4476de::t_6473cbe7fffb84 1-104
+scripts/check-core.sh
+  s_cd9ce9aa4476de::t_706627e22e95da 1-12
+scripts/check-docs.py
+  s_cd9ce9aa4476de::t_b8755f2510b7a6 1-60
+scripts/tests/test_check_docs.py
+  s_cd9ce9aa4476de::t_94b392a934fa67 1-55
+tools/launchops/Cargo.toml
+  s_cd9ce9aa4476de::t_2b46381e77bd85 1-16
+tools/launchops/src/audit.rs
+  s_cd9ce9aa4476de::t_ba63747695cd46 1-90
+tools/launchops/src/classifier.rs
+  s_cd9ce9aa4476de::t_eda0cd490f8f1a 1-105
+tools/launchops/src/commands.rs
+  s_cd9ce9aa4476de::t_0e8e0652054798 1-105
+tools/launchops/src/conflict.rs
+  s_cd9ce9aa4476de::t_b521eac7ba3bd2 1-225
+tools/launchops/src/contract.rs
+  s_cd9ce9aa4476de::t_c8cc904659556b 1-614
+tools/launchops/src/drift.rs
+  s_cd9ce9aa4476de::t_2fabe112cb6e5d 1-135
+tools/launchops/src/evidence.rs
+  s_cd9ce9aa4476de::t_9ae049178a6608 1-292
+tools/launchops/src/gates.rs
+  s_cd9ce9aa4476de::t_f4f3d4cf867c02 1-176
+tools/launchops/src/gitdiff.rs
+  s_cd9ce9aa4476de::t_2816b56bafe0e9 1-75
+tools/launchops/src/inventory.rs
+  s_cd9ce9aa4476de::t_9f135b3fa19f1c 1-1257
+tools/launchops/src/main.rs
+  s_cd9ce9aa4476de::t_104d8c343e130b 1-1438
+tools/launchops/src/models.rs
+  s_cd9ce9aa4476de::t_ed8e88879148dd 1-737
+tools/launchops/src/parser.rs
+  s_cd9ce9aa4476de::t_0d0b0aac1c2683 1-84
+tools/launchops/src/report.rs
+  s_cd9ce9aa4476de::t_0e469886cf1062 1-385
+tools/launchops/src/risk_rules.rs
+  s_cd9ce9aa4476de::t_77d2370330930c 1-233
+tools/launchops/src/scanner.rs
+  s_cd9ce9aa4476de::t_2e168e60afe26b 1-101
+tools/launchops/src/scoring.rs
+  s_cd9ce9aa4476de::t_7b645667f2ec0e 1-233
+tools/launchops/src/stale_docs.rs
+  s_cd9ce9aa4476de::t_706eea4ab492cf 1-50
+tools/launchops/src/test_weaken.rs
+  s_cd9ce9aa4476de::t_9e4edbdfdbb713 1-103
+tools/launchops/src/verify.rs
+  s_cd9ce9aa4476de::t_3ff32da54be87c 1-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e77c1057a653e108a8090c53007d667608d4197b",
+  "prompts": {},
+  "sessions": {
+    "s_cd9ce9aa4476de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "s_cd9ce9aa4476de",
+        "model": "unknown"
+      },
+      "human_author": "crypto pimpim <cryptopimpinainteazy@gmail.com>"
+    }
+  }
+}
