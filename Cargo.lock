@@ -1734,6 +1734,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "build-helper"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2166,6 +2176,16 @@ name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
+
+[[package]]
+name = "colored"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
+dependencies = [
+ "lazy_static",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "com"
@@ -5198,6 +5218,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
+name = "globset"
+version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07c34a9410465b45bd9787443bc7370f37735bad04b0f0cd57ff1a3186c98988"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "gloo-net"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6958,6 +6991,21 @@ checksum = "bf7a85fe66f9ff9cd74e169fdd2c94c6e1e74c412c99a73b4df3200b5d3760b2"
 dependencies = [
  "kvdb",
  "parking_lot 0.12.5",
+]
+
+[[package]]
+name = "launchops"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "globset",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
+ "walkdir",
 ]
 
 [[package]]
@@ -11590,6 +11638,29 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "proof-forge"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "colored",
+ "hex",
+ "indicatif",
+ "parking_lot 0.12.5",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "walkdir",
 ]
 
 [[package]]
@@ -20398,6 +20469,8 @@ dependencies = [
  "once_cell",
  "rustls 0.23.46",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "url 2.5.8",
  "webpki-roots 0.26.11",
 ]
@@ -21967,6 +22040,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-chain-health-daemon"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "env_logger 0.10.2",
+ "hex",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "ureq",
+ "x3-atomic-swap",
+]
+
+[[package]]
 name = "x3-chain-node"
 version = "0.1.0"
 dependencies = [
@@ -22241,6 +22331,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-constitution"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "x3-proof",
+]
+
+[[package]]
 name = "x3-cross-vm-bridge"
 version = "0.1.0"
 dependencies = [
@@ -22395,6 +22497,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-genesis-builder"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "x3-gpu-validator-swarm"
 version = "0.1.0"
 dependencies = [
@@ -22525,6 +22637,19 @@ dependencies = [
  "sha3",
  "x3-lang-common",
  "x3-lang-compiler",
+]
+
+[[package]]
+name = "x3-launch-validator"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "x3-constitution",
+ "x3-proof",
 ]
 
 [[package]]
@@ -22691,6 +22816,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-proving-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "x3-readiness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "toml 0.8.23",
+ "ureq",
+]
+
+[[package]]
+name = "x3-readiness-report"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "x3-relayer"
 version = "0.1.0"
 dependencies = [
@@ -22838,6 +23000,21 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+]
+
+[[package]]
+name = "x3-state-snapshot"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sp-core",
+ "sp-state-machine",
+ "sp-trie",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

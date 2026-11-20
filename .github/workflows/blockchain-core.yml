@@ -16,10 +16,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang llvm libclang-dev libssl-dev pkg-config
       - name: Verify copied source and workspace
         run: |
+          python3 -m unittest discover -s scripts/tests -p test_check_docs.py
+          python3 scripts/check-docs.py
           python3 scripts/verify-core-snapshot.py
           cargo metadata --locked --no-deps --format-version 1 > /tmp/core-metadata.json
           bash -n scripts/run-dev-node.sh
       - name: Test canonical bytecode
         run: cargo test --locked -p x3bc-core
+      - name: Test snapshot and genesis tools
+        run: cargo test --locked -p x3-state-snapshot -p x3-genesis-builder
+      - name: Compile restored operator and proof tools
+        run: cargo check --locked -p proof-forge -p x3-proving-harness -p x3-chain-health-daemon -p x3-launch-validator -p x3-readiness -p x3-readiness-report -p launchops
       - name: Check actual node and embedded runtime build
         run: cargo check --locked -p x3-chain-node
+  nested-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: '2'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [cross-vm-coordinator, x3-sim, x3-mc]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install nested native prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang llvm libclang-dev libssl-dev pkg-config
+      - name: Test default nested workspace
+        run: cargo test --locked --manifest-path crates/${{ matrix.module }}/Cargo.toml

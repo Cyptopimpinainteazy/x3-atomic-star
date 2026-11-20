@@ -1,0 +1,57 @@
+{
+  "date_utc": "2026-11-16T20:55:23.361008+00:00",
+  "base_commit": "b74015420efcded666bdc61d46436d23202801f9",
+  "source_commit": "69234c1897d9e80424cb0a652d48cd4ee6511deb",
+  "copied_source_identities": 2617,
+  "root_workspace_members": 130,
+  "archived_documents_byte_identical": 11,
+  "checks": {
+    "support_tool_tests": {
+      "status": "PASS",
+      "tests": 399
+    },
+    "restored_root_package_check": {
+      "status": "PASS",
+      "packages": 10
+    },
+    "node_and_embedded_wasm_check": {
+      "status": "PASS",
+      "seconds": 903
+    },
+    "documentation_checker_tests": {
+      "status": "PASS",
+      "tests": 6
+    },
+    "maintained_local_links": {
+      "status": "PASS",
+      "documents": 23,
+      "targets": 72
+    },
+    "proof_input_omission_probes": {
+      "status": "PASS",
+      "cases": 2
+    },
+    "source_identity": {
+      "status": "PASS",
+      "files": 2617
+    },
+    "staged_secrets_scan": {
+      "status": "PASS",
+      "findings": 0
+    },
+    "one_command_core_gate": {
+      "command": "bash scripts/check-core.sh",
+      "status": "PASS",
+      "rust_tests": 126,
+      "docs_checker_tests": 6,
+      "scope": "local build/source/unit checks only"
+    }
+  },
+  "independent_review": "No blocking findings after restoring policy/claims inputs and adding restored-tool/nested CI coverage. Native prerequisites made explicit in nested jobs.",
+  "limitations": [
+    "Local source/build/unit/filesystem/simulator checks are not deployed-chain, snapshot restore, partition recovery or settlement evidence.",
+    "Valkey live feature tests and formal Coq/K/TLA executions were not run.",
+    "Legacy readiness declarations, RPC capability probes and health prototype outputs are not release gates; see docs/verification/EXPERIMENTAL.md.",
+    "Hosted CI is separate from local evidence. No merge, deployment, running-node change, key or payment action."
+  ]
+}
