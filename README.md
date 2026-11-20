@@ -1,37 +1,21 @@
-# X3 Atomic Star — blockchain core candidate
+# X3 Atomic Star
 
-A local extraction of the X3 blockchain node, runtime, required pallets and shared Rust crates. XXXSTAR remains active and authoritative while this candidate is verified. Nothing here changes or decommissions it.
+A focused blockchain development repository: node, runtime, on-chain modules, shared crates, proof/failure-testing tools and operator utilities. XXXSTAR remains active as the companion project workspace.
 
-The source snapshot is `xxxstar@69234c1897d9e80424cb0a652d48cd4ee6511deb`. Extraction retains the node/runtime dependency closure, local patches, chain specifications and required language/compiler fixtures. Unrelated applications and services, local chain databases, bundled toolchains and historical build dumps remain outside this source tree.
+Start with the [documentation index](docs/README.md), [architecture](docs/architecture/README.md) and [current release status](docs/release/STATUS.md). The code layout keeps existing Substrate/Cargo paths stable; apps and general AI services stay outside this core.
 
-## Scope
+## Build and check
 
-The root workspace retains 120 explicitly listed members, down from 189. Cargo can include additional local dependency packages automatically. Consensus, execution, custody, settlement and GPU fallback source is copied unchanged. Root workspace membership and lockfile pruning are packaging changes that still require build and execution verification.
-
-This is a candidate, not a release or a verified running network. Original status and security limits remain in [LAUNCH_SCOPE.md](LAUNCH_SCOPE.md), [CURRENT_MAINNET_STATUS.md](CURRENT_MAINNET_STATUS.md) and [SECURITY.md](SECURITY.md).
-
-## Verify
-
-Use the pinned Rust toolchain and install the upstream node prerequisites, including protobuf, clang and LLVM.
+Use the pinned [Rust toolchain](rust-toolchain.toml) and [native prerequisites](docs/development/README.md). From the repository root:
 
 ```bash
-python3 scripts/verify-core-snapshot.py
-cargo metadata --locked --no-deps --format-version 1
-cargo check --locked -p x3-chain-node
-cargo test --locked -p x3bc-core
+bash scripts/check-core.sh
 ```
 
-Build the actual node and start a disposable development chain only after the gates pass:
+For executable builds and isolated testnets, follow [local operations](docs/operations/README.md). Checks and their limits are explained in [verification](docs/verification/README.md). This is a development candidate, not a verified production network or a deployment approval.
 
-```bash
-cargo build --locked --release -p x3-chain-node
-bash scripts/run-dev-node.sh
-```
+## Source and evidence
 
-The launcher requires the real node binary and never substitutes a mock RPC server. Development keys must never secure a funded or public production network.
+The source import is pinned to `xxxstar@69234c1897d9e80424cb0a652d48cd4ee6511deb`. [Migration provenance](audit-artifacts/migration/provenance.json) and [recorded extraction checks](audit-artifacts/migration/verification.json) preserve that original observation. Follow-up changes have their own evidence.
 
-## Provenance and ownership
-
-[audit-artifacts/migration/provenance.json](audit-artifacts/migration/provenance.json) identifies the source and local-only migration status. The file manifest checks copied bytes; it is not a security audit or proof of runtime equivalence. XXXSTAR branch history and unmerged work are preserved in their original repository, not merged indiscriminately into this candidate.
-
-No repository visibility, hosted default branch, deployed node, key, contract or payment is changed by this extraction.
+Earlier status documents are kept in [the historical archive](docs/archive/README.md), separate from current instructions. [Security policy](SECURITY.md) and [invariants](INVARIANTS.md) remain relevant. No cleanup changes XXXSTAR, running nodes, contracts, keys or funds.

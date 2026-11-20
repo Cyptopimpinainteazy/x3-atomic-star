@@ -1,0 +1,1210 @@
+{
+  "source_commit": "69234c1897d9e80424cb0a652d48cd4ee6511deb",
+  "destination": "/home/lojak/Desktop/x3/x3-atomic-star",
+  "requested_roots": [
+    "proof-forge",
+    "proving",
+    "crates/cross-vm-coordinator",
+    "crates/x3-sim",
+    "crates/x3-mc",
+    "crates/x3-state-snapshot",
+    "crates/x3-genesis-builder",
+    "crates/x3-chain-health-daemon",
+    "crates/x3-launch-validator",
+    "crates/x3-readiness",
+    "crates/x3-readiness-report",
+    "tools/launchops"
+  ],
+  "dependency_closure": [
+    "crates/cross-vm-bridge",
+    "crates/cross-vm-coordinator",
+    "crates/x3-atomic-swap",
+    "crates/x3-chain-health-daemon",
+    "crates/x3-constitution",
+    "crates/x3-genesis-builder",
+    "crates/x3-launch-validator",
+    "crates/x3-mc",
+    "crates/x3-proof",
+    "crates/x3-readiness",
+    "crates/x3-readiness-report",
+    "crates/x3-sim",
+    "crates/x3-state-snapshot",
+    "proof-forge",
+    "proving",
+    "tools/launchops"
+  ],
+  "added_root_members": [
+    "crates/x3-chain-health-daemon",
+    "crates/x3-constitution",
+    "crates/x3-genesis-builder",
+    "crates/x3-launch-validator",
+    "crates/x3-readiness",
+    "crates/x3-readiness-report",
+    "crates/x3-state-snapshot",
+    "proof-forge",
+    "proving",
+    "tools/launchops"
+  ],
+  "root_member_count": 130,
+  "restored_files": [
+    {
+      "path": "crates/cross-vm-coordinator/Cargo.lock",
+      "source_git_blob": "aa9358919f4e6d6465428f2ca216082bdd34fe2c",
+      "sha256": "cc9fc41d915f60463f3002b53161675e94f74b461120bd04bbfe5e1687b7ec5a",
+      "candidate_path": "crates/cross-vm-coordinator/Cargo.lock"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/Cargo.toml",
+      "source_git_blob": "d1a4c26270eef32d344a463417a7875b34975987",
+      "sha256": "2fb63507cec02ee131054cdf7dba095fb0cbf85015410a2a68313462ed8201d7",
+      "candidate_path": "crates/cross-vm-coordinator/Cargo.toml"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/abi.rs",
+      "source_git_blob": "7942e9c39f9e2997dfd94d82b534fd2431909fec",
+      "sha256": "53e6d121f9aac2c1b6f0d4e44ce8731c95fa14456d4a5ec3e5d1c893117a6ae9",
+      "candidate_path": "crates/cross-vm-coordinator/src/abi.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/attempt_ledger.rs",
+      "source_git_blob": "82fe3564ce0eafe70bffdbf6f635996958c84486",
+      "sha256": "9e2fe25aa1dfe2eaad363933dd53744351271af895ac0d321b756aeef77dc221",
+      "candidate_path": "crates/cross-vm-coordinator/src/attempt_ledger.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/bridge_integration_tests.rs",
+      "source_git_blob": "049561ec1e3addd79fa6fde3ec9a3a22794382cb",
+      "sha256": "a684b86a526e50c5b31db648f955537745af6d7ec88e9f95344fdd32088b499d",
+      "candidate_path": "crates/cross-vm-coordinator/src/bridge_integration_tests.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/concurrent.rs",
+      "source_git_blob": "90d82f3599755be419eff8a1ce701da3228c50ea",
+      "sha256": "55994c9467710e7567e0393eb971e00e19ec40623f7fe6641dc79622a9ddf7b9",
+      "candidate_path": "crates/cross-vm-coordinator/src/concurrent.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/config.rs",
+      "source_git_blob": "3f351f37f353429822abb242fa6d4c439a9bcb8a",
+      "sha256": "3f7702ecc2e31f7b2b592264b830f880c6d5219be31a37d651cbbfce4e56ea6d",
+      "candidate_path": "crates/cross-vm-coordinator/src/config.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/flashloan_adapter.rs",
+      "source_git_blob": "0754552f4da657cc5107e7f52c046b41a155b144",
+      "sha256": "f45914e14c788a25b612ec0e368ac4b0e8d8ea180987028bca09fe5ea745fb80",
+      "candidate_path": "crates/cross-vm-coordinator/src/flashloan_adapter.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/htlc.rs",
+      "source_git_blob": "29f1cc52307b5eb95e44e246c5355baed930893a",
+      "sha256": "85466aa20ecf15439cdb3cd83473b31bff5d511dda5ddbf9de697dc64dcfcec4",
+      "candidate_path": "crates/cross-vm-coordinator/src/htlc.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/intent_binding.rs",
+      "source_git_blob": "93863987659ceef62722743920f8cfb52eaa02ab",
+      "sha256": "178a8622fcf77ffb12eac423009aa8d6f9e751b882cb09e200197c026772f5ee",
+      "candidate_path": "crates/cross-vm-coordinator/src/intent_binding.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/lease.rs",
+      "source_git_blob": "6ebf02056001983f9c36cd3126cda33b2a736bc8",
+      "sha256": "1cda0e5f9b0546253de30c6a41f855d7f79fda57f042fb600138834743a8d1e8",
+      "candidate_path": "crates/cross-vm-coordinator/src/lease.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/lib.rs",
+      "source_git_blob": "bbf0ae512559132d0666820e5513a124b90eaf9e",
+      "sha256": "cb927e97b652d2437b9363d6e2bdb9872bc24efc42396379465ccc4d301904fd",
+      "candidate_path": "crates/cross-vm-coordinator/src/lib.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/merkle_settlement.rs",
+      "source_git_blob": "441328461d4096ed09b9c28abd51b7220984d4e4",
+      "sha256": "4c56c4d60658d63ab398729c7c5ae06f2c3cace858bba29e3408a9540b9846e1",
+      "candidate_path": "crates/cross-vm-coordinator/src/merkle_settlement.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/persistence.rs",
+      "source_git_blob": "940637ee9cdd8249a25bf3f648b3355bc8ee9e28",
+      "sha256": "fb6b8a6a84d490078adc54c93f55f1ca26479acc069d62a2a95432badd4e6315",
+      "candidate_path": "crates/cross-vm-coordinator/src/persistence.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/proof_binding.rs",
+      "source_git_blob": "1d6ca31c45f0b912addafed43129ed16551bc34f",
+      "sha256": "6579963c2c7accf2b480b31a9dfc4b15af520be5aa58d59108df856da126fdf8",
+      "candidate_path": "crates/cross-vm-coordinator/src/proof_binding.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/proof_vault.rs",
+      "source_git_blob": "ab498b32f0d9f7ea9cbd36a93597578528f05cef",
+      "sha256": "2a88d3a9f57dc907c2824a0cd5d6a673083b9c43d1c45e9478b425617098d4ce",
+      "candidate_path": "crates/cross-vm-coordinator/src/proof_vault.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/recovery.rs",
+      "source_git_blob": "02cd73affc7f817e2e17a743a0f12e48b52cacef",
+      "sha256": "5fcddbcccdea9a1b914df0342e613615f0c048a73f9a738759226cfbb719e43d",
+      "candidate_path": "crates/cross-vm-coordinator/src/recovery.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/relayer.rs",
+      "source_git_blob": "98ac37c14d8c2b3165b56580c1a14dc3ee3b87ef",
+      "sha256": "49012517095ee6cb75439e0183c9145f963b20cf3e3deb7deaf4edf943938f56",
+      "candidate_path": "crates/cross-vm-coordinator/src/relayer.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/rpc_client.rs",
+      "source_git_blob": "ffe4b50db4174d9ff8bb77a5941145592d96ea29",
+      "sha256": "8dac21aa7164e1d4ed780da5ff406ac7091b6b2f84ff741e1ee408df2bf1f059",
+      "candidate_path": "crates/cross-vm-coordinator/src/rpc_client.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/settlement_finality.rs",
+      "source_git_blob": "3c980fe39bd096b942e72dbace52d6c445e6cc2c",
+      "sha256": "ec10670c62fb3c1b3659b4d3b4c5e40ba95769c86b1919aa15e781960f111ef0",
+      "candidate_path": "crates/cross-vm-coordinator/src/settlement_finality.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/settlement_outbox.rs",
+      "source_git_blob": "1c7b804fe52018eaf05a01d606da63c04679fb39",
+      "sha256": "22806d6518ec736810f9f5f10648972724781b9242cadb560ecec5042fc257b2",
+      "candidate_path": "crates/cross-vm-coordinator/src/settlement_outbox.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/settlement_reconcile.rs",
+      "source_git_blob": "43cb71d45b2322e4b4e1d46c5159415ca7fa773b",
+      "sha256": "221977750cfff3c0adeb5366f750efa32f84a4a462e81759a7e8c5378381d9c8",
+      "candidate_path": "crates/cross-vm-coordinator/src/settlement_reconcile.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/settlement_submission.rs",
+      "source_git_blob": "788073d761fc1c428e90af4c9f2236086bfd8c92",
+      "sha256": "c1591fba8730dc83d1967834ed5b56558da168e2d422867a676031aa98d857af",
+      "candidate_path": "crates/cross-vm-coordinator/src/settlement_submission.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/state_machine.rs",
+      "source_git_blob": "a98bf75f7d2363f0adc9fef20a4eb4d883d416c4",
+      "sha256": "5b56d9bac3e9fe8758fce4a9bed40aa171c08b4e695862f478a87cbed6588fc4",
+      "candidate_path": "crates/cross-vm-coordinator/src/state_machine.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/tests.rs",
+      "source_git_blob": "f4612d7510d2588132fe1d0238edde10f3e9b2ae",
+      "sha256": "3cc0a818b5ab9857c11fe5320dd8764012a567385d293b9d4473531f24b1fd66",
+      "candidate_path": "crates/cross-vm-coordinator/src/tests.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/types.rs",
+      "source_git_blob": "b188aec07ab4263d659c0ed37b01cea8bc8603cd",
+      "sha256": "63d37a6ae92182ba37721df340c347b38f571f85e2f926affaacb0fb3f5a8b6c",
+      "candidate_path": "crates/cross-vm-coordinator/src/types.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/src/valkey.rs",
+      "source_git_blob": "6ae1f3bd56ce8a7e511f34d5b17dfbec42f8439c",
+      "sha256": "6d93f677cd5dc5c0c55eab9dc238677373b2a881523d45b5b7b66bcdc74a4fce",
+      "candidate_path": "crates/cross-vm-coordinator/src/valkey.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/tests/distributed_chaos.rs",
+      "source_git_blob": "8823e2ae417ad27b6917f5c77c39b5ab0d48f2bf",
+      "sha256": "0d142499fe637bf18ea1e23e85710e6e32b3174d362a27254bfaefbc4cde1179",
+      "candidate_path": "crates/cross-vm-coordinator/tests/distributed_chaos.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/tests/security_regression.rs",
+      "source_git_blob": "220b21bfd9d8c5e02248a969c3d488ef1fcfcd11",
+      "sha256": "4d9fded966e7049f377b22f36ae71cd5a58e06233179ea2ecaf8a76ff0e76615",
+      "candidate_path": "crates/cross-vm-coordinator/tests/security_regression.rs"
+    },
+    {
+      "path": "crates/cross-vm-coordinator/tests/valkey_live.rs",
+      "source_git_blob": "61655444df4e3e3e5604822d1389623a7cb39a07",
+      "sha256": "17d699569e591acadb63978ddcf0192365dd849f3552e2694a30a63a50643f08",
+      "candidate_path": "crates/cross-vm-coordinator/tests/valkey_live.rs"
+    },
+    {
+      "path": "crates/x3-chain-health-daemon/Cargo.toml",
+      "source_git_blob": "369e5613cdb1497839d3ca09d898c28fbc293954",
+      "sha256": "a843e2def164d53e3b3830c77b6eeea7691cb2eb22ebe9e76bfa08086944d401",
+      "candidate_path": "crates/x3-chain-health-daemon/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-chain-health-daemon/src/main.rs",
+      "source_git_blob": "36ec6d70cf5eddc3181c001cc71ba093947d1444",
+      "sha256": "20fcb563338b25809277e6331c9bbfa00eaf2919ea0d2952863becc1ea4327d7",
+      "candidate_path": "crates/x3-chain-health-daemon/src/main.rs"
+    },
+    {
+      "path": "crates/x3-constitution/Cargo.toml",
+      "source_git_blob": "56a4657b2cf8b2f353001bdd05cbdd633a9d9315",
+      "sha256": "9c437442f5151ba12e307972aa57a083422f025d51ab3d069bbb6a9a3bf5c7ac",
+      "candidate_path": "crates/x3-constitution/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-constitution/src/amendment.rs",
+      "source_git_blob": "a114afaf658d8d8041c295948c58608e23a920a7",
+      "sha256": "0597d7c28084e3341769dc6d7a536ad7d37945484edaeed5a5264f50fae0df59",
+      "candidate_path": "crates/x3-constitution/src/amendment.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/articles.rs",
+      "source_git_blob": "dcd2e39d904377312c80f589d059ea9490e65d81",
+      "sha256": "d8b67e1a74662295db3d40da6987e8ebf79680935a64193e932a3eba3a46ffd8",
+      "candidate_path": "crates/x3-constitution/src/articles.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/engine.rs",
+      "source_git_blob": "9c68ed47ea041ffc1e7feedd108a8bc5d0cdfefb",
+      "sha256": "b5396fcb3d1dd825ff15a682bac0605d7d6d9ec57aff27ee47eb5733e585e837",
+      "candidate_path": "crates/x3-constitution/src/engine.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/error.rs",
+      "source_git_blob": "bbb40382d5c2ad574b27d9a8a98f963ab36ae40a",
+      "sha256": "061ae3714db329308a94471f459febabac2956bc93e828de6b82dec0028c8747",
+      "candidate_path": "crates/x3-constitution/src/error.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/invariants.rs",
+      "source_git_blob": "288922829ce45a44b1a830a51f13920358018806",
+      "sha256": "855806455233e04370f3ac1b2006cc9963a893d72b4f47c4044a4a08e07762f8",
+      "candidate_path": "crates/x3-constitution/src/invariants.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/lib.rs",
+      "source_git_blob": "605636a04acdeffc4683402e947cfe3589c5f20f",
+      "sha256": "2b3eeae5ebbbc00f6cb7611671c45bee01dc7d27207ef2d715d3afc25779c7f3",
+      "candidate_path": "crates/x3-constitution/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-constitution/src/types.rs",
+      "source_git_blob": "8d0cd6cf4eaa698d16a5aec82583b2f4d551afb8",
+      "sha256": "f825c8fce2bf284dd06ca6cb9d75dfd4817ec2c1360b3b252670c2af26d3d95c",
+      "candidate_path": "crates/x3-constitution/src/types.rs"
+    },
+    {
+      "path": "crates/x3-genesis-builder/Cargo.toml",
+      "source_git_blob": "54e7bea5a3e2f159443173bcf05054d102fa4679",
+      "sha256": "912fa906bd22cb8f40de5192504d89ebdb9b44d68a996527b6ac8e84119307e8",
+      "candidate_path": "crates/x3-genesis-builder/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-genesis-builder/src/lib.rs",
+      "source_git_blob": "f9f6123344526d38a27e21b3615fc2972891c329",
+      "sha256": "890f5c012d7cef2823cbb0ef14cf875e85c47238b4e76b94ada5cabe6192efc9",
+      "candidate_path": "crates/x3-genesis-builder/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-genesis-builder/src/main.rs",
+      "source_git_blob": "f8ae87b939e6c48c2e4216daf5ae1e7696fb0fae",
+      "sha256": "39e31f9dd1e5b4048d1e6dfec50a811148a9791c3ffc5010a8a52b707f1a78d0",
+      "candidate_path": "crates/x3-genesis-builder/src/main.rs"
+    },
+    {
+      "path": "crates/x3-launch-validator/Cargo.toml",
+      "source_git_blob": "92600b3a5de9b2f3e306a2a2cb1faf1fd3eb0eb4",
+      "sha256": "d0d447dff923d59d81fa8764338d30b6981525546bd9afa53d9566a0b552aced",
+      "candidate_path": "crates/x3-launch-validator/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-launch-validator/src/checklist.rs",
+      "source_git_blob": "343cf9bce271ac95e050166e16b0b872229285c8",
+      "sha256": "2dce4b10ea5614e892b02de0a308d01bc0f04353decfe2a29a6d371a08dc770f",
+      "candidate_path": "crates/x3-launch-validator/src/checklist.rs"
+    },
+    {
+      "path": "crates/x3-launch-validator/src/checks.rs",
+      "source_git_blob": "bef7db657311ed43fe9e2ab94a5c95561766b579",
+      "sha256": "160bdfaa7736ae16ef1cf88b4fe3ee502e780cf65045dc0f421c612f0546331a",
+      "candidate_path": "crates/x3-launch-validator/src/checks.rs"
+    },
+    {
+      "path": "crates/x3-launch-validator/src/lib.rs",
+      "source_git_blob": "100936f22bc22aa3b3ade0a1c5dd90a206c3913f",
+      "sha256": "ffa775e3e4c3f72b4cf23caee6023e8612a2c88d63dfb038602505f4d09273f0",
+      "candidate_path": "crates/x3-launch-validator/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-launch-validator/src/main.rs",
+      "source_git_blob": "1ceec7492c8f1fc8679f61039d314d5817ad2a03",
+      "sha256": "0c0dd8cc6445faf275c337820e0418f08576c5ecb4f82109b5201e293cedf6a7",
+      "candidate_path": "crates/x3-launch-validator/src/main.rs"
+    },
+    {
+      "path": "crates/x3-launch-validator/src/reporter.rs",
+      "source_git_blob": "51b1870b06b1ac14ef8556c198d97499998d0f88",
+      "sha256": "543bab3fd29494242ff13225f3d670f9983012f8b20d402079bee4408c4e47e6",
+      "candidate_path": "crates/x3-launch-validator/src/reporter.rs"
+    },
+    {
+      "path": "crates/x3-mc/Cargo.lock",
+      "source_git_blob": "60086f7c296d594e1b9f4b02f1a77f7bf508165d",
+      "sha256": "379c988b4e8b21a89ce90df864e9229e0af4a8bb25092acb54ef9a3a6cef5fa8",
+      "candidate_path": "crates/x3-mc/Cargo.lock"
+    },
+    {
+      "path": "crates/x3-mc/Cargo.toml",
+      "source_git_blob": "05a8ee28712d9449d02c4ce96f6e81134b523847",
+      "sha256": "d22e736cc967ec53641e727e75c4ff66f066aa2ab4c4d37392cce0337597ccaf",
+      "candidate_path": "crates/x3-mc/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-mc/README.md",
+      "source_git_blob": "305142dc7d646e67c255967632c30d7946f5eefd",
+      "sha256": "ffd18057e2bd194cf079323b6e4a195c6a60181f6c6b15042f72e6030d3e9edf",
+      "candidate_path": "crates/x3-mc/README.md"
+    },
+    {
+      "path": "crates/x3-mc/campaigns/mc-x3-atomic-001.json",
+      "source_git_blob": "4a745caa1e134c15aaadfdf4b8d4c5d32b94598d",
+      "sha256": "3a746e4dc94b01713a1dc6d4331f717cbd83586f18a7fcbd3bbab84844fa55a1",
+      "candidate_path": "crates/x3-mc/campaigns/mc-x3-atomic-001.json"
+    },
+    {
+      "path": "crates/x3-mc/src/campaign.rs",
+      "source_git_blob": "029d993f7581fb388db925a83653aa89b2e1592d",
+      "sha256": "96137e4f962d93decc8264b39c095e5a9d0250b296e9dfbe5d47dc1457bd17c4",
+      "candidate_path": "crates/x3-mc/src/campaign.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/distribution.rs",
+      "source_git_blob": "f782e4c1e9a2c34fdc3604ad5f38811fc9b0d98d",
+      "sha256": "0d2b893d9fe49d01f3688ebc8e1c8e26912a869a218794ac84730f7790ec5524",
+      "candidate_path": "crates/x3-mc/src/distribution.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/engine.rs",
+      "source_git_blob": "bc4566f46ee1fcfbf7e809dd8f26bf27f71fbadc",
+      "sha256": "792dd64caa66165f441756df813638ec42b6b4b275c91ef3514def25f4137e07",
+      "candidate_path": "crates/x3-mc/src/engine.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/evidence.rs",
+      "source_git_blob": "01432052e5f3f859e82acffa0aef523cdc97c470",
+      "sha256": "31c26d5c4a86c0f1f38e90ea2c67b43c7b41b40fe4dcc0f3f544749e2a5647be",
+      "candidate_path": "crates/x3-mc/src/evidence.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/lib.rs",
+      "source_git_blob": "8771d452fa5ba511aeb496b157ff4a3b3e768616",
+      "sha256": "97ce90afffd5a0ececa84344a92ee01dfbdd9ce78a0d1146834eca035d1e955e",
+      "candidate_path": "crates/x3-mc/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/main.rs",
+      "source_git_blob": "91060b838e1e2ae762090ed0d721f1fe10462c76",
+      "sha256": "67844d6d2fcffaae98ca9648e806c47de426a8e20c846d345893d5f89fbab892",
+      "candidate_path": "crates/x3-mc/src/main.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/minimize.rs",
+      "source_git_blob": "60e03336b6a256ddba1f847c45961f695125f670",
+      "sha256": "80d4cc63b91da8ad68f2abf4ec28ff117fe1e65fcf6554751bfa5e4f71602d7f",
+      "candidate_path": "crates/x3-mc/src/minimize.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/rng.rs",
+      "source_git_blob": "037440e073fe67160163ebb1e74429668db46442",
+      "sha256": "b81b2ae335d59994156331d55cb1801e459472a0df01f5aa98f41ba91ed465a3",
+      "candidate_path": "crates/x3-mc/src/rng.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/scenarios/atomic.rs",
+      "source_git_blob": "a5e707d75dc5a9036c4de785ddbc97ed89a0a51f",
+      "sha256": "4722ff461a4f9a0427e274157d19057508d0e87da1a4e1569d081b7ba639dc3d",
+      "candidate_path": "crates/x3-mc/src/scenarios/atomic.rs"
+    },
+    {
+      "path": "crates/x3-mc/src/scenarios/mod.rs",
+      "source_git_blob": "7aa017f847e6a7ad18ca3944bd1c7141c3fb175e",
+      "sha256": "e0d6439604b832440fe2aa7eae23e43495a2e438912f3b399ce929043f122884",
+      "candidate_path": "crates/x3-mc/src/scenarios/mod.rs"
+    },
+    {
+      "path": "crates/x3-mc/tests/engine.rs",
+      "source_git_blob": "7136c428c206c0a71bcbc354165455aad72e0b8a",
+      "sha256": "8c21a8fef0698677f4793edc077b5143b1eb5e5f9e993c7f701c238e79479ef9",
+      "candidate_path": "crates/x3-mc/tests/engine.rs"
+    },
+    {
+      "path": "crates/x3-readiness/Cargo.toml",
+      "source_git_blob": "9612919692b5cbc01c97fcf563e2c2ca3fc344ff",
+      "sha256": "64bd769735dac0e05cca13d4d47fe3d5940ea8fc2b202e4bfc8a2ffab21377e8",
+      "candidate_path": "crates/x3-readiness/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-readiness/src/lib.rs",
+      "source_git_blob": "51b89b81819ae48ee6c050d3dd0163cde9426c6b",
+      "sha256": "d86f61bd61f72386b3a8901f15be7f0a4343065dd323670dec8d091ca8e9c8c3",
+      "candidate_path": "crates/x3-readiness/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-readiness/src/main.rs",
+      "source_git_blob": "ff7330a226b7d9f5cf1e24de6da42e5a6c536c4e",
+      "sha256": "31062f81ea0531a5cbdcd0b3f2b06a5fda94196aabe37550c938fb867449142b",
+      "candidate_path": "crates/x3-readiness/src/main.rs"
+    },
+    {
+      "path": "crates/x3-readiness-report/Cargo.toml",
+      "source_git_blob": "50526cd05ef25d1b248962c7ab1cf471db29b794",
+      "sha256": "b9f8a23b7824d3cff963923ae0b5bd186319d8c3c9d3c1bcd21de63411710c6f",
+      "candidate_path": "crates/x3-readiness-report/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-readiness-report/src/collector.rs",
+      "source_git_blob": "241a58f8ab3b11acfaf83fd84804773289a0d7a3",
+      "sha256": "eaabe4eb16bfa0c91ebf14cff0ef99d541bbb14f7ff0f58ab5cdd9433bb779fc",
+      "candidate_path": "crates/x3-readiness-report/src/collector.rs"
+    },
+    {
+      "path": "crates/x3-readiness-report/src/formatter.rs",
+      "source_git_blob": "a0f059048b97eb96dbc25efa7f67ec71df38f208",
+      "sha256": "b8e5c35b21027d63c0b0b949e73ae446658cc7c7f85fc700b6341a00fba5d748",
+      "candidate_path": "crates/x3-readiness-report/src/formatter.rs"
+    },
+    {
+      "path": "crates/x3-readiness-report/src/lib.rs",
+      "source_git_blob": "684f21c7a00f9577d1dcb457a6ad9ef593cbe45e",
+      "sha256": "93abe68751118d7573f3f49a5915b2fb7a4bae8ff3e2e7492e1571e6315dbaac",
+      "candidate_path": "crates/x3-readiness-report/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-readiness-report/src/tests.rs",
+      "source_git_blob": "dc1242c0f853062aaf0e973248fede9740719805",
+      "sha256": "e0a1202d9da30e9a72cfbd4eef4b29e5ba58385af681caba8ac753c2f7165ac6",
+      "candidate_path": "crates/x3-readiness-report/src/tests.rs"
+    },
+    {
+      "path": "crates/x3-readiness-report/src/types.rs",
+      "source_git_blob": "f65627b72c9ca584e1fdcfb265b941bbc1cf28e7",
+      "sha256": "e5a0cadadb913779ffeffa16ce584d867a7b4e993122f87f7e3c0d06ef85d6ac",
+      "candidate_path": "crates/x3-readiness-report/src/types.rs"
+    },
+    {
+      "path": "crates/x3-sim/Cargo.lock",
+      "source_git_blob": "ce4b62b489e65b7082c85a890903299721fcce64",
+      "sha256": "529f5a18f737d925d86ca1dbba4f11df85a480fa8ea03d6a5715a89a17602069",
+      "candidate_path": "crates/x3-sim/Cargo.lock"
+    },
+    {
+      "path": "crates/x3-sim/Cargo.toml",
+      "source_git_blob": "6a10f42529f36ac144bfe9f42352acc6364f4fdb",
+      "sha256": "8e942db4f4edce4ba178844444f4b9e3e8a3e460c7c70b07dd8c8d2e7b80c83b",
+      "candidate_path": "crates/x3-sim/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-sim/README.md",
+      "source_git_blob": "06bc9b5db56b8045881b752e997ca025ad6ef170",
+      "sha256": "8b269e27ee6a3b9aef79c7b4120cc15d20f88a6049cda8a52779cd95aab061fd",
+      "candidate_path": "crates/x3-sim/README.md"
+    },
+    {
+      "path": "crates/x3-sim/scripts/root_cause.py",
+      "source_git_blob": "8ef95069ac4c76a77dc30a76c00baf89cba9c6a5",
+      "sha256": "78fff34f86b3f2f799b08ef7026dfbf531b7713b792666dc43f9d3121af5a03d",
+      "candidate_path": "crates/x3-sim/scripts/root_cause.py"
+    },
+    {
+      "path": "crates/x3-sim/scripts/test_root_cause.py",
+      "source_git_blob": "48d665e8acd4fa263f8b9291ccf32d015b514fe6",
+      "sha256": "e63966c68af3c933a9aea4c515322bd572d04ca4ddac293278638c7562606c23",
+      "candidate_path": "crates/x3-sim/scripts/test_root_cause.py"
+    },
+    {
+      "path": "crates/x3-sim/src/clock.rs",
+      "source_git_blob": "421ed38cb0cb34766eef4511889a1f6fc5677a95",
+      "sha256": "77ae101384f0adaaf8bce506d12250f189192d05f5e585c0e6039e25083a0a0e",
+      "candidate_path": "crates/x3-sim/src/clock.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/faults.rs",
+      "source_git_blob": "0cbc85e42070a549c6f598edb743590bef632543",
+      "sha256": "d4e11d90ffba3330eb29ddc8519be85f7e6802c9b66676e17480a0b48bc94b8b",
+      "candidate_path": "crates/x3-sim/src/faults.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/hunt.rs",
+      "source_git_blob": "b7c63f4062d34a754a32ec2f63c7e78bdb0f130a",
+      "sha256": "1370ddd4a702801fdb9e93e8170a34b367ab4b283c0dd98eba79eeaaff9eac2e",
+      "candidate_path": "crates/x3-sim/src/hunt.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/invariants.rs",
+      "source_git_blob": "16df3df5122fbb78aed2c656552b3b962308f87c",
+      "sha256": "1d475f435cdd0c7c16f80bb0ba865b00ce275dd55a2003a74db73db8176e095e",
+      "candidate_path": "crates/x3-sim/src/invariants.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/lib.rs",
+      "source_git_blob": "22fa0cf862bf0330620af228e3894ab262313fe4",
+      "sha256": "3a7da440cafdc5fdeb81f2bc81be0f63d11aa38bdcefdc80525040475650ea9c",
+      "candidate_path": "crates/x3-sim/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/main.rs",
+      "source_git_blob": "a1b5434d29d2c801901751930d26957f1644f81e",
+      "sha256": "cc1e2b7d4e16f9c9f81f85e2d2f8a8ab1851a611b00d050443d03fe68b3889d4",
+      "candidate_path": "crates/x3-sim/src/main.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/minimize.rs",
+      "source_git_blob": "4d2f558196a28b027519701c62cc009f1479f28d",
+      "sha256": "8c1fa2f12d9eee822360cc022e696c105302b2db3fecf3eccd6d8d8157b82386",
+      "candidate_path": "crates/x3-sim/src/minimize.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/network.rs",
+      "source_git_blob": "f8b82b93f753531c2daadd7730e84ae76f93946a",
+      "sha256": "0278719b7c435495e9c13affefc232bbe21f6530ad9cf51d32fb356b1ee3532e",
+      "candidate_path": "crates/x3-sim/src/network.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/packet.rs",
+      "source_git_blob": "c39557eda4ac0db18201d4d72d9197adb8a7e7c7",
+      "sha256": "56011d963f7a107ef8febc788d02b8ab6009140362c24f291f913a958d7bf4cc",
+      "candidate_path": "crates/x3-sim/src/packet.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/params.rs",
+      "source_git_blob": "99428bf20d270674d3252692b44b5caea8dba509",
+      "sha256": "b20a9960222fb46626cf0f74592b3ed277be58d870916bcce5e3d0cfa12444d3",
+      "candidate_path": "crates/x3-sim/src/params.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/rng.rs",
+      "source_git_blob": "84318f3382b48fffa5145c26ce4fb74cfcde1512",
+      "sha256": "16ff57cd3d5980ff91d0f8a50d092fe6fc691853fa823a52990ef729f4141fe7",
+      "candidate_path": "crates/x3-sim/src/rng.rs"
+    },
+    {
+      "path": "crates/x3-sim/src/sim.rs",
+      "source_git_blob": "e032c5091ca328feb17921e25d0fdb6e2962e9d1",
+      "sha256": "42e092370f83686079ef070adad6cd180fde807350573153107b3333c0dbd41a",
+      "candidate_path": "crates/x3-sim/src/sim.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/determinism.rs",
+      "source_git_blob": "9e22f3007eefffd2b466e0beb276939ccc074074",
+      "sha256": "49642f6800d132ee96a4781d75354b2c04b09a4c5b61325418276b038889608f",
+      "candidate_path": "crates/x3-sim/tests/determinism.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/invariants.rs",
+      "source_git_blob": "23c9dd0eb3d870c380d504b377d001dff51c7877",
+      "sha256": "4db251e202b550cf4acf66b71d4d3c2d9081c527911fa7d5773c2fe42e2cc360",
+      "candidate_path": "crates/x3-sim/tests/invariants.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/minimize.rs",
+      "source_git_blob": "ff5c20c8389b7e930ddbde7c69371c28af349d5d",
+      "sha256": "1254a174729ee398ce1e24b8a090b790122ae59d64cc3f4b876b6753da0cc7c5",
+      "candidate_path": "crates/x3-sim/tests/minimize.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/packet.rs",
+      "source_git_blob": "308a815dfcfb882beca17e6fbc3eb13cc1976807",
+      "sha256": "2fd47a8cb27ae30873859d7fccb0f9d648413b19e3f6098f932021dfcbd90625",
+      "candidate_path": "crates/x3-sim/tests/packet.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/params.rs",
+      "source_git_blob": "7319b10a6c3454be156d7d3782ba2fbc3fab3eb6",
+      "sha256": "ea4fc68f0ae73fbe16431e0ed740ba2489ecacef1ad042e8db7c281df42738f7",
+      "candidate_path": "crates/x3-sim/tests/params.rs"
+    },
+    {
+      "path": "crates/x3-sim/tests/refund_after_claim.rs",
+      "source_git_blob": "335e62a603f7402f4b3c37761a4a96895a7efd02",
+      "sha256": "6c32883e690e2bb2b51986c61a41466f145d857ac66ae6af97727253b2498e8b",
+      "candidate_path": "crates/x3-sim/tests/refund_after_claim.rs"
+    },
+    {
+      "path": "crates/x3-state-snapshot/Cargo.toml",
+      "source_git_blob": "8d3d5c544e7c6b2fd08fe4878411c2661e4d89a7",
+      "sha256": "f0db3b77719223058a83b91a0d5c6f55e76dab78109d4ec92cebce70a91f0d32",
+      "candidate_path": "crates/x3-state-snapshot/Cargo.toml"
+    },
+    {
+      "path": "crates/x3-state-snapshot/src/lib.rs",
+      "source_git_blob": "ba1801ccf2b8164c1cbd0aa1a97eff9c360fe243",
+      "sha256": "30906c038255d9f927c9d0c4d10ade920be73acbdc0f3e74a71ddb1d7ea0e853",
+      "candidate_path": "crates/x3-state-snapshot/src/lib.rs"
+    },
+    {
+      "path": "crates/x3-state-snapshot/src/main.rs",
+      "source_git_blob": "27a6882059803b55c95f6ab967bdf143d0e15736",
+      "sha256": "71e49d61ca0232d76a986ffbbef0db9c9d6876c90d4c74c8b2758c3a53a4e4e1",
+      "candidate_path": "crates/x3-state-snapshot/src/main.rs"
+    },
+    {
+      "path": "crates/x3-state-snapshot/src/tests.rs",
+      "source_git_blob": "446bba6618668b041b0b09941c277db61dc4baab",
+      "sha256": "0801a762dc3297256660843e9a68580e2d57dcf377d2691be049ef8b129950c6",
+      "candidate_path": "crates/x3-state-snapshot/src/tests.rs"
+    },
+    {
+      "path": "proof-forge/Cargo.toml",
+      "source_git_blob": "975183df49394cd8a775e30952227611b5eb025d",
+      "sha256": "306bb270938f2b2a2da9c4608a67849b798d40b07267907f0661c6a4b1337dcd",
+      "candidate_path": "proof-forge/Cargo.toml"
+    },
+    {
+      "path": "proof-forge/src/dashboard/mod.rs",
+      "source_git_blob": "f2f4bab90633f37993d302868ce6b6150e5d1b82",
+      "sha256": "1704368ea1c3d07ff3fabfc2ae4c646c1576a1b468db85925d1cc78e42b5cfe9",
+      "candidate_path": "proof-forge/src/dashboard/mod.rs"
+    },
+    {
+      "path": "proof-forge/src/feature_proof.rs",
+      "source_git_blob": "d9a6c2e79de51d175bf0b0a34ebec5fef24c0046",
+      "sha256": "3bd4deea2ced9c844689a0113dc60ea6adf88599c64b09a4c006a4120772e439",
+      "candidate_path": "proof-forge/src/feature_proof.rs"
+    },
+    {
+      "path": "proof-forge/src/gap_proof.rs",
+      "source_git_blob": "e5c16f69721e83f0f2c446c9d258d54e846e6233",
+      "sha256": "ce1cdab08fee0e5621ff3b4fce52ab7aa3c8f024463ee6476bd0645a27eb1d44",
+      "candidate_path": "proof-forge/src/gap_proof.rs"
+    },
+    {
+      "path": "proof-forge/src/lib.rs",
+      "source_git_blob": "37837ebea312915ff8bc49f99f91cac317cfe2c2",
+      "sha256": "8312e2fd01cbe0c055bdaf3db31cfb200e1dfe5c6c6394ad665889598c0ed596",
+      "candidate_path": "proof-forge/src/lib.rs"
+    },
+    {
+      "path": "proof-forge/src/main.rs",
+      "source_git_blob": "1a22a52db93a371b7eb8d2a6b45695cc36ab7698",
+      "sha256": "0a70917d55854acffcedc2c1306bd27f803098c3af5cb35cfbf488724700da2e",
+      "candidate_path": "proof-forge/src/main.rs"
+    },
+    {
+      "path": "proof-forge/src/proof.rs",
+      "source_git_blob": "9edf562c45d5915b76f48cd751441ba4c008cab8",
+      "sha256": "2e374c66a4cb5f20758d0efdcb4b3c72565daab9d7e27dd2dc7e0047b4ba7ca0",
+      "candidate_path": "proof-forge/src/proof.rs"
+    },
+    {
+      "path": "proof-forge/src/receipt.rs",
+      "source_git_blob": "46ed0022ae2e75757a3fa9f366f3659a6d46c7ec",
+      "sha256": "d32f555b7b5efaac5bf17d223f1f56e91f911915ea2c4290ff03c313b174cd05",
+      "candidate_path": "proof-forge/src/receipt.rs"
+    },
+    {
+      "path": "proof-forge/src/registry/claims.rs",
+      "source_git_blob": "737cc89f3d7e8ab6662ed5d3389969363e7437e3",
+      "sha256": "d967d4076c63618824785009b0723bddfda55da49fa1cfe7ae9076adb7ae3ec5",
+      "candidate_path": "proof-forge/src/registry/claims.rs"
+    },
+    {
+      "path": "proof-forge/src/registry/mod.rs",
+      "source_git_blob": "934d656e77e519b4a67aac99695ba02c560d95bf",
+      "sha256": "b05875d08801028124f5a6d592383da822ce7d87d8b8125ecbc7662239b07cef",
+      "candidate_path": "proof-forge/src/registry/mod.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/asset_kernel.rs",
+      "source_git_blob": "1a11a8690de295a09ecf8453d4cfcba5c90d427e",
+      "sha256": "2b5671bc7b777ded4c3cb2cd0d2ae08fd758490e2551609247740ae87bcfe495",
+      "candidate_path": "proof-forge/src/runners/asset_kernel.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/atomic.rs",
+      "source_git_blob": "1be6c8bc93fb592dc5ebef41ebcfe069fd086e3f",
+      "sha256": "7de8d6d0fbd02ae74366e5434e203674d6775cccb5705da681b89b39c741795e",
+      "candidate_path": "proof-forge/src/runners/atomic.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/bridge.rs",
+      "source_git_blob": "74638b8308db8a57220071a39636bb6166f4e1f2",
+      "sha256": "d7b1e4fe309acf598956a34ecdf61419dfa24e52cd0bdb60c1105a29b149575d",
+      "candidate_path": "proof-forge/src/runners/bridge.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/bug_bounty.rs",
+      "source_git_blob": "31bda95e4bcbba3eb487d72c8f4594f9c589dc28",
+      "sha256": "c2bfb24e13e1524db28a7a81be35e63eb9222646d9a9a64632fe14b8399a8180",
+      "candidate_path": "proof-forge/src/runners/bug_bounty.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/consensus.rs",
+      "source_git_blob": "14554d392cdd6e72b42c9bc208c00250e5aed1c0",
+      "sha256": "3888264ec23da61ae37e375136f856fce93938bbababd794c3f619ba3f943c22",
+      "candidate_path": "proof-forge/src/runners/consensus.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/cross_vm.rs",
+      "source_git_blob": "018d484f173adda2d12049807eeb314f3358faa1",
+      "sha256": "2f8590cd4f239d5631327bbf4528fffbbb95928173b557808d7eaeee35c8a8dc",
+      "candidate_path": "proof-forge/src/runners/cross_vm.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/custody.rs",
+      "source_git_blob": "1cbd237004ceeae634b4696d462f6a773166ceea",
+      "sha256": "779998e8258957dcf058bcbeb3c6471af606275540b19e13d344d0881d616a68",
+      "candidate_path": "proof-forge/src/runners/custody.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/dex.rs",
+      "source_git_blob": "9d7bc3abd9163db20f410eecf62fe7bab0bfc3d4",
+      "sha256": "83214fdb15007877b95194a4a070f79b50a2866454c254c592499b6dfca46ad7",
+      "candidate_path": "proof-forge/src/runners/dex.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/ecosystem_quality.rs",
+      "source_git_blob": "2cea97fcb9e7f91c99b17ddb42966aec0fcac17c",
+      "sha256": "acae8007e5f96d2f03e06a52ffa46a636d071e392c845ef838f04977283b27c9",
+      "candidate_path": "proof-forge/src/runners/ecosystem_quality.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/flashloans.rs",
+      "source_git_blob": "9f79c181f08d5d7e71b3c0a636e270919a543fc7",
+      "sha256": "7382018a31e58338e2668e3972c4d4132d07cdc1e5bf46c61147a2405569f1e2",
+      "candidate_path": "proof-forge/src/runners/flashloans.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/formal_proofs.rs",
+      "source_git_blob": "103fe1bbbdaa56332744711cf7392e8af6e4b6bf",
+      "sha256": "b73406d4d6f6c960fa681c97c32b64e04cbcee4bb148ea1507820253479d2db9",
+      "candidate_path": "proof-forge/src/runners/formal_proofs.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/governance.rs",
+      "source_git_blob": "c32516d51bf822b3dcf431e5bdc9b7db20dc35f7",
+      "sha256": "dcbaeeebcbfd2842e62e8f052598fbf6931d0ef885a8e304e49cf2fff64a97db",
+      "candidate_path": "proof-forge/src/runners/governance.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/gpu.rs",
+      "source_git_blob": "e2cfdfada3bbe6e8f3be9ececd037eb9fc3514b4",
+      "sha256": "b49ed61e944330e31f2eed01a6d9450c72109767ea75be3a7929b234f503b9ff",
+      "candidate_path": "proof-forge/src/runners/gpu.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/incident_response.rs",
+      "source_git_blob": "ca92fa59bcc981ad9c76562f5c91b1159b4f6ae4",
+      "sha256": "eb891c08d132a74709e8be40c00a3022f677d2fc89f73a941bb33641df8d6862",
+      "candidate_path": "proof-forge/src/runners/incident_response.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/launchpad.rs",
+      "source_git_blob": "60f5c17ec0df4499f9494f9c877baf5a1c1da13a",
+      "sha256": "1d898c9a83df53a1d345132fbc3c51de5f7ebbdb8b30478619dc587f8e9e29b4",
+      "candidate_path": "proof-forge/src/runners/launchpad.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/mod.rs",
+      "source_git_blob": "2419bfe46352c36106006ce8e670fed3093c8457",
+      "sha256": "afe33643322fe382ccf18186b9ff5bcb857ae105b31c3aefc4516bd2024b908d",
+      "candidate_path": "proof-forge/src/runners/mod.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/operational.rs",
+      "source_git_blob": "01a54e35c6a0ad67e72a802527f5737ad4e05be6",
+      "sha256": "8ef363f3b9f0be5fc043bfb77e1b1e9357ba1f5894261f21c0a7f94c4a0121c0",
+      "candidate_path": "proof-forge/src/runners/operational.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/oracle.rs",
+      "source_git_blob": "1363ddd7607c7a27e45c875176d274200f3f47f5",
+      "sha256": "998cbde44f55dd800b55b88de93b60cbd67ba13cd55de3eff41118676b82f013",
+      "candidate_path": "proof-forge/src/runners/oracle.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/runtime.rs",
+      "source_git_blob": "8bac8f9fd05202822c1636c32db979528fb0c164",
+      "sha256": "69623185abb54ee874a406334ee61a82d3000a892652b3847412bf0c9fb84deb",
+      "candidate_path": "proof-forge/src/runners/runtime.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/smart_contracts.rs",
+      "source_git_blob": "4f1cdd40e6b2254f3d52daf5a471a0bc6d7bcb9e",
+      "sha256": "20cad21fa02c95bcfea00caad826538b73989f8d6de358479c7a62372e980a4a",
+      "candidate_path": "proof-forge/src/runners/smart_contracts.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/social_consensus.rs",
+      "source_git_blob": "c0ded377a07d06cf6a61c51fd6b510dc4ce75c9d",
+      "sha256": "c04d4594f4ca4d297193513e22dd82ad3f31fe76d839d2b237eaaac4c03f1322",
+      "candidate_path": "proof-forge/src/runners/social_consensus.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/treasury.rs",
+      "source_git_blob": "9641bff313ab7de7cb5f9bb24de4ba55bd9a1888",
+      "sha256": "0bc878c5ee5441e1e125228887a59b369c6710e9644dc11a32df00bd3d16324f",
+      "candidate_path": "proof-forge/src/runners/treasury.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/upgrade_safety.rs",
+      "source_git_blob": "32b7d23d300f3f0267ee2c6f22bfe591007a91df",
+      "sha256": "6b3b17527adebbc86d58125068125656a56861088877f437a73a71c033150584",
+      "candidate_path": "proof-forge/src/runners/upgrade_safety.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/x3language.rs",
+      "source_git_blob": "17c6fa6f7ba87940456abefa2024a1b0194b5e21",
+      "sha256": "458ddc37a27fa24f831782c6f4c9074f08e070078d620395eddc1cdca6a7ea6c",
+      "candidate_path": "proof-forge/src/runners/x3language.rs"
+    },
+    {
+      "path": "proof-forge/src/runners/x3vm.rs",
+      "source_git_blob": "8f47494f21ad58949a2e310f9a1ef9cefc11a6e0",
+      "sha256": "d1e7257ead56086ad7f25cbaab1781a0e1ce2cea1b336cf746d31eb149d9257d",
+      "candidate_path": "proof-forge/src/runners/x3vm.rs"
+    },
+    {
+      "path": "proof-forge/src/scoring/formula.rs",
+      "source_git_blob": "982484de5f34a15c3b3267355c8b9338f8fd1803",
+      "sha256": "8cc49268cb02e38b58e32259ffc8e265cd230d664e689885df5c79d9536796b9",
+      "candidate_path": "proof-forge/src/scoring/formula.rs"
+    },
+    {
+      "path": "proof-forge/src/scoring/mod.rs",
+      "source_git_blob": "5608d10f38c3e8f7c7e2839368786685d1c4c77c",
+      "sha256": "42e75fc547084a86a5cec3613ceb2e5bddf909c05a66bb223404489753095a69",
+      "candidate_path": "proof-forge/src/scoring/mod.rs"
+    },
+    {
+      "path": "proof-forge/src/todo_proof.rs",
+      "source_git_blob": "c0b9b70bc6e055e188e360fad0b8b9cd0da3c4e9",
+      "sha256": "69905e6a6ce6a97e2b4c094fe54631fd056d6f2e1047f402217679fb83a65042",
+      "candidate_path": "proof-forge/src/todo_proof.rs"
+    },
+    {
+      "path": "proving/Cargo.toml",
+      "source_git_blob": "3be3b82ef022700f0e65c4cd87848d421176c5aa",
+      "sha256": "ae47d81909177379b5975a66ed39759b0cd93ad93b6959d190a533669cae49b1",
+      "candidate_path": "proving/Cargo.toml"
+    },
+    {
+      "path": "proving/README.md",
+      "source_git_blob": "fd1524bf9f7102593ded82635369b5b9089a04f6",
+      "sha256": "1bc17b38e3fff9a8ad258015186c6709aeec760a16af72da3772ceb396949b99",
+      "candidate_path": "docs/archive/xxxstar-69234c18/proving/README.md"
+    },
+    {
+      "path": "proving/src/checks.rs",
+      "source_git_blob": "61536891e4e12d729a17288d25ad1d44d032d02b",
+      "sha256": "b519e287711d5af419c522b8d9805ac47cfad8888544583a53d154e7617667ec",
+      "candidate_path": "proving/src/checks.rs"
+    },
+    {
+      "path": "proving/src/main.rs",
+      "source_git_blob": "0b53751c73335d154f33e413780e4c7b12b496d0",
+      "sha256": "0d9826c02d7d5598cf09bce08f87cdb5c23c1139f4a096d9542e07e232f337c5",
+      "candidate_path": "proving/src/main.rs"
+    },
+    {
+      "path": "proving/src/report.rs",
+      "source_git_blob": "3faadb5c215a1449b5d5c9c86aa22925917706f9",
+      "sha256": "ffe3e3ecda4d603f31009014fc1e152d80f82374b54a3c73251eeb88bc513bdc",
+      "candidate_path": "proving/src/report.rs"
+    },
+    {
+      "path": "tools/launchops/Cargo.toml",
+      "source_git_blob": "b84b55c9f3c807574654725d437f4df37e1e49e3",
+      "sha256": "9fe2512d794815f6c62da2366ec9705a6ad5161bf85a7b0812b7cef11aec2643",
+      "candidate_path": "tools/launchops/Cargo.toml"
+    },
+    {
+      "path": "tools/launchops/src/audit.rs",
+      "source_git_blob": "5f0239b0fe200136184c7d736409af84524e1f2a",
+      "sha256": "2c2d544c8b8f6f08e6558c1c0de52dc306578100fcb03e0fa38d64e9106e19ed",
+      "candidate_path": "tools/launchops/src/audit.rs"
+    },
+    {
+      "path": "tools/launchops/src/classifier.rs",
+      "source_git_blob": "a40fc7a83aa4e5da1206277eb8f40a77f65160e1",
+      "sha256": "52911cac64a490108d027a26226e5bf064a7d1a9bf31f6226b37f367b6e32af9",
+      "candidate_path": "tools/launchops/src/classifier.rs"
+    },
+    {
+      "path": "tools/launchops/src/commands.rs",
+      "source_git_blob": "a37afd3db50c6970611d8d55cea9652fe32d7a17",
+      "sha256": "5eb6dab01a8216424b72d14568db25f79903e54cb1b87139d0f1746c3567c717",
+      "candidate_path": "tools/launchops/src/commands.rs"
+    },
+    {
+      "path": "tools/launchops/src/conflict.rs",
+      "source_git_blob": "9daac6ff323048fc3c066da65e00574a7923ba39",
+      "sha256": "aba4a41041eb49c78c6214eb33798dabef98a116f54f4a966e51234f52ebc9b3",
+      "candidate_path": "tools/launchops/src/conflict.rs"
+    },
+    {
+      "path": "tools/launchops/src/contract.rs",
+      "source_git_blob": "833d5c93fda707becf6c55a81cc79a2a3b62782e",
+      "sha256": "454fd058211aefe6e4adc1bceb71e55ced8ea82de985f1f32530bfd626648efd",
+      "candidate_path": "tools/launchops/src/contract.rs"
+    },
+    {
+      "path": "tools/launchops/src/drift.rs",
+      "source_git_blob": "17b5ab72f415b90a8e3128ff697b124bf49fdf31",
+      "sha256": "c67dda422a1e4afd95d6af48eb86616363bfb487d9ab177ded2b5394125b66f0",
+      "candidate_path": "tools/launchops/src/drift.rs"
+    },
+    {
+      "path": "tools/launchops/src/evidence.rs",
+      "source_git_blob": "742da084734d9edd555502f1bc47fd17b8880d18",
+      "sha256": "0ca491f672dad6040544de86557468c96a086d1f85dfbfbfb92de4372f367e5f",
+      "candidate_path": "tools/launchops/src/evidence.rs"
+    },
+    {
+      "path": "tools/launchops/src/gates.rs",
+      "source_git_blob": "8b677b051d9dade885c380c25af868734f36c258",
+      "sha256": "202aac332bbec52a5ff5405c88d5d3a7a47683e81811cba2a7a8a771f488d9dc",
+      "candidate_path": "tools/launchops/src/gates.rs"
+    },
+    {
+      "path": "tools/launchops/src/gitdiff.rs",
+      "source_git_blob": "eca60033d4ee08ef600be7cb91f08a673e67dbbe",
+      "sha256": "4decd44ee49ac4c9a1f6bbb92ad25d5f82776bb7fd2d38b7b88c77d8a7a7e5f3",
+      "candidate_path": "tools/launchops/src/gitdiff.rs"
+    },
+    {
+      "path": "tools/launchops/src/inventory.rs",
+      "source_git_blob": "1585b08a82241f920695a3fe505c5dfffd76465c",
+      "sha256": "eac5c77c20a60a8b3c1f9311d0d9648c7be8f7f218e63f8028ccb57cc4438867",
+      "candidate_path": "tools/launchops/src/inventory.rs"
+    },
+    {
+      "path": "tools/launchops/src/main.rs",
+      "source_git_blob": "8e7613d2b702d2efaede4b1ac39177e609d5df2e",
+      "sha256": "bf896a0f1131b44a49c928f184fbaada092d6171feeb290318b1674843a0759d",
+      "candidate_path": "tools/launchops/src/main.rs"
+    },
+    {
+      "path": "tools/launchops/src/models.rs",
+      "source_git_blob": "09e37cec86721ba029b22338769daa17b30ab197",
+      "sha256": "0374811284950c2bffb85b1fe4fea122264efaf09ced537521b38c477271e9a6",
+      "candidate_path": "tools/launchops/src/models.rs"
+    },
+    {
+      "path": "tools/launchops/src/parser.rs",
+      "source_git_blob": "5f0a7df2727e422eeace20b205bbca770d88abc8",
+      "sha256": "bbac72a623239ef2c3f920d2a4a8fbecb53edc3d4c641720c63a5e36ed9750d1",
+      "candidate_path": "tools/launchops/src/parser.rs"
+    },
+    {
+      "path": "tools/launchops/src/report.rs",
+      "source_git_blob": "cf21903a92dd8feb8fb78252f56d8f052792765d",
+      "sha256": "2a8d1f16446f388096b0be30658be848af4005419e3f4677c9eff7ecf8ce6908",
+      "candidate_path": "tools/launchops/src/report.rs"
+    },
+    {
+      "path": "tools/launchops/src/risk_rules.rs",
+      "source_git_blob": "fa848c6acbf1fa5401843c1cd80d9ffbb677050c",
+      "sha256": "dd28047ade86078740357d3885f02732488b606864f2800b4cc478a1072a597f",
+      "candidate_path": "tools/launchops/src/risk_rules.rs"
+    },
+    {
+      "path": "tools/launchops/src/scanner.rs",
+      "source_git_blob": "a76dc5b43316699322d356053d91c7cea806ff30",
+      "sha256": "1c1aa482127946432d88f99460ac8b0da73771353d3915e06a9a17ba61459c9b",
+      "candidate_path": "tools/launchops/src/scanner.rs"
+    },
+    {
+      "path": "tools/launchops/src/scoring.rs",
+      "source_git_blob": "2908b0412621805e248aab9354f04f8b388e8c34",
+      "sha256": "b63aa21e734436fd753d10219988eb647c06a61e94d06f1a0f4e414f4955ad16",
+      "candidate_path": "tools/launchops/src/scoring.rs"
+    },
+    {
+      "path": "tools/launchops/src/stale_docs.rs",
+      "source_git_blob": "a393cb2d41e388f5db83b953f56f846e0e6c6d9c",
+      "sha256": "fe3cb1d4c7285df4f84e0157a93df30d8a5b3294d68759b63ae99bc103db7a8d",
+      "candidate_path": "tools/launchops/src/stale_docs.rs"
+    },
+    {
+      "path": "tools/launchops/src/test_weaken.rs",
+      "source_git_blob": "013ae15145dca06880d3ec6b8f7130c3dbf2b1dd",
+      "sha256": "c5bd86572cbe8adf5f97bb6ace6a6d3587870c954d39c5c957edbd3972a479ba",
+      "candidate_path": "tools/launchops/src/test_weaken.rs"
+    },
+    {
+      "path": "tools/launchops/src/verify.rs",
+      "source_git_blob": "68dcab4c12302ae50cf1b20994bfca2bf2e1c5e1",
+      "sha256": "01344dc9172649fe6fc1d2a8fe0d9f727bc456a6bc649859d02e6db94707a5d7",
+      "candidate_path": "tools/launchops/src/verify.rs"
+    }
+  ],
+  "existing_paths_not_overwritten": [
+    "crates/cross-vm-bridge/Cargo.toml",
+    "crates/cross-vm-bridge/src/canonical.rs",
+    "crates/cross-vm-bridge/src/connector.rs",
+    "crates/cross-vm-bridge/src/finality.rs",
+    "crates/cross-vm-bridge/src/finality_feed.rs",
+    "crates/cross-vm-bridge/src/lib.rs",
+    "crates/cross-vm-bridge/src/merkle_proof_validator.rs",
+    "crates/cross-vm-bridge/src/merkle_settlement_bridge.rs",
+    "crates/cross-vm-bridge/src/tests/attack_arbitrage.rs",
+    "crates/cross-vm-bridge/tests/integration.rs",
+    "crates/cross-vm-bridge/x3-cross-vm-bridge.cdx.json",
+    "crates/x3-atomic-swap/Cargo.toml",
+    "crates/x3-atomic-swap/src/adapter.rs",
+    "crates/x3-atomic-swap/src/adapter_ledger.rs",
+    "crates/x3-atomic-swap/src/bin/gen_wallet.rs",
+    "crates/x3-atomic-swap/src/bin/x3_evm_broadcast.rs",
+    "crates/x3-atomic-swap/src/bin/x3_finality_cert.rs",
+    "crates/x3-atomic-swap/src/bitcoin_htlc.rs",
+    "crates/x3-atomic-swap/src/btc_live.rs",
+    "crates/x3-atomic-swap/src/cairo_vm_htlc.rs",
+    "crates/x3-atomic-swap/src/chain_health.rs",
+    "crates/x3-atomic-swap/src/cosmwasm_htlc.rs",
+    "crates/x3-atomic-swap/src/dashboard.rs",
+    "crates/x3-atomic-swap/src/dispute.rs",
+    "crates/x3-atomic-swap/src/error.rs",
+    "crates/x3-atomic-swap/src/ethereum_tx.rs",
+    "crates/x3-atomic-swap/src/event_watcher.rs",
+    "crates/x3-atomic-swap/src/evm_htlc.rs",
+    "crates/x3-atomic-swap/src/evm_live.rs",
+    "crates/x3-atomic-swap/src/finality.rs",
+    "crates/x3-atomic-swap/src/finality_producer.rs",
+    "crates/x3-atomic-swap/src/fuel_htlc.rs",
+    "crates/x3-atomic-swap/src/insurance.rs",
+    "crates/x3-atomic-swap/src/intent.rs",
+    "crates/x3-atomic-swap/src/ledger.rs",
+    "crates/x3-atomic-swap/src/lib.rs",
+    "crates/x3-atomic-swap/src/move_vm_htlc.rs",
+    "crates/x3-atomic-swap/src/near_htlc.rs",
+    "crates/x3-atomic-swap/src/plutus_htlc.rs",
+    "crates/x3-atomic-swap/src/polkadot_ink_htlc.rs",
+    "crates/x3-atomic-swap/src/proof_bundle.rs",
+    "crates/x3-atomic-swap/src/registry.rs",
+    "crates/x3-atomic-swap/src/relayer.rs",
+    "crates/x3-atomic-swap/src/rpc_client.rs",
+    "crates/x3-atomic-swap/src/rpc_quorum.rs",
+    "crates/x3-atomic-swap/src/scoreboard.rs",
+    "crates/x3-atomic-swap/src/secret_release.rs",
+    "crates/x3-atomic-swap/src/slashing.rs",
+    "crates/x3-atomic-swap/src/solana_watcher.rs",
+    "crates/x3-atomic-swap/src/soroban_htlc.rs",
+    "crates/x3-atomic-swap/src/substrate_htlc.rs",
+    "crates/x3-atomic-swap/src/svm_htlc.rs",
+    "crates/x3-atomic-swap/src/timeout.rs",
+    "crates/x3-atomic-swap/src/ton_htlc.rs",
+    "crates/x3-atomic-swap/src/wasm_l1_htlc.rs",
+    "crates/x3-atomic-swap/src/x3vm_htlc.rs",
+    "crates/x3-atomic-swap/src/x3vm_live.rs",
+    "crates/x3-atomic-swap/src/x3vm_native.rs",
+    "crates/x3-atomic-swap/src/x3vm_node.rs",
+    "crates/x3-atomic-swap/src/x3vm_proof_store.rs",
+    "crates/x3-atomic-swap/src/zkvm_htlc.rs",
+    "crates/x3-atomic-swap/tests/adapter_readiness_truth.rs",
+    "crates/x3-atomic-swap/tests/atlas_htlc_deploy_test.rs",
+    "crates/x3-atomic-swap/tests/atomic_swap_chaos.rs",
+    "crates/x3-atomic-swap/tests/atomic_swap_integration.rs",
+    "crates/x3-atomic-swap/tests/evm_tx_minimal_integers.rs",
+    "crates/x3-atomic-swap/tests/rpc_live_test.rs",
+    "crates/x3-proof/Cargo.toml",
+    "crates/x3-proof/fuzz/fuzz_targets/bridge_proof_verify.rs",
+    "crates/x3-proof/src/chain.rs",
+    "crates/x3-proof/src/engine.rs",
+    "crates/x3-proof/src/epoch.rs",
+    "crates/x3-proof/src/error.rs",
+    "crates/x3-proof/src/finality_registry.rs",
+    "crates/x3-proof/src/hasher.rs",
+    "crates/x3-proof/src/lib.rs",
+    "crates/x3-proof/src/main.rs",
+    "crates/x3-proof/src/types.rs",
+    "crates/x3-proof/src/verifier.rs",
+    "crates/x3-proof/x3-proof.cdx.json"
+  ],
+  "missing": [],
+  "source_unchanged": true,
+  "verification": [
+    {
+      "gate": "snapshot-genesis-tests",
+      "passed": 55,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/home/lojak/workspace/x3-repo-migration-20261116/organization/snapshot-genesis-tests.log"
+    },
+    {
+      "gate": "operator-tests",
+      "passed": 101,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/home/lojak/workspace/x3-repo-migration-20261116/organization/operator-tests.log"
+    },
+    {
+      "gate": "coordinator-tests-online",
+      "passed": 160,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/home/lojak/workspace/x3-repo-migration-20261116/organization/coordinator-tests-online.log"
+    },
+    {
+      "gate": "sim-dedicated-tests",
+      "passed": 45,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/home/lojak/workspace/x3-repo-migration-20261116/organization/sim-dedicated-tests.log"
+    },
+    {
+      "gate": "mc-dedicated-tests",
+      "passed": 38,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/home/lojak/workspace/x3-repo-migration-20261116/organization/mc-dedicated-tests.log"
+    }
+  ],
+  "root_metadata_locked_passed": true,
+  "root_operator_check_passed": true,
+  "root_packages_checked": [
+    "proof-forge",
+    "x3-proving-harness",
+    "x3-chain-health-daemon",
+    "x3-launch-validator",
+    "x3-readiness",
+    "x3-readiness-report",
+    "launchops",
+    "x3-constitution",
+    "x3-genesis-builder",
+    "x3-state-snapshot"
+  ],
+  "source_files_identical": true,
+  "limitations": [
+    "Tests exercise local unit, filesystem and deterministic simulator behavior, not deployed-chain or production readiness.",
+    "Valkey live feature is not enabled or exercised.",
+    "Legacy x3-readiness scans excluded ecosystem apps and stored registry scores; no live readiness claim.",
+    "Proving RPC capability probes are not settlement/atomicity tests; malformed JSON fallback is legacy behavior.",
+    "Health-daemon is EVM prototype with incomplete quorum/finality/gas measurement and must not gate release.",
+    "No consensus source, source-repository files, keys, nodes, mainnet accounts, repository visibility or hosted refs changed."
+  ],
+  "executed_tests_total": 399,
+  "source_files_identical_at_recorded_candidate_paths": true,
+  "intended_readme_relocations": {
+    "proving/README.md": "docs/archive/xxxstar-69234c18/proving/README.md"
+  },
+  "root_package_count": 1831,
+  "new_package_identities_from_source": [],
+  "completed_at_utc": "2026-11-16T20:53:17.521642+00:00",
+  "no_source_repository_changes": true,
+  "commands": [
+    "cargo metadata --offline --format-version 1",
+    "cargo metadata --locked --offline --no-deps --format-version 1",
+    "cargo check --locked --offline -p proof-forge -p x3-proving-harness -p x3-chain-health-daemon -p x3-launch-validator -p x3-readiness -p x3-readiness-report -p launchops -p x3-constitution -p x3-genesis-builder -p x3-state-snapshot",
+    "cargo test --locked --offline -p x3-genesis-builder -p x3-state-snapshot",
+    "cargo test --locked --offline -p proof-forge -p x3-proving-harness -p x3-chain-health-daemon -p x3-launch-validator -p x3-readiness -p x3-readiness-report -p launchops -p x3-constitution",
+    "cargo test --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml",
+    "cargo test --locked --manifest-path crates/x3-sim/Cargo.toml",
+    "cargo test --locked --manifest-path crates/x3-mc/Cargo.toml"
+  ],
+  "attempts_not_counted_as_pass": [
+    "Coordinator offline attempt required uncached cc1.4.7; locked online retry passed.",
+    "First sim attempt was waiting behind parent node build; only owned queued processes348859/348864 terminated per parent instruction, then dedicated-target retry passed."
+  ],
+  "target_directories": {
+    "root_and_coordinator": "/home/lojak/workspace/x3-atomic-star-core-20261116/target",
+    "sim_and_mc": "/home/lojak/workspace/x3-repo-migration-20261116/organization/nested-target"
+  },
+  "jobs": {
+    "initial": 2,
+    "dedicated_nested_explicit_parent_override": 4
+  }
+}

@@ -1,0 +1,50 @@
+# X3 Atomic Star — Testnet Feature Flags
+# Updated: 2026-06-17 — CI-gated pallet test suites wired
+# This file is the authoritative runtime feature-gate configuration.
+# All CI, deployment, and documentation MUST align with this file.
+# Contradictions in other repo documents are superseded by these flags.
+
+# === Core Consensus Runtime (CI-gated) ===
+atomic_kernel = "LIVE_TESTNET"         # `make test-atomic-kernel` wired
+atomic_router = "LIVE_TESTNET"         # `make test-atomic-router` wired
+atomic_lock = "LIVE_TESTNET"           # `make test-atomic-kernel` wired
+
+# === Guarded Testnet (CI-gated, safety constraints apply) ===
+atomic_gateway = "GUARDED_TESTNET"     # `make test-atomic-gateway` wired; bridge backend has 4 verifier families
+axe = "GUARDED_TESTNET"                # `make test-axe` wired
+x3_forge = "GUARDED_TESTNET"           # `make test-x3-forge` wired
+x3_sentinel = "GUARDED_TESTNET"        # `make test-x3-sentinel` wired
+x3_swarm = "GUARDED_TESTNET"           # experimental
+
+# === Live Testnet (non-consensus tooling) ===
+x3_reactor = "LIVE_TESTNET"
+x3_broadcast = "LIVE_TESTNET"
+x3_grantsmith = "LIVE_TESTNET"
+x3_wallet_pallet = "LIVE_TESTNET"      # `make test-x3-wallet` wired
+
+# === External Bridge Exposure (public-testnet launch guardrail) ===
+#
+# These two keys describe *public exposure*, not code maturity: they are what
+# `scripts/mainnet/rc6_public_testnet_readiness.sh` reads and what
+# `LAUNCH_SCOPE.md` promises the public testnet. The paths they name are off at
+# genesis (`ExternalBridgesEnabled = false`), which is exactly what
+# FEATURE_REGISTRY.toml records as the [atomic_gateway] and [x3_wrapped]
+# blockers, so any other value here contradicts the canonical registry,
+# contradicts the RC6 guardrail ("External bridges must remain disabled for
+# initial public testnet"), and makes the RC6 gate fail.
+#
+# The previous values said GUARDED_TESTNET with the note "proof verification via
+# NoOp validator in testnet". That note was inaccurate and unsafe to keep in a
+# launch document. The router's quorum/EVM/Bitcoin strategies fail closed when
+# no real verifier is registered (`VerificationError::NotImplemented`, see
+# `crates/x3-verification-router/src/lib.rs`), and the permissive structural-only
+# path exists only under the `test-verifier` feature, which is a
+# dev-dependency-only feature that CI asserts cannot be combined with
+# `production`. Do not re-derive a "the chain checks nothing" claim from this
+# file.
+external_bridges_mainnet = "DISABLED_BLOCKED"  # off at genesis; RC6 public-testnet guardrail
+btc_mainnet_gateway = "DISABLED_BLOCKED"       # BTC domain is simulator-only (registry [btc_fortress_gateway] = SIM_TESTNET)
+
+# === Still Blocked (post-audit phase) ===
+ai_consensus = "DISABLED_BLOCKED"
+auto_mainnet_deploy = "DISABLED_BLOCKED"

@@ -1,0 +1,34 @@
+[package]
+name = "x3-sim"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Deterministic, seed-replayable fault-injection simulator for X3 atomic swap coordination"
+
+# Standalone workspace root, for the same reason `crates/cross-vm-coordinator`
+# is one: this crate drives the real coordinator crate, which is deliberately
+# excluded from the parent Substrate workspace. Making x3-sim its own root keeps
+# `cargo test --manifest-path crates/x3-sim/Cargo.toml` independent of the full
+# workspace resolve.
+#
+# It is NOT a simulation of a re-implementation. Every state transition below is
+# produced by calling `x3_cross_vm_coordinator::SwapCoordinator` itself. The
+# simulator supplies the clock, the RNG, the network and the faults; the
+# coordinator supplies all the semantics being tested.
+[workspace]
+members = []
+resolver = "2"
+
+[dependencies]
+x3-cross-vm-coordinator = { path = "../cross-vm-coordinator" }
+rand = "0.8"
+rand_chacha = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+blake3 = "1.5"
+hex = "0.4"
+
+[[bin]]
+name = "x3-sim"
+path = "src/main.rs"
